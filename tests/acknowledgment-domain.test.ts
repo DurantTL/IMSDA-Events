@@ -5,15 +5,22 @@ import {
   approvedRequestMetadata,
   decideActing,
   evidenceRequestHash,
+  hasLiveAcceptance,
   holdAcknowledgmentAnswers,
+  latestLiveAction,
+  normalizePaperLocation,
   planAcknowledgments,
   policyContent,
   resolveAcknowledgmentStatus,
   sha256,
   staffEvidenceKey,
   submissionEvidenceKey,
+  statusLabels,
   textContent,
+  withdrawalRequestHash,
+  type HistoryRow,
 } from "@/modules/acknowledgments/domain";
+import { RECONSENT_RULE, type ReconsentRule } from "@/modules/acknowledgments/reconsent-rule";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 
 // Obviously synthetic wording; no legal text.
@@ -204,6 +211,120 @@ describe("historical status resolution", () => {
   it("asks for a new acknowledgment after a material later version", () => {
     expect(resolveAcknowledgmentStatus(policy(1, 2, true))).toBe("REACKNOWLEDGMENT_REQUIRED");
     expect(resolveAcknowledgmentStatus(policy(1, 3, true))).toBe("REACKNOWLEDGMENT_REQUIRED");
+  });
+});
+
+describe("the declared re-consent rule (#130)", () => {
+  const policy = (evidenceVersionNumber: number, effectiveNumber: number, laterVersionIsMaterial: boolean) => ({
+    evidence: { source: "POLICY_VERSION" as const },
+    policy: { evidenceVersionNumber, effective: { versionNumber: effectiveNumber }, laterVersionIsMaterial },
+  });
+  const requireAll: ReconsentRule = { materialChange: "REQUIRE_FRESH_AGREEMENT", nonMaterialChange: "REQUIRE_FRESH_AGREEMENT" };
+  const carryAll: ReconsentRule = { materialChange: "CARRY_FORWARD", nonMaterialChange: "CARRY_FORWARD" };
+
+  it("declares that a material change needs a fresh agreement and a non-material one carries forward", () => {
+    expect(RECONSENT_RULE).toEqual({ materialChange: "REQUIRE_FRESH_AGREEMENT", nonMaterialChange: "CARRY_FORWARD" });
+  });
+
+  it("defaults to the declared rule", () => {
+    expect(resolveAcknowledgmentStatus(policy(1, 2, true))).toBe("REACKNOWLEDGMENT_REQUIRED");
+    expect(resolveAcknowledgmentStatus(policy(1, 2, true), RECONSENT_RULE)).toBe("REACKNOWLEDGMENT_REQUIRED");
+  });
+
+  it("follows the rule both ways for a material change", () => {
+    expect(resolveAcknowledgmentStatus(policy(1, 2, true), requireAll)).toBe("REACKNOWLEDGMENT_REQUIRED");
+    expect(resolveAcknowledgmentStatus(policy(1, 2, true), carryAll)).toBe("ACKNOWLEDGED_EARLIER_VERSION");
+  });
+
+  it("never requires a fresh agreement for a non-material change under the declared rule", () => {
+    expect(resolveAcknowledgmentStatus(policy(1, 2, false), RECONSENT_RULE)).toBe("ACKNOWLEDGED_EARLIER_VERSION");
+    expect(resolveAcknowledgmentStatus(policy(1, 5, false), carryAll)).toBe("ACKNOWLEDGED_EARLIER_VERSION");
+  });
+
+  it("changes nothing while the version they saw is still in force", () => {
+    expect(resolveAcknowledgmentStatus(policy(2, 2, true), requireAll)).toBe("ACKNOWLEDGED");
+  });
+});
+
+describe("status from the history: decline and withdrawal (#130)", () => {
+  const day = (offset: number) => new Date(Date.UTC(2027, 0, 1 + offset)).toISOString();
+  const row = (overrides: Partial<HistoryRow> & { id?: string }): HistoryRow & { id?: string } => ({
+    action: "ACKNOWLEDGE", acknowledgedAt: day(10), recordedAt: day(10), ...overrides,
+  });
+  const kindAt = (rows: HistoryRow[], offset: number) => latestLiveAction(rows, new Date(day(offset)))?.kind ?? null;
+
+  it("has labels for the new statuses", () => {
+    expect(statusLabels.DECLINED).toBe("Declined");
+    expect(statusLabels.WITHDRAWN).toBe("Withdrawn");
+    expect(resolveAcknowledgmentStatus({ evidence: { source: "TEXT", action: "DECLINE" } })).toBe("DECLINED");
+    expect(resolveAcknowledgmentStatus({ evidence: { source: "POLICY_VERSION", action: "WITHDRAWAL" } })).toBe("WITHDRAWN");
+  });
+
+  it("is withdrawn only from the withdrawal moment: the acceptance stays valid before it", () => {
+    const rows = [row({ withdrawal: { withdrawnAt: day(20), recordedAt: day(25) } })];
+    expect(kindAt(rows, 5)).toBeNull();
+    expect(kindAt(rows, 15)).toBe("ACKNOWLEDGE");
+    expect(kindAt(rows, 19)).toBe("ACKNOWLEDGE");
+    expect(kindAt(rows, 20)).toBe("WITHDRAWAL");
+    expect(kindAt(rows, 400)).toBe("WITHDRAWAL");
+  });
+
+  it("is accepted again after accept, withdraw, re-accept, and keeps each past answer", () => {
+    const rows = [
+      row({ withdrawal: { withdrawnAt: day(20), recordedAt: day(20) } }),
+      row({ acknowledgedAt: day(30), recordedAt: day(30) }),
+    ];
+    expect(kindAt(rows, 15)).toBe("ACKNOWLEDGE");
+    expect(kindAt(rows, 25)).toBe("WITHDRAWAL");
+    expect(kindAt(rows, 35)).toBe("ACKNOWLEDGE");
+    expect(latestLiveAction(rows)?.kind).toBe("ACKNOWLEDGE");
+  });
+
+  it("skips an acceptance voided by the moment, with its withdrawal, but not before the void", () => {
+    const rows = [row({ voidedAt: day(22), withdrawal: { withdrawnAt: day(20), recordedAt: day(20) } })];
+    expect(kindAt(rows, 21)).toBe("WITHDRAWAL");
+    expect(kindAt(rows, 23)).toBeNull();
+  });
+
+  it("lets the latest of a decline and an acceptance win", () => {
+    const rows = [row({ action: "DECLINE", acknowledgedAt: day(5), recordedAt: day(5) }), row({ acknowledgedAt: day(10) })];
+    expect(kindAt(rows, 7)).toBe("DECLINE");
+    expect(kindAt(rows, 12)).toBe("ACKNOWLEDGE");
+  });
+
+  it("settles a tie at the same moment in favor of what was recorded last", () => {
+    const rows = [row({ acknowledgedAt: day(10), recordedAt: day(10), withdrawal: { withdrawnAt: day(10), recordedAt: day(11) } })];
+    expect(kindAt(rows, 10)).toBe("WITHDRAWAL");
+  });
+
+  it("knows whether an acceptance is still live", () => {
+    expect(hasLiveAcceptance([row({})])).toBe(true);
+    expect(hasLiveAcceptance([row({ voidedAt: day(11) })])).toBe(false);
+    expect(hasLiveAcceptance([row({ withdrawal: { withdrawnAt: day(11) } })])).toBe(false);
+    expect(hasLiveAcceptance([row({ action: "DECLINE" })])).toBe(false);
+  });
+});
+
+describe("paper location and request hashes (#130)", () => {
+  it("requires a trimmed 1 to 200 character location for paper and refuses it elsewhere", () => {
+    expect(normalizePaperLocation("PAPER", "  Synthetic office, binder  ")).toEqual({ ok: true, value: "Synthetic office, binder" });
+    expect(normalizePaperLocation("PAPER", "   ")).toMatchObject({ ok: false, code: "PAPER_LOCATION_REQUIRED" });
+    expect(normalizePaperLocation("PAPER", null)).toMatchObject({ ok: false, code: "PAPER_LOCATION_REQUIRED" });
+    expect(normalizePaperLocation("PAPER", "x".repeat(201))).toMatchObject({ ok: false, code: "PAPER_LOCATION_REQUIRED" });
+    expect(normalizePaperLocation("PAPER", "x".repeat(200))).toMatchObject({ ok: true });
+    expect(normalizePaperLocation("STAFF_ENTERED", "Synthetic office")).toMatchObject({ ok: false, code: "PAPER_LOCATION_NOT_ALLOWED" });
+    expect(normalizePaperLocation("STAFF_ENTERED", null)).toEqual({ ok: true, value: null });
+    expect(normalizePaperLocation("ONLINE", "  ")).toEqual({ ok: true, value: null });
+  });
+
+  it("keeps an acknowledgment's request hash unchanged, and tells a decline or another location apart", () => {
+    const base = { eventId: "e", registrationId: "r", registrationAttendeeId: null, fieldKey: "k", actedByPersonId: "p", channel: "STAFF_ENTERED" as const, contentRef: "text:abc" };
+    expect(evidenceRequestHash({ ...base, action: "ACKNOWLEDGE", paperLocation: null })).toBe(evidenceRequestHash(base));
+    expect(evidenceRequestHash({ ...base, action: "DECLINE" })).not.toBe(evidenceRequestHash(base));
+    const paper = { ...base, channel: "PAPER" as const };
+    expect(evidenceRequestHash({ ...paper, paperLocation: "Synthetic binder" })).not.toBe(evidenceRequestHash({ ...paper, paperLocation: "Another binder" }));
+    const withdrawal = { eventId: "e", registrationId: "r", evidenceId: "ev", actedByPersonId: null, channel: "STAFF_ENTERED" as const, paperLocation: null };
+    expect(withdrawalRequestHash(withdrawal)).not.toBe(withdrawalRequestHash({ ...withdrawal, evidenceId: "ev-2" }));
   });
 });
 

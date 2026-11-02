@@ -22,6 +22,10 @@ const { FakeConsentPolicyError, FakePolicyKindMismatchError } = vi.hoisted(() =>
 
 const state = vi.hoisted(() => ({
   evidence: [] as Row[],
+  /** Append-only withdrawals (#130), by the evidence they withdraw. */
+  withdrawals: [] as Row[],
+  /** The advisory-lock keys taken, in order. */
+  locks: [] as string[],
   audits: [] as Row[],
   clock: 0,
   /** Published policy versions the consent module would find, by id. */
@@ -57,37 +61,102 @@ vi.mock("@/modules/guardian-authority/repository", () => ({
 }));
 
 function naturalKey(row: Row) {
-  return `${row.registrationId}|${row.registrationAttendeeId ?? ""}|${row.fieldKey}|${row.contentRef}`;
+  return `${row.registrationId}|${row.registrationAttendeeId ?? ""}|${row.fieldKey}|${row.contentRef}|${String(row.generation ?? 0)}`;
+}
+
+/** An evidence row as a read returns it: with its withdrawal joined and an action (every row has one). */
+function joined(row: Row): Row {
+  return { action: "ACKNOWLEDGE", paperLocation: null, ...row, withdrawal: state.withdrawals.find((withdrawal) => withdrawal.evidenceId === row.id) ?? row.withdrawal ?? null };
+}
+
+/** What the generation trigger would demand: earlier acceptances of this content that are voided or withdrawn (0 for a decline). */
+function expectedGeneration(row: Row) {
+  if ((row.action ?? "ACKNOWLEDGE") !== "ACKNOWLEDGE") return 0;
+  return state.evidence.filter((existing) => (
+    existing.registrationId === row.registrationId && (existing.registrationAttendeeId ?? null) === (row.registrationAttendeeId ?? null)
+    && existing.fieldKey === row.fieldKey && existing.contentRef === row.contentRef && (existing.action ?? "ACKNOWLEDGE") === "ACKNOWLEDGE"
+    && (existing.void || state.withdrawals.some((withdrawal) => withdrawal.evidenceId === existing.id))
+  )).length;
 }
 
 function fakeTx() {
   return {
+    $executeRaw: vi.fn(async (_strings: TemplateStringsArray, key: string) => {
+      state.locks.push(key);
+      return 0;
+    }),
     acknowledgmentEvidence: {
       findUnique: vi.fn(async ({ where }: { where: Row }) => {
         const key = where.eventId_idempotencyKey as { eventId: string; idempotencyKey: string } | undefined;
-        if (key) return state.evidence.find((row) => row.eventId === key.eventId && row.idempotencyKey === key.idempotencyKey) ?? null;
-        return state.evidence.find((row) => row.id === where.id) ?? null;
+        const found = key
+          ? state.evidence.find((row) => row.eventId === key.eventId && row.idempotencyKey === key.idempotencyKey)
+          : state.evidence.find((row) => row.id === where.id);
+        return found ? joined(found) : null;
       }),
       findUniqueOrThrow: vi.fn(async ({ where }: { where: Row }) => {
         const found = state.evidence.find((row) => row.id === where.id);
         if (!found) throw new Error("not found");
-        return found;
+        return joined(found);
       }),
-      findFirst: vi.fn(async ({ where }: { where: Row }) => state.evidence.find((row) => (
-        row.registrationId === where.registrationId
-        && (row.registrationAttendeeId ?? null) === (where.registrationAttendeeId ?? null)
-        && row.fieldKey === where.fieldKey
-        && row.contentRef === where.contentRef
-      )) ?? null),
+      findFirst: vi.fn(async ({ where }: { where: Row }) => {
+        if (where.id) {
+          const byId = state.evidence.find((row) => row.id === where.id && row.eventId === where.eventId && row.registrationId === where.registrationId);
+          return byId ? joined(byId) : null;
+        }
+        const matches = state.evidence.filter((row) => (
+          row.registrationId === where.registrationId
+          && (row.registrationAttendeeId ?? null) === (where.registrationAttendeeId ?? null)
+          && row.fieldKey === where.fieldKey
+          && row.contentRef === where.contentRef
+          && (row.action ?? "ACKNOWLEDGE") === (where.action ?? row.action ?? "ACKNOWLEDGE")
+        ));
+        const latest = matches.sort((a, b) => (b.generation as number) - (a.generation as number))[0];
+        return latest ? joined(latest) : null;
+      }),
+      findMany: vi.fn(async ({ where }: { where: Row }) => state.evidence
+        .filter((row) => row.registrationId === where.registrationId && (row.registrationAttendeeId ?? null) === (where.registrationAttendeeId ?? null) && row.fieldKey === where.fieldKey)
+        .sort((a, b) => (a.acknowledgedAt as Date).getTime() - (b.acknowledgedAt as Date).getTime())
+        .map(joined)),
       createMany: vi.fn(async ({ data }: { data: Row[] }) => {
         let count = 0;
         for (const row of data) {
+          const isAcceptance = (row.action ?? "ACKNOWLEDGE") === "ACKNOWLEDGE";
           const duplicate = state.evidence.some((existing) => (
-            (existing.eventId === row.eventId && existing.idempotencyKey === row.idempotencyKey) || naturalKey(existing) === naturalKey(row)
+            (existing.eventId === row.eventId && existing.idempotencyKey === row.idempotencyKey)
+            || (isAcceptance && (existing.action ?? "ACKNOWLEDGE") === "ACKNOWLEDGE" && naturalKey(existing) === naturalKey({ ...row, generation: row.generation ?? 0 }))
           ));
           if (duplicate) continue;
+          // The database trigger: a wrong generation is refused outright.
+          if ((row.generation ?? 0) !== expectedGeneration(row)) throw new Error("generation trigger refused the row");
           state.clock += 1;
           state.evidence.push({ ...row, recordedAt: new Date(Date.UTC(2027, 0, 1, 0, 0, state.clock)) });
+          count += 1;
+        }
+        return { count };
+      }),
+    },
+    acknowledgmentWithdrawal: {
+      findUnique: vi.fn(async ({ where }: { where: Row }) => {
+        const key = where.eventId_idempotencyKey as { eventId: string; idempotencyKey: string } | undefined;
+        return (key
+          ? state.withdrawals.find((row) => row.eventId === key.eventId && row.idempotencyKey === key.idempotencyKey)
+          : state.withdrawals.find((row) => row.evidenceId === where.evidenceId || row.id === where.id)) ?? null;
+      }),
+      findUniqueOrThrow: vi.fn(async ({ where }: { where: Row }) => {
+        const found = state.withdrawals.find((row) => row.id === where.id);
+        if (!found) throw new Error("not found");
+        return found;
+      }),
+      createMany: vi.fn(async ({ data }: { data: Row[] }) => {
+        let count = 0;
+        for (const row of data) {
+          // The unique indexes: one withdrawal per acceptance, one row per request key.
+          if (state.withdrawals.some((existing) => existing.evidenceId === row.evidenceId || (existing.eventId === row.eventId && existing.idempotencyKey === row.idempotencyKey))) continue;
+          const target = state.evidence.find((evidence) => evidence.id === row.evidenceId);
+          // The insert trigger: an acceptance of the same event, and never before it.
+          if (!target || (target.action ?? "ACKNOWLEDGE") !== "ACKNOWLEDGE" || (row.withdrawnAt as Date).getTime() < (target.acknowledgedAt as Date).getTime()) throw new Error("withdrawal trigger refused the row");
+          state.clock += 1;
+          state.withdrawals.push({ ...row, recordedAt: new Date(Date.UTC(2027, 0, 1, 0, 0, state.clock)) });
           count += 1;
         }
         return { count };
@@ -104,10 +173,14 @@ vi.mock("@/lib/prisma", () => ({
     $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(prismaStand.tx),
     registration: { findFirst: async () => state.registration },
     acknowledgmentEvidence: {
-      findMany: async () => [...state.evidence].sort((a, b) => (a.acknowledgedAt as Date).getTime() - (b.acknowledgedAt as Date).getTime()),
-      findFirst: async ({ where }: { where: Row }) => state.evidence.find((row) => row.id === where.id && row.eventId === where.eventId && row.registrationId === where.registrationId) ?? null,
+      findMany: async () => [...state.evidence].sort((a, b) => (a.acknowledgedAt as Date).getTime() - (b.acknowledgedAt as Date).getTime()).map(joined),
+      findFirst: async ({ where }: { where: Row }) => {
+        const found = state.evidence.find((row) => row.id === where.id && row.eventId === where.eventId && row.registrationId === where.registrationId);
+        return found ? joined(found) : null;
+      },
     },
     acknowledgmentVoid: { findUnique: async () => null },
+    acknowledgmentWithdrawal: { findUnique: async ({ where }: { where: Row }) => state.withdrawals.find((row) => row.evidenceId === where.evidenceId) ?? null },
     consentPolicyVersion: {
       findUnique: async ({ where }: { where: { id: string } }) => state.versions.get(where.id) ?? null,
       count: async ({ where }: { where: { policyId: string; versionNumber: { gt: number; lte: number }; effectiveFrom: { lte: Date } } }) => (
@@ -130,6 +203,7 @@ import {
   recordAcknowledgmentEvidence,
   recordStaffAcknowledgment,
   recordSubmissionAcknowledgments,
+  withdrawAcknowledgmentEvidence,
   type RecordRequest,
 } from "@/modules/acknowledgments/repository";
 
@@ -179,6 +253,8 @@ async function failure(promise: Promise<unknown>) {
 
 beforeEach(() => {
   state.evidence.length = 0;
+  state.withdrawals.length = 0;
+  state.locks.length = 0;
   state.audits.length = 0;
   state.clock = 0;
   state.versions.clear();
@@ -313,7 +389,7 @@ describe("retries are safe (#150)", () => {
 
   it("refuses one request key reused for a different request", async () => {
     await run((tx) => recordAcknowledgmentEvidence(asTx(tx), request()));
-    const error = await failure(run((tx) => recordAcknowledgmentEvidence(asTx(tx), request({ channel: "PAPER", recordedByUserId: "staff-1" }))));
+    const error = await failure(run((tx) => recordAcknowledgmentEvidence(asTx(tx), request({ channel: "PAPER", recordedByUserId: "staff-1", paperLocation: "Synthetic binder" }))));
     expect((error as AcknowledgmentError).code).toBe("IDEMPOTENCY_CONFLICT");
     expect(state.evidence).toHaveLength(1);
   });
@@ -445,7 +521,7 @@ describe("staff-entered and paper evidence (#150)", () => {
     };
   }
   const staff = (overrides: Partial<Parameters<typeof recordStaffAcknowledgment>[0]> = {}) => recordStaffAcknowledgment({
-    eventId: "event-1", registrationId: "reg-1", fieldKey: "att_ack", attendeeId: "att-dan", channel: "PAPER", actorUserId: "staff-1", clientRequestId: "req-1", ...overrides,
+    eventId: "event-1", registrationId: "reg-1", fieldKey: "att_ack", attendeeId: "att-dan", channel: "PAPER", paperLocation: "Synthetic binder, shelf one", actorUserId: "staff-1", clientRequestId: "req-1", ...overrides,
   }, new Date("2027-01-10T00:00:00Z"));
 
   beforeEach(() => seedRegistration());
@@ -463,7 +539,7 @@ describe("staff-entered and paper evidence (#150)", () => {
   });
 
   it("records a staff-entered registration-level text acknowledgment for the registrant", async () => {
-    const outcome = await staff({ fieldKey: "reg_ack", attendeeId: null, channel: "STAFF_ENTERED", clientRequestId: "req-reg" });
+    const outcome = await staff({ fieldKey: "reg_ack", attendeeId: null, channel: "STAFF_ENTERED", paperLocation: null, clientRequestId: "req-reg" });
     expect(outcome.created).toBe(true);
     expect(state.evidence[0]).toMatchObject({ channel: "STAFF_ENTERED", recordedByUserId: "staff-1", registrationAttendeeId: null, subjectPersonId: null, actedByPersonId: "p-dan", source: "TEXT", shownText: WORDING });
   });
@@ -477,7 +553,7 @@ describe("staff-entered and paper evidence (#150)", () => {
     expect(sameContent).toMatchObject({ replayed: false, created: false });
     expect(sameContent.evidence.id).toBe(first.evidence.id);
     expect(state.evidence).toHaveLength(1);
-    expect((await failure(staff({ channel: "STAFF_ENTERED" })) as AcknowledgmentError).code).toBe("IDEMPOTENCY_CONFLICT");
+    expect((await failure(staff({ channel: "STAFF_ENTERED", paperLocation: null })) as AcknowledgmentError).code).toBe("IDEMPOTENCY_CONFLICT");
   });
 
   it("refuses a minor unless the person who signed is the declared responsible adult", async () => {
@@ -546,7 +622,7 @@ describe("historical status resolution (#150)", () => {
   }
   function evidenceRow(overrides: Row) {
     state.evidence.push({
-      id: `ev-${state.evidence.length + 1}`, eventId: "event-1", registrationId: "reg-1", registrationAttendeeId: "att-dan", subjectPersonId: "p-dan", actedByPersonId: "p-dan", channel: "ONLINE",
+      id: `ev-${state.evidence.length + 1}`, action: "ACKNOWLEDGE", eventId: "event-1", registrationId: "reg-1", registrationAttendeeId: "att-dan", subjectPersonId: "p-dan", actedByPersonId: "p-dan", channel: "ONLINE",
       fieldKey: "att_ack", fieldLabel: "Attendee acknowledgment", source: "POLICY_VERSION", policyVersionId: "version-1", contentHash: "hash-version-1", subjectMinorStatus: "ADULT",
       guardianAuthorityId: null, acknowledgedAt: day(10), recordedAt: day(10), shownText: null, requestMetadata: {}, ...overrides,
     });
@@ -649,5 +725,320 @@ describe("historical status resolution (#150)", () => {
     evidenceRow({ fieldKey: "reg_ack", registrationAttendeeId: null, subjectPersonId: null, source: "TEXT", policyVersionId: null, shownText: WORDING, requestMetadata: { userAgentHash: "ua-hash" } });
     const payload = await getAcknowledgmentEvidencePayload("event-1", "reg-1", "ev-1");
     expect(payload).toMatchObject({ shownText: WORDING, policyVersion: null, requestMetadata: { userAgentHash: "ua-hash" } });
+  });
+});
+
+describe("decline, withdrawal and re-acceptance (#130)", () => {
+  const day = (offset: number) => new Date(Date.UTC(2027, 0, 1 + offset));
+  const NOW = day(20);
+  const LOCATION = "Synthetic office, event binder";
+
+  function seed() {
+    state.registration = {
+      id: "reg-1", status: "CONFIRMED", accountHolderPersonId: "p-dan",
+      event: { startsAt: new Date("2027-03-05T15:00:00Z"), timezone: "America/Chicago", ageOfMajority: 18 },
+      publicFormSubmission: { formVersionId: "form-v1", responses: { wants_program: "No", reg_ack: true }, formVersion: { definition } },
+      attendees: [
+        { id: "att-dan", personId: "p-dan", formResponses: { first_name: "Dan", attendee_age: "44", attending_activity: "Yes" }, profileSnapshot: { firstName: "Dan", lastName: "Sample" } },
+        { id: "att-sam", personId: "p-sam", formResponses: { first_name: "Sam", attendee_age: "12" }, profileSnapshot: { firstName: "Sam", lastName: "Sample" } },
+        { id: "att-ulf", personId: "p-ulf", formResponses: { first_name: "Ulf", attendee_age: "40" }, profileSnapshot: { firstName: "Ulf", lastName: "Sample" } },
+      ],
+    };
+  }
+  const accept = (overrides: Partial<Parameters<typeof recordStaffAcknowledgment>[0]> = {}) => recordStaffAcknowledgment({
+    eventId: "event-1", registrationId: "reg-1", fieldKey: "att_ack", attendeeId: "att-dan", channel: "STAFF_ENTERED", actorUserId: "staff-1", clientRequestId: "req-accept-1",
+    acknowledgedAt: day(5), ...overrides,
+  }, NOW);
+  const decline = (overrides: Partial<Parameters<typeof recordStaffAcknowledgment>[0]> = {}) => accept({ action: "DECLINE", clientRequestId: "req-decline-1", ...overrides });
+  const withdraw = (evidenceId: string, overrides: Partial<Parameters<typeof withdrawAcknowledgmentEvidence>[0]> = {}, now = NOW) => withdrawAcknowledgmentEvidence({
+    eventId: "event-1", registrationId: "reg-1", evidenceId, channel: "STAFF_ENTERED", actorUserId: "staff-1", clientRequestId: "req-withdraw-1", withdrawnAt: day(8), ...overrides,
+  }, now);
+  const statusAt = async (at: Date) => {
+    const views = (await listRegistrationAcknowledgments("event-1", "reg-1", at))!;
+    return views.find((view) => view.fieldKey === "att_ack" && view.subject.kind === "ATTENDEE" && view.subject.attendeeId === "att-dan")!;
+  };
+
+  beforeEach(() => seed());
+
+  describe("accept, withdraw, accept again", () => {
+    it("keeps all three records, never touches the first acceptance, and answers each past moment as it was", async () => {
+      const first = await accept();
+      const firstRow = structuredClone(state.evidence[0]);
+      const withdrawn = await withdraw(first.evidence.id);
+      expect(withdrawn).toMatchObject({ created: true, replayed: false });
+      const again = await accept({ clientRequestId: "req-accept-2", acknowledgedAt: day(10) });
+      expect(again).toMatchObject({ created: true });
+
+      expect(state.evidence).toHaveLength(2);
+      expect(state.withdrawals).toHaveLength(1);
+      // The acceptance row is exactly as it was written, and the new one is the next generation.
+      expect(state.evidence[0]).toEqual(firstRow);
+      expect(state.evidence.map((row) => row.generation)).toEqual([0, 1]);
+      expect(state.withdrawals[0]).toMatchObject({ evidenceId: first.evidence.id, channel: "STAFF_ENTERED", recordedByUserId: "staff-1", subjectMinorStatus: "ADULT", actedByPersonId: "p-dan" });
+      expect(state.withdrawals[0]!.withdrawnAt).toEqual(day(8));
+
+      expect((await statusAt(day(4))).status).toBe("NOT_ACKNOWLEDGED");
+      // Before the withdrawal the first acceptance is still valid evidence for that period.
+      expect((await statusAt(day(7))).status).toBe("ACKNOWLEDGED");
+      expect((await statusAt(day(9))).status).toBe("WITHDRAWN");
+      expect((await statusAt(day(12))).status).toBe("ACKNOWLEDGED");
+      const view = await statusAt(day(12));
+      expect(view.evidence).toHaveLength(2);
+      expect(view.evidence[0]!.withdrawal).toMatchObject({ id: withdrawn.withdrawal.id, withdrawnAt: day(8).toISOString(), channel: "STAFF_ENTERED" });
+      expect(view.evidence[1]!.withdrawal).toBeNull();
+    });
+
+    it("moves a withdrawn acceptance's re-acceptance to the next generation, and a later material version leaves WITHDRAWN as it was", async () => {
+      const first = await accept();
+      await withdraw(first.evidence.id);
+      addVersion({ id: "version-2", versionNumber: 2, effectiveFrom: day(15), isMaterialChange: true });
+      expect((await statusAt(day(16))).status).toBe("WITHDRAWN");
+    });
+  });
+
+  describe("a policy revision in the middle of an event", () => {
+    it("requires a fresh agreement after a material revision, and carries forward after a non-material one", async () => {
+      state.versions.clear();
+      addVersion({ id: "version-1", versionNumber: 1, effectiveFrom: day(-100), effectiveTo: day(30) });
+      await accept();
+      addVersion({ id: "version-2", versionNumber: 2, effectiveFrom: day(30), isMaterialChange: true });
+      expect((await statusAt(day(29))).status).toBe("ACKNOWLEDGED");
+      expect((await statusAt(day(31))).status).toBe("REACKNOWLEDGMENT_REQUIRED");
+      // Still the same answer for a past moment after the later version exists, and the first acceptance is still on record.
+      expect((await statusAt(day(20))).status).toBe("ACKNOWLEDGED");
+      expect((await statusAt(day(31))).evidence).toHaveLength(1);
+
+      addVersion({ id: "version-2", versionNumber: 2, effectiveFrom: day(30), isMaterialChange: false });
+      expect((await statusAt(day(31))).status).toBe("ACKNOWLEDGED_EARLIER_VERSION");
+    });
+  });
+
+  describe("a repeat submission ends in one action event", () => {
+    it("records one acceptance for the same request key and for a different key", async () => {
+      await accept();
+      await accept();
+      await accept({ clientRequestId: "req-accept-other" });
+      expect(state.evidence).toHaveLength(1);
+      expect(state.audits).toHaveLength(1);
+    });
+
+    it("records one decline for a repeat under the same key or a different key", async () => {
+      const first = await decline();
+      const sameKey = await decline();
+      const otherKey = await decline({ clientRequestId: "req-decline-2" });
+      expect(sameKey).toMatchObject({ created: false, replayed: true });
+      expect(otherKey).toMatchObject({ created: false, replayed: false });
+      expect(otherKey.evidence.id).toBe(first.evidence.id);
+      expect(state.evidence).toHaveLength(1);
+    });
+
+    it("records one withdrawal for the same key, a different key, and both at once", async () => {
+      const first = await accept();
+      const one = await withdraw(first.evidence.id);
+      const sameKey = await withdraw(first.evidence.id);
+      const otherKey = await withdraw(first.evidence.id, { clientRequestId: "req-withdraw-2" });
+      const [raceA, raceB] = await Promise.all([
+        withdraw(first.evidence.id, { clientRequestId: "req-withdraw-3" }),
+        withdraw(first.evidence.id, { clientRequestId: "req-withdraw-4" }),
+      ]);
+      expect(sameKey).toMatchObject({ created: false, replayed: true });
+      for (const outcome of [otherKey, raceA, raceB]) {
+        expect(outcome).toMatchObject({ created: false });
+        expect(outcome.withdrawal.id).toBe(one.withdrawal.id);
+      }
+      expect(state.withdrawals).toHaveLength(1);
+      expect(state.audits.filter((entry) => entry.action === "ACKNOWLEDGMENT_WITHDRAWN")).toHaveLength(1);
+    });
+
+    it("takes the subject-and-field lock before every action write, one key per subject and field", async () => {
+      const first = await accept();
+      await decline({ fieldKey: "reg_ack", attendeeId: null });
+      await withdraw(first.evidence.id);
+      await accept({ attendeeId: "att-ulf", clientRequestId: "req-ulf" });
+      expect(state.locks).toHaveLength(4);
+      expect(state.locks[0]).toBe(state.locks[2]);
+      expect(new Set(state.locks).size).toBe(3);
+      for (const key of state.locks) expect(key).toContain("reg-1");
+    });
+  });
+
+  describe("declining", () => {
+    it("records a decline with the wording of the registration's own form version, and the status becomes Declined", async () => {
+      const outcome = await decline({ channel: "PAPER", paperLocation: LOCATION });
+      expect(outcome).toMatchObject({ created: true });
+      expect(outcome.evidence).toMatchObject({ action: "DECLINE", channel: "PAPER", withdrawal: null });
+      expect(state.evidence[0]).toMatchObject({ action: "DECLINE", source: "POLICY_VERSION", policyVersionId: "version-1", generation: 0, paperLocation: LOCATION });
+      expect((await statusAt(day(10))).status).toBe("DECLINED");
+      expect((await statusAt(day(3))).status).toBe("NOT_ACKNOWLEDGED");
+      expect(state.audits[0]).toMatchObject({ action: "ACKNOWLEDGMENT_DECLINED", metadata: expect.objectContaining({ action: "DECLINE" }) });
+      expect(JSON.stringify(state.audits)).not.toContain(LOCATION);
+    });
+
+    it("refuses a decline while a live acceptance stands, and says to withdraw instead", async () => {
+      await accept();
+      const error = await failure(decline());
+      expect((error as AcknowledgmentError).code).toBe("ALREADY_ACKNOWLEDGED");
+      expect((error as AcknowledgmentError).message).toContain("Withdraw");
+      expect(state.evidence).toHaveLength(1);
+    });
+
+    it("allows a decline after the acceptance was withdrawn, and an acceptance after a decline", async () => {
+      const first = await accept();
+      await withdraw(first.evidence.id);
+      const declined = await decline({ acknowledgedAt: day(12) });
+      expect(declined.created).toBe(true);
+      expect((await statusAt(day(14))).status).toBe("DECLINED");
+      await accept({ clientRequestId: "req-accept-3", acknowledgedAt: day(16) });
+      expect((await statusAt(day(18))).status).toBe("ACKNOWLEDGED");
+      expect(state.evidence.map((row) => row.action)).toEqual(["ACKNOWLEDGE", "DECLINE", "ACKNOWLEDGE"]);
+    });
+
+    it("allows a decline after the acceptance was voided", async () => {
+      await accept();
+      state.evidence[0]!.void = { voidedAt: day(6) };
+      expect((await decline()).created).toBe(true);
+    });
+
+    it("returns the decline already on file when the latest live action is a decline of the same content, even dated later", async () => {
+      const first = await accept();
+      await withdraw(first.evidence.id);
+      const one = await decline({ acknowledgedAt: day(12) });
+      const second = await decline({ clientRequestId: "req-decline-2", acknowledgedAt: day(13) });
+      expect(second.evidence.id).toBe(one.evidence.id);
+      expect(state.evidence.filter((row) => row.action === "DECLINE")).toHaveLength(1);
+    });
+
+    it("is never recorded online", async () => {
+      const error = await failure(run((tx) => recordAcknowledgmentEvidence(asTx(tx), request({ action: "DECLINE" }))));
+      expect((error as AcknowledgmentError).code).toBe("ACKNOWLEDGMENT_REFUSED");
+      expect(state.evidence).toHaveLength(0);
+    });
+
+    it("follows the same actor rules: a minor's decline needs the declared responsible adult", async () => {
+      state.authority.set("p-sam", { id: "auth-1", adultPersonId: "p-dan" });
+      for (const actor of [null, "p-ulf"]) {
+        const error = await failure(decline({ attendeeId: "att-sam", actedByPersonId: actor, clientRequestId: `req-minor-${actor ?? "none"}` }));
+        expect((error as AcknowledgmentError).code).toBe("ACTING_FOR_MINOR_NOT_AUTHORIZED");
+      }
+      expect(state.evidence).toHaveLength(0);
+      const allowed = await decline({ attendeeId: "att-sam", actedByPersonId: "p-dan", clientRequestId: "req-minor-ok" });
+      expect(allowed.created).toBe(true);
+      expect(state.evidence[0]).toMatchObject({ guardianAuthorityId: "auth-1", subjectMinorStatus: "MINOR", action: "DECLINE" });
+    });
+
+    it("treats a repeat of the same request key with another action as a conflict", async () => {
+      await accept({ clientRequestId: "req-shared" });
+      const error = await failure(decline({ clientRequestId: "req-shared" }));
+      expect((error as AcknowledgmentError).code).toBe("IDEMPOTENCY_CONFLICT");
+    });
+  });
+
+  describe("withdrawing: validation", () => {
+    it("refuses a withdrawal dated in the future", async () => {
+      const first = await accept();
+      const error = await failure(withdraw(first.evidence.id, { withdrawnAt: day(40) }));
+      expect((error as AcknowledgmentError).code).toBe("WITHDRAWN_AT_INVALID");
+      expect(state.withdrawals).toHaveLength(0);
+    });
+
+    it("refuses a withdrawal dated before the acceptance", async () => {
+      const first = await accept({ acknowledgedAt: day(10) });
+      const error = await failure(withdraw(first.evidence.id, { withdrawnAt: day(9) }));
+      expect((error as AcknowledgmentError).code).toBe("WITHDRAWN_AT_INVALID");
+      expect(state.withdrawals).toHaveLength(0);
+    });
+
+    it("accepts a withdrawal dated the same moment as the acceptance", async () => {
+      const first = await accept({ acknowledgedAt: day(10) });
+      expect((await withdraw(first.evidence.id, { withdrawnAt: day(10) })).created).toBe(true);
+    });
+
+    it("refuses a voided acceptance", async () => {
+      const first = await accept();
+      state.evidence[0]!.void = { voidedAt: day(6) };
+      const error = await failure(withdraw(first.evidence.id));
+      expect((error as AcknowledgmentError).code).toBe("EVIDENCE_VOIDED");
+      expect(state.withdrawals).toHaveLength(0);
+    });
+
+    it("refuses a decline row", async () => {
+      const declined = await decline();
+      const error = await failure(withdraw(declined.evidence.id));
+      expect((error as AcknowledgmentError).code).toBe("EVIDENCE_NOT_WITHDRAWABLE");
+      expect(state.withdrawals).toHaveLength(0);
+    });
+
+    it("needs a paper location for paper, and refuses one for anything else", async () => {
+      const first = await accept();
+      expect(((await failure(withdraw(first.evidence.id, { channel: "PAPER" }))) as AcknowledgmentError).code).toBe("PAPER_LOCATION_REQUIRED");
+      expect(((await failure(withdraw(first.evidence.id, { channel: "PAPER", paperLocation: "  " }))) as AcknowledgmentError).code).toBe("PAPER_LOCATION_REQUIRED");
+      expect(((await failure(withdraw(first.evidence.id, { channel: "STAFF_ENTERED", paperLocation: LOCATION }))) as AcknowledgmentError).code).toBe("PAPER_LOCATION_NOT_ALLOWED");
+      expect(state.withdrawals).toHaveLength(0);
+      const paper = await withdraw(first.evidence.id, { channel: "PAPER", paperLocation: `  ${LOCATION}  ` });
+      expect(paper.created).toBe(true);
+      expect(state.withdrawals[0]!.paperLocation).toBe(LOCATION);
+    });
+
+    it("needs a paper location for a paper acceptance and a paper decline", async () => {
+      expect(((await failure(accept({ channel: "PAPER" }))) as AcknowledgmentError).code).toBe("PAPER_LOCATION_REQUIRED");
+      expect(((await failure(decline({ channel: "PAPER", paperLocation: null }))) as AcknowledgmentError).code).toBe("PAPER_LOCATION_REQUIRED");
+      expect(((await failure(accept({ channel: "STAFF_ENTERED", paperLocation: LOCATION }))) as AcknowledgmentError).code).toBe("PAPER_LOCATION_NOT_ALLOWED");
+      expect(state.evidence).toHaveLength(0);
+    });
+
+    it("follows the actor rules for the subject: a minor's withdrawal needs the declared responsible adult", async () => {
+      state.authority.set("p-sam", { id: "auth-1", adultPersonId: "p-dan" });
+      const first = await accept({ attendeeId: "att-sam", actedByPersonId: "p-dan" });
+      for (const actor of [null, "p-ulf"]) {
+        const error = await failure(withdraw(first.evidence.id, { actedByPersonId: actor }));
+        expect((error as AcknowledgmentError).code).toBe("ACTING_FOR_MINOR_NOT_AUTHORIZED");
+      }
+      expect(((await failure(withdraw(first.evidence.id, { actedByPersonId: "p-stranger" }))) as AcknowledgmentError).code).toBe("ACTOR_NOT_FOUND");
+      const allowed = await withdraw(first.evidence.id, { actedByPersonId: "p-dan" });
+      expect(allowed.created).toBe(true);
+      expect(state.withdrawals[0]).toMatchObject({ guardianAuthorityId: "auth-1", subjectMinorStatus: "MINOR", actedByPersonId: "p-dan" });
+    });
+
+    it("refuses an adult withdrawn by another adult", async () => {
+      const first = await accept();
+      const error = await failure(withdraw(first.evidence.id, { actedByPersonId: "p-ulf" }));
+      expect((error as AcknowledgmentError).code).toBe("ACTING_FOR_ANOTHER_NOT_AUTHORIZED");
+    });
+
+    it("does not find evidence of another registration", async () => {
+      const first = await accept();
+      const error = await failure(withdraw(first.evidence.id, { registrationId: "reg-other" }));
+      expect((error as AcknowledgmentError).code).toBe("EVIDENCE_NOT_FOUND");
+    });
+
+    it("refuses a request key reused for a different withdrawal", async () => {
+      const first = await accept();
+      await withdraw(first.evidence.id, { channel: "PAPER", paperLocation: LOCATION });
+      const error = await failure(withdraw(first.evidence.id, { channel: "PAPER", paperLocation: "Another binder" }));
+      expect((error as AcknowledgmentError).code).toBe("IDEMPOTENCY_CONFLICT");
+    });
+
+    it("writes an audit entry with ids only, never the paper location", async () => {
+      const first = await accept({ channel: "PAPER", paperLocation: LOCATION });
+      await withdraw(first.evidence.id, { channel: "PAPER", paperLocation: LOCATION });
+      const entry = state.audits.find((audit) => audit.action === "ACKNOWLEDGMENT_WITHDRAWN")!;
+      expect(entry).toMatchObject({ entityType: "AcknowledgmentWithdrawal", metadata: expect.objectContaining({ evidenceId: first.evidence.id, channel: "PAPER" }) });
+      expect(JSON.stringify(state.audits)).not.toContain(LOCATION);
+    });
+  });
+
+  describe("reading", () => {
+    it("keeps the paper location out of summaries and in the payload only, with the withdrawal", async () => {
+      const first = await accept({ channel: "PAPER", paperLocation: LOCATION });
+      await withdraw(first.evidence.id, { channel: "PAPER", paperLocation: "Synthetic cabinet, drawer two" });
+      const views = await listRegistrationAcknowledgments("event-1", "reg-1", day(12));
+      const text = JSON.stringify(views);
+      expect(text).not.toContain(LOCATION);
+      expect(text).not.toContain("Synthetic cabinet");
+      expect(text).not.toContain("paperLocation");
+      const payload = await getAcknowledgmentEvidencePayload("event-1", "reg-1", first.evidence.id);
+      expect(payload.paperLocation).toBe(LOCATION);
+      expect(payload.withdrawal).toMatchObject({ paperLocation: "Synthetic cabinet, drawer two", channel: "PAPER" });
+    });
   });
 });

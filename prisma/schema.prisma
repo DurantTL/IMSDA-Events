@@ -934,6 +934,7 @@ model User {
   guardianAuthoritiesDeclared  GuardianAuthority[]                       @relation("GuardianAuthorityActorUser")
   acknowledgmentEvidenceRecorded AcknowledgmentEvidence[]                 @relation("AcknowledgmentEvidenceRecordedBy")
   acknowledgmentVoids AcknowledgmentVoid[] @relation("AcknowledgmentVoidedBy")
+  acknowledgmentWithdrawalsRecorded AcknowledgmentWithdrawal[] @relation("AcknowledgmentWithdrawalRecordedBy")
   guardianAuthoritiesRevoked   GuardianAuthority[]                       @relation("GuardianAuthorityRevokedBy")
   guardianConflictsResolved    GuardianAuthorityConflict[]               @relation("GuardianConflictResolvedBy")
 
@@ -1870,6 +1871,7 @@ model Event {
   acknowledgmentEvidence              AcknowledgmentEvidence[]
   signatureEvidence SignatureEvidence[]
   acknowledgmentVoids AcknowledgmentVoid[]
+  acknowledgmentWithdrawals AcknowledgmentWithdrawal[]
   guardianAuthorityConflicts          GuardianAuthorityConflict[]
 
   invoices                            Invoice[]
@@ -2465,6 +2467,7 @@ model Person {
   guardianAuthoritiesDeclared GuardianAuthority[] @relation("GuardianAuthorityActorPerson")
   acknowledgmentEvidenceAsSubject AcknowledgmentEvidence[] @relation("AcknowledgmentEvidenceSubject")
   acknowledgmentEvidenceActed AcknowledgmentEvidence[] @relation("AcknowledgmentEvidenceActedBy")
+  acknowledgmentWithdrawalsActed AcknowledgmentWithdrawal[] @relation("AcknowledgmentWithdrawalActedBy")
   guardianConflictsAsMinor   GuardianAuthorityConflict[] @relation("GuardianConflictMinor")
   guardianConflictsAsAdult   GuardianAuthorityConflict[] @relation("GuardianConflictAdult")
   lodgingRoommateAsker       EventLodgingRoommateRequest[] @relation("LodgingRoommateFromPerson")
@@ -3363,6 +3366,7 @@ model Registration {
   acknowledgmentEvidence  AcknowledgmentEvidence[]
   signatureEvidence SignatureEvidence[]
   acknowledgmentVoids AcknowledgmentVoid[]
+  acknowledgmentWithdrawals AcknowledgmentWithdrawal[]
   guardianAuthorityConflicts GuardianAuthorityConflict[]
   lodgingRequests         EventLodgingRequest[]
   lodgingChangeRequests   EventLodgingChangeRequest[]
@@ -7955,6 +7959,13 @@ enum AcknowledgmentChannel {
   PAPER
 }
 
+/// What a recorded act was (#130): the person agreed, or the person was shown the wording and declined. Withdrawing an
+/// agreement is not an action of its own: it is a separate append-only `AcknowledgmentWithdrawal` row.
+enum AcknowledgmentAction {
+  ACKNOWLEDGE
+  DECLINE
+}
+
 /// What an acknowledgment pointed at: the exact text on the form version, or a published #129 policy version.
 enum AcknowledgmentSource {
   TEXT
@@ -8007,8 +8018,16 @@ model AcknowledgmentEvidence {
   /// How many earlier rows for this same subject, field and content were voided (#150). A voided acknowledgment can be
   /// recorded again as the next generation; a trigger makes this exactly that count, so there is never a second live row.
   generation             Int                   @default(0)
+  /// ACKNOWLEDGE (the default, every row before #130) or DECLINE: the person saw this wording and said no. Staff-recorded
+  /// only (a database check refuses an ONLINE decline); an unticked box is not a decline. A decline row is never part of
+  /// the unique indexes and its generation is 0. Status is derived from the history, never stored.
+  action                 AcknowledgmentAction  @default(ACKNOWLEDGE)
+  /// Where a PAPER form physically lives (for example "Conference office, event binder"), never what it says. Null for
+  /// every other channel (a check enforces it). Read only with VIEW_SENSITIVE_DATA; never in summaries, audit rows or exports.
+  paperLocation          String?
 
   void          AcknowledgmentVoid?
+  withdrawal    AcknowledgmentWithdrawal?
   event         Event                   @relation(fields: [eventId], references: [id], onDelete: Restrict)
   registration  Registration            @relation(fields: [registrationId], references: [id], onDelete: Restrict)
   subjectPerson Person?                 @relation("AcknowledgmentEvidenceSubject", fields: [subjectPersonId], references: [id], onDelete: Restrict)
@@ -8082,6 +8101,43 @@ model AcknowledgmentVoid {
   evidence     AcknowledgmentEvidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
   voidedBy     User                 @relation("AcknowledgmentVoidedBy", fields: [voidedByUserId], references: [id], onDelete: Restrict)
 
+  @@index([registrationId])
+  @@index([eventId])
+}
+
+/// A withdrawal of an earlier acceptance (#130): a new append-only event, never an edit. The acceptance row is untouched
+/// and stays the evidence of what the person agreed to for the period before `withdrawnAt`. One withdrawal per acceptance
+/// (a second is the same withdrawal); a new acceptance of the same content afterward is the next generation. Triggers
+/// refuse every UPDATE and DELETE (event deletion included) and require the evidence to be an ACKNOWLEDGE row of the same
+/// event and registration, with `withdrawnAt` not before it. `paperLocation` says where a paper form lives, never what it
+/// says; it is read only with VIEW_SENSITIVE_DATA. Never read by exports, logs, analytics or messages.
+model AcknowledgmentWithdrawal {
+  id                  String                @id @default(cuid())
+  eventId             String
+  registrationId      String
+  evidenceId          String                @unique
+  actedByPersonId     String
+  /// Staff who recorded it; null only if a future online path has none (same rule as evidence).
+  recordedByUserId    String?
+  channel             AcknowledgmentChannel
+  /// MINOR, ADULT or UNKNOWN on the event's start date when it was withdrawn.
+  subjectMinorStatus  String
+  /// The #131 declaration that let the person act for a minor (plain id: declarations are never deleted).
+  guardianAuthorityId String?
+  paperLocation       String?
+  /// When the withdrawal took effect (a paper form's date); never in the future, never before the acceptance.
+  withdrawnAt         DateTime
+  recordedAt          DateTime              @default(now())
+  idempotencyKey      String
+  requestHash         String
+
+  event        Event                  @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  registration Registration           @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  evidence     AcknowledgmentEvidence @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  actedBy      Person                 @relation("AcknowledgmentWithdrawalActedBy", fields: [actedByPersonId], references: [id], onDelete: Restrict)
+  recordedBy   User?                  @relation("AcknowledgmentWithdrawalRecordedBy", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([eventId, idempotencyKey])
   @@index([registrationId])
   @@index([eventId])
 }

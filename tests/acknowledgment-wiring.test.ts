@@ -11,7 +11,7 @@ import { eventDeletionBlockers, decideEventDeletion, type EventDeletionCounts } 
 const emptyCounts: EventDeletionCounts = {
   registrations: 0, attendees: 0, payments: 0, invoices: 0, honorEnrollments: 0, locations: 0, forms: 0, messages: 0, queuedMessages: 0,
   formSubmissions: 0, informationFormResponses: 0, imports: 0, merchandiseOrders: 0, clubRegistrationDrafts: 0, communityPosts: 0, announcements: 0, realPayments: 0, scholarshipContributions: 0,
-  healthSnapshots: 0, heldHealthSnapshots: 0, acknowledgmentEvidence: 0, signatureEvidence: 0,
+  healthSnapshots: 0, heldHealthSnapshots: 0, acknowledgmentEvidence: 0, acknowledgmentWithdrawals: 0, signatureEvidence: 0,
 };
 
 describe("event deletion refuses while acknowledgment evidence exists", () => {
@@ -19,6 +19,8 @@ describe("event deletion refuses while acknowledgment evidence exists", () => {
     expect(eventDeletionBlockers(emptyCounts)).toEqual([]);
     expect(eventDeletionBlockers({ ...emptyCounts, acknowledgmentEvidence: 3 })).toEqual(["3 acknowledgment records"]);
     expect(eventDeletionBlockers({ ...emptyCounts, acknowledgmentEvidence: 1 })).toEqual(["1 acknowledgment record"]);
+    // Withdrawals (#130) block deletion the same way, even counted on their own.
+    expect(eventDeletionBlockers({ ...emptyCounts, acknowledgmentWithdrawals: 2 })).toEqual(["2 acknowledgment withdrawal records"]);
   });
 
   it("refuses a system administrator, with the reason, and names unpublishing instead", () => {
@@ -92,6 +94,8 @@ describe("other places an acknowledgment must not leak or be mis-attributed (#15
   it("counts both evidence relations before removing a club roster person, so removal keeps the Person instead of failing", () => {
     expect(clubRosters).toContain("acknowledgmentEvidenceAsSubject: true");
     expect(clubRosters).toContain("acknowledgmentEvidenceActed: true");
+    // A withdrawal (#130) also names a Person with onDelete: Restrict.
+    expect(clubRosters).toContain("acknowledgmentWithdrawalsActed: true");
   });
 
   it("confirms a general-link team only with acknowledgment answers from the form version the director saw", () => {
@@ -171,6 +175,57 @@ describe("where evidence is checked and never exposed", () => {
   it("is an additive migration later than every other migration", () => {
     expect(migration).not.toMatch(/DROP (TABLE|COLUMN)|ALTER TABLE "(?!AcknowledgmentEvidence)[A-Za-z]+" (DROP|ALTER COLUMN)/);
     expect("20261029100000_acknowledgment_evidence" > "20261027200000_consent_policies").toBe(true);
+  });
+
+  const withdrawalMigration = readFileSync("prisma/migrations/20261231100000_acknowledgment_decline_withdraw/migration.sql", "utf8");
+  const withdrawalModel = schema.slice(schema.indexOf("model AcknowledgmentWithdrawal"), schema.indexOf("A second adult claiming a minor"));
+
+  it("appends withdrawals in their own append-only table: restricted references, one per acceptance, insert guard, no truncate, no exception for event deletion", () => {
+    expect(withdrawalMigration).toContain('CREATE TABLE "AcknowledgmentWithdrawal"');
+    expect(withdrawalMigration).toContain('CREATE UNIQUE INDEX "AcknowledgmentWithdrawal_evidenceId_key"');
+    expect(withdrawalMigration).toContain('CREATE UNIQUE INDEX "AcknowledgmentWithdrawal_eventId_idempotencyKey_key"');
+    expect(withdrawalMigration).toContain('BEFORE UPDATE OR DELETE ON "AcknowledgmentWithdrawal"');
+    expect(withdrawalMigration).toContain('BEFORE TRUNCATE ON "AcknowledgmentWithdrawal"');
+    expect(withdrawalMigration).toContain('BEFORE INSERT ON "AcknowledgmentWithdrawal"');
+    expect(withdrawalMigration).not.toContain("imsda.event_deletion");
+    const keys = withdrawalMigration.split("\n").filter((line) => line.includes('ADD CONSTRAINT "AcknowledgmentWithdrawal_') && line.includes("FOREIGN KEY"));
+    expect(keys).toHaveLength(5);
+    for (const line of keys) expect(line).toContain("ON DELETE RESTRICT");
+    const relations = withdrawalModel.split("\n").filter((line) => line.includes("@relation("));
+    expect(relations).toHaveLength(5);
+    for (const line of relations) expect(line).toContain("onDelete: Restrict");
+  });
+
+  it("counts voided or withdrawn acceptances for the generation, and keeps declines out of the unique indexes", () => {
+    expect(withdrawalMigration).toContain('AND "action" = \'ACKNOWLEDGE\';');
+    expect(withdrawalMigration.match(/WHERE "registrationAttendeeId" IS (NOT )?NULL AND "action" = 'ACKNOWLEDGE'/g)).toHaveLength(2);
+    expect(withdrawalMigration).toContain('FROM "AcknowledgmentWithdrawal" w WHERE w."evidenceId" = e."id"');
+    expect(withdrawalMigration).toContain('"AcknowledgmentEvidence_decline_channel_check"');
+  });
+
+  it("is additive, sorts after the open security-check-codes migration, and changes no existing row", () => {
+    expect(withdrawalMigration).not.toMatch(/DROP (TABLE|COLUMN)|UPDATE "|DELETE FROM/);
+    expect(withdrawalMigration).toContain("DEFAULT 'ACKNOWLEDGE'");
+    expect("20261231100000_acknowledgment_decline_withdraw" > "20261230100000").toBe(true);
+    expect("20261231100000_acknowledgment_decline_withdraw" > "20261229100000_security_check_codes").toBe(true);
+  });
+
+  it("is read by no export, report, search, message or analytics module, nor by anything that could carry a paper location or a withdrawal", () => {
+    const readers = [
+      "modules/reporting", "modules/club-reports", "modules/messaging", "modules/exports", "modules/analytics", "modules/operations-search",
+    ];
+    for (const directory of readers) {
+      let listing: string[] = [];
+      try {
+        listing = readdirRecursive(directory);
+      } catch {
+        continue;
+      }
+      for (const file of listing) {
+        const text = readFileSync(file, "utf8");
+        expect(text, file).not.toMatch(/acknowledgmentWithdrawal|AcknowledgmentWithdrawal|paperLocation|AcknowledgmentAction/);
+      }
+    }
   });
 
   it("is read by no export, report, search, message or analytics module", () => {

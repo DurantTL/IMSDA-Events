@@ -35,6 +35,8 @@ export type EventDeletionCounts = {
   heldHealthSnapshots: number;
   /** Append-only acknowledgment evidence rows (#150). Counts only; any one blocks the deletion. */
   acknowledgmentEvidence: number;
+  /** Append-only withdrawals of acknowledgments (#130). Counts only; any one blocks the deletion. */
+  acknowledgmentWithdrawals: number;
   /** Append-only typed-name signature rows (#1265). Counts only; any one blocks the deletion. */
   signatureEvidence: number;
 };
@@ -79,6 +81,8 @@ export function eventDeletionBlockers(counts: EventDeletionCounts) {
   // Acknowledgment evidence (#150) is append-only and its retention is a human decision, so an event that holds any is
   // never deleted: the safe default until someone decides how long it must be kept.
   if (counts.acknowledgmentEvidence > 0) blockers.push(plural(counts.acknowledgmentEvidence, "acknowledgment record"));
+  // So are withdrawals of those acknowledgments (#130): a withdrawal always sits beside its acceptance, and is held to the same rule.
+  if (counts.acknowledgmentWithdrawals > 0) blockers.push(plural(counts.acknowledgmentWithdrawals, "acknowledgment withdrawal record"));
   // Signature evidence (#1265) is append-only too, and held to the same rule.
   if (counts.signatureEvidence > 0) blockers.push(plural(counts.signatureEvidence, "signature record"));
   // A legal hold is never bypassed by deleting the event (#924): lift the hold first.

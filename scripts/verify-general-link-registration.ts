@@ -903,7 +903,7 @@ async function main() {
   const ownEvidence = await prisma.acknowledgmentEvidence.findMany({ where: { eventId, registrationId: ownRegistration.registrationId } });
   assert(ownEvidence.length === 1 && ownEvidence[0]!.channel === "ONLINE" && ownEvidence[0]!.recordedByUserId === null, "and records the director's own online acknowledgment");
   // Later, staff record it on paper for the director (the account holder), and the evidence names that.
-  const actAsRecord = await recordStaffAcknowledgment({ eventId, registrationId: actAsTeam.registrationId, fieldKey: "ack_release", channel: "PAPER", actorUserId: staffUserId, clientRequestId: randomUUID() });
+  const actAsRecord = await recordStaffAcknowledgment({ eventId, registrationId: actAsTeam.registrationId, fieldKey: "ack_release", channel: "PAPER", paperLocation: "Synthetic office, event binder", actorUserId: staffUserId, clientRequestId: randomUUID() });
   assert(actAsRecord.created && actAsRecord.evidence.channel === "PAPER" && actAsRecord.evidence.registrationId === actAsTeam.registrationId, "a paper record by staff afterward works");
   const paperRow = await prisma.acknowledgmentEvidence.findUniqueOrThrow({ where: { id: actAsRecord.evidence.id } });
   assert(paperRow.recordedByUserId === staffUserId && paperRow.actedByPersonId === actAsTeam.registration.accountHolderPersonId && paperRow.shownText === ACK_WORDING, "naming the staff recorder and the registrant, with the form's own wording");
