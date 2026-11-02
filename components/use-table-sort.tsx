@@ -15,10 +15,10 @@ const NO_SORT: SortState<string> = { key: null, dir: "asc" };
  * second table on the page). Returns the sorted rows, a `header(column, label)` that renders the shared `SortableHeader`,
  * and the one-line note saying how the list is ordered. With no sort in the address the rows keep their given order.
  */
-export function useTableSort<T, K extends string>(rows: readonly T[], spec: Record<K, ColumnSpec<T>>, prefix?: string) {
+export function useTableSort<T, K extends string>(rows: readonly T[], spec: Record<K, ColumnSpec<T>>, prefix?: string, onChange?: () => void) {
   const columns = useMemo(() => Object.keys(spec) as K[], [spec]);
   const accessors = useMemo(() => Object.fromEntries(columns.map((key) => [key, spec[key].get])) as Record<K, (row: T) => SortValue>, [columns, spec]);
-  const sort = useAddressSort<K>(columns, NO_SORT as SortState<K>, undefined, prefix);
+  const sort = useAddressSort<K>(columns, NO_SORT as SortState<K>, onChange, prefix);
   const sorted = sort.key ? sortRows(rows, sort.key, sort.dir, accessors) : [...rows];
   const header = (column: K, label: string, options: { className?: string; hiddenLabel?: string } = {}): ReactNode => (
     <SortableHeader active={sort.key === column} className={options.className} direction={sort.dir} hiddenLabel={options.hiddenLabel} label={label} onSort={() => sort.toggle(column)} />
