@@ -1003,6 +1003,14 @@ async function sortAttendees(page: J.Page, column: string, label: string, direct
     await page.waitForURL((url: URL) => url.searchParams.get("sort") === column && (url.searchParams.get("dir") ?? "asc") === direction, { timeout: 15_000 });
   }
   await settle(page);
+  // The address changes before the sorted rows render: wait until the pager's Next link carries the new order, so a later
+  // read or Next press never uses the previous render (a run once read page 2 in the old order).
+  await page.waitForFunction(({ column, direction }) => {
+    const next = [...document.querySelectorAll<HTMLAnchorElement>(".list-pager a")].find((link) => /next/i.test(link.textContent ?? ""));
+    if (!next) return true;
+    const params = new URL(next.href).searchParams;
+    return params.get("sort") === column && (params.get("dir") ?? "asc") === direction;
+  }, { column, direction }, { timeout: 15_000 });
 }
 
 async function attendeeListJourney(ctx: Ctx, page: J.Page) {
