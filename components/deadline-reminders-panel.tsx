@@ -5,6 +5,7 @@ import { Send, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { formatDateRange } from "@/modules/calendar/domain";
 import type { PendingReminderBatch, PendingReminders } from "@/modules/calendar/deadline-reminders";
+import { EmptyState } from "@/components/empty-state";
 
 type ApiResult = Partial<PendingReminders> & {
   message?: string;
@@ -81,7 +82,7 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       {state.batches.length === 0 ? (
-        <div className="empty-state"><h3>Nothing waiting</h3><p>No reminders are waiting to be sent.</p></div>
+        <EmptyState hint="Nothing to do here. Reminders are listed as deadlines get close." title="Nothing waiting">No reminders are waiting to be sent.</EmptyState>
       ) : (
         <ul className="calendar-admin-list">
           {state.batches.map((batch) => {

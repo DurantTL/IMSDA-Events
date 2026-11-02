@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { STAFF_INVITATION_GROUPS, STAFF_INVITATION_GROUP_LABEL, type StaffInvitationGroupValue } from "@/modules/staff-invitations/domain";
 import type { ApprovalRow } from "@/modules/staff-invitations/repository";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 
 type Props = {
   eventId: string;
@@ -168,7 +169,9 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
       {notice && <div className="inline-notice" role="status">{notice}</div>}
 
       {visible.length === 0 ? (
-        <section className="panel empty-state"><h3>Nothing here</h3><p>No registrations match. People appear here after they register through their personal link.</p></section>
+        rows.length === 0
+          ? <EmptyState className="panel empty-state" headingLevel={3} hint="People appear here after they register through their personal link." title="No registrations to approve">Nobody has registered through a personal link.</EmptyState>
+          : <NoMatchesState clear={{ onClick: () => { setFilter("ALL"); setGroup("ALL"); } }} known={`${rows.length} ${rows.length === 1 ? "registration was" : "registrations were"} made through personal links.`} noun="registrations" />
       ) : (
         <div className="report-table-wrap card-box">
           <table className="report-table staff-invite-table">

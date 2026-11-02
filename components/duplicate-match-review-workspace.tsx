@@ -16,6 +16,7 @@ import styles from "./duplicate-match-review-workspace.module.css";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { PersonMatchCandidateRecord } from "@/modules/people/duplicate-match-repository";
 import type { PersonMergeRecord } from "@/modules/people/person-merge-repository";
+import { EmptyState } from "@/components/empty-state";
 
 const signalLabels: Record<string, string> = {
   PHONE_MATCH: "Same phone number",
@@ -243,11 +244,7 @@ export function DuplicateMatchReviewWorkspace({
       {notice && <p className="inline-notice" role="status">{notice}</p>}
 
       {candidates.length === 0 ? (
-        <section className="panel empty-state">
-          <ShieldCheck aria-hidden="true" size={24} />
-          <h3>Nothing open for review</h3>
-          <p>Run a scan to look for shared phone numbers, household and surname overlaps, or shared external identities.</p>
-        </section>
+        <EmptyState action={{ label: "Scan for new candidates", onClick: runGeneration }} actionClass="secondary-button" canCreate={!generating} className="panel empty-state" icon={<ShieldCheck aria-hidden="true" size={24} />} title="Nothing open for review">A scan looks for shared phone numbers, household and surname overlaps, or shared external identities.</EmptyState>
       ) : (
         <section className="panel duplicate-section">
           <div className="section-heading">

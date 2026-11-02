@@ -11,6 +11,7 @@ import {
 import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listRegistrations } from "@/modules/registrations/repository";
+import { EmptyState } from "@/components/empty-state";
 
 export const metadata: Metadata = {
   title: "Printable attendee passes",
@@ -157,12 +158,10 @@ export default async function PrintableAttendeePassesPage({
       )}
 
       {passesAvailable && passes.length === 0 && (
-        <div className="empty-state panel">
-          <QrCode aria-hidden="true" size={26} />
-          <h3>No passes to print yet</h3>
-          <p>Active submitted or confirmed attendees will appear here automatically.</p>
+        <>
+          <EmptyState className="empty-state panel" headingLevel={3} hint="Passes appear here automatically once someone registers." icon={<QrCode aria-hidden="true" size={26} />} title="No passes to print yet">Active submitted or confirmed attendees get a pass, and there are none yet.</EmptyState>
           <EventSetupHelp eventId={event.id} context="passes" id="passes-none" />
-        </div>
+        </>
       )}
     </section>
   );

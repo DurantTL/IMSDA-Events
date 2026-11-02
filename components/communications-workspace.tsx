@@ -93,6 +93,7 @@ import type {
   FailedMessagesRetryPreview,
   FailedMessagesRetryResult,
 } from "@/modules/communications/retry-failed-domain";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 
 /** The delivery log is re-read this often while messages are queued or sending and the tab is visible (#860). */
 export const DELIVERY_REFRESH_INTERVAL_MS = 20_000;
@@ -1601,7 +1602,10 @@ export function CommunicationsWorkspace({
               </article>
             ))}
             {announcements.length === 0 && (
-              <div className="empty-state panel"><Megaphone aria-hidden="true" size={24} /><h3>No announcements yet</h3><p>Create a draft when attendees need an event-feed update.</p><EventSetupHelp context="announcements" id="announcements-none" /></div>
+              <>
+                <EmptyState action={{ label: "New announcement", onClick: () => openDraftEditor(blankAnnouncementValues, [], null) }} canCreate={canManage} className="empty-state panel" hint="Ask an event administrator to create one when attendees need an update." icon={<Megaphone aria-hidden="true" size={24} />} title="No announcements yet">Create a draft when attendees need an event-feed update.</EmptyState>
+                <EventSetupHelp context="announcements" id="announcements-none" />
+              </>
             )}
           </section>
           <aside className="panel audience-panel">
@@ -1710,11 +1714,7 @@ export function CommunicationsWorkspace({
                 </tbody>
               </table>
               {messaging.reminderPreview.recipients.length === 0 && (
-                <div className="empty-state">
-                  <CheckCircle2 size={24} aria-hidden="true" />
-                  <h3>No balance reminders are needed</h3>
-                  <p>No active registration currently has both a balance due and a valid contact email.</p>
-                </div>
+                <EmptyState hint="Nothing to do here. Reminders become possible when a registration has a balance and a valid contact email." icon={<CheckCircle2 size={24} aria-hidden="true" />} title="No balance reminders are needed">No active registration currently has both a balance due and a valid contact email.</EmptyState>
               )}
             </div>
           </section>
@@ -1859,17 +1859,9 @@ export function CommunicationsWorkspace({
               </table>
               {messaging.shirtSizePreview.recipients.length === 0 && (
                 messaging.shirtSizePreview.eventSupportsShirtSizes ? (
-                  <div className="empty-state">
-                    <CheckCircle2 size={24} aria-hidden="true" />
-                    <h3>Every attendee has a shirt size</h3>
-                    <p>No active registration is currently missing a shirt size with a valid contact email.</p>
-                  </div>
+                  <EmptyState hint="Nothing to do here. Requests become possible when a registration is missing a shirt size." icon={<CheckCircle2 size={24} aria-hidden="true" />} title="Every attendee has a shirt size">No active registration is currently missing a shirt size with a valid contact email.</EmptyState>
                 ) : (
-                  <div className="empty-state">
-                    <AlertTriangle size={24} aria-hidden="true" />
-                    <h3>This event does not collect shirt sizes</h3>
-                    <p>Registrants of this event have no shirt-size question on their private page, so a request would send them to a page that cannot answer it.</p>
-                  </div>
+                  <EmptyState hint="Nothing to do here. Shirt-size requests are only for events that ask for a size." icon={<AlertTriangle size={24} aria-hidden="true" />} title="This event does not collect shirt sizes">Registrants of this event have no shirt-size question on their private page, so a request would send them to a page that cannot answer it.</EmptyState>
                 )
               )}
             </div>
@@ -2016,7 +2008,7 @@ export function CommunicationsWorkspace({
                 ))}
               </div>
             </form>
-          ) : <div className="panel empty-state"><FileText size={25} /><h3>No templates available</h3></div>}
+          ) : <EmptyState className="panel empty-state" hint="Message templates are provided by the system. Ask a system administrator if none are listed." icon={<FileText size={25} />} title="No templates available">There are no message templates to edit.</EmptyState>}
 
           {selectedTemplate && (
             <aside className="message-preview-column">
@@ -2239,7 +2231,9 @@ export function CommunicationsWorkspace({
                   </button>
                 ))}
                 <ListPager label="Delivery log pages" onPage={setDeliveryPage} slice={deliverySlice} />
-                {filteredMessages.length === 0 && <div className="empty-state"><Inbox size={24} /><h3>No matching messages</h3><p>Submit a public registration or capture a template test to create a local row.</p></div>}
+                {filteredMessages.length === 0 && (deliveryFilter === "ALL"
+                  ? <EmptyState hint="Messages are logged here as the system sends or captures them, for example after a registration or a template test." icon={<Inbox size={24} />} title="No messages yet">Nothing has been sent or captured for this event.</EmptyState>
+                  : <NoMatchesState clear={{ onClick: () => void chooseDeliveryFilter("ALL") }} icon={<Inbox size={24} />} noun="messages" />)}
               </div>
               <aside className="message-delivery-detail">
                 {selectedMessage ? (
@@ -2415,7 +2409,7 @@ export function CommunicationsWorkspace({
                       </button>
                     )}
                   </>
-                ) : <div className="empty-state"><Mail size={24} /><h3>Select a message</h3><p>Choose a row to inspect the immutable subject, body, and attempts.</p></div>}
+                ) : <EmptyState headingLevel={3} hint="Choose a message in the list to see its subject, body, and attempts." icon={<Mail size={24} />} title="No message selected">Nothing is open for inspection.</EmptyState>}
               </aside>
             </div>
           </section>

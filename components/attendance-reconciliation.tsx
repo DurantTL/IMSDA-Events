@@ -14,6 +14,7 @@ import {
 } from "@/modules/attendance-reconciliation/domain";
 import type { AttendanceReconciliationView, VersionSummary } from "@/modules/attendance-reconciliation/repository";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { EmptyState } from "@/components/empty-state";
 
 function when(value: string) {
   return formatInConferenceTime(value, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -57,11 +58,7 @@ export function AttendanceReconciliation({
     return (
       <section className="page-stack">
         <div className="page-intro"><div><p className="eyebrow">Financial operations</p><h2>Attendance reconciliation</h2></div></div>
-        <div className="panel empty-state">
-          <ClipboardCheck aria-hidden="true" size={24} />
-          <h3>This event is not billed to organizations</h3>
-          <p>Attendance reconciliation applies to events where churches and groups are invoiced after the event.</p>
-        </div>
+        <EmptyState className="panel empty-state" headingLevel={3} hint="Nothing to do here. Pick an event that invoices churches and groups after the event." icon={<ClipboardCheck aria-hidden="true" size={24} />} title="This event is not billed to organizations">Attendance reconciliation applies to events where churches and groups are invoiced after the event.</EmptyState>
       </section>
     );
   }
@@ -163,11 +160,7 @@ export function AttendanceReconciliation({
       </section>
 
       {result.groups.length === 0 && (
-        <div className="panel empty-state">
-          <ClipboardCheck aria-hidden="true" size={24} />
-          <h3>No registrations to reconcile yet</h3>
-          <p>Submitted and confirmed registrations appear here.</p>
-        </div>
+        <EmptyState className="panel empty-state" headingLevel={3} hint="Registrations appear here once people submit or confirm them." icon={<ClipboardCheck aria-hidden="true" size={24} />} title="No registrations to reconcile yet">Only submitted and confirmed registrations are reconciled.</EmptyState>
       )}
       {result.groups.map((group) => <GroupPanel acknowledgementDetails={acknowledgementDetails} correctionDetails={correctionDetails} eventId={eventId} group={group} isLive={isLive} key={group.key} />)}
 

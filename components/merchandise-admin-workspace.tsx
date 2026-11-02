@@ -30,6 +30,7 @@ import {
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import styles from "./merchandise-admin-workspace.module.css";
+import { EmptyState } from "@/components/empty-state";
 
 type Artwork = { id: string; url?: string; altText?: string | null; filename?: string };
 type TaxTreatment = "TAXABLE" | "TAX_EXEMPT";
@@ -449,7 +450,7 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
       <div className={styles.layout}>
         <section className="panel" aria-labelledby="catalog-products-heading">
           <div className="section-heading"><div><p className="eyebrow">Staff configuration</p><h2 id="catalog-products-heading">Products</h2></div><span className="count-badge">{catalog.products.length} total</span></div>
-          {catalog.products.length === 0 ? <div className="empty-state"><ShoppingBag size={26} aria-hidden="true" /><h3>No products yet</h3><p>Add a product with at least one variant to build the attendee offering.</p><button className="primary-button" type="button" onClick={() => openProductEditor("new")}>Create first product</button></div> : <div className={styles.productList}>
+          {catalog.products.length === 0 ? <EmptyState action={{ label: "Create first product", onClick: () => openProductEditor("new") }} canCreate icon={<ShoppingBag size={26} aria-hidden="true" />} title="No products yet">Add a product with at least one variant to build the attendee offering.</EmptyState> : <div className={styles.productList}>
             {orderedProducts().map((product, index, ordered) => {
               const status = merchandiseAdminStatus(product);
               return <article className={`${styles.productCard} ${selectedId === product.id ? styles.selected : ""}`} key={product.id}>
@@ -474,9 +475,9 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
           <p className={styles.previewAs}>Preview as…</p><div className={styles.audienceToggle} role="group" aria-label="Preview as attendee context">{previewAudiences.map((audience) => <button key={audience.value} type="button" className="secondary-button" aria-pressed={previewAudience === audience.value} onClick={() => void changePreviewAudience(audience.value)}>{audience.label}</button>)}</div>
           <div className={styles.previewList} aria-busy={previewStatus === "loading"}>
             <p className={styles.previewContext} role="status">{previewStatus === "failed" ? "" : previewStatus === "loading" && !previewShown ? `Loading preview as ${previewLabel}…` : `Showing preview as ${previewLabel}.`}</p>
-            {previewStatus === "failed" ? <div className="empty-state"><ShoppingBag size={24} aria-hidden="true" /><p role="alert">The preview as {previewLabel} could not be loaded.</p><button className="secondary-button" type="button" onClick={() => void loadPreview(previewAudience)}>Try again</button></div>
+            {previewStatus === "failed" ? <EmptyState action={{ label: "Try again", onClick: () => void loadPreview(previewAudience) }} actionClass="secondary-button" canCreate headingLevel={4} icon={<ShoppingBag size={24} aria-hidden="true" />} title="The preview could not be loaded">The preview as {previewLabel} could not be loaded.</EmptyState>
               : !previewShown ? null
-              : previewProducts.length === 0 ? <div className="empty-state"><ShoppingBag size={24} aria-hidden="true" /><p>Nothing is currently visible to {previewLabel}. No enabled variants are on sale for this group.</p></div>
+              : previewProducts.length === 0 ? <EmptyState headingLevel={4} hint="Put a variant on sale for this group in the product editor." icon={<ShoppingBag size={24} aria-hidden="true" />} title="Nothing is visible to this group">Nothing is currently visible to {previewLabel}. No enabled variants are on sale for this group.</EmptyState>
               : previewProducts.map((product) => <article className={styles.previewCard} key={product.id}>{product.artwork && <img src={artworkPreviewUrl(eventId, product.artwork.assetId)} alt={product.artwork.altText} />}<div><h3>{product.name}</h3>{product.description && <p>{product.description}</p>}<ul>{product.variants.map((variant) => <li key={variant.id}><span>{variant.label}</span><strong>{formatMerchandiseMoney(variant.availability.priceCents)}</strong></li>)}</ul></div></article>)}</div>
           {selected && <div className={styles.variantSummary}><div className={styles.variantHeading}><strong>{selected.name} variants</strong><button className="secondary-button" type="button" onClick={() => openVariantEditor("new")}><Plus size={14} aria-hidden="true" /> Add variant</button></div>{orderedVariants(selected).map((variant, index, ordered) => <div className={styles.variantRow} key={variant.id}>
             <span><strong>{variant.label}</strong><small>{variant.sku ? `${variant.sku} · ` : ""}{variant.availability?.inventoryPolicy === "TRACKED" ? `${variant.availability.inventoryQuantity ?? 0} in stock` : "Unlimited inventory"} · {variant.isArchived ? "archived" : variant.isEnabled ? "enabled" : "disabled"} · {variant.availability?.attendeeAvailability === "STAFF_ONLY" ? "staff only" : variant.availability?.attendeeAvailability === "REGISTERED" ? "registered attendees" : "all attendees"}</small></span>

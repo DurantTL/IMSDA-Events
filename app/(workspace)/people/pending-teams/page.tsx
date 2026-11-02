@@ -5,6 +5,7 @@ import { PendingTeamsReview } from "@/components/pending-teams-review";
 import { listClubSponsorChoices } from "@/modules/organizations/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listAttachableClubs, listPendingTeams, resolvedTeamCounts } from "@/modules/general-link-registrations/repository";
+import { EmptyState } from "@/components/empty-state";
 
 export const metadata: Metadata = { title: "Teams waiting for a club" };
 
@@ -47,11 +48,7 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
         </div>
       </div>
       {teams.length === 0 ? (
-        <section className="panel empty-state">
-          <ShieldCheck aria-hidden="true" size={24} />
-          <h3>Nothing waiting</h3>
-          <p>Every team registered through the link is attached to a club.</p>
-        </section>
+        <EmptyState className="panel empty-state" hint="Nothing to do here. Teams that register through the link without a club will be listed for you to attach." icon={<ShieldCheck aria-hidden="true" size={24} />} title="Nothing waiting">Every team registered through the link is attached to a club.</EmptyState>
       ) : (
         <PendingTeamsReview canAddClub={canAddClub} clubs={clubs} eventId={event.id} sponsors={sponsors} teams={teams} timeZone={event.timezone} />
       )}

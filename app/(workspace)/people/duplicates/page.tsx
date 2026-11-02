@@ -19,6 +19,7 @@ import {
 } from "@/modules/registrations/duplicate-detection";
 import { listRegistrations } from "@/modules/registrations/repository";
 import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
+import { EmptyState } from "@/components/empty-state";
 
 export const metadata: Metadata = { title: "Duplicate finder" };
 
@@ -94,14 +95,9 @@ export default async function DuplicateFinderPage({
       </section>
 
       {nothingFound ? (
-        <section className="panel empty-state">
-          <ShieldCheck aria-hidden="true" size={24} />
-          <h3>No duplicates found</h3>
-          <p>
-            No two active registrations share an email address, a name and
-            phone number, or a name. Cancelled registrations are not scanned.
-          </p>
-        </section>
+        <EmptyState className="panel empty-state" hint="Nothing to do here. Check again after more people register." icon={<ShieldCheck aria-hidden="true" size={24} />} title="No duplicates found">
+          No two active registrations share an email address, a name and phone number, or a name. Cancelled registrations are not scanned.
+        </EmptyState>
       ) : null}
 
       {report.attendeeGroups.length > 0 && (

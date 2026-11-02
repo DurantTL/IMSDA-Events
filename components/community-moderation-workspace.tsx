@@ -4,6 +4,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { Eye, Flag, MessageSquareWarning, Save, ShieldCheck, UsersRound } from "lucide-react";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { EmptyState } from "@/components/empty-state";
 
 type StaffCommunity = {
   eventId: string;
@@ -204,7 +205,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
           <ShieldCheck size={21} aria-hidden="true" />
         </div>
         {community.reports.length === 0 ? (
-          <p className="empty-state">There are no open community reports.</p>
+          <EmptyState hint="Nothing to do here. Reports from attendees will appear in this queue." title="No open reports">There are no open community reports.</EmptyState>
         ) : community.reports.map((report) => (
           <article className="community-report-card" key={report.id}>
             <header><strong>{report.reason.toLowerCase()}</strong><time>{when(report.createdAt)}</time></header>
@@ -234,7 +235,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
           </a>
         </div>
         {posts.length === 0 ? (
-          <p className="empty-state">No attendee conversations have been posted.</p>
+          <EmptyState hint="Posts and replies from attendees will appear here for review." title="No conversations yet">No attendee conversations have been posted.</EmptyState>
         ) : posts.map((post) => (
           <article className="community-staff-post" key={post.id}>
             <header>

@@ -54,6 +54,7 @@ import {
   parseLiveCheckInChanges,
 } from "@/modules/checkin/live-changes";
 import type { ClubCheckInInfo } from "@/modules/club-registrations/repository";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 
 /** Arrivals rendered per page; search always runs across the whole roster (#702). */
 export const ARRIVALS_PAGE_SIZE = 50;
@@ -836,14 +837,12 @@ export function CheckInWorkspace({
         })}
         <ListPager label="Arrival roster pages" noun="arrivals" nounOne="arrival" onPage={setRosterPage} slice={rosterSlice} />
         {visible.length === 0 && (
-          <div className="empty-state">
-            <Search aria-hidden="true" size={24} />
-            <h3>{arrivals.length === 0 ? "No expected attendees yet" : "No arrivals found"}</h3>
-            <p>{arrivals.length === 0
-              ? "Nobody is registered for this event, so there is no one to check in. Registrations appear here once people submit the public form."
-              : "Check the name or confirmation code and try again."}</p>
+          <>
+            {arrivals.length === 0
+              ? <EmptyState hint="Registrations appear here once people submit the public form." icon={<Search aria-hidden="true" size={24} />} title="No expected attendees yet">Nobody is registered for this event, so there is no one to check in.</EmptyState>
+              : <NoMatchesState clear={{ onClick: () => search.setValue("") }} known={`${arrivals.length} ${arrivals.length === 1 ? "person is" : "people are"} expected.`} noun="arrivals" query={query} />}
             {arrivals.length === 0 && <EventSetupHelp context="check-in" id="check-in-no-arrivals" />}
-          </div>
+          </>
         )}
       </section>
     </section>

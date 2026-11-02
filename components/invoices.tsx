@@ -5,6 +5,7 @@ import { blockerReasonLabel } from "@/modules/attendance-reconciliation/domain";
 import { versionStatusLabel, type InvoiceVersionStatus } from "@/modules/invoices/domain";
 import type { InvoiceListRow, InvoicesView } from "@/modules/invoices/repository";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { EmptyState } from "@/components/empty-state";
 
 export function invoiceMoney(cents: number) {
   return formatCents(cents);
@@ -35,11 +36,7 @@ export function Invoices({ eventId, view, canFinalize }: { eventId: string; view
     return (
       <section className="page-stack">
         <div className="page-intro"><div><p className="eyebrow">Financial operations</p><h2>Invoices</h2></div></div>
-        <div className="panel empty-state">
-          <FileText aria-hidden="true" size={24} />
-          <h3>This event is not billed to organizations</h3>
-          <p>Invoices apply to events where churches and groups are invoiced after the event.</p>
-        </div>
+        <EmptyState className="panel empty-state" hint="Nothing to do here. Pick an event that invoices churches and groups after the event." icon={<FileText aria-hidden="true" size={24} />} title="This event is not billed to organizations">Invoices apply to events where churches and groups are invoiced after the event.</EmptyState>
       </section>
     );
   }

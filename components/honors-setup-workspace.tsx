@@ -13,6 +13,7 @@ import { siteChangePatch } from "@/modules/honors/locations";
 import type { HonorCopyPlan } from "@/modules/honors/copy";
 import { groupSessionsBySite, nextSessionOrder, sessionClassWarning, sharedSessionsLabel } from "@/modules/honors/session-order";
 import type { EventHonorSetup } from "@/modules/honors/repository";
+import { EmptyState } from "@/components/empty-state";
 
 type Offering = EventHonorSetup["offerings"][number];
 type SetupSession = EventHonorSetup["sessions"][number];
@@ -655,11 +656,7 @@ export function HonorsSetupWorkspace({
           <span className="count-badge">{setup.offerings.length} classes</span>
         </div>
         {setup.offerings.length === 0 ? (
-          <div className="empty-state">
-            <Award aria-hidden="true" size={27} />
-            <h3>No classes yet</h3>
-            <p>Add sessions and classes above, or copy them from another site below.</p>
-          </div>
+          <EmptyState hint="Add sessions and classes above, or copy them from another site below." icon={<Award aria-hidden="true" size={27} />} title="No classes yet">No classes are offered at this site.</EmptyState>
         ) : groups.filter((group) => group.offerings.length > 0).map((group) => (
           <div className="report-table-wrap honor-table-wrap" key={group.key}>
             <h3 className="honor-group-heading">{group.title}</h3>

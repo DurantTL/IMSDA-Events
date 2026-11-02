@@ -4,6 +4,7 @@ import { ShieldCheck, Users } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listDirectoryReviewEntries } from "@/modules/forms/directory-review";
+import { EmptyState } from "@/components/empty-state";
 
 export const metadata: Metadata = { title: "Directory review" };
 
@@ -38,11 +39,7 @@ export default async function DirectoryReviewPage({ searchParams }: { searchPara
         </div>
       </div>
       {entries.length === 0 ? (
-        <section className="panel empty-state">
-          <ShieldCheck aria-hidden="true" size={24} />
-          <h3>Nothing to review</h3>
-          <p>Every club and church answer for this event matched the live directory.</p>
-        </section>
+        <EmptyState className="panel empty-state" hint="Nothing to do here. New answers that are not in the directory will be listed as people register." icon={<ShieldCheck aria-hidden="true" size={24} />} title="Nothing to review">Every club and church answer for this event matched the live directory.</EmptyState>
       ) : (
         <section className="panel finance-list" aria-label="Not listed club and church answers">
           <div className="finance-row finance-head"><span>Confirmation</span><span>Field</span><span>Typed name</span><span /></div>

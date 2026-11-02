@@ -14,6 +14,7 @@ import {
 } from "@/modules/organizations/director-grants-domain";
 import type { DirectorGrantRecord } from "@/modules/organizations/director-grants-repository";
 import styles from "@/components/club-directors-workspace.module.css";
+import { EmptyState } from "@/components/empty-state";
 
 type GrantResponse = {
   grants?: DirectorGrantRecord[];
@@ -225,11 +226,7 @@ export function ClubDirectorsWorkspace({
           <span className="count-badge">{`${grants.length} total`}</span>
         </div>
         {grants.length === 0 ? (
-          <div className="empty-state">
-            <UserCog aria-hidden="true" size={27} />
-            <h3>No directors yet</h3>
-            <p>Assign the club director so they can manage the roster.</p>
-          </div>
+          <EmptyState headingLevel={3} hint="Use the form above to assign the club director." icon={<UserCog aria-hidden="true" size={27} />} title="No directors yet">Nobody has been given access to manage this club&apos;s roster.</EmptyState>
         ) : (
           <div className="report-table-wrap card-box">
           <table className="report-table table-cards table-cards-tablet" role="table">

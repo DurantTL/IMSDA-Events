@@ -28,6 +28,7 @@ import {
   registrationMatchesSearch,
 } from "@/modules/registrations/search";
 import { registrationMoneyStatus, registrationStatusWord, registrationStatusWords } from "@/modules/registrations/status-words";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 
 type PaymentRecord = RegistrationRecord["payments"][number];
 type AdjustmentRecord = RegistrationRecord["adjustments"][number];
@@ -258,7 +259,9 @@ export function FinanceWorkspace({
             <span data-label="Total"><Money cents={registration.totalAmountCents} /></span><span data-label="Received"><Money cents={registration.paidCents} /></span>{registration.isDeferredOrganizationBilling ? <span className="paid-balance" data-label="Balance">{registrationMoneyStatus({ totalCents: registration.totalAmountCents, balanceCents: 0, deferredBilling: true, isGroup: registration.isGroup, audience: "staff" })}</span> : <span className={attendeeBalanceCents(registration) > 0 ? "balance-due" : "paid-balance"} data-label="Balance"><Money cents={registration.balanceCents} /></span>}<span>View</span>
           </button>
         ))}
-        {visible.length === 0 && <div className="empty-state"><Search aria-hidden="true" size={24} /><h3>No financial records found</h3><p>Search covers the payer, every attendee on the registration, and the confirmation code. Try another term or balance filter.</p></div>}
+        {visible.length === 0 && (registrations.length === 0
+          ? <EmptyState hint="Records appear here once people register for this event." icon={<Search aria-hidden="true" size={24} />} title="No financial records yet">Nobody has registered for this event.</EmptyState>
+          : <NoMatchesState clear={{ onClick: () => { search.setValue(""); setFilter("ALL"); } }} known={`This event has ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"}. Search covers the payer, every attendee, and the confirmation code.`} noun="financial records" query={query} />)}
       </section>
 
       {modal && selected && (

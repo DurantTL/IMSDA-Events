@@ -39,6 +39,7 @@ import { calendarDateIn, calendarStatusLabels, closureLabel, formatDateRange } f
 import { describeRepeat, previewOccurrences, weekdayLabels, type RepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry, CalendarAdminEvent } from "@/modules/calendar/repository";
 import { savedMessage } from "@/components/form-message";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 
 type ApiResponse = {
   entries?: CalendarAdminEntry[];
@@ -179,6 +180,14 @@ export function CalendarAdminWorkspace({
 
   function changeFilters(patch: Partial<EntryDropdownFilters>) {
     setFilters(patch);
+    startNewView();
+  }
+
+  function resetEntryFilters() {
+    // One history entry for the whole clearing, so Back brings the filters back.
+    writeAddressParams({ q: null, category: null, source: null, state: null, time: null, entryType: null }, "push");
+    setFilters(defaultEntryDropdownFilters);
+    search.setValue(defaultEntryFilters.search);
     startNewView();
   }
 
@@ -357,11 +366,7 @@ export function CalendarAdminWorkspace({
               </div>
             </div>
             {entries.length === 0 ? (
-              <div className="empty-state">
-                <CalendarDays aria-hidden="true" size={27} />
-                <h3>No entries yet</h3>
-                <p>Add dates for events that aren&apos;t registered here, such as rallies or camporees.</p>
-              </div>
+              <EmptyState hint="Use the form above to add dates for events that aren't registered here, such as rallies or camporees." icon={<CalendarDays aria-hidden="true" size={27} />} title="No entries yet">The calendar has no entries of its own.</EmptyState>
             ) : (
               <>
               <EntryFiltersBar
@@ -369,13 +374,7 @@ export function CalendarAdminWorkspace({
                 feeds={initialFeeds}
                 filters={filters}
                 onChange={changeFilters}
-                onReset={() => {
-                  // One history entry for the whole clearing, so Back brings the filters back.
-                  writeAddressParams({ q: null, category: null, source: null, state: null, time: null, entryType: null }, "push");
-                  setFilters(defaultEntryDropdownFilters);
-                  search.setValue(defaultEntryFilters.search);
-                  startNewView();
-                }}
+                onReset={resetEntryFilters}
                 search={search}
                 onSort={(next) => { setSort(next); startNewView(); }}
                 sort={sort}
@@ -421,7 +420,7 @@ export function CalendarAdminWorkspace({
                 )}
               </div>
               {matching.length === 0 ? (
-                <div className="empty-state"><h3>No entries match</h3><p>Change the search or filters to see more.</p></div>
+                <NoMatchesState clear={{ onClick: resetEntryFilters }} known={`The calendar has ${entries.length} ${entries.length === 1 ? "entry" : "entries"} in all.`} noun="entries" query={search.term} />
               ) : (
               <ul className="calendar-admin-list">
                 {matching.slice(0, visibleCount).map((entry) => (
@@ -537,7 +536,7 @@ export function CalendarAdminWorkspace({
             </div>
           </div>
           {events.length === 0 ? (
-            <div className="empty-state"><CalendarDays aria-hidden="true" size={27} /><h3>No upcoming events</h3></div>
+            <EmptyState hint="Create an event first; published events then appear here." icon={<CalendarDays aria-hidden="true" size={27} />} title="No upcoming events">There are no upcoming events to show on the calendar.</EmptyState>
           ) : (
             <ul className="calendar-admin-list">
               {events.map((event) => {

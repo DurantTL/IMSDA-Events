@@ -19,6 +19,7 @@ import {
   type ScheduledEmailTrigger,
 } from "@/modules/communications/scheduled-email-options";
 import type { ScheduledEmailRecord, ScheduledEmailReviewView } from "@/modules/communications/scheduled-email-repository";
+import { EmptyState } from "@/components/empty-state";
 
 /**
  * The staff page for scheduled email batches (#177). Writing a schedule and approving it are two separate steps a person
@@ -429,11 +430,10 @@ export function ScheduledEmailsWorkspace({
       )}
 
       {schedules.length === 0 && !form ? (
-        <div className="empty-state">
-          <CalendarClock aria-hidden="true" size={22} />
-          <p>No emails are scheduled for this event.</p>
+        <>
+          <EmptyState action={{ label: "Schedule an email", onClick: () => void openNew() }} canCreate={!busy} icon={<CalendarClock aria-hidden="true" size={22} />} title="No emails are scheduled">No emails are scheduled for this event.</EmptyState>
           <EventSetupHelp context="scheduled emails" id="scheduled-emails-none" />
-        </div>
+        </>
       ) : (
         <ul className="scheduled-email-list">
           {schedules.map((schedule) => {

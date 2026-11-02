@@ -10,6 +10,7 @@ import { describeRepeat, parseRepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry } from "@/modules/calendar/repository";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { savedMessage } from "@/components/form-message";
+import { EmptyState } from "@/components/empty-state";
 
 type FeedResponse = {
   feeds?: CalendarAdminFeed[];
@@ -208,7 +209,7 @@ export function CalendarFeedsPanel({
           </div>
         </div>
         {feeds.length === 0 ? (
-          <div className="empty-state"><Download aria-hidden="true" size={27} /><h3>No imported calendars</h3><p>Add a Google Calendar above to bring its events onto the public calendar.</p></div>
+          <EmptyState hint="Add a Google Calendar above to bring its events onto the public calendar." icon={<Download aria-hidden="true" size={27} />} title="No imported calendars">No outside calendars are being imported.</EmptyState>
         ) : (
           <ul className="calendar-admin-list">
             {feeds.map((feed) => (

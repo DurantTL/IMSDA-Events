@@ -10,6 +10,7 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { formatPersonName } from "@/lib/person-name";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 
 export const metadata: Metadata = {
   title: staffPageTitles.groupedPackets,
@@ -150,7 +151,9 @@ export default async function EventPacketsPage({
         </article>
       ))}
 
-      {selectedGroups.length === 0 && <div className="empty-state panel"><PackageOpen size={26} aria-hidden="true" /><h3>No matching packet</h3><p>Active attendees will appear after registration data is available.</p></div>}
+      {selectedGroups.length === 0 && (query.group
+        ? <NoMatchesState clear={{ href: `/more/reports/packets?${eventQuery}` }} headingLevel={3} icon={<PackageOpen size={26} aria-hidden="true" />} known={`This event has ${packets.groups.length} ${packets.groups.length === 1 ? "packet" : "packets"}.`} noun="packets" />
+        : <EmptyState className="empty-state panel" headingLevel={3} hint="Packets appear here once active attendees register." icon={<PackageOpen size={26} aria-hidden="true" />} title="No packets yet">There are no active attendees to build a packet for.</EmptyState>)}
     </section>
   );
 }

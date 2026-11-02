@@ -32,6 +32,7 @@ import { activeRegistrationStatuses } from "@/modules/events/lifecycle";
 import { resolveEventContext } from "@/modules/events/selection";
 import { listRegistrations } from "@/modules/registrations/repository";
 import { eventCollectsShirtSizes } from "@/modules/merchandise/legacy-shirt-size-compat";
+import { EmptyState } from "@/components/empty-state";
 
 export const metadata: Metadata = {
   title: "Printable name badges",
@@ -238,12 +239,10 @@ export default async function PrintableNameBadgesPage({
       </div>
 
       {labels.length === 0 ? (
-        <div className="empty-state panel">
-          <ContactRound aria-hidden="true" size={26} />
-          <h3>No badges to print yet</h3>
-          <p>Active submitted or confirmed attendees will appear here automatically.</p>
+        <>
+          <EmptyState className="empty-state panel" headingLevel={3} hint="Badges appear here automatically once someone registers." icon={<ContactRound aria-hidden="true" size={26} />} title="No badges to print yet">Active submitted or confirmed attendees get a badge, and there are none yet.</EmptyState>
           <EventSetupHelp eventId={event.id} context="badges" id="badges-none" />
-        </div>
+        </>
       ) : (
         <div className="badge-sheet-stack">
           {sheets.map((sheet, sheetIndex) => (
