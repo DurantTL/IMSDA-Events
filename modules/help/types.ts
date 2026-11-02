@@ -95,4 +95,23 @@ export type PortalDestination = {
   formsRole?: boolean;
 };
 
-export type PortalGuide = Omit<HelpGuide, "workspace" | "audience"> & { audience: PortalAudience };
+/**
+ * One illustrated step of a walkthrough (#1482): the plain instruction and the alt text for its picture. Alt text is
+ * plain data so it can be translated later (#1445). The picture files are derived from the ids (`walkthrough-images.ts`).
+ */
+export type WalkthroughStep = {
+  /** Stable id, unique inside the walkthrough. It names the picture files and the browser action that drives the screen. */
+  id: string;
+  /** One or two plain sentences. */
+  text: string;
+  /** Describes what the picture shows, for someone who cannot see it. */
+  alt: string;
+};
+
+export type PortalGuide = Omit<HelpGuide, "workspace" | "audience"> & {
+  audience: PortalAudience;
+  /** A step-by-step guide with a real-screen picture for each step (#1482). `steps` holds the same sentences as text. */
+  walkthrough?: { steps: readonly WalkthroughStep[] };
+  /** Ids of the walkthrough guides that show this guide's task step by step. Shown as "See it step by step" links. */
+  walkthroughIds?: readonly string[];
+};

@@ -256,6 +256,9 @@ const pages: PageSpec[] = [
   { name: "account-help-guide-director", path: "/account/help/director-monthly-record", role: "director" },
   { name: "account-help-area", path: "/account/help", role: "area" },
   { name: "account-help-guide-area", path: "/account/help/coordinator-follow-records", role: "area" },
+  // Walkthrough guides (#1482): each step is an instruction and a picture, so the picture must fit the column at every width.
+  { name: "account-help-walkthrough-director", path: "/account/help/walkthrough-director-roster", role: "director", expectText: /Step by step: Add, edit and remove a roster member/ },
+  { name: "account-help-walkthrough-area", path: "/account/help/walkthrough-coordinator-clubs", role: "area", expectText: /Step by step: Your clubs and Who's missing what/ },
   { ...club("home", ""), flow: "portal-navigation" },
   { ...club("roster", "/roster"), prepare: openRosterSections },
   // A director on a past club year: the read-only banner, with the year carried between Home and Roster (#1112).

@@ -50,7 +50,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     href: "/account/security",
     linkable: true,
     actionLabel: "Open Security",
-    helpHref: portalGuideHref("director-two-step-sign-in"),
+    helpHref: portalGuideHref("walkthrough-director-two-step"),
   });
   add({
     id: "leaders",
@@ -62,7 +62,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     linkable: can.manageTeam,
     unavailableNote: askDirector("to invite leaders"),
     actionLabel: "Open Club admins",
-    helpHref: portalGuideHref("director-leaders-and-invites"),
+    helpHref: portalGuideHref("walkthrough-director-leaders"),
   });
   add({
     id: "roster",
@@ -74,7 +74,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     linkable: can.roster,
     unavailableNote: askDirector("to build the roster"),
     actionLabel: "Open roster",
-    helpHref: portalGuideHref("director-roster-and-forms"),
+    helpHref: portalGuideHref("walkthrough-director-roster"),
   });
   add({
     id: "forms",
@@ -86,7 +86,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     linkable: isClubFormsRole(facts.role),
     unavailableNote: askDirector("to fill in the club forms"),
     actionLabel: "Open Forms",
-    helpHref: portalGuideHref("director-roster-and-forms"),
+    helpHref: portalGuideHref("walkthrough-director-club-forms"),
   });
   const eventsKnown = facts.registeredEventCount !== null;
   add({
@@ -99,7 +99,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     linkable: can.registerForEvents,
     unavailableNote: askDirector("to register the club"),
     actionLabel: "Open club events",
-    helpHref: portalGuideHref("director-register-for-events"),
+    helpHref: portalGuideHref("walkthrough-director-register-event"),
   });
   add({
     id: "orders",
@@ -111,7 +111,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     linkable: can.roster,
     unavailableNote: askDirector("to build the order list"),
     actionLabel: "Open Orders",
-    helpHref: portalGuideHref("director-orders-and-supplies"),
+    helpHref: portalGuideHref("walkthrough-director-orders"),
   });
   add({
     id: "records",
@@ -125,7 +125,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     linkable: can.submitReports,
     unavailableNote: askDirector("to file the Monthly Records, or to give you the Reporter role"),
     actionLabel: "Open Monthly Records",
-    helpHref: portalGuideHref("director-monthly-record"),
+    helpHref: portalGuideHref("walkthrough-director-monthly-records"),
   });
   add({
     id: "sterling",
@@ -149,8 +149,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     href: "/account/help",
     linkable: true,
     actionLabel: "Open Help",
-    helpHref: portalGuideHref(GUIDE),
-    helpLabel: "Getting started guide",
+    helpHref: portalGuideHref("walkthrough-director-get-help"),
   });
   // A reporter has no roster, forms, events or orders at all (their Home is Monthly Records only), so those rows are left out
   // rather than listing pages with nothing for them to do.

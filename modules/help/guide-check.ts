@@ -1,5 +1,6 @@
 import { helpDestinations, helpGuides } from "@/modules/help/guides";
 import { portalDestinations, portalGuides, reservedPortalGuideIds } from "@/modules/help/portal-guides";
+import { walkthroughImage } from "@/modules/help/walkthrough-images";
 import type { HelpDestination, HelpGuide, PortalDestination, PortalGuide } from "@/modules/help/types";
 
 /**
@@ -77,7 +78,7 @@ export function checkHelpGuides(input: GuideCheckInput): GuideProblem[] {
   checkDestinations("staff", staffDestinations);
   checkDestinations("portal", portalDests);
 
-  const checkGuide = (source: GuideProblem["source"], guide: Pick<HelpGuide, "id" | "destinationIds" | "relatedDocs" | "lastReviewed" | "screenshot">, destinations: Record<string, unknown>) => {
+  const checkGuide = (source: GuideProblem["source"], guide: Pick<HelpGuide, "id" | "destinationIds" | "relatedDocs" | "lastReviewed" | "screenshot"> & Pick<PortalGuide, "walkthrough">, destinations: Record<string, unknown>) => {
     for (const id of guide.destinationIds) {
       if (!destinations[id]) add(source, guide.id, "unknown-destination", `Guide "${guide.id}" uses destination "${id}", which is not defined.`);
     }
@@ -86,6 +87,15 @@ export function checkHelpGuides(input: GuideCheckInput): GuideProblem[] {
     }
     if (guide.screenshot && input.publicFileExists && !input.publicFileExists(guide.screenshot.src)) {
       add(source, guide.id, "missing-screenshot", `Guide "${guide.id}" shows ${guide.screenshot.src}, which is not a file under public/.`);
+    }
+    // Walkthrough pictures (#1482): a missing file is an error. A stale picture is only a warning (walkthrough-check.ts).
+    if (guide.walkthrough && input.publicFileExists) {
+      for (const [index, step] of guide.walkthrough.steps.entries()) {
+        for (const kind of ["phone", "desktop"] as const) {
+          const { src } = walkthroughImage(guide.id, index, step.id, kind);
+          if (!input.publicFileExists(src)) add(source, guide.id, "missing-screenshot", `Guide "${guide.id}" step "${step.id}" shows ${src}, which is not a file under public/. Run: npm run help:screenshots`);
+        }
+      }
     }
     if (guide.screenshot && !(Number.isInteger(guide.screenshot.width) && guide.screenshot.width > 0 && Number.isInteger(guide.screenshot.height) && guide.screenshot.height > 0)) {
       add(source, guide.id, "invalid-screenshot-size", `Guide "${guide.id}" has a screenshot without a positive width and height.`);
