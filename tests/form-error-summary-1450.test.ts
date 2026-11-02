@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -286,11 +286,64 @@ describe("every converted form file", () => {
     "components/invite-person.tsx",
     "components/event-settings-workspace.tsx",
     "components/club-form-roster-add.tsx",
+    "components/club-form-fill-in.tsx",
   ])("%s has noValidate and the linked summary, and no per-field alert", (file) => {
     const source = read(file);
     expect(source).toMatch(/noValidate/);
     expect(source).toContain("<FormErrorSummary");
     expect(source).not.toContain("roster-field-error");
+  });
+});
+
+/**
+ * Why the club form fill-in (#1501, B7) slipped through: the list above only names files someone remembered. This scan
+ * reads every club component with a form: a native `required` attribute with no `noValidate` means a missed answer shows
+ * only the browser's own bubble, never the shared summary. A form still on the list below has a reason; remove it when it
+ * gets noValidate and the summary.
+ */
+const requiredWithoutSummary: Record<string, string> = {
+  "components/club-assignments-workspace.tsx": "follow-up: assignment forms",
+  "components/club-directors-workspace.tsx": "follow-up: dialog form, one or two fields",
+  "components/club-form-create.tsx": "follow-up: one required name",
+  "components/club-forms-actions.tsx": "follow-up: small action forms",
+  "components/club-honors-workspace.tsx": "follow-up: small forms",
+  "components/club-meeting-notes.tsx": "follow-up: meeting notes editor",
+  "components/club-member-honors-dialog.tsx": "follow-up: dialog form",
+  "components/club-registration-editor.tsx": "follow-up: registration editor",
+  "components/club-registration-workspace.tsx": "follow-up: registration form",
+  "components/club-report-form.tsx": "follow-up: Monthly Record signature fields",
+  "components/club-team-workspace.tsx": "follow-up: team forms",
+};
+
+function clubFormsWithNativeRequired() {
+  return readdirSync(path.join(process.cwd(), "components"))
+    .filter((name) => name.startsWith("club-") && name.endsWith(".tsx"))
+    .map((name) => ({ file: `components/${name}`, source: read(`components/${name}`) }))
+    .filter(({ source }) => source.includes("<form") && /\srequired(?:\s|=|\/|>)/.test(source) && !source.includes("noValidate"))
+    .map(({ file }) => file);
+}
+
+describe("native required needs the shared summary (#1501, B7)", () => {
+  it("no club form relies on the browser's bubbles unless it is listed with a reason", () => {
+    expect(clubFormsWithNativeRequired().filter((file) => !(file in requiredWithoutSummary))).toEqual([]);
+  });
+
+  it("every listed form still has a native required and no noValidate", () => {
+    const found = new Set(clubFormsWithNativeRequired());
+    for (const file of Object.keys(requiredWithoutSummary)) expect(found.has(file), `${file} is fixed; remove it from the list`).toBe(true);
+  });
+
+  it("would have caught the club form fill-in before it had noValidate", () => {
+    const before = '<form className="club-form-fill" onSubmit={submit}><input required value={x} /></form>';
+    expect(before.includes("<form") && /\srequired(?:\s|=|\/|>)/.test(before) && !before.includes("noValidate")).toBe(true);
+  });
+
+  it("the club form fill-in shows the summary, links each missing answer to its control and shows the message by it", () => {
+    const source = read("components/club-form-fill-in.tsx");
+    expect(source).toMatch(/<form\s+className="club-form-fill"\s+noValidate/);
+    expect(source).toContain("<FormErrorSummary");
+    expect(source).toContain("answerIsGiven(");
+    expect(source).toContain("id: controlId");
   });
 });
 

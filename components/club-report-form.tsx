@@ -18,6 +18,7 @@ import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { ClubReportRecord } from "@/modules/club-reports/repository";
 import { clubClassLevelLabels, type ClubClassLevel } from "@/modules/club-rosters/domain";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type Prefill = {
   meetingPlace: string;
@@ -113,6 +114,9 @@ export function ClubReportForm({
   const [savingIntent, setSavingIntent] = useState<"draft" | "submit" | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Any edit since the form was opened or last saved (B6, #1452). The facts are uncontrolled, so the form's change event marks it.
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChangesGuard(dirty && !readOnly, "You have unsaved changes to this Monthly Record. Leave this page and discard them?");
 
   // As a dialog the form stays mounted (hidden) so what was typed survives closing it (#789).
   const dialogOpen = asDialog && open;
@@ -169,6 +173,7 @@ export function ClubReportForm({
       const result = await response.json().catch(() => ({})) as SaveResponse;
       if (!response.ok || !result.report) throw new Error(result.message ?? result.issues?.[0]?.message ?? "The report could not be saved.");
       setReport(result.report);
+      setDirty(false);
       setCountsRefresh(null);
       setNotice(status === "DRAFT" ? savedMessage("Submit it when you are ready.") : `Submitted. ${result.report.totalPoints} points for ${monthLabel}.`);
     } catch (caught) {
@@ -216,6 +221,7 @@ export function ClubReportForm({
       staffCount: notesPrefill.staffCount,
     });
     setHonors(padHonors(notesPrefill.honors));
+    setDirty(true);
   }
 
   const card = variant === "account" ? "public-manage-card" : "panel";
@@ -432,7 +438,7 @@ export function ClubReportForm({
     </>
   );
 
-  if (!asDialog) return <>{confirmDialog}<form className="club-report-form" onSubmit={save}>{formBody}</form></>;
+  if (!asDialog) return <>{confirmDialog}<form className="club-report-form" onChange={() => setDirty(true)} onSubmit={save}>{formBody}</form></>;
 
   return (
     <>
@@ -449,7 +455,7 @@ export function ClubReportForm({
               <X aria-hidden="true" size={18} />
             </button>
           </div>
-          <form className="club-report-form" onSubmit={save}>{formBody}</form>
+          <form className="club-report-form" onChange={() => setDirty(true)} onSubmit={save}>{formBody}</form>
         </section>
       </div>
     </>

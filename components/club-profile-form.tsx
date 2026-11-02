@@ -11,6 +11,7 @@ import { PhoneInput, phoneBlockingMessage } from "@/components/phone-input";
 import { EMAIL_FIELD_MESSAGE, MAX_EMAIL_LENGTH, PHONE_FIELD_MESSAGE } from "@/lib/field-validation";
 import type { ClubProfileRecord } from "@/modules/organizations/club-profile-repository";
 import { sponsorOptionLabel } from "@/modules/organizations/domain";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type ProfileResponse = { profile?: ClubProfileRecord; message?: string; issues?: Array<{ message?: string; path?: Array<string | number> }> };
 type ContactErrors = { contactEmail?: string; contactPhone?: string };
@@ -34,6 +35,9 @@ export function ClubProfileForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Any edit since the profile was loaded or last saved (B6, #1452); the form is uncontrolled, so the change event marks it.
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChangesGuard(dirty, "You have unsaved changes to the club profile. Leave this page and discard them?");
   // The contact email and phone name their own problems next to the field and in the linked summary (#1451).
   const [attempted, setAttempted] = useState(false);
   const [contactErrors, setContactErrors] = useState<ContactErrors>({});
@@ -95,6 +99,7 @@ export function ClubProfileForm({
         throw new Error(result.message ?? result.issues?.[0]?.message ?? "The club profile could not be saved.");
       }
       setProfile(result.profile);
+      setDirty(false);
       setNotice(savedMessage());
     } catch (caught) {
       setError(notSavedMessage(caught instanceof Error ? caught.message : "The club profile could not be saved."));
@@ -114,6 +119,7 @@ export function ClubProfileForm({
       onChange={(event) => {
         // Editing again makes "Saved." stale.
         setNotice("");
+        setDirty(true);
         const id = (event.target as HTMLElement).id;
         if (id === "club-profile-email" || id === "club-profile-phone") {
           clearSummaryField(id);

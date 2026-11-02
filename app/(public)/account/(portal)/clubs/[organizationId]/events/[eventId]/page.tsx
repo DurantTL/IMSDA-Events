@@ -30,7 +30,7 @@ import { ClubRegistrationError, getClubEventWorkspace } from "@/modules/club-reg
 import { activeRegistrationStatuses, calendarDateInEventTimeZone, registrationClosedMessage } from "@/modules/events/lifecycle";
 import { getClassSelectionWorkspaceIfRegistered, getRegistrationHonorsCatalog } from "@/modules/honors/enrollment-repository";
 import { TEAM_LEVELS, teamLevelLabels, draftKeySchema, singleSearchParam } from "@/modules/club-teams/domain";
-import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
+import { clubRegistrationWord, registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Club registration" };
@@ -219,7 +219,7 @@ export default async function ClubEventRegistrationPage({
       {workspace.registration && (
         <section className="public-manage-card">
           <div className="public-manage-card-heading">
-            <p className="public-registration-eyebrow">Registered</p>
+            <p className="public-registration-eyebrow">{clubRegistrationWord(workspace.registration.status)}</p>
             <h2><CheckCircle2 size={20} aria-hidden="true" /> <span>{workspace.registration.teamName ? <><span translate="no">{workspace.registration.teamName}</span> is registered</> : "Your club is registered"}</span></h2>
           </div>
           <ClubHonorsNote eventId={eventId} organizationId={organizationId} />

@@ -56,13 +56,10 @@ const allowlist: Record<string, string> = {
   "components/club-honors-workspace.tsx": "needs guard: follow-up #1468",
   "components/club-leaders-list.tsx": "search or filter",
   "components/club-member-honors-dialog.tsx": "needs guard: follow-up #1468",
-  "components/club-profile-form.tsx": "needs guard: follow-up #1468",
   "components/club-registration-workspace.tsx": "needs guard: follow-up #1468",
-  "components/club-report-form.tsx": "needs guard: follow-up #1468",
   "components/club-roster-carry-forward.tsx": "needs guard: follow-up #1468",
   "components/club-supply-stock-workspace.tsx": "needs guard: follow-up #1468",
   "components/club-team-workspace.tsx": "needs guard: follow-up #1468",
-  "components/club-year-end-report-form.tsx": "needs guard: follow-up #1468",
   "components/clubs-year-selector.tsx": "search or filter",
   "components/community-moderation-workspace.tsx": "needs guard: follow-up #1468",
   "components/desk-location-select.tsx": "saves instantly / autosave",
@@ -194,6 +191,12 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
       "components/public-registration-form.tsx",
       "components/club-roster-workspace.tsx",
       "components/invite-person.tsx",
+      // Found by the club journeys (#1501): these three sat on the allow-list as "follow-up #1468" while a director's
+      // typing was lost. Club forms a director fills in stay guarded; they never go back on the list.
+      "components/club-profile-form.tsx",
+      "components/club-report-form.tsx",
+      "components/club-year-end-report-form.tsx",
+      "components/club-form-fill-in.tsx",
     ]) {
       expect(guarded(readFileSync(join(root, path), "utf8")), path).toBe(true);
     }
@@ -202,7 +205,7 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
   it("lists the forms that still need a guard", () => {
     const pending = Object.entries(allowlist).filter(([, reason]) => reason === followUp).map(([path]) => path);
     // Not a limit to raise: it only goes down as the follow-up mounts the hook.
-    expect(pending.length).toBeLessThanOrEqual(73);
+    expect(pending.length).toBeLessThanOrEqual(70);
   });
 });
 

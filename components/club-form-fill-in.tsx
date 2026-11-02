@@ -1,7 +1,7 @@
 "use client";
 
 import { SubmitButton } from "@/components/submit-button";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { HoneypotField } from "@/components/honeypot-field";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
@@ -17,8 +17,12 @@ import { DateInput } from "@/components/club-form-date-input";
 import { inputAttributesFor } from "@/lib/field-validation";
 import { addressComponentKeys, addressComponentLabels } from "@/modules/forms/address";
 import { savedMessage } from "@/components/form-message";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
 import {
+  answerIsGiven,
   dateFieldBounds,
+  fieldDisplayLabel,
   fieldRuns,
   isFieldRequired,
   isFieldVisible,
@@ -139,16 +143,44 @@ export function ClubFormFillIn(props: Props) {
   // flagged for correction but never blocks saving the rest of the form.
   const [attempted, setAttempted] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
+  const isSkipped = (field: RegistrationFormField) => !isFieldVisible(field, answers) || (props.mode !== "club" && field.autoDate === "TODAY");
+  /** What the browser's `required` used to enforce before noValidate; the server checks everything again. */
+  const missingFor = (field: RegistrationFormField) => (
+    !isSkipped(field) && isFieldRequired(field, answers) && !answerIsGiven(answers[field.key]) ? `${fieldDisplayLabel(field)} is required.` : ""
+  );
   const problemFor = (field: RegistrationFormField) => {
+    if (attempted) {
+      const missing = missingFor(field);
+      if (missing) return missing;
+    }
     const raw = typedAnswerProblem(field, answers[field.key]);
     if (!raw) return "";
     const legacy = typedAnswerProblem(field, answers[field.key], initialAnswers[field.key]) === null;
     if (!legacy && !attempted && !touched[field.key]) return "";
     return legacy ? `${raw} This saved answer needs correcting.` : raw;
   };
-  const blockingProblems = definition.sections.flatMap((section) => section.fields)
-    .filter((field) => isFieldVisible(field, answers) && !(props.mode !== "club" && field.autoDate === "TODAY"))
+  const allFields = definition.sections.flatMap((section) => section.fields);
+  const blockingProblems = allFields
+    .filter((field) => !isSkipped(field))
     .filter((field) => typedAnswerProblem(field, answers[field.key]) && typedAnswerProblem(field, answers[field.key], initialAnswers[field.key]));
+  const clubChoiceProblem = props.mode === "open" && !clubChoice ? "Choose your club, or choose Not listed." : "";
+  const clubNameProblem = props.mode === "open" && clubChoice === "NOT_LISTED" && !unlistedClubName.trim() ? "Your club's name is required." : "";
+  /** Every problem that stops a send, each linked to its control (the shared summary, #1450). */
+  function summaryProblems(): ErrorSummaryItem[] {
+    return [
+      ...(clubChoiceProblem ? [{ targetId: "club-form-apply-club", message: summaryMessage("Club", clubChoiceProblem) }] : []),
+      ...(clubNameProblem ? [{ targetId: "club-form-apply-club-name", message: clubNameProblem }] : []),
+      ...allFields
+        .filter((field) => missingFor(field) || blockingProblems.includes(field))
+        .map((field) => ({ targetId: `club-form-${field.id}`, message: summaryMessage(fieldDisplayLabel(field), missingFor(field) || typedAnswerProblem(field, answers[field.key]) || "") })),
+    ];
+  }
+  // A fixed answer drops its summary item; focus never moves.
+  const problemTargets = summaryProblems().map((item) => item.targetId).join("|");
+  useEffect(() => {
+    for (const item of summaryItems) if (item.targetId && !problemTargets.split("|").includes(item.targetId)) clearSummaryField(item.targetId);
+  }, [problemTargets, summaryItems, clearSummaryField]);
 
   function set(key: string, value: unknown) {
     setAnswers((current) => ({ ...current, [key]: value }));
@@ -156,16 +188,14 @@ export function ClubFormFillIn(props: Props) {
 
   async function send(submit: boolean) {
     setAttempted(true);
-    if (props.mode === "open" && (!clubChoice || (clubChoice === "NOT_LISTED" && !unlistedClubName.trim()))) {
-      setError(clubChoice ? "Type your club's name." : "Choose your club, or choose Not listed.");
+    const found = summaryProblems();
+    if (found.length > 0) {
+      setError("");
       setIssues([]);
+      showSummary(found);
       return;
     }
-    if (blockingProblems.length > 0) {
-      setError("Check the highlighted answers and try again.");
-      setIssues([]);
-      return;
-    }
+    clearSummary();
     if (saving) return;
     if (props.mode === "open" && !check.current?.require("Submit form")) return;
     setSaving(true);
@@ -249,11 +279,13 @@ export function ClubFormFillIn(props: Props) {
   return (
     <form
       className="club-form-fill"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         void send(true);
       }}
     >
+      {summaryItems.length > 0 && <FormErrorSummary action="submitting" items={summaryItems} ref={summaryRef} />}
       {props.mode === "club" && (
         <fieldset className="public-manage-card form-stack" disabled={saving || Boolean(savedId)}>
           <ClubFormSectionTitle>Who is this form for?</ClubFormSectionTitle>
@@ -282,16 +314,18 @@ export function ClubFormFillIn(props: Props) {
           <div className="club-form-apply-club">
             <label>
               <span>Club<span aria-hidden="true">{"\u00a0*"}</span></span>
-              <select onChange={(event) => setClubChoice(event.target.value)} required value={clubChoice}>
+              <select id="club-form-apply-club" onChange={(event) => setClubChoice(event.target.value)} required value={clubChoice} {...fieldErrorProps("club-form-apply-club-error", attempted ? clubChoiceProblem : "")}>
                 <option value="">Choose your club…</option>
                 {props.clubs.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
                 <option value="NOT_LISTED">Not listed</option>
               </select>
+              <FieldError id="club-form-apply-club-error">{attempted ? clubChoiceProblem : ""}</FieldError>
             </label>
             {clubChoice === "NOT_LISTED" && (
               <label>
                 <span>Your club&apos;s name<span aria-hidden="true">{"\u00a0*"}</span></span>
-                <input maxLength={120} onChange={(event) => setUnlistedClubName(event.target.value)} required value={unlistedClubName} />
+                <input id="club-form-apply-club-name" maxLength={120} onChange={(event) => setUnlistedClubName(event.target.value)} required value={unlistedClubName} {...fieldErrorProps("club-form-apply-club-name-error", attempted ? clubNameProblem : "")} />
+                <FieldError id="club-form-apply-club-name-error">{attempted ? clubNameProblem : ""}</FieldError>
               </label>
             )}
           </div>
@@ -396,15 +430,18 @@ export function FieldInput({
       {isSensitive && <small className="club-form-private"><LockKeyhole aria-hidden="true" size={11} /> Private</small>}
     </span>
   );
-  const problemId = `club-form-${field.id}-problem`;
+  // The control (or its group) carries this id so the summary can link to it, and points at its own message (#1450).
+  const controlId = `club-form-${field.id}`;
+  const problemId = `${controlId}-problem`;
   const help = (
     <>
       {field.helpText ? <small className="field-help">{field.helpText}</small> : null}
-      {problem ? <small className="field-error" id={problemId} role="alert">{problem}</small> : null}
+      <FieldError id={problemId}>{problem}</FieldError>
     </>
   );
   const invalid = problem ? true : undefined;
   const describedBy = problem ? problemId : undefined;
+  const controlProps = { id: controlId, "aria-describedby": describedBy, "aria-invalid": invalid };
   const wide = field.type === "LONG_TEXT" || field.type === "ADDRESS" || field.type === "RADIO" || field.type === "MULTISELECT" || field.type === "RANKED_CHOICE" || field.label.length > 60;
   const className = wide ? "club-form-field-wide" : undefined;
 
@@ -412,14 +449,14 @@ export function FieldInput({
     case "LONG_TEXT":
       return (
         <label className={className}>{label}
-          <textarea maxLength={5000} required={required} rows={4} value={textOf(value)} onChange={(event) => onChange(event.target.value)} />
+          <textarea {...controlProps} maxLength={5000} required={required} rows={4} value={textOf(value)} onChange={(event) => onChange(event.target.value)} />
           {help}
         </label>
       );
     case "SELECT":
       return (
         <label className={className}>{label}
-          <select required={required} value={textOf(value)} onChange={(event) => onChange(event.target.value)}>
+          <select {...controlProps} required={required} value={textOf(value)} onChange={(event) => onChange(event.target.value)}>
             <option value="">Choose…</option>
             {field.options.map((option) => <option key={option} value={option}>{field.optionLabels?.[option] ?? option}</option>)}
           </select>
@@ -428,7 +465,7 @@ export function FieldInput({
       );
     case "RADIO":
       return (
-        <fieldset className={`club-form-choice ${className ?? ""}`}>
+        <fieldset {...controlProps} className={`club-form-choice ${className ?? ""}`}>
           <legend>{label}</legend>
           <div className="club-form-choice-row">
             {field.options.map((option) => (
@@ -446,7 +483,7 @@ export function FieldInput({
       const maximum = rankedMaximum(field);
       const minimum = field.minSelections ?? (required ? Math.min(2, maximum) : 0);
       return (
-        <fieldset className={`club-form-choice ${className ?? ""}`}>
+        <fieldset {...controlProps} className={`club-form-choice ${className ?? ""}`}>
           <legend>{label}</legend>
           <small className="field-help">
             {minimum > 0 ? `Choose ${minimum} and rank up to ${maximum}.` : `Optional — rank up to ${maximum} if you'd like.`} Tap choices in preference order; tap a ranked choice again to remove it and re-rank.
@@ -476,7 +513,7 @@ export function FieldInput({
     case "MULTISELECT": {
       const selected = Array.isArray(value) ? value.map(String) : [];
       return (
-        <fieldset className={`club-form-choice ${className ?? ""}`}>
+        <fieldset {...controlProps} className={`club-form-choice ${className ?? ""}`}>
           <legend>{label}</legend>
           <div className="club-form-choice-row">
             {field.options.map((option) => (
@@ -497,7 +534,7 @@ export function FieldInput({
     case "CHECKBOX":
       return (
         <label className={`checkbox-label ${className ?? "club-form-field-wide"}`}>
-          <input checked={value === true} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
+          <input {...controlProps} checked={value === true} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
           {label}
           {help}
         </label>
@@ -505,7 +542,7 @@ export function FieldInput({
     case "ADDRESS": {
       const address = (value && typeof value === "object" ? value : {}) as Record<string, string>;
       return (
-        <fieldset className="club-form-choice club-form-field-wide">
+        <fieldset {...controlProps} className="club-form-choice club-form-field-wide">
           <legend>{label}</legend>
           <div className="form-grid two-column">
             {addressComponentKeys.map((key) => (
@@ -524,6 +561,9 @@ export function FieldInput({
           bounds={dateFieldBounds(field)}
           className={className}
           help={<>{lockedDate ? <small className="field-help">Filled in automatically with today&apos;s date.</small> : null}{help}</>}
+          describedBy={describedBy}
+          fieldId={controlId}
+          invalid={Boolean(problem)}
           label={label}
           labelText={field.label}
           locked={lockedDate}
@@ -535,7 +575,7 @@ export function FieldInput({
     case "NUMBER":
       return (
         <label className={className}>{label}
-          <input aria-describedby={describedBy} aria-invalid={invalid} inputMode="decimal" onBlur={onBlur} required={required} step="any" type="number" value={typeof value === "number" || typeof value === "string" ? String(value) : ""} onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))} />
+          <input {...controlProps} inputMode="decimal" onBlur={onBlur} required={required} step="any" type="number" value={typeof value === "number" || typeof value === "string" ? String(value) : ""} onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))} />
           {help}
         </label>
       );
@@ -544,8 +584,7 @@ export function FieldInput({
       return (
         <label className={className}>{label}
           <input
-            aria-describedby={describedBy}
-            aria-invalid={invalid}
+            {...controlProps}
             autoComplete={attributes?.autoComplete}
             inputMode={attributes?.inputMode}
             maxLength={field.type === "EMAIL" ? 160 : field.type === "PHONE" ? 40 : 500}

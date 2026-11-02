@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { useClientSearch } from "@/components/search-as-you-type";
 import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
-import { savedMessage } from "@/components/form-message";
+import { FormMessage, savedMessage } from "@/components/form-message";
+import { useConfirm } from "@/components/use-confirm";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
 import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/components/club-uniform-section";
 import { ORDER_LIST_SECTIONS, activeHelperLines, formatSizeLabel, groupUnmatchedByHonor, hasStockTracking, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
@@ -216,6 +217,9 @@ export function ClubOrderWorkspace({
   const focusHonorId = useRef<string | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  // The line just taken off the list and the quantity to put back, for Undo (B9, #1448, #1455); cleared by the next action.
+  const [undoRemove, setUndoRemove] = useState<{ key: string; quantity: number | null; name: string } | null>(null);
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   const base = ordersBase(organizationId);
   const uniformsBase = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/uniforms`;
 
@@ -298,6 +302,7 @@ export function ClubOrderWorkspace({
     setBusy(true);
     setNotice("");
     setError("");
+    setUndoRemove(null);
     try {
       setNotice(await run());
       return true;
@@ -344,9 +349,25 @@ export function ClubOrderWorkspace({
     if (!await setQuantity(`${HONOR_PICK_PREFIX}${honor.honorId}`, honor.members, `Added ${honor.name} to the list, quantity ${honor.members}.`)) focusHonorId.current = null;
   }
 
-  function removeLine(line: HelperLine) {
+  async function removeLine(line: HelperLine) {
+    const label = `${line.name}${line.size ? `, ${line.size}` : ""}`;
+    if (!(await askConfirm({
+      title: `Remove ${label} from the list?`,
+      body: <p>It comes off your order list. You can put it back with Undo right after, or add it again from the picker.</p>,
+      confirmLabel: "Remove from the list",
+      destructive: true,
+    }))) return;
+    const key = lineKey(line);
+    // Undo puts the line back the way it was: the director's own quantity, or the computed count when nobody had edited it.
+    const previous = line.edited ? line.needed : null;
     // A line nothing calls for was added by hand: forget it. Otherwise keep a 0 so it stays off the list.
-    return setQuantity(lineKey(line), line.computedNeeded > 0 ? 0 : null, `Took ${line.name} off the list.`);
+    if (await setQuantity(key, line.computedNeeded > 0 ? 0 : null, `Took ${label} off the list.`)) setUndoRemove({ key, quantity: previous, name: label });
+  }
+
+  function undoRemoveLine() {
+    if (!undoRemove) return;
+    const { key, quantity, name } = undoRemove;
+    return setQuantity(key, quantity, `Put ${name} back on the list.`);
   }
 
   async function addLine() {
@@ -469,7 +490,8 @@ export function ClubOrderWorkspace({
       ) : (
         <p className={`field-help ${styles.helpText}`}>Completed honors, uniform needs, and earned awards that haven&apos;t been handed out appear here on their own. Change a quantity, add an item, or take one off. Stock on hand comes off what you need.</p>
       )}
-      {notice && <p className="inline-notice success" role="status">{notice}</p>}
+      {confirmDialog}
+      <FormMessage message={notice} tone="success" undo={undoRemove ? { busy, onUndo: () => void undoRemoveLine() } : undefined} />
       {error && <p className="inline-notice error" role="alert">{error}</p>}
 
       {showPrompt && (
