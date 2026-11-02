@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useDebouncedCallback, useSearchTicket } from "@/components/search-as-you-type";
 import {
   Bell,
@@ -134,6 +135,10 @@ export function AttendeeCommunityBoard({
   const [posts, setPosts] = useState(community.posts);
   const [nextPostCursor, setNextPostCursor] = useState(community.nextPostCursor);
   const [loadingMore, setLoadingMore] = useState(false);
+  // A post or reply with typed text that is not sent yet (B6, #1468). The search box and edit/report forms are not dirty;
+  // sending clears the draft. The drafts also stay on this device, so the reload after any action never asks.
+  const hasUnsentDraft = Object.values(drafts).some((body) => body.trim() !== "");
+  const allowNavigation = useUnsavedChangesGuard(hasUnsentDraft, "You have a post or reply that is not sent. Leave this page and discard it?");
   const endpoint = `/api/attendee/events/${encodeURIComponent(community.eventId)}/community`;
   const draftPrefix = `imsda-community-draft:${community.eventId}:`;
   const unread = community.notifications.filter((notification) => !notification.read);
@@ -215,6 +220,7 @@ export function AttendeeCommunityBoard({
       const result = await response.json() as { message?: string };
       if (!response.ok) throw new Error(result.message ?? "The community action failed.");
       onSuccess?.();
+      allowNavigation();
       window.location.reload();
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "The community action failed.";

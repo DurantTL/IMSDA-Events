@@ -2,6 +2,7 @@
 
 import { ExactValue } from "@/components/exact-value";
 import { useState, type FormEvent } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { BackToEventsLink } from "@/components/back-to-events-link";
 import { BrandLink } from "@/components/brand-link";
@@ -47,6 +48,13 @@ export function StaffInvitationRegistration({ token, event, person, questions }:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState<{ confirmationCode: string; message: string } | null>(null);
+
+  // Typed values that differ from the prefilled name or the blank start (B6, #1468). A submitted registration is saved, so it never warns.
+  const hasTypedAnything =
+    firstName !== person.firstName || lastName !== person.lastName || phone !== "" || hasSpouse || spouseFirst !== "" || spouseLast !== "" ||
+    children.length > 0 || needsHousing || housingNote !== "" ||
+    [primaryAnswers, spouseAnswers, ...Object.values(childAnswers)].some((answers) => Object.keys(answers).length > 0);
+  useUnsavedChangesGuard(hasTypedAnything && !done, "You have not finished this registration. Leave this page and discard what you entered?");
 
   function addChild() {
     setChildren((current) => [...current, { key: nextKey, firstName: "", lastName, age: "" }]);
