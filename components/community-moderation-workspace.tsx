@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Eye, Flag, MessageSquareWarning, Save, ShieldCheck, UsersRound } from "lucide-react";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { EmptyState } from "@/components/empty-state";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type StaffCommunity = {
   eventId: string;
@@ -67,12 +68,46 @@ function when(value: string) {
   return formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
+/**
+ * True when a moderation or report form holds something other than the status and note it opened with
+ * (uncontrolled fields, so the values are read from the form itself).
+ */
+export function moderationFormEdited(form: HTMLFormElement, baseStatus: string, baseNote: string): boolean {
+  const data = new FormData(form);
+  return String(data.get("status") ?? baseStatus) !== baseStatus || String(data.get("note") ?? "") !== baseNote;
+}
+
 export function CommunityModerationWorkspace({ community }: { community: StaffCommunity }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [posts, setPosts] = useState(community.posts);
   const [nextPostCursor, setNextPostCursor] = useState(community.nextPostCursor);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [settings, setSettings] = useState({
+    isEnabled: community.settings.isEnabled,
+    allowNewPosts: community.settings.allowNewPosts,
+    allowReplies: community.settings.allowReplies,
+    conductText: community.settings.conductText,
+    retentionDays: String(community.settings.retentionDays),
+  });
+  const [editedForms, setEditedForms] = useState<ReadonlySet<string>>(new Set());
+  const settingsDirty = settings.isEnabled !== community.settings.isEnabled
+    || settings.allowNewPosts !== community.settings.allowNewPosts
+    || settings.allowReplies !== community.settings.allowReplies
+    || settings.conductText !== community.settings.conductText
+    || settings.retentionDays !== String(community.settings.retentionDays);
+  // Dirty while the controls differ from what is saved, or a post or report form has an unsent change. Every
+  // successful save reloads the page, so that is allowed through below (#1468).
+  const allowNavigation = useUnsavedChangesGuard(settingsDirty || editedForms.size > 0);
+  const trackForm = (key: string, form: HTMLFormElement, baseStatus: string, baseNote: string) => {
+    const edited = moderationFormEdited(form, baseStatus, baseNote);
+    setEditedForms((current) => {
+      if (current.has(key) === edited) return current;
+      const next = new Set(current);
+      if (edited) next.add(key); else next.delete(key);
+      return next;
+    });
+  };
   const endpoint = `/api/events/${encodeURIComponent(community.eventId)}/community`;
 
   async function action(body: Record<string, unknown>) {
@@ -86,6 +121,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
       });
       const result = await response.json() as { message?: string };
       if (!response.ok) throw new Error(result.message ?? "The community change failed.");
+      allowNavigation();
       window.location.reload();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The community change failed.");
@@ -168,18 +204,18 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
         </div>
         <form onSubmit={saveSettings}>
           <div className="community-toggle-grid">
-            <label><input defaultChecked={community.settings.isEnabled} name="isEnabled" type="checkbox" /> Enable attendee community</label>
-            <label><input defaultChecked={community.settings.allowNewPosts} name="allowNewPosts" type="checkbox" /> Allow new conversations</label>
-            <label><input defaultChecked={community.settings.allowReplies} name="allowReplies" type="checkbox" /> Allow replies</label>
+            <label><input checked={settings.isEnabled} onChange={(event) => setSettings((current) => ({ ...current, isEnabled: event.target.checked }))} name="isEnabled" type="checkbox" /> Enable attendee community</label>
+            <label><input checked={settings.allowNewPosts} onChange={(event) => setSettings((current) => ({ ...current, allowNewPosts: event.target.checked }))} name="allowNewPosts" type="checkbox" /> Allow new conversations</label>
+            <label><input checked={settings.allowReplies} onChange={(event) => setSettings((current) => ({ ...current, allowReplies: event.target.checked }))} name="allowReplies" type="checkbox" /> Allow replies</label>
           </div>
           <label>
             <span>Conduct agreement · version {community.settings.conductVersion}</span>
-            <textarea defaultValue={community.settings.conductText} maxLength={4000} minLength={40} name="conductText" required rows={5} />
+            <textarea value={settings.conductText} onChange={(event) => setSettings((current) => ({ ...current, conductText: event.target.value }))} maxLength={4000} minLength={40} name="conductText" required rows={5} />
             <small>Changing this text requires every participant to accept the new version before posting again.</small>
           </label>
           <label>
             <span>Delete discussion after the event</span>
-            <select defaultValue={String(community.settings.retentionDays)} name="retentionDays">
+            <select value={settings.retentionDays} onChange={(event) => setSettings((current) => ({ ...current, retentionDays: event.target.value }))} name="retentionDays">
               <option value="7">7 days after</option>
               <option value="14">14 days after</option>
               <option value="30">30 days after</option>
@@ -215,7 +251,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
               <div><dt>Reported by</dt><dd>{report.reporterName} · {report.reporterEmail}</dd></div>
             </dl>
             {report.detail && <p><strong>Reporter detail:</strong> {report.detail}</p>}
-            <form onSubmit={(event) => reportForm(event, report.id)}>
+            <form onChange={(event) => trackForm(`report:${report.id}`, event.currentTarget, "RESOLVED", "")} onSubmit={(event) => reportForm(event, report.id)}>
               <select defaultValue="RESOLVED" name="status">
                 <option value="RESOLVED">Resolve after review</option>
                 <option value="DISMISSED">Dismiss report</option>
@@ -250,7 +286,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
                 {post.revisions.map((revision, index) => <p key={`${revision.createdAt}:${index}`}><small>{when(revision.createdAt)}</small><br />{revision.body}</p>)}
               </details>
             )}
-            <form onSubmit={(event) => moderationForm(event, post.id)}>
+            <form onChange={(event) => trackForm(`post:${post.id}`, event.currentTarget, post.status, post.moderationNote ?? "")} onSubmit={(event) => moderationForm(event, post.id)}>
               <select defaultValue={post.status} name="status">
                 <option value="PUBLISHED">Visible</option>
                 <option value="HIDDEN">Hide pending review</option>
@@ -270,7 +306,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
                     {reply.revisions.map((revision, index) => <p key={`${revision.createdAt}:${index}`}><small>{when(revision.createdAt)}</small><br />{revision.body}</p>)}
                   </details>
                 )}
-                <form onSubmit={(event) => moderationForm(event, reply.id)}>
+                <form onChange={(event) => trackForm(`post:${reply.id}`, event.currentTarget, reply.status, reply.moderationNote ?? "")} onSubmit={(event) => moderationForm(event, reply.id)}>
                   <select defaultValue={reply.status} name="status">
                     <option value="PUBLISHED">Visible</option>
                     <option value="HIDDEN">Hide</option>

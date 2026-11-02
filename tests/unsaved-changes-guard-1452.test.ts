@@ -26,7 +26,6 @@ const allowlist: Record<string, string> = {
   "components/asset-issue-desk.tsx": "needs guard: follow-up #1468",
   "components/asset-return-panel.tsx": "needs guard: follow-up #1468",
   "components/attendance-reconciliation-controls.tsx": "needs guard: follow-up #1468",
-  "components/attendee-configuration-workspace.tsx": "needs guard: follow-up #1468",
   "components/attendee-pass-grid.tsx": "action button only, no typed fields",
   "components/attendee-password-reset-form.tsx": "sign-in",
   "components/attendee-sign-in-form.tsx": "sign-in",
@@ -36,8 +35,6 @@ const allowlist: Record<string, string> = {
   "components/billing-responsibility-controls.tsx": "needs guard: follow-up #1468",
   "components/calendar-admin-workspace.tsx": "needs guard: follow-up #1468",
   "components/calendar-feeds-panel.tsx": "needs guard: follow-up #1468",
-  "components/cancellation-carry-out.tsx": "needs guard: follow-up #1468",
-  "components/cancellation-policy-workspace.tsx": "needs guard: follow-up #1468",
   "components/cancellation-request-panel.tsx": "needs guard: follow-up #1468",
   "components/cancellation-requests-workspace.tsx": "action button only, no typed fields",
   "components/check-in-scanner.tsx": "action button only, no typed fields",
@@ -48,12 +45,8 @@ const allowlist: Record<string, string> = {
   "components/club-form-alert-recipients.tsx": "one field",
   "components/club-leaders-list.tsx": "search or filter",
   "components/clubs-year-selector.tsx": "search or filter",
-  "components/community-moderation-workspace.tsx": "needs guard: follow-up #1468",
   "components/desk-location-select.tsx": "saves instantly / autosave",
   "components/duplicate-match-review-workspace.tsx": "needs guard: follow-up #1468",
-  "components/email-delivery-section.tsx": "needs guard: follow-up #1468",
-  "components/event-locations-panel.tsx": "needs guard: follow-up #1468",
-  "components/event-team-settings-panel.tsx": "needs guard: follow-up #1468",
   "components/finance-workspace.tsx": "needs guard: follow-up #1468",
   "components/health-import-workspace.tsx": "one field",
   "components/health-privacy-acknowledgment.tsx": "action button only, no typed fields",
@@ -93,9 +86,6 @@ const allowlist: Record<string, string> = {
   "components/public-registration-recovery-form.tsx": "sign-in",
   "components/public-responsible-adult.tsx": "action button only, no typed fields",
   "components/public-shirt-size-confirmation.tsx": "action button only, no typed fields",
-  "components/registration-amendment-editor.tsx": "needs guard: follow-up #1468",
-  "components/registration-form-notifications-panel.tsx": "needs guard: follow-up #1468",
-  "components/registration-notes-tags-panel.tsx": "needs guard: follow-up #1468",
   "components/roster-unlock-form.tsx": "sign-in",
   "components/scholarship-fund-workspace.tsx": "needs guard: follow-up #1468",
   "components/sign-in-code-form.tsx": "sign-in",
@@ -196,7 +186,7 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
   it("lists the forms that still need a guard", () => {
     const pending = Object.entries(allowlist).filter(([, reason]) => reason === followUp).map(([path]) => path);
     // Not a limit to raise: it only goes down as the follow-up mounts the hook.
-    expect(pending.length).toBeLessThanOrEqual(45);
+    expect(pending.length).toBeLessThanOrEqual(35);
   });
 });
 

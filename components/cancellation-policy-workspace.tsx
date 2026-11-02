@@ -5,6 +5,7 @@ import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { Fragment, useId, useState } from "react";
 import { cardCell } from "@/components/table-card-labels";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { postJson } from "@/lib/post-json";
 import type { CancellationResult } from "@/modules/cancellation-policy/calculator";
 import { localDateKey, localInstant, localMidnightInstant } from "@/modules/cancellation-policy/event-time";
@@ -239,6 +240,11 @@ function currentTimeMs() {
 function NewVersion({ eventId, timezone, versions, presets }: { eventId: string; timezone: string; versions: PolicyVersionView[]; presets: CancellationPresetOption[] }) {
   const router = useRouter();
   const [draft, setDraft] = useState<Draft | null>(null);
+  // The rules the editor opened with, so "dirty" means changed since Start blank or Start from a preset (#1468).
+  const [opened, setOpened] = useState<Draft | null>(null);
+  const begin = (next: Draft) => { setOpened(next); setDraft(next); };
+  const close = () => { setOpened(null); setDraft(null); };
+  useUnsavedChangesGuard(draft !== null && JSON.stringify(draft) !== JSON.stringify(opened));
   const [deadlines, setDeadlines] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -252,7 +258,7 @@ function NewVersion({ eventId, timezone, versions, presets }: { eventId: string;
         <p>A saved version is never edited. To change the rules, save a new version; earlier calculations keep the version they used.</p>
         <div className="form-stack">
           <div className="form-actions cancel-policy-actions">
-            <button className="secondary-button" type="button" onClick={() => setDraft(draftFromRules({
+            <button className="secondary-button" type="button" onClick={() => begin(draftFromRules({
               windows: [], afterWindows: { label: "After the last window", terms: { refund: { kind: "NONE" }, flatWithholdCents: 0, flatWithholdLabel: "Processing fee", depositTreatment: "REFUND", creditAllowed: false } },
               noShow: null, allowedScopes: ["FULL_REGISTRATION", "ATTENDEE", "COMPONENT"], supportedComponents: { categories: [], fieldKeys: [] }, classifications: [], nonrefundable: { categories: [], fieldKeys: [] }, cardFeeTreatment: "REFUNDABLE",
             } satisfies CancellationRulesInput))}>Start blank</button>
@@ -265,7 +271,7 @@ function NewVersion({ eventId, timezone, versions, presets }: { eventId: string;
               </label>
               <small>{preset.description}</small>
               <div className="form-actions cancel-policy-actions">
-                <button className="secondary-button" type="button" disabled={!deadline} onClick={() => setDraft(draftFromRules(cancellationRulesFromPreset(preset.content, deadline)))}>Start from the {preset.label}</button>
+                <button className="secondary-button" type="button" disabled={!deadline} onClick={() => begin(draftFromRules(cancellationRulesFromPreset(preset.content, deadline)))}>Start from the {preset.label}</button>
               </div>
             </Fragment>;
           })}
@@ -298,7 +304,7 @@ function NewVersion({ eventId, timezone, versions, presets }: { eventId: string;
       return;
     }
     setNotice("Saved as a new version.");
-    setDraft(null);
+    close();
     router.refresh();
   }
 
@@ -371,7 +377,7 @@ function NewVersion({ eventId, timezone, versions, presets }: { eventId: string;
         <label>Note for the record (optional)<input value={draft.note} maxLength={500} onChange={(event) => update({ note: event.target.value })} /></label>
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-actions cancel-policy-actions">
-          <button className="text-button" type="button" onClick={() => setDraft(null)}>Discard</button>
+          <button className="text-button" type="button" onClick={close}>Discard</button>
           <button className="primary-button" type="submit" disabled={busy}>{busy ? "Saving" : "Save as a new version"}</button>
         </div>
       </form>

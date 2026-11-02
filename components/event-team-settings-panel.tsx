@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, UsersRound } from "lucide-react";
 import type { TeamSettings } from "@/modules/club-teams/domain";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type Draft = {
   allowMultipleTeams: boolean;
@@ -62,6 +63,9 @@ function bodyFrom(draft: Draft) {
  */
 export function EventTeamSettingsPanel({ eventId, initialSettings }: { eventId: string; initialSettings: TeamSettings | null }) {
   const [draft, setDraft] = useState<Draft>(() => draftFrom(initialSettings));
+  const [saved, setSaved] = useState<Draft>(() => draftFrom(initialSettings));
+  // Dirty while the fields differ from the loaded or last-saved rules; a save resets the baseline (#1468).
+  useUnsavedChangesGuard(JSON.stringify(draft) !== JSON.stringify(saved));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -83,7 +87,9 @@ export function EventTeamSettingsPanel({ eventId, initialSettings }: { eventId: 
         setError(result.message ?? "The team rules couldn't be saved.");
         return;
       }
-      setDraft(draftFrom(result.teamSettings ?? null));
+      const next = draftFrom(result.teamSettings ?? null);
+      setDraft(next);
+      setSaved(next);
       setNotice(savedMessage());
     } catch {
       setError("We couldn't reach the server. Nothing was changed.");

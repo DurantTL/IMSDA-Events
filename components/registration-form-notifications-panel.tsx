@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useState } from "react";
 import { Plus, Save, Trash2 } from "lucide-react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import {
@@ -78,6 +79,17 @@ function blankDraft(): Draft {
   return { localKey: nextKey(), name: "", recipientsText: "", savedRecipients: [], conditionFieldKey: "", conditionOperator: "EQUALS", conditionValue: "", onlyTheseSections: false, sectionIds: [], warnings: [], clubRemoved: false };
 }
 
+/** A new row (no id) nothing has been typed into: "Add a notification" alone is not work to lose. */
+function isUntouchedNewRow(row: Draft): boolean {
+  return !row.id && row.name === "" && row.recipientsText === "" && row.conditionFieldKey === "" && row.conditionValue === "" && !row.onlyTheseSections && row.sectionIds.length === 0;
+}
+
+/** True when the edited notifications differ from the saved ones (the local key of a new row never counts, nor does an untouched new row). */
+export function notificationDraftsDirty(drafts: Draft[], saved: Draft[]): boolean {
+  const plain = (rows: Draft[]) => JSON.stringify(rows.filter((row) => !isUntouchedNewRow(row)).map((row) => ({ ...row, localKey: "" })));
+  return plain(drafts) !== plain(saved);
+}
+
 /** The club search box and the club list it narrows. It owns the typed words, which are never saved. */
 function ClubPicker({ clubRemoved, clubs, label, onChoose, value }: {
   clubRemoved: boolean;
@@ -121,6 +133,9 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Dirty while the rows differ from what the server last returned; a save or reload replaces both (#1468).
+  useUnsavedChangesGuard(data !== null && notificationDraftsDirty(drafts, data.notifications.map(toDraft)));
 
   const apply = useCallback((next: PanelData) => {
     setData(next);

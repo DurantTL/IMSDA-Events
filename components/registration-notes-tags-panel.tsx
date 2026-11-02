@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NotebookPen, Tags } from "lucide-react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type TagOption = { id: string; name: string; color: string; description: string; isActive: boolean };
 type TagAssignment = {
@@ -55,6 +56,9 @@ export function RegistrationNotesTagsPanel({
   const [restrictedPermission, setRestrictedPermission] = useState<string>(restrictablePermissions[0]);
   const [saving, setSaving] = useState(false);
   const [selectedTagId, setSelectedTagId] = useState("");
+  const [noteBody, setNoteBody] = useState("");
+  // Only typed note text is work to lose: a tag pick or the visibility choice is not, and Cancel or a saved note clears it (#1468).
+  useUnsavedChangesGuard(addingNote && noteBody.trim() !== "");
 
   const basePath = `/api/events/${eventId}/${subjectPath}`;
 
@@ -145,6 +149,7 @@ export function RegistrationNotesTagsPanel({
       const result = await response.json();
       if (!response.ok) throw new Error(result.message ?? result.issues?.[0]?.message ?? "Unable to save that note.");
       setAddingNote(false);
+      setNoteBody("");
       setNoteVisibility("STAFF");
       await refresh();
     } catch (caught) {
@@ -212,7 +217,7 @@ export function RegistrationNotesTagsPanel({
           )}
           {canManage && addingNote && (
             <form className="form-stack inset-form" onSubmit={submitNote}>
-              <label>Note<textarea name="body" rows={3} maxLength={4000} required /></label>
+              <label>Note<textarea name="body" rows={3} maxLength={4000} required value={noteBody} onChange={(event) => setNoteBody(event.target.value)} /></label>
               <label>
                 Visibility
                 <select value={noteVisibility} onChange={(event) => setNoteVisibility(event.target.value as "STAFF" | "RESTRICTED")}>
@@ -229,7 +234,7 @@ export function RegistrationNotesTagsPanel({
                 </label>
               )}
               <div className="form-actions">
-                <button className="secondary-button" type="button" onClick={() => { setAddingNote(false); setError(""); }}>Cancel</button>
+                <button className="secondary-button" type="button" onClick={() => { setAddingNote(false); setNoteBody(""); setError(""); }}>Cancel</button>
                 <button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Save note"}</button>
               </div>
             </form>
