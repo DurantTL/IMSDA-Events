@@ -1365,6 +1365,8 @@ async function main() {
     for (const viewport of chosen) {
       const started = Date.now();
       console.log(`\n== ${viewport.name} (${viewport.width}px)`);
+      // Each width spends several emailed-code sends; a fresh budget per width keeps a both-widths local run inside the limit.
+      await resetEventBudgets(prisma);
       const world = await seedEventWorld(prisma, viewport.name);
       worlds.push(world);
       const rec = new Recorder(viewport.name, KNOWN_BUGS);
