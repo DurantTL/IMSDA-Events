@@ -13,6 +13,7 @@ import {
   type RosterAttendee,
 } from "@/components/public-registration-form";
 import { rosterOwnedResponses, rosterRolePrefill } from "@/modules/club-registrations/domain";
+import { groupEditorChanged } from "@/modules/group-registrations/editor-dirty";
 import { groupSeatType, MAX_GROUP_ATTENDEES } from "@/modules/group-registrations/domain";
 import type { GroupRegistrationWorkspace } from "@/modules/group-registrations/repository";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -42,7 +43,6 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
   const [adding, setAdding] = useState(false);
   // The add-person form is typed into while open (B6, #1468); Add, Cancel and closing the editor all clear it.
   const [addDirty, setAddDirty] = useState(false);
-  useUnsavedChangesGuard(open && step === "who" && adding && addDirty, "You have typed a person who is not added yet. Leave this page and discard them?");
   const definition = workspace.experience.form.definition;
   const ageKey = workspace.attendeeAgeKey;
   const registered = workspace.registration.attendees;
@@ -52,6 +52,25 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
   const [newPeople, setNewPeople] = useState<NewPerson[]>([]);
   const [locationId, setLocationId] = useState<string | null>(currentLocationId);
   const [answers, setAnswers] = useState<Record<string, FormResponses>>({});
+
+  // Staged edits are lost on leaving (B6, #1468): the editor is open and the kept people, new people, location or answers
+  // differ from what is registered, or the add-person form has typed values. Cancel and a save close the editor, which clears it.
+  const stagedChanged = groupEditorChanged(
+    { keptIds, newPersonCount: newPeople.length, locationId, answers },
+    { attendees: registered, locationId: currentLocationId },
+  );
+  useUnsavedChangesGuard(open && (stagedChanged || (adding && addDirty)), "You have changes to this group that are not saved. Leave this page and discard them?");
+
+  function resetStaged() {
+    setKeptIds(registered.map((person) => person.attendeeId));
+    setNewPeople([]);
+    setLocationId(currentLocationId);
+    setAnswers({});
+    setAdding(false);
+    setAddDirty(false);
+    setStep("who");
+    setError("");
+  }
 
   const locationChoices = useMemo(() => {
     const registeredLocation = workspace.registration.location;
@@ -179,6 +198,8 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
       setStep("who");
       setNewPeople([]);
       setAnswers({});
+      setAdding(false);
+      setAddDirty(false);
       router.refresh();
     },
   }), [initialAttendees, previousResponses, workspace.lockedAttendeeFieldKeys, onDraftChange, submitEdit, router]);
@@ -189,7 +210,7 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
 
   if (!open) {
     return (
-      <button className="secondary-button" onClick={() => setOpen(true)} type="button">
+      <button className="secondary-button" onClick={() => { resetStaged(); setOpen(true); }} type="button">
         <Pencil aria-hidden="true" size={14} /> Change people, location, or details
       </button>
     );
@@ -276,7 +297,7 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
         </form>
       )}
       <div className="club-registration-toolbar">
-        <button className="secondary-button" onClick={() => { setError(""); setAddDirty(false); setAdding(false); setOpen(false); }} type="button">
+        <button className="secondary-button" onClick={() => { resetStaged(); setOpen(false); }} type="button">
           <X aria-hidden="true" size={15} /> Cancel
         </button>
         <button
