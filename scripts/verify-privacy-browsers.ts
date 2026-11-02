@@ -39,7 +39,7 @@ import { randomBytes } from "node:crypto";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
-import { BLOCK_FILTERS, STRICT_STORAGE_INIT_SCRIPT, blockedBy, type BlockMode } from "./support/privacy-block-lists";
+import { BLOCK_FILTERS, PREVIEW_FAILS_INIT_SCRIPT, STRICT_STORAGE_INIT_SCRIPT, blockedBy, type BlockMode } from "./support/privacy-block-lists";
 import {
   cleanupPrivacyBrowsers,
   directorCookie,
@@ -366,20 +366,6 @@ async function publicRegistration({ browser, mode, tracker, browserName }: Param
     await closeContext(context);
   }
 }
-
-/** Makes the shared price function throw in the page, the way a broken or blocked script would. */
-const PREVIEW_FAILS_INIT_SCRIPT = `
-(() => {
-  const original = Array.prototype.reduce;
-  Array.prototype.reduce = function (callback, ...rest) {
-    if (typeof callback === "function" && /Math\\.max\\([^)]*amountCents/.test(Function.prototype.toString.call(callback))) {
-      window.__previewThrew = true;
-      throw new Error("The price preview failed (injected by the privacy-browser check).");
-    }
-    return original.call(this, callback, ...rest);
-  };
-})();
-`;
 
 async function publicRegistrationPreviewFails({ browser, mode, tracker, browserName }: Parameters<Journey["run"]>[0]) {
   await clearRateLimits();

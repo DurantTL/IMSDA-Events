@@ -133,4 +133,13 @@ export class FakeMailServer {
     if (!code) throw new Error(`The message "${message.subject}" has no six-digit code.`);
     return `${code[1]}${code[2]}`;
   }
+
+  /** Like `waitForCode`, for the message whose subject matches (sign-up verification, security code, edit code). */
+  async waitForCodeWithSubject(to: string, subject: RegExp, options: { since: number; timeoutMs?: number }): Promise<string> {
+    const pattern = /\b(\d{3}) ?(\d{3})\b/;
+    const message = await this.waitForMessage(to, (candidate) => subject.test(candidate.subject) && pattern.test(candidate.text), options);
+    const code = pattern.exec(message.text);
+    if (!code) throw new Error(`The message "${message.subject}" has no six-digit code.`);
+    return `${code[1]}${code[2]}`;
+  }
 }

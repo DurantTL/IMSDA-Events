@@ -17,10 +17,15 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 - **Browser test:** a check that uses the page in a real browser.
   "planned (#1439)" means it does not exist yet. The mobile layout audit is
   `npm run test:mobile-layout` (`scripts/verify-mobile-layout.ts`). The role
-  journeys suite is `npm run test:club-journeys` (`scripts/verify-club-journeys.ts`,
+  journeys suites are `npm run test:club-journeys` (`scripts/verify-club-journeys.ts`,
   the required CI check "Club journeys (real browser)"): club directors and area
   coordinators use the site in Chromium at 1280 and 390 px wide, and every page
-  they visit is checked against the rules listed here for it.
+  they visit is checked against the rules listed here for it; and
+  `npm run test:event-journeys` (`scripts/verify-event-journeys.ts`, the CI checks
+  "Event journeys (real browser, desktop)" and "(real browser, phone)"): an
+  attendee creates an account, registers with a promo code and pays by card,
+  manages the registration and asks to cancel it, at the same two widths. Staff
+  journeys are the next phase.
 - **Rule IDs** (G1, S1, …) are what a review report names when it lists the
   rules it checked.
 
@@ -36,7 +41,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| P1 | Every calculation that matters (prices, fees, discounts, deposits, balances, capacity, eligibility) is done on the server from one shared function. The browser only shows a preview from that same function; the server never trusts a total the browser sends, and if the browser's scripts fail or are blocked, the amount charged and recorded is still correct. | `tests/server-calculations-1445.test.ts` | planned (#1445) | Caleb, Nov 1 (#1445) |
+| P1 | Every calculation that matters (prices, fees, discounts, deposits, balances, capacity, eligibility) is done on the server from one shared function. The browser only shows a preview from that same function; the server never trusts a total the browser sends, and if the browser's scripts fail or are blocked, the amount charged and recorded is still correct. | `tests/server-calculations-1445.test.ts` | `npm run test:event-journeys` (registration with a promo code and card: plain, translated, blocked, and with the price preview failing; the amount on the card step and the recorded total are checked against the app's own pricing functions) | Caleb, Nov 1 (#1445) |
 | P2 | Live lists (the club roster above all, plus registrations, attendee lists, orders and monthly records) always show current data from the server, update right away after a change, are never cached by the browser, Cloudflare or the app, and still work with blockers and translation on. | `tests/live-lists-no-store-1445.test.ts` (the app's and API's headers and every browser fetch); what Cloudflare really does is browser test only (#1439) | `npm run test:live-roster` (roster); `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | Caleb, Nov 1 (#1445) |
 
 ## Search
@@ -47,7 +52,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | S2 | No minimum number of characters and no "type to search" empty state; "type more to narrow" caps are replaced with paging. | `tests/search-field-consistency-1347.test.ts`, `tests/empty-server-search-1348.test.ts`, `tests/search-as-you-type-guard-1431.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1342, #1347, #1348 |
 | S3 | The Sterling Volunteers name lookup also follows the empty-search rule, keeping its existing permission checks and audit logging. | `tests/background-check-routes.test.ts`, `tests/search-as-you-type-guard-1431.test.ts` (the empty lookup, its permission check, and no early return) | planned (#1439) | #1348 |
 | S4 | Every search box should search as you type, across the board. Empty shows the full list, typing narrows it, and no Enter is needed. | `tests/search-as-you-type-guard-1431.test.ts`, `tests/search-as-you-type-dom-1431.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1431 |
-| S5 | While results update, focus is kept and results are announced; Enter and no-JavaScript still work. | `tests/search-as-you-type-dom-1431.test.ts` | planned (#1439) | #1431 |
+| S5 | While results update, focus is kept and results are announced; Enter and no-JavaScript still work. | `tests/search-as-you-type-dom-1431.test.ts` | `npm run test:event-journeys` (attendee pages); no-JavaScript Enter included | #1431 |
 
 ## Setup help
 
@@ -65,34 +70,34 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
 | B1 | Every list can be sorted by clicking a column header, and uses the same paging control and "Showing 1–25 of 140" line. Every staff and admin table is sortable except short fixed or set-order lists, which go on an allowlist. | `tests/sorting-pager-rule1-1458.test.ts`, `tests/list-sort-pager-1458.test.ts`, `tests/sorting-round-a-1458.test.ts` | planned (#1439) | #1433; Caleb, Nov 1 |
-| B2 | Filters live in the web address (Back and shared links keep them), and every filtered list has a "Clear filters" button. | `tests/filters-in-address-rule2-1456.test.ts`, `tests/search-as-you-type-dom-1431.test.ts` | planned (#1439) | #1433 |
+| B2 | Filters live in the web address (Back and shared links keep them), and every filtered list has a "Clear filters" button. | `tests/filters-in-address-rule2-1456.test.ts`, `tests/search-as-you-type-dom-1431.test.ts` | `npm run test:event-journeys` (attendee pages): the My registrations filter tabs (the address). The "Clear filters" button is n/a there (the filters are tabs, All is the way back) | #1433 |
 | B3 | On a phone, every table turns into cards the same way. | `tests/table-cards-guard-1457.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1433 |
-| B4 | Every empty list says why it's empty and offers the next step. | `tests/empty-states-rule4-1449.test.ts`, `tests/empty-states-rule4-render-1449.test.ts`, `tests/empty-states-guard-1440.test.ts` | planned (#1439) | #1433 |
+| B4 | Every empty list says why it's empty and offers the next step. | `tests/empty-states-rule4-1449.test.ts`, `tests/empty-states-rule4-render-1449.test.ts`, `tests/empty-states-guard-1440.test.ts` | `npm run test:event-journeys` (attendee pages): empty My registrations tabs | #1433 |
 
 ## Behavior: forms and saving
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| B5 | Every form either saves automatically or has one clear Save button, with the same "Saved" confirmation either way. Forms keep one Save button; autosave only where it already exists; the same "Saved" message everywhere. | `tests/saving-messages-1455.test.ts`, `tests/unsaved-changes-guard-1452.test.ts` | planned (#1439) | #1433; Caleb, Nov 1 |
+| B5 | Every form either saves automatically or has one clear Save button, with the same "Saved" confirmation either way. Forms keep one Save button; autosave only where it already exists; the same "Saved" message everywhere. | `tests/saving-messages-1455.test.ts`, `tests/unsaved-changes-guard-1452.test.ts` | `npm run test:event-journeys` (attendee pages): the contact details form | #1433; Caleb, Nov 1 |
 | B6 | Leaving a page with unsaved changes always warns first. | `tests/unsaved-changes-guard-1452.test.ts`, `tests/unsaved-changes-leave-1452.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1433 |
 | B7 | Errors show the same way everywhere: a short summary at the top, and each problem next to its field. | `tests/form-error-summary-1450.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1433 |
-| B8 | Phone numbers, emails and dates are checked and formatted the same way in every form. | `tests/field-checks-1451.test.ts`, `tests/field-checks-1451-dom.test.ts` | planned (#1439) | #1433 |
+| B8 | Phone numbers, emails and dates are checked and formatted the same way in every form. | `tests/field-checks-1451.test.ts`, `tests/field-checks-1451-dom.test.ts` | `npm run test:event-journeys` (attendee pages): the registration form, the contact details form and Create account | #1433 |
 
 ## Behavior: actions and messages
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| B9 | Every delete or cancel asks for confirmation in the same style, and offers Undo where possible. | `tests/confirm-guard-1448.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1433 |
-| B10 | Buttons show "Saving…" while working, and success and error messages appear in the same place. | `tests/saving-messages-1455.test.ts` | planned (#1439) | #1433 |
+| B9 | Every delete or cancel asks for confirmation in the same style, and offers Undo where possible. | `tests/confirm-guard-1448.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)); `npm run test:event-journeys` (attendee pages): cancellation request and withdraw | #1433 |
+| B10 | Buttons show "Saving…" while working, and success and error messages appear in the same place. | `tests/saving-messages-1455.test.ts` | `npm run test:event-journeys` (attendee pages): Create account, Apply, Submit, Save, Send request | #1433 |
 | B11 | Every Download or Export button works the same, with the same file naming. | `tests/exports-rule11-1458.test.ts` | planned (#1439) | #1433 |
 
 ## Behavior: words and display
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| B12 | The same status words mean the same thing everywhere (Pending, Confirmed, Waitlisted, Cancelled, …). The status words are exactly Draft, Submitted, Pending payment, Pending approval, Confirmed, Waitlisted, Cancelled, Refunded. Club forms and links, club applications, team permissions, invites, general links, club transfers and merchandise orders use the same words (#1479). Three things keep their own words because they describe something other than a record's status: email delivery states (Queued, Processing, Captured, Sent, Failed, Suppressed) describe delivery of a message; the area coordinator roll-ups "Registered" and "Not registered" describe whether an area has registered; check-in states describe arrival at the event. Words outside the eight that stay: Expired, Used, Attached to a club, Declined (transfers), Completed. | `tests/status-words-1453.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1433; Caleb, Nov 1 |
+| B12 | The same status words mean the same thing everywhere (Pending, Confirmed, Waitlisted, Cancelled, …). The status words are exactly Draft, Submitted, Pending payment, Pending approval, Confirmed, Waitlisted, Cancelled, Refunded. Club forms and links, club applications, team permissions, invites, general links, club transfers and merchandise orders use the same words (#1479). Three things keep their own words because they describe something other than a record's status: email delivery states (Queued, Processing, Captured, Sent, Failed, Suppressed) describe delivery of a message; the area coordinator roll-ups "Registered" and "Not registered" describe whether an area has registered; check-in states describe arrival at the event. Words outside the eight that stay: Expired, Used, Attached to a club, Declined (transfers), Completed. | `tests/status-words-1453.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)); `npm run test:event-journeys` (attendee pages): My registrations status | #1433; Caleb, Nov 1 |
 | B13 | Names and times display the same way everywhere, with times in Central and labeled. | `tests/person-name-format-1454.test.ts`, `tests/times-labeled-central-1454.test.ts`, `tests/shared-formatters-1355.test.ts` | planned (#1439) | #1433 |
-| B14 | "You don't have access" pages all say the same thing and explain who to ask. | `tests/no-access-copy-1411.test.ts`, `tests/access-pages-rule14.test.ts` | planned (#1439) | #1433 |
+| B14 | "You don't have access" pages all say the same thing and explain who to ask. | `tests/no-access-copy-1411.test.ts`, `tests/access-pages-rule14.test.ts` | `npm run test:event-journeys` (attendee pages): a staff page opened as an attendee | #1433 |
 
 ## Sign-in
 
@@ -108,20 +113,20 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| T3 | When the Security check cannot load or complete (a privacy browser, ad blocker or VPN blocks it), the person is never stuck. Sign-in, sign-up and password reset offer **"Email me a code instead"**: a one-time code to the address they typed (10 minutes, single use, five tries, rate limited, audit logged with ids only) that satisfies the check for that one request. Every other public form sends without a token, only through a much stricter rate limit (3 per hour per source, 2 per hour per address), and is flagged for staff in the audit log, never shown to the person. | `tests/security-check-fallback-1480.test.ts`, `tests/security-check-fallback-limits-1480.test.ts`, `tests/security-check-fallback-ui-1480.test.ts`, `tests/turnstile-gated-routes-1399.test.ts` | planned (#1439) | Caleb, Nov 1 (#1480) |
-| T4 | Next to the blocked-check message the office contact is shown (the footer help contact setting, default support@imsda.org and (515) 223-1197), with `translate="no"` on the email and phone. | `tests/security-check-fallback-ui-1480.test.ts` | planned (#1439) | Caleb, Nov 1 (#1480) |
-| T5 | A token that is present but invalid is never bypassed: the fallback applies only when the check could not produce a token. The emailed-code answer never says whether an account exists (same status and words either way). | `tests/security-check-fallback-1480.test.ts` | planned (#1439) | Caleb, Nov 1 (#1480) |
+| T3 | When the Security check cannot load or complete (a privacy browser, ad blocker or VPN blocks it), the person is never stuck. Sign-in, sign-up and password reset offer **"Email me a code instead"**: a one-time code to the address they typed (10 minutes, single use, five tries, rate limited, audit logged with ids only) that satisfies the check for that one request. Every other public form sends without a token, only through a much stricter rate limit (3 per hour per source, 2 per hour per address), and is flagged for staff in the audit log, never shown to the person. | `tests/security-check-fallback-1480.test.ts`, `tests/security-check-fallback-limits-1480.test.ts`, `tests/security-check-fallback-ui-1480.test.ts`, `tests/turnstile-gated-routes-1399.test.ts` | `npm run test:event-journeys` (Create account and Sign-in with the Security check blocked) | Caleb, Nov 1 (#1480) |
+| T4 | Next to the blocked-check message the office contact is shown (the footer help contact setting, default support@imsda.org and (515) 223-1197), with `translate="no"` on the email and phone. | `tests/security-check-fallback-ui-1480.test.ts` | `npm run test:event-journeys` (attendee pages) | Caleb, Nov 1 (#1480) |
+| T5 | A token that is present but invalid is never bypassed: the fallback applies only when the check could not produce a token. The emailed-code answer never says whether an account exists (same status and words either way). | `tests/security-check-fallback-1480.test.ts` | `npm run test:event-journeys` (attendee pages): sign-in, an address with an account and one without | Caleb, Nov 1 (#1480) |
 
 ## Look
 
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
-| L1 | One search field look: the `.search-field` wrapper draws the border with a 10px radius; the input inside draws nothing. Native clear "x" is hidden; clear buttons are 44px. | `tests/search-field-consistency-1347.test.ts` | planned (#1439) | #1342, #1347 |
-| L2 | No focus glow (halo). Every field and search box shows one purple ring only (2px at 2px offset), gold on navy. | `tests/field-focus-ring-1349.test.ts` | mobile layout audit (focus rings); planned (#1439) | #1342, #1347, #1349 |
-| L3 | A field with an error that has focus keeps the red border **and** gets the purple ring. | `tests/field-focus-ring-1349.test.ts` | planned (#1439) | #1349 |
-| L4 | Status chips and badges use the shared `.status-chip` and `.count-badge`, colored from tokens. "Missing" and "Late" are coral; "To review" is purple; filter counts use the navy count badge. | `tests/status-chips-1351.test.ts` | planned (#1439) | #1351 |
-| L5 | Buttons use the shared button classes. Main and light buttons have hover looks; disabled buttons use the "not allowed" cursor; check-in station buttons stay at 48px; the club finder list stays a pick-one row in app colors. | `tests/look-guard-1440.test.ts` | planned (#1439) | #1352 |
-| L6 | Tabs use the one shared tabs component, with keyboard support. | `tests/tabs-shared-1353.test.ts` | planned (#1439) | #1353 |
+| L1 | One search field look: the `.search-field` wrapper draws the border with a 10px radius; the input inside draws nothing. Native clear "x" is hidden; clear buttons are 44px. | `tests/search-field-consistency-1347.test.ts` | `npm run test:event-journeys` (attendee pages) | #1342, #1347 |
+| L2 | No focus glow (halo). Every field and search box shows one purple ring only (2px at 2px offset), gold on navy. | `tests/field-focus-ring-1349.test.ts` | mobile layout audit (focus rings); `npm run test:event-journeys` (attendee pages) | #1342, #1347, #1349 |
+| L3 | A field with an error that has focus keeps the red border **and** gets the purple ring. | `tests/field-focus-ring-1349.test.ts` | `npm run test:event-journeys` (attendee pages) | #1349 |
+| L4 | Status chips and badges use the shared `.status-chip` and `.count-badge`, colored from tokens. "Missing" and "Late" are coral; "To review" is purple; filter counts use the navy count badge. | `tests/status-chips-1351.test.ts` | `npm run test:event-journeys` (attendee pages) | #1351 |
+| L5 | Buttons use the shared button classes. Main and light buttons have hover looks; disabled buttons use the "not allowed" cursor; check-in station buttons stay at 48px; the club finder list stays a pick-one row in app colors. | `tests/look-guard-1440.test.ts` | `npm run test:event-journeys` (attendee pages) | #1352 |
+| L6 | Tabs use the one shared tabs component, with keyboard support. | `tests/tabs-shared-1353.test.ts` | `npm run test:event-journeys` (the check runs on every page; no attendee page has tabs, so it is n/a there until the staff journeys) | #1353 |
 | L7 | Dialogs use the shared `useAccessibleDialog` hook (focus trap, Escape, return focus). | `tests/dialogs-shared-hook-1354.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | #1354 |
 | L8 | Identical radius and color values use the shared tokens in `app/globals.css`. Values that differ wait for a later mockup issue. | `tests/look-guard-1440.test.ts` | none (code rule) | #1350 |
 

@@ -27,6 +27,8 @@
  *  - H3/H4: a text that says something is not set up, missing, blocked or not available yet must have, nearby, a link or
  *    a "How to do this" panel (H3) or name who to ask (H4).
  */
+import { EMAIL_FIELD_MESSAGE, PHONE_FIELD_MESSAGE } from "../../lib/field-validation";
+import { attendeeStaffPageCopy } from "../../modules/access/no-access-copy";
 import { clubDirectorRoleLabels } from "../../modules/organizations/director-grants-domain";
 import type { Page } from "./browser-journeys";
 
@@ -200,7 +202,7 @@ async function scanPage(page: Page): Promise<Scan> {
   });
 }
 
-export async function checkPage(page: Page, rec: Recorder, name: string, options: { extraWords?: string[] } = {}) {
+export async function checkPage(page: Page, rec: Recorder, name: string, options: { extraWords?: string[]; look?: boolean } = {}) {
   const scan = await scanPage(page);
 
   // B12: status chips.
@@ -240,6 +242,13 @@ export async function checkPage(page: Page, rec: Recorder, name: string, options
   }
 
   await checkSearchBoxes(page, rec, name);
+  // The look rules (L1, L4, L5, L6) are passive too, but only the event journeys switch them on.
+  if (options.look) {
+    await checkSearchFieldLook(page, rec, name);
+    await checkChipsAndBadges(page, rec, name);
+    await checkButtons(page, rec, name);
+    await checkTabs(page, rec, name);
+  }
 }
 
 /* ------------------------------------------------------------ search */
@@ -271,7 +280,7 @@ export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) 
     await box.pressSequentially("zzqx-no-match-zz", { delay: 15 });
     // Narrowing means fewer lines of results than before, or a no-match message that was not there before; a different
     // line somewhere (a counter, an echo of the typed text) is not narrowing.
-    const noMatch = /\b(no (?:\w+ )*(?:results?|matches|clubs?|guides?|items?|people|forms?) (?:found|match)|no (?:results?|matches)|nothing (?:found|matches)|none of them match|0 (?:results?|matches|of \d+)|not found)\b/i;
+    const noMatch = /\b(no (?:\w+ )*(?:results?|matches|clubs?|guides?|items?|people|forms?|events?) (?:found|match)|no (?:results?|matches)|nothing (?:found|matches)|none of them match|0 (?:results?|matches|of \d+)|not found)\b/i;
     const baselineCount = baseline.split("\n").length;
     const narrowed = await pollPage<string>(page, read, (text) => text.split("\n").length < baselineCount || (noMatch.test(text) && !noMatch.test(baseline)), 5_000);
     rec.record(name, "S4", `${what} (typing narrows, no Enter)`, narrowed.ok ? "pass" : "fail", narrowed.ok ? "fewer results (or a no-match message) while typing" : "typing a string that matches nothing did not narrow the results or show a no-match message without pressing Enter");
@@ -372,4 +381,380 @@ export async function checkDialogBehavior(page: Page, rec: Recorder, name: strin
     const back = await pollPage<boolean>(page, () => opener.evaluate((node: Element) => node === document.activeElement), Boolean, 3_000);
     rec.record(name, "L7", `${what}: focus returns to the opener`, back.ok ? "pass" : "fail", back.ok ? "focus is back on the button that opened it" : "focus did not return to the button that opened the dialog");
   }
+}
+
+/* =========================================================================================================
+ * Event journeys (#1439 round 2): checks for the rules the attendee pages answer to. Each is capable of failing, and a
+ * rule that does not apply to a page is recorded "n/a" with the reason. The look checks (L1, L4, L5, L6) run from
+ * `checkPage` only when `look: true` is passed.
+ * ========================================================================================================= */
+
+/** What a person can read of a field's own message: the elements its aria-describedby points at, joined. */
+async function describedText(field: ReturnType<Page["locator"]>) {
+  return field.evaluate((node: Element) => (node.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean)
+    .map((id) => document.getElementById(id)?.textContent ?? "").join(" ").replace(/\s+/g, " ").trim());
+}
+
+/** Holds back the next request that `match` accepts, so the in-flight state (the "Saving…" label) can be read before it ends. */
+export async function holdRequest(page: Page, match: (url: string, method: string, body: string | null) => boolean) {
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  let seen: () => void = () => undefined;
+  const hit = new Promise<void>((resolve) => { seen = resolve; });
+  let held = false;
+  const handler = async (route: { request(): { url(): string; method(): string; postData(): string | null }; fallback(): Promise<void>; continue(): Promise<void> }) => {
+    const request = route.request();
+    if (held || !match(request.url(), request.method(), request.postData())) return route.fallback();
+    held = true;
+    seen();
+    await gate;
+    await route.continue().catch(() => undefined);
+  };
+  await page.route("**/*", handler);
+  return { hit, release, stop: async () => { release(); await page.unroute("**/*", handler).catch(() => undefined); } };
+}
+
+/* ------------------------------------------------------------- B8 */
+
+/**
+ * B8: phone, email and date answers are checked and tidied the same way in every form. Types a bad value into each given
+ * field, leaves it, and expects the shared message (the field is marked invalid and its own message is the one in
+ * lib/field-validation.ts); a good unformatted phone is tidied to "(515) 555-0134" when the field is left. Leaves the fields blank.
+ */
+export async function checkTypedFields(page: Page, rec: Recorder, name: string, fields: { phone?: ReturnType<Page["locator"]>; email?: ReturnType<Page["locator"]>; birthDate?: ReturnType<Page["locator"]> }) {
+  const leave = async (field: ReturnType<Page["locator"]>) => { await field.blur(); };
+  const messageOf = (field: ReturnType<Page["locator"]>) => async () => ({ invalid: (await field.getAttribute("aria-invalid")) === "true", text: await describedText(field) });
+  if (fields.phone) {
+    await fields.phone.fill("idk 911");
+    await leave(fields.phone);
+    const bad = await pollPage(page, messageOf(fields.phone), (value) => value.invalid, 3_000);
+    const text = bad.value?.text ?? "";
+    rec.record(name, "B8", "a bad phone gets the shared message", bad.ok && text.includes(PHONE_FIELD_MESSAGE) ? "pass" : "fail", bad.ok ? `message: "${text.slice(0, 90)}"` : "a bad phone number was not marked invalid when the field was left");
+    await fields.phone.fill("5155550134");
+    await leave(fields.phone);
+    const tidy = await pollPage<string>(page, () => fields.phone!.inputValue(), (value) => value === "(515) 555-0134", 3_000);
+    rec.record(name, "B8", "a good phone is tidied to (515) 555-0134", tidy.ok ? "pass" : "fail", tidy.ok ? "5155550134 became (515) 555-0134 when the field was left" : `the phone stayed "${tidy.value}"`);
+    await fields.phone.fill("");
+  }
+  if (fields.email) {
+    await fields.email.fill("not-an-email");
+    await leave(fields.email);
+    const bad = await pollPage(page, messageOf(fields.email), (value) => value.invalid, 3_000);
+    const text = bad.value?.text ?? "";
+    rec.record(name, "B8", "a bad email gets the shared message", bad.ok && text.includes(EMAIL_FIELD_MESSAGE) ? "pass" : "fail", bad.ok ? `message: "${text.slice(0, 90)}"` : "a bad email address was not marked invalid when the field was left");
+  }
+  if (fields.birthDate) {
+    const future = new Date(Date.now() + 400 * 86_400_000).toISOString().slice(0, 10);
+    await fields.birthDate.fill(future);
+    await leave(fields.birthDate);
+    const bad = await pollPage(page, messageOf(fields.birthDate), (value) => value.invalid, 3_000);
+    const text = bad.value?.text ?? "";
+    rec.record(name, "B8", "a birth date in the future gets the shared date message", bad.ok && /can't be in the future/.test(text) ? "pass" : "fail", bad.ok ? `message: "${text.slice(0, 90)}"` : "a birth date a year from now was not marked invalid");
+    await fields.birthDate.fill("");
+  }
+}
+
+/** B8 for a plain email field that the browser alone checks (the shared message never appears): records what really happens. */
+export async function checkBrowserOnlyEmail(page: Page, rec: Recorder, name: string, field: ReturnType<Page["locator"]>) {
+  await field.fill("not-an-email");
+  await field.blur();
+  const state = await pollPage(page, async () => ({
+    invalid: (await field.getAttribute("aria-invalid")) === "true",
+    text: await describedText(field),
+    native: await field.evaluate((node: HTMLInputElement) => node.validity.typeMismatch),
+  }), (value) => value.invalid || value.text.length > 0, 1_500);
+  const value = state.value;
+  const shared = Boolean(value?.invalid && value.text.includes(EMAIL_FIELD_MESSAGE));
+  rec.record(name, "B8", "a bad email gets the shared message", shared ? "pass" : "fail", shared ? `message: "${value!.text.slice(0, 90)}"` : `the field shows no shared message when left; only the browser's own check (${value?.native ? "type mismatch on submit" : "none"}) applies`);
+  await field.fill("");
+}
+
+/* ------------------------------------------------------- B5 and B10 */
+
+/**
+ * B5 and B10: a form has one clear Save, the pressed button reads "Saving…" while the request is in flight, and one message
+ * under it says "Saved." (or "Not saved: ..."). `click` presses Save; `match` picks the request to hold open.
+ */
+export async function checkSaveFlow(page: Page, rec: Recorder, name: string, what: string, input: { form: ReturnType<Page["locator"]>; button: ReturnType<Page["locator"]>; click: () => Promise<void>; match: (url: string, method: string, body: string | null) => boolean; done: () => Promise<unknown> }) {
+  const saveButtons = await input.form.locator("button").evaluateAll((nodes: HTMLButtonElement[]) => nodes.filter((node) => node.getBoundingClientRect().width > 0).map((node) => (node.textContent ?? "").replace(/\s+/g, " ").trim()).filter((text) => /^(save|saving|update)\b/i.test(text)));
+  rec.record(name, "B5", `${what}: one clear Save button`, saveButtons.length === 1 ? "pass" : "fail", `Save-type buttons in the form: ${JSON.stringify(saveButtons)}`);
+  const held = await holdRequest(page, input.match);
+  try {
+    await input.click();
+    await Promise.race([held.hit, page.waitForTimeout(8_000)]);
+    const label = clean((await input.button.textContent()) ?? "");
+    const busy = (await input.button.getAttribute("aria-busy")) === "true";
+    rec.record(name, "B10", `${what}: the button reads "Saving…" while working`, /^Saving…$/.test(label) ? "pass" : "fail", `while the request was in flight the button said "${label}"${busy ? " (aria-busy)" : ""}`);
+  } finally {
+    await held.stop();
+  }
+  await input.done();
+  const messages = await input.form.locator('[role="status"], [role="alert"], .inline-notice').evaluateAll((nodes: HTMLElement[]) => nodes.filter((node) => node.getBoundingClientRect().width > 0 && (node.textContent ?? "").trim().length > 0).map((node) => (node.textContent ?? "").replace(/\s+/g, " ").trim()));
+  const text = messages[0] ?? "";
+  rec.record(name, "B5", `${what}: one "Saved." message after saving`, messages.length === 1 && /^Saved\./.test(text) ? "pass" : "fail", `messages shown after saving: ${JSON.stringify(messages)}`);
+}
+
+/** B10: a button that sends something says what it is doing (ends in "…", like "Saving…" or "Submitting…") while the request is in flight, and is marked busy or disabled so it cannot be sent twice. */
+export async function checkInFlightLabel(page: Page, rec: Recorder, name: string, what: string, input: { button: ReturnType<Page["locator"]>; click: () => Promise<void>; match: (url: string, method: string, body: string | null) => boolean; expect?: RegExp }) {
+  const held = await holdRequest(page, input.match);
+  try {
+    await input.click();
+    await Promise.race([held.hit, page.waitForTimeout(8_000)]);
+    const text = clean((await input.button.first().textContent()) ?? "");
+    const guarded = (await input.button.first().getAttribute("aria-busy")) === "true" || (await input.button.first().isDisabled());
+    const named = input.expect ? input.expect.test(text) : /…$/.test(text);
+    rec.record(name, "B10", `${what}: says what it is doing while working`, named && guarded ? "pass" : "fail", `while the request was in flight the button said "${text}"${guarded ? ", and could not be pressed again" : ", and could be pressed again"}`);
+  } finally {
+    await held.stop();
+  }
+}
+
+/* --------------------------------------------------------------- B4 */
+
+/** B4: an empty list says why it is empty and offers the next step (a link or a button with its own words). */
+export async function checkEmptyState(page: Page, rec: Recorder, name: string, what: string, container: ReturnType<Page["locator"]>) {
+  const found = await container.first().waitFor({ state: "visible", timeout: 5_000 }).then(() => true, () => false);
+  if (!found) { rec.record(name, "B4", `${what}: says why and offers a next step`, "fail", "no empty-state message is on the page"); return; }
+  const state = await container.first().evaluate((node: HTMLElement) => ({
+    text: (node.textContent ?? "").replace(/\s+/g, " ").trim(),
+    next: [...node.querySelectorAll("a[href], button")].map((control) => (control.textContent ?? "").replace(/\s+/g, " ").trim()).filter(Boolean),
+  }));
+  const why = state.text.length >= 25 && /\b(no|none|nothing|not|yet)\b/i.test(state.text);
+  rec.record(name, "B4", `${what}: says why it is empty`, why ? "pass" : "fail", `"${state.text.slice(0, 120)}"`);
+  rec.record(name, "B4", `${what}: offers the next step`, state.next.length > 0 ? "pass" : "fail", state.next.length > 0 ? `next step: ${state.next.map((label: string) => `"${label}"`).join(", ")}` : "the empty message has no link or button to go on with");
+}
+
+/* -------------------------------------------------------------- B14 */
+
+/** B14: a staff page opened by someone signed in as an attendee says the shared thing and who to ask. */
+export async function checkNoAccess(page: Page, rec: Recorder, name: string, email: string) {
+  const copy = attendeeStaffPageCopy(email);
+  const text = clean(await page.evaluate(() => document.body?.innerText ?? ""));
+  const ask = `Ask ${copy.whoToAsk} if you need access.`;
+  rec.record(name, "B14", "says the shared no-access words", text.includes(copy.heading) && text.includes(copy.body) ? "pass" : "fail", text.includes(copy.heading) ? `heading "${copy.heading}"` : `page says: "${text.slice(0, 140)}"`);
+  rec.record(name, "B14", "explains who to ask", text.includes(ask) ? "pass" : "fail", text.includes(ask) ? `"${ask}"` : "the \"Ask ... if you need access.\" line is missing");
+  const heading = await page.getByRole("heading", { level: 1 }).count();
+  rec.record(name, "B14", "the page has its own heading", heading > 0 ? "pass" : "fail", `${heading} level-1 heading(s)`);
+}
+
+/* --------------------------------------------------------------- S5 */
+
+/**
+ * S5: typing in a search box keeps focus in it while the results update, and the new results are announced in a live
+ * region (role="status" or aria-live). `query` should narrow the list.
+ */
+export async function checkSearchLive(page: Page, rec: Recorder, name: string, input: { box: ReturnType<Page["locator"]>; query: string }) {
+  const live = () => page.evaluate(() => [...document.querySelectorAll('[role="status"], [aria-live="polite"], [aria-live="assertive"]')].map((node) => (node.textContent ?? "").replace(/\s+/g, " ").trim()).filter(Boolean).join(" | "));
+  const before = await live();
+  await input.box.click();
+  await input.box.pressSequentially(input.query, { delay: 15 });
+  const announced = await pollPage<string>(page, live, (text) => text !== before && text.length > 0, 6_000);
+  const stillFocused = await input.box.evaluate((node: Element) => node === document.activeElement);
+  const kept = (await input.box.inputValue()) === input.query;
+  rec.record(name, "S5", "focus stays in the search box while results update", stillFocused && kept ? "pass" : "fail", stillFocused ? (kept ? "the typed text and the focus were still in the box after the results changed" : "the box lost what was typed") : "focus left the search box while the results updated");
+  rec.record(name, "S5", "the new results are announced in a live region", announced.ok ? "pass" : "fail", announced.ok ? `live region: "${(announced.value ?? "").slice(0, 80)}" (was "${before.slice(0, 40)}")` : "no live region changed while the results updated");
+}
+
+/** S5: Enter and no-JavaScript still work: with scripts off, typing and pressing Enter submits the form and shows the narrowed list. */
+export async function checkSearchWithoutScript(browser: { newContext(options: Record<string, unknown>): Promise<{ newPage(): Promise<Page>; close(): Promise<void> }> }, rec: Recorder, name: string, input: { url: string; query: string; expectText: string }) {
+  const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1280, height: 900 } });
+  try {
+    const page = await context.newPage();
+    await page.goto(input.url, { waitUntil: "load" });
+    const box = page.locator('input[type="search"]').first();
+    await box.fill(input.query);
+    await Promise.all([page.waitForURL((url: URL) => url.searchParams.get("q") === input.query, { timeout: 15_000 }), box.press("Enter")]);
+    const shown = await page.getByText(input.expectText).first().isVisible().catch(() => false);
+    rec.record(name, "S5", "Enter and no-JavaScript still work", shown ? "pass" : "fail", shown ? "with scripts off, Enter sent the search in the address and the list showed the match" : "with scripts off, Enter did not show the matching result");
+  } finally {
+    await context.close();
+  }
+}
+
+/* ------------------------------------------------------------- look */
+
+
+/** L1: the `.search-field` wrapper draws the border (10px radius), the input draws nothing, the native clear "x" is hidden, clear buttons are 44px. */
+export async function checkSearchFieldLook(page: Page, rec: Recorder, name: string) {
+  const wrapper = page.locator(".search-field:visible").first();
+  if (!(await wrapper.count())) { rec.record(name, "L1", "search field look", "n/a", "no search field on this page"); return; }
+  const look = await wrapper.evaluate((node: HTMLElement) => {
+    const style = getComputedStyle(node);
+    const input = node.querySelector("input");
+    const inner = input ? getComputedStyle(input) : null;
+    // The browser does not report the native x through getComputedStyle, so ask the page's own stylesheets: a rule that
+    // matches this input (before its ::-webkit-search-cancel-button) and says display: none.
+    let cancel = "shown";
+    const hideRules = (rules: CSSRuleList) => {
+      for (const rule of Array.from(rules)) {
+        const nested = (rule as CSSGroupingRule).cssRules;
+        if (nested) hideRules(nested);
+        const styleRule = rule as CSSStyleRule;
+        if (!styleRule.selectorText || !input || !styleRule.selectorText.includes("::-webkit-search-cancel-button")) continue;
+        const matches = styleRule.selectorText.split(",").some((selector) => selector.includes("::-webkit-search-cancel-button") && (() => { try { return input.matches(selector.replace(/::-webkit-search-cancel-button.*$/, "").trim()); } catch { return false; } })());
+        if (matches && styleRule.style.display === "none") cancel = "none";
+      }
+    };
+    for (const sheet of Array.from(document.styleSheets)) { try { hideRules(sheet.cssRules); } catch { /* a sheet from another site */ } }
+    return {
+      radii: [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius],
+      border: `${style.borderTopWidth} ${style.borderTopStyle}`,
+      inner: inner ? { width: inner.borderTopWidth, style: inner.borderTopStyle, shadow: inner.boxShadow, type: input!.type } : null,
+      cancel,
+    };
+  });
+  rec.record(name, "L1", "the wrapper draws the border with a 10px radius", look.radii.every((radius: string) => radius === "10px") && !/^0px|none/.test(look.border) ? "pass" : "fail", `radius ${look.radii.join("/")}, border ${look.border}`);
+  if (look.inner) {
+    const drawsNothing = (look.inner.width === "0px" || look.inner.style === "none") && (look.inner.shadow === "none" || look.inner.shadow === "");
+    rec.record(name, "L1", "the input inside draws no border", drawsNothing ? "pass" : "fail", `input border ${look.inner.width} ${look.inner.style}, shadow ${look.inner.shadow}`);
+    if (look.inner.type === "search") rec.record(name, "L1", "the native clear x is hidden", look.cancel === "none" ? "pass" : "fail", look.cancel === "none" ? "a stylesheet rule hides ::-webkit-search-cancel-button inside this field" : "no stylesheet rule hides the browser's own clear x inside this field");
+  }
+  // The clear button shows once something is typed.
+  const input = wrapper.locator("input").first();
+  await input.fill("x");
+  const clear = wrapper.locator("button:visible").first();
+  const shown = await clear.waitFor({ state: "visible", timeout: 2_000 }).then(() => true, () => false);
+  if (!shown) rec.record(name, "L1", "the clear button is 44px", "fail", "no clear button appeared after typing in the search field");
+  else {
+    const box = await clear.boundingBox();
+    rec.record(name, "L1", "the clear button is 44px", box && box.width >= 43.5 && box.height >= 43.5 ? "pass" : "fail", `clear button is ${box ? `${Math.round(box.width)}x${Math.round(box.height)}` : "not measurable"}px`);
+  }
+  await input.fill("");
+}
+
+/** The ring a focused field shows: one 2px ring at 2px offset in the field-focus color, and no halo. */
+async function focusLook(field: ReturnType<Page["locator"]>) {
+  await field.focus();
+  return field.evaluate((input: HTMLElement) => {
+    // A search box draws its ring on the .search-field wrapper (focus-within), the input inside stays bare.
+    const node = (input.closest(".search-field") as HTMLElement | null) ?? input;
+    const style = getComputedStyle(node);
+    const probe = document.createElement("span");
+    probe.style.color = "var(--field-focus)";
+    document.body.append(probe);
+    const ring = getComputedStyle(probe).color;
+    probe.remove();
+    return { outline: `${style.outlineWidth} ${style.outlineStyle}`, color: style.outlineColor, ring, offset: style.outlineOffset, shadow: `${style.boxShadow}${node === input ? "" : ` / input ${getComputedStyle(input).boxShadow}`}`.replace(/^none \/ input none$/, "none"), border: style.borderTopColor };
+  });
+}
+
+/** L2: a focused field shows one 2px ring at 2px offset in the shared focus color, with no box-shadow halo. */
+export async function checkFocusRing(page: Page, rec: Recorder, name: string, field: ReturnType<Page["locator"]>) {
+  const look = await focusLook(field);
+  const ok = look.outline === "2px solid" && look.offset === "2px" && look.color === look.ring;
+  rec.record(name, "L2", "a focused field shows one 2px ring at 2px offset", ok ? "pass" : "fail", `outline ${look.outline} ${look.color} at ${look.offset} offset (the shared color is ${look.ring})`);
+  rec.record(name, "L2", "a focused field has no glow", look.shadow === "none" ? "pass" : "fail", `box-shadow: ${look.shadow}`);
+}
+
+/** L3: an errored field that has focus keeps the red edge (a red border, or the 1px red line the invalid style draws around the border) and also gets the ring. The field must already be marked invalid. */
+export async function checkErroredFocus(page: Page, rec: Recorder, name: string, field: ReturnType<Page["locator"]>) {
+  const invalid = (await field.getAttribute("aria-invalid")) === "true";
+  if (!invalid) { rec.record(name, "L3", "an errored focused field keeps the red border and the ring", "fail", "the field is not marked invalid, so the errored state could not be checked"); return; }
+  const look = await focusLook(field);
+  const redOf = (color: string) => {
+    const [red = 0, green = 255, blue = 255] = (color.match(/\d+(\.\d+)?/g) ?? []).map(Number);
+    return red >= 100 && red >= green * 1.5 && red >= blue * 1.5;
+  };
+  const borderRed = redOf(look.border);
+  const shadowRed = redOf(look.shadow) && /\b[1-9]\d*px\s*(rgb|$)|0px 0px 0px [1-9]/.test(look.shadow);
+  const ring = look.outline === "2px solid" && look.offset === "2px" && look.color === look.ring;
+  rec.record(name, "L3", "an errored focused field keeps the red border and the ring", (borderRed || shadowRed) && ring ? "pass" : "fail", `border ${look.border} (${borderRed ? "red" : "not red"}), shadow ${look.shadow} (${shadowRed ? "red line" : "no red line"}), outline ${look.outline} ${look.color} at ${look.offset}`);
+}
+
+/** L4: status chips and badges use the shared `.status-chip` and `.count-badge`; filter counts use the count badge. */
+export async function checkChipsAndBadges(page: Page, rec: Recorder, name: string) {
+  const scan = await page.evaluate(() => {
+    const visible = (element: Element) => { const box = element.getBoundingClientRect(); return box.width > 0 && box.height > 0; };
+    const words = (value: string) => value.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z]+/);
+    const shared = (element: Element) => element.matches(".status-chip, .count-badge") || Boolean(element.closest(".status-chip, .count-badge")) || Boolean(element.querySelector(".status-chip, .count-badge"));
+    const own = [...document.body.querySelectorAll("*")].filter((element) => {
+      if (element.closest("svg, script, style, nav.skip-links") || !visible(element) || shared(element)) return false;
+      const text = (element.textContent ?? "").replace(/\s+/g, " ").trim();
+      if (text.length === 0 || text.length > 40 || element.children.length > 2) return false;
+      const classes = String((element as HTMLElement).className || "").split(/\s+/).flatMap((token) => words(token));
+      return classes.some((word) => ["pill", "chip", "badge"].includes(word));
+    }).map((element) => `${element.tagName.toLowerCase()}.${String((element as HTMLElement).className).split(/\s+/)[0]} "${(element.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 30)}"`);
+    const filterLinks = [...document.querySelectorAll('nav[aria-label*="Show" i] a, nav[aria-label*="Filter" i] a, [role="tab"]')].filter(visible);
+    const counted = filterLinks.flatMap((link) => {
+      const count = [...link.querySelectorAll("span, small")].find((child) => /^\(?\d+\)?$/.test((child.textContent ?? "").trim()));
+      return count ? [{ label: (link.textContent ?? "").replace(/\s+/g, " ").trim(), shared: count.matches(".count-badge") || Boolean(count.closest(".count-badge")), cls: String((count as HTMLElement).className) }] : [];
+    });
+    return { own: [...new Set(own)], counted };
+  });
+  if (scan.own.length === 0) rec.record(name, "L4", "chips and badges use the shared classes", "n/a", "no chip, pill or badge on this page outside the shared ones");
+  else rec.record(name, "L4", "chips and badges use the shared classes", "fail", `own chip look instead of .status-chip / .count-badge: ${scan.own.slice(0, 3).join("; ")}`);
+  if (scan.counted.length === 0) rec.record(name, "L4", "filter counts use the count badge", "n/a", "no filter with counts on this page");
+  else {
+    const bad = scan.counted.filter((entry: { shared: boolean }) => !entry.shared);
+    rec.record(name, "L4", "filter counts use the count badge", bad.length === 0 ? "pass" : "fail", bad.length === 0 ? `${scan.counted.length} filter count(s) use .count-badge` : `the count in "${bad[0]!.label}" is a plain span (.${String(bad[0]!.cls).split(" ")[0] || "no class"}), not .count-badge`);
+  }
+}
+
+const REVIEWED_OWN_LOOK = /retryButton|resetButton|skip|linkButton|productSelect|undo|chipRemove/;
+
+/** L5: buttons use the shared classes (no button styled by a module class alone), main and light buttons have a hover look, a disabled button shows the not-allowed cursor. */
+export async function checkButtons(page: Page, rec: Recorder, name: string) {
+  const scan = await page.evaluate((reviewed: string) => {
+    const visible = (element: Element) => { const box = element.getBoundingClientRect(); return box.width > 0 && box.height > 0; };
+    const sharedClass = /(^|\s)(primary|secondary|text|icon|danger|ghost)-button(\s|$)/;
+    const buttons = [...document.querySelectorAll("button")].filter(visible);
+    const ownLook = buttons.filter((button) => {
+      const classes = String(button.className || "").trim();
+      if (!classes || sharedClass.test(classes) || button.closest("summary")) return false;
+      const tokens = classes.split(/\s+/);
+      return tokens.every((token) => token.includes("__")) && !new RegExp(reviewed).test(classes);
+    }).map((button) => `${String(button.className).split(" ")[0]} "${(button.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 30)}"`);
+    const disabled = buttons.filter((button) => (button as HTMLButtonElement).disabled).map((button) => ({ label: (button.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 30), cursor: getComputedStyle(button).cursor }));
+    return { count: buttons.length, ownLook: [...new Set(ownLook)], disabled };
+  }, REVIEWED_OWN_LOOK.source);
+  if (scan.count === 0) rec.record(name, "L5", "buttons use the shared classes", "n/a", "no button on this page");
+  else rec.record(name, "L5", "buttons use the shared classes", scan.ownLook.length === 0 ? "pass" : "fail", scan.ownLook.length === 0 ? `${scan.count} button(s), none styled by a module class alone` : `styled by a module class alone: ${scan.ownLook.slice(0, 3).join("; ")}`);
+  if (scan.disabled.length === 0) rec.record(name, "L5", "a disabled button shows the not-allowed cursor", "n/a", "no disabled button on this page");
+  else {
+    const bad = scan.disabled.filter((entry: { cursor: string }) => entry.cursor !== "not-allowed");
+    rec.record(name, "L5", "a disabled button shows the not-allowed cursor", bad.length === 0 ? "pass" : "fail", bad.length === 0 ? `${scan.disabled.length} disabled button(s), all not-allowed` : `disabled "${bad[0]!.label}" has cursor ${bad[0]!.cursor}`);
+  }
+  // Hover: a main or light button changes its look under the pointer.
+  const target = page.locator("button.primary-button:visible:enabled, button.secondary-button:visible:enabled").first();
+  if (await target.count()) {
+    const paint = () => target.evaluate((node: HTMLElement) => { const style = getComputedStyle(node); return `${style.backgroundColor}|${style.boxShadow}|${style.color}|${style.borderTopColor}`; });
+    // The pointer may still be where the last click was (over this very button): move it off before reading the resting look.
+    await page.mouse.move(0, 0);
+    await pollPage<boolean>(page, () => target.evaluate((node: Element) => !node.matches(":hover")), Boolean, 1_000);
+    const resting = await pollPage<string>(page, paint, () => true, 100).then(async () => {
+      // The look can still be easing back (a 120ms transition): read it again once it stops changing.
+      let last = await paint();
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const next = await paint();
+        if (next === last) break;
+        last = next;
+      }
+      return last;
+    });
+    await target.hover();
+    // If something covers the button the pointer is not on it, and that says nothing about the button's look.
+    const reached = await pollPage<boolean>(page, () => target.evaluate((node: Element) => node.matches(":hover")), Boolean, 1_000);
+    const hovered = reached.ok ? await pollPage<string>(page, paint, (value) => value !== resting, 1_500) : { ok: false, value: null };
+    await page.mouse.move(0, 0);
+    if (!reached.ok) rec.record(name, "L5", "main and light buttons have a hover look", "n/a", "the pointer could not reach the first button (something covers it), so its hover look was not read");
+    else rec.record(name, "L5", "main and light buttons have a hover look", hovered.ok ? "pass" : "fail", hovered.ok ? "the button changed its look under the pointer" : `the "${clean((await target.textContent()) ?? "")}" button (${(await target.getAttribute("class")) ?? ""}) looked the same under the pointer`);
+  }
+}
+
+/** L6: tabs use the shared tabs component: a tablist, one selected tab, arrow keys move between tabs. */
+export async function checkTabs(page: Page, rec: Recorder, name: string) {
+  const list = page.locator('[role="tablist"]:visible').first();
+  if (!(await list.count())) { rec.record(name, "L6", "tabs use the shared tablist with arrow keys", "n/a", "no tab list on this page"); return; }
+  const tabs = list.locator('[role="tab"]');
+  const count = await tabs.count();
+  const selected = await list.locator('[role="tab"][aria-selected="true"]').count();
+  const rover = await tabs.evaluateAll((nodes: HTMLElement[]) => nodes.map((node) => `${node.getAttribute("aria-selected")}:${node.tabIndex}`));
+  const shape = count >= 2 && selected === 1 && rover.every((entry: string) => entry === "true:0" || entry === "false:-1");
+  const first = tabs.nth(0);
+  await first.focus();
+  const startIndex = await tabs.evaluateAll((nodes: HTMLElement[]) => nodes.findIndex((node) => node === document.activeElement));
+  await page.keyboard.press("ArrowRight");
+  const moved = await pollPage<number>(page, () => tabs.evaluateAll((nodes: HTMLElement[]) => nodes.findIndex((node) => node === document.activeElement)), (index) => index === (startIndex + 1) % count, 1_500);
+  await page.keyboard.press("ArrowLeft");
+  rec.record(name, "L6", "tabs use the shared tablist with arrow keys", shape && moved.ok ? "pass" : "fail", shape ? (moved.ok ? `${count} tabs, one selected, ArrowRight moved focus to the next tab` : "ArrowRight did not move focus to the next tab") : `tab roles are off: ${JSON.stringify(rover)}`);
 }

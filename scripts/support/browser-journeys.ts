@@ -365,6 +365,26 @@ export async function mintDirectorSession(tokens: string[], accountId: string = 
   return { name: attendeeSessionCookie.legacyName, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
 }
 
+/** A signed-in staff session for the seeded administrator, minted directly (staff sign-in needs a second factor, as in verify-badge-print). */
+export async function mintStaffSession(tokens: string[], email = "admin@imsda-events.test") {
+  const { assertSeededStaffEmail } = await import("./local-only-guard");
+  assertSeededStaffEmail(email);
+  const { getPrisma } = await import("../../lib/prisma");
+  const user = await getPrisma().user.findUnique({ where: { email }, select: { id: true } });
+  if (!user) throw new Error("The seeded administrator is missing. Run `npm run db:seed` first.");
+  const { createDatabaseSession } = await import("../../modules/access/session-store");
+  const { staffSessionCookie } = await import("../../modules/security/session-cookies");
+  const session = await createDatabaseSession(user.id, null);
+  tokens.push(session.token);
+  return { name: staffSessionCookie.legacyName, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
+}
+
+/** Ends the staff sessions `mintStaffSession` made. */
+export async function revokeStaffSessions(tokens: string[]) {
+  const { revokeDatabaseSession } = await import("../../modules/access/session-store");
+  for (const token of tokens) await revokeDatabaseSession(token).catch(() => undefined);
+}
+
 export async function revokeSessions(tokens: string[]) {
   const { revokeAttendeeSession } = await import("../../modules/attendee-accounts/session-store");
   for (const token of tokens) await revokeAttendeeSession(token).catch(() => undefined);
