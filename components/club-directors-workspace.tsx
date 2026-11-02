@@ -3,6 +3,8 @@
 import { useConfirm } from "@/components/use-confirm";
 import { SubmitButton } from "@/components/submit-button";
 import { cardCell } from "@/components/table-card-labels";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import Link from "next/link";
 import { useState } from "react";
 import { clubRoleText } from "@/modules/access/role-descriptions";
@@ -29,6 +31,15 @@ const statusTone: Record<DirectorGrantStatus, string> = {
   ENDED: "gold",
   REVOKED: "coral",
 };
+
+/** The directors table sorts from its headers, in the address (#1458); nothing is chosen until someone clicks, so grants stay in the order the server gave. */
+const DIRECTOR_SORT = {
+  person: { label: "Person", noteLabel: "person", value: (grant) => grant.account.displayName },
+  role: { label: "Role", value: (grant) => clubDirectorRoleLabels[grant.role] },
+  dates: { label: "Dates", kind: "date", noteLabel: "start date", value: (grant) => new Date(grant.effectiveFrom) },
+  status: { label: "Status", value: (grant) => directorGrantStatusLabels[grant.status] },
+  reason: { label: "Reason", value: (grant) => grant.reason },
+} satisfies Record<string, SortSpec<DirectorGrantRecord>>;
 
 function firstName(displayName: string) {
   return displayName.trim().split(/\s+/)[0] || "them";
@@ -57,6 +68,7 @@ export function ClubDirectorsWorkspace({
   canOpenPeople?: boolean;
 }) {
   const [grants, setGrants] = useState(initialGrants);
+  const sorted = useTableSort(grants, DIRECTOR_SORT, "directors");
   const [saving, setSaving] = useState(false);
   const { ask, confirmDialog } = useConfirm();
   const [error, setError] = useState("");
@@ -232,19 +244,20 @@ export function ClubDirectorsWorkspace({
           </div>
         ) : (
           <div className="report-table-wrap card-box">
+          {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
           <table className="report-table table-cards table-cards-tablet" role="table">
             <thead role="rowgroup">
               <tr role="row">
-                <th role="columnheader" scope="col">Person</th>
-                <th role="columnheader" scope="col">Role</th>
-                <th role="columnheader" scope="col">Dates</th>
-                <th role="columnheader" scope="col">Status</th>
-                <th role="columnheader" scope="col">Reason</th>
+                <SortableHeader {...sorted.headerProps("person")} />
+                <SortableHeader {...sorted.headerProps("role")} />
+                <SortableHeader {...sorted.headerProps("dates")} />
+                <SortableHeader {...sorted.headerProps("status")} />
+                <SortableHeader {...sorted.headerProps("reason")} />
                 <th role="columnheader" scope="col"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody role="rowgroup">
-              {grants.map((grant) => (
+              {sorted.rows.map((grant) => (
                 <tr key={grant.id} role="row">
                   <th role="rowheader" scope="row">
                     <strong translate="no">{grant.account.displayName}</strong>

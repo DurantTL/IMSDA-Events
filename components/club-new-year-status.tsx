@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NewYearStatusTable } from "@/components/club-screen-tables";
 
 type NewYearStatus = {
   toClubYear: string;
@@ -25,27 +25,7 @@ export function ClubNewYearStatus({ status, clubHref }: { status: NewYearStatus 
       {notStarted.length === 0 ? (
         <p className="report-empty">Every club has started.</p>
       ) : (
-        <div className="report-table-wrap">
-          <table role="table" className="report-table table-cards">
-            <caption className="sr-only">{`Clubs that have not started the ${toClubYear} roster`}</caption>
-            <thead role="rowgroup">
-              <tr role="row">
-                <th role="columnheader" scope="col">Club</th>
-                <th role="columnheader" scope="col">Church</th>
-                <th role="columnheader" scope="col">People last year</th>
-              </tr>
-            </thead>
-            <tbody role="rowgroup">
-              {notStarted.map((club) => (
-                <tr role="row" key={club.organizationId}>
-                  <th role="rowheader" scope="row" translate="no"><Link href={clubHref(club.organizationId)}>{club.name}</Link></th>
-                  <td data-label="Church" translate="no">{club.church ?? "—"}</td>
-                  <td data-label="People last year">{club.lastYearActive}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <NewYearStatusTable caption={`Clubs that have not started the ${toClubYear} roster`} rows={notStarted.map((club) => ({ ...club, href: clubHref(club.organizationId) }))} />
       )}
     </section>
   );

@@ -4,6 +4,8 @@ import { ExactValue } from "@/components/exact-value";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/post-json";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { clubClassLevelLabels, clubClassLevels, clubRosterAttendeeTypeLabels } from "@/modules/club-rosters/domain";
 
 /**
@@ -27,6 +29,15 @@ export type CarryForwardRow = {
   transferWithStaff?: boolean;
 };
 
+/** Sorts by what each person had last year, not by the choices being edited, so a row does not jump while the director types (#1458). */
+const CARRY_FORWARD_SORT = {
+  name: { label: "Name", value: (row) => `${row.lastName}, ${row.firstName}` },
+  age: { label: "Age", kind: "number", value: (row) => row.age },
+  type: { label: "Type", value: (row) => clubRosterAttendeeTypeLabels[row.attendeeType] },
+  role: { label: "Role", value: (row) => row.role },
+  class: { label: "Class", value: (row) => (row.classLevel ? clubClassLevelLabels[row.classLevel as keyof typeof clubClassLevelLabels] ?? row.classLevel : null) },
+} satisfies Record<string, SortSpec<CarryForwardRow>>;
+
 type Choice = { ticked: boolean; attendeeType: AttendeeType; role: string; classLevel: string };
 
 export function ClubRosterCarryForward({
@@ -41,6 +52,7 @@ export function ClubRosterCarryForward({
   rows: CarryForwardRow[];
 }) {
   const router = useRouter();
+  const sorted = useTableSort(rows, CARRY_FORWARD_SORT, "carry");
   const [choices, setChoices] = useState<Record<string, Choice>>(() => Object.fromEntries(
     rows.map((row) => [row.memberId, { ticked: !row.transferring, attendeeType: row.attendeeType, role: row.role, classLevel: row.classLevel ?? "" }]),
   ));
@@ -110,20 +122,21 @@ export function ClubRosterCarryForward({
         <button className="secondary-button" onClick={() => setAll(false)} type="button">Untick everyone</button>
       </div>
       <div className="report-table-wrap">
+        {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
         <table className="report-table table-cards" role="table">
           <caption className="sr-only">{`People on the ${fromClubYear} roster`}</caption>
           <thead role="rowgroup">
             <tr role="row">
               <th role="columnheader" scope="col">Carry forward</th>
-              <th role="columnheader" scope="col">Name</th>
-              <th role="columnheader" scope="col">Age</th>
-              <th role="columnheader" scope="col">{`${toClubYear} type`}</th>
-              <th role="columnheader" scope="col">Role</th>
-              <th role="columnheader" scope="col">Class</th>
+              <SortableHeader {...sorted.headerProps("name")} />
+              <SortableHeader {...sorted.headerProps("age")} />
+              <SortableHeader {...sorted.headerProps("type", { label: `${toClubYear} type` })} />
+              <SortableHeader {...sorted.headerProps("role")} />
+              <SortableHeader {...sorted.headerProps("class")} />
             </tr>
           </thead>
           <tbody role="rowgroup">
-            {rows.map((row) => {
+            {sorted.rows.map((row) => {
               const choice = choices[row.memberId]!;
               const fullName = `${row.firstName} ${row.lastName}`.trim();
               return (
