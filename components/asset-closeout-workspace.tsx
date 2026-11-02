@@ -134,17 +134,6 @@ const EXCEPTION_SORT: Record<"exception" | "item" | "holder" | "detail", ColumnS
   holder: { value: (row) => row.holderLabel, label: "holder" },
   detail: { value: (row) => row.detail, label: "detail" },
 };
-const TYPE_SORT: Record<"kind" | "out" | "returned" | "lost" | "damaged" | "corrected" | "replaced" | "stillOut" | "reconciles", ColumnSpec<TypeReconciliation>> = {
-  kind: { value: (row) => row.typeName, label: "kind" },
-  out: { value: (row) => row.inflow, label: "went out", kind: "number" },
-  returned: { value: (row) => row.returned, label: "returned", kind: "number" },
-  lost: { value: (row) => row.lost, label: "lost", kind: "number" },
-  damaged: { value: (row) => row.damaged, label: "damaged", kind: "number" },
-  corrected: { value: (row) => row.corrected, label: "withdrawn in error", kind: "number" },
-  replaced: { value: (row) => row.replacedUnaccounted, label: "replaced, unaccounted", kind: "number" },
-  stillOut: { value: (row) => row.outstanding, label: "still out", kind: "number" },
-  reconciles: { value: (row) => row.balanced, label: "whether it reconciles" },
-};
 const CHARGE_SORT: Record<"item" | "holder" | "charge" | "state" | "why", ColumnSpec<ChargeRow>> = {
   item: { value: (row) => row.identifier, label: "item" },
   holder: { value: (row) => row.holderLabel, label: "holder" },
@@ -198,12 +187,12 @@ function ExceptionsTable({ ctx, rows }: { ctx: TableContext; rows: ExceptionRow[
   </table></div>;
 }
 
+/** A short fixed list (one row per asset kind, a reconciliation tally), so not sortable (#1458). */
 function TypesTable({ rows }: { rows: TypeReconciliation[] }) {
-  const sorted = useTableSort(rows, TYPE_SORT, "kinds");
-  return <div className="table-wrap card-box">{sorted.note}<table role="table" className="report-table table-cards table-cards-tablet">
+  return <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-tablet">
     <caption className="sr-only">Units issued, returned, lost, damaged and still out, by kind</caption>
-    <thead role="rowgroup"><tr role="row">{sorted.header("kind", "Kind")}{sorted.header("out", "Went out")}{sorted.header("returned", "Returned")}{sorted.header("lost", "Lost")}{sorted.header("damaged", "Damaged")}{sorted.header("corrected", "Withdrawn in error")}{sorted.header("replaced", "Replaced, unaccounted")}{sorted.header("stillOut", "Still out")}{sorted.header("reconciles", "Reconciles")}</tr></thead>
-    <tbody role="rowgroup">{sorted.rows.map((row) => <tr role="row" key={row.typeId}>
+    <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">Went out</th><th role="columnheader" scope="col">Returned</th><th role="columnheader" scope="col">Lost</th><th role="columnheader" scope="col">Damaged</th><th role="columnheader" scope="col">Withdrawn in error</th><th role="columnheader" scope="col">Replaced, unaccounted</th><th role="columnheader" scope="col">Still out</th><th role="columnheader" scope="col">Reconciles</th></tr></thead>
+    <tbody role="rowgroup">{rows.map((row) => <tr role="row" key={row.typeId}>
       <th role="rowheader" scope="row">{row.typeName}</th><td {...cardCell("Went out")}>{row.inflow}</td><td {...cardCell("Returned")}>{row.returned}</td><td {...cardCell("Lost")}>{row.lost}</td><td {...cardCell("Damaged")}>{row.damaged}</td>
       <td {...cardCell("Withdrawn in error")}>{row.corrected}</td><td {...cardCell("Replaced, unaccounted")}>{row.replacedUnaccounted}</td><td {...cardCell("Still out")}>{row.outstanding}</td>
       <td {...cardCell("Reconciles")}>{row.balanced ? "Yes" : `No, off by ${row.difference}`}</td>

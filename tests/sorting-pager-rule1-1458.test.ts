@@ -78,6 +78,7 @@ const shownWording: Record<string, string> = {
 
 /** Files with a sorted table and one more table that is not (the exact number), and why. */
 const partlyUnsortedTables: Record<string, { unsorted: number; reason: string }> = {
+  "components/asset-closeout-workspace.tsx": { unsorted: 1, reason: "short fixed list: one row per asset kind, a reconciliation tally" },
   "components/honors-setup-workspace.tsx": { unsorted: 1, reason: "set order: copy plan preview in source order" },
   "components/lodging-assignments-panels.tsx": { unsorted: 3, reason: "set order: offer and plan previews in apply order, occupancy by night in date order" },
   "components/lodging-requests-workspace.tsx": { unsorted: 1, reason: "short fixed list: lodging types in the event's order" },
