@@ -9,6 +9,8 @@
  * (#411) print helper without drifting between callers.
  */
 
+import type { StatusWord } from "@/modules/registrations/status-words";
+
 export type ClubAssignmentStatus = "UNASSIGNED" | "PARTIAL" | "SET";
 
 export type ClubAssignmentFields = {
@@ -51,6 +53,9 @@ export function clubAssignmentStatus(fields: ClubAssignmentFields): ClubAssignme
   if (filled === 3) return "SET";
   return "PARTIAL";
 }
+
+/** The email chip for an assignment that has never been emailed (#1479): the shared word Draft. Sent and "Changed since sent" stay. */
+export const CLUB_ASSIGNMENT_EMAIL_NOT_SENT_WORD = "Draft" as const satisfies StatusWord;
 
 export const clubAssignmentStatusLabels: Readonly<Record<ClubAssignmentStatus, string>> = {
   UNASSIGNED: "Unassigned",

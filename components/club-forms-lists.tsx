@@ -8,6 +8,7 @@ import { DeleteClubFormLinkButton, RevokeClubFormLinkButton } from "@/components
 import type { PastYearGroup } from "@/modules/club-forms/past-years-domain";
 import type { ClubFormLinkRow } from "@/modules/club-forms/links";
 import type { ClubFormSubmissionListRow } from "@/modules/club-forms/submissions";
+import type { StatusWord } from "@/modules/registrations/status-words";
 import styles from "./club-forms-lists.module.css";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
@@ -26,7 +27,7 @@ const emailDeliveryLabel = {
   UNKNOWN: "",
 } as const;
 
-const linkStateLabel = { OPEN: "Waiting", USED: "Submitted", REVOKED: "Withdrawn", EXPIRED: "Expired" } as const;
+const linkStateLabel = { OPEN: "Draft", USED: "Submitted", REVOKED: "Cancelled", EXPIRED: "Expired" } as const satisfies Record<ClubFormLinkRow["state"], StatusWord | "Expired">;
 
 /** Both tables sort in the address (#1458); a second table on the page (a past year) passes its own `sortPrefix`, so the two do not share a sort. */
 const LINK_SORT_COLUMNS = ["form", "sentTo", "status", "email", "expires"] as const;

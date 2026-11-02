@@ -4,7 +4,7 @@ import { ExactValue } from "@/components/exact-value";
 import { useState } from "react";
 import { CircleAlert, Mail, Pencil, Send } from "lucide-react";
 import type { ClubAssignmentRow } from "@/modules/club-registrations/assignments-repository";
-import { clubAssignmentStatusLabels } from "@/modules/club-registrations/assignments";
+import { CLUB_ASSIGNMENT_EMAIL_NOT_SENT_WORD, clubAssignmentStatusLabels } from "@/modules/club-registrations/assignments";
 import type { ClubAssignmentPreview } from "@/modules/communications/club-assignment-audience";
 
 type EditableFields = ClubAssignmentRow["fields"];
@@ -296,7 +296,7 @@ export function ClubAssignmentsWorkspace({
                     <td>
                       {row.lastEmailSentAt
                         ? row.changedSinceSent ? <span className="status-chip gold">Changed since sent</span> : <span className="status-chip green">Sent</span>
-                        : <span className="status-chip">Not sent</span>}
+                        : <span className="status-chip">{CLUB_ASSIGNMENT_EMAIL_NOT_SENT_WORD}</span>}
                       {canSend && (
                         <div>
                           <button type="button" className="text-button" onClick={() => loadPreview({ scope: "ONE", organizationId: row.organizationId, ...(row.teamKey ? { teamKey: row.teamKey } : {}) })}>
