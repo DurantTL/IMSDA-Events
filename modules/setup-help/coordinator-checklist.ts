@@ -33,7 +33,7 @@ export function buildCoordinatorChecklist(facts: CoordinatorChecklistFacts): Che
       href: "/account/clubs",
       linkable: true,
       actionLabel: "Open All clubs",
-      helpHref: portalGuideHref("coordinator-find-club"),
+      helpHref: portalGuideHref("walkthrough-coordinator-clubs"),
     },
     {
       id: "directors",
@@ -46,7 +46,7 @@ export function buildCoordinatorChecklist(facts: CoordinatorChecklistFacts): Che
       linkable: facts.clubsWithoutDirector === 0,
       unavailableNote: `Ask ${CONFERENCE_OFFICE} to add one.`,
       actionLabel: "See which clubs",
-      helpHref: portalGuideHref("coordinator-follow-up-clubs"),
+      helpHref: portalGuideHref("walkthrough-coordinator-no-director"),
     },
     {
       id: "records",
@@ -57,7 +57,7 @@ export function buildCoordinatorChecklist(facts: CoordinatorChecklistFacts): Che
       href: `/account/area-clubs/reports?year=${encodeURIComponent(facts.clubYear)}`,
       linkable: true,
       actionLabel: "Open Monthly Records",
-      helpHref: portalGuideHref("coordinator-follow-records"),
+      helpHref: portalGuideHref("walkthrough-coordinator-records"),
     },
     {
       id: "behind",
@@ -68,7 +68,7 @@ export function buildCoordinatorChecklist(facts: CoordinatorChecklistFacts): Che
       href: `#${WHOS_MISSING_ANCHOR}`,
       linkable: true,
       actionLabel: "See who's missing what",
-      helpHref: portalGuideHref("coordinator-follow-up-clubs"),
+      helpHref: portalGuideHref("walkthrough-coordinator-follow-up"),
     },
     {
       id: "points",
@@ -79,7 +79,7 @@ export function buildCoordinatorChecklist(facts: CoordinatorChecklistFacts): Che
       href: `/account/area-clubs/points?year=${encodeURIComponent(facts.clubYear)}`,
       linkable: true,
       actionLabel: "Open Points",
-      helpHref: portalGuideHref("coordinator-points"),
+      helpHref: portalGuideHref("walkthrough-coordinator-points"),
     },
     {
       id: "approvals",

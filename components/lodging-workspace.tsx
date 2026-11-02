@@ -11,7 +11,9 @@ import {
   type LodgingCategory,
   type LodgingRateBasis,
 } from "@/modules/lodging/domain";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import type { LodgingUnitView, LodgingView } from "@/modules/lodging/service";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 
 async function call(url: string, method: string, body: unknown): Promise<{ lodging: LodgingView }> {
   const response = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -91,13 +93,7 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
         </table></div>}
       </section>
 
-      {view.buildings.map((building) => <section className="panel" key={building.key}>
-        <h3>{building.name}</h3>
-        <div className="table-wrap"><table className="report-table report-table-auto">
-          <thead><tr><th scope="col">Unit</th><th scope="col">Details</th><th scope="col">Sleeps up to</th><th scope="col">Nights in service</th><th scope="col">Unavailable</th><th scope="col">Holds</th></tr></thead>
-          <tbody>{building.units.map((unit) => <UnitRow key={unit.eventUnitId} unit={unit} nights={view.nights} base={base} busy={busy} run={run} />)}</tbody>
-        </table></div>
-      </section>)}
+      {view.buildings.map((building) => <BuildingUnits key={building.key} building={building} nights={view.nights} base={base} busy={busy} run={run} />)}
 
       <section className="panel">
         <h3>Lodging rates</h3>
@@ -112,8 +108,37 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
   </div>;
 }
 
+// Each building's units sort from their headers (#1458); the keys here are the whitelist. The nights table is in date order and
+// the rates table is the short fixed list of lodging categories, so neither sorts.
+const UNIT_SORT: Record<"unit" | "details" | "sleeps" | "nights" | "unavailable" | "holds", ColumnSpec<LodgingUnitView>> = {
+  unit: { value: (unit) => unit.name, label: "unit" },
+  details: { value: (unit) => describeUnit(unit), label: "details" },
+  sleeps: { value: (unit) => unit.capacityOverride ?? unit.defaultCapacity, label: "sleeps up to", kind: "number" },
+  nights: { value: (unit) => nightsInService(unit), label: "nights in service", kind: "number" },
+  unavailable: { value: (unit) => unit.unavailable, label: "unavailable" },
+  holds: { value: (unit) => unit.holds.filter((hold) => hold.active).length, label: "active holds", kind: "number" },
+};
+
+function BuildingUnits({ building, nights, base, busy, run }: {
+  building: LodgingView["buildings"][number];
+  nights: string[];
+  base: string;
+  busy: boolean;
+  run: (action: () => Promise<{ lodging: LodgingView }>, success: string) => Promise<void>;
+}) {
+  // One shared sort for every building: a header click orders each building's units the same way.
+  const sorted = useTableSort(building.units, UNIT_SORT);
+  return <section className="panel">
+    <h3>{building.name}</h3>
+    <div className="table-wrap">{sorted.note}<table className="report-table report-table-auto">
+      <thead><tr>{sorted.header("unit", "Unit")}{sorted.header("details", "Details")}{sorted.header("sleeps", "Sleeps up to")}{sorted.header("nights", "Nights in service")}{sorted.header("unavailable", "Unavailable")}{sorted.header("holds", "Holds")}</tr></thead>
+      <tbody>{sorted.rows.map((unit) => <UnitRow key={unit.eventUnitId} unit={unit} nights={nights} base={base} busy={busy} run={run} />)}</tbody>
+    </table></div>
+  </section>;
+}
+
 function formatRate(rate: { amountCents: number; basis: LodgingRateBasis; minimumNights: number | null }) {
-  return `$${(rate.amountCents / 100).toFixed(2)} ${lodgingRateBasisLabels[rate.basis]}${rate.minimumNights ? `, ${rate.minimumNights}+ nights` : ""}`;
+  return `${formatCentsPlain(rate.amountCents)} ${lodgingRateBasisLabels[rate.basis]}${rate.minimumNights ? `, ${rate.minimumNights}+ nights` : ""}`;
 }
 
 function UnitRow({ unit, nights, base, busy, run }: {
@@ -135,7 +160,7 @@ function UnitRow({ unit, nights, base, busy, run }: {
           const raw = String(new FormData(event.currentTarget).get("capacity") ?? "").trim();
           void run(() => call(`${base}/units/${unit.eventUnitId}`, "PATCH", { capacityOverride: raw === "" ? null : Number(raw) }), `Capacity for ${unit.name} saved.`);
         }}>
-          <label className="visually-hidden" htmlFor={`cap-${unit.eventUnitId}`}>Sleeps up to for {unit.name}</label>
+          <label className="sr-only" htmlFor={`cap-${unit.eventUnitId}`}>Sleeps up to for {unit.name}</label>
           <input id={`cap-${unit.eventUnitId}`} name="capacity" type="number" min={0} max={500} defaultValue={unit.capacityOverride ?? ""} placeholder={unit.defaultCapacity === null ? "no limit" : String(unit.defaultCapacity)} />
           <button type="submit" disabled={busy}>Save</button>
         </form>

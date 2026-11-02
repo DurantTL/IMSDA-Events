@@ -20,6 +20,7 @@ separately.
 - `app/(public)/account/(portal)/help/`: the portal hub and `[guideId]` pages.
 - `tests/help-learning-1077.test.ts`: registry, visibility and search checks.
 - `tests/help-hub-filters-1259.test.ts`, `help-portal-1259.test.ts`, `help-check-1259.test.ts`: the #1259 checks.
+- `modules/help/walkthroughs.ts`, `tests/browser/walkthroughs/`, `tests/walkthroughs-1482.test.ts`: the walkthroughs (see "Walkthroughs").
 - `docs/FUTURE-INFORMATION-ARCHITECTURE.md`: where later work belongs, by issue. A map only; it adds no menu entry.
 
 The registry is plain data. It reads no database, session or event, and a guide never holds an event name, an
@@ -90,6 +91,18 @@ page, and a staff viewer never gets a portal guide in staff search.
   `reservedPortalGuideIds`). Static routes win over `[guideId]`, and the check reports a collision.
 - Add a guide the same way as a staff guide (see above), using `portalDestinations` and the audience.
 
+### Searching portal Help
+
+The portal Help hub (`/account/help`) has a "Search the guides" box (`app/(public)/account/(portal)/help/portal-help-search.tsx`),
+built from the same pieces as the staff hub: `useClientSearch` (`components/search-as-you-type`), the generic `filterGuides`
+(`modules/help/visibility.ts`) and the same `help.module.css` classes. The server still decides which guides this viewer may see
+and passes the browser only each guide's id, title, summary, audience and keywords, never viewer data. The box filters as you
+type (title, summary and keywords; every word typed must match), keeps focus, announces the count (`role="status"`), shows the
+full list when it is empty, and offers "Show all guides" when nothing matches. With JavaScript off the full list still renders.
+Give a new guide good `keywords` so the search finds it (walkthroughs carry "step by step"). A viewer never sees, or finds by
+search, a guide for a role they do not hold: the coordinator walkthroughs never appear for a director-only account.
+`tests/walkthrough-search-restore-1482.test.ts` checks the search.
+
 ## Permitted next steps
 
 The shared staff states "Permission required" (`AccessRestricted`) and "Not available for this event"
@@ -111,6 +124,86 @@ The check itself is the pure function `checkHelpGuides` in `modules/help/guide-c
 way to ask whether a doc exists and the current time, so its tests pin the clock. It is **not part of CI**, on purpose: a
 guide aging past the limit should prompt a review, not fail an unrelated pull request. Run it by hand when menus or routes
 change, and after you re-check a guide, update its `lastReviewed`.
+
+## Walkthroughs
+
+Step-by-step guides with a picture of the real screen for every step (#1482, site rule H6). Each walkthrough is its own portal
+guide (ids start `walkthrough-`, titles start "Step by step: "), so the hub, Help search and the Getting started links reach it
+like any other guide. Today: the 10 club director walkthroughs and the 6 area coordinator walkthroughs (sign-in; their clubs
+and Who's missing what; Monthly Records; Points; following up with a club that is behind; a club with no director). A written guide that has a step-by-step version shows
+"See it step by step" links near its Steps (`walkthroughsForGuide` in `modules/help/walkthroughs.ts`), and the Getting started
+checklists and the setup-help "Help guide" links point at the walkthrough where it is the same task.
+
+**Where things live**
+
+- `modules/help/walkthroughs.ts`: the data, no Playwright. Per walkthrough: guide id, audience, the guide's own text, the
+  app source files its pictures depend on (`sourceFiles`, repo paths) and the steps `{ id, text, alt }`. Step text is one or
+  two plain sentences in the screen's exact words. Alt text is plain data so it can be translated later (#1445).
+- `tests/browser/walkthroughs/`: the browser actions. `club-director.ts` and `coordinator.ts` have, for every walkthrough and step id, an `async`
+  action that drives the page to the state the picture shows (including the tap that leads there from the step before) and
+  returns the control to mark. `steps.ts` exports `runWalkthrough(walkthroughId, context, onStep?)`; the club browser tests
+  (#1439) can import it with their own `WalkthroughContext` (`types.ts`).
+- `scripts/support/walkthrough-harness.ts` and `help-walkthrough-fixtures.ts`: the local-only runner and the synthetic
+  fixtures (every id starts `walkthrough`, names are obvious samples, emails are `@example.test`, phones are
+  "(515) 555-01xx"). Every run resets the fixtures first, so reruns give the same pictures.
+- `public/help/walkthroughs/<guideId>/<nn>-<stepId>-phone.webp` and `-desktop.webp`, and `manifest.json`.
+- `components/walkthrough-steps.tsx`: the Steps list on the guide page: the instruction, then a `<picture>` (phone picture, and
+  the desktop one from 768 px up) with real width and height, lazy loading, the "Example with sample data" caption and the
+  usual out-of-date note.
+
+**Adding or changing a walkthrough**
+
+1. Add the entry to `directorWalkthroughs` or `coordinatorWalkthroughs` in `modules/help/walkthroughs.ts`, and list its
+   `sourceFiles`. Add a fixture to `help-walkthrough-fixtures.ts` if the screen needs sample data. A walkthrough starts
+   `signed-out`, `signed-in` (the sample club director, two-step sign-in done) or `signed-in-coordinator` (the sample area
+   coordinator).
+2. Add one action per step id in `tests/browser/walkthroughs/`. Use roles and the exact labels.
+3. `HELP_SHOTS_ONLY=<walkthrough id> npm run help:screenshots`, then open the pictures and check that nothing looks like a real
+   person and that each mark sits on the right control.
+4. `npx vitest run tests/walkthroughs-1482.test.ts`.
+
+**Commands** (the app must be running locally, outside production, with no `ACCOUNT_EMAIL_*` set; `npm i --no-save
+playwright-core@1.56.1` unless Playwright is already installed; `HELP_SHOTS_BROWSER` points at a Chromium executable)
+
+- `npm run help:screenshots` regenerates every picture and the manifest. `HELP_SHOTS_ONLY=<text>` runs the walkthroughs whose id
+  contains the text. `HELP_SHOTS_BASE_URL` defaults to `http://localhost:3000`.
+- `npm run test:walkthroughs` runs every step at phone and desktop width and fails when an action or the control it marks is
+  missing. It saves nothing. CI runs it in `.github/workflows/help-walkthroughs.yml`.
+
+The area coordinator walkthroughs use a sample area: a coordinator account with an authenticator app (its secret is made fresh each
+run and only the script knows it, so the coordinator sign-in walkthrough types a real six-digit code), and four sample clubs:
+one up to date, one behind, one with no director, and the director's own club. A coordinator sees every active club, so the
+script hides the clubs already in the local database while it runs and shows them again afterwards.
+
+A run also refuses to start when `ACCOUNT_EMAIL_SENDER_ADDRESS`, `RESEND_API_KEY` or an SES region is set in its environment (the
+app only returns the sign-in code when it has no email to send it with, and no run may send real email). The browser is found
+without `HELP_SHOTS_BROWSER`: the installed package's own Chromium, then a Chromium found under `PLAYWRIGHT_BROWSERS_PATH` or
+`/opt/pw-browsers`, then the other package. A run changes a few things outside its own fixtures (passkeys, some form templates, the
+published club events already in the database, and for coordinator walkthroughs the clubs already in the database). Their "before" state is written to a marker file in the OS
+temp directory (`imsda-help-walkthroughs-restore.json`, never in the repository) before anything changes; the end of the run,
+Ctrl-C and SIGTERM put it back, and the next run restores from a leftover marker first, so a killed run is repaired. A signal only sets a stop flag: the run checks it before every write and its single `finally` does the one restore and the exit. The two
+commands run `node --import tsx` rather than the `tsx` command, because the `tsx` wrapper can end the script before it handles the signal. The
+marker is named for the user, is written with `wx`, and is ignored unless it is the user's own regular file (no symlinks).
+
+Both refuse `NODE_ENV=production`, a database or app URL that is not on this machine, and a database that is not a seeded dev
+or CI one. The first-sign-in and passkey walkthroughs sign in for real: the emailed code is the one the local app returns
+instead of sending mail (it is never real email), and a software passkey (Chromium's virtual authenticator) stands in for a
+fingerprint. The script switches passkeys on for the local database while it runs and puts the setting, and the form
+templates it turns on, back afterwards.
+
+**Stale pictures.** `manifest.json` holds, per walkthrough, the capture date and a sha256 over its `sourceFiles`. `npm run
+help:check` prints a WARNING (not an error, exit code unchanged) when a walkthrough's source changed since capture or it has no
+manifest entry, with the command that fixes it, and the workflow turns each into a `::warning::` annotation. A picture file that
+is missing is an error. The guide page also shows "This picture may be out of date; the steps above are current." when the
+guide's `lastReviewed` is later than the capture date.
+
+The hash covers only the files listed in a walkthrough's `sourceFiles`: its pages, the main components they render and their CSS
+modules. A change to something not listed (a shared hook, a helper, global CSS, a deeper child component) does not trigger the
+warning, so when you change shared look or behavior, re-run `npm run test:walkthroughs` (it fails on a missing control) and
+refresh the pictures by hand. Add a file to `sourceFiles` when a walkthrough's pictures start to depend on it.
+
+**Size budget.** Pictures are WebP (quality 70): phone 390 x 844, desktop 1280 x 800 resized to 960 wide. Target at most 60 KB
+(phone) and 90 KB (desktop); over 150 KB fails the test, and all walkthroughs together should stay under about 6 MB.
 
 ## Contextual help
 

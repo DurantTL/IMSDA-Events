@@ -1,8 +1,6 @@
-import { NavigationLink as Link } from "@/components/navigation-link";
+import { WhosMissingTable } from "@/components/club-screen-tables";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
-import { cardCell } from "@/components/table-card-labels";
 import type { WhosMissingRow } from "@/modules/club-reports/whos-missing-what";
-import styles from "./coordinator-whos-missing.module.css";
 import { WHOS_MISSING_ANCHOR } from "@/modules/setup-help/coordinator-checklist";
 
 /**
@@ -23,39 +21,7 @@ export function CoordinatorWhosMissing({ rows, clubCount, monthLabel, query = ""
       ) : (
         <>
           <p className="coordinator-count">{totalMissing} of {clubCount} {clubCount === 1 ? "club is" : "clubs are"} missing something. Each has one next step.{query && ` ${rows.length} listed below match “${query}”.`}</p>
-          <div className="report-table-wrap card-box">
-            <table className={`report-table table-cards table-cards-tablet ${styles.table}`} role="table">
-              <caption className="sr-only">Clubs that are missing something, with the next step for each</caption>
-              <thead role="rowgroup">
-                <tr role="row">
-                  <th role="columnheader" scope="col">Club / church</th>
-                  <th role="columnheader" scope="col">Missing</th>
-                  <th role="columnheader" scope="col">Next step</th>
-                </tr>
-              </thead>
-              <tbody role="rowgroup">
-                {rows.map((row) => (
-                  <tr key={row.clubId} role="row">
-                    <th className="coordinator-club-cell" role="rowheader" scope="row">
-                      <span translate="no">{row.name}</span>
-                      {row.church && <small translate="no">{row.church}</small>}
-                    </th>
-                    <td {...cardCell("Missing")}>
-                      <ul className={styles.chips}>
-                        {row.items.map((item) => <li key={item.kind}><span className={`status-chip ${item.tone}`}>{item.label}</span></li>)}
-                      </ul>
-                    </td>
-                    <td {...cardCell("Next step")} className={styles.next}>
-                      {row.next.text}{" "}
-                      <Link className="text-button" href={row.next.href}>
-                        {row.next.linkLabel}<span className="sr-only">: {row.name}</span>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <WhosMissingTable rows={rows} />
         </>
       )}
       <CoordinatorSetupHelp context="clubs that are behind" id="whos-missing" />

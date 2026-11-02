@@ -10,22 +10,28 @@ const root = process.cwd();
 const script = readFileSync(path.join(root, "scripts/verify-mobile-layout.ts"), "utf8");
 const css = readFileSync(path.join(root, "app/globals.css"), "utf8");
 
-describe("#997 wide-table audit rule", () => {
-  it("records table-wider-than-box on every page at the widths where tables stay tables", () => {
+describe("#997 wide-table audit rule (no table scrolls sideways, #1457)", () => {
+  it("records table-wider-than-box and table-scrolls-sideways on every page at every width", () => {
     expect(script).toContain('record("table-wider-than-box", spec.name, width, problem)');
-    expect(script).toContain("if (!args.cards) {");
+    expect(script).toContain('record("table-scrolls-sideways", spec.name, width, table)');
+    // No width gate: the scrolling check used to run only at card widths and the wide check only above them.
+    expect(script).not.toContain("if (!args.cards) {");
+    expect(script).not.toContain("if (args.cards) {");
   });
 
-  it("lets a table scroll only with an opted-in box that draws a gradient edge cue", () => {
-    expect(script).toContain('box.hasAttribute("data-scroll-cue")');
-    expect(script).toContain('style.backgroundImage.includes("gradient")');
-    expect(script).toContain('box.classList.contains("scroll-cue")');
-    expect(script).toContain("paint a solid background over the scroll cue");
+  it("lets no table scroll, with or without a scroll cue", () => {
+    expect(script).not.toContain('box.hasAttribute("data-scroll-cue")');
+    expect(script).not.toContain("paint a solid background over the scroll cue");
     expect(script).toContain("the box clips it, so the columns past the edge cannot be reached");
+    expect(script).toContain("with no scroll-cue exemption");
   });
 
-  it("injects a defect for the rule in the self-test", () => {
-    for (const marker of ["self-test clipped wide table", "self-test cue claimed, none drawn"]) expect(script, marker).toContain(marker);
+  it("checks that a table-cards table sits in a table-box container", () => {
+    expect(script).toContain('record("table-cards-no-box", spec.name, width, problem)');
+  });
+
+  it("injects defects for the rules in the self-test, including a scrolling table that claims a scroll cue", () => {
+    for (const marker of ["self-test clipped wide table", "self-test scrolling table with a cue", "wide cell"]) expect(script, marker).toContain(marker);
   });
 
   it("still accepts no finding", () => {
@@ -34,28 +40,22 @@ describe("#997 wide-table audit rule", () => {
 });
 
 describe("#997 shared layout CSS", () => {
-  it("draws a gradient scroll cue for .scroll-cue", () => {
-    const block = css.slice(css.indexOf("  .scroll-cue {"));
-    expect(block.slice(0, 900)).toContain("linear-gradient");
+  it("has no scroll-cue shadow any more: a table that does not fit is cards", () => {
+    expect(css).not.toContain("  .scroll-cue {");
   });
 
   it("lets the staff column fill the room beside the sidebar, up to a maximum", () => {
     expect(css).toContain(".workspace-content { max-width: 1600px; }");
     // The sidebar keeps its width; tables decide cards or scroll by their own box (a container query), not the viewport.
     expect(css).not.toContain("--sidebar-width: 224px");
-    expect(css).toContain(".card-box { container-type: inline-size; }");
-    expect(css).toContain("@container (max-width: 760px)");
+    expect(css).toContain(".card-box { container: table-box / inline-size; }");
+    expect(css).toContain("@container table-box (min-width: 601px) and (max-width: 760px)");
   });
 
   it("has one copy of the tab-strip and long-name CSS, and does not clip a card-box that shows cards", () => {
     expect(css.split("/* Tab strips that scroll (#997)")).toHaveLength(2);
     expect(css.split("/* A long club name (#997)")).toHaveLength(2);
-    expect(css).toContain(".card-box:has(> table:is(.table-cards-tablet, .table-cards-compact)) { overflow: visible; }");
-  });
-
-  it("checks rows, row groups and footers for a solid background over the scroll cue", () => {
-    expect(script).toContain("tfoot > tr > *");
-    expect(script).toContain("thead tr");
+    expect(css).toContain(".card-box:has(> table.table-cards) { overflow: visible; }");
   });
 
   it("keeps ordinary words whole in cards: break-word, with anywhere only for emails and codes", () => {

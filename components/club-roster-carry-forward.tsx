@@ -1,9 +1,12 @@
 "use client";
 
 import { ExactValue } from "@/components/exact-value";
+import { formatPersonName } from "@/lib/person-name";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/post-json";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { clubClassLevelLabels, clubClassLevels, clubRosterAttendeeTypeLabels } from "@/modules/club-rosters/domain";
 
 /**
@@ -27,6 +30,15 @@ export type CarryForwardRow = {
   transferWithStaff?: boolean;
 };
 
+/** Sorts by what each person had last year, not by the choices being edited, so a row does not jump while the director types (#1458). */
+const CARRY_FORWARD_SORT = {
+  name: { label: "Name", value: (row) => formatPersonName(row, "sorted") },
+  age: { label: "Age", kind: "number", value: (row) => row.age },
+  type: { label: "Type", value: (row) => clubRosterAttendeeTypeLabels[row.attendeeType] },
+  role: { label: "Role", value: (row) => row.role },
+  class: { label: "Class", value: (row) => (row.classLevel ? clubClassLevelLabels[row.classLevel as keyof typeof clubClassLevelLabels] ?? row.classLevel : null) },
+} satisfies Record<string, SortSpec<CarryForwardRow>>;
+
 type Choice = { ticked: boolean; attendeeType: AttendeeType; role: string; classLevel: string };
 
 export function ClubRosterCarryForward({
@@ -41,6 +53,7 @@ export function ClubRosterCarryForward({
   rows: CarryForwardRow[];
 }) {
   const router = useRouter();
+  const sorted = useTableSort(rows, CARRY_FORWARD_SORT, "carry");
   const [choices, setChoices] = useState<Record<string, Choice>>(() => Object.fromEntries(
     rows.map((row) => [row.memberId, { ticked: !row.transferring, attendeeType: row.attendeeType, role: row.role, classLevel: row.classLevel ?? "" }]),
   ));
@@ -110,25 +123,26 @@ export function ClubRosterCarryForward({
         <button className="secondary-button" onClick={() => setAll(false)} type="button">Untick everyone</button>
       </div>
       <div className="report-table-wrap">
-        <table className="report-table table-cards">
+        {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
+        <table className="report-table table-cards" role="table">
           <caption className="sr-only">{`People on the ${fromClubYear} roster`}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Carry forward</th>
-              <th scope="col">Name</th>
-              <th scope="col">Age</th>
-              <th scope="col">{`${toClubYear} type`}</th>
-              <th scope="col">Role</th>
-              <th scope="col">Class</th>
+          <thead role="rowgroup">
+            <tr role="row">
+              <th role="columnheader" scope="col">Carry forward</th>
+              <SortableHeader {...sorted.headerProps("name")} />
+              <SortableHeader {...sorted.headerProps("age")} />
+              <SortableHeader {...sorted.headerProps("type", { label: `${toClubYear} type` })} />
+              <SortableHeader {...sorted.headerProps("role")} />
+              <SortableHeader {...sorted.headerProps("class")} />
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row) => {
+          <tbody role="rowgroup">
+            {sorted.rows.map((row) => {
               const choice = choices[row.memberId]!;
               const fullName = `${row.firstName} ${row.lastName}`.trim();
               return (
-                <tr key={row.memberId}>
-                  <td data-label="Carry forward">
+                <tr key={row.memberId} role="row">
+                  <td data-label="Carry forward" role="cell">
                     <input
                       aria-label={`Carry ${fullName} forward`}
                       checked={choice.ticked}
@@ -136,13 +150,13 @@ export function ClubRosterCarryForward({
                       type="checkbox"
                     />
                   </td>
-                  <th scope="row">
+                  <th role="rowheader" scope="row">
                     <ExactValue>{fullName}</ExactValue>
                     {row.transferring && <small> Transferring to another club</small>}
                     {row.transferWithStaff && <small> Transfer request is with conference staff</small>}
                   </th>
-                  <td data-label="Age">{row.age ?? "—"}</td>
-                  <td data-label={`${toClubYear} type`}>
+                  <td data-label="Age" role="cell">{row.age ?? "—"}</td>
+                  <td data-label={`${toClubYear} type`} role="cell">
                     <select
                       aria-label={`${fullName} type`}
                       disabled={!choice.ticked}
@@ -152,7 +166,7 @@ export function ClubRosterCarryForward({
                       {Object.entries(clubRosterAttendeeTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
                   </td>
-                  <td data-label="Role">
+                  <td data-label="Role" role="cell">
                     <input
                       aria-label={`${fullName} role`}
                       disabled={!choice.ticked}
@@ -161,7 +175,7 @@ export function ClubRosterCarryForward({
                       value={choice.role}
                     />
                   </td>
-                  <td data-label="Class">
+                  <td data-label="Class" role="cell">
                     <select
                       aria-label={`${fullName} class`}
                       disabled={!choice.ticked || choice.attendeeType !== "YOUTH"}

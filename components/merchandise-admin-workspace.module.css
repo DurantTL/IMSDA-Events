@@ -18,7 +18,7 @@
 .previewList { display: grid; gap: 10px; }
 .previewCard { display: grid; grid-template-columns: 60px minmax(0, 1fr); gap: 11px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px; }
 .previewCard > img { width: 60px; height: 60px; border-radius: 10px; object-fit: cover; }
-.previewCard h3 { margin: 0; color: var(--imsda-navy); font-size: .82rem; }
+.previewCard h3 { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), .82rem); }
 .previewCard p { margin: 3px 0 6px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), .64rem); }
 .previewCard ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .previewCard li, .variantSummary div { display: flex; justify-content: space-between; gap: 8px; font-size: max(var(--type-floor, 0px), .66rem); }
@@ -51,4 +51,4 @@
 
 .previewAs { margin: 0 0 6px; font-weight: 700; font-size: max(var(--type-body-floor, 0px), .67rem); }
 .previewContext { margin: 0; color: var(--muted); font-size: max(var(--type-floor, 0px), .63rem); }
-.editor form > :global(.form-actions) { position: sticky; bottom: -22px; margin: 0 -22px -22px; padding: 12px 22px; border-top: 1px solid var(--line); background: white; }
+.editor form > :global(.form-actions) { position: sticky; bottom: -22px; margin: 0 -22px -22px; padding: 12px 22px; border-top: 1px solid var(--line); background: var(--card); }

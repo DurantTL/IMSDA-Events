@@ -30,9 +30,10 @@
  *  - squeezed text (#996): no visible text in a box narrower than about four characters, no text that wraps one
  *    character per line, and no ordinary word (6 to 15 letters) broken in the middle; only emails, codes and
  *    unbroken strings that cannot fit may break anywhere;
- *  - table wider than its box (#997, tablet and desktop widths): a data table wider than the box around it is a finding. A table may
- *    scroll sideways only when its box has `data-scroll-cue` and really draws an edge fade or shadow (the `.scroll-cue` class); a
- *    box that clips it (overflow hidden) never qualifies;
+ *  - a `table-cards` table sits in a `table-box` container (`table-cards-no-box`), so it can become cards;
+ *  - tables never scroll sideways (#1457), at every width: a table whose scrolling box is wider than the box is `table-scrolls-sideways`
+ *    (no scroll-cue exemption; a table that does not fit is the shared `table-cards` cards, switched by its container's width),
+ *    and a table clipped by its box or sticking out of it is `table-wider-than-box` (#997);
  *  - sticky bars (#996): when a page opens, no sticky or fixed action bar (one holding a button) sits on top of text;
  *  - the shell's "Loading IMSDA Events…" fallback is waited out before anything is measured, and a page that never
  *    leaves it is a finding;
@@ -256,6 +257,9 @@ const pages: PageSpec[] = [
   { name: "account-help-guide-director", path: "/account/help/director-monthly-record", role: "director" },
   { name: "account-help-area", path: "/account/help", role: "area" },
   { name: "account-help-guide-area", path: "/account/help/coordinator-follow-records", role: "area" },
+  // Walkthrough guides (#1482): each step is an instruction and a picture, so the picture must fit the column at every width.
+  { name: "account-help-walkthrough-director", path: "/account/help/walkthrough-director-roster", role: "director", expectText: /Step by step: Add, edit and remove a roster member/ },
+  { name: "account-help-walkthrough-area", path: "/account/help/walkthrough-coordinator-clubs", role: "area", expectText: /Step by step: Your clubs and Who's missing what/ },
   { ...club("home", ""), flow: "portal-navigation" },
   { ...club("roster", "/roster"), prepare: openRosterSections },
   // A director on a past club year: the read-only banner, with the year carried between Home and Roster (#1112).
@@ -2128,19 +2132,26 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
     }
   }
 
-  // 2. Tables that must be scrolled sideways on a phone.
+  // 2. A table never scrolls sideways, at any width (#1457). A table whose scrolling box is wider than the box is a finding, whether
+  //    or not the box draws a scroll cue: a table that does not fit its box is cards instead (the shared `table-cards` pattern).
   const scrollingTables: string[] = [];
-  if (args.cards) {
-    for (const table of Array.from(document.querySelectorAll("table"))) {
-      if (!visible(table) || inHiddenTree(table)) continue;
-      for (let node: HTMLElement | null = table.parentElement; node && node !== document.body; node = node.parentElement) {
-        const style = getComputedStyle(node);
-        if (/(auto|scroll)/.test(style.overflowX) && node.scrollWidth > node.clientWidth + 1) {
-          scrollingTables.push(`${describe(table)} in ${describe(node)} (${node.scrollWidth}px in ${node.clientWidth}px)`);
-          break;
-        }
+  for (const table of Array.from(document.querySelectorAll("table"))) {
+    if (!visible(table) || inHiddenTree(table)) continue;
+    for (let node: HTMLElement | null = table.parentElement; node && node !== document.body; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (/(auto|scroll)/.test(style.overflowX) && node.scrollWidth > node.clientWidth + 1) {
+        scrollingTables.push(`${describe(table)} in ${describe(node)} (${node.scrollWidth}px in ${node.clientWidth}px)`);
+        break;
       }
     }
+  }
+
+  // A `table-cards` table is cards by the width of its box, so its parent must be a `table-box` size container (#1457).
+  const cardsWithoutBox: string[] = [];
+  for (const table of Array.from(document.querySelectorAll("table.table-cards"))) {
+    if (!visible(table) || inHiddenTree(table)) continue;
+    const parent = table.parentElement;
+    if (parent && !/(^|\s)table-box(\s|$)/.test(getComputedStyle(parent).containerName)) cardsWithoutBox.push(`${describe(table)} sits in ${describe(parent)}, which is not a table-box container: it never becomes cards`);
   }
 
   // 3. Tap targets.
@@ -2314,51 +2325,26 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
     if (box && box.scrollWidth > box.clientWidth + 1) fitProblems.push(`${describe(table)} is ${box.scrollWidth}px wide in a ${box.clientWidth}px box`);
   }
 
-  // A data table is never wider than its box (#997). Where tables stay tables (tablet and desktop), a table that is wider than the
-  // box around it is a finding: it is clipped, or the person scrolls sideways without knowing. A table may scroll sideways only
-  // when its box opts in with `data-scroll-cue` AND really draws an edge fade or shadow (a gradient background, drawn by the
-  // `.scroll-cue` class). A box that clips (overflow hidden) can never opt in: the cut-off columns cannot be reached.
+  // A data table is never wider than its box (#997, #1457). A table that is clipped by its box (overflow hidden) or sticks out of it is a
+  // finding. A table that scrolls inside its box is reported as `table-scrolls-sideways` above, at every width, with no scroll-cue exemption.
   const wideTables: string[] = [];
-  if (!args.cards) {
-    for (const table of Array.from(document.querySelectorAll("table"))) {
-      if (!visible(table) || inHiddenTree(table)) continue;
-      let box: HTMLElement | null = null;
-      for (let node: HTMLElement | null = table.parentElement; node && node !== document.body; node = node.parentElement) {
-        if (getComputedStyle(node).overflowX !== "visible") { box = node; break; }
+  for (const table of Array.from(document.querySelectorAll("table"))) {
+    if (!visible(table) || inHiddenTree(table)) continue;
+    let box: HTMLElement | null = null;
+    for (let node: HTMLElement | null = table.parentElement; node && node !== document.body; node = node.parentElement) {
+      if (getComputedStyle(node).overflowX !== "visible") { box = node; break; }
+    }
+    const tableRect = table.getBoundingClientRect();
+    if (!box) {
+      const parent = table.parentElement;
+      if (parent && tableRect.right > parent.getBoundingClientRect().right + 1) {
+        wideTables.push(`${describe(table)} is ${Math.round(tableRect.width)}px wide and sticks out of ${describe(parent)}`);
       }
-      const tableRect = table.getBoundingClientRect();
-      if (!box) {
-        const parent = table.parentElement;
-        if (parent && tableRect.right > parent.getBoundingClientRect().right + 1) {
-          wideTables.push(`${describe(table)} is ${Math.round(tableRect.width)}px wide and sticks out of ${describe(parent)}`);
-        }
-        continue;
-      }
-      if (box.scrollWidth <= box.clientWidth + 1) continue;
-      const style = getComputedStyle(box);
-      const scrolls = /(auto|scroll)/.test(style.overflowX);
-      const optedIn = box.hasAttribute("data-scroll-cue");
-      // The shadow is the scroll-cue class's gradients, or a box that draws its own with both a scrolling and a local attachment.
-      const attachment = style.backgroundAttachment;
-      const drawn = style.backgroundImage.includes("gradient")
-        && (box.classList.contains("scroll-cue") || (attachment.includes("scroll") && attachment.includes("local")));
-      const alphaOf = (color: string) => {
-        const match = /rgba?\(([^)]+)\)/.exec(color);
-        if (!match) return 1;
-        const parts = match[1]!.split(/[ ,/]+/).filter(Boolean);
-        return parts.length >= 4 ? Number(parts[3]) : 1;
-      };
-      const detail = `${describe(table)} is ${box.scrollWidth}px wide in a ${box.clientWidth}px box (${describe(box)})`;
-      if (!scrolls) wideTables.push(`${detail}: the box clips it, so the columns past the edge cannot be reached`);
-      else if (!optedIn) wideTables.push(`${detail}: it scrolls sideways with no scroll cue (add data-scroll-cue and the scroll-cue class) or it should fit`);
-      else if (!drawn) wideTables.push(`${detail}: data-scroll-cue is set but no edge fade or shadow is drawn (the box needs the scroll-cue class)`);
-      else {
-        // The shadow sits behind the table: a cell that paints a solid background over it hides it.
-        // Cells, rows and row groups all count (an opaque row or footer would hide the cue just as a cell does).
-        const covering = [table, ...Array.from(table.querySelectorAll("thead, thead tr, thead th, tbody, tbody tr:nth-child(-n+5), tbody tr:nth-child(-n+5) > *, tfoot, tfoot tr, tfoot > tr > *"))]
-          .filter((cell) => alphaOf(getComputedStyle(cell).backgroundColor) > 0.5);
-        if (covering.length > 0) wideTables.push(`${detail}: ${covering.length} element(s) (cells, rows or the table) such as ${describe(covering[0]!)} paint a solid background over the scroll cue, so the shadow cannot show`);
-      }
+      continue;
+    }
+    if (box.scrollWidth <= box.clientWidth + 1) continue;
+    if (!/(auto|scroll)/.test(getComputedStyle(box).overflowX)) {
+      wideTables.push(`${describe(table)} is ${box.scrollWidth}px wide in a ${box.clientWidth}px box (${describe(box)}): the box clips it, so the columns past the edge cannot be reached`);
     }
   }
 
@@ -2388,6 +2374,7 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
     scrollWidth,
     overflowers,
     scrollingTables,
+    cardsWithoutBox,
     smallTargets,
     barNotes,
     cellProblems,
@@ -3331,9 +3318,10 @@ function injectDefects() {
     '<div style="width:50px;font:14px sans-serif;overflow-wrap:anywhere">Pathfinder Registration</div>',
     '<div style="position:fixed;left:0;right:0;top:140px;height:60px;z-index:30;background:#ccc"><button type="button" style="min-height:44px">self-test bar action</button></div><p style="position:absolute;top:150px;left:0;margin:0">self-test paragraph under an action bar</p>',
     '<div class="shell-loading">Loading IMSDA Events…</div>',
-    // A table wider than its box (#997): one in a clipping box, one in a scrolling box that claims a scroll cue and draws none.
+    // A table wider than its box (#997): one in a clipping box, one in a scrolling box that claims a scroll cue.
     '<div style="width:300px;overflow:hidden"><table><tbody><tr><td><div style="width:900px">self-test clipped wide table</div></td></tr></tbody></table></div>',
-    '<div data-scroll-cue style="width:300px;overflow-x:auto"><table><tbody><tr><td><div style="width:900px">self-test cue claimed, none drawn</div></td></tr></tbody></table></div>',
+    // A table that scrolls sideways is a finding even when its box claims a scroll cue (#1457).
+    '<div data-scroll-cue class="scroll-cue" style="width:300px;overflow-x:auto"><table><tbody><tr><td><div style="width:900px">self-test scrolling table with a cue</div></td></tr></tbody></table></div>',
   ].join("");
   document.body.appendChild(box);
   const opener = document.createElement("button");
@@ -3919,6 +3907,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     record("horizontal-scroll", spec.name, width, `page is ${result.scrollWidth}px wide in a ${result.innerWidth}px window; sticking out: ${result.overflowers.join("; ") || "(nothing identified)"}`);
   }
   for (const table of result.scrollingTables) record("table-scrolls-sideways", spec.name, width, table);
+  for (const problem of result.cardsWithoutBox) record("table-cards-no-box", spec.name, width, problem);
   for (const target of result.smallTargets) record("small-tap-target", spec.name, width, target);
   for (const note of result.barNotes) record("sticky-bar-size", spec.name, width, note);
   for (const problem of result.cellProblems) record("table-cell", spec.name, width, problem);

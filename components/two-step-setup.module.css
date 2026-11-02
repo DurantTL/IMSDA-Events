@@ -5,7 +5,7 @@
   align-items: start;
   gap: 10px;
   border: 1px solid #d9c9ea;
-  border-radius: 14px;
+  border-radius: var(--radius-info);
   background: var(--imsda-purple-soft);
   color: #3f1f5e;
   padding: 15px;
@@ -92,8 +92,8 @@
   gap: 12px;
   min-height: 64px;
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
+  border-radius: var(--radius-info);
+  background: var(--card);
   cursor: pointer;
   padding: 12px 14px;
 }
@@ -123,7 +123,7 @@
 .chip {
   display: inline-block;
   margin-left: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--imsda-gold-soft);
   color: #6f5316;
   padding: 1px 8px;

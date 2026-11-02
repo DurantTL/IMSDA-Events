@@ -6,12 +6,22 @@ import { Download } from "lucide-react";
 import { formatReportYearDueDate, yearEndProgress } from "@/modules/club-reports/year-end-domain";
 import type { YearEndClubSummary } from "@/modules/club-reports/year-end-repository";
 import { cardCell } from "@/components/table-card-labels";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 
 type Row = Pick<YearEndClubSummary, "id" | "name" | "church" | "status" | "submittedAt" | "late"> & {
   totalMembership: number | null;
 };
 
 const statusText = { NONE: "Missing", DRAFT: "Draft (missing)", SUBMITTED: "Submitted" } as const;
+
+/** Sorts from the headers, in the address (#1458); clubs stay in the order the server gave until a column is chosen. */
+const YEAR_END_SORT = {
+  club: { label: "Club", value: (row) => row.name },
+  church: { label: "Sponsoring church", noteLabel: "sponsoring church", value: (row) => row.church },
+  status: { label: "Status", value: (row) => `${statusText[row.status]}${row.status === "SUBMITTED" && row.late ? " (late)" : ""}` },
+  membership: { label: "Total membership", kind: "number", noteLabel: "total membership", value: (row) => row.totalMembership },
+} satisfies Record<string, SortSpec<Row>>;
 
 /**
  * Every club's Year-End Report for a Pathfinder year (#607): submitted and
@@ -20,6 +30,7 @@ const statusText = { NONE: "Missing", DRAFT: "Draft (missing)", SUBMITTED: "Subm
  */
 export function ClubYearEndConference({ reportYear, initialRows }: { reportYear: string; initialRows: Row[] }) {
   const [rows, setRows] = useState(initialRows);
+  const sorted = useTableSort(rows, YEAR_END_SORT, "yearEnd");
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const progress = yearEndProgress(rows);
@@ -59,14 +70,15 @@ export function ClubYearEndConference({ reportYear, initialRows }: { reportYear:
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <div className="table-wrap">
+        {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
         <table role="table" className="report-table report-table-auto table-cards">
           <thead role="rowgroup">
-            <tr role="row"><th role="columnheader">Club</th><th role="columnheader">Sponsoring church</th><th role="columnheader">Status</th><th role="columnheader">Total membership</th><th role="columnheader" /></tr>
+            <tr role="row"><SortableHeader {...sorted.headerProps("club")} /><SortableHeader {...sorted.headerProps("church")} /><SortableHeader {...sorted.headerProps("status")} /><SortableHeader {...sorted.headerProps("membership")} /><th role="columnheader"><span className="sr-only">Actions</span></th></tr>
           </thead>
           <tbody role="rowgroup">
-            {rows.map((row) => (
+            {sorted.rows.map((row) => (
               <tr role="row" key={row.id}>
-                <td {...cardCell("Club")}>{row.name}</td>
+                <th role="rowheader" scope="row">{row.name}</th>
                 <td {...cardCell("Sponsoring church")}>{row.church}</td>
                 <td {...cardCell("Status")}>{statusText[row.status]}{row.status === "SUBMITTED" && row.late ? " (late)" : ""}</td>
                 <td {...cardCell("Total membership")}>{row.totalMembership ?? ""}</td>

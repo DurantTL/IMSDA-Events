@@ -172,7 +172,7 @@ describe("print and screen scope (#1004 review)", () => {
 
   it("keeps every tile rule inside a screen-only media query", () => {
     const start = css.indexOf("/* --- Stat tiles never leave one tile alone on a row (#1004)");
-    const end = css.indexOf("/* --- Roster cards: the actions sit in the card header (#1004)");
+    const end = css.indexOf("/* With a header banner the page has one hero.");
     const block = css.slice(start, end);
     const queries = block.match(/@media [^{]+\{/g) ?? [];
     expect(queries.length).toBeGreaterThanOrEqual(5);

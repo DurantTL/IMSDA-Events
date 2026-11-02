@@ -103,7 +103,7 @@ export default async function EventPacketsPage({
             <strong>{group.attendees.length} {group.attendees.length === 1 ? "attendee" : "attendees"}</strong>
           </header>
 
-          {sections.registrationContacts && <section>
+          {sections.registrationContacts && <section className="card-box">
             <h2>Registration contacts</h2>
             <table className="table-cards" role="table">
               <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Confirmation</th><th role="columnheader" scope="col">Contact</th><th role="columnheader" scope="col">Email / phone</th><th role="columnheader" scope="col">Arrival</th></tr></thead>

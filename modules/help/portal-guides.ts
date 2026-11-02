@@ -1,6 +1,7 @@
 import { clubRoleText, type ClubRoleKey } from "@/modules/access/role-descriptions";
 import { newCoordinatorGuides, newDirectorGuides } from "@/modules/help/portal-role-guides";
 import type { PortalDestination, PortalGuide } from "@/modules/help/types";
+import { walkthroughGuides, walkthroughsForGuide } from "@/modules/help/walkthroughs";
 
 /**
  * Portal guides (#1259): short task guides for attendees, club directors and Area Coordinators, shown inside the
@@ -39,7 +40,7 @@ export const portalDestinations: Record<string, PortalDestination> = {
 
 const roleLines = (Object.keys(clubRoleText) as ClubRoleKey[]).map((role) => `${clubRoleText[role].name}: ${clubRoleText[role].summary}${clubRoleText[role].cannot.length ? ` Can't: ${clubRoleText[role].cannot.join(" ")}` : ""}`);
 
-export const portalGuides: readonly PortalGuide[] = [
+const writtenPortalGuides: readonly PortalGuide[] = [
   {
     id: "find-my-registration",
     title: "Find your registration and its next step",
@@ -236,6 +237,12 @@ export const portalGuides: readonly PortalGuide[] = [
   },
   ...newDirectorGuides,
   ...newCoordinatorGuides,
+];
+
+/** The written guides (each with a "See it step by step" link where one exists), then the walkthroughs (#1482). */
+export const portalGuides: readonly PortalGuide[] = [
+  ...writtenPortalGuides.map((guide) => (walkthroughsForGuide[guide.id] ? { ...guide, walkthroughIds: walkthroughsForGuide[guide.id] } : guide)),
+  ...walkthroughGuides,
 ];
 
 export function findPortalGuide(id: string): PortalGuide | undefined {

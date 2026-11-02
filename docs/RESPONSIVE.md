@@ -16,8 +16,8 @@ event administrator and system administrator), visits the main pages at 360,
 | Finding | Rule | Applies at |
 | --- | --- | --- |
 | `horizontal-scroll` | `documentElement.scrollWidth <= innerWidth`; the elements sticking out are named | every width |
-| `table-scrolls-sideways` | a table needs sideways scrolling inside its wrapper: make it cards | 600 px and under |
-| `table-wider-than-box` | a data table is wider than the box around it (#997): it must fit, or scroll sideways in a box that has `data-scroll-cue` and the `scroll-cue` class (an edge shadow that shows which side has more); a box that clips never qualifies | 601 px and over |
+| `table-scrolls-sideways` | a table needs sideways scrolling inside its wrapper, with or without a scroll cue (#1457): make it fit, or make it cards (`table-cards`, switched by the width of its box) | every width |
+| `table-wider-than-box` | a data table is clipped by the box around it, or sticks out of it (#997); a table may no longer scroll sideways in its box (#1457, see `table-scrolls-sideways`) | every width |
 | `small-tap-target` | a button, form control, summary or stand-alone link under 44 px (a link inside a sentence is exempt) | 600 px and under |
 | `dialog-too-tall` | a dialog or sheet taller than the screen, or cut off at the top or bottom | every width |
 | `sticky-bar-covers-content` / `sticky-bar-size` | the last content is hidden under a fixed bar, or fixed bars take over a third of the screen | every width |
@@ -168,20 +168,13 @@ person's name (or the item's title) the row header (`<th scope="row">`): it
 becomes the card's title. On a desktop the row header looks like a normal cell
 if the table has no `.report-table` styling; check the wide table too.
 
-The header row is visually hidden on a phone, so a **sortable column's header
-control is not usable on cards**. Say how the list is ordered with a
-`SortOrderNote`, and give the phone another way to change it:
-
-- a client-sorted list (honors) keeps its order and its note;
-- a server-sorted list (the attendee listing) adds Sort and Direction selects to
-  its GET filter form, shown at 600 px and under (`.attendee-sort-phone`), and
-  its header links are `PhoneHiddenSortLink`, which is out of the tab order on a
-  phone so there are no invisible Tab stops. The header row itself stays in the
-  accessibility tree so each cell keeps its column name.
-
-If a list cannot give up its sort header, keep the table in its scroll box and
-record the exception in `acceptedFindings`. Used by: roster
-(`.roster-card-table`), club reports, honors, area overview and points,
+The header row is visually hidden in card mode, except on a table with sortable columns (#1457): its
+sortable headers show as a "Sort by" row of 44px pill buttons above the cards, at every width where the
+table is cards, and the active sort is highlighted. The other column headers stay visually hidden but in the
+accessibility tree, so each cell keeps its column name. Say how the list is ordered with a `SortOrderNote`.
+A server-sorted list (the attendee listing) also keeps its Sort and Direction selects in the GET filter form
+at 600 px and under (`.attendee-sort-phone`); its header links (`PhoneHiddenSortLink`) are ordinary, focusable
+links. Used by: roster, club reports, honors, area overview and points, coordinator records and destinations,
 invites, Sterling Volunteers, team, accounts, club forms, attendee listing.
 
 ### Tables on a wide screen: padding, minimum widths, and no overlap (#811)
@@ -294,3 +287,23 @@ own or on a wrapper within two levels, or with a boundary under 3:1;
   listed with reasons at the top of the script) and `header-too-narrow` (a column header narrower
   than its longest word; a hyphenated word may wrap at its hyphen). Overlapping text is the
   `text-overlap` rule of the text-rules set.
+
+## Tables are cards by their box's width (#1457)
+
+One pattern: `table.table-cards` with `cardCell()` labels (`components/table-card-labels.tsx`) and static ARIA roles. The wrap around the
+table (`.report-table-wrap`, `.table-wrap`, `.table-scroll`, `.reminder-recipient-table-wrap`, `.card-box`) is a size container named
+`table-box`, and the cards switch on that box's width, not the viewport:
+
+| Class on the table | Cards when its box is | Use for |
+| --- | --- | --- |
+| `table-cards` (and `-compact`) | 600px or narrower | most tables |
+| `table-cards-tablet` | 760px or narrower | more columns |
+| `table-cards-wide` | 860px or narrower | seven or eight columns |
+| `table-cards-xwide` | 1100px or narrower | the roster, the settings tables, month grids |
+| `table-cards-max` | 1260px or narrower | the 12-column attendee listing |
+
+No table scrolls sideways at any width: pick the threshold from the table's real width, and the audit (`table-scrolls-sideways`,
+`table-wider-than-box`) fails one that does not fit. A `table-cards` table must sit directly in a wrap (`table-cards-no-box`).
+Every card keeps its column label (`data-label`), the row header (`th scope="row"`) is the card's heading, and the row's action is the
+last unlabelled cell, shown at the card's foot above a thin divider. `tests/table-cards-guard-1457.test.ts` fails on a new `<table`
+without `table-cards` unless its file is on that test's allow-list.

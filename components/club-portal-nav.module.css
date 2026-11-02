@@ -1,7 +1,7 @@
 /* The club shell's tab row (#1319): every destination the role can open, one row; a horizontally scrollable strip when it does not fit. */
 .nav {
   border-bottom: 1px solid var(--line);
-  background: #fff;
+  background: var(--card);
 }
 
 .strip {

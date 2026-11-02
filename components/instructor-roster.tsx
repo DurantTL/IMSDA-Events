@@ -5,6 +5,16 @@ import { Check, CheckCheck, Eraser } from "lucide-react";
 import type { InstructorRosterRow } from "@/modules/honors/instructor-domain";
 import { formatPersonName } from "@/lib/person-name";
 import { savedMessage } from "@/components/form-message";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
+
+/** Sorts from the headers, in the address (#1458); the roster stays in the server's order until a column is chosen. */
+const INSTRUCTOR_ROSTER_SORT = {
+  name: { label: "Name", value: (row) => formatPersonName(row, "sorted") },
+  club: { label: "Club", value: (row) => row.clubName },
+  attended: { label: "Attended", noteLabel: "attended", value: (row) => row.attended },
+  completed: { label: "Completed", noteLabel: "completed", value: (row) => row.completed },
+} satisfies Record<string, SortSpec<InstructorRosterRow>>;
 
 type MarkResponse = { people?: InstructorRosterRow[]; locked?: number; writeBack?: { skipped: number } | null; message?: string };
 
@@ -29,6 +39,7 @@ export function InstructorRoster({
   notOpenYet?: boolean;
 }) {
   const [rows, setRows] = useState(initialRows);
+  const sorted = useTableSort(rows, INSTRUCTOR_ROSTER_SORT, "roster");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -80,11 +91,12 @@ export function InstructorRoster({
         <p className="public-manage-empty">No one has chosen this class yet.</p>
       ) : (
         <div className="report-table-wrap">
+          {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
           <table className="report-table">
             <caption className="sr-only">People in this class</caption>
-            <thead><tr><th scope="col">Name</th><th scope="col">Club</th><th scope="col">Attended</th><th scope="col">Completed</th></tr></thead>
+            <thead><tr><SortableHeader {...sorted.headerProps("name")} /><SortableHeader {...sorted.headerProps("club")} /><SortableHeader {...sorted.headerProps("attended")} /><SortableHeader {...sorted.headerProps("completed")} /></tr></thead>
             <tbody>
-              {rows.map((row) => (
+              {sorted.rows.map((row) => (
                 <tr key={row.enrollmentId}>
                   <th scope="row" translate="no">{formatPersonName(row, "sorted")}</th>
                   <td translate="no">{row.clubName}</td>

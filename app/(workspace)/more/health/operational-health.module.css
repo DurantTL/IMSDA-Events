@@ -58,7 +58,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 17px;
-  background: white;
+  background: var(--card);
   padding: 18px 19px;
   box-shadow: 0 8px 24px rgba(0, 59, 92, 0.045);
 }
@@ -104,7 +104,7 @@
 .section {
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
-  background: white;
+  background: var(--card);
   padding: 21px;
   box-shadow: 0 8px 24px rgba(0, 59, 92, 0.045);
 }
@@ -241,7 +241,7 @@
   gap: 5px;
   border: 1px solid #cfdde3;
   border-radius: 9px;
-  background: white;
+  background: var(--card);
   color: var(--imsda-purple);
   padding: 8px 10px;
   font-size: max(var(--type-body-floor, 0px), 0.63rem);
@@ -268,11 +268,6 @@
   text-align: center;
 }
 
-.moreNotice {
-  margin: 11px 2px 0;
-  color: var(--muted);
-  font-size: max(var(--type-floor, 0px), 0.63rem);
-}
 
 .rules {
   border: 1px solid #d8e3e7;
@@ -345,7 +340,7 @@
   .healthyState,
   .rules {
     border-color: #aaa;
-    background: white;
+    background: var(--card);
     box-shadow: none;
   }
 
@@ -362,7 +357,7 @@
   .issue {
     break-inside: avoid;
     border-color: #bbb;
-    background: white;
+    background: var(--card);
     padding: 8px;
   }
 }

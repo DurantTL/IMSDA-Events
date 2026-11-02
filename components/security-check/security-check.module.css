@@ -28,7 +28,7 @@
 .message:not(:empty) {
   margin-top: 8px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #fdf4f2;
   color: #8f3a30;
   font-weight: 600;
@@ -77,7 +77,7 @@
 
 /* The shared hover rule only skips real `:disabled`; keep the resting look while sending. */
 .emailCodeButton.emailCodeButton[aria-disabled="true"]:hover {
-  background: #f9fbfb;
+  background: var(--secondary-bg);
   border-color: var(--line);
 }
 
@@ -90,7 +90,7 @@
 
 .codeStatus:not(:empty) {
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #f1f7f2;
   color: #1f5a33;
   font-weight: 600;
@@ -98,7 +98,7 @@
 
 .codeError:not(:empty) {
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #fdf4f2;
   color: #8f3a30;
   font-weight: 600;

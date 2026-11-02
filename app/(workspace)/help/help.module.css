@@ -274,6 +274,33 @@
   border-radius: 10px;
 }
 
+/* A walkthrough step (#1482): the instruction, then its picture, in the usual numbered list. */
+.stepWithPicture {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* The phone picture is 390 px wide; on a phone it fills the column. The desktop picture is 960 px wide, so its text stays readable. Existing guide screenshots keep their own cap. */
+.stepWithPicture .figureImage {
+  max-width: min(100%, 960px);
+}
+
+.stepLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepLinks a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 .figureCaption {
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   color: var(--muted, #5b6470);

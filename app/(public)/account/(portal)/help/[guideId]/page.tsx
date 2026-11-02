@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuideScreenshotFigure } from "@/components/guide-screenshot";
+import { WalkthroughSteps } from "@/components/walkthrough-steps";
 import { BackLink } from "@/components/back-link";
 import { docLabel, docUrl } from "@/modules/help/guides";
+import { walkthroughCapturedFor } from "@/modules/help/walkthrough-check";
+import { walkthroughManifest } from "@/modules/help/walkthrough-manifest-data";
 import { loadPortalHelpViewer } from "@/modules/help/portal-viewer";
 import { portalGuideForViewer, portalGuideLinksForViewer, portalUnavailableText } from "@/modules/help/portal-visibility";
 import styles from "@/app/(workspace)/help/help.module.css";
@@ -33,6 +36,11 @@ export default async function PortalGuidePage({ params }: { params: Promise<{ gu
   const guide = portalGuideForViewer(guideId, viewer);
   if (!guide) notFound();
   const { links, unavailable } = portalGuideLinksForViewer(guide, viewer);
+  // "See it step by step" (#1482): only walkthroughs this viewer may see.
+  const walkthroughLinks = (guide.walkthroughIds ?? []).flatMap((id) => {
+    const walkthrough = portalGuideForViewer(id, viewer);
+    return walkthrough ? [{ id, label: walkthrough.title.replace(/^Step by step: /, "") }] : [];
+  });
 
   return (
     <>
@@ -59,7 +67,16 @@ export default async function PortalGuidePage({ params }: { params: Promise<{ gu
           </section>
           <section className={styles.section} aria-labelledby="guide-steps">
             <h2 className={styles.sectionTitle} id="guide-steps">Steps</h2>
-            <ol className={styles.steps}>{guide.steps.map((item) => <li key={item}>{item}</li>)}</ol>
+            {walkthroughLinks.length > 0 && (
+              <ul className={styles.stepLinks}>
+                {walkthroughLinks.map((link) => (
+                  <li key={link.id}><Link className="secondary-button" href={`/account/help/${link.id}`}>See it step by step: {link.label}</Link></li>
+                ))}
+              </ul>
+            )}
+            {guide.walkthrough
+              ? <WalkthroughSteps capturedFor={walkthroughCapturedFor(walkthroughManifest, guide.id)} guideId={guide.id} lastReviewed={guide.lastReviewed} steps={guide.walkthrough.steps} />
+              : <ol className={styles.steps}>{guide.steps.map((item) => <li key={item}>{item}</li>)}</ol>}
             <GuideScreenshotFigure guide={guide} />
           </section>
           <section className={styles.section} aria-labelledby="guide-verify">

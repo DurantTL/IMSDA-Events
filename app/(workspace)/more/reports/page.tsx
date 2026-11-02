@@ -1,5 +1,6 @@
 import { ExportLink } from "@/components/export-link";
 import { ExactValue } from "@/components/exact-value";
+import { formatPersonName } from "@/lib/person-name";
 import type { Metadata } from "next";
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { StaffPageHeader } from "@/components/staff-page-header";
@@ -36,6 +37,10 @@ import { canSeeIssuesText } from "@/modules/background-checks/notes-access";
 import { listEventBackgroundFlags } from "@/modules/background-checks/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { cardCell } from "@/components/table-card-labels";
+import { ColumnHeader } from "@/components/column-header";
+import { SortOrderNote } from "@/components/list-sort";
+import { serverSort, sortRows, type ServerSort } from "@/lib/list-sort";
+import { REPORT_COUNTS_SORT_COLUMNS, REPORT_ROSTER_SORT_COLUMNS, REPORT_SEMINAR_SORT_COLUMNS, REPORT_TYPES_SORT_COLUMNS, REPORT_VOLUNTEER_SORT_COLUMNS, UNSORTED, sortLine } from "@/lib/staff-sort-columns";
 
 export const metadata: Metadata = { title: staffPageTitles.operationalReports };
 
@@ -59,14 +64,17 @@ function CountFields({
   fields,
   emptyCopy,
   help,
+  sorting,
 }: {
   fields: OperationalCountField[];
   emptyCopy: string;
   help?: React.ReactNode;
+  sorting: ServerSort<typeof REPORT_COUNTS_SORT_COLUMNS[number]>;
 }) {
   if (fields.length === 0) return <EmptyReport help={help}>{emptyCopy}</EmptyReport>;
   return (
     <div className="report-field-list">
+      {sorting.order.key && <SortOrderNote>{sortLine(sorting.order)}</SortOrderNote>}
       {fields.map((field) => (
         <article className="report-field" key={field.id}>
           <div className="report-field-heading">
@@ -79,9 +87,9 @@ function CountFields({
           <div className="report-table-wrap card-box">
             <table role="table" className="report-table table-cards table-cards-compact">
               <caption className="sr-only">{field.label} counts</caption>
-              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Choice or quantity</th><th role="columnheader" scope="col">Count</th></tr></thead>
+              <thead role="rowgroup"><tr role="row"><ColumnHeader column="choice" label="Choice or quantity" sorting={sorting} /><ColumnHeader column="count" label="Count" sorting={sorting} /></tr></thead>
               <tbody role="rowgroup">
-                {field.counts.map((row) => (
+                {sortRows(field.counts, sorting.order.key, sorting.order.dir, { choice: (row) => row.label, count: (row) => row.count }).map((row) => (
                   <tr role="row" key={row.label}><th role="rowheader" scope="row">{row.label}</th><td {...cardCell("Count")}>{displayCount(row.count)}</td></tr>
                 ))}
               </tbody>
@@ -93,12 +101,13 @@ function CountFields({
   );
 }
 
-function SeminarFields({ fields }: { fields: OperationalSeminarField[] }) {
+function SeminarFields({ fields, sorting }: { fields: OperationalSeminarField[]; sorting: ServerSort<typeof REPORT_SEMINAR_SORT_COLUMNS[number]> }) {
   if (fields.length === 0) {
     return <EmptyReport>No ranked-choice fields are configured on an active registration form yet.</EmptyReport>;
   }
   return (
     <div className="report-field-list">
+      {sorting.order.key && <SortOrderNote>{sortLine(sorting.order)}</SortOrderNote>}
       {fields.map((field) => (
         <article className="report-field" key={field.id}>
           <div className="report-field-heading">
@@ -112,10 +121,10 @@ function SeminarFields({ fields }: { fields: OperationalSeminarField[] }) {
             <table role="table" className="report-table seminar-table table-cards table-cards-compact">
               <caption className="sr-only">{field.label} ranked interest</caption>
               <thead role="rowgroup">
-                <tr role="row"><th role="columnheader" scope="col">Option</th><th role="columnheader" scope="col">1st</th><th role="columnheader" scope="col">2nd</th><th role="columnheader" scope="col">Total interest</th></tr>
+                <tr role="row"><ColumnHeader column="option" label="Option" sorting={sorting} /><ColumnHeader column="first" label="1st" sorting={sorting} /><ColumnHeader column="second" label="2nd" sorting={sorting} /><ColumnHeader column="total" label="Total interest" sorting={sorting} /></tr>
               </thead>
               <tbody role="rowgroup">
-                {field.choices.map((choice) => (
+                {sortRows(field.choices, sorting.order.key, sorting.order.dir, { option: (choice) => choice.label, first: (choice) => choice.firstChoice, second: (choice) => choice.secondChoice, total: (choice) => choice.totalInterest }).map((choice) => (
                   <tr role="row" key={choice.label}>
                     <th role="rowheader" scope="row">{choice.label}</th>
                     <td {...cardCell("1st")}>{choice.firstChoice}</td>
@@ -135,9 +144,10 @@ function SeminarFields({ fields }: { fields: OperationalSeminarField[] }) {
 export default async function OperationalReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string }>;
+  searchParams: Promise<{ event?: string; mealsSort?: string; mealsDir?: string; housingSort?: string; housingDir?: string; childcareSort?: string; childcareDir?: string; volunteerCountsSort?: string; volunteerCountsDir?: string; attendanceSort?: string; attendanceDir?: string; seminarSort?: string; seminarDir?: string; rosterSort?: string; rosterDir?: string; typeSort?: string; typeDir?: string; volunteerSort?: string; volunteerDir?: string }>;
 }) {
-  const requested = (await searchParams).event;
+  const query = await searchParams;
+  const requested = query.event;
   const { event, permissions } = await resolveEventContext(requested, { allowWithoutEventView: true });
   if (!permissions.includes("VIEW_REPORTS")) {
     return (
@@ -155,6 +165,14 @@ export default async function OperationalReportsPage({
     getOperationalReport(event.id),
     listEventBackgroundFlags(event.id, { includeNotes: canSeeIssuesText(user), includeContact: true }),
   ]);
+  // Each kind of table sorts from its own column headers (its own address pair), from a fixed list of columns; the order stays as is until one is chosen (#1458).
+  const path = "/more/reports";
+  // Each count section sorts on its own, so a click in one leaves the others alone.
+  const countSorts = Object.fromEntries(([["meals", "meal-counts"], ["housing", "housing-counts"], ["childcare", "childcare-counts"], ["volunteerCounts", "volunteer-counts"], ["attendance", "attendance-counts"]] as const).map(([prefix, anchor]) => [prefix, serverSort(path, query, REPORT_COUNTS_SORT_COLUMNS, UNSORTED, { prefix, hash: `#${anchor}` })])) as Record<"meals" | "housing" | "childcare" | "volunteerCounts" | "attendance", ReturnType<typeof serverSort<typeof REPORT_COUNTS_SORT_COLUMNS[number]>>>;
+  const seminarSorting = serverSort(path, query, REPORT_SEMINAR_SORT_COLUMNS, UNSORTED, { prefix: "seminar", hash: "#seminar-ranking" });
+  const rosterSorting = serverSort(path, query, REPORT_ROSTER_SORT_COLUMNS, UNSORTED, { prefix: "roster", hash: "#attendee-roster" });
+  const typeSorting = serverSort(path, query, REPORT_TYPES_SORT_COLUMNS, UNSORTED, { prefix: "type", hash: "#attendee-types" });
+  const volunteerSorting = serverSort(path, query, REPORT_VOLUNTEER_SORT_COLUMNS, UNSORTED, { prefix: "volunteer", hash: "#volunteer-roster" });
   const peopleQuery = `?event=${encodeURIComponent(event.id)}`;
   // Sections with nothing configured collapse into one line (#981), instead of eight empty panels.
   const emptyCountSections = ([
@@ -281,6 +299,7 @@ export default async function OperationalReportsPage({
         {report.rosterGroups.length === 0
           ? <EmptyReport help={<EventSetupHelp eventId={event.id} context="reports" id="reports-no-attendees" setupKey="reports-no-attendees" />}>No active attendees are available yet.</EmptyReport>
           : <div className="roster-report-groups">
+              {rosterSorting.order.key && <SortOrderNote>{sortLine(rosterSorting.order)}</SortOrderNote>}
               {report.rosterGroups.map((group) => (
                 <article className="roster-report-group" key={group.id}>
                   <header>
@@ -290,9 +309,14 @@ export default async function OperationalReportsPage({
                   <div className="report-table-wrap card-box">
                     <table role="table" className="report-table roster-table table-cards table-cards-compact">
                       <caption className="sr-only">Attendees in {group.label}</caption>
-                      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Attendee</th><th role="columnheader" scope="col">Type</th><th role="columnheader" scope="col">Registration</th><th role="columnheader" scope="col">Account holder</th></tr></thead>
+                      <thead role="rowgroup"><tr role="row"><ColumnHeader column="attendee" label="Attendee" sorting={rosterSorting} /><ColumnHeader column="type" label="Type" sorting={rosterSorting} /><ColumnHeader column="registration" label="Registration" sorting={rosterSorting} /><ColumnHeader column="holder" label="Account holder" sorting={rosterSorting} /></tr></thead>
                       <tbody role="rowgroup">
-                        {group.attendees.map((attendee) => (
+                        {sortRows(group.attendees, rosterSorting.order.key, rosterSorting.order.dir, {
+                          attendee: (attendee) => formatPersonName(attendee, "sorted"),
+                          type: (attendee) => attendee.attendeeType,
+                          registration: (attendee) => attendee.confirmationCode,
+                          holder: (attendee) => attendee.accountHolderName,
+                        }).map((attendee) => (
                           <tr role="row" key={attendee.attendeeId}>
                             <th role="rowheader" scope="row">{attendee.lastName}, {attendee.firstName}</th>
                             <td {...cardCell("Type")}>{attendee.attendeeType}</td>
@@ -319,6 +343,7 @@ export default async function OperationalReportsPage({
         {report.attendeeTypeGroups.length === 0
           ? <EmptyReport help={<EventSetupHelp eventId={event.id} context="reports" id="reports-no-attendees" sameAs="reports-no-attendees" />}>No active attendees are available yet.</EmptyReport>
           : <div className="roster-report-groups">
+              {typeSorting.order.key && <SortOrderNote>{sortLine(typeSorting.order)}</SortOrderNote>}
               {report.attendeeTypeGroups.map((group) => (
                 <article className="roster-report-group" key={group.id}>
                   <header>
@@ -328,9 +353,14 @@ export default async function OperationalReportsPage({
                   <div className="report-table-wrap card-box">
                     <table role="table" className="report-table roster-table table-cards table-cards-compact">
                       <caption className="sr-only">{group.label} attendees</caption>
-                      <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Attendee</th><th role="columnheader" scope="col">Group</th><th role="columnheader" scope="col">Registration</th><th role="columnheader" scope="col">Account holder</th></tr></thead>
+                      <thead role="rowgroup"><tr role="row"><ColumnHeader column="attendee" label="Attendee" sorting={typeSorting} /><ColumnHeader column="group" label="Group" sorting={typeSorting} /><ColumnHeader column="registration" label="Registration" sorting={typeSorting} /><ColumnHeader column="holder" label="Account holder" sorting={typeSorting} /></tr></thead>
                       <tbody role="rowgroup">
-                        {group.attendees.map((attendee) => (
+                        {sortRows(group.attendees, typeSorting.order.key, typeSorting.order.dir, {
+                          attendee: (attendee) => formatPersonName(attendee, "sorted"),
+                          group: (attendee) => attendee.groupLabel,
+                          registration: (attendee) => attendee.confirmationCode,
+                          holder: (attendee) => attendee.accountHolderName,
+                        }).map((attendee) => (
                           <tr role="row" key={attendee.attendeeId}>
                             <th role="rowheader" scope="row" translate="no">{attendee.lastName}, {attendee.firstName}</th>
                             <td {...cardCell("Group")}>{attendee.groupLabel ?? "—"}</td>
@@ -355,7 +385,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "meals")}><Download aria-hidden="true" size={15} /> Download meal CSV</ExportLink>
           </div>
-          <CountFields fields={report.meals} emptyCopy="No structured meal or dietary-choice fields are configured on an active registration form yet." />
+          <CountFields fields={report.meals} emptyCopy="No structured meal or dietary-choice fields are configured on an active registration form yet." sorting={countSorts.meals} />
         </section>
       )}
 
@@ -368,7 +398,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "housing")}><Download aria-hidden="true" size={15} /> Download housing CSV</ExportLink>
           </div>
-          <CountFields fields={report.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
+          <CountFields fields={report.housing} sorting={countSorts.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
         </section>
       )}
 
@@ -381,7 +411,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "seminars")}><Download aria-hidden="true" size={15} /> Download ranking CSV</ExportLink>
           </div>
-          <SeminarFields fields={report.seminars} />
+          <SeminarFields fields={report.seminars} sorting={seminarSorting} />
         </section>
       )}
 
@@ -394,7 +424,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "childcare")}><Download aria-hidden="true" size={15} /> Download childcare CSV</ExportLink>
           </div>
-          <CountFields fields={report.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
+          <CountFields fields={report.childcare} sorting={countSorts.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
         </section>
       )}
 
@@ -416,7 +446,7 @@ export default async function OperationalReportsPage({
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "volunteers")}><Download aria-hidden="true" size={15} /> Counts CSV</ExportLink>
           </span>
         </div>
-        {report.volunteers.length > 0 && <CountFields fields={report.volunteers} emptyCopy="" />}
+        {report.volunteers.length > 0 && <CountFields fields={report.volunteers} emptyCopy="" sorting={countSorts.volunteerCounts} />}
         <article className="roster-report-group" id="volunteer-roster">
           <header>
             <div><h3>Who said yes</h3><p>Everyone who answered yes to a volunteer question, with a phone number to reach them. &ldquo;Email volunteers&rdquo; writes to each registration&rsquo;s contact after you preview it.</p></div>
@@ -425,11 +455,18 @@ export default async function OperationalReportsPage({
           {report.volunteerRoster.length === 0
             ? <EmptyReport>No one has said yes to a volunteer question yet.</EmptyReport>
             : <div className="report-table-wrap card-box">
+                {volunteerSorting.order.key && <SortOrderNote>{sortLine(volunteerSorting.order)}</SortOrderNote>}
                 <table role="table" className="report-table roster-table table-cards table-cards-compact">
                   <caption className="sr-only">Volunteers</caption>
-                  <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Volunteer</th><th role="columnheader" scope="col">Answer</th><th role="columnheader" scope="col">Phone</th><th role="columnheader" scope="col">Group</th><th role="columnheader" scope="col">Registration</th></tr></thead>
+                  <thead role="rowgroup"><tr role="row"><ColumnHeader column="volunteer" label="Volunteer" sorting={volunteerSorting} /><ColumnHeader column="answer" label="Answer" sorting={volunteerSorting} /><ColumnHeader column="phone" label="Phone" sorting={volunteerSorting} /><ColumnHeader column="group" label="Group" sorting={volunteerSorting} /><ColumnHeader column="registration" label="Registration" sorting={volunteerSorting} /></tr></thead>
                   <tbody role="rowgroup">
-                    {report.volunteerRoster.map((volunteer) => (
+                    {sortRows(report.volunteerRoster, volunteerSorting.order.key, volunteerSorting.order.dir, {
+                      volunteer: (volunteer) => formatPersonName(volunteer, "sorted"),
+                      answer: (volunteer) => volunteer.answer,
+                      phone: (volunteer) => volunteer.phone,
+                      group: (volunteer) => volunteer.groupLabel,
+                      registration: (volunteer) => volunteer.confirmationCode,
+                    }).map((volunteer) => (
                       <tr role="row" key={`${volunteer.attendeeId}-${volunteer.question}`}>
                         <th role="rowheader" scope="row"><ExactValue>{volunteer.lastName}, {volunteer.firstName}</ExactValue><small className="quiet-copy"> · {volunteer.attendeeType}</small></th>
                         <td {...cardCell("Answer")}>{volunteer.answer}{report.volunteers.length > 1 && <small className="quiet-copy"> · {volunteer.question}</small>}</td>
@@ -453,7 +490,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "attendance")}><Download aria-hidden="true" size={15} /> Download attendance CSV</ExportLink>
           </div>
-          <CountFields fields={report.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
+          <CountFields fields={report.attendance} sorting={countSorts.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
         </section>
       )}
       {emptyCountSections.length > 0 && (

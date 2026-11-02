@@ -59,6 +59,7 @@
   /* #1350: tokens from docs/design-system/tokens.css, same values as the literals they replace. */
   --secondary-bg: #f9fbfb;
   --table-head: #f6f9fa;
+  --table-row-line: #eaf0f2; /* the thin divider inside a table row and a table card (#1457); the value #eaf0f2 had before */
   --touch-target: 44px;
   --radius-sm: 8px;
   --radius-card: 12px;
@@ -8137,86 +8138,7 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
   .club-sticky-bar .primary-button { flex: 1; justify-content: center; }
 }
 
-/*
- * Roster: cards below ~720px (#435). Each person becomes a labelled card
- * instead of a squashed table row; the section-title row becomes a plain
- * heading above its cards instead of a table-style row.
- */
-@media (max-width: 720px) {
-  .roster-card-table, .roster-card-table tbody, .roster-card-table tr, .roster-card-table td, .roster-card-table th { display: block; width: 100%; box-sizing: border-box; }
-  .roster-card-table { min-width: 0; }
-  .roster-card-table thead { display: none; }
-  .roster-card-table tr:not(.roster-section-row):not(.roster-section-empty-row) {
-    position: relative; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
-  }
-  .roster-card-table td { border: 0; padding: 2px 0; }
-  .roster-card-table td[data-label] { display: flex; justify-content: space-between; gap: 12px; font-size: max(var(--type-body-floor, 0px), 0.8rem); }
-  .roster-card-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-weight: 600; }
-  .roster-card-table td.roster-card-name[data-label] { display: block; margin-bottom: 6px; font-size: 0.9rem; }
-  .roster-card-table .roster-card-name[data-label]::before { content: none; }
-  .roster-card-table td.roster-card-flags[data-label]::before { padding-top: 2px; }
-  .roster-card-table td.roster-card-actions { display: flex; width: 100%; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-  .roster-card-table td.roster-card-actions .honor-row-actions { gap: 8px; }
-  .roster-card-table td.roster-card-actions::before { content: none; }
-  .roster-card-table .roster-card-actions .secondary-button { min-width: 44px; min-height: 44px; }
-  .roster-card-table .roster-section-heading { margin: 14px 0 4px; padding: 0; background: transparent; border: 0; font-size: 0.95rem; }
-  .roster-card-table .roster-section-empty-row td { padding: 0 0 8px; }
-}
-
-/* #996: the Honors Classes table has nine columns, more than the ~640px beside the staff sidebar can show at tablet and small
-   desktop widths (the first column scrolled out of view). It becomes the same labelled cards up to 1180px. */
-@media (min-width: 721px) and (max-width: 1180px) {
-  .roster-card-table.roster-card-table-wide, .roster-card-table.roster-card-table-wide tbody, .roster-card-table.roster-card-table-wide tr, .roster-card-table.roster-card-table-wide td, .roster-card-table.roster-card-table-wide th { display: block; width: 100%; box-sizing: border-box; }
-  .roster-card-table.roster-card-table-wide { min-width: 0; }
-  .roster-card-table.roster-card-table-wide thead { display: none; }
-  .roster-card-table.roster-card-table-wide tr:not(.roster-section-row):not(.roster-section-empty-row) {
-    position: relative; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
-  }
-  .roster-card-table.roster-card-table-wide td { border: 0; padding: 2px 0; }
-  .roster-card-table.roster-card-table-wide td[data-label] { display: flex; justify-content: space-between; gap: 12px; font-size: max(var(--type-body-floor, 0px), 0.8rem); }
-  .roster-card-table.roster-card-table-wide td[data-label]::before { content: attr(data-label); color: var(--muted); font-weight: 600; }
-  .roster-card-table.roster-card-table-wide td.roster-card-name[data-label] { display: block; margin-bottom: 6px; font-size: 0.9rem; }
-  .roster-card-table.roster-card-table-wide .roster-card-name[data-label]::before { content: none; }
-  .roster-card-table.roster-card-table-wide td.roster-card-flags[data-label]::before { padding-top: 2px; }
-  .roster-card-table.roster-card-table-wide td.roster-card-actions { display: flex; width: 100%; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-  .roster-card-table.roster-card-table-wide td.roster-card-actions .honor-row-actions { gap: 8px; }
-  .roster-card-table.roster-card-table-wide td.roster-card-actions::before { content: none; }
-  .roster-card-table.roster-card-table-wide .roster-card-actions .secondary-button { min-width: 44px; min-height: 44px; }
-  .roster-card-table.roster-card-table-wide .roster-section-heading { margin: 14px 0 4px; padding: 0; background: transparent; border: 0; font-size: 0.95rem; }
-  .roster-card-table.roster-card-table-wide .roster-section-empty-row td { padding: 0 0 8px; }}
-
-/* #997: a roster table whose box is narrower than 640px (beside the staff sidebar below ~980px, or on a tablet) is labelled
-   cards: a grid of label-over-value fields, with the row's actions in the card's top-right corner. Wider than that the table
-   stays a table and scrolls with its scroll cue. The box (`.card-box`) decides, not the viewport. Honors Classes cards (#996)
-   are not in a `.card-box`, so they keep their own rules. */
-@media (min-width: 721px) {
-  @container (max-width: 640px) {
-    .roster-card-table, .roster-card-table tbody, .roster-card-table tr, .roster-card-table td, .roster-card-table th { display: block; width: 100%; box-sizing: border-box; }
-    .roster-card-table { min-width: 0; }
-    .roster-card-table thead { display: none; }
-    .roster-card-table tr:not(.roster-section-row):not(.roster-section-empty-row) {
-      position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); align-items: start; gap: 8px 16px;
-      margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
-    }
-    .roster-card-table td { border: 0; padding: 2px 0; }
-    .roster-card-table td[data-label] { display: block; font-size: max(var(--type-body-floor, 0px), 0.8rem); }
-    .roster-card-table td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 1px; color: var(--muted); font-weight: 600; font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.75rem); }
-    .roster-card-table td.roster-card-name[data-label] { grid-column: 1 / -1; min-height: 44px; margin-bottom: 0; padding-right: 11rem; font-size: 0.9rem; }
-    .roster-card-table .roster-card-name[data-label]::before { content: none; }
-    .roster-card-table td.roster-card-flags[data-label] { grid-column: span 2; }
-    .roster-card-table td.roster-honors-cell { position: absolute; top: 8px; right: 12px; display: flex; width: auto; padding: 0; }
-    .roster-card-table td.roster-honors-cell::before { content: none; }
-    .roster-card-table .roster-honors-cell .secondary-button { min-height: 44px; }
-    .roster-card-table td.roster-card-actions { position: absolute; top: 8px; right: 12px; display: flex; width: auto; justify-content: flex-end; gap: 8px; margin: 0; padding: 0; }
-    .roster-card-table td.roster-card-actions .honor-row-actions { gap: 8px; }
-    .roster-card-table td.roster-card-actions::before { content: none; }
-    /* With an Honors button already in the corner, the edit actions take the card's last row. */
-    .roster-card-table tr:has(.roster-honors-cell) td.roster-card-actions { position: static; grid-column: 1 / -1; }
-    .roster-card-table .roster-card-actions .secondary-button { min-width: 44px; min-height: 44px; }
-    .roster-card-table .roster-section-heading { margin: 14px 0 4px; padding: 0; background: transparent; border: 0; font-size: 0.95rem; }
-    .roster-card-table .roster-section-empty-row td { padding: 0 0 8px; }
-  }
-}
+/* Roster cards: the roster is the shared `table-cards` pattern (table-cards-xwide), not its own card system (#1457). */
 
 /* Account and club pages (split into separate screens) */
 .account-nav { max-width: 1180px; margin: 18px auto 0; }
@@ -8765,24 +8687,7 @@ a.calendar-year-day:hover { background: #eef3f6; }
   letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap;
 }
 .editable-settings-table tbody tr:last-child > * { border-bottom: 0; }
-@media (max-width: 640px) {
-  .editable-settings-table, .editable-settings-table tbody, .editable-settings-table tr,
-  .editable-settings-table td, .editable-settings-table th { display: block; width: 100%; box-sizing: border-box; }
-  .editable-settings-table thead { display: none; }
-  .editable-settings-table tbody tr {
-    margin-bottom: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
-  }
-  .editable-settings-table td { border: 0; padding: 6px 0; }
-  .editable-settings-table td[data-label] {
-    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
-  }
-  .editable-settings-table td[data-label]::before {
-    content: attr(data-label); flex: 0 0 auto; color: var(--muted); font-weight: 700;
-    font-size: max(var(--type-body-floor, 0px), 0.66rem); text-transform: uppercase; letter-spacing: 0.04em;
-  }
-  .editable-settings-table td[data-label] input:not([type="color"]),
-  .editable-settings-table td[data-label] .form-grid { flex: 1 1 auto; min-width: 0; }
-}
+/* Narrow boxes show the shared table-cards cards (the table carries table-cards table-cards-xwide, #1457). */
 @media print {
   .account-nav, .account-portal .public-registration-header, .account-portal .account-page-hero,
   .club-schedule-actions, .honor-roster-downloads, .event-packet-selector, .honor-roster-tabs, .team-level-tabs, .honor-seat-override { display: none !important; }
@@ -9602,22 +9507,35 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 /* Next-step link inside an empty state (#688): a 44px tap target. */
 .empty-state-link { display: inline-flex; min-height: 44px; align-items: center; color: var(--imsda-purple); font-weight: 700; text-decoration: underline; }
 
-/* Issue #686 - mobile pass 3: report and overview tables as stacked cards on
-   phones. `table.table-cards` is the opt-in. Everything is CSS plus markup the
-   server already renders (data-label on each cell via cardCell(), static ARIA
-   roles on the table parts so the display changes keep table semantics), so the
-   first paint is already cards. Desktop is untouched: all rules sit inside the
-   media query. The doubled class (.table-cards.table-cards) beats desktop
-   rules such as `.report-table td:last-child { width: 120px }` and the
+/* Issue #686 - mobile pass 3, made container-driven in #1457: report and overview tables as stacked cards. `table.table-cards` is the
+   opt-in, and the ONE shared card pattern (the roster, the settings tables and the kitchen report use it too). Everything is CSS plus
+   markup the server already renders (data-label on each cell via cardCell(), static ARIA roles on the table parts so the display
+   changes keep table semantics), so the first paint is already cards. The box around the table decides, not the viewport: the wrap
+   (.report-table-wrap, .table-wrap, .table-scroll, .reminder-recipient-table-wrap or .card-box) is a size container named `table-box`
+   (declared below), so a table is cards exactly when its columns would not fit its box, at any viewport width. Thresholds:
+     table-cards (no variant) and -compact   box 600px or narrower
+     table-cards-tablet                      box 760px or narrower
+     table-cards-wide                        box 860px or narrower
+     table-cards-xwide                       box 1100px or narrower (nine-column tables such as the roster)
+     table-cards-max                         box 1260px or narrower (the 12-column attendee listing, 78rem wide)
+   A table needs a wrap; a `table-cards` table without a `table-box` container never becomes cards (the audit's table-cards-no-box
+   rule). The doubled class (.table-cards.table-cards) beats desktop rules such as `.report-table td:last-child { width: 120px }` and the
    roster/seminar/team nowrap rules without !important. */
-@media screen and (max-width: 600px) {
-  .report-table-wrap:has(> table.table-cards),
-  .table-wrap:has(> table.table-cards),
-  .reminder-recipient-table-wrap:has(> table.table-cards) { overflow: visible; }
+.report-table-wrap:has(> table.table-cards),
+.table-wrap:has(> table.table-cards),
+.table-scroll:has(> table.table-cards),
+.reminder-recipient-table-wrap:has(> table.table-cards),
+.card-box { container: table-box / inline-size; }
+/* Cards fit their box, so the wrap never scrolls or clips: a focus ring or an open menu can show past a card's edge. */
+.report-table-wrap:has(> table.table-cards),
+.table-wrap:has(> table.table-cards),
+.table-scroll:has(> table.table-cards),
+.reminder-recipient-table-wrap:has(> table.table-cards) { overflow: visible; }
 
+@container table-box (max-width: 600px) {
   table.table-cards.table-cards,
   table.table-cards.table-cards > tbody,
-  table.table-cards.table-cards > caption:not(.sr-only) { display: block; width: 100%; box-sizing: border-box; min-width: 0; }
+  table.table-cards.table-cards > caption:not(.sr-only) { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
 
   /* A visually hidden caption (.sr-only) is left out above: it stays absolutely
      positioned and 1px wide. width: 100% on it was as wide as the page plus its
@@ -9631,20 +9549,21 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
     clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
   }
 
+  /* One bordered card per row (#1457). */
   table.table-cards.table-cards > tbody > tr {
     display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
-    margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
+    margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
   }
   table.table-cards.table-cards > tbody > tr > :is(th, td) {
     display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
-    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: anywhere;
+    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: break-word; word-break: normal; vertical-align: top;
   }
 
   /* The row header is the card title, always first (the points table lists
      Rank before Club, the special-roles table Role before Name). */
   table.table-cards.table-cards > tbody > tr > th[scope="row"] {
-    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid #eaf0f2;
-    font-size: max(var(--type-body-floor, 0px), 0.9rem); overflow-wrap: break-word; word-break: normal;
+    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--table-row-line);
+    font-size: max(var(--type-body-floor, 0px), 0.9rem);
   }
 
   /* "Header: value" lines. The label floats into a left gutter (negative margin
@@ -9655,18 +9574,24 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   }
   table.table-cards > tbody > tr > td[data-label]::before {
     content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
-    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
     overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
   }
   /* Long labels and cells that hold controls: label above, value full width. */
-  table.table-cards.table-cards > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions)) { padding-left: 0; }
-  table.table-cards > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions))::before {
+  table.table-cards.table-cards > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea)) { padding-left: 0; }
+  table.table-cards > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea))::before {
     float: none; display: block; width: auto; margin: 0 0 2px;
   }
   table.table-cards .team-account-actions { flex-wrap: wrap; }
-  /* Unlabelled (sr-only header) action cells: just the controls, wrapping. */
-  table.table-cards.table-cards > tbody > tr > td:not([data-label]) { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* The row's action sits at the bottom of the card, above a thin divider: unlabelled (sr-only header) action cells are just the controls, wrapping. */
+  table.table-cards.table-cards > tbody > tr > td:not([data-label]) {
+    display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--table-row-line);
+  }
   table.table-cards.table-cards > tbody > tr > td:empty { display: none; }
+  table.table-cards.table-cards > tbody > tr > td[colspan] { display: block; margin-top: 0; padding: 4px 0; border-top: 0; }
+
+  /* A month grid keeps its 62rem table-mode minimum only as a table (the rule is later in this file, with equal specificity). */
+  .club-reports-grid table.table-cards.table-cards { min-width: 0; }
 
   /* Month grids: two short "Sep  81" cells per line. The label takes the free
      space (margin-right: auto) so the value and a following "late" stay together. */
@@ -9674,6 +9599,313 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .club-reports-grid table.table-cards.table-cards > tbody > tr > th[scope="row"] { grid-column: 1 / -1; }
   .club-reports-grid table.table-cards.table-cards > tbody > tr > td[data-label] { display: flex; align-items: baseline; gap: 6px; padding-left: 0; }
   .club-reports-grid table.table-cards > tbody > tr > td[data-label]::before { float: none; width: auto; margin: 0 auto 0 0; }
+}
+
+/* The same cards at a wider threshold, for a table with more columns (the box decides, #1457). */
+@container table-box (min-width: 601px) and (max-width: 760px) {
+  table.table-cards-tablet.table-cards-tablet,
+  table.table-cards-tablet.table-cards-tablet > tbody,
+  table.table-cards-tablet.table-cards-tablet > caption:not(.sr-only) { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
+
+  /* A visually hidden caption (.sr-only) is left out above: it stays absolutely
+     positioned and 1px wide. width: 100% on it was as wide as the page plus its
+     offset, which scrolled the document sideways (#737). It stays in the
+     accessibility tree, so the table is still named. */
+
+  /* Visually hidden but still in the accessibility tree: the column headers
+     stay announced, and can never clip. */
+  table.table-cards-tablet.table-cards-tablet > thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  /* One bordered card per row (#1457). */
+  table.table-cards-tablet.table-cards-tablet > tbody > tr {
+    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
+    margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
+  }
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > :is(th, td) {
+    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
+    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: break-word; word-break: normal; vertical-align: top;
+  }
+
+  /* The row header is the card title, always first (the points table lists
+     Rank before Club, the special-roles table Role before Name). */
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > th[scope="row"] {
+    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--table-row-line);
+    font-size: max(var(--type-body-floor, 0px), 0.9rem);
+  }
+
+  /* "Header: value" lines. The label floats into a left gutter (negative margin
+     into the cell's padding), so a label that wraps to two lines grows the row
+     instead of overlapping the next one. flow-root contains the float. */
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > td[data-label] {
+    display: flow-root; padding-left: 8.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
+  }
+  table.table-cards-tablet > tbody > tr > td[data-label]::before {
+    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
+    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
+  }
+  /* Long labels and cells that hold controls: label above, value full width. */
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea)) { padding-left: 0; }
+  table.table-cards-tablet > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea))::before {
+    float: none; display: block; width: auto; margin: 0 0 2px;
+  }
+  table.table-cards-tablet .team-account-actions { flex-wrap: wrap; }
+  /* The row's action sits at the bottom of the card, above a thin divider: unlabelled (sr-only header) action cells are just the controls, wrapping. */
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > td:not([data-label]) {
+    display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--table-row-line);
+  }
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > td:empty { display: none; }
+  table.table-cards-tablet.table-cards-tablet > tbody > tr > td[colspan] { display: block; margin-top: 0; padding: 4px 0; border-top: 0; }
+}
+@container table-box (max-width: 860px) {
+  table.table-cards-wide.table-cards-wide,
+  table.table-cards-wide.table-cards-wide > tbody,
+  table.table-cards-wide.table-cards-wide > caption:not(.sr-only) { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
+
+  /* A visually hidden caption (.sr-only) is left out above: it stays absolutely
+     positioned and 1px wide. width: 100% on it was as wide as the page plus its
+     offset, which scrolled the document sideways (#737). It stays in the
+     accessibility tree, so the table is still named. */
+
+  /* Visually hidden but still in the accessibility tree: the column headers
+     stay announced, and can never clip. */
+  table.table-cards-wide.table-cards-wide > thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  /* One bordered card per row (#1457). */
+  table.table-cards-wide.table-cards-wide > tbody > tr {
+    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
+    margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
+  }
+  table.table-cards-wide.table-cards-wide > tbody > tr > :is(th, td) {
+    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
+    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: break-word; word-break: normal; vertical-align: top;
+  }
+
+  /* The row header is the card title, always first (the points table lists
+     Rank before Club, the special-roles table Role before Name). */
+  table.table-cards-wide.table-cards-wide > tbody > tr > th[scope="row"] {
+    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--table-row-line);
+    font-size: max(var(--type-body-floor, 0px), 0.9rem);
+  }
+
+  /* "Header: value" lines. The label floats into a left gutter (negative margin
+     into the cell's padding), so a label that wraps to two lines grows the row
+     instead of overlapping the next one. flow-root contains the float. */
+  table.table-cards-wide.table-cards-wide > tbody > tr > td[data-label] {
+    display: flow-root; padding-left: 8.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
+  }
+  table.table-cards-wide > tbody > tr > td[data-label]::before {
+    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
+    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
+  }
+  /* Long labels and cells that hold controls: label above, value full width. */
+  table.table-cards-wide.table-cards-wide > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea)) { padding-left: 0; }
+  table.table-cards-wide > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea))::before {
+    float: none; display: block; width: auto; margin: 0 0 2px;
+  }
+  table.table-cards-wide .team-account-actions { flex-wrap: wrap; }
+  /* The row's action sits at the bottom of the card, above a thin divider: unlabelled (sr-only header) action cells are just the controls, wrapping. */
+  table.table-cards-wide.table-cards-wide > tbody > tr > td:not([data-label]) {
+    display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--table-row-line);
+  }
+  table.table-cards-wide.table-cards-wide > tbody > tr > td:empty { display: none; }
+  table.table-cards-wide.table-cards-wide > tbody > tr > td[colspan] { display: block; margin-top: 0; padding: 4px 0; border-top: 0; }
+  table.table-cards-wide.table-cards-wide > tbody > tr > td.org-cell-actions { text-align: left; }
+  .org-directory-table .org-status-button { min-height: 44px; }
+}
+@container table-box (max-width: 1100px) {
+  table.table-cards-xwide.table-cards-xwide,
+  table.table-cards-xwide.table-cards-xwide > tbody,
+  table.table-cards-xwide.table-cards-xwide > caption:not(.sr-only) { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
+
+  /* A visually hidden caption (.sr-only) is left out above: it stays absolutely
+     positioned and 1px wide. width: 100% on it was as wide as the page plus its
+     offset, which scrolled the document sideways (#737). It stays in the
+     accessibility tree, so the table is still named. */
+
+  /* Visually hidden but still in the accessibility tree: the column headers
+     stay announced, and can never clip. */
+  table.table-cards-xwide.table-cards-xwide > thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  /* One bordered card per row (#1457). */
+  table.table-cards-xwide.table-cards-xwide > tbody > tr {
+    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
+    margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
+  }
+  table.table-cards-xwide.table-cards-xwide > tbody > tr > :is(th, td) {
+    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
+    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: break-word; word-break: normal; vertical-align: top;
+  }
+
+  /* The row header is the card title, always first (the points table lists
+     Rank before Club, the special-roles table Role before Name). */
+  table.table-cards-xwide.table-cards-xwide > tbody > tr > th[scope="row"] {
+    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--table-row-line);
+    font-size: max(var(--type-body-floor, 0px), 0.9rem);
+  }
+
+  /* "Header: value" lines. The label floats into a left gutter (negative margin
+     into the cell's padding), so a label that wraps to two lines grows the row
+     instead of overlapping the next one. flow-root contains the float. */
+  table.table-cards-xwide.table-cards-xwide > tbody > tr > td[data-label] {
+    display: flow-root; padding-left: 8.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
+  }
+  table.table-cards-xwide > tbody > tr > td[data-label]::before {
+    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
+    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
+  }
+  /* Long labels and cells that hold controls: label above, value full width. */
+  table.table-cards-xwide.table-cards-xwide > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea)) { padding-left: 0; }
+  table.table-cards-xwide > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea))::before {
+    float: none; display: block; width: auto; margin: 0 0 2px;
+  }
+  table.table-cards-xwide .team-account-actions { flex-wrap: wrap; }
+  /* The row's action sits at the bottom of the card, above a thin divider: unlabelled (sr-only header) action cells are just the controls, wrapping. */
+  table.table-cards-xwide.table-cards-xwide > tbody > tr > td:not([data-label]) {
+    display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--table-row-line);
+  }
+  table.table-cards-xwide.table-cards-xwide > tbody > tr > td:empty { display: none; }
+  table.table-cards-xwide.table-cards-xwide > tbody > tr > td[colspan] { display: block; margin-top: 0; padding: 4px 0; border-top: 0; }
+}
+/* Sorting on cards (#1457, #1458): the header row is hidden in card mode, so a table with sortable columns shows its sort buttons
+   as a "Sort by" row of 44px pills above the cards, at every width where it is cards. The other column headers stay visually hidden
+   but in the accessibility tree, so each cell keeps its column name. */
+@container table-box (max-width: 600px) {
+  table.table-cards.table-cards > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+@container table-box (min-width: 601px) and (max-width: 760px) {
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+@container table-box (max-width: 860px) {
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+@container table-box (max-width: 1100px) {
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+@container table-box (max-width: 1260px) {
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+/* Month grids at the wider thresholds: the same two short "Sep  81" cells per line (#1457). */
+@container table-box (min-width: 601px) and (max-width: 1100px) {
+  .club-reports-grid table.table-cards-xwide.table-cards-xwide { min-width: 0; }
+  .club-reports-grid table.table-cards-xwide.table-cards-xwide > tbody > tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); column-gap: 14px; }
+  .club-reports-grid table.table-cards-xwide.table-cards-xwide > tbody > tr > th[scope="row"] { grid-column: 1 / -1; }
+  .club-reports-grid table.table-cards-xwide.table-cards-xwide > tbody > tr > td[data-label] { display: flex; align-items: baseline; gap: 6px; padding-left: 0; }
+  .club-reports-grid table.table-cards-xwide > tbody > tr > td[data-label]::before { float: none; width: auto; margin: 0 auto 0 0; }
+}
+@container table-box (max-width: 1260px) {
+  table.table-cards-max.table-cards-max,
+  table.table-cards-max.table-cards-max > tbody,
+  table.table-cards-max.table-cards-max > caption:not(.sr-only) { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
+
+  /* A visually hidden caption (.sr-only) is left out above: it stays absolutely
+     positioned and 1px wide. width: 100% on it was as wide as the page plus its
+     offset, which scrolled the document sideways (#737). It stays in the
+     accessibility tree, so the table is still named. */
+
+  /* Visually hidden but still in the accessibility tree: the column headers
+     stay announced, and can never clip. */
+  table.table-cards-max.table-cards-max > thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  /* One bordered card per row (#1457). */
+  table.table-cards-max.table-cards-max > tbody > tr {
+    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
+    margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
+  }
+  table.table-cards-max.table-cards-max > tbody > tr > :is(th, td) {
+    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
+    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: break-word; word-break: normal; vertical-align: top;
+  }
+
+  /* The row header is the card title, always first (the points table lists
+     Rank before Club, the special-roles table Role before Name). */
+  table.table-cards-max.table-cards-max > tbody > tr > th[scope="row"] {
+    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--table-row-line);
+    font-size: max(var(--type-body-floor, 0px), 0.9rem);
+  }
+
+  /* "Header: value" lines. The label floats into a left gutter (negative margin
+     into the cell's padding), so a label that wraps to two lines grows the row
+     instead of overlapping the next one. flow-root contains the float. */
+  table.table-cards-max.table-cards-max > tbody > tr > td[data-label] {
+    display: flow-root; padding-left: 8.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
+  }
+  table.table-cards-max > tbody > tr > td[data-label]::before {
+    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
+    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
+  }
+  /* Long labels and cells that hold controls: label above, value full width. */
+  table.table-cards-max.table-cards-max > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea)) { padding-left: 0; }
+  table.table-cards-max > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea))::before {
+    float: none; display: block; width: auto; margin: 0 0 2px;
+  }
+  table.table-cards-max .team-account-actions { flex-wrap: wrap; }
+  /* The row's action sits at the bottom of the card, above a thin divider: unlabelled (sr-only header) action cells are just the controls, wrapping. */
+  table.table-cards-max.table-cards-max > tbody > tr > td:not([data-label]) {
+    display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--table-row-line);
+  }
+  table.table-cards-max.table-cards-max > tbody > tr > td:empty { display: none; }
+  table.table-cards-max.table-cards-max > tbody > tr > td[colspan] { display: block; margin-top: 0; padding: 4px 0; border-top: 0; }
 }
 
 /* Club forms and records (#703). */
@@ -9803,43 +10035,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .org-status-button { min-height: 36px; white-space: nowrap; }
 @media (pointer: coarse) {
   .org-status-button { min-height: 44px; }
-}
-
-/* Directory table as cards up to 1100px (#723), where the sidebar leaves too little width for seven columns. The same card rules as
-   .table-cards (#686), which stops at 600px; the directory has seven columns,
-   so it needs the cards sooner. */
-@media screen and (max-width: 1100px) {
-  .report-table-wrap:has(> table.table-cards-wide) { overflow: visible; }
-  table.table-cards-wide.table-cards-wide,
-  table.table-cards-wide.table-cards-wide > tbody { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
-  table.table-cards-wide.table-cards-wide > thead {
-    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
-    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
-  }
-  table.table-cards-wide.table-cards-wide > tbody > tr {
-    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
-    margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
-  }
-  table.table-cards-wide.table-cards-wide > tbody > tr > :is(th, td) {
-    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
-    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: anywhere;
-  }
-  table.table-cards-wide.table-cards-wide > tbody > tr > th[scope="row"] {
-    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid #eaf0f2;
-    font-size: max(var(--type-body-floor, 0px), 0.9rem); overflow-wrap: break-word; word-break: normal;
-  }
-  table.table-cards-wide.table-cards-wide > tbody > tr > td[data-label] {
-    display: flow-root; padding-left: 6.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
-  }
-  table.table-cards-wide > tbody > tr > td[data-label]::before {
-    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 5.75rem; margin-left: -6.5rem;
-    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
-    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
-  }
-  table.table-cards-wide.table-cards-wide > tbody > tr > td:not([data-label]) { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
-  table.table-cards-wide.table-cards-wide > tbody > tr > td.org-cell-actions { text-align: left; }
-  .org-status-button { min-height: 44px; }
-  table.table-cards-wide.table-cards-wide > tbody > tr > td[colspan] { padding-left: 0; }
 }
 
 /* #718: the "Age on event date" field inside a roster person's card. It sits
@@ -10978,9 +11173,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 /* #918: the member's name is the most prominent thing in its row; "Class history" is a quiet secondary link under it. */
 .roster-card-name .roster-class-history-link { margin-top: 4px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8125rem); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .roster-card-name .roster-class-history-link:hover, .roster-card-name .roster-class-history-link:focus-visible { color: var(--imsda-purple); }
-@media (max-width: 720px) {
-  .roster-card-table td.roster-card-name[data-label] { font-size: max(var(--type-body-floor, 0px), 1.0625rem); }
-}
 .area-club-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .area-club-search .search-field { max-width: 360px; padding: 0 12px; }
 
@@ -11106,10 +11298,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 }
 @media (max-width: 800px) {
   @supports (height: 1dvh) { .modal-card { max-height: calc(100dvh - 20px); } }
-}
-
-@media screen and (max-width: 600px) {
-  .table-scroll:has(> table.table-cards) { overflow: visible; }
 }
 
 /* The 44px rules below are for phones (600px and under), the same width the audit uses for
@@ -12185,9 +12373,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* #996: a name or class in a roster table keeps room for a whole word. With overflow-wrap: anywhere the column could shrink to
    a few pixels and split "Lindqvist" or "Companion" across lines. */
-@media (min-width: 721px) {
-  .roster-card-table td.roster-card-name { min-width: 9.5rem; }
-}
+.roster-card-table th.roster-card-name { min-width: 9.5rem; }
 
 /* #997 UI recheck batch 2: layout patterns. */
 
@@ -12200,24 +12386,9 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .workspace { padding-inline: 20px; }
 }
 /* A table box that decides its own layout by its own width (cards when narrow): the box is a size container. */
-.card-box { container-type: inline-size; }
+/* (.card-box is a `table-box` size container, declared with the shared table-cards rules.) */
 
-/* A table that still needs more room than its box scrolls sideways, and says so: a soft shadow on each
-   edge that has more to scroll to (the classic "scroll shadows": the gradients that scroll with the content
-   cover the shadows at the ends). The audit's `table-wider-than-box` rule only lets a table scroll when its
-   box has data-scroll-cue and this class (docs/RESPONSIVE.md). */
-@media screen and (min-width: 601px) {
-  .scroll-cue {
-    overflow-x: auto;
-    background:
-      linear-gradient(to right, #fff 30%, rgba(255, 255, 255, 0)) left center / 32px 100% no-repeat local,
-      linear-gradient(to left, #fff 30%, rgba(255, 255, 255, 0)) right center / 32px 100% no-repeat local,
-      linear-gradient(to right, rgba(11, 43, 58, 0.28), rgba(11, 43, 58, 0)) left center / 16px 100% no-repeat scroll,
-      linear-gradient(to left, rgba(11, 43, 58, 0.28), rgba(11, 43, 58, 0)) right center / 16px 100% no-repeat scroll;
-  }
-  /* The shadow is drawn behind the table, so the header tint and section rows are see-through enough to let it show. */
-  .scroll-cue thead th, .scroll-cue .roster-section-row th { background-color: rgba(246, 249, 250, 0.4); }
-}
+/* No table scrolls sideways (#1457): a table that does not fit its box is the shared table-cards cards, so the old .scroll-cue edge shadow is gone. */
 
 /* One row of actions: a compact row (never a wall of full-width buttons), with the shared Actions menu holding the rest.
    Used in table rows and cards, on a phone and on a desktop alike. The menu opens over the content instead of pushing it,
@@ -12260,77 +12431,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .app-shell .team-directory-table .team-account-actions .secondary-button { padding: 6px 7px; }
 }
 
-/* A table with more columns than its box can show is the same labelled cards when the box is narrower than 760px (#997): beside the
-   staff sidebar that is any viewport up to about 1100px, and 768px without it. The box decides (a container query on the
-   `.card-box` around the table), not the viewport, so there is no width where the table is squeezed or clipped. Add
-   `table-cards-tablet` next to `table-cards` and `card-box` on the wrapper. */
-@media screen and (min-width: 601px) {
-  @container (max-width: 760px) {
-  table.table-cards-tablet.table-cards-tablet,
-  table.table-cards-tablet.table-cards-tablet > tbody { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
-  table.table-cards-tablet.table-cards-tablet > thead {
-    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
-    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
-  }
-  table.table-cards-tablet.table-cards-tablet > tbody > tr {
-    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
-    margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
-  }
-  table.table-cards-tablet.table-cards-tablet > tbody > tr > :is(th, td) {
-    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
-    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: anywhere;
-  }
-  table.table-cards-tablet.table-cards-tablet > tbody > tr > th[scope="row"] {
-    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid #eaf0f2;
-    font-size: max(var(--type-body-floor, 0px), 0.9rem); overflow-wrap: break-word; word-break: normal;
-  }
-  table.table-cards-tablet.table-cards-tablet > tbody > tr > td[data-label] {
-    display: flow-root; padding-left: 6.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
-  }
-  table.table-cards-tablet > tbody > tr > td[data-label]::before {
-    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 5.75rem; margin-left: -6.5rem;
-    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
-    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
-  }
-  table.table-cards-tablet.table-cards-tablet > tbody > tr > td:not([data-label]) { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
-  table.table-cards-tablet.table-cards-tablet > tbody > tr > td[colspan] { padding-left: 0; }
-}
-}
-
-/* The same cards for a table that only just overflows: its box is narrower than 600px (a compact table beside the staff sidebar at
-   about 860-940px). Add `table-cards-compact` next to `table-cards`, and `card-box` on the wrapper. */
-@media screen and (min-width: 601px) {
-  @container (max-width: 600px) {
-  table.table-cards-compact.table-cards-compact,
-  table.table-cards-compact.table-cards-compact > tbody { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
-  table.table-cards-compact.table-cards-compact > thead {
-    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
-    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
-  }
-  table.table-cards-compact.table-cards-compact > tbody > tr {
-    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
-    margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
-  }
-  table.table-cards-compact.table-cards-compact > tbody > tr > :is(th, td) {
-    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
-    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: anywhere;
-  }
-  table.table-cards-compact.table-cards-compact > tbody > tr > th[scope="row"] {
-    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid #eaf0f2;
-    font-size: max(var(--type-body-floor, 0px), 0.9rem); overflow-wrap: break-word; word-break: normal;
-  }
-  table.table-cards-compact.table-cards-compact > tbody > tr > td[data-label] {
-    display: flow-root; padding-left: 6.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
-  }
-  table.table-cards-compact > tbody > tr > td[data-label]::before {
-    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 5.75rem; margin-left: -6.5rem;
-    color: var(--muted); font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);
-    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
-  }
-  table.table-cards-compact.table-cards-compact > tbody > tr > td:not([data-label]) { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
-  table.table-cards-compact.table-cards-compact > tbody > tr > td[colspan] { padding-left: 0; }
-}
-}
+/* The tablet (760px) and wide thresholds are generated above with the shared card rules (#1457); `table-cards-compact` is the same
+   600px threshold as `table-cards` itself, so it needs no rules of its own. */
 
 /* Tab strips that scroll (#997): the row opens on a whole tab (account-section-nav.tsx), snaps to a tab edge when scrolled, fades
    on each edge that has more tabs, and shows a real arrow button there (focusable, "Scroll tabs left/right"). The 46px scroll
@@ -12408,13 +12510,13 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* A list of cards with one action each (#997): the action is a compact button in the card's top corner on the title's line, and the
    short fields sit two to a row with their label above, so a card is about a third as tall as a stack with a full-width button.
    Add `table-cards-corner` next to `table-cards` on a table whose rows have one action cell. */
-@media screen and (max-width: 600px) {
+@container table-box (max-width: 600px) {
   table.table-cards.table-cards-corner.table-cards-corner > tbody > tr { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; column-gap: 14px; }
   table.table-cards.table-cards-corner.table-cards-corner > tbody > tr > th[scope="row"] { grid-column: 1 / -1; min-height: 44px; margin-bottom: 6px; padding-right: 8.25rem; }
   table.table-cards.table-cards-corner.table-cards-corner > tbody > tr > td[data-label] { display: block; padding-left: 0; }
   table.table-cards.table-cards-corner > tbody > tr > td[data-label]::before { float: none; display: block; width: auto; margin: 0 0 1px; }
   table.table-cards.table-cards-corner.table-cards-corner > tbody > tr > td[data-label-long] { grid-column: 1 / -1; }
-  table.table-cards.table-cards-corner.table-cards-corner > tbody > tr > td:not([data-label]) { position: absolute; top: 6px; right: 10px; display: flex; width: auto; padding: 0; }
+  table.table-cards.table-cards-corner.table-cards-corner > tbody > tr > td:not([data-label]) { position: absolute; top: 6px; right: 10px; display: flex; width: auto; margin: 0; padding: 0; border-top: 0; }
   table.table-cards-corner td:not([data-label]) > :is(button, a).secondary-button { width: auto; }
 }
 
@@ -12462,16 +12564,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .builder-gate { display: block; }
 .builder-gate > svg { display: inline-block; margin-right: 6px; vertical-align: -3px; }
 
-/* Words break at word boundaries (#997): a card's cells wrap between words (word-break: normal), and only an email or a code may break
-   anywhere (it has no spaces to wrap at). A single word longer than the card still wraps rather than sticking out. */
-@media screen and (max-width: 600px) {
-  table.table-cards.table-cards > tbody > tr > :is(th, td) { overflow-wrap: break-word; word-break: normal; }
-}
-@media screen and (min-width: 601px) {
-  @container (max-width: 760px) {
-    :is(table.table-cards-tablet, table.table-cards-compact) > tbody > tr > :is(th, td) { overflow-wrap: break-word; word-break: normal; }
-  }
-}
+/* Words break at word boundaries (#997): a card's cells wrap between words (word-break: normal, set with the shared card rules above), and
+   only an email or a code may break anywhere (it has no spaces to wrap at). */
 .break-anywhere.break-anywhere, table td :is(code, a[href^="mailto:"], .team-email) { overflow-wrap: anywhere; }
 
 /* A closed Actions menu draws nothing: its items are not laid out at all, so a table cell holding one is measured by its trigger only. */
@@ -12490,7 +12584,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* A card-box whose table is tablet or compact cards does not clip what pokes out of a card (a focus ring, a tooltip). These tables
    fit their box whenever they are not cards (the thresholds sit above their widest layout, and the audit's table-wider-than-box
    rule would flag one that did not), so they never need the sideways scroll; the roster and the wide grids keep their scroll cue. */
-.card-box:has(> table:is(.table-cards-tablet, .table-cards-compact)) { overflow: visible; }
+.card-box:has(> table.table-cards) { overflow: visible; }
 
 /* Popup close buttons: one look everywhere (Caleb, Oct 17). The × is navy on white; the button edge is at least
    3:1 against the dialog (WCAG 1.4.11), it never shrinks beside a long title, it is a 44px target on phones, and it
@@ -12562,20 +12656,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 }
 @media screen and (max-width: 440px) {
   .report-summary-grid > :last-child { grid-column: auto; }
-}
-
-/* --- Roster cards: the actions sit in the card header (#1004) -------------------
-   On a phone each person is a card. The name and the row's actions share the first line;
-   every other field takes its own full-width row underneath. */
-@media (max-width: 720px) {
-  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row):has(> td.roster-card-actions) {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: start;
-  }
-  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td { grid-column: 1 / -1; }
-  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-name { grid-column: 1; grid-row: 1; min-height: 44px; margin-bottom: 6px; }
-  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-actions {
-    grid-column: 2; grid-row: 1; width: auto; max-width: 100%; margin: 0; padding: 0; flex-wrap: wrap; justify-content: flex-end;
-  }
 }
 
 /* With a header banner the page has one hero. The event's dates and place follow as a plain row, not a second hero (#1004). */
@@ -13579,13 +13659,11 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .honor-name-search-field { min-width: 0; }
 /* Coordinator pages at 200% text on a phone (#1113): an Open club button sits under its card label, as other
    controls do, instead of beside a gutter that grows with the text; a long leader email wraps in the club's list (only the unclassed text span, so badges and buttons keep their width). */
-@media screen and (max-width: 600px) {
-  /* When enlarged text makes a card narrow for its text, every label moves above its value instead of squeezing it. */
-  :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) { container-type: inline-size; }
-  @container (max-width: 15em) {
-    :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) table.table-cards.table-cards > tbody > tr > td[data-label] { padding-left: 0; }
-    :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) table.table-cards.table-cards > tbody > tr > td[data-label]::before { float: none; display: block; width: auto; margin: 0 0 2px; }
-  }
+@container (max-width: 15em) {
+  :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) table.table-cards.table-cards > tbody > tr > td[data-label] { padding-left: 0; }
+  :is(.coordinator-overview, .coordinator-destination) .report-table-wrap:not(.club-reports-grid) table.table-cards.table-cards > tbody > tr > td[data-label]::before { float: none; display: block; width: auto; margin: 0 0 2px; }
+}
+@container table-box (max-width: 600px) {
   :is(.coordinator-overview, .coordinator-destination) table.table-cards.table-cards > tbody > tr > td[data-label]:has(> a.secondary-button) { padding-left: 0; }
   :is(.coordinator-overview, .coordinator-destination) table.table-cards.table-cards > tbody > tr > td[data-label]:has(> a.secondary-button)::before { float: none; display: block; width: auto; margin: 0 0 2px; }
 }
@@ -13752,7 +13830,7 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .fb-rule-row { display: grid; gap: 8px; min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
 .fb-rule-row > legend { padding: 0 6px; color: var(--ink); font-size: 0.875rem; font-weight: 700; }
 .fb-rule-row[data-invalid="true"] { border-color: var(--danger, #8f3a30); }
-.fb-rule-row label { color: var(--muted); font-size: 0.8125rem; font-weight: 700; }
+.fb-rule-row label { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.8125rem); font-weight: 700; }
 .fb-rule-row select, .fb-rule-row input { width: 100%; min-height: var(--touch-target, 44px); box-sizing: border-box; }
 .fb-rule-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
 .fb-rule-pair > div { display: grid; gap: 4px; }
@@ -13992,19 +14070,6 @@ html[data-sidebar="collapsed"] .sidebar-search-button:focus-visible { outline: 2
   .fb-shell:not([data-phone]) .fb-body { min-height: 70vh; }
 }
 
-/* Roster cards (#1167): the table-cell rules stay global (the roster-card-table classes are shared with the honors table); the search, Edit and Actions rules moved to components/club-roster-workspace.module.css. */
+/* Roster table cells (#1167): the cell minimums apply to the table layout only; in cards the shared rules set min-width: 0 (#1457). The search, Edit and Actions rules are in components/club-roster-workspace.module.css. */
 .roster-card-table td.roster-card-flags { min-width: 10rem; }
 .roster-card-table td.roster-row-actions { min-width: 9.5rem; }
-/* The shared rule that lets an open menu out of a table wrap would push this page sideways; the roster's menu is in the flow, so the wrap keeps scrolling. */
-@media screen { .report-table-wrap:has(.roster-row-action-set .actions-menu[open]) { overflow-x: auto; } }
-@media (max-width: 720px) {
-  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-name { grid-column: 1 / -1; }
-  .roster-card-table:not(.roster-card-table-wide) tr:not(.roster-section-row):not(.roster-section-empty-row) > td.roster-card-actions.roster-row-actions { grid-column: 1 / -1; grid-row: auto; justify-content: flex-start; margin-top: 8px; }
-  .roster-card-table td.roster-card-actions.roster-row-actions { justify-content: flex-start; }
-}
-@media (min-width: 721px) {
-  @container (max-width: 640px) {
-    .roster-card-table td.roster-card-name[data-label] { padding-right: 0; }
-    .roster-card-table td.roster-card-actions.roster-row-actions { position: static; grid-column: 1 / -1; justify-content: flex-start; }
-  }
-}

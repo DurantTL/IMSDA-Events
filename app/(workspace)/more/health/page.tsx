@@ -13,6 +13,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
+import { ListPager } from "@/components/list-pager";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { resolveEventContext } from "@/modules/events/selection";
 import {
@@ -26,12 +27,15 @@ import {
   type OperationalSeverity,
 } from "@/modules/operations/operational-health";
 import { getOperationalHealth } from "@/modules/operations/repository";
+import { paginate, parsePageParam, type PageSlice } from "@/lib/pagination";
+import { searchPageHref } from "@/lib/search-page-href";
 import styles from "./operational-health.module.css";
 import { staffPageTitles } from "@/components/staff-navigation";
 
 export const metadata: Metadata = { title: staffPageTitles.operationalHealth };
 
-const visibleRowLimit = 20;
+/** Rows per page in each section (#1458): every exception is listed, a page at a time, each section with its own page. */
+const PAGE_SIZE = 20;
 
 function timeLabel(value: string, timeZone: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -107,19 +111,17 @@ function ResolveLink({
   );
 }
 
-function hiddenRowsNotice(total: number) {
-  const hidden = total - visibleRowLimit;
-  return hidden > 0
-    ? <p className={styles.moreNotice}>Showing the first {visibleRowLimit}. Open the linked workspace to review all {total}.</p>
-    : null;
+function sectionPager(params: Record<string, string | string[] | undefined>, prefix: string, label: string, slice: PageSlice<unknown>) {
+  return <ListPager hrefFor={(page) => searchPageHref("/more/health", params, page, { prefix })} label={label} noun="items" nounOne="item" slice={slice} />;
 }
 
 export default async function OperationalHealthPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const requested = (await searchParams).event;
+  const params = await searchParams;
+  const requested = typeof params.event === "string" ? params.event : undefined;
   const { event, permissions } = await resolveEventContext(requested);
   if (!canAccessOperationalHealth(permissions)) {
     return (
@@ -135,6 +137,14 @@ export default async function OperationalHealthPage({
   // The System report is for system administrators only, so the link is only shown to them.
   const showSystemReportLink = (await getCurrentSession()).user?.globalRole === "SYSTEM_ADMIN";
   const health = await getOperationalHealth(event.id, access);
+  const pageFor = <T,>(items: T[], prefix: string) => paginate(items, parsePageParam(typeof params[`${prefix}Page`] === "string" ? (params[`${prefix}Page`] as string) : undefined), PAGE_SIZE);
+  const slices = {
+    payments: pageFor(health.paymentAttempts, "payments"),
+    balances: pageFor(health.balances, "balances"),
+    messages: pageFor(health.messages, "messages"),
+    imports: pageFor(health.imports, "imports"),
+    capacity: pageFor(health.capacity, "capacity"),
+  };
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   const refreshHref = `/more/health?${eventQuery}`;
   const financeHref = `/finance?${eventQuery}`;
@@ -217,7 +227,7 @@ export default async function OperationalHealthPage({
             emptyCopy="No current failed or stuck Square payment attempts."
           >
             <ul className={styles.issueList}>
-              {health.paymentAttempts.slice(0, visibleRowLimit).map((issue) => (
+              {slices.payments.items.map((issue) => (
                 <li className={`${styles.issue} ${issue.severity === "URGENT" ? styles.urgent : ""}`} key={issue.id}>
                   <div className={styles.issueMain}>
                     <div className={styles.issueTitle}>
@@ -235,7 +245,7 @@ export default async function OperationalHealthPage({
                 </li>
               ))}
             </ul>
-            {hiddenRowsNotice(health.paymentAttempts.length)}
+            {sectionPager(params, "payments", "Square payment attempts, pages", slices.payments)}
           </IssueSection>
 
           <IssueSection
@@ -246,7 +256,7 @@ export default async function OperationalHealthPage({
             emptyCopy="Every active paid registration is currently paid in full."
           >
             <ul className={styles.issueList}>
-              {health.balances.slice(0, visibleRowLimit).map((issue) => (
+              {slices.balances.items.map((issue) => (
                 <li className={styles.issue} key={issue.registrationId}>
                   <div className={styles.issueMain}>
                     <div className={styles.issueTitle}>
@@ -260,7 +270,7 @@ export default async function OperationalHealthPage({
                 </li>
               ))}
             </ul>
-            {hiddenRowsNotice(health.balances.length)}
+            {sectionPager(params, "balances", "Registration balances, pages", slices.balances)}
           </IssueSection>
         </>
       )}
@@ -274,7 +284,7 @@ export default async function OperationalHealthPage({
           emptyCopy="No failed, rejected, or overdue email deliveries."
         >
           <ul className={styles.issueList}>
-            {health.messages.slice(0, visibleRowLimit).map((issue) => (
+            {slices.messages.items.map((issue) => (
               <li className={`${styles.issue} ${issue.severity === "URGENT" ? styles.urgent : ""}`} key={issue.id}>
                 <div className={styles.issueMain}>
                   <div className={styles.issueTitle}>
@@ -288,7 +298,7 @@ export default async function OperationalHealthPage({
               </li>
             ))}
           </ul>
-          {hiddenRowsNotice(health.messages.length)}
+          {sectionPager(params, "messages", "Email delivery, pages", slices.messages)}
         </IssueSection>
       )}
 
@@ -301,7 +311,7 @@ export default async function OperationalHealthPage({
           emptyCopy="No unfinished import previews have errors or warnings."
         >
           <ul className={styles.issueList}>
-            {health.imports.slice(0, visibleRowLimit).map((issue) => (
+            {slices.imports.items.map((issue) => (
               <li className={`${styles.issue} ${issue.severity === "URGENT" ? styles.urgent : ""}`} key={issue.id}>
                 <div className={styles.issueMain}>
                   <div className={styles.issueTitle}>
@@ -315,7 +325,7 @@ export default async function OperationalHealthPage({
               </li>
             ))}
           </ul>
-          {hiddenRowsNotice(health.imports.length)}
+          {sectionPager(params, "imports", "Import review, pages", slices.imports)}
         </IssueSection>
       )}
 
@@ -328,7 +338,7 @@ export default async function OperationalHealthPage({
           emptyCopy="No configured event or choice limit is at or near capacity."
         >
           <ul className={styles.issueList}>
-            {health.capacity.slice(0, visibleRowLimit).map((issue) => (
+            {slices.capacity.items.map((issue) => (
               <li className={`${styles.issue} ${issue.severity === "URGENT" ? styles.urgent : ""}`} key={issue.id}>
                 <div className={styles.issueMain}>
                   <div className={styles.issueTitle}>
@@ -341,7 +351,7 @@ export default async function OperationalHealthPage({
               </li>
             ))}
           </ul>
-          {hiddenRowsNotice(health.capacity.length)}
+          {sectionPager(params, "capacity", "Capacity, pages", slices.capacity)}
         </IssueSection>
       )}
 
