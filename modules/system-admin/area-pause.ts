@@ -1,4 +1,5 @@
 import { getPrisma } from "@/lib/prisma";
+import { currentCorrelationId } from "@/lib/request-context";
 import { logError } from "@/lib/logger";
 import {
   AREA_PAUSE_KEY_PREFIX,
@@ -161,7 +162,7 @@ export async function setAreaPaused(
         action: "AREA_PAUSE_CHANGED",
         entityType: "NotificationSetting",
         entityId: key,
-        correlationId: `area-pause:${area}:${Date.now()}`,
+        correlationId: currentCorrelationId() ?? `area-pause:${area}:${Date.now()}`,
         summary: `${paused ? "Paused" : "Resumed"} ${definition.name.toLowerCase()}.`,
         metadata: { area, key, oldValue: previous, newValue: paused, changedByUserId: actorUserId },
       },

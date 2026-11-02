@@ -25,7 +25,7 @@ export const areaPauseDefinitions: readonly AreaPauseDefinition[] = [
   {
     key: "EVENTS_REGISTRATION",
     name: "Event registration",
-    pauses: "New registrations and changes to an existing registration (answers, lodging, cancellation, group details). Pages stay readable.",
+    pauses: "New registrations and changes to an existing one (answers, lodging, cancellation, group details), whether made from the public form, a manage link, an account or a club's event registration. Pages stay readable.",
     message: "Event registration is paused for a few minutes while we fix something. Nothing you entered is lost, so please try again shortly.",
   },
   {
@@ -37,7 +37,7 @@ export const areaPauseDefinitions: readonly AreaPauseDefinition[] = [
   {
     key: "CLUB_PORTAL",
     name: "Club portal",
-    pauses: "Saving anything in the club portal (rosters, honors, orders, reports, team), club invites and the public club forms. Pages stay readable.",
+    pauses: "Saving anything else in the club portal (rosters, honors, orders, reports, forms, team), club invites and the public club forms. Club registrations for an event follow Event registration. Pages stay readable.",
     message: "The club portal is paused for a few minutes while we fix something. Nothing you entered is lost, so please try again shortly.",
   },
 ];
@@ -81,7 +81,24 @@ const CLUB_PORTAL_PREFIXES = [
   "/api/public/club-forms/",
   "/api/public/club-form-applications/",
 ] as const;
-const CLUB_PORTAL_EXACT = ["/api/attendee/roster-unlock", "/api/public/club-applications"] as const;
+const CLUB_PORTAL_EXACT = ["/api/public/club-applications"] as const;
+
+/**
+ * Club registrations for an event (registration, classes, draft, roster link, waitlist) are event registration, not
+ * club-portal work, so the registration switch covers them.
+ */
+const CLUB_EVENT_REGISTRATION = /^\/api\/attendee\/clubs\/[^/]+\/events\//;
+
+/**
+ * Routes that use POST but only read (so a pause must not block them), under the paused club prefixes. Each was
+ * checked: the roster export builds a preview or CSV (the audit row it writes records the download), and the
+ * birth-dates route shows audited birth dates. Saved export formats (`/roster/export/formats`) WRITE, so they are
+ * not listed. `/api/attendee/roster-unlock` is account security and is not under any paused prefix.
+ */
+const READ_ONLY_POSTS = [
+  /^\/api\/attendee\/clubs\/[^/]+\/roster\/export$/,
+  /^\/api\/attendee\/clubs\/[^/]+\/roster\/birth-dates$/,
+] as const;
 
 /**
  * Which area, if any, a request belongs to. Only requests that change something are ever classified: a read returns
@@ -91,6 +108,8 @@ export function classifyPausableArea(method: string, pathname: string): AreaPaus
   if (READ_METHODS.has(method.toUpperCase())) return null;
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
 
+  if (READ_ONLY_POSTS.some((pattern) => pattern.test(path))) return null;
+  if (CLUB_EVENT_REGISTRATION.test(path)) return "EVENTS_REGISTRATION";
   if (CLUB_PORTAL_EXACT.some((exact) => path === exact)) return "CLUB_PORTAL";
   if (CLUB_PORTAL_PREFIXES.some((prefix) => path.startsWith(prefix))) return "CLUB_PORTAL";
 

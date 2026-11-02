@@ -1458,8 +1458,11 @@ default: **Event registration**, **Payments** and **Club portal**. Pausing asks 
   audited (`AREA_PAUSE_CHANGED`: who, when, old and new value).
 - **Timing:** a server notices a change within about five seconds (at once on the server that saved it). If the database
   cannot be read, the area is treated as running (and the failure is logged), so a pause is never applied by accident.
-- **Known limit:** a registration that goes straight to card checkout is governed by the Event registration switch, not
-  Payments. Paying on an existing registration is governed by Payments.
+- **Which switch covers what:** Event registration covers public, manage-link, account and club registrations for
+  events, including creating the registration. Payments covers the card charge, payment links and payment choices (the
+  card form posts to the manage or account `/payment` endpoint). Club portal covers the rest of club work: rosters,
+  honors, orders, reports, forms, team and invites. Read-only actions that use POST (roster export preview and CSV,
+  birth-date reveal) are never paused, and neither is roster unlock (account security).
 - **Remember to resume.** A pause does not expire by itself.
 
 ## Two-factor authentication

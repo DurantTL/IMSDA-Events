@@ -81,7 +81,6 @@ describe("classifyPausableArea (#1518)", () => {
     ["PUT", "/api/attendee/area-clubs/team-permissions/perm_1", "CLUB_PORTAL"],
     ["POST", "/api/attendee/club-invites/inv_1/accept", "CLUB_PORTAL"],
     ["POST", "/api/attendee/area-coordinator-invites/inv_1/accept", "CLUB_PORTAL"],
-    ["POST", "/api/attendee/roster-unlock", "CLUB_PORTAL"],
     ["POST", "/api/attendee/honor-instructor/classes/off_1/marks", "CLUB_PORTAL"],
     ["PUT", "/api/attendee/honor-instructor/preferences/ins_1", "CLUB_PORTAL"],
     ["POST", "/api/public/club-forms/tok_1", "CLUB_PORTAL"],
@@ -90,6 +89,17 @@ describe("classifyPausableArea (#1518)", () => {
     // Never paused.
     ["POST", "/api/webhooks/square", null],
     ["POST", "/api/public/square-return/ret_1", null],
+    ["POST", "/api/attendee/roster-unlock", null],
+    // Club registrations for an event follow Event registration.
+    ["POST", "/api/attendee/clubs/org_1/events/evt_1/registration", "EVENTS_REGISTRATION"],
+    ["PUT", "/api/attendee/clubs/org_1/events/evt_1/draft", "EVENTS_REGISTRATION"],
+    ["POST", "/api/attendee/clubs/org_1/events/evt_1/classes", "EVENTS_REGISTRATION"],
+    ["POST", "/api/attendee/clubs/org_1/events/evt_1/classes/waitlist", "EVENTS_REGISTRATION"],
+    ["POST", "/api/attendee/clubs/org_1/events/evt_1/registration/roster-link", "EVENTS_REGISTRATION"],
+    // POST-but-read-only club routes are never paused; the saved-formats route writes, so it is paused.
+    ["POST", "/api/attendee/clubs/org_1/roster/export", null],
+    ["POST", "/api/attendee/clubs/org_1/roster/birth-dates", null],
+    ["POST", "/api/attendee/clubs/org_1/roster/export/formats", "CLUB_PORTAL"],
     ["POST", "/api/attendee/sign-in", null],
     ["POST", "/api/attendee/sign-in-code/verify", null],
     ["POST", "/api/attendee/sign-out", null],
