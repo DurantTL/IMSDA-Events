@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { QuestionLibraryAdminRow } from "@/modules/question-library/domain";
 
 /**
@@ -16,6 +17,9 @@ export function QuestionLibraryManager({ items }: { items: QuestionLibraryAdminR
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // The rename form is dirty only while open and its values differ from the saved question; Cancel and a save close it (#1468).
+  const editing = editingId === null ? undefined : items.find((item) => item.id === editingId);
+  useUnsavedChangesGuard(editing !== undefined && (name !== editing.name || description !== editing.description));
   const headingRef = useRef<HTMLHeadingElement>(null);
   // The row that held focus disappears or changes, so focus goes back to the list heading.
   const focusHeading = () => window.setTimeout(() => headingRef.current?.focus(), 0);

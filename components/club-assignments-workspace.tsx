@@ -2,6 +2,7 @@
 
 import { ExactValue } from "@/components/exact-value";
 import { useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { CircleAlert, Mail, Pencil, Send } from "lucide-react";
@@ -123,6 +124,12 @@ export function ClubAssignmentsWorkspace({
   const [sendError, setSendError] = useState<string>("");
   const [batchId, setBatchId] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  // The assignment editor is dirty only while a row is open and its draft differs from that row's saved fields;
+  // Cancel and a save close it. The email review checkbox is not a draft (#1468).
+  const editingRow = editingId === null ? undefined : assignments.find((row) => row.clubEventRegistrationId === editingId);
+  useUnsavedChangesGuard(
+    editingRow !== undefined && (Object.keys(emptyEdit) as Array<keyof EditableFields>).some((key) => draft[key] !== editingRow.fields[key]),
+  );
 
   function beginEdit(row: ClubAssignmentRow) {
     setEditingId(row.clubEventRegistrationId);

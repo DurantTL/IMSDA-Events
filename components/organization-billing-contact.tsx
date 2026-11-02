@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { BillingContactAdminEntry } from "@/modules/billing-responsibility/repository";
 
 function date(value: string) {
@@ -30,8 +31,11 @@ export function OrganizationBillingContact({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [roleLabel, setRoleLabel] = useState("Treasurer");
+  const [savedRoleLabel, setSavedRoleLabel] = useState("Treasurer");
   const [attempted, setAttempted] = useState(false);
   const base = useId();
+  // The form starts blank and clears after a save; the role keeps its saved value (#1468).
+  useUnsavedChangesGuard(Boolean(name || email || phone) || roleLabel !== savedRoleLabel);
 
   async function send(body: Record<string, unknown>) {
     setBusy(true);
@@ -82,7 +86,7 @@ export function OrganizationBillingContact({
             return;
           }
           void send({ action: "set", contact: { name, email, phone: phone || undefined, roleLabel } }).then((ok) => {
-            if (ok) { setName(""); setEmail(""); setPhone(""); }
+            if (ok) { setName(""); setEmail(""); setPhone(""); setSavedRoleLabel(roleLabel); }
           });
         }}
       >

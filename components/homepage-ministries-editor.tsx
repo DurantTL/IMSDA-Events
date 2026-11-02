@@ -10,6 +10,7 @@ import {
 import styles from "@/components/homepage-ministries-editor.module.css";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type TileDraft = Omit<HomepageMinistry, "description" | "linkHref" | "categories"> & { description: string; linkHref: string; categories: string };
 
@@ -48,6 +49,7 @@ export function HomepageMinistriesEditor({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const dirty = JSON.stringify(tiles) !== JSON.stringify(saved);
+  useUnsavedChangesGuard(dirty);
 
   function change(position: number, patch: Partial<TileDraft>) {
     setTiles((current) => current.map((tile) => (tile.position === position ? { ...tile, ...patch } : tile)));

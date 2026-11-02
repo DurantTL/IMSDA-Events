@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { EmailInput } from "@/components/email-input";
 import { PhoneInput } from "@/components/phone-input";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { inlineFieldProblem, inlinePhoneProblem } from "@/lib/field-validation";
 import type { PastorContactEntry } from "@/modules/organizations/contacts-repository";
 
@@ -20,6 +21,8 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const base = useId();
+  // The add or replace form starts blank and clears after a save, so any typed value is unsaved (#1468).
+  useUnsavedChangesGuard(Boolean(name || email || phone));
   const [phoneTouched, setPhoneTouched] = useState(false);
   // The same phone check the server runs (#1193). The form starts blank, so a typed phone is always a new value.
   const phoneProblem = inlinePhoneProblem("Phone", phone, undefined, phoneTouched);

@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { MapPin, Save } from "lucide-react";
 import { FormMessage, notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { ChurchLocationRecord } from "@/modules/organizations/church-location-repository";
 import { displayCoordinate, numberOrNull } from "@/components/church-location-coordinates";
 
@@ -35,9 +36,23 @@ export function ChurchLocationForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [cityText, setCityText] = useState(initialLocation.city);
+  const [stateText, setStateText] = useState(initialLocation.state);
+  const [zipText, setZipText] = useState(initialLocation.zip);
   const [entryMode, setEntryMode] = useState<"manual" | "map">("manual");
   const [latitudeText, setLatitudeText] = useState(initialLocation.latitude !== null ? displayCoordinate(initialLocation.latitude) : "");
   const [longitudeText, setLongitudeText] = useState(initialLocation.longitude !== null ? displayCoordinate(initialLocation.longitude) : "");
+
+  // Dirty while any field differs from the last saved location (#1468).
+  const savedLatitude = location.latitude !== null ? displayCoordinate(location.latitude) : "";
+  const savedLongitude = location.longitude !== null ? displayCoordinate(location.longitude) : "";
+  useUnsavedChangesGuard(
+    cityText !== location.city ||
+      stateText !== location.state ||
+      zipText !== location.zip ||
+      latitudeText !== savedLatitude ||
+      longitudeText !== savedLongitude,
+  );
 
   const parsedLatitude = numberOrNull(latitudeText);
   const parsedLongitude = numberOrNull(longitudeText);
@@ -73,6 +88,9 @@ export function ChurchLocationForm({
         throw new Error(result.message ?? result.issues?.[0]?.message ?? "The church location could not be saved.");
       }
       setLocation(result.location);
+      setCityText(result.location.city);
+      setStateText(result.location.state);
+      setZipText(result.location.zip);
       setLatitudeText(result.location.latitude !== null ? displayCoordinate(result.location.latitude) : "");
       setLongitudeText(result.location.longitude !== null ? displayCoordinate(result.location.longitude) : "");
       setNotice(savedMessage());
@@ -95,15 +113,15 @@ export function ChurchLocationForm({
       <div className="form-grid two-column">
         <label>
           City or town
-          <input defaultValue={location.city} maxLength={120} name="city" placeholder="e.g. Des Moines" />
+          <input maxLength={120} name="city" onChange={(event) => setCityText(event.target.value)} value={cityText} placeholder="e.g. Des Moines" />
         </label>
         <label>
           State
-          <input defaultValue={location.state} maxLength={2} name="state" placeholder="e.g. IA" />
+          <input maxLength={2} name="state" onChange={(event) => setStateText(event.target.value)} value={stateText} placeholder="e.g. IA" />
         </label>
         <label>
           ZIP code
-          <input defaultValue={location.zip} maxLength={10} name="zip" placeholder="e.g. 50309 or 50309-1234" />
+          <input maxLength={10} name="zip" onChange={(event) => setZipText(event.target.value)} value={zipText} placeholder="e.g. 50309 or 50309-1234" />
         </label>
       </div>
       <div className="form-grid two-column">

@@ -1,6 +1,7 @@
 "use client";
 
 import { SubmitButton } from "@/components/submit-button";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -15,6 +16,8 @@ export function FormTemplateCopy({ templates }: { templates: Array<{ key: string
   const [sourceKey, setSourceKey] = useState(templates[0]?.key ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Typing a name is unsaved work; picking the template to copy is not (#1468).
+  const allowNavigation = useUnsavedChangesGuard(name.trim().length > 0);
 
   async function copy(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,6 +34,7 @@ export function FormTemplateCopy({ templates }: { templates: Array<{ key: string
         setError(result.message ?? "The template could not be created.");
         return;
       }
+      allowNavigation();
       router.push(`/admin/form-templates/${encodeURIComponent(result.key)}`);
     } catch {
       setError("The template could not be created. Check your connection and try again.");

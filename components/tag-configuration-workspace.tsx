@@ -4,6 +4,7 @@ import { cardCell } from "@/components/table-card-labels";
 import { EmptyState } from "@/components/empty-state";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import Link from "next/link";
 import { Info } from "lucide-react";
@@ -30,6 +31,15 @@ export function TagConfigurationWorkspace({
 }) {
   const [notice, setNotice] = useState("");
   const [tags, setTags] = useState(initialTags);
+  // The tags as last saved, so a row edited but not yet saved with its own Save button counts as unsaved (#1468).
+  const [savedTags, setSavedTags] = useState(initialTags);
+  // The add form is uncontrolled and React clears it when the action ends, so this tracks what is typed in it.
+  const [addTyped, setAddTyped] = useState(false);
+  const rowsDirty = tags.some((tag) => {
+    const saved = savedTags.find((candidate) => candidate.id === tag.id);
+    return saved !== undefined && (tag.name !== saved.name || tag.color !== saved.color || tag.description !== saved.description);
+  });
+  useUnsavedChangesGuard(rowsDirty || addTyped);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   // Review before deactivating a tag (#471): this is the closest thing to
@@ -50,9 +60,10 @@ export function TagConfigurationWorkspace({
         }),
       }));
       setTags((current) => [...current, body.tag].sort((a, b) => a.name.localeCompare(b.name)));
+      setSavedTags((current) => [...current, body.tag]);
       setNotice(`Tag ${body.tag.name} added. Next: staff can apply it to registrations and attendees from the registrations list.`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The tag could not be saved."); }
-    finally { setSaving(false); }
+    finally { setSaving(false); setAddTyped(false); }
   }
 
   function openDeactivate(row: TagRow) {
@@ -69,6 +80,7 @@ export function TagConfigurationWorkspace({
         body: JSON.stringify({ ...row, ...patch }),
       }));
       setTags((current) => current.map((candidate) => candidate.id === row.id ? body.tag : candidate));
+      setSavedTags((current) => current.map((candidate) => candidate.id === row.id ? body.tag : candidate));
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The tag could not be updated.");
@@ -100,7 +112,7 @@ export function TagConfigurationWorkspace({
         <td {...cardCell("Status")}>{row.isActive ? "Active" : "Inactive"}</td>
         <td {...cardCell(null)}><span className="form-actions"><button className="secondary-button" disabled={saving} type="button" onClick={() => updateTag(row, {})}>Save</button><button className="secondary-button" disabled={saving} type="button" onClick={() => row.isActive ? openDeactivate(row) : updateTag(row, { isActive: true })}>{row.isActive ? "Deactivate" : "Activate"}</button></span></td>
       </tr>)}</tbody></table></div>}
-      {canCreate && <form className="form-stack inset-form" action={addTag}>
+      {canCreate && <form className="form-stack inset-form" action={addTag} onChange={(event) => { const data = new FormData(event.currentTarget); setAddTyped(String(data.get("name") ?? "").trim() !== "" || String(data.get("description") ?? "").trim() !== ""); }}>
         <div className="form-grid two-column color-field-row"><label>Name<input id="tag-name-input" name="name" required placeholder="VIP" /></label><label>Color<input name="color" type="color" defaultValue="#4F46E5" /></label></div>
         <label>Description<input name="description" /></label>
         <button className="primary-button" disabled={saving} type="submit">Add tag</button>
