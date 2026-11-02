@@ -37,6 +37,8 @@ export type JourneyWorld = {
   directorPassword: string;
   templateIds: string[];
   supplyItemIds: string[];
+  /** Area coordinator journeys (part B), set by `seedCoordinatorWorld`. */
+  coordinator?: { accountId: string; email: string; submittedMonths: string[]; clubs: { missing: Director; complete: Director; outside: Director } };
   eventId: string;
   eventName: string;
   eventSlug: string;
@@ -305,4 +307,40 @@ export async function cleanupJourneyWorld(prisma: PrismaClient, world: JourneyWo
  */
 export async function resetSignInBudgets(prisma: PrismaClient) {
   await prisma.rateLimitBucket.deleteMany({ where: { policy: { startsWith: "attendee." } } });
+}
+
+/**
+ * Area coordinator world (part B): a coordinator account (a placeholder two-step enrollment, so a minted session passes
+ * the club gate; sign-in itself is covered by the director journey) and three more clubs with their own directors:
+ * "missing" has no monthly record at all, "complete" has a submitted record for every month so far this club year,
+ * and "outside" stands for a club the coordinator is not responsible for. Coordinators see every active club by design
+ * (#387, modules/organizations/area-coordinators.ts), so "outside" is expected to be listed; the journey asserts that.
+ */
+export async function seedCoordinatorWorld(prisma: PrismaClient, world: JourneyWorld) {
+  const { clubYearFor } = await import("../../modules/club-rosters/domain");
+  const { clubYearMonths } = await import("../../modules/club-reports/domain");
+  const now = new Date();
+  const clubYear = clubYearFor(now);
+  const clubs = {
+    missing: await seedDirector(prisma, world, "areamissing", clubYear, 3),
+    complete: await seedDirector(prisma, world, "areacomplete", clubYear, 4),
+    outside: await seedDirector(prisma, world, "areaoutside", clubYear, 2),
+  };
+  const accountId = `${world.prefix}_coordinator`;
+  const email = `${JOURNEY_PREFIX}.${world.stamp}.coordinator@example.test`;
+  await seedAccount(prisma, world, { id: accountId, email, first: "Casey", last: `${personMarker(world.stamp)}-Coordinator`, password: `Quartz-Meadow-${world.stamp}-coordinator-Lantern-47` });
+  await prisma.attendeeMfaEnrollment.create({ data: { accountId, method: "TOTP", status: "ACTIVE", sealedSecret: `${JOURNEY_PREFIX}-placeholder-not-a-secret`, confirmedAt: now } });
+  await prisma.areaCoordinatorGrant.create({ data: { attendeeAccountId: accountId } });
+  const current = now.toISOString().slice(0, 7);
+  const submittedMonths = clubYearMonths(clubYear).filter((entry) => entry <= current);
+  for (const month of submittedMonths) {
+    await prisma.clubMonthlyReport.create({
+      data: {
+        organizationId: clubs.complete.clubId, clubYear, reportMonth: month, meetingPlace: "Fellowship hall", averageAttendance: 12, pathfinderCount: 8, tltCount: 1, staffCount: 3,
+        points: {}, honors: [], onTimePoints: 25, totalPoints: 25, signatureName: "Dana Director", signedOn: now.toISOString().slice(0, 10), status: "SUBMITTED", submittedAt: now, firstSubmittedAt: now,
+      },
+    });
+  }
+  world.coordinator = { accountId, email, submittedMonths, clubs };
+  return world.coordinator;
 }

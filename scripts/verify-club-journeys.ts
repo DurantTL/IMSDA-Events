@@ -41,10 +41,10 @@ import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 import * as J from "./support/browser-journeys";
 import { FakeMailServer } from "./support/fake-mail-server";
-import { cleanupJourneyWorld, resetSignInBudgets, seedClubFormTemplate, seedJourneyWorld, seedSupplyItem, type Director, type JourneyWorld } from "./support/journey-data";
+import { cleanupJourneyWorld, resetSignInBudgets, seedClubFormTemplate, seedCoordinatorWorld, seedJourneyWorld, seedSupplyItem, type Director, type JourneyWorld } from "./support/journey-data";
 import * as S from "./support/journey-steps";
 import { blockedBy } from "./support/privacy-block-lists";
-import { Recorder, checkConfirmDialog, checkDialogBehavior, checkErrorSummary, checkLeaveWarning, checkPage, clean, pollPage, type KnownBug } from "./support/site-rule-checks";
+import { AREA_ROLLUP_WORDS, Recorder, checkConfirmDialog, checkDialogBehavior, checkErrorSummary, checkLeaveWarning, checkPage, clean, pollPage, type KnownBug } from "./support/site-rule-checks";
 
 loadEnvConfig(process.cwd());
 
@@ -73,7 +73,19 @@ export const KNOWN_BUGS: KnownBug[] = [
   {
     id: "help-no-search",
     description: "Help: the account Help page (app/(public)/account/(portal)/help/page.tsx) lists the director guides but has no search box (only the staff Help has one), so a director cannot search for a guide (H5, S4).",
-    labels: ["Help | H5 | Help search finds the director guide"],
+    labels: ["Help | H5 | Help search finds the director guide", "Coordinator: Help | H5 | Help search finds the coordinator guide"],
+  },
+  {
+    id: "records-grid-scrolls-sideways",
+    description: "Coordinator Monthly Records: the \"Monthly Record status by club\" grid (CoordinatorMonthlyRecords) is a 14-column table that scrolls sideways inside its wrapper (scrollWidth 1600 in a 1132px box at 1280px wide) (B3).",
+    labels: ["Coordinator: Monthly Records | B3 | tables do not scroll sideways"],
+    only: "desktop",
+  },
+  {
+    id: "records-chart-table-scrolls-sideways",
+    description: "Coordinator Monthly Records on a phone: the \"Records by month\" table (components/club-report-charts.tsx tableWrap) scrolls sideways (374px of content in a 330px box at 390px wide) instead of turning into cards (B3).",
+    labels: ["Coordinator: Monthly Records | B3 | tables do not scroll sideways"],
+    only: "phone",
   },
   {
     id: "club-profile-unsaved",
@@ -137,13 +149,14 @@ async function settle(page: J.Page) {
 }
 
 /** The page is loaded, healthy, and passes the passive SITE-RULES checks. */
-async function visited(ctx: Ctx, page: J.Page, name: string, options: { rules?: boolean } = {}) {
+async function visited(ctx: Ctx, page: J.Page, name: string, options: { rules?: boolean; coordinator?: boolean } = {}) {
   await settle(page);
   await J.assertHealthy(page, `${ctx.viewport.name}: ${name}`, problems);
-  if (options.rules !== false) await checkPage(page, ctx.rec, name);
+  // The coordinator's roll-ups "Registered" and "Not registered" are approved words on coordinator pages only (B12).
+  if (options.rules !== false) await checkPage(page, ctx.rec, name, { extraWords: options.coordinator ? AREA_ROLLUP_WORDS : [] });
 }
 
-async function visit(ctx: Ctx, page: J.Page, name: string, path: string, options: { rules?: boolean } = {}) {
+async function visit(ctx: Ctx, page: J.Page, name: string, path: string, options: { rules?: boolean; coordinator?: boolean } = {}) {
   await S.openPage(page, path);
   await visited(ctx, page, name, options);
 }
@@ -470,6 +483,116 @@ async function formsHelpJourney(ctx: Ctx, page: J.Page) {
   await checkDialogBehavior(page, rec, "Forms (help popup)", "Forms help popup", dialog, opener);
 }
 
+/* ---------------------------------------------------------------- area coordinator */
+
+async function coordinatorContext(ctx: Ctx) {
+  const coordinator = ctx.world.coordinator!;
+  const cookie = await J.mintDirectorSession(ctx.tokens, coordinator.accountId);
+  return newDirectorContext(ctx, { cookie });
+}
+
+/** Coordinator pages stream their tables in after the page is interactive, so wait for the network to go quiet before checking them. */
+const quiet = (page: J.Page) => page.waitForLoadState("networkidle", { timeout: 8_000 }).catch(() => undefined);
+async function coordinatorVisit(ctx: Ctx, page: J.Page, name: string, path: string) {
+  await S.openPage(page, path);
+  await quiet(page);
+  await visited(ctx, page, `Coordinator: ${name}`, { coordinator: true });
+}
+async function coordinatorVisited(ctx: Ctx, page: J.Page, name: string) {
+  await quiet(page);
+  await visited(ctx, page, `Coordinator: ${name}`, { coordinator: true });
+}
+
+/** 1. Their clubs: every active club is listed (an area coordinator sees all clubs by design, #387), and one opens view only. */
+async function coordinatorClubsJourney(ctx: Ctx, page: J.Page) {
+  const { clubs } = ctx.world.coordinator!;
+  await coordinatorVisit(ctx, page, "All clubs", "/account/clubs");
+  for (const club of [ctx.world.main, clubs.missing, clubs.complete, clubs.outside]) {
+    assert(await page.getByText(club.clubName).first().isVisible(), `the club list does not show ${club.clubName}`);
+  }
+  // Decision (not a bug): the role sees every active club, with the ones it does not run marked "View only". The
+  // coordinator's brief asked for "only their area's clubs", but no area exists in the data model; the club stands for
+  // "a club outside the area" and is expected to be listed.
+  ctx.rec.record("Coordinator: All clubs", "Scope", "every active club is listed (#387), including one outside any area", "pass", "the outside club is listed with View only, as the role is defined");
+  assert(await page.getByText(/Showing 1.\d+ of \d+ clubs/).count(), "the list does not say how many clubs it shows");
+  await page.locator(`a[href$="/account/area/${clubs.complete.clubId}"]`).first().click();
+  await page.waitForURL(new RegExp(`/account/area/${clubs.complete.clubId}$`), { timeout: 20_000 });
+  await coordinatorVisited(ctx, page, "Club (view only)");
+  assert(await page.getByText(/View only/).count(), "the club page does not say it is view only");
+}
+
+/** 2. Who's missing what: the club without a record is listed, the complete one is not. */
+async function coordinatorMissingJourney(ctx: Ctx, page: J.Page) {
+  const { clubs } = ctx.world.coordinator!;
+  await coordinatorVisit(ctx, page, "Overview", "/account/area-clubs/overview");
+  const section = page.locator("#whos-missing-what");
+  await section.waitFor({ state: "visible", timeout: 20_000 });
+  const text = clean(await section.innerText());
+  assert(text.includes(clubs.missing.clubName), "Who's missing what does not list the club with no monthly record");
+  assert(/Missing/.test(text), "Who's missing what shows no Missing chip");
+  assert(!text.includes(clubs.complete.clubName), "Who's missing what lists the club whose records are all in");
+  // Its next step opens that club.
+  await section.locator(`a[href$="/account/area/${clubs.missing.clubId}"]`).first().click();
+  await page.waitForURL(new RegExp(`/account/area/${clubs.missing.clubId}$`), { timeout: 20_000 });
+}
+
+/** 3. Monthly review: a submitted record opens read only; a club with none says Not submitted. The coordinator has no approval to give. */
+async function coordinatorRecordsJourney(ctx: Ctx, page: J.Page) {
+  const { clubs, submittedMonths } = ctx.world.coordinator!;
+  // A month that has ended (the current month is "Not due yet" for everyone).
+  const month = submittedMonths[Math.max(0, submittedMonths.length - 2)]!;
+  await coordinatorVisit(ctx, page, "Monthly Records", `/account/area-clubs/reports?month=${month}`);
+  // The club's row appears in more than one table on the page (the month table and the full-year grid); any may say it.
+  const rowsOf = (name: string) => () => page.locator("tr").filter({ hasText: name }).allInnerTexts().then((rows: string[]) => rows.map(clean));
+  // With many clubs the month view lists only some, so find each club the way a coordinator would: search by name.
+  const search = page.locator("#area-club-search");
+  await search.fill(clubs.missing.clubName);
+  const missing = await pollPage<string[]>(page, rowsOf(clubs.missing.clubName), (rows) => rows.some((row) => /Not submitted/.test(row)), 8_000);
+  assert(missing.ok, `the club with no record is not shown as Not submitted (rows: ${JSON.stringify(missing.value)})`);
+  await search.fill(clubs.complete.clubName);
+  const complete = await pollPage<string[]>(page, rowsOf(clubs.complete.clubName), (rows) => rows.some((row) => /Submitted/.test(row)), 8_000);
+  assert(complete.ok, `the club with a record is not shown as Submitted (rows: ${JSON.stringify(complete.value)})`);
+  await page.locator(`a[href*="/account/area/${clubs.complete.clubId}/reports/${month}"]`).first().click();
+  await page.waitForURL(new RegExp(`/area/${clubs.complete.clubId}/reports/${month}`), { timeout: 20_000 });
+  await coordinatorVisited(ctx, page, "Monthly Record (read only)");
+  assert(await page.getByText(/Submitted \(/).count(), "the record does not show its Submitted state");
+  // Read only: nothing here saves, submits or approves (the page says the club files and changes its own reports).
+  assert(!(await page.getByRole("button", { name: /Save draft|Submit report|Reviewed|Approve/ }).count()), "the coordinator's record page offers a save, submit or approve button");
+}
+
+/** 4. Points: every seeded club is ranked; the club with three submitted records leads. The page has no action to take. */
+async function coordinatorPointsJourney(ctx: Ctx, page: J.Page) {
+  const { clubs, submittedMonths } = ctx.world.coordinator!;
+  await coordinatorVisit(ctx, page, "Points", "/account/area-clubs/points");
+  const leader = page.getByText(clubs.complete.clubName).first();
+  await leader.waitFor({ state: "visible", timeout: 20_000 });
+  assert(await page.getByText(clubs.missing.clubName).first().isVisible(), "the points chart does not list the club with no records");
+  assert(await page.getByText(new RegExp(`${submittedMonths.length * 25}\\s*total points`)).count(), `the leader's ${submittedMonths.length * 25} points are not shown`);
+}
+
+/** 5. Help: the coordinator's Getting started guide is linked from Overview, and Help lists it (H5). */
+async function coordinatorHelpJourney(ctx: Ctx, page: J.Page) {
+  const { rec } = ctx;
+  await coordinatorVisit(ctx, page, "Overview (Getting started)", "/account/area-clubs/overview");
+  await page.getByText(/Getting started as an area coordinator/).first().waitFor({ state: "visible", timeout: 20_000 });
+  await page.getByRole("link", { name: /Read the Getting started guide/ }).first().click();
+  await page.waitForURL(/\/account\/help\/coordinator-getting-started/, { timeout: 20_000 });
+  await coordinatorVisited(ctx, page, "Getting started guide");
+  await coordinatorVisit(ctx, page, "Help", "/account/help");
+  const guide = page.getByRole("link", { name: /Getting started as an area coordinator/ });
+  assert(await guide.count(), "the Help page does not list the coordinator's Getting started guide");
+  const search = page.locator('input[type="search"], [role="searchbox"]');
+  if ((await search.count()) === 0) rec.record("Coordinator: Help", "H5", "Help search finds the coordinator guide", "fail", "the account Help page has no search box to type in");
+  else {
+    await search.first().fill("getting started");
+    const found = await pollPage<number>(page, () => guide.count(), (count) => count > 0, 4_000);
+    rec.record("Coordinator: Help", "H5", "Help search finds the coordinator guide", found.ok ? "pass" : "fail", found.ok ? "searching lists the guide" : "the guide is not found by searching");
+  }
+  await guide.first().click();
+  await page.waitForURL(/\/account\/help\/coordinator-getting-started/, { timeout: 20_000 });
+  await S.expectHeading(page, /Getting started/);
+}
+
 /* ---------------------------------------------------------------- key journey, translated and blocked */
 
 /**
@@ -516,7 +639,7 @@ async function keyJourneyVariant(ctx: Ctx, director: Director, mode: "translate"
 /* ---------------------------------------------------------------- run */
 
 const ONLY = (process.env.JOURNEY_ONLY ?? "").split(",").map((value) => value.trim()).filter(Boolean);
-const wanted = (id: string) => ONLY.length === 0 || ONLY.includes(id);
+const wanted = (id: string) => ONLY.length === 0 || ONLY.includes(id) || (ONLY.includes("C") && id.startsWith("C"));
 
 async function runShard(ctx: Ctx) {
   const { world } = ctx;
@@ -535,6 +658,19 @@ async function runShard(ctx: Ctx) {
     if (wanted("10")) await journey(ctx, "10. Forms help popup", () => formsHelpJourney(ctx, main.page));
   } finally {
     await main.context.close();
+  }
+  if (["C1", "C2", "C3", "C4", "C5"].some(wanted)) {
+    await seedCoordinatorWorld(ctx.prisma, world);
+    const coordinator = await coordinatorContext(ctx);
+    try {
+      if (wanted("C1")) await journey(ctx, "C1. Coordinator: the club list", () => coordinatorClubsJourney(ctx, coordinator.page));
+      if (wanted("C2")) await journey(ctx, "C2. Coordinator: who's missing what", () => coordinatorMissingJourney(ctx, coordinator.page));
+      if (wanted("C3")) await journey(ctx, "C3. Coordinator: open a submitted monthly record", () => coordinatorRecordsJourney(ctx, coordinator.page));
+      if (wanted("C4")) await journey(ctx, "C4. Coordinator: points", () => coordinatorPointsJourney(ctx, coordinator.page));
+      if (wanted("C5")) await journey(ctx, "C5. Coordinator: Getting started and Help", () => coordinatorHelpJourney(ctx, coordinator.page));
+    } finally {
+      await coordinator.context.close();
+    }
   }
   const [, translate, blockers] = world.directors;
   if (wanted("T")) await journey(ctx, "Key journey with the translation simulation", () => keyJourneyVariant(ctx, translate!, "translate"));

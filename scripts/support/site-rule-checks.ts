@@ -16,7 +16,8 @@
  *    area roll-ups; check-in states) are accepted. "Missing", "Late" and "To review" are L4's coral/purple flags, not
  *    record statuses, so they are accepted too, and so are a person's club role (Director, Registrar, ...) and the
  *    Sterling Volunteers state of a roster person (Clear, Not in compliance, No record): they describe a person, not a
- *    record. Event availability ("Open", "Registration closed", ...) and a form's "Done" are not record statuses either.
+ *    record. The coordinator's gap flags ("No director", "No roster yet", "Missing 1 earlier month", "Late 2
+ *    records") are L4 "Missing"/"Late" flags too. Event availability ("Open", "Registration closed", ...) and a form's "Done" are not record statuses either.
  *    A chip's detail after " · " ("Draft saved · 2 chosen") is ignored; its first words are the word. Anything else is
  *    reported as a failure naming the word.
  *  - B13 looks for clock times ("3:15 PM"): each must sit next to "CT". Dates alone are not times.
@@ -35,7 +36,7 @@ export const APPROVED_STATUS_WORDS = ["Draft", "Submitted", "Pending payment", "
 const OWN_MEANING_WORDS = ["Expired", "Used", "Attached to a club", "Declined", "Completed", "Queued", "Processing", "Captured", "Sent", "Failed", "Suppressed"];
 /** The area coordinator roll-ups (B12): whether an area has registered. Accepted only on coordinator pages (`extraWords`). */
 export const AREA_ROLLUP_WORDS = ["Registered", "Not registered"];
-const L4_FLAGS = ["Missing", "Late", "To review"];
+const L4_FLAGS = ["Missing", "Late", "To review", "No director", "No roster yet"];
 /**
  * Chips that use the shared look but are not the status of a record (decided in #1439): a person's role in the club
  * (Director, Deputy, Registrar, Reporter) and the Sterling Volunteers background-check state of a roster person.
@@ -116,7 +117,8 @@ export async function pollPage<T>(page: Page, read: () => Promise<T>, done: (val
   }
 }
 
-const bodyText = (page: Page) => async () => clean(await page.evaluate(() => document.body?.innerText ?? ""));
+/** The page text, one trimmed line per line, so two reads can be compared line by line. */
+const bodyText = (page: Page) => async () => (await page.evaluate(() => document.body?.innerText ?? "")).split("\n").map((line: string) => clean(line)).filter(Boolean).join("\n");
 
 /* ----------------------------------------------------------- passive */
 
@@ -170,19 +172,22 @@ async function scanPage(page: Page): Promise<Scan> {
     const notSet: Scan["notSet"] = [];
     const seen = new Set<Element>();
     for (const element of document.body.querySelectorAll("p, li, small, span, h3, h4, strong, div")) {
-      if (!visible(element) || element.closest("script, style, option, nav, header, .modal-card")) continue;
+      if (!visible(element) || element.closest("script, style, option, nav, header, .modal-card, a[href]")) continue;
       // The deepest element that says it: a container whose own children already say it is skipped.
       if ([...element.children].some((child) => notSetPattern.test(squash(child.textContent ?? "")))) continue;
       const own = squash(element.textContent ?? "");
       if (own.length > 220 || !notSetPattern.test(own) || seen.has(element)) continue;
       seen.add(element);
-      let container: Element = element;
-      for (let depth = 0; depth < 4 && container.parentElement && container.parentElement !== document.body; depth += 1) {
-        container = container.parentElement;
-        if (container.matches("section, article, li, form, main, .public-manage-card")) break;
-      }
-      const fixLinks = [...container.querySelectorAll("a[href], button, summary")].filter(visible)
+      // The nearest enclosing row, item or section that holds a way forward (a link, button or "How to do this" panel).
+      const controlsIn = (node: Element) => [...node.querySelectorAll("a[href], button, summary")].filter(visible)
         .map((control) => squash(control.textContent ?? "")).filter((text) => fixPattern.test(text));
+      let container: Element = element;
+      let fixLinks = controlsIn(container);
+      for (let depth = 0; depth < 6 && fixLinks.length === 0 && container.parentElement && container.parentElement !== document.body; depth += 1) {
+        container = container.parentElement;
+        fixLinks = controlsIn(container);
+        if (container.matches("section, article, form, main, .public-manage-card")) break;
+      }
       notSet.push({ text: own.slice(0, 100), fixLinks: fixLinks.slice(0, 3), asksWho: whoPattern.test(squash(container.textContent ?? "")) });
     }
     return { chips, badTimes, times, tables: tables.length, wideTables, notSet };
@@ -199,7 +204,9 @@ export async function checkPage(page: Page, rec: Recorder, name: string, options
     // A chip may carry a detail after the word ("Draft saved · 2 chosen"): the word is what is checked, and it may be
     // an approved word followed by more words ("Draft saved").
     const wordOf = (chip: string) => chip.split(" · ")[0]!.trim().toLowerCase();
-    const bad = [...new Set(scan.chips.filter((chip) => !accepted.includes(wordOf(chip)) && !APPROVED_STATUS_WORDS.some((word) => wordOf(chip).startsWith(`${word.toLowerCase()} `))))];
+    // "Missing 1 earlier month" and "Late 2 records" are the L4 flags with a count.
+    const flagged = (word: string) => /^(missing|late) /.test(word);
+    const bad = [...new Set(scan.chips.filter((chip) => !accepted.includes(wordOf(chip)) && !flagged(wordOf(chip)) && !APPROVED_STATUS_WORDS.some((word) => wordOf(chip).startsWith(`${word.toLowerCase()} `))))];
     const words = [...new Set(scan.chips)].join(", ");
     if (bad.length === 0) rec.record(name, "B12", "status chip words", "pass", `chips: ${words}`);
     else rec.record(name, "B12", "status chip words", "fail", `chip word(s) outside the approved list: ${bad.map((word) => `"${word}"`).join(", ")} (all chips: ${words})`);
@@ -260,7 +267,10 @@ export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) 
     rec.record(name, "S4", `${what} (typing narrows, no Enter)`, narrowed.ok ? "pass" : "fail", narrowed.ok ? "results changed while typing" : "typed text did not change the results without pressing Enter");
     // S1/S2: clearing shows the full list again.
     await box.fill("");
-    const restored = await pollPage<string>(page, read, (text) => text === baseline, 5_000);
+    // Emptying the box brings the whole list back: every line the page showed before is shown again (a page may add
+    // more, for example a table that stays open after a search).
+    const baselineLines = baseline.split("\n");
+    const restored = await pollPage<string>(page, read, (text) => { const now = new Set(text.split("\n")); return baselineLines.every((line: string) => now.has(line)); }, 5_000);
     rec.record(name, "S1", `${what} (empty shows full list)`, restored.ok ? "pass" : "fail", restored.ok ? "emptying the box restored the full list" : "emptying the box did not bring back the full list");
   }
 }
