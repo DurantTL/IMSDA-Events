@@ -2219,7 +2219,7 @@ export function CommunicationsWorkspace({
               ))}
             </div>
             {(messaging.messages.length >= DELIVERY_SERVER_CAP) && (
-              <p className="inline-notice" role="status">Showing the newest {DELIVERY_SERVER_CAP} messages only. Older messages aren&apos;t listed here.</p>
+              <p className="inline-notice" role="status">This log holds the newest {DELIVERY_SERVER_CAP} messages. Older messages aren&apos;t loaded here.</p>
             )}
             <div className="message-delivery-layout">
               <div className="message-delivery-list">
@@ -2230,7 +2230,7 @@ export function CommunicationsWorkspace({
                     <span><span className={`status-chip ${statusTone(message.status)}`}>{friendlyStatus(message.status)}</span><small>{new Date(message.createdAt).toLocaleString()}</small></span>
                   </button>
                 ))}
-                <ListPager label="Delivery log pages" onPage={setDeliveryPage} slice={deliverySlice} />
+                <ListPager label="Delivery log pages" noun="messages" nounOne="message" onPage={setDeliveryPage} slice={deliverySlice} />
                 {filteredMessages.length === 0 && (deliveryFilter === "ALL"
                   ? <EmptyState hint="Messages are logged here as the system sends or captures them, for example after a registration or a template test." icon={<Inbox size={24} />} title="No messages yet">Nothing has been sent or captured for this event.</EmptyState>
                   : <NoMatchesState clear={{ onClick: () => void chooseDeliveryFilter("ALL") }} icon={<Inbox size={24} />} noun="messages" />)}

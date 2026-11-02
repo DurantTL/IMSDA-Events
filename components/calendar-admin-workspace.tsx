@@ -1,6 +1,8 @@
 "use client";
 
+import { ListPager } from "@/components/list-pager";
 import { StaffPageHeader } from "@/components/staff-page-header";
+import { paginate } from "@/lib/pagination";
 import { useId, useMemo, useRef, useState } from "react";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
@@ -157,18 +159,19 @@ export function CalendarAdminWorkspace({
   const filters = useMemo(() => ({ ...dropdownFilters, search: search.term }), [dropdownFilters, search.term]);
   const [sort, setSort] = useState<EntrySort>("date");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [visibleCount, setVisibleCount] = useState(pageSize);
+  const [page, setPage] = useState(1);
   const [bulkCategory, setBulkCategory] = useState("");
   const [bulkTarget, setBulkTarget] = useState<BulkAction | null>(null);
   const today = calendarDateIn(new Date());
   const matching = useMemo(() => filterAndSortEntries(entries, filters, sort, today), [entries, filters, sort, today]);
   // Only rows still in the current list count: a stale tick (an entry edited, removed or refreshed away) never reaches the server.
   const selectedIds = selectedMatchingIds(matching, selected);
+  const slice = paginate(matching, page, pageSize);
 
   // A new view starts with nothing ticked, so a bulk action never touches rows you can't see.
   function startNewView() {
     setSelected(new Set());
-    setVisibleCount(pageSize);
+    setPage(1);
   }
 
   // A changed search term starts a new view too, once the list has changed.
@@ -381,7 +384,7 @@ export function CalendarAdminWorkspace({
               />
               <p aria-live="polite" className="calendar-list-summary" ref={summaryRef} role="status" tabIndex={-1}>
                 {describeEntryCount(matching.length)} match. {describeEntrySort(sort)}.
-                {entries.length >= calendarEntryListLimit && ` Showing the newest ${calendarEntryListLimit} entries by start date; older ones are not listed.`}
+                {entries.length >= calendarEntryListLimit && ` The list holds the ${calendarEntryListLimit.toLocaleString("en-US")} entries with the newest start dates; older ones are not loaded.`}
               </p>
               <div className="calendar-bulk-bar">
                 <label className="checkbox-label">
@@ -423,7 +426,7 @@ export function CalendarAdminWorkspace({
                 <NoMatchesState clear={{ onClick: resetEntryFilters }} known={`The calendar has ${entries.length} ${entries.length === 1 ? "entry" : "entries"} in all.`} noun="entries" query={search.term} />
               ) : (
               <ul className="calendar-admin-list">
-                {matching.slice(0, visibleCount).map((entry) => (
+                {slice.items.map((entry) => (
                   <li className="calendar-entry-row" key={entry.id}>
                     <label className="calendar-row-select">
                       <input checked={selected.has(entry.id)} onChange={() => toggleSelected(entry.id)} type="checkbox" />
@@ -511,13 +514,7 @@ export function CalendarAdminWorkspace({
                 ))}
               </ul>
               )}
-              {matching.length > visibleCount && (
-                <p>
-                  <button className="secondary-button" onClick={() => setVisibleCount((count) => count + pageSize)} type="button">
-                    Show more ({matching.length - visibleCount} not shown)
-                  </button>
-                </p>
-              )}
+              <ListPager label="Calendar entry pages" noun="entries" nounOne="entry" onPage={setPage} slice={slice} />
               </>
             )}
           </section>

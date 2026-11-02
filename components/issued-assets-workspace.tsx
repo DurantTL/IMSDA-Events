@@ -10,6 +10,7 @@ import {
   type AssetCondition,
   type AssigneeKind,
 } from "@/modules/issued-assets/domain";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { depositShortfalls, depositShortfallLabels } from "@/modules/issued-assets/returns-domain";
 import type { CatalogAsset, CatalogType, CatalogView } from "@/modules/issued-assets/view";
@@ -106,10 +107,22 @@ function MoneyFields({ type }: { type?: CatalogType }) {
   </>;
 }
 
+/** The items table sorts from its headers (#1458); the keys on this object are the whitelist. */
+const ASSET_SORT: Record<"identifier" | "scanCode" | "quantity" | "out" | "condition" | "location" | "status", ColumnSpec<CatalogAsset>> = {
+  identifier: { value: (asset) => asset.identifier, label: "identifier" },
+  scanCode: { value: (asset) => asset.scanCode, label: "barcode value" },
+  quantity: { value: (asset) => asset.quantityTotal, label: "quantity", kind: "number" },
+  out: { value: (asset) => asset.outQuantity, label: "out", kind: "number" },
+  condition: { value: (asset) => asset.condition, label: "condition" },
+  location: { value: (asset) => asset.location, label: "location" },
+  status: { value: (asset) => asset.availability, label: "status" },
+};
+
 type Run = (url: string, body: unknown, success: (result: Result) => string) => Promise<boolean>;
 
 function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; assets: CatalogAsset[]; base: string; busy: boolean; run: Run }) {
   const serialized = type.mode === "SERIALIZED";
+  const sorted = useTableSort(assets, ASSET_SORT);
   const setKinds = (kind: AssigneeKind, on: boolean) => {
     const next = on ? [...new Set([...type.assigneeKinds, kind])] : type.assigneeKinds.filter((existing) => existing !== kind);
     if (next.length === 0) return;
@@ -179,9 +192,10 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
 
     {assets.length === 0 ? null : <details>
       <summary>{assets.length} {serialized ? "items" : "lots"}</summary>
+      {sorted.note}
       <div className="table-wrap"><table className="report-table report-table-auto">
-        <thead><tr><th scope="col">Identifier</th><th scope="col">Barcode value</th>{serialized ? null : <th scope="col">Quantity</th>}<th scope="col">Out</th><th scope="col">Condition</th><th scope="col">Location</th><th scope="col">Status</th></tr></thead>
-        <tbody>{assets.map((asset) => <tr key={asset.id}>
+        <thead><tr>{sorted.header("identifier", "Identifier")}{sorted.header("scanCode", "Barcode value")}{serialized ? null : sorted.header("quantity", "Quantity")}{sorted.header("out", "Out")}{sorted.header("condition", "Condition")}{sorted.header("location", "Location")}{sorted.header("status", "Status")}</tr></thead>
+        <tbody>{sorted.rows.map((asset) => <tr key={asset.id}>
           <th scope="row">{asset.identifier}</th>
           <td>{asset.scanCode}</td>
           {serialized ? null : <td>{asset.quantityTotal}</td>}

@@ -28,7 +28,7 @@ const NOT_IN_CI = new Set([
   "test:custom-message", // not in ci.yml before the shards (#1233)
 ]);
 
-const SHARD_JOB = /^(db-scripts-\d+|http-scripts)$/;
+const SHARD_JOB = /^(db-scripts-\d+|http-scripts|club-journeys)$/;
 
 type Job = { id: string; lines: string[] };
 
@@ -66,14 +66,16 @@ describe("CI database-script shards (#1233)", () => {
       }
     }
     for (const [script, ids] of placements) {
-      expect(ids, script).toHaveLength(1);
-      expect(ids[0], script).toMatch(SHARD_JOB);
+      // A script runs once, in one shard job. Only the club journeys job may repeat it (once per width, JOURNEY_SHARD).
+      if (ids.length > 1) expect(ids, script).toEqual(ids.map(() => "club-journeys"));
+      else expect(ids, script).toHaveLength(1);
+      for (const id of ids) expect(id, script).toMatch(SHARD_JOB);
     }
     const expected = packageScripts
       .filter((name) => !NOT_IN_CI.has(name))
       .sort();
     expect([...placements.keys()].sort()).toEqual(expected);
-    expect(expected).toHaveLength(97);
+    expect(expected).toHaveLength(98);
   });
 
   it("keeps the scripts that need the app in the shard that starts it", () => {

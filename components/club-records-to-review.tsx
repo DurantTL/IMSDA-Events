@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ClubReportReview } from "@/components/club-report-review";
-import { cardCell } from "@/components/table-card-labels";
+import { RecordsToReviewTable } from "@/components/club-screen-tables";
 import { reportMonthLabel } from "@/modules/club-reports/domain";
 import type { RecordToReview } from "@/modules/club-reports/review-domain";
 
@@ -19,31 +18,7 @@ export function ClubRecordsToReview({ rows, month, clubYear }: { rows: RecordToR
       {rows.length === 0 ? (
         <p className="report-empty">Nothing is waiting for review.</p>
       ) : (
-        <div className="report-table-wrap">
-          <table role="table" className="report-table table-cards">
-            <caption className="sr-only">{`Monthly records to review for ${reportMonthLabel(month)}`}</caption>
-            <thead role="rowgroup">
-              <tr role="row">
-                <th role="columnheader" scope="col">Club</th>
-                <th role="columnheader" scope="col">Points</th>
-                <th role="columnheader" scope="col">Open</th>
-                <th role="columnheader" scope="col">Review</th>
-              </tr>
-            </thead>
-            <tbody role="rowgroup">
-              {rows.map((row) => (
-                <tr role="row" key={row.id}>
-                  <th role="rowheader" scope="row" translate="no">{row.name}{row.church && <small> ({row.church})</small>}</th>
-                  <td {...cardCell("Points")}>{row.points}{row.late && <small> late</small>}</td>
-                  <td {...cardCell("Open")}>
-                    <Link className="secondary-button" href={`/admin/clubs/reports/${encodeURIComponent(row.id)}/${row.month}`}>Open<span className="sr-only">{` ${row.name} record`}</span></Link>
-                  </td>
-                  <td {...cardCell("Review")}><ClubReportReview clubName={row.name} compact month={row.month} organizationId={row.id} reviewed={false} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <RecordsToReviewTable month={month} rows={rows} />
       )}
       <Link className="secondary-button" href={`/admin/clubs/reports?year=${encodeURIComponent(clubYear)}`}>Show every club</Link>
     </section>

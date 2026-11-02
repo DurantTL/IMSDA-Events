@@ -357,10 +357,10 @@ export async function cleanupJourneyData(prisma: PrismaClient) {
 }
 
 /** A signed-in director session, minted directly (the second factor is skipped, as in verify-badge-print). */
-export async function mintDirectorSession(tokens: string[]) {
+export async function mintDirectorSession(tokens: string[], accountId: string = directorAccountId) {
   const { createAttendeeSession } = await import("../../modules/attendee-accounts/session-store");
   const { attendeeSessionCookie } = await import("../../modules/security/session-cookies");
-  const session = await createAttendeeSession(directorAccountId, null, { secondFactorVerifiedAt: new Date() });
+  const session = await createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() });
   tokens.push(session.token);
   return { name: attendeeSessionCookie.legacyName, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
 }
@@ -395,8 +395,8 @@ export async function launch(playwright: Record<string, any>, name: string): Pro
 export const rosterUrl = `${baseUrl}/account/clubs/${clubId}/roster`;
 
 /** The roster is fully interactive (hydrated) when the search box answers. */
-export async function openRoster(page: Page) {
-  await page.goto(rosterUrl, { waitUntil: "load" });
+export async function openRoster(page: Page, url: string = rosterUrl) {
+  await page.goto(url, { waitUntil: "load" });
   await settleRoster(page);
 }
 

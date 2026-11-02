@@ -94,6 +94,7 @@
     "test:mobile-layout": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-mobile-layout.ts",
     "test:translation-sim": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-translation-simulation.ts",
     "test:live-roster": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-live-roster.ts",
+    "test:club-journeys": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-journeys.ts",
     "test:form-revisions": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-form-revisions.ts",
     "test:lodging": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-lodging-inventory.ts",
     "test:meals": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-meals.ts",

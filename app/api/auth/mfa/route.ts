@@ -56,7 +56,7 @@ function apiError(error: unknown) {
   }
   logError("MFA request failed", error);
   return Response.json(
-    { error: "MFA_REQUEST_FAILED", message: "Two-factor settings are temporarily unavailable." },
+    { error: "MFA_REQUEST_FAILED", message: "Two-step sign-in settings are temporarily unavailable." },
     { status: 500 },
   );
 }

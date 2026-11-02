@@ -5,6 +5,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { useState, type FormEvent } from "react";
 import { describeRate, lodgingCategories, lodgingCategoryLabels } from "@/modules/lodging/domain";
 import { savedMessage } from "@/components/form-message";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import {
   CHURCH_SHARE_AUTOMATIC,
   type ChurchShareFact,
@@ -28,6 +29,27 @@ async function call(url: string, method: string, body: unknown): Promise<Reply> 
 }
 
 const formatRate = describeRate;
+
+// The requests table sorts from its headers (#1458); the keys on these objects are the whitelist. The two accessibility columns
+// are on the whitelist only for staff the server sent them to (VIEW_SENSITIVE_DATA), so no address can order rows by a column
+// the viewer cannot see. The lodging types table is a short fixed list in the event's set order.
+type LodgingRequest = StaffLodgingRequestView;
+type RequestColumn = "registration" | "type" | "nights" | "people" | "rooms" | "ground" | "accessible" | "private" | "household" | "version";
+export const REQUEST_SORT_PLAIN: Omit<Record<RequestColumn, ColumnSpec<LodgingRequest>>, "ground" | "accessible"> = {
+  registration: { value: (request: LodgingRequest) => request.registration, label: "registration" },
+  type: { value: (request: LodgingRequest) => (request.category ? lodgingCategoryLabels[request.category] : "No preference"), label: "type" },
+  nights: { value: (request: LodgingRequest) => request.firstNight, label: "first night", kind: "date" },
+  people: { value: (request: LodgingRequest) => request.partySize, label: "people", kind: "number" },
+  rooms: { value: (request: LodgingRequest) => (request.category ? request.roomCount : null), label: "rooms", kind: "number" },
+  private: { value: (request: LodgingRequest) => request.privateRoomRequested, label: "private room" },
+  household: { value: (request: LodgingRequest) => request.householdPreference, label: "household" },
+  version: { value: (request: LodgingRequest) => request.version, label: "version", kind: "number" },
+};
+export const REQUEST_SORT_SENSITIVE: Record<RequestColumn, ColumnSpec<LodgingRequest>> = {
+  ...REQUEST_SORT_PLAIN,
+  ground: { value: (request) => request.groundFloorNeeded, label: "ground floor" },
+  accessible: { value: (request) => request.accessibleRoomNeeded, label: "accessible room" },
+};
 
 /**
  * Staff review of lodging requests (#199): settings, the review queue, what each registration asked for, and the
@@ -61,6 +83,10 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
     } finally { setBusy(false); }
   };
 
+  // Two views of one sort (same address params): the full spec only drives the table for staff who may see the accessibility columns.
+  const plainSort = useTableSort(view.requests, REQUEST_SORT_PLAIN, "requests");
+  const fullSort = useTableSort(view.requests, REQUEST_SORT_SENSITIVE, "requests");
+  const requestSort = view.canSeeSensitive ? fullSort : plainSort;
   const queue = view.queue.filter((item) => showAcknowledged || !item.acknowledged);
   const activeRules = view.rules.filter((rule) => !rule.ended);
 
@@ -137,13 +163,13 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
 
     <section className="panel" aria-labelledby="lodging-requests-table">
       <h3 id="lodging-requests-table">Requests ({view.requests.length})</h3>
-      {view.requests.length === 0 ? <p>No one has asked for lodging yet.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
+      {view.requests.length === 0 ? <p>No one has asked for lodging yet.</p> : <div className="table-wrap">{requestSort.note}<table className="report-table report-table-auto">
         <thead><tr>
-          <th scope="col">Registration</th><th scope="col">Type</th><th scope="col">Nights</th><th scope="col">People</th><th scope="col">Rooms</th>
-          {view.canSeeSensitive ? <th scope="col">Ground floor</th> : null}{view.canSeeSensitive ? <th scope="col">Accessible room</th> : null}
-          <th scope="col">Private room</th><th scope="col">Household</th><th scope="col">Roommates</th><th scope="col">Version</th><th scope="col">Change</th>
+          {requestSort.header("registration", "Registration")}{requestSort.header("type", "Type")}{requestSort.header("nights", "Nights")}{requestSort.header("people", "People")}{requestSort.header("rooms", "Rooms")}
+          {view.canSeeSensitive ? fullSort.header("ground", "Ground floor") : null}{view.canSeeSensitive ? fullSort.header("accessible", "Accessible room") : null}
+          {requestSort.header("private", "Private room")}{requestSort.header("household", "Household")}<th scope="col">Roommates</th>{requestSort.header("version", "Version")}<th scope="col">Change</th>
         </tr></thead>
-        <tbody>{view.requests.map((request) => <RequestRow key={request.requestId} request={request} view={view} base={base} busy={busy} run={run} />)}</tbody>
+        <tbody>{requestSort.rows.map((request) => <RequestRow key={request.requestId} request={request} view={view} base={base} busy={busy} run={run} />)}</tbody>
       </table></div>}
     </section>
 

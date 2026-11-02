@@ -268,11 +268,6 @@
   text-align: center;
 }
 
-.moreNotice {
-  margin: 11px 2px 0;
-  color: var(--muted);
-  font-size: max(var(--type-floor, 0px), 0.63rem);
-}
 
 .rules {
   border: 1px solid #d8e3e7;

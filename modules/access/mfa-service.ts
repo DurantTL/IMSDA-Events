@@ -237,7 +237,7 @@ export async function regenerateRecoveryCodes(userId: string) {
 }
 
 /**
- * Two-factor sign-in can't be turned off by anyone (decision 2026-09-23). A
+ * Two-step sign-in can't be turned off by anyone (decision 2026-09-23). A
  * lost device is handled by a system administrator resetting it, which is
  * audited and makes the person set it up again at their next sign-in.
  */
@@ -247,7 +247,7 @@ export async function disableMfa(userId: string, code: string, options: { now?: 
   void options;
   throw new MfaError(
     "MFA_REQUIRED_BY_ROLE",
-    "Two-factor sign-in can't be turned off. If you lose your device, ask a system administrator to reset it.",
+    "Two-step sign-in can't be turned off. If you lose your device, ask a system administrator to reset it.",
   );
 }
 

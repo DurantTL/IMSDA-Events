@@ -11,6 +11,10 @@ import { getClubEventReports } from "@/modules/reporting/club-event-reports-repo
 import { resolveClubReportsAccess } from "@/modules/reporting/club-reports-access";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { cardCell } from "@/components/table-card-labels";
+import { ColumnHeader } from "@/components/column-header";
+import { SortOrderNote } from "@/components/list-sort";
+import { serverSort, sortRows } from "@/lib/list-sort";
+import { CLUB_CAMPING_SORT_COLUMNS, CLUB_DUTIES_SORT_COLUMNS, CLUB_MILESTONES_SORT_COLUMNS, CLUB_ROLES_SORT_COLUMNS, UNSORTED, sortLine } from "@/lib/staff-sort-columns";
 
 export const metadata: Metadata = { title: staffPageTitles.clubReports };
 export const dynamic = "force-dynamic";
@@ -22,9 +26,10 @@ function reportDownloadHref(eventId: string, kind: string, locationId: string | 
 export default async function ClubEventReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string; location?: string }>;
+  searchParams: Promise<{ event?: string; location?: string; campingSort?: string; campingDir?: string; dutiesSort?: string; dutiesDir?: string; milestonesSort?: string; milestonesDir?: string; rolesSort?: string; rolesDir?: string }>;
 }) {
-  const { event: requested, location: requestedLocation } = await searchParams;
+  const query = await searchParams;
+  const { event: requested, location: requestedLocation } = query;
   const { event, allowed, readOnly } = await resolveClubReportsAccess(requested);
   if (!allowed) {
     return (
@@ -41,6 +46,47 @@ export default async function ClubEventReportsPage({
   const reports = await getClubEventReports(event.id, { locationId });
   const usesTeams = (await getTeamSettings(event.id)) !== null;
   const showLocation = locations.length > 0;
+  // Each table sorts from its own column headers (its own address pair), from a fixed list of columns; the default is today's order (#1458).
+  const path = "/more/reports/clubs";
+  const campingSorting = serverSort(path, query, CLUB_CAMPING_SORT_COLUMNS, UNSORTED, { prefix: "camping", hash: "#club-camping" });
+  const dutiesSorting = serverSort(path, query, CLUB_DUTIES_SORT_COLUMNS, UNSORTED, { prefix: "duties", hash: "#club-duties" });
+  const milestonesSorting = serverSort(path, query, CLUB_MILESTONES_SORT_COLUMNS, UNSORTED, { prefix: "milestones", hash: "#club-milestones" });
+  const rolesSorting = serverSort(path, query, CLUB_ROLES_SORT_COLUMNS, UNSORTED, { prefix: "roles", hash: "#club-special-roles" });
+  const campingRows = sortRows(reports.camping, campingSorting.order.key, campingSorting.order.dir, {
+    club: (row) => row.organizationName,
+    location: (row) => row.locationName,
+    tents: (row) => row.camping.tents,
+    trailers: (row) => row.camping.trailers,
+    canopy: (row) => row.camping.kitchenCanopy,
+    sqft: (row) => row.camping.totalSqft,
+    campNextTo: (row) => row.camping.campNextTo,
+    pf: (row) => row.headcounts.pathfinder,
+    tlt: (row) => row.headcounts.tlt,
+    staff: (row) => row.headcounts.staff,
+    child: (row) => row.headcounts.child,
+    total: (row) => row.headcounts.total,
+  });
+  const dutiesRows = sortRows(reports.dutiesActivities, dutiesSorting.order.key, dutiesSorting.order.dir, {
+    club: (row) => row.organizationName,
+    location: (row) => row.locationName,
+    dutyAreas: (row) => row.dutyAreas.join(", "),
+    activities: (row) => row.specialActivities.join(", "),
+    campsite: (row) => row.assignment?.campsiteLocation,
+    duty: (row) => (row.assignment ? [row.assignment.dutyLabel, row.assignment.dutyDay, row.assignment.dutyTime].filter(Boolean).join(" · ") : ""),
+    activity: (row) => row.assignment?.activityLabel,
+  });
+  const milestoneRows = sortRows(reports.milestones, milestonesSorting.order.key, milestonesSorting.order.dir, {
+    club: (row) => row.organizationName,
+    location: (row) => row.locationName,
+    baptism: (row) => row.baptismNames,
+    bible: (row) => row.bibleNames,
+  });
+  const roleRows = sortRows(reports.specialRoles, rolesSorting.order.key, rolesSorting.order.dir, {
+    role: (row) => row.role,
+    name: (row) => row.name,
+    club: (row) => row.organizationName,
+    location: (row) => row.locationName,
+  });
 
   return (
     <section className="page-stack reports-workspace">
@@ -75,18 +121,19 @@ export default async function ClubEventReportsPage({
         </div>
         {reports.camping.length === 0 ? <p className="report-empty">No active club registrations yet.</p> : (
           <div className="report-table-wrap">
+            {campingSorting.order.key && <SortOrderNote>{sortLine(campingSorting.order)}</SortOrderNote>}
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Club camping summary</caption>
               <thead role="rowgroup">
                 <tr role="row">
-                  <th role="columnheader" scope="col">Club</th>{showLocation && <th role="columnheader" scope="col">Location</th>}<th role="columnheader" scope="col">Tents</th><th role="columnheader" scope="col">Trailers</th>
-                  <th role="columnheader" scope="col">Kitchen canopy</th><th role="columnheader" scope="col">Total sq ft</th><th role="columnheader" scope="col">Camp next to</th>
-                  <th role="columnheader" scope="col">PF</th><th role="columnheader" scope="col">TLT</th><th role="columnheader" scope="col">Staff</th><th role="columnheader" scope="col">Child</th><th role="columnheader" scope="col">Total</th>
+                  <ColumnHeader column="club" label="Club" sorting={campingSorting} />{showLocation && <ColumnHeader column="location" label="Location" sorting={campingSorting} />}<ColumnHeader column="tents" label="Tents" sorting={campingSorting} /><ColumnHeader column="trailers" label="Trailers" sorting={campingSorting} />
+                  <ColumnHeader column="canopy" label="Kitchen canopy" sorting={campingSorting} /><ColumnHeader column="sqft" label="Total sq ft" sorting={campingSorting} /><ColumnHeader column="campNextTo" label="Camp next to" sorting={campingSorting} />
+                  <ColumnHeader column="pf" label="PF" sorting={campingSorting} /><ColumnHeader column="tlt" label="TLT" sorting={campingSorting} /><ColumnHeader column="staff" label="Staff" sorting={campingSorting} /><ColumnHeader column="child" label="Child" sorting={campingSorting} /><ColumnHeader column="total" label="Total" sorting={campingSorting} />
                   <th role="columnheader" scope="col"><span className="sr-only">Print packet</span></th>
                 </tr>
               </thead>
               <tbody role="rowgroup">
-                {reports.camping.map((row) => (
+                {campingRows.map((row) => (
                   <tr role="row" key={row.confirmationCode}>
                     <th role="rowheader" scope="row" translate="no">{row.organizationName}{row.sponsoringChurch && <small> · {row.sponsoringChurch}</small>}</th>
                     {showLocation && <td {...cardCell("Location")} translate="no">{row.locationName ?? "—"}</td>}
@@ -118,13 +165,14 @@ export default async function ClubEventReportsPage({
         </div>
         {reports.dutiesActivities.length === 0 ? <p className="report-empty">No active club registrations yet.</p> : (
           <div className="report-table-wrap">
+            {dutiesSorting.order.key && <SortOrderNote>{sortLine(dutiesSorting.order)}</SortOrderNote>}
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Club duties and activities</caption>
               <thead role="rowgroup">
-                <tr role="row"><th role="columnheader" scope="col">Club</th>{showLocation && <th role="columnheader" scope="col">Location</th>}<th role="columnheader" scope="col">Duty areas</th><th role="columnheader" scope="col">Activities</th><th role="columnheader" scope="col">Assigned campsite</th><th role="columnheader" scope="col">Assigned duty</th><th role="columnheader" scope="col">Assigned activity</th></tr>
+                <tr role="row"><ColumnHeader column="club" label="Club" sorting={dutiesSorting} />{showLocation && <ColumnHeader column="location" label="Location" sorting={dutiesSorting} />}<ColumnHeader column="dutyAreas" label="Duty areas" sorting={dutiesSorting} /><ColumnHeader column="activities" label="Activities" sorting={dutiesSorting} /><ColumnHeader column="campsite" label="Assigned campsite" sorting={dutiesSorting} /><ColumnHeader column="duty" label="Assigned duty" sorting={dutiesSorting} /><ColumnHeader column="activity" label="Assigned activity" sorting={dutiesSorting} /></tr>
               </thead>
               <tbody role="rowgroup">
-                {reports.dutiesActivities.map((row) => (
+                {dutiesRows.map((row) => (
                   <tr role="row" key={row.confirmationCode}>
                     <th role="rowheader" scope="row" translate="no">{row.organizationName}</th>
                     {showLocation && <td {...cardCell("Location")} translate="no">{row.locationName ?? "—"}</td>}
@@ -150,11 +198,12 @@ export default async function ClubEventReportsPage({
         </div>
         {reports.milestones.length === 0 ? <p className="report-empty">No club has submitted a baptism or Bible read-through name yet.</p> : (
           <div className="report-table-wrap">
+            {milestonesSorting.order.key && <SortOrderNote>{sortLine(milestonesSorting.order)}</SortOrderNote>}
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Club spiritual milestones</caption>
-              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Club</th>{showLocation && <th role="columnheader" scope="col">Location</th>}<th role="columnheader" scope="col">Baptism interest</th><th role="columnheader" scope="col">Bible read-through</th></tr></thead>
+              <thead role="rowgroup"><tr role="row"><ColumnHeader column="club" label="Club" sorting={milestonesSorting} />{showLocation && <ColumnHeader column="location" label="Location" sorting={milestonesSorting} />}<ColumnHeader column="baptism" label="Baptism interest" sorting={milestonesSorting} /><ColumnHeader column="bible" label="Bible read-through" sorting={milestonesSorting} /></tr></thead>
               <tbody role="rowgroup">
-                {reports.milestones.map((row) => (
+                {milestoneRows.map((row) => (
                   <tr role="row" key={row.confirmationCode}>
                     <th role="rowheader" scope="row" translate="no">{row.organizationName}</th>
                     {showLocation && <td {...cardCell("Location")} translate="no">{row.locationName ?? "—"}</td>}
@@ -177,11 +226,12 @@ export default async function ClubEventReportsPage({
         </div>
         {reports.specialRoles.length === 0 ? <p className="report-empty">No club has flagged medical personnel or a Master Guide candidate yet.</p> : (
           <div className="report-table-wrap">
+            {rolesSorting.order.key && <SortOrderNote>{sortLine(rolesSorting.order)}</SortOrderNote>}
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Special roles</caption>
-              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Role</th><th role="columnheader" scope="col">Name</th><th role="columnheader" scope="col">Club</th>{showLocation && <th role="columnheader" scope="col">Location</th>}</tr></thead>
+              <thead role="rowgroup"><tr role="row"><ColumnHeader column="role" label="Role" sorting={rolesSorting} /><ColumnHeader column="name" label="Name" sorting={rolesSorting} /><ColumnHeader column="club" label="Club" sorting={rolesSorting} />{showLocation && <ColumnHeader column="location" label="Location" sorting={rolesSorting} />}</tr></thead>
               <tbody role="rowgroup">
-                {reports.specialRoles.map((row) => (
+                {roleRows.map((row) => (
                   <tr role="row" key={`${row.role}-${row.attendeeId}`}>
                     <td {...cardCell("Role")}>{row.role}</td>
                     <th role="rowheader" scope="row" translate="no">{row.name}</th>

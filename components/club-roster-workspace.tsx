@@ -1,4 +1,5 @@
 "use client";
+import { pagerText } from "@/components/list-pager";
 import { LiveListBoundary, ReloadButton } from "@/components/live-list-boundary";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
@@ -392,7 +393,9 @@ function ClubRosterWorkspaceInner({
       : null,
   });
   const filtersActive = query.trim() !== "" || detailsOnly || complianceFilterOn;
-  const resultText = `${visible.length} of ${population.length} ${population.length === 1 ? "person" : "people"} shown${detailsOnly ? ", Details needed" : ""}${query.trim() ? `, name contains ${query.trim()}` : ""}`;
+  // The shared count wording (rule B1, #1458); the filters in force follow it.
+  const countText = pagerText({ from: visible.length ? 1 : 0, to: visible.length, total: population.length }, "people", "person");
+  const resultText = `${countText}${detailsOnly ? ", Details needed" : ""}${query.trim() ? `, name contains ${query.trim()}` : ""}`;
   function clearFilters() {
     const cleared = clearedRosterFilters();
     // One history entry for the whole clearing, so Back brings every filter back; the address no longer says what the page is not showing.
@@ -853,7 +856,7 @@ function ClubRosterWorkspaceInner({
           </p>
           <div className={styles.rosterResultLine}>
             <p id="roster-result-text" tabIndex={-1}>
-              <strong>{`${visible.length} of ${population.length}`}</strong> {population.length === 1 ? "person" : "people"} shown
+              {countText}
               {detailsOnly ? " · Details needed" : ""}{query.trim() ? ` · Name contains "${query.trim()}"` : ""}
             </p>
             {/* The same result for screen readers; it follows the search term, which settles once typing pauses. */}
