@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { resetServerEnvCache } from "@/lib/env";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/modules/communications/effective-delivery", async () => {
@@ -611,6 +612,8 @@ describe("the tester's direct backup send", () => {
 
   it("goes straight to Resend and never touches SES, recorded as a direct send, not a failover", async () => {
     vi.stubEnv("ACCOUNT_EMAIL_SENDER_ADDRESS", "no-reply@imsda.org");
+    // The server environment is cached: drop any copy an earlier test read before this stub (#1496).
+    resetServerEnvCache();
     const store = fakeStore();
     store.message.eventId = null;
     store.message.templateKey = "SYSTEM_TEST_EMAIL";
@@ -625,6 +628,8 @@ describe("the tester's direct backup send", () => {
 
   it("is refused when the backup is not configured", async () => {
     vi.stubEnv("ACCOUNT_EMAIL_SENDER_ADDRESS", "no-reply@imsda.org");
+    // The server environment is cached: drop any copy an earlier test read before this stub (#1496).
+    resetServerEnvCache();
     const store = fakeStore();
     const mocks = providers();
     await expect(processAccountEmailQueue({ useBackup: true, dependencies: accountDependencies(store, mocks, { backupConfiguration: null }) }))

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { MessageTemplateKey } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import { resetServerEnvCache } from "@/lib/env";
 vi.mock("@/modules/communications/effective-delivery", async () => (await import("./support/effective-delivery-double")).effectiveDeliveryDouble);
 vi.mock("server-only", () => ({}));
 
@@ -251,6 +252,8 @@ describe("club invoices and every scope get the layout (#1443)", () => {
 
   it("sends the account queue's text-only rows and the sign-in code box as HTML, never null, in both scopes", async () => {
     vi.stubEnv("ACCOUNT_EMAIL_SENDER_ADDRESS", "no-reply@imsda.org");
+    // The server environment is cached: drop any copy an earlier test read before this stub (#1496).
+    resetServerEnvCache();
     const store = multiStore(
       [
         { id: "a1", eventId: null, templateKey: "ATTENDEE_SIGN_IN_CODE", bodyHtmlSnapshot: null, bodyTextSnapshot: "Enter this code to finish signing in:\n\n482 913\n\nDidn't try to sign in?\nIgnore it." },
