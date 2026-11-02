@@ -7,6 +7,7 @@ import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list
 import { sortByName, sortOrderText, sortRows, type SortKind, type SortState } from "@/lib/list-sort";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { Download, ListPlus, Plus, Search, UsersRound, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -114,8 +115,16 @@ export function ClubHonorsWorkspace({
   const [voidTarget, setVoidTarget] = useState<MemberHonorEntryRecord | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const [voidError, setVoidError] = useState("");
-  const closeHistory = () => { historyRequest.current += 1; setHistoryFor(null); };
+  // Typed values in the single-record form: the honor combobox is controlled, the rest are uncontrolled, so a change event marks it (#1468).
+  const [singleEdited, setSingleEdited] = useState(false);
+  const closeHistory = () => { historyRequest.current += 1; setHistoryFor(null); setSingleEdited(false); };
   const dialogRef = useAccessibleDialog<HTMLElement>(Boolean(historyFor) && !voidTarget, closeHistory);
+  // Filters, search and ticked members are not unsaved work; typed record fields are (#1468).
+  const unsavedHonors =
+    (bulkOpen && (bulkHonorId !== "" || bulkDate !== "" || bulkNote.trim() !== "")) ||
+    (Boolean(historyFor) && (singleHonorId !== "" || singleEdited)) ||
+    (Boolean(voidTarget) && voidReason.trim() !== "");
+  useUnsavedChangesGuard(unsavedHonors, "You have honors you have not recorded yet. Leave this page and discard them?");
   const closeBulk = () => { setBulkOpen(false); setConfirmingBulk(false); };
   const bulkDialogRef = useAccessibleDialog<HTMLElement>(bulkOpen && !confirmingBulk, closeBulk);
   const closeVoid = () => { setVoidTarget(null); setVoidReason(""); };
@@ -231,6 +240,7 @@ export function ClubHonorsWorkspace({
   async function openHistory(row: ClubHonorsRow) {
     const request = ++historyRequest.current;
     setSingleHonorId("");
+    setSingleEdited(false);
     setHistoryFor(row);
     await loadHistory(row.memberId, request);
   }
@@ -266,6 +276,7 @@ export function ClubHonorsWorkspace({
       if (refreshedBody.rows) setRows(refreshedBody.rows);
       formElement.reset();
       setSingleHonorId("");
+      setSingleEdited(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That honor could not be recorded.");
     } finally {
@@ -578,7 +589,7 @@ export function ClubHonorsWorkspace({
               </ul>
             )}
             {!readOnly && (
-              <form className="form-stack" key={historyFor.memberId} onSubmit={recordSingle}>
+              <form className="form-stack" key={historyFor.memberId} onChange={() => setSingleEdited(true)} onSubmit={recordSingle}>
                 <div className="form-grid two-column">
                   <HonorCombobox label="Honor" name="honorId" onChange={setSingleHonorId} options={honorOptions} required value={singleHonorId} />
                   <label>

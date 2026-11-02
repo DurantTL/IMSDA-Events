@@ -4,6 +4,7 @@ import { ExactValue } from "@/components/exact-value";
 import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { Paperclip, Send } from "lucide-react";
 import { sponsorOptionLabel } from "@/modules/organizations/domain";
 import {
@@ -53,6 +54,14 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
   const [inviteName, setInviteName] = useState("");
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteMessage, setInviteMessage] = useState<{ text: string; tone: "error" | "success" } | null>(null);
+
+  // Typed values not yet sent: an open decision's reason or church choice, or the invite fields (#1468).
+  // Cancelling a decision hides its form, so its leftover text no longer counts; a sent decision or invite clears them.
+  const unsentDecision = (mode?.kind === "decline" && reason.trim() !== "") || (mode?.kind === "approve" && churchChoice !== "");
+  useUnsavedChangesGuard(
+    unsentDecision || inviteEmail.trim() !== "" || inviteName.trim() !== "",
+    "You have typed something here that has not been sent. Leave this page and discard it?",
+  );
 
   async function decide(application: NewClubApplicationRecord, body: object) {
     setBusyId(application.id);

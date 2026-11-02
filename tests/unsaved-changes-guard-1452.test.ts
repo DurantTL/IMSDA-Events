@@ -51,15 +51,7 @@ const allowlist: Record<string, string> = {
   "components/club-assignments-workspace.tsx": "needs guard: follow-up #1468",
   "components/club-directors-workspace.tsx": "needs guard: follow-up #1468",
   "components/club-form-alert-recipients.tsx": "one field",
-  "components/club-form-roster-add.tsx": "needs guard: follow-up #1468",
-  "components/club-forms-actions.tsx": "needs guard: follow-up #1468",
-  "components/club-honors-workspace.tsx": "needs guard: follow-up #1468",
   "components/club-leaders-list.tsx": "search or filter",
-  "components/club-member-honors-dialog.tsx": "needs guard: follow-up #1468",
-  "components/club-registration-workspace.tsx": "needs guard: follow-up #1468",
-  "components/club-roster-carry-forward.tsx": "needs guard: follow-up #1468",
-  "components/club-supply-stock-workspace.tsx": "needs guard: follow-up #1468",
-  "components/club-team-workspace.tsx": "needs guard: follow-up #1468",
   "components/clubs-year-selector.tsx": "search or filter",
   "components/community-moderation-workspace.tsx": "needs guard: follow-up #1468",
   "components/desk-location-select.tsx": "saves instantly / autosave",
@@ -98,7 +90,6 @@ const allowlist: Record<string, string> = {
   "components/mfa-manager.tsx": "sign-in",
   "components/module-request-form.tsx": "one field",
   "components/module-request-queue.tsx": "action button only, no typed fields",
-  "components/new-club-applications-queue.tsx": "needs guard: follow-up #1468",
   "components/notifications-workspace.tsx": "needs guard: follow-up #1468",
   "components/organization-billing-contact.tsx": "needs guard: follow-up #1468",
   "components/organization-directory-workspace.tsx": "needs guard: follow-up #1468",
@@ -197,6 +188,16 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
       "components/club-report-form.tsx",
       "components/club-year-end-report-form.tsx",
       "components/club-form-fill-in.tsx",
+      // Director and area coordinator club forms (#1468): never back on the allow-list.
+      "components/club-form-roster-add.tsx",
+      "components/club-forms-actions.tsx",
+      "components/club-honors-workspace.tsx",
+      "components/club-member-honors-dialog.tsx",
+      "components/club-registration-workspace.tsx",
+      "components/club-roster-carry-forward.tsx",
+      "components/club-supply-stock-workspace.tsx",
+      "components/club-team-workspace.tsx",
+      "components/new-club-applications-queue.tsx",
     ]) {
       expect(guarded(readFileSync(join(root, path), "utf8")), path).toBe(true);
     }
@@ -205,7 +206,7 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
   it("lists the forms that still need a guard", () => {
     const pending = Object.entries(allowlist).filter(([, reason]) => reason === followUp).map(([path]) => path);
     // Not a limit to raise: it only goes down as the follow-up mounts the hook.
-    expect(pending.length).toBeLessThanOrEqual(70);
+    expect(pending.length).toBeLessThanOrEqual(61);
   });
 });
 

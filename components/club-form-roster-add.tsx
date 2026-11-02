@@ -2,6 +2,7 @@
 
 import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { EmailInput } from "@/components/email-input";
 import { PhoneInput } from "@/components/phone-input";
@@ -48,6 +49,9 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
   const [formType, setFormType] = useState<string>(prefill.attendeeType);
   const [formBirthDate, setFormBirthDate] = useState(prefill.birthDate);
   const [duplicates, setDuplicates] = useState<Duplicate[]>(review.duplicates);
+  // Any edit to the pre-filled review since it loaded (#1468). A successful add or link leaves the page, so it lets that through first.
+  const [dirty, setDirty] = useState(false);
+  const allowNavigation = useUnsavedChangesGuard(dirty, "You have unsaved changes to this roster entry. Leave this page and discard them?");
   const base = `/api/attendee/clubs/${encodeURIComponent(review.organizationId)}/forms/submissions/${encodeURIComponent(review.submissionId)}/roster`;
   const typeHint = formBirthDate
     ? attendeeTypeAgeHint(formType as keyof typeof clubRosterAttendeeTypeLabels, formBirthDate, calendarDateInEventTimeZone(new Date(), "America/Chicago"))
@@ -72,6 +76,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
         return;
       }
       // Back to the form, which now reads "Added to roster".
+      allowNavigation();
       window.location.assign(formHref);
     } catch {
       setError("This could not be added to the roster. Check your connection and try again.");
@@ -164,6 +169,7 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
         className="form-stack"
         noValidate
         onInput={(event) => {
+          setDirty(true);
           const name = (event.target as HTMLInputElement).name;
           const field = name === "birthDateText" ? "birthDate" : name;
           setFieldErrors((current) => (field in current ? { ...current, [field]: undefined } : current));

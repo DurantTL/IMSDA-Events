@@ -5,6 +5,7 @@ import { ageInputAttributes } from "@/modules/attendee-types/age-limits";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { notSavedMessage } from "@/components/form-message";
 import { settingsSaveStateLabels } from "@/components/settings-save-state";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
@@ -14,7 +15,7 @@ import {
   type FormResponses,
   type RosterAttendee,
 } from "@/components/public-registration-form";
-import { createDraftSaveQueue } from "@/modules/club-registrations/draft-save-queue";
+import { createDraftSaveQueue, registrationDraftUnsaved } from "@/modules/club-registrations/draft-save-queue";
 import { createDraftSender, DRAFT_CONFLICT_MESSAGE, draftBlockedReason } from "@/modules/club-registrations/draft-sender";
 import { restoreDraftLocation } from "@/modules/club-registrations/draft-location";
 import { rosterHrefFromRegistration } from "@/modules/club-registrations/roster-return";
@@ -147,6 +148,14 @@ export function ClubRegistrationWorkspace({
     },
     send: (next) => sender.send(next),
   }));
+
+  // Leaving while a change is still waiting to save, saving, or failed to save would lose it (#1468). The roster links
+  // below save first and only warn when that fails, so this covers every other way out (header, tab, Back).
+  const [submitted, setSubmitted] = useState(false);
+  useUnsavedChangesGuard(
+    registrationDraftUnsaved({ hasPending: queue.hasPending(), saveState, conflict, submitted }),
+    "Your latest registration changes are not saved yet. Leave this page and lose them?",
+  );
 
   /** Saves the pending draft now; true when nothing is left unsaved. */
   const flush = useCallback(async (): Promise<boolean> => {
@@ -481,6 +490,7 @@ export function ClubRegistrationWorkspace({
     onSubmitted: (result?: { honors?: { error?: string } | null }) => {
       if (timer.current) clearTimeout(timer.current);
       queue.submitted();
+      setSubmitted(true);
       // The registration is saved even when a class filled up meanwhile; the class picker on the next screen says so.
       if (result?.honors?.error) {
         try { sessionStorage.setItem(honorsNoteKey(organizationId, workspace.event.id), result.honors.error); } catch { /* the picker still shows the picks */ }

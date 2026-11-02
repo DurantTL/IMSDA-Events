@@ -4,6 +4,7 @@ import { announceClubForms } from "@/components/club-forms-status";
 import { clubFormLinkRequestBody } from "@/components/club-form-link-body";
 import { SubmitButton } from "@/components/submit-button";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Printer, Send } from "lucide-react";
@@ -43,6 +44,11 @@ export function SendClubFormLink({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The days value the form last started from; a link that sends leaves the director's chosen days in place (#1468).
+  const [baseDays, setBaseDays] = useState(String(defaultDays));
+  // Typed values waiting in the open send form; closing it, or a link that sent, clears this (#1468).
+  const dirty = open && (email.trim() !== "" || subjectName.trim() !== "" || days !== baseDays || rosterMemberId !== defaultRosterMemberId);
+  useUnsavedChangesGuard(dirty, "You have not sent this form link yet. Leave this page and discard it?");
 
   async function send(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,6 +71,7 @@ export function SendClubFormLink({
       setEmail("");
       setSubjectName("");
       setRosterMemberId(defaultRosterMemberId);
+      setBaseDays(days);
       router.refresh();
     } catch {
       setError("The link could not be sent. Check your connection and try again.");
@@ -113,7 +120,7 @@ export function SendClubFormLink({
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <div className="intro-actions">
         <SubmitButton className="primary-button" label="Send link" submitting={saving} submittingLabel="Sending…" />
-        <button className="text-button" disabled={saving} onClick={() => setOpen(false)} type="button">Close</button>
+        <button className="text-button" disabled={saving} onClick={() => { setOpen(false); setEmail(""); setSubjectName(""); setDays(baseDays); setRosterMemberId(defaultRosterMemberId); }} type="button">Close</button>
       </div>
     </form>
   );
