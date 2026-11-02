@@ -79,9 +79,14 @@ function blankDraft(): Draft {
   return { localKey: nextKey(), name: "", recipientsText: "", savedRecipients: [], conditionFieldKey: "", conditionOperator: "EQUALS", conditionValue: "", onlyTheseSections: false, sectionIds: [], warnings: [], clubRemoved: false };
 }
 
-/** True when the edited notifications differ from the saved ones (the local key of a new row never counts). */
+/** A new row (no id) nothing has been typed into: "Add a notification" alone is not work to lose. */
+function isUntouchedNewRow(row: Draft): boolean {
+  return !row.id && row.name === "" && row.recipientsText === "" && row.conditionFieldKey === "" && row.conditionValue === "" && !row.onlyTheseSections && row.sectionIds.length === 0;
+}
+
+/** True when the edited notifications differ from the saved ones (the local key of a new row never counts, nor does an untouched new row). */
 export function notificationDraftsDirty(drafts: Draft[], saved: Draft[]): boolean {
-  const plain = (rows: Draft[]) => JSON.stringify(rows.map((row) => ({ ...row, localKey: "" })));
+  const plain = (rows: Draft[]) => JSON.stringify(rows.filter((row) => !isUntouchedNewRow(row)).map((row) => ({ ...row, localKey: "" })));
   return plain(drafts) !== plain(saved);
 }
 

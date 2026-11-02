@@ -34,5 +34,8 @@ describe("unsaved-changes helpers, round 3b (#1468)", () => {
     expect(notificationDraftsDirty([row], [{ ...row, localKey: "other" }])).toBe(false);
     expect(notificationDraftsDirty([{ ...row, name: "Camping 2" }], [row])).toBe(true);
     expect(notificationDraftsDirty([row, { ...row, localKey: "n1", id: undefined }], [row])).toBe(true);
+    const blank = { ...row, localKey: "n2", id: undefined, name: "", recipientsText: "", savedRecipients: [] };
+    expect(notificationDraftsDirty([blank], [])).toBe(false);
+    expect(notificationDraftsDirty([{ ...blank, name: "Camping" }], [])).toBe(true);
   });
 });
