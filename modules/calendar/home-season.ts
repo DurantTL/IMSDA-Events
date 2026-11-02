@@ -123,8 +123,20 @@ export function seasonMonthMarks(window: SeasonWindow) {
   // A month with only a few days left would put its label on top of the next one's: drop that label only; every month
   // boundary keeps its grid line.
   if (marks.length > 1 && marks[1].leftPct < 8) marks[0].showLabel = false;
+  // Likewise a last month with only a few days on the ribbon would push its label past the right edge (#1507): drop that
+  // label only when it would not fit in the space left.
+  for (const mark of marks) {
+    if (mark.leftPct > 0 && mark.leftPct + monthLabelPct(mark.label) > 100) mark.showLabel = false;
+  }
   return marks;
 }
+
+/**
+ * About how much of the ribbon a month label takes at its narrowest (the ribbon shows from 861px, where the track is
+ * about 635px and a label about 7.3px a character): a little generous so a label never reaches the edge.
+ */
+const monthLabelPctPerChar = 1.3;
+const monthLabelPct = (label: string) => label.length * monthLabelPctPerChar;
 
 const round = (value: number) => Math.round(value * 100) / 100;
 
