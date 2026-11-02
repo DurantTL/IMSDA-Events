@@ -147,7 +147,11 @@ describe("registrationDraftUnsaved (#1468)", () => {
   });
 
   it("is clean after the registration was submitted", () => {
-    expect(registrationDraftUnsaved({ hasPending: true, saveState: "error", conflict: true, submitted: true })).toBe(false);
+    expect(registrationDraftUnsaved({ hasPending: false, saveState: "error", conflict: true, submitted: true })).toBe(false);
+  });
+
+  it("warns about an edit made after the submit, before its save starts", () => {
+    expect(registrationDraftUnsaved({ hasPending: true, saveState: "saved", conflict: false, submitted: true })).toBe(true);
   });
 
   it("follows the real queue: dirty after set, clean once the save lands", async () => {

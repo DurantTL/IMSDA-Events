@@ -68,6 +68,8 @@ export function registrationDraftUnsaved(state: {
   conflict: boolean;
   submitted: boolean;
 }): boolean {
+  // A submit empties the queue, so a change pending now was made after it and is always new work.
+  if (state.hasPending) return true;
   if (state.submitted) return false;
-  return state.hasPending || state.saveState === "saving" || state.saveState === "error" || state.conflict;
+  return state.saveState === "saving" || state.saveState === "error" || state.conflict;
 }
