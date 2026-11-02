@@ -170,7 +170,7 @@ export function HealthImportWorkspace() {
                         )}
                       </td>
                     )}
-                    <td {...cardCell("Name")} translate="no">{row.name}</td>
+                    <th role="rowheader" scope="row" translate="no">{row.name}</th>
                     <td {...cardCell("Club")} translate="no">{row.clubName ?? row.clubText}</td>
                     <td {...cardCell("Result")}>
                       <span className={chipClass(row.outcome as Outcome)}>{outcomeLabels[row.outcome as Outcome]}</span>

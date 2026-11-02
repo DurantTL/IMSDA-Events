@@ -1,5 +1,6 @@
 "use client";
 
+import { cardCell } from "@/components/table-card-labels";
 import { EmptyState } from "@/components/empty-state";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { useState } from "react";
@@ -91,12 +92,13 @@ export function TagConfigurationWorkspace({
         >
           Tags are labels staff apply to registrations and attendees, such as VIP or Needs ride. Add one below and it appears on the registrations list.
         </EmptyState>
-      ) : <div className="table-wrap scroll-cue" data-scroll-cue><table className="editable-settings-table"><thead><tr><th>Color</th><th>Name</th><th>Description</th><th>Status</th><th>Actions</th></tr></thead><tbody>{tags.map((row) => <tr key={row.id}>
-        <td data-label="Color"><input aria-label={`Color for ${row.name}`} type="color" value={row.color} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, color: event.target.value } : candidate))} /></td>
-        <td data-label="Name"><input aria-label={`Name for ${row.name}`} value={row.name} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, name: event.target.value } : candidate))} /></td>
-        <td data-label="Description"><input aria-label={`Description for ${row.name}`} value={row.description} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, description: event.target.value } : candidate))} /></td>
-        <td data-label="Status">{row.isActive ? "Active" : "Inactive"}</td>
-        <td data-label="Actions"><span className="form-actions"><button className="secondary-button" disabled={saving} type="button" onClick={() => updateTag(row, {})}>Save</button><button className="secondary-button" disabled={saving} type="button" onClick={() => row.isActive ? openDeactivate(row) : updateTag(row, { isActive: true })}>{row.isActive ? "Deactivate" : "Activate"}</button></span></td>
+      ) : <div className="table-wrap"><table className="editable-settings-table table-cards table-cards-xwide" role="table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Tag</th><th role="columnheader" scope="col">Color</th><th role="columnheader" scope="col">Name</th><th role="columnheader" scope="col">Description</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Actions</th></tr></thead><tbody role="rowgroup">{tags.map((row) => <tr key={row.id} role="row">
+        <th role="rowheader" scope="row"><strong translate="no">{row.name}</strong></th>
+        <td {...cardCell("Color")}><input aria-label={`Color for ${row.name}`} type="color" value={row.color} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, color: event.target.value } : candidate))} /></td>
+        <td {...cardCell("Name")}><input aria-label={`Name for ${row.name}`} value={row.name} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, name: event.target.value } : candidate))} /></td>
+        <td {...cardCell("Description")}><input aria-label={`Description for ${row.name}`} value={row.description} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, description: event.target.value } : candidate))} /></td>
+        <td {...cardCell("Status")}>{row.isActive ? "Active" : "Inactive"}</td>
+        <td {...cardCell(null)}><span className="form-actions"><button className="secondary-button" disabled={saving} type="button" onClick={() => updateTag(row, {})}>Save</button><button className="secondary-button" disabled={saving} type="button" onClick={() => row.isActive ? openDeactivate(row) : updateTag(row, { isActive: true })}>{row.isActive ? "Deactivate" : "Activate"}</button></span></td>
       </tr>)}</tbody></table></div>}
       {canCreate && <form className="form-stack inset-form" action={addTag}>
         <div className="form-grid two-column color-field-row"><label>Name<input id="tag-name-input" name="name" required placeholder="VIP" /></label><label>Color<input name="color" type="color" defaultValue="#4F46E5" /></label></div>

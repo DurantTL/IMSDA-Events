@@ -109,7 +109,7 @@ export function CoordinatorMonthTable({ clubs, clubYear, month, query, now, show
   const shown = limited ? rows.slice(0, COORDINATOR_RECORDS_PAGE_SIZE) : rows;
   const monthLabel = reportMonthLabel(month);
   return (
-    <div className={styles.tableBlock}>
+    <div className={`report-table-wrap ${styles.tableBlock}`}>
       {sorting?.order.key && <SortOrderNote>{sortOrderText(sorting.order.key === "club" ? "club name" : `${shortMonth(month)} record`, sorting.order.dir)}</SortOrderNote>}
       <table className={`report-table table-cards ${styles.table}`} role="table">
         <caption className="sr-only">Clubs and their {monthLabel} record, club year {clubYear}</caption>

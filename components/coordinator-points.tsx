@@ -32,7 +32,7 @@ export function CoordinatorPointsRanking({ allClubs, clubYear, query, sorting, o
     <details className={styles.details} open={open || undefined}>
       <summary className={styles.summary}>Show as a table (ranking and supporting records)</summary>
       {key && <SortOrderNote>{sortOrderText(sortWords[key], dir, key === "name" ? "text" : "number")}</SortOrderNote>}
-      <CoordinatorScrollRegion label={`Points by club for ${clubYear}. Scroll sideways to see every column.`}>
+      <CoordinatorScrollRegion label={`Points by club for ${clubYear}`}>
         <table className="report-table table-cards" role="table">
           <caption className="sr-only">Total points per club for {clubYear}, with each club&apos;s submitted records</caption>
           <thead role="rowgroup">

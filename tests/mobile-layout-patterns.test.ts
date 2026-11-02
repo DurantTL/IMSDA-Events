@@ -39,7 +39,7 @@ function enclosingMedia(source: string, needle: string): string | null {
 
 describe("tables that became phone cards (#447)", () => {
   it("the attendee listing is a table-cards table with labelled cells and the name as row header", () => {
-    expect(attendeeListing).toContain('role="table" className="report-table table-cards attendee-listing-table"');
+    expect(attendeeListing).toContain('role="table" className="report-table table-cards table-cards-max attendee-listing-table"');
     expect(attendeeListing).toContain("{...cardCell(column.label)}");
     expect(attendeeListing).toMatch(/column\.key === "name"\s*\?\s*<th key=\{column\.key\} data-col=\{column\.key\} role="rowheader" scope="row">/);
     // The header cell comes from the shared SortableHeader, which sets role and scope (#1458).
@@ -54,7 +54,9 @@ describe("tables that became phone cards (#447)", () => {
     // The link-mode SortableHeader renders through PhoneHiddenSortLink (#1458).
     expect(attendeeListing).toContain("<SortableHeader");
     expect(read("components/list-sort.tsx")).toContain("<PhoneHiddenSortLink");
-    expect(read("components/phone-hidden-sort-link.tsx")).toContain("tabIndex={onPhone ? -1 : undefined}");
+    // Card mode shows the sortable headers as a visible "Sort by" row (#1457), so the link stays a Tab stop.
+    expect(read("components/phone-hidden-sort-link.tsx")).not.toContain("tabIndex");
+    expect(css).toContain('table.table-cards.table-cards > thead:has(.table-sort-button) > tr::before { content: "Sort by";');
     expect(enclosingMedia(css, ".attendee-sort-phone { display: contents; }")).toBe("@media screen and (max-width: 600px)");
   });
 
@@ -73,7 +75,7 @@ describe("tables that became phone cards (#447)", () => {
   });
 
   it("the admin club forms table is table-cards with labelled cells and the form as row header", () => {
-    expect(clubForms).toContain('role="table" className="report-table table-cards table-cards-tablet"');
+    expect(clubForms).toContain('role="table" className="report-table table-cards table-cards-wide"');
     expect(clubForms).toContain('className="report-table-wrap card-box"');
     for (const label of ["Status", "Filled in", "Version"]) expect(clubForms).toContain(`cardCell("${label}")`);
     expect(clubForms).toContain("cardCell(null)");

@@ -1,0 +1,6 @@
+/* The Age band cell holds two inputs; each shows its own short label, in the table and in the card (#1457). */
+/* The gap clears the input's focus ring (outline plus offset) so it never covers the Min or Max text. */
+.ageBand { align-items: end; }
+.ageBandField { display: grid; gap: 8px; min-width: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.ageBandField > span { line-height: 1.3; }
+.ageBandField > input { min-width: 0; }

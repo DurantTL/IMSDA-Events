@@ -5,6 +5,7 @@ import { useConfirm } from "@/components/use-confirm";
 import { useMemo, useState } from "react";
 import { Award, CalendarRange, ClipboardList, Copy, Pencil, Plus, Power, Save, Trash2, TriangleAlert, UsersRound, X } from "lucide-react";
 import { clubClassLevelLabels, clubClassLevels } from "@/modules/club-rosters/domain";
+import { cardCell } from "@/components/table-card-labels";
 import { honorOfferingSpanLabels, offeringPlacementPatch, sessionEditPatch } from "@/modules/honors/domain";
 import { honorSetChange, honorsNeedConfirmationMessage } from "@/modules/honors/offering-honors";
 import { HonorMultiSelect } from "@/components/honor-multi-select";
@@ -662,35 +663,35 @@ export function HonorsSetupWorkspace({
         ) : groups.filter((group) => group.offerings.length > 0).map((group) => (
           <div className="report-table-wrap honor-table-wrap" key={group.key}>
             <h3 className="honor-group-heading">{group.title}</h3>
-            <table className="report-table roster-card-table roster-card-table-wide">
-              <thead>
-                <tr>
-                  <th>Honors</th>
-                  <th>Youth seats taken</th>
-                  <th>Min. age</th>
-                  <th>Requires</th>
-                  <th>Per club</th>
-                  <th>Teacher</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th><span className="sr-only">Actions</span></th>
+            <table className="report-table table-cards table-cards-xwide" role="table">
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader" scope="col">Honors</th>
+                  <th role="columnheader" scope="col">Youth seats taken</th>
+                  <th role="columnheader" scope="col">Min. age</th>
+                  <th role="columnheader" scope="col">Requires</th>
+                  <th role="columnheader" scope="col">Per club</th>
+                  <th role="columnheader" scope="col">Teacher</th>
+                  <th role="columnheader" scope="col">Location</th>
+                  <th role="columnheader" scope="col">Status</th>
+                  <th role="columnheader" scope="col"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {group.offerings.map((offering) => (
-                  <tr key={offering.id}>
-                    <td className="roster-card-name" data-label="Honors">
+                  <tr key={offering.id} role="row">
+                    <th className="roster-card-name" role="rowheader" scope="row">
                       {/* One line per honor the class teaches (#812). */}
                       {offering.honors.map((honor) => (
                         <div key={honor.id}><strong>{honor.name}</strong> <small><code>{honor.code}</code></small></div>
                       ))}
-                    </td>
-                    <td data-label="Youth seats taken">
+                    </th>
+                    <td {...cardCell("Youth seats taken")}>
                       {offering.seatsTaken} / {offering.capacity}
                       {offering.enrolled > offering.seatsTaken && <><br /><small>+{offering.enrolled - offering.seatsTaken} without a seat</small></>}
                     </td>
-                    <td data-label="Min. age">{offering.minimumAge ?? "—"}</td>
-                    <td data-label="Requires">
+                    <td {...cardCell("Min. age")}>{offering.minimumAge ?? "—"}</td>
+                    <td {...cardCell("Requires")}>
                       {offering.minimumClassLevel === null && offering.prerequisiteHonors.length === 0 ? "—" : (
                         <>
                           {offering.minimumClassLevel !== null && <div>{clubClassLevelLabels[offering.minimumClassLevel]} and up</div>}
@@ -698,15 +699,15 @@ export function HonorsSetupWorkspace({
                         </>
                       )}
                     </td>
-                    <td data-label="Per club">{offering.perClubLimit ?? "—"}</td>
-                    <td data-label="Teacher" translate="no">{offering.teacherName || "—"}</td>
-                    <td data-label="Location">{offering.location || "—"}</td>
-                    <td data-label="Status">
+                    <td {...cardCell("Per club")}>{offering.perClubLimit ?? "—"}</td>
+                    <td {...cardCell("Teacher")} translate="no">{offering.teacherName || "—"}</td>
+                    <td {...cardCell("Location")}>{offering.location || "—"}</td>
+                    <td {...cardCell("Status")}>
                       <span className={`status-chip ${offering.isActive ? "green" : "gold"}`}>
                         {offering.isActive ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td className="roster-card-actions">
+                    <td {...cardCell(null)} className="roster-card-actions">
                       <div className="honor-row-actions">
                         <button
                           aria-label={`Edit ${offering.honorName}`}
