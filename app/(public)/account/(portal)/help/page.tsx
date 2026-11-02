@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { loadPortalHelpViewer } from "@/modules/help/portal-viewer";
 import { visiblePortalGuides } from "@/modules/help/portal-visibility";
-import type { PortalAudience } from "@/modules/help/types";
 import styles from "@/app/(workspace)/help/help.module.css";
+import { PortalHelpSearch } from "./portal-help-search";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +10,6 @@ export const metadata: Metadata = {
   title: "Help",
   robots: { index: false, follow: false, nocache: true },
 };
-
-const groups: readonly { audience: PortalAudience; title: string }[] = [
-  { audience: "attendee", title: "Your registrations" },
-  { audience: "director", title: "Your club" },
-  { audience: "coordinator", title: "Club coordination" },
-];
 
 /**
  * Portal help (#1259): short guides for the roles this account holds, inside the account portal. Which guides are
@@ -44,25 +37,9 @@ export default async function PortalHelpPage() {
           </div>
           {guides.length === 0 ? (
             <p className={styles.empty}>There are no guides for this account yet.</p>
-          ) : groups.map((group) => {
-            const inGroup = guides.filter((guide) => guide.audience === group.audience);
-            if (inGroup.length === 0) return null;
-            return (
-              <section aria-label={group.title} className={styles.group} key={group.audience}>
-                <h2 className={styles.groupTitle}>{group.title}</h2>
-                <ul className={styles.list}>
-                  {inGroup.map((guide) => (
-                    <li className={styles.card} key={guide.id}>
-                      <Link className={styles.cardLink} href={`/account/help/${guide.id}`}>
-                        <span className={styles.cardTitle}>{guide.title}</span>
-                        <span className={styles.cardSummary}>{guide.summary}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
+          ) : (
+            <PortalHelpSearch guides={guides.map(({ id, title, summary, audience, keywords }) => ({ id, title, summary, audience, keywords }))} />
+          )}
         </div>
       </div>
     </>

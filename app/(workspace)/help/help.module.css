@@ -281,9 +281,9 @@
   min-width: 0;
 }
 
-/* The phone picture is 390 px wide; on a phone it fills the column, on a larger screen the desktop picture is capped like any figure. */
+/* The phone picture is 390 px wide; on a phone it fills the column. The desktop picture is 960 px wide, so its text stays readable. Existing guide screenshots keep their own cap. */
 .stepWithPicture .figureImage {
-  max-width: 640px;
+  max-width: min(100%, 960px);
 }
 
 .stepLinks {
