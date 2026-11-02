@@ -1,0 +1,14 @@
+/* The lost-device recovery link (#221). */
+.wrap {
+  margin: 12px 0 0;
+}
+
+.link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--imsda-purple);
+  font-size: max(var(--type-body-floor, 0px), 0.875rem);
+  font-weight: 700;
+  text-decoration: underline;
+}

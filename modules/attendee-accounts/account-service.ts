@@ -15,6 +15,7 @@ import {
 import {
   createAttendeeSession,
   revokeAllAttendeeSessions,
+  revokeOtherAttendeeSessions,
 } from "@/modules/attendee-accounts/session-store";
 
 /**
@@ -533,6 +534,11 @@ async function countAttendeePasswordMiss(credentialId: string, accountId: string
 /** Signs every device out of an account. Used when a password changes. */
 export async function signOutEverywhere(accountId: string, now = new Date()) {
   await revokeAllAttendeeSessions(accountId, now);
+}
+
+/** "Sign out everywhere else" (#221): every session of the account except the one asking. Returns how many were signed out. */
+export async function signOutOtherSessions(accountId: string, keepSessionId: string, now = new Date()) {
+  return revokeOtherAttendeeSessions(accountId, keepSessionId, now);
 }
 
 export type AttendeePasswordResetRequest = {

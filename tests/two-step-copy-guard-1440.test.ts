@@ -82,6 +82,12 @@ describe("A5: one name on the gate page", () => {
     "components/roster-unlock-form.tsx",
     "components/passkey-unlock-button.tsx",
     "app/api/attendee/mfa/route.ts",
+    // Lost-device recovery (#221) speaks the same name.
+    "app/(public)/account/two-step/recover/page.tsx",
+    "components/two-step-recovery-form.tsx",
+    "components/two-step-recovery-link.tsx",
+    "app/api/attendee/two-step-recovery/send/route.ts",
+    "app/api/attendee/two-step-recovery/verify/route.ts",
   ];
   const otherNames = /two[- ]factor|\b2[- ]?fa\b|\bmfa\b(?!_|[A-Z])|multi[- ]factor|2[- ]step|two step\b|two-step verification|two-step authentication/i;
 
@@ -108,6 +114,17 @@ describe("A5: one name on the gate page", () => {
     expect(mounted.container.querySelector("h1")?.textContent).toContain("two-step sign-in");
     const source = read("components/two-step-setup.tsx");
     expect(source).toContain("Two-step sign-in is on");
+  });
+
+  it("says why recovery matters, names what will be removed, and links to it from the gate", () => {
+    const recover = read("app/(public)/account/two-step/recover/page.tsx");
+    expect(recover).toContain("Why this is needed");
+    expect(recover).toMatch(/records about young people/);
+    expect(recover).toMatch(/remove\s+your passkeys and authenticator app/);
+    expect(recover).toMatch(/sign out your other devices/);
+    expect(read("components/two-step-recovery-link.tsx")).toContain("Lost your phone or security key? Recover two-step sign-in");
+    expect(read("app/(public)/account/two-step/page.tsx")).toContain("<TwoStepRecoveryLink");
+    expect(read("components/attendee-account-settings.tsx")).toContain("<TwoStepRecoveryLink");
   });
 
   it("catches another name (the scanner itself)", () => {

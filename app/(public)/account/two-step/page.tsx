@@ -6,6 +6,7 @@ import { BackToEventsLink } from "@/components/back-to-events-link";
 import { BrandLink } from "@/components/brand-link";
 import { PasskeyUnlockButton } from "@/components/passkey-unlock-button";
 import { RosterUnlockForm } from "@/components/roster-unlock-form";
+import { TwoStepRecoveryLink } from "@/components/two-step-recovery-link";
 import { TwoStepGate } from "@/components/two-step-setup";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { getAttendeeMfaStatus } from "@/modules/attendee-accounts/mfa-service";
@@ -91,6 +92,7 @@ export default async function TwoStepPage({
                 <RosterUnlockForm label="Continue" />
               </>
             )}
+            <TwoStepRecoveryLink next={next} />
           </section>
         </div>
       </main>

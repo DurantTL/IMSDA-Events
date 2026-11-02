@@ -106,6 +106,7 @@ const SIGN_IN_PAGES = [
   "app/(public)/account/sign-up/page.tsx",
   "app/(public)/account/forgot-password/page.tsx",
   "app/(public)/account/two-step/page.tsx",
+  "app/(public)/account/two-step/recover/page.tsx",
   "app/(public)/account/verify-email/page.tsx",
   "app/(public)/staff-invite/[token]/page.tsx",
   // The club-invite acceptance page (/clubs/register/[token]) renders this shared page.
