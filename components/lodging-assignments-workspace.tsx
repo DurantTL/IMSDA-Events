@@ -11,6 +11,8 @@ import {
   callLodging,
   type Run,
 } from "@/components/lodging-assignments-panels";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { lodgingCategoryLabels } from "@/modules/lodging/domain";
 import type { AssignmentWorkspaceView, OccupantCard, PersonCard, UnitCard, UnitStatusWord } from "@/modules/lodging/assignment-view";
 
@@ -25,6 +27,8 @@ import type { AssignmentWorkspaceView, OccupantCard, PersonCard, UnitCard, UnitS
  * colour alone (status and household are also words), controls are real buttons and fields with labels, results are
  * announced in a live region, and the layout reflows to one column on a phone.
  */
+
+const defaultMoveReason = "Moved by staff";
 
 type Tab = "rooms" | "plan" | "waitlist" | "attention" | "reports" | "display";
 
@@ -74,7 +78,7 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<{ occupantKey: string; moveAssignmentId?: string } | null>(null);
-  const [moveReason, setMoveReason] = useState("Moved by staff");
+  const [moveReason, setMoveReason] = useState(defaultMoveReason);
   const [pendingSpecial, setPendingSpecial] = useState<{ unit: UnitCard; personKeys: string[] } | null>(null);
   const searchBox = useClientSearch();
   const search = searchBox.term;
@@ -83,6 +87,11 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
   const [floorLabel, setFloorLabel] = useState("all");
   const [layout, setLayout] = useState<"list" | "hall">("list");
   const base = `/api/events/${view.eventId}/lodging`;
+  // Typed work in the placement forms (cancel, late arrival or early departure, transfer, link, expected guest, rename): any
+  // field off its starting value; and a move reason changed from the default while a move is chosen. A save, closing the
+  // selection, or a form leaving the page clears it; a failed save keeps what was typed (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty || (Boolean(selected?.moveAssignmentId) && moveReason !== defaultMoveReason));
 
   const run: Run = async (action, success) => {
     setBusy(true); setError(""); setNotice("");
@@ -149,7 +158,7 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
       reason: moving ? moveReason : "Assigned by staff",
       placements: people.map((person) => placementFor(person, place, moving ? "MOVE" : "ASSIGN", confirmSpecialUse, moving && move ? { first: move.firstNight, last: move.lastNight } : undefined)),
     }), people.length === 1 ? `${people[0]!.name} placed in ${where}.` : `${people.length} people placed in ${where}.`);
-    if (ok) setSelected(null);
+    if (ok) { setSelected(null); setMoveReason(defaultMoveReason); }
   }
 
   function selectedMovePlacement() {
@@ -205,8 +214,9 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
         void (async () => {
           const place = target.kind === "UNIT" ? { kind: "UNIT" as const, eventUnitId: target.unit.eventUnitId } : { kind: "BUCKET" as const, bucketId: target.bucketId };
           if (target.kind === "UNIT" && target.unit.specialUse) { setPendingSpecial({ unit: target.unit, personKeys: [person.occupantKey] }); return; }
-          await run(() => callLodging(`${base}/assignments`, "POST", { action: "place", reason: moveReason, placements: [placementFor(person, place, "MOVE", false, { first: placement.firstNight, last: placement.lastNight })] }), `${person.name} moved.`);
+          const moved = await run(() => callLodging(`${base}/assignments`, "POST", { action: "place", reason: moveReason, placements: [placementFor(person, place, "MOVE", false, { first: placement.firstNight, last: placement.lastNight })] }), `${person.name} moved.`);
           setSelected(null);
+          if (moved) setMoveReason(defaultMoveReason);
         })();
       }
       return;
@@ -267,21 +277,27 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
         <summary>Change {occupant.name}&apos;s place</summary>
         <div className="lodging-assign-chip-tools">
           <button type="button" className="secondary-button" onClick={() => setSelected({ occupantKey: occupant.occupantKey, moveAssignmentId: occupant.assignmentId })}>Move to another room</button>
-          <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          <form ref={edits.gone(`cancel:${occupant.assignmentId}`)} onChange={edits.track(`cancel:${occupant.assignmentId}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
-            const form = new FormData(event.currentTarget);
-            void run(() => callLodging(`${base}/assignments`, "POST", { action: "cancel", assignmentId: occupant.assignmentId, reason: String(form.get("reason")) }), `Cancelled ${occupant.name}'s place in ${unitName}.`);
+            const formElement = event.currentTarget;
+            const form = new FormData(formElement);
+            void run(() => callLodging(`${base}/assignments`, "POST", { action: "cancel", assignmentId: occupant.assignmentId, reason: String(form.get("reason")) }), `Cancelled ${occupant.name}'s place in ${unitName}.`).then((ok) => {
+              if (ok) { formElement.reset(); edits.clear(`cancel:${occupant.assignmentId}`); }
+            });
           }}>
             <label>Reason <input name="reason" required maxLength={300} /></label>
             <button type="submit" disabled={busy}>Cancel this placement</button>
           </form>
-          <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          <form ref={edits.gone(`stay:${occupant.assignmentId}`)} onChange={edits.track(`stay:${occupant.assignmentId}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
-            const form = new FormData(event.currentTarget);
+            const formElement = event.currentTarget;
+            const form = new FormData(formElement);
             void run(() => callLodging(`${base}/assignments`, "POST", {
               action: "stay_change", occupant: { kind: occupant.kind, id: occupant.occupantId }, kind: String(form.get("kind")), night: String(form.get("night")),
               keepCapacity: form.get("keep") === "on", reason: String(form.get("reason")),
-            }), "Stay changed.");
+            }), "Stay changed.").then((ok) => {
+              if (ok) { formElement.reset(); edits.clear(`stay:${occupant.assignmentId}`); }
+            });
           }}>
             <fieldset><legend>Late arrival or early departure</legend>
               <label>Change <select name="kind"><option value="LATE_ARRIVAL">Arrives late (first night is)</option><option value="EARLY_DEPARTURE">Leaves early (last night is)</option></select></label>
@@ -291,12 +307,15 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
               <button type="submit" disabled={busy}>Record</button>
             </fieldset>
           </form>
-          <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          <form ref={edits.gone(`transfer:${occupant.assignmentId}`)} onChange={edits.track(`transfer:${occupant.assignmentId}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
-            const form = new FormData(event.currentTarget);
+            const formElement = event.currentTarget;
+            const form = new FormData(formElement);
             const to = peopleByKey.get(String(form.get("to")));
             if (!to) return;
-            void run(() => callLodging(`${base}/assignments`, "POST", { action: "transfer", assignmentId: occupant.assignmentId, to: { kind: to.kind, id: to.occupantId }, reason: String(form.get("reason")) }), `Transferred the place to ${to.name}.`);
+            void run(() => callLodging(`${base}/assignments`, "POST", { action: "transfer", assignmentId: occupant.assignmentId, to: { kind: to.kind, id: to.occupantId }, reason: String(form.get("reason")) }), `Transferred the place to ${to.name}.`).then((ok) => {
+              if (ok) { formElement.reset(); edits.clear(`transfer:${occupant.assignmentId}`); }
+            });
           }}>
             <fieldset><legend>Give this place to someone else</legend>
               <label>To <select name="to" required>{view.people.filter((candidate) => candidate.occupantKey !== occupant.occupantKey && candidate.active && candidate.placements.length === 0).map((candidate) => <option key={candidate.occupantKey} value={candidate.occupantKey}>{candidate.name}{candidate.registrationCode ? ` (${candidate.registrationCode})` : " (expected)"}</option>)}</select></label>
@@ -313,10 +332,13 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
   function renderPlaceholderLink(person: PersonCard) {
     const candidates = view.people.filter((candidate) => candidate.kind === "ATTENDEE" && candidate.active && candidate.placements.length === 0 && person.people === 1);
     if (candidates.length === 0) return <p key="link" className="field-hint">To link this expected guest, the registered attendee must not be placed yet, and a group cannot be linked.</p>;
-    return <form key="link" onSubmit={(event: FormEvent<HTMLFormElement>) => {
+    return <form key="link" ref={edits.gone(`link:${person.occupantKey}`)} onChange={edits.track(`link:${person.occupantKey}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      void run(() => callLodging(`${base}/assignments/placeholders`, "POST", { action: "link", placeholderId: person.occupantId, attendeeId: String(form.get("attendee")), reason: String(form.get("reason")) }), "Linked to the registration.");
+      const formElement = event.currentTarget;
+      const form = new FormData(formElement);
+      void run(() => callLodging(`${base}/assignments/placeholders`, "POST", { action: "link", placeholderId: person.occupantId, attendeeId: String(form.get("attendee")), reason: String(form.get("reason")) }), "Linked to the registration.").then((ok) => {
+        if (ok) { formElement.reset(); edits.clear(`link:${person.occupantKey}`); }
+      });
     }}>
       <fieldset><legend>Link to their registration</legend>
         <label>Attendee <select name="attendee" required>{candidates.map((candidate) => <option key={candidate.occupantKey} value={candidate.occupantId}>{candidate.name} ({candidate.registrationCode})</option>)}</select></label>
@@ -383,7 +405,7 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
         {selectedPerson ? <div className="usage-note" role="status">
           <span>{selected?.moveAssignmentId ? "Moving" : "Assigning"} <strong>{selectedPerson.name}</strong>. Choose a room, a housing choice below, or</span>
           {selected?.moveAssignmentId ? <label>Reason <input value={moveReason} onChange={(event) => setMoveReason(event.target.value)} maxLength={300} /></label> : null}
-          <button type="button" className="secondary-button" onClick={() => setSelected(null)}>Clear my selection</button>
+          <button type="button" className="secondary-button" onClick={() => { setSelected(null); setMoveReason(defaultMoveReason); }}>Clear my selection</button>
         </div> : <p className="field-hint">Select a person, then press &quot;Assign here&quot; on a room. You can also drag a person onto a room.</p>}
         <ul className="lodging-assign-peoplelist">
           {shownPeople.map((person) => <li key={person.occupantKey} className={selected?.occupantKey === person.occupantKey ? "is-selected" : undefined} style={{ ["--household" as string]: `var(--la-h${person.colorIndex})` }}
@@ -407,11 +429,11 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
             </button>
           </li>)}
         </ul>
-        <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        <form onChange={edits.track("addGuest")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
           const form = event.currentTarget;
           const data = new FormData(form);
-          void run(() => callLodging(`${base}/assignments/placeholders`, "POST", { action: "create", displayName: String(data.get("name")), headcount: Number(data.get("headcount")) || 1, note: String(data.get("note") ?? "") }), "Expected guest added.").then((ok) => { if (ok) form.reset(); });
+          void run(() => callLodging(`${base}/assignments/placeholders`, "POST", { action: "create", displayName: String(data.get("name")), headcount: Number(data.get("headcount")) || 1, note: String(data.get("note") ?? "") }), "Expected guest added.").then((ok) => { if (ok) { form.reset(); edits.clear("addGuest"); } });
         }}>
           <fieldset><legend>Add an expected guest</legend>
             <label>Name <input name="name" required maxLength={120} /></label>
@@ -434,9 +456,9 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
             <div className="lodging-assign-actions">
               {selectedPerson ? <button type="button" className="primary-button" disabled={busy} onClick={() => assignHere({ kind: "BUCKET", bucketId: bucket.id, label: bucket.label })}>{selected?.moveAssignmentId ? "Move" : "Assign"} {selectedPerson.name} to {bucket.label}</button> : null}
             </div>
-            <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+            <form onChange={edits.track(`rename:${bucket.id}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
               event.preventDefault();
-              void run(() => callLodging(`${base}/assignments/buckets`, "PATCH", { bucketId: bucket.id, label: String(new FormData(event.currentTarget).get("label")) }), "Renamed.");
+              void run(() => callLodging(`${base}/assignments/buckets`, "PATCH", { bucketId: bucket.id, label: String(new FormData(event.currentTarget).get("label")) }), "Renamed.").then((ok) => { if (ok) edits.clear(`rename:${bucket.id}`); });
             }}>
               <label>Rename <input name="label" defaultValue={bucket.label} required maxLength={60} /></label>
               <button type="submit" className="secondary-button" disabled={busy}>Save name</button>

@@ -5,6 +5,9 @@ import { formatCents } from "@/modules/payments/format-cents";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { RegistrationMealsHistory } from "@/components/registration-meals-history";
 import { useMemo, useState } from "react";
+import type { FormEvent } from "react";
+import { formHasEdits } from "@/components/form-has-edits";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { BadgePercent, Banknote, Building2, CircleDollarSign, ReceiptText, RotateCcw, Search, WalletCards, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
@@ -65,8 +68,16 @@ export function FinanceWorkspace({
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
   /** Whether the payment form opened from the reservation-deposit line (#415), so it starts as a deposit. */
   const [depositFirst, setDepositFirst] = useState(false);
-  const [modal, setModal] = useState<"detail" | "payment" | "refund" | "adjust" | "reverse" | null>(initialSelected ? "detail" : null);
+  const [modal, setModalState] = useState<"detail" | "payment" | "refund" | "adjust" | "reverse" | null>(initialSelected ? "detail" : null);
+  // Typed work in the open payment, refund, adjustment or reversal form: any field off its starting value. Moving to another
+  // view (Back, close, or a successful save) clears it; a failed save keeps what was typed (#1468).
+  const [formEdited, setFormEdited] = useState(false);
+  const [fundEdited, setFundEdited] = useState(false);
+  function setModal(next: typeof modal) { setModalState(next); setFormEdited(false); }
+  const trackForm = (event: FormEvent<HTMLFormElement>) => setFormEdited(formHasEdits(event.currentTarget, { ignore: ["adjustKind", "useFund", "fundOrganizationId", "fundSponsorName", "fundPledged"] }));
   const [adjustKind, setAdjustKind] = useState<AdjustmentKind>("SCHOLARSHIP");
+  // The fund fields and the adjustment Type are controlled, so they are counted from their own state, not from the form.
+  useUnsavedChangesGuard(formEdited || (modal === "adjust" && (adjustKind !== "SCHOLARSHIP" || fundEdited)));
   const [selectedAdjustment, setSelectedAdjustment] = useState<AdjustmentRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -326,10 +337,10 @@ export function FinanceWorkspace({
                 {!activeFinancialStatuses.has(selected.status) && <div className="inline-notice">This registration is {registrationStatusWords[selected.status].toLowerCase()}. New payments are disabled, but existing payment and refund history remains available.</div>}
               </div>
             ) : modal === "adjust" ? (
-              <form className="form-stack" onSubmit={saveAdjustment}>
+              <form className="form-stack" onChange={trackForm} onSubmit={saveAdjustment}>
                 <div className="inline-notice">{selected.isDeferredOrganizationBilling ? `Current estimated ${selected.isGroup ? "amount" : "church amount"} ${formatCents(selected.totalAmountCents)}. ${selected.isGroup ? groupBillingFinalNote : churchBillingFinalNote}` : `Current total ${formatCents(selected.totalAmountCents)} · paid ${formatCents(selected.paidCents)} · balance ${formatCents(selected.balanceCents)}`}</div>
                 <label>Type
-                  <select value={adjustKind} onChange={(event) => { setAdjustKind(event.target.value as AdjustmentKind); setError(""); }}>
+                  <select name="adjustKind" value={adjustKind} onChange={(event) => { setAdjustKind(event.target.value as AdjustmentKind); setError(""); }}>
                     <option value="SCHOLARSHIP">{`Scholarship — ${wording.lowers}`}</option>
                     <option value="DISCOUNT">{`Discount — ${wording.lowers}`}</option>
                     <option value="PROMO_CODE">Promo code — apply an event code now</option>
@@ -355,7 +366,7 @@ export function FinanceWorkspace({
                       <label>Direction<select name="direction" defaultValue="LOWER"><option value="LOWER">{wording.lower}</option><option value="RAISE">{wording.raise}</option></select></label>
                     )}
                     <label>Amount<input name="amount" type="number" min="0.01" step="0.01" required /></label>
-                    {adjustKind === "SCHOLARSHIP" && !selected.isDeferredOrganizationBilling && <ScholarshipFundAwardFields eventId={eventId} />}
+                    {adjustKind === "SCHOLARSHIP" && !selected.isDeferredOrganizationBilling && <ScholarshipFundAwardFields eventId={eventId} onEdited={setFundEdited} />}
                   </>
                 )}
                 <label>Reason<textarea name="reason" minLength={3} maxLength={500} rows={3} required placeholder="For example: WR26 scholarship approved by the committee" /></label>
@@ -363,7 +374,7 @@ export function FinanceWorkspace({
                 <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Save adjustment"}</button></div>
               </form>
             ) : modal === "reverse" ? (
-              <form className="form-stack" onSubmit={reverseAdjustment}>
+              <form className="form-stack" onChange={trackForm} onSubmit={reverseAdjustment}>
                 <div className="inline-notice">
                   This adds an opposite line of <Money cents={Math.abs(selectedAdjustment?.amountCents ?? 0)} />. The original stays on record.
                 </div>
@@ -372,9 +383,9 @@ export function FinanceWorkspace({
                 <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Reverse adjustment"}</button></div>
               </form>
             ) : modal === "payment" ? (
-              <form className="form-stack" onSubmit={recordPayment}><label>Amount<input name="amount" type="number" min="0.01" step="0.01" required defaultValue={(depositFirst && selected.deposit ? selected.deposit.dueCents : Math.max(selected.balanceCents, 0)) / 100} /></label>{selected.deposit && !selected.deposit.held && <label className="checkbox-row"><input name="isDeposit" type="checkbox" defaultChecked={depositFirst} /> This is the reservation deposit (holds the reservation)</label>}<label>Method<select name="method" defaultValue="CHECK"><option value="CHECK">Check</option><option value="CASH">Cash</option><option value="MANUAL">Other manual payment</option></select></label><label>Reference or note<input name="reference" maxLength={120} placeholder="Check number or staff note" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Record payment"}</button></div></form>
+              <form className="form-stack" onChange={trackForm} onSubmit={recordPayment}><label>Amount<input name="amount" type="number" min="0.01" step="0.01" required defaultValue={(depositFirst && selected.deposit ? selected.deposit.dueCents : Math.max(selected.balanceCents, 0)) / 100} /></label>{selected.deposit && !selected.deposit.held && <label className="checkbox-row"><input name="isDeposit" type="checkbox" defaultChecked={depositFirst} /> This is the reservation deposit (holds the reservation)</label>}<label>Method<select name="method" defaultValue="CHECK"><option value="CHECK">Check</option><option value="CASH">Cash</option><option value="MANUAL">Other manual payment</option></select></label><label>Reference or note<input name="reference" maxLength={120} placeholder="Check number or staff note" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Saving…" : "Record payment"}</button></div></form>
             ) : (
-              <form className="form-stack" onSubmit={reviewRefund}><div className="inline-notice">Refundable on this payment: <Money cents={(selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0)} /></div><label>Refund amount<input name="amount" type="number" min="0.01" max={((selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0)) / 100} step="0.01" required /></label><label>Reason<textarea name="reason" minLength={3} maxLength={300} rows={4} required placeholder="Why is this refund being recorded?" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>Review refund</button></div></form>
+              <form className="form-stack" onChange={trackForm} onSubmit={reviewRefund}><div className="inline-notice">Refundable on this payment: <Money cents={(selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0)} /></div><label>Refund amount<input name="amount" type="number" min="0.01" max={((selectedPayment?.amountCents ?? 0) - (selectedPayment?.refundedCents ?? 0)) / 100} step="0.01" required /></label><label>Reason<textarea name="reason" minLength={3} maxLength={300} rows={4} required placeholder="Why is this refund being recorded?" /></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => setModal("detail")}>Back</button><button className="primary-button" type="submit" disabled={saving}>Review refund</button></div></form>
             )}
           </section>
         </div>

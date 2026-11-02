@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import type { RecipientCandidate } from "@/modules/invoices/delivery-domain";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 /**
  * Staff controls for sending an invoice, marking it posted to AR, and recording payments (#168). Each posts to an
@@ -50,8 +51,13 @@ export function PostToArForm({ eventId, versionId, posted }: { eventId: string; 
   const [date, setDate] = useState(posted?.postedOn ?? today());
   const [reference, setReference] = useState(posted?.reference ?? "");
   const [reason, setReason] = useState("");
+  // The date and reference as last saved, so saving makes the form clean again (#1468).
+  const [savedDate, setSavedDate] = useState(posted?.postedOn ?? today());
+  const [savedReference, setSavedReference] = useState(posted?.reference ?? "");
   const { busy, error, notice, run } = useLedgerAction(eventId);
   const correcting = posted !== null;
+  // A date or reference changed from the saved posting, or a correction reason typed (#1468).
+  useUnsavedChangesGuard(date !== savedDate || reference !== savedReference || reason.trim() !== "");
   return (
     <form
       className="billing-link-form"
@@ -62,7 +68,13 @@ export function PostToArForm({ eventId, versionId, posted }: { eventId: string; 
             ? { action: "correct-ar", versionId, postedOn: date, reference: reference.trim() || null, reason }
             : { action: "post-to-ar", versionId, postedOn: date, reference: reference.trim() || null },
           () => (correcting ? savedMessage() : "Marked as posted to AR."),
-        );
+        ).then((ok) => {
+          if (ok) {
+            setSavedDate(date);
+            setSavedReference(reference);
+            setReason("");
+          }
+        });
       }}
     >
       <label>
@@ -95,10 +107,14 @@ export function RecordPaymentForm({ eventId, invoiceId }: { eventId: string; inv
   const [amount, setAmount] = useState("");
   const [checkNumber, setCheckNumber] = useState("");
   const [receivedOn, setReceivedOn] = useState(today());
+  // The received-on date a fresh fill starts from: today, then whatever was kept after the last recorded payment.
+  const [baseDate, setBaseDate] = useState(receivedOn);
   const [note, setNote] = useState("");
   // One key per form fill, reused if the request is retried, so a double click records one payment.
   const [key, setKey] = useState(newKey);
   const { busy, error, notice, run } = useLedgerAction(eventId);
+  // A payment being typed: an amount, check number or note, or a received-on date changed from where the fill started (#1468).
+  useUnsavedChangesGuard(amount.trim() !== "" || checkNumber.trim() !== "" || note.trim() !== "" || receivedOn !== baseDate);
   return (
     <form
       className="billing-link-form"
@@ -110,6 +126,7 @@ export function RecordPaymentForm({ eventId, invoiceId }: { eventId: string; inv
             setAmount("");
             setCheckNumber("");
             setNote("");
+            setBaseDate(receivedOn);
             setKey(newKey());
           }
         });
@@ -146,13 +163,15 @@ export function VoidPaymentButton({ eventId, paymentId }: { eventId: string; pay
   const [reason, setReason] = useState("");
   const [key] = useState(newKey);
   const { busy, error, run } = useLedgerAction(eventId);
+  // A void reason typed in the open form; the closed button holds nothing to lose (#1468).
+  useUnsavedChangesGuard(open && reason.trim() !== "");
   if (!open) return <button className="secondary-button" onClick={() => setOpen(true)} type="button">Void</button>;
   return (
     <form
       className="billing-link-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void run({ action: "void-payment", paymentId, reason, requestKey: key });
+        void run({ action: "void-payment", paymentId, reason, requestKey: key }).then((ok) => { if (ok) setReason(""); });
       }}
     >
       <label>
@@ -170,13 +189,16 @@ export function VoidPaymentButton({ eventId, paymentId }: { eventId: string; pay
 
 export function PaymentInstructionsForm({ eventId, value, defaultText }: { eventId: string; value: string | null; defaultText: string }) {
   const [text, setText] = useState(value ?? "");
+  const [savedText, setSavedText] = useState(value ?? "");
   const { busy, error, notice, run } = useLedgerAction(eventId);
+  // The instruction text differs from the last saved one (#1468).
+  useUnsavedChangesGuard(text !== savedText);
   return (
     <form
       className="billing-link-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void run({ action: "set-payment-instructions", instructions: text.trim() === "" ? null : text }, () => savedMessage());
+        void run({ action: "set-payment-instructions", instructions: text.trim() === "" ? null : text }, () => savedMessage()).then((ok) => { if (ok) setSavedText(text); });
       }}
     >
       <label>
@@ -219,6 +241,9 @@ export function SendInvoiceForm(props: SendFormProps) {
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const confirmId = useId();
   const none = ticked.length === 0;
+  const recipientsChanged = ticked.length !== props.recipients.length || props.recipients.some((recipient) => !ticked.includes(recipient.key));
+  // The message or recipient list edited from what was offered; once the invoice is sent the form is gone (#1468).
+  useUnsavedChangesGuard(!result && (subject !== props.subject || body !== props.body || recipientsChanged));
   async function send() {
     setBusy(true);
     setError("");

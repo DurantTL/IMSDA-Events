@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   Clock,
   GitMerge,
@@ -72,6 +73,14 @@ export function DuplicateMatchReviewWorkspace({
   const mergeDialogRef = useAccessibleDialog<HTMLElement>(Boolean(merging), closeMerge);
   const [unmerging, setUnmerging] = useState<PersonMergeRecord | null>(null);
   const [unmergeReason, setUnmergeReason] = useState("");
+  // A dismiss, merge or unmerge dialog that is open with a reason typed or a different primary person picked. Closing a dialog or a
+  // completed request resets these, and a failed request keeps them; merging itself is unchanged (#1468).
+  useUnsavedChangesGuard(
+    (dismissing !== null && reason.trim() !== "")
+    // Opening Merge pre-selects the first person as primary, so only a different pick counts.
+    || (merging !== null && (primaryPersonId !== merging.personA.id || mergeReason.trim() !== ""))
+    || (unmerging !== null && unmergeReason.trim() !== ""),
+  );
   const unmergeDialogRef = useAccessibleDialog<HTMLElement>(Boolean(unmerging), closeUnmerge);
 
   function closeDismiss() {

@@ -10,7 +10,7 @@ import type { FundView, SponsorDirectoryEntry } from "@/modules/scholarship-fund
  * plain named inputs the form reads on submit (`useFund`, `fundOrganizationId`, `fundSponsorName`, `fundPledged`);
  * the server checks the balance again, so what is shown here is only a hint.
  */
-export function ScholarshipFundAwardFields({ eventId }: { eventId: string }) {
+export function ScholarshipFundAwardFields({ eventId, onEdited }: { eventId: string; /** Told whether any fund field holds work, from this component's own state (#1468). Reports false when the fields leave the page. */ onEdited?: (edited: boolean) => void }) {
   const [useFund, setUseFund] = useState(false);
   const [pledged, setPledged] = useState(false);
   // A sponsor is a directory church or a typed name, never both: choosing one switches the other off.
@@ -18,6 +18,13 @@ export function ScholarshipFundAwardFields({ eventId }: { eventId: string }) {
   const [typedSponsor, setTypedSponsor] = useState("");
   const [info, setInfo] = useState<{ fund: FundView; directory: SponsorDirectoryEntry[] } | null>(null);
   const [loadError, setLoadError] = useState("");
+
+  // The other fund fields only show while the fund option is ticked, so a hidden sponsor name is not work to lose.
+  const edited = useFund;
+  useEffect(() => {
+    onEdited?.(edited);
+    return () => onEdited?.(false);
+  }, [edited, onEdited]);
 
   useEffect(() => {
     if (!useFund || info) return;

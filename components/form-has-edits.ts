@@ -3,8 +3,10 @@
  * pick, or a ticked box. Checked against the defaults rather than "anything is filled in", so a pre-filled form is clean.
  * Feeds `useUnsavedChangesGuard` for forms that read their values on submit (#1468).
  */
-export function formHasEdits(form: HTMLFormElement): boolean {
+export function formHasEdits(form: HTMLFormElement, options: { ignore?: readonly string[] } = {}): boolean {
   return Array.from(form.elements).some((element) => {
+    // Controlled fields the caller tracks itself (React keeps their default in step with what is typed) are skipped by name.
+    if (options.ignore && "name" in element && options.ignore.includes(String(element.name))) return false;
     if (element instanceof HTMLInputElement) {
       if (element.type === "hidden" || element.type === "submit" || element.type === "button") return false;
       return element.type === "checkbox" || element.type === "radio" ? element.checked !== element.defaultChecked : element.value !== element.defaultValue;

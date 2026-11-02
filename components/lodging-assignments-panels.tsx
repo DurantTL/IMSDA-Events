@@ -15,6 +15,8 @@ import type { AssignmentWorkspaceView, RoomingReports } from "@/modules/lodging/
 import type { OfferPreviewRow } from "@/modules/lodging/waitlist-service";
 import { savedMessage } from "@/components/form-message";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 /**
  * The panels of the staff assignment workspace that are not the room board (#200): exceptions, the waitlist, the
@@ -42,6 +44,9 @@ export function ExceptionsPanel({ view, base, run, busy }: { view: AssignmentWor
   const conflicts = view.exceptions.filter((row) => row.section === "CONFLICT");
   const closeout = view.exceptions.filter((row) => row.section === "CLOSEOUT");
   const hasInactive = view.exceptions.some((row) => row.kind === "INACTIVE_REGISTRATION");
+  // The release reason changed from the one offered; releasing the rooms clears it (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
   const list = (rows: typeof view.exceptions) => rows.length === 0 ? <p>Nothing here.</p> : <ul className="lodging-assign-exceptions">{rows.map((row) => <li key={row.key}>
     <strong>{exceptionKindLabels[row.kind]}{row.kind === "ACCESSIBILITY_UNMET" ? " (restricted)" : ""}</strong>
     <p>{row.title}. {row.detail}</p>
@@ -55,10 +60,10 @@ export function ExceptionsPanel({ view, base, run, busy }: { view: AssignmentWor
     <section className="panel" aria-labelledby="la-closeout">
       <h3 id="la-closeout">Closeout exceptions ({closeout.length})</h3>
       {list(closeout)}
-      {hasInactive ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+      {hasInactive ? <form ref={edits.gone("release")} onChange={edits.track("release")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
-        void run(() => callLodging(`${base}/assignments`, "POST", { action: "release_inactive", reason }), "Released the rooms of registrations that are no longer active.");
+        void run(() => callLodging(`${base}/assignments`, "POST", { action: "release_inactive", reason }), "Released the rooms of registrations that are no longer active.").then((ok) => { if (ok) edits.clear("release"); });
       }}>
         <label>Reason for releasing their rooms <input name="reason" required maxLength={300} defaultValue="Registration no longer active" /></label>
         <button type="submit" className="secondary-button" disabled={busy}>Release rooms of inactive registrations</button>
@@ -105,6 +110,10 @@ export function WaitlistPanel({ view, base, run, busy, canConfigure }: { view: A
   const units = view.buildings.flatMap((building) => building.floors.flatMap((floor) => floor.units.map((unit) => ({ building: building.name, unit }))));
   const categories = Object.entries(lodgingCategoryLabels) as Array<[string, string]>;
   const act = (body: unknown, success: string) => run(() => callLodging(`${base}/waitlist`, "POST", body), success);
+  // Typed work in the answer, place-in-a-room and add-to-waitlist forms: any field off its starting value. Choosing entries for an
+  // offer is not typed work (nothing is sent until the offer is confirmed). A save, or a form leaving the page, clears it (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
 
   return <div className="lodging-assign-panels">
     <section className="panel" aria-labelledby="la-waitlist">
@@ -132,22 +141,28 @@ export function WaitlistPanel({ view, base, run, busy, canConfigure }: { view: A
                 ? <><br /><strong role="alert">The offer email did not reach the guest, but the offer clock is running. Offer again to send it, or contact them.</strong></> : null}</td>
             <td>
               {open ? <details><summary>Answer, remove or place</summary>
-                <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                <form ref={edits.gone(`answer:${entry.id}`)} onChange={edits.track(`answer:${entry.id}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
                   event.preventDefault();
+                  const formElement = event.currentTarget;
                   const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-                  const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
-                  void act({ action: submitter?.value ?? "remove", entryId: entry.id, reason }, "Waitlist updated.");
+                  const reason = String(new FormData(formElement).get("reason") ?? "");
+                  void act({ action: submitter?.value ?? "remove", entryId: entry.id, reason }, "Waitlist updated.").then((ok) => {
+                    if (ok) { formElement.reset(); edits.clear(`answer:${entry.id}`); }
+                  });
                 }}>
                   <label>Reason <input name="reason" required maxLength={300} /></label>
                   <button type="submit" value="accept" disabled={busy || entry.status !== "OFFERED"}>Record: accepted</button>
                   <button type="submit" value="decline" disabled={busy || entry.status !== "OFFERED"}>Record: declined</button>
                   <button type="submit" value="remove" disabled={busy}>Remove from the waitlist</button>
                 </form>
-                {entry.status === "ACCEPTED" && canConfigure ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                {entry.status === "ACCEPTED" && canConfigure ? <form ref={edits.gone(`promote:${entry.id}`)} onChange={edits.track(`promote:${entry.id}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
                   event.preventDefault();
-                  const form = new FormData(event.currentTarget);
+                  const formElement = event.currentTarget;
+                  const form = new FormData(formElement);
                   const attendeeIds = form.getAll("attendeeId").map(String);
-                  void act({ action: "promote", entryId: entry.id, eventUnitId: String(form.get("unit")), attendeeIds, confirmSpecialUse: form.get("special") === "on" }, "Placed the party in the room.");
+                  void act({ action: "promote", entryId: entry.id, eventUnitId: String(form.get("unit")), attendeeIds, confirmSpecialUse: form.get("special") === "on" }, "Placed the party in the room.").then((ok) => {
+                    if (ok) { formElement.reset(); edits.clear(`promote:${entry.id}`); }
+                  });
                 }}>
                   <fieldset><legend>Place the party in a room</legend>
                     <label>Room <select name="unit" required>{units.filter((row) => row.unit.status !== "NOT_ASSIGNABLE").map((row) => <option key={row.unit.eventUnitId} value={row.unit.eventUnitId}>{row.building} {row.unit.name}</option>)}</select></label>
@@ -193,10 +208,13 @@ export function WaitlistPanel({ view, base, run, busy, canConfigure }: { view: A
 
     <section className="panel" aria-labelledby="la-waitlist-add">
       <h3 id="la-waitlist-add">Add a registration to the waitlist</h3>
-      <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+      <form onChange={edits.track("join")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
-        void act({ action: "join", registrationId: String(form.get("registration")), category: String(form.get("category")), partySize: Number(form.get("party")) || 1, ...(Number(form.get("rooms")) ? { roomCount: Number(form.get("rooms")) } : {}), reason: String(form.get("reason") ?? "") }, "Added to the waitlist.");
+        const formElement = event.currentTarget;
+        const form = new FormData(formElement);
+        void act({ action: "join", registrationId: String(form.get("registration")), category: String(form.get("category")), partySize: Number(form.get("party")) || 1, ...(Number(form.get("rooms")) ? { roomCount: Number(form.get("rooms")) } : {}), reason: String(form.get("reason") ?? "") }, "Added to the waitlist.").then((ok) => {
+          if (ok) { formElement.reset(); edits.clear("join"); }
+        });
       }}>
         <label>Registration <select name="registration" required>{registrations.map(([id, code]) => <option key={id} value={id}>{code}</option>)}</select></label>
         <label>Lodging type <select name="category">{categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -218,6 +236,8 @@ export function PlanPanel({ view, base, run, busy, canExport }: { view: Assignme
   const [preview, setPreview] = useState<PlanPreview | null>(null);
   const [csv, setCsv] = useState("");
   const [source, setSource] = useState<"PROPOSAL" | "CSV_IMPORT">("PROPOSAL");
+  // CSV text pasted or loaded for an import, while the import view is showing; applying the plan clears it (#1468).
+  useUnsavedChangesGuard(source === "CSV_IMPORT" && csv.trim() !== "");
   const request = (mode: "preview" | "apply") => ({ mode, source, ...(source === "CSV_IMPORT" ? { csv } : {}), ...(mode === "apply" && preview ? { fingerprint: preview.fingerprint } : {}) });
   return <div className="lodging-assign-panels">
     <section className="panel" aria-labelledby="la-plan">
@@ -250,7 +270,7 @@ export function PlanPanel({ view, base, run, busy, canExport }: { view: Assignme
           <tbody>{preview.rows.slice(0, 300).map((row, index) => <tr key={`${row.occupantId}-${index}`}><th scope="row">{row.name}</th><td>{row.place}</td><td>{nightRange(row.firstNight, row.lastNight)}</td><td>{row.outcome === "PROBLEM" ? row.message : row.outcome === "MOVE" ? "Moves them" : row.outcome === "NEW" ? "New" : "Already there"}</td></tr>)}</tbody>
         </table></div>
         <button type="button" className="primary-button" disabled={busy || preview.counts.new + preview.counts.move === 0 || (source === "CSV_IMPORT" && preview.problems.length > 0)} onClick={() => {
-          void run(async () => { const result = await callLodging(`${base}/assignments/plan`, "POST", request("apply")); setPreview(null); return result; }, "Applied exactly what was previewed.");
+          void run(async () => { const result = await callLodging(`${base}/assignments/plan`, "POST", request("apply")); setPreview(null); return result; }, "Applied exactly what was previewed.").then((ok) => { if (ok) setCsv(""); });
         }}>Apply these {preview.counts.new + preview.counts.move} changes</button>
         {source === "CSV_IMPORT" && preview.problems.length > 0 ? <p className="field-hint">A file with problems is not applied. Fix it and preview again.</p> : null}
       </div> : null}
@@ -346,18 +366,21 @@ export function ReportsPanel({ eventId }: { eventId: string }) {
 export function DisplayPanel({ view, base, run, busy, canConfigure }: { view: AssignmentWorkspaceView; base: string; run: Run; busy: boolean; canConfigure: boolean }) {
   const registrations = [...new Map(view.people.filter((person) => person.kind === "ATTENDEE" && person.active && person.registrationId && person.placements.length > 0).map((person) => [person.registrationId!, person.registrationCode ?? ""])).entries()];
   const noticeOf = new Map(view.notices.map((notice) => [notice.registrationId, notice]));
+  // The attendee display settings off what is saved: a ticked box or the instructions text. Saving clears it (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
   return <div className="lodging-assign-panels">
     <section className="panel" aria-labelledby="la-display">
       <h3 id="la-display">What attendees see</h3>
       <p>Attendees see their approved building, room and instructions on their private registration page only after you show assignments. Roommates are shown by first name only, only adults on other registrations, and only when you turn that on. Contact details are never shown.</p>
-      {canConfigure ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+      {canConfigure ? <form ref={edits.gone("display")} onChange={edits.track("display")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         void run(() => callLodging(`${base}/assignments/settings`, "PATCH", {
           showAssignmentsToAttendees: form.get("show") === "on",
           showRoommateFirstNames: form.get("mates") === "on",
           attendeeInstructions: String(form.get("instructions") ?? "").trim() || null,
-        }), savedMessage());
+        }), savedMessage()).then((ok) => { if (ok) edits.clear("display"); });
       }}>
         <label><input type="checkbox" name="show" defaultChecked={view.settings.showAssignmentsToAttendees} /> Show room assignments to attendees</label>
         <label><input type="checkbox" name="mates" defaultChecked={view.settings.showRoommateFirstNames} /> Show roommates by first name</label>

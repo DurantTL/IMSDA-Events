@@ -4,6 +4,7 @@ import { useConfirm } from "@/components/use-confirm";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 /**
  * Staff controls for the Invoices screens (#167). Every action posts to one endpoint that checks
@@ -133,16 +134,24 @@ export function ReviseForm({
   contactChanged: boolean;
   amountsOutOfDate: boolean;
 }) {
-  const [mode, setMode] = useState<"CONTACT_ONLY" | "FROM_RECONCILIATION">(contactChanged && !amountsOutOfDate ? "CONTACT_ONLY" : "FROM_RECONCILIATION");
+  const startMode: "CONTACT_ONLY" | "FROM_RECONCILIATION" = contactChanged && !amountsOutOfDate ? "CONTACT_ONLY" : "FROM_RECONCILIATION";
+  const [mode, setMode] = useState(startMode);
   const [reason, setReason] = useState("");
   const reasonId = useId();
   const { busy, error, run } = useAction(eventId);
+  // The reason typed, or a different kind of revision picked than the one offered; both clear once the revision starts (#1468).
+  useUnsavedChangesGuard(reason.trim() !== "" || mode !== startMode);
   return (
     <form
       className="billing-link-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void run({ action: "revise", invoiceId, mode, reason });
+        void run({ action: "revise", invoiceId, mode, reason }).then((ok) => {
+          if (ok) {
+            setReason("");
+            setMode(startMode);
+          }
+        });
       }}
     >
       <label>
@@ -218,13 +227,16 @@ export function FinalizeControl({
 
 export function InvoiceClubTypeForm({ eventId, clubType }: { eventId: string; clubType: string | null }) {
   const [text, setText] = useState(clubType ?? "");
+  const [savedText, setSavedText] = useState(clubType ?? "");
   const { busy, error, notice, run } = useAction(eventId);
+  // The club type differs from the last saved one (#1468).
+  useUnsavedChangesGuard(text !== savedText);
   return (
     <form
       className="billing-link-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void run({ action: "set-club-type", clubType: text.trim() === "" ? null : text }, () => savedMessage());
+        void run({ action: "set-club-type", clubType: text.trim() === "" ? null : text }, () => savedMessage()).then((ok) => { if (ok) setSavedText(text); });
       }}
     >
       <label>
@@ -264,6 +276,8 @@ export function ManualLinesPanel({
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [rate, setRate] = useState("");
+  // A manual line being typed: any field off its blank starting value (quantity starts at 1). Cleared when the line is added (#1468).
+  useUnsavedChangesGuard(item.trim() !== "" || description.trim() !== "" || quantity !== "1" || rate.trim() !== "");
   return (
     <section className="panel billing-settings" aria-label="Manual lines">
       <div className="section-heading"><h3>Manual lines</h3></div>
@@ -309,14 +323,17 @@ export function ManualLinesPanel({
 
 export function InvoiceCodeForm({ eventId, explicit, effective, locked, year }: { eventId: string; explicit: string | null; effective: string; locked: boolean; year: number }) {
   const [code, setCode] = useState(explicit ?? "");
+  const [savedCode, setSavedCode] = useState(explicit ?? "");
   const { busy, error, notice, run } = useAction(eventId);
+  // The code differs from the last saved one; a locked code cannot be edited (#1468).
+  useUnsavedChangesGuard(!locked && code !== savedCode);
   const yy = String(year % 100).padStart(2, "0");
   return (
     <form
       className="billing-link-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void run({ action: "set-code", code: code.trim() === "" ? null : code }, () => savedMessage());
+        void run({ action: "set-code", code: code.trim() === "" ? null : code }, () => savedMessage()).then((ok) => { if (ok) setSavedCode(code); });
       }}
     >
       <label>

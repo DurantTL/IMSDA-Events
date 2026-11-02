@@ -2,6 +2,8 @@
 
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { useState } from "react";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { staffPageTitles } from "@/components/staff-navigation";
 import {
   lodgingCategories,
@@ -44,14 +46,16 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
   const [busy, setBusy] = useState(false);
   const base = `/api/events/${view.eventId}/lodging`;
 
-  async function run(action: () => Promise<{ lodging: LodgingView }>, success: string) {
+  async function run(action: () => Promise<{ lodging: LodgingView }>, success: string): Promise<boolean> {
     setBusy(true); setError(""); setNotice("");
     try {
       const result = await action();
       setView(result.lodging);
       setNotice(success);
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "That could not be saved.");
+      return false;
     } finally { setBusy(false); }
   }
 
@@ -124,7 +128,7 @@ function BuildingUnits({ building, nights, base, busy, run }: {
   nights: string[];
   base: string;
   busy: boolean;
-  run: (action: () => Promise<{ lodging: LodgingView }>, success: string) => Promise<void>;
+  run: (action: () => Promise<{ lodging: LodgingView }>, success: string) => Promise<boolean>;
 }) {
   // One shared sort for every building: a header click orders each building's units the same way.
   const sorted = useTableSort(building.units, UNIT_SORT);
@@ -146,19 +150,24 @@ function UnitRow({ unit, nights, base, busy, run }: {
   nights: string[];
   base: string;
   busy: boolean;
-  run: (action: () => Promise<{ lodging: LodgingView }>, success: string) => Promise<void>;
+  run: (action: () => Promise<{ lodging: LodgingView }>, success: string) => Promise<boolean>;
 }) {
   const [open, setOpen] = useState(false);
   const activeHolds = unit.holds.filter((hold) => hold.active);
+  // Typed work in this unit's capacity box, hold-release reasons and new-hold form: any field off its starting value. A save,
+  // or closing the holds list, clears the forms it covers; a failed save keeps what was typed (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
+  const holdKeys = ["newHold", ...unit.holds.map((hold) => `release:${hold.id}`)];
   return <>
     <tr>
       <th scope="row">{unit.name}{unit.retired ? " (Retired)" : ""}</th>
       <td>{describeUnit(unit)}{unit.notes ? ` (${unit.notes})` : ""}</td>
       <td>
-        <form onSubmit={(event) => {
+        <form onChange={edits.track("capacity")} onSubmit={(event) => {
           event.preventDefault();
           const raw = String(new FormData(event.currentTarget).get("capacity") ?? "").trim();
-          void run(() => call(`${base}/units/${unit.eventUnitId}`, "PATCH", { capacityOverride: raw === "" ? null : Number(raw) }), `Capacity for ${unit.name} saved.`);
+          void run(() => call(`${base}/units/${unit.eventUnitId}`, "PATCH", { capacityOverride: raw === "" ? null : Number(raw) }), `Capacity for ${unit.name} saved.`).then((ok) => { if (ok) edits.clear("capacity"); });
         }}>
           <label className="sr-only" htmlFor={`cap-${unit.eventUnitId}`}>Sleeps up to for {unit.name}</label>
           <input id={`cap-${unit.eventUnitId}`} name="capacity" type="number" min={0} max={500} defaultValue={unit.capacityOverride ?? ""} placeholder={unit.defaultCapacity === null ? "no limit" : String(unit.defaultCapacity)} />
@@ -169,28 +178,34 @@ function UnitRow({ unit, nights, base, busy, run }: {
       <td>
         <label><input type="checkbox" checked={unit.unavailable} disabled={busy} onChange={(event) => void run(() => call(`${base}/units/${unit.eventUnitId}`, "PATCH", { unavailable: event.target.checked }), `${unit.name} updated.`)} /> Unavailable</label>
       </td>
-      <td><button type="button" className="secondary-button" aria-expanded={open} onClick={() => setOpen(!open)}>{activeHolds.length} active, {unit.holds.length} total</button></td>
+      <td><button type="button" className="secondary-button" aria-expanded={open} onClick={() => { if (open) edits.clear(...holdKeys); setOpen(!open); }}>{activeHolds.length} active, {unit.holds.length} total</button></td>
     </tr>
     {open ? <tr><td colSpan={6}>
       {unit.holds.length === 0 ? <p>No holds yet.</p> : <ul>{unit.holds.map((hold) => <li key={hold.id}>
         <strong>{({ STAFF: "Staff hold", MAINTENANCE: "Maintenance", SAFETY: "Safety", DAMAGE: "Damage" } as Record<string, string>)[hold.kind] ?? hold.kind}</strong>: {hold.reason}, {hold.firstNight} to {hold.lastNight}{hold.active ? "" : ` (released: ${hold.releaseReason})`}
         {hold.staleDefault ? <span role="alert"> This default hold no longer covers every night of the event. <button type="button" disabled={busy || nights.length === 0} onClick={() => void run(() => call(`${base}/holds/${hold.id}`, "PATCH", { action: "change_window", firstNight: nights[0], lastNight: nights[nights.length - 1] }), "Hold extended to cover the event.")}>Extend to cover the event</button></span> : null}
         <ul>{hold.history.map((entry, index) => <li key={index}>{entry.type.toLowerCase().replace("_", " ")} on {entry.at.slice(0, 10)}{entry.reason ? `: ${entry.reason}` : ""}{entry.firstNight ? ` (${entry.firstNight} to ${entry.lastNight})` : ""}</li>)}</ul>
-        {hold.active ? <form onSubmit={(event) => {
+        {hold.active ? <form onChange={edits.track(`release:${hold.id}`)} onSubmit={(event) => {
           event.preventDefault();
           const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
-          void run(() => call(`${base}/holds/${hold.id}`, "PATCH", { action: "release", reason }), "Hold released.");
+          void run(() => call(`${base}/holds/${hold.id}`, "PATCH", { action: "release", reason }), "Hold released.").then((ok) => { if (ok) edits.clear(`release:${hold.id}`); });
         }}>
           <label>Reason for releasing <input name="reason" required maxLength={300} /></label>
           <button type="submit" disabled={busy}>Release hold</button>
         </form> : null}
       </li>)}</ul>}
-      <form onSubmit={(event) => {
+      <form onChange={edits.track("newHold")} onSubmit={(event) => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
+        const formElement = event.currentTarget;
+        const form = new FormData(formElement);
         void run(() => call(`${base}/units/${unit.eventUnitId}/holds`, "POST", {
           kind: form.get("kind"), reason: form.get("reason"), firstNight: form.get("firstNight"), lastNight: form.get("lastNight"),
-        }), `Hold placed on ${unit.name}.`);
+        }), `Hold placed on ${unit.name}.`).then((ok) => {
+          if (ok) {
+            formElement.reset();
+            edits.clear("newHold");
+          }
+        });
       }}>
         <label>Kind <select name="kind"><option value="STAFF">Staff hold</option><option value="MAINTENANCE">Maintenance</option><option value="SAFETY">Safety</option><option value="DAMAGE">Damage</option></select></label>
         <label>Reason <input name="reason" required maxLength={300} /></label>
@@ -207,13 +222,17 @@ function RateRow({ category, view, base, busy, run }: {
   view: LodgingView;
   base: string;
   busy: boolean;
-  run: (action: () => Promise<{ lodging: LodgingView }>, success: string) => Promise<void>;
+  run: (action: () => Promise<{ lodging: LodgingView }>, success: string) => Promise<boolean>;
 }) {
   const rate = view.rates[category];
+  // Typed work in this category's rate form: any field off its starting value. Saving or removing the rate clears it (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
   return <tr>
     <th scope="row">{lodgingCategoryLabels[category]}</th>
     <td>{rate ? formatRate(rate) : category === "TENT_WITH_POWER" && view.rates.TENT ? "Uses the tent rate" : "Included or free"}</td>
-    <td><form onSubmit={(event) => {
+    {/* Keyed on the saved rate so a save re-mounts the form with defaults that match what is shown ("12.5" becomes "12.50"). */}
+    <td><form key={rate ? `${rate.amountCents}:${rate.basis}:${rate.minimumNights ?? ""}` : "none"} onChange={edits.track("rate")} onSubmit={(event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const dollars = Number(form.get("amount"));
@@ -221,13 +240,21 @@ function RateRow({ category, view, base, busy, run }: {
       void run(() => call(`${base}/rates`, "PUT", {
         category,
         rate: { amountCents: Math.round(dollars * 100), basis: form.get("basis"), minimumNights: minimum === "" ? null : Number(minimum) },
-      }), `${lodgingCategoryLabels[category]} rate saved.`);
+      }), `${lodgingCategoryLabels[category]} rate saved.`).then((ok) => { if (ok) edits.clear("rate"); });
     }}>
       <label>Amount ($) <input name="amount" type="number" min={0} step="0.01" required defaultValue={rate ? (rate.amountCents / 100).toFixed(2) : ""} /></label>
       <label>Basis <select name="basis" defaultValue={rate?.basis ?? "PER_UNIT_NIGHT"}>{lodgingRateBases.map((basis) => <option key={basis} value={basis}>{lodgingRateBasisLabels[basis]}</option>)}</select></label>
       <label>Minimum nights <input name="minimumNights" type="number" min={1} max={30} defaultValue={rate?.minimumNights ?? ""} /></label>
       <button type="submit" disabled={busy}>Save rate</button>
-      {rate ? <button type="button" disabled={busy} onClick={() => void run(() => call(`${base}/rates`, "PUT", { category, rate: null }), `${lodgingCategoryLabels[category]} rate removed.`)}>Remove rate</button> : null}
+      {rate ? <button type="button" disabled={busy} onClick={(event) => {
+        const formElement = event.currentTarget.form;
+        void run(() => call(`${base}/rates`, "PUT", { category, rate: null }), `${lodgingCategoryLabels[category]} rate removed.`).then((ok) => {
+          if (ok) {
+            formElement?.reset();
+            edits.clear("rate");
+          }
+        });
+      }}>Remove rate</button> : null}
     </form></td>
   </tr>;
 }
