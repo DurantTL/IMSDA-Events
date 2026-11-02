@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { informationApiBase, informationBuilderHref, informationPublicPath, informationResponsesHref, type InformationBuilderConfig, type InformationFillAccess, type InformationFormStatus } from "@/components/registration-builder/information-mode";
 
 export type InformationFormListItem = {
@@ -27,6 +28,15 @@ export type InformationFormTemplateChoice = { key: string; name: string; descrip
 const statusWords: Record<InformationFormStatus, string> = { DRAFT: "Not open yet", OPEN: "Open", CLOSED: "Closed" };
 const accessWords: Record<InformationFillAccess, string> = { ANYONE_WITH_LINK: "Anyone with the link", SIGNED_IN: "Signed-in people" };
 
+// Sorts from its headers (#1458); the keys here are the whitelist.
+const FORM_SORT: Record<"form" | "status" | "access" | "answers" | "link", ColumnSpec<InformationFormListItem>> = {
+  form: { get: (form) => form.name, label: "form" },
+  status: { get: (form) => statusWords[form.status], label: "status" },
+  access: { get: (form) => accessWords[form.fillAccess], label: "who can fill it" },
+  answers: { get: (form) => form.responseCount, label: "answers", kind: "number" },
+  link: { get: (form) => form.slug, label: "public link" },
+};
+
 export function InformationFormsHome({ config, forms, templates }: { config: InformationBuilderConfig; forms: InformationFormListItem[]; templates: InformationFormTemplateChoice[] }) {
   const router = useRouter();
   const [creating, setCreating] = useState(forms.length === 0);
@@ -35,6 +45,7 @@ export function InformationFormsHome({ config, forms, templates }: { config: Inf
   const [templateKey, setTemplateKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const sorted = useTableSort(forms, FORM_SORT);
 
   async function create() {
     if (name.trim().length < 3) { setError("Give the form a name of at least 3 characters."); return; }
@@ -89,13 +100,14 @@ export function InformationFormsHome({ config, forms, templates }: { config: Inf
       {forms.length > 0 && (
         <section className="panel">
           <div className="report-table-wrap">
+            {sorted.note}
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Information forms</caption>
               <thead role="rowgroup">
-                <tr role="row"><th role="columnheader" scope="col">Form</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Who can fill it</th><th role="columnheader" scope="col">Answers</th><th role="columnheader" scope="col">Public link</th><th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr>
+                <tr role="row">{sorted.header("form", "Form")}{sorted.header("status", "Status")}{sorted.header("access", "Who can fill it")}{sorted.header("answers", "Answers")}{sorted.header("link", "Public link")}<th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr>
               </thead>
               <tbody role="rowgroup">
-                {forms.map((form) => (
+                {sorted.rows.map((form) => (
                   <tr role="row" key={form.id}>
                     <th role="rowheader" scope="row">{form.name}</th>
                     <td {...cardCell("Status")}>{statusWords[form.status]}{form.status === "DRAFT" && form.published ? " (published)" : ""}</td>

@@ -6,6 +6,7 @@ import { Mail, Pause, Play, Save } from "lucide-react";
 import { savedMessage } from "@/components/form-message";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { cardCell } from "@/components/table-card-labels";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import type { EventEmailState } from "@/modules/communications/event-email-pause";
 
 export type CentralSenderView = { name: string; email: string; replyTo: string };
@@ -27,6 +28,12 @@ async function readMessage(response: Response) {
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
 }
+
+// Sorts from its headers (#1458); the keys here are the whitelist.
+const PAUSED_SORT: Record<"event" | "since", ColumnSpec<EventEmailState>> = {
+  event: { get: (event) => event.eventName, label: "event" },
+  since: { get: (event) => event.pausedAt, label: "paused since", kind: "date" },
+};
 
 /**
  * System management > Email > Delivery & sender (#1043). Real email is on for every event by default; this is where a
@@ -68,6 +75,7 @@ export function EmailDeliverySection({
   const dirty = JSON.stringify(draft) !== JSON.stringify(sender);
   const paused = events.filter((event) => event.paused);
   const pausable = events.filter((event) => !event.paused && !event.archived);
+  const pausedSort = useTableSort(paused, PAUSED_SORT);
 
   async function saveSender(submitEvent: React.FormEvent<HTMLFormElement>) {
     submitEvent.preventDefault();
@@ -196,17 +204,18 @@ export function EmailDeliverySection({
           <p className="quiet-copy">No events are paused.</p>
         ) : (
           <div className="report-table-wrap">
+            {pausedSort.note}
             <table className="report-table table-cards" role="table">
               <caption className="sr-only">Events with email paused</caption>
               <thead role="rowgroup">
                 <tr role="row">
-                  <th role="columnheader" scope="col">Event</th>
-                  <th role="columnheader" scope="col">Paused since</th>
+                  {pausedSort.header("event", "Event")}
+                  {pausedSort.header("since", "Paused since")}
                   <th role="columnheader" scope="col"><span className="sr-only">Action</span></th>
                 </tr>
               </thead>
               <tbody role="rowgroup">
-                {paused.map((event) => (
+                {pausedSort.rows.map((event) => (
                   <tr data-event-id={event.eventId} key={event.eventId} role="row">
                     <th role="rowheader" scope="row">
                       {event.eventName}
