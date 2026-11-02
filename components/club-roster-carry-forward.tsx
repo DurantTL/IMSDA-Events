@@ -1,6 +1,7 @@
 "use client";
 
 import { ExactValue } from "@/components/exact-value";
+import { formatPersonName } from "@/lib/person-name";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/post-json";
@@ -31,7 +32,7 @@ export type CarryForwardRow = {
 
 /** Sorts by what each person had last year, not by the choices being edited, so a row does not jump while the director types (#1458). */
 const CARRY_FORWARD_SORT = {
-  name: { label: "Name", value: (row) => `${row.lastName}, ${row.firstName}` },
+  name: { label: "Name", value: (row) => formatPersonName(row, "sorted") },
   age: { label: "Age", kind: "number", value: (row) => row.age },
   type: { label: "Type", value: (row) => clubRosterAttendeeTypeLabels[row.attendeeType] },
   role: { label: "Role", value: (row) => row.role },

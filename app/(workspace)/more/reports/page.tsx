@@ -1,5 +1,6 @@
 import { ExportLink } from "@/components/export-link";
 import { ExactValue } from "@/components/exact-value";
+import { formatPersonName } from "@/lib/person-name";
 import type { Metadata } from "next";
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { StaffPageHeader } from "@/components/staff-page-header";
@@ -310,7 +311,7 @@ export default async function OperationalReportsPage({
                       <thead role="rowgroup"><tr role="row"><ColumnHeader column="attendee" label="Attendee" sorting={rosterSorting} /><ColumnHeader column="type" label="Type" sorting={rosterSorting} /><ColumnHeader column="registration" label="Registration" sorting={rosterSorting} /><ColumnHeader column="holder" label="Account holder" sorting={rosterSorting} /></tr></thead>
                       <tbody role="rowgroup">
                         {sortRows(group.attendees, rosterSorting.order.key, rosterSorting.order.dir, {
-                          attendee: (attendee) => `${attendee.lastName}, ${attendee.firstName}`,
+                          attendee: (attendee) => formatPersonName(attendee, "sorted"),
                           type: (attendee) => attendee.attendeeType,
                           registration: (attendee) => attendee.confirmationCode,
                           holder: (attendee) => attendee.accountHolderName,
@@ -354,7 +355,7 @@ export default async function OperationalReportsPage({
                       <thead role="rowgroup"><tr role="row"><ColumnHeader column="attendee" label="Attendee" sorting={typeSorting} /><ColumnHeader column="group" label="Group" sorting={typeSorting} /><ColumnHeader column="registration" label="Registration" sorting={typeSorting} /><ColumnHeader column="holder" label="Account holder" sorting={typeSorting} /></tr></thead>
                       <tbody role="rowgroup">
                         {sortRows(group.attendees, typeSorting.order.key, typeSorting.order.dir, {
-                          attendee: (attendee) => `${attendee.lastName}, ${attendee.firstName}`,
+                          attendee: (attendee) => formatPersonName(attendee, "sorted"),
                           group: (attendee) => attendee.groupLabel,
                           registration: (attendee) => attendee.confirmationCode,
                           holder: (attendee) => attendee.accountHolderName,
@@ -459,7 +460,7 @@ export default async function OperationalReportsPage({
                   <thead role="rowgroup"><tr role="row"><ColumnHeader column="volunteer" label="Volunteer" sorting={volunteerSorting} /><ColumnHeader column="answer" label="Answer" sorting={volunteerSorting} /><ColumnHeader column="phone" label="Phone" sorting={volunteerSorting} /><ColumnHeader column="group" label="Group" sorting={volunteerSorting} /><ColumnHeader column="registration" label="Registration" sorting={volunteerSorting} /></tr></thead>
                   <tbody role="rowgroup">
                     {sortRows(report.volunteerRoster, volunteerSorting.order.key, volunteerSorting.order.dir, {
-                      volunteer: (volunteer) => `${volunteer.lastName}, ${volunteer.firstName}`,
+                      volunteer: (volunteer) => formatPersonName(volunteer, "sorted"),
                       answer: (volunteer) => volunteer.answer,
                       phone: (volunteer) => volunteer.phone,
                       group: (volunteer) => volunteer.groupLabel,

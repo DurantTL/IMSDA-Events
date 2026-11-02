@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { Phone } from "lucide-react";
 import { ClubReportReview } from "@/components/club-report-review";
+import { formatPersonName } from "@/lib/person-name";
 import { ExactValue } from "@/components/exact-value";
 import { NavigationLink } from "@/components/navigation-link";
 import { cardCell } from "@/components/table-card-labels";
@@ -206,7 +207,7 @@ export function FormsMissingTable({ clubs, clubYear }: { clubs: readonly ClubReq
 // ---- A director's Sterling Volunteers follow-up -----------------------------------------------------------------
 
 const STERLING_SORT = {
-  person: { label: "Person", value: (person) => `${person.lastName}, ${person.firstName}` },
+  person: { label: "Person", value: (person) => formatPersonName(person, "sorted") },
   status: { label: "Status", value: (person) => backgroundFlagLabels[person.state] },
 } satisfies Record<string, SortSpec<DirectorSterlingPerson>>;
 
@@ -245,7 +246,7 @@ export type GuardianTableRow = { memberId: string; firstName: string; lastName: 
 
 const contactName = (row: GuardianTableRow, position: number) => row.guardians.find((guardian) => guardian.position === position)?.name;
 const GUARDIAN_SORT = {
-  member: { label: "Member", value: (row) => `${row.lastName}, ${row.firstName}` },
+  member: { label: "Member", value: (row) => formatPersonName(row, "sorted") },
   contact1: { label: "Contact 1", noteLabel: "first contact", value: (row) => contactName(row, 1) },
   contact2: { label: "Contact 2", noteLabel: "second contact", value: (row) => contactName(row, 2) },
 } satisfies Record<string, SortSpec<GuardianTableRow>>;

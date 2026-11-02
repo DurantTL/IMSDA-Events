@@ -1,5 +1,6 @@
 import { ExportLink } from "@/components/export-link";
 import { ExactValue } from "@/components/exact-value";
+import { formatPersonName } from "@/lib/person-name";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Award, Download, ShieldCheck, UsersRound } from "lucide-react";
@@ -83,7 +84,7 @@ export default async function HonorRostersPage({
   const totalsSorting = serverSort(honorsPath, query, HONOR_TOTALS_SORT_COLUMNS, UNSORTED, { prefix: "totals" });
   const siteSorting = serverSort(honorsPath, query, HONOR_SITE_SORT_COLUMNS, UNSORTED);
   const scheduleSorting = serverSort(honorsPath, query, HONOR_SCHEDULE_SORT_COLUMNS, UNSORTED);
-  const nameOf = (person: { lastName: string; firstName: string }) => `${person.lastName}, ${person.firstName}`;
+  const nameOf = (person: { lastName: string; firstName: string }) => formatPersonName(person, "sorted");
   const sortedTotals = sortRows(siteRoster.clubs, totalsSorting.order.key, totalsSorting.order.dir, {
     club: (club) => club.clubName,
     youth: (club) => club.YOUTH,
