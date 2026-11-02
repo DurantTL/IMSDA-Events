@@ -89,7 +89,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
           <div>
             <p className="eyebrow">Your account</p>
             <h2>Edit profile</h2>
-            <p>Your details, two-step verification, passkeys and signed-in devices.</p>
+            <p>Your details, two-step sign-in, passkeys and signed-in devices.</p>
           </div>
         </div>
         {staffSections}
@@ -105,7 +105,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
             {!secondStepPending && (
               <AccountAnnouncementBanner accountId={attendeeAccount.id} announcements={data.bannerAnnouncements} />
             )}
-            {data.showTwoStepOn && <p className="auth-success" role="status">Two-step verification is on.</p>}
+            {data.showTwoStepOn && <p className="auth-success" role="status">Two-step sign-in is on.</p>}
             {!secondStepPending && (
               <p className="field-help">
                 Signed in as <strong className="profile-account-email" translate="no">{attendeeAccount.verifiedEmail}</strong>. Saved details fill in new registration forms for you.
@@ -128,7 +128,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
         <div>
           <p className="public-registration-eyebrow">Your account</p>
           <h1>Edit profile</h1>
-          <p>Your details, two-step verification, passkeys and signed-in devices.</p>
+          <p>Your details, two-step sign-in, passkeys and signed-in devices.</p>
         </div>
       </section>
 
@@ -145,7 +145,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
                   <AttendeeSignOutButton className="secondary-button" label="Sign out of registration account" />
                 </div>
               </div>
-              {data.showTwoStepOn && <p className="auth-success" role="status">Two-step verification is on.</p>}
+              {data.showTwoStepOn && <p className="auth-success" role="status">Two-step sign-in is on.</p>}
               {!secondStepPending && (
                 <p className="field-help">
                   Signed in as <strong className="profile-account-email" translate="no">{attendeeAccount.verifiedEmail}</strong>. Saved details fill in new registration forms for you.

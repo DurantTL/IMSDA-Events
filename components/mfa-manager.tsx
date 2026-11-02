@@ -27,7 +27,7 @@ export function MfaManager({
   attendee = false,
   otherMethodAvailable = false,
   onEnrolled,
-  heading = "Two-factor authentication",
+  heading = "Two-step sign-in",
   eyebrow = "Account security",
   hideIntro = false,
 }: {
@@ -131,12 +131,12 @@ export function MfaManager({
         // Only before setup starts: once the key is on screen its own help text takes over (#568).
         <p className="quiet-copy">
           {status.required
-            ? "This account administers events, so a second factor is required. You will be asked to set one up the next time you sign in."
+            ? "This account administers events, so two-step sign-in is required. You will be asked to set it up the next time you sign in."
             : attendee
               ? otherMethodAvailable
                 ? "A passkey is already set up for this account, so an authenticator is optional. Add one too if you'd like a backup."
                 : "Add an authenticator app, or set up a passkey instead — either one satisfies the requirement before this account may reach medical information or club rosters."
-              : "Add a second factor so a leaked password is not enough to sign in as you. Accounts that administer events are required to have one."}
+              : "Turn on two-step sign-in so a leaked password is not enough to sign in as you. Accounts that administer events are required to use it."}
         </p>
       )}
 
