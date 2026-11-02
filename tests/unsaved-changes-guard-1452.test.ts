@@ -117,6 +117,7 @@ const allowlist: Record<string, string> = {
   "components/system-readiness-workspace.tsx": "action button only, no typed fields",
   "components/tag-configuration-workspace.tsx": "needs guard: follow-up #1468",
   "components/team-results-workspace.tsx": "needs guard: follow-up #1468",
+  "components/two-step-recovery-form.tsx": "sign-in",
 };
 
 const followUp = "needs guard: follow-up #1468";

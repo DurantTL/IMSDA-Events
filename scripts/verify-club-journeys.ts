@@ -211,6 +211,108 @@ async function signInJourney(ctx: Ctx, page: J.Page, director: Director, options
   await visited(ctx, page, "Club home", { rules: checks });
 }
 
+/* ---------------------------------------------------------------- 11. lost-device recovery (#221) */
+
+/**
+ * A director whose authenticator is on (journey 1) signs in again on a new browser, lands on "Confirm it's you", follows
+ * "Recover two-step sign-in", enters the emailed code and is back at setup: club pages stay closed until a new method is
+ * set up, their own pages are open, and their other signed-in browser is signed out. Then, on the profile, "Sign out
+ * everywhere else" asks first, signs the other browser out and keeps this one. Runs after the journeys that use the main
+ * browser: recovery signs that browser out.
+ */
+async function recoveryJourney(ctx: Ctx) {
+  const { world, rec } = ctx;
+  const director = world.main;
+  const club = S.clubPath(director.clubId);
+  const other = await newDirectorContext(ctx, { cookie: await J.mintDirectorSession(ctx.tokens, director.accountId) });
+  const fresh = await newDirectorContext(ctx);
+  const page = fresh.page;
+  try {
+    await S.openPage(other.page, "/account/registrations");
+    assert(new URL(other.page.url()).pathname === "/account/registrations", "the other browser could not open the director's registrations before recovery");
+
+    // Lost device: password sign-in leaves the account at "Confirm it's you" (an authenticator is on).
+    await S.submitPassword(page, { email: director.email, password: director.password, next: club });
+    await page.waitForURL((url: URL) => !/\/account\/sign-in/.test(url.pathname), { timeout: 20_000 });
+    await S.openPage(page, `/account/two-step?next=${encodeURIComponent(club)}`);
+    await S.expectHeading(page, /Confirm it.s you/);
+    await visited(ctx, page, "Confirm it's you (authenticator on)");
+    await page.getByRole("link", { name: /Recover two-step sign-in/ }).click();
+    await page.waitForURL(/\/account\/two-step\/recover/, { timeout: 20_000 });
+    await S.expectHeading(page, /Recover two-step sign-in/);
+    await visited(ctx, page, "Recover two-step sign-in");
+
+    // The page says what will happen before anything is sent (A3, A5).
+    const text = clean(await J.bodyText(page));
+    const explained = /We.ll email a code to/.test(text) && /remove\s+your passkeys and authenticator app/.test(text) && /sign out your other devices/.test(text) && /young people/.test(text);
+    const other5 = /\b(two[- ]factor|2[- ]?factor|2fa|mfa|multi[- ]?factor|2[- ]step)\b/i.exec(text);
+    rec.record("Recover two-step sign-in", "A3", "explains why, and what will happen, before sending", explained ? "pass" : "fail", explained ? "names the email, what is removed, the other devices and why" : "the explanation is missing");
+    rec.record("Recover two-step sign-in", "A5", "one name: two-step sign-in", /two-step sign-in/i.test(text) && !other5 ? "pass" : "fail", other5 ? `also says "${other5[0]}"` : "only \"two-step sign-in\"");
+    const backLink = await page.getByRole("link", { name: /Back to events/ }).first().isVisible();
+    rec.record("Recover two-step sign-in", "A6", "a visible Back to events link", backLink ? "pass" : "fail", backLink ? "the link is showing" : "no Back to events link");
+    const before = (await ctx.prisma.attendeeMfaEnrollment.count({ where: { accountId: director.accountId } }));
+    assert(before === 1, "the director has no authenticator to recover; journey 1 did not set it up");
+
+    const since = Date.now() - 1_000;
+    await page.getByRole("button", { name: S.exactly("Email me a code") }).click();
+    await page.getByText(/a code is on its way to/).first().waitFor({ state: "visible", timeout: 20_000 });
+    // Nothing is removed until the code is entered.
+    assert((await ctx.prisma.attendeeMfaEnrollment.count({ where: { accountId: director.accountId } })) === 1, "the authenticator was removed before the code was entered");
+    const code = await ctx.mail.waitForCodeWithSubject(director.email, /recovery code/i, { since });
+    await page.getByLabel("Recovery code").fill(code);
+    await page.getByRole("button", { name: /Remove my old two-step sign-in/ }).click();
+    await page.waitForURL(/\/account\/two-step(\?|$)/, { timeout: 20_000 });
+    await page.getByRole("button", { name: /Set up two-step sign-in/ }).waitFor({ state: "visible", timeout: 20_000 });
+    await visited(ctx, page, "Two-step gate after recovery");
+    assert((await ctx.prisma.attendeeMfaEnrollment.count({ where: { accountId: director.accountId } })) === 0, "the authenticator is still on after recovery");
+    await ctx.mail.waitForMessage(director.email, /Two-step sign-in was reset/, { since });
+
+    // A1: a club page stays closed; their own registrations open on the emailed proof.
+    await S.openPage(page, club);
+    const gated = /\/account\/two-step/.test(new URL(page.url()).pathname);
+    rec.record("Two-step gate after recovery", "A1", "a club page needs a new method after recovery", gated ? "pass" : "fail", gated ? "the club page went to two-step setup" : `the club page opened without a new method (${page.url()})`);
+    await S.openPage(page, "/account/registrations");
+    assert(new URL(page.url()).pathname === "/account/registrations", "own registrations did not open after recovery");
+
+    // The other browser was signed out; this one was kept.
+    await S.openPage(other.page, "/account/registrations");
+    assert(/\/account\/sign-in/.test(new URL(other.page.url()).pathname), `the other browser was not signed out by recovery (${other.page.url()})`);
+
+    // Set up a new method, then the club opens.
+    await S.openPage(page, club);
+    await page.getByRole("button", { name: /Set up two-step sign-in/ }).waitFor({ state: "visible", timeout: 20_000 });
+    await S.startTwoStepSetup(page);
+    await S.finishAuthenticatorSetup(page);
+    await S.openClubFromTwoStepDone(page, director.clubName);
+
+    // Sign out everywhere else, from the profile.
+    const third = await newDirectorContext(ctx, { cookie: await J.mintDirectorSession(ctx.tokens, director.accountId) });
+    try {
+      await S.openPage(third.page, "/account/registrations");
+      assert(new URL(third.page.url()).pathname === "/account/registrations", "the third browser could not open the director's registrations");
+      await S.openPage(page, "/account/profile");
+      await S.expectHeading(page, /Signed-in devices/);
+      await visited(ctx, page, "Profile: signed-in devices");
+      assert(await page.getByText("This device").count(), "the signed-in devices list does not mark This device");
+      assert(/Last active .*(CST|CDT)/.test(clean(await J.bodyText(page))), "the signed-in devices list does not show a labeled Central time");
+      const button = page.getByRole("button", { name: S.exactly("Sign out everywhere else") });
+      await checkConfirmDialog(page, rec, "Profile: signed-in devices", "sign out everywhere else", () => button.click(), button);
+      await button.click();
+      await page.locator(".confirm-dialog").getByRole("button", { name: S.exactly("Sign out everywhere else") }).click();
+      await page.getByRole("status").filter({ hasText: /Signed out \d+ other device/ }).waitFor({ state: "visible", timeout: 20_000 });
+      await S.openPage(third.page, "/account/registrations");
+      assert(/\/account\/sign-in/.test(new URL(third.page.url()).pathname), `the other browser was not signed out (${third.page.url()})`);
+      await S.openPage(page, "/account/registrations");
+      assert(new URL(page.url()).pathname === "/account/registrations", "this browser was signed out too");
+    } finally {
+      await third.context.close();
+    }
+  } finally {
+    await fresh.context.close();
+    await other.context.close();
+  }
+}
+
 /* ---------------------------------------------------------------- 2. team */
 
 async function teamJourney(ctx: Ctx, page: J.Page) {
@@ -659,6 +761,8 @@ async function runShard(ctx: Ctx) {
     if (wanted("8")) await journey(ctx, "8. Year-end report: fill and save", () => yearEndJourney(ctx, main.page));
     if (wanted("9")) await journey(ctx, "9. Getting started checklist and Help", () => helpJourney(ctx, main.page));
     if (wanted("10")) await journey(ctx, "10. Forms help popup", () => formsHelpJourney(ctx, main.page));
+    // Last of the main director's journeys: recovery signs the other browsers of the account out.
+    if (wanted("11")) await journey(ctx, "11. Lost-device recovery, then sign out everywhere else", () => recoveryJourney(ctx));
   } finally {
     await main.context.close();
   }

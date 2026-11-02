@@ -560,6 +560,9 @@ enum AttendeeStepUpPurpose {
   REGISTRATION_EDIT
   /// The emailed one-time code a club-role account without two-step sign-in enters after its password (#1410).
   SIGN_IN
+  /// The emailed one-time code that proves the account email before a lost authenticator or passkey is removed (#221).
+  /// Never interchangeable with SIGN_IN: each purpose only ever matches its own rows.
+  TWO_STEP_RECOVERY
 }
 
 enum AttendeeEditPolicy {
@@ -599,6 +602,10 @@ enum MessageTemplateKey {
   ATTENDEE_EDIT_VERIFICATION
   /// The emailed sign-in code for a club-role account that has not set up two-step sign-in (#1410).
   ATTENDEE_SIGN_IN_CODE
+  /// The emailed code that lets a signed-in attendee remove a lost authenticator or passkey (#221).
+  ATTENDEE_TWO_STEP_RECOVERY_CODE
+  /// Tells an attendee their two-step sign-in was reset through recovery (#221). Carries no code and no link.
+  ATTENDEE_TWO_STEP_RECOVERY_NOTICE
   /// The emailed code that stands in for the Security check when a privacy browser blocks it (#1480). No account needed.
   SECURITY_CHECK_CODE
   REGISTRATION_CONFIRMATION_ORGANIZATION_BILLED

@@ -336,8 +336,11 @@ export async function verifyAttendeeSecondFactor(
 }
 
 /**
- * Nobody can turn off their own second step (decision 2026-09-23). A lost
- * device is reset by a system administrator instead.
+ * Nobody can turn off their own second step (decision 2026-09-23). The 2026-09-23 note that only an
+ * administrator can reset a lost device is superseded (Caleb, Nov 2, #221): a signed-in person recovers a
+ * lost device themselves at /account/two-step/recover, with an emailed code. Recovery REPLACES the method (a
+ * club role sets a new one up before club pages); it never leaves the account without two-step sign-in, so
+ * turning it off stays disallowed.
  */
 export async function disableAttendeeMfa(accountId: string, code: string, now = new Date()): Promise<never> {
   void accountId;
@@ -345,6 +348,6 @@ export async function disableAttendeeMfa(accountId: string, code: string, now = 
   void now;
   throw new AttendeeMfaError(
     "MFA_REMOVAL_NOT_ALLOWED",
-    "Two-step sign-in can't be turned off. If you lose your device, ask the conference office to reset it.",
+    "Two-step sign-in can't be turned off. If you lost your device, use the \"Recover two-step sign-in\" link on this page to set it up again.",
   );
 }

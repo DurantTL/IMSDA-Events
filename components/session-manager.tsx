@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LogOut, MonitorSmartphone } from "lucide-react";
 import { visibleSessionLimit, visibleSessions } from "@/components/session-list";
+import { useConfirm, type ConfirmRequest } from "@/components/use-confirm";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type SignedInSession = {
@@ -10,21 +11,40 @@ type SignedInSession = {
   isCurrent: boolean;
   startedAt: string;
   lastSeenAt: string;
-  expiresAt: string;
+  expiresAt?: string;
 };
 
 function when(value: string) {
   return formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
+/**
+ * The signed-in devices panel. Staff use it as is; the registration account's list (#221) reuses it with its own
+ * endpoint, heading, wording and a confirmation, so both profile sections look and behave the same.
+ */
 export function SessionManager({
   initialSessions,
   idleTimeoutSeconds,
+  endpoint = "/api/auth/sessions",
+  method = "DELETE",
+  eyebrow = "Your account",
+  description,
+  signOutLabel,
+  confirmRequest,
 }: {
   initialSessions: SignedInSession[];
-  idleTimeoutSeconds: number;
+  idleTimeoutSeconds?: number;
+  endpoint?: string;
+  method?: "DELETE" | "POST";
+  eyebrow?: string;
+  description?: string;
+  /** A fixed button label; the staff default counts the other devices. */
+  signOutLabel?: string;
+  /** Asks in the shared dialog before signing the others out. */
+  confirmRequest?: ConfirmRequest;
 }) {
-  const [sessions, setSessions] = useState(initialSessions);
+  const { confirm, confirmDialog } = useConfirm();
+  const [sessions, setSessions] = useState(() => [...initialSessions].sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent)));
   const [showAll, setShowAll] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -33,14 +53,15 @@ export function SessionManager({
   const others = sessions.filter((session) => !session.isCurrent);
 
   async function revokeOthers() {
+    if (confirmRequest && !(await confirm(confirmRequest))) return;
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      const response = await fetch("/api/auth/sessions", { method: "DELETE" });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "Unable to sign out the other devices.");
-      setSessions(result.sessions);
+      const response = await fetch(endpoint, { method });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(result.sessions)) throw new Error(result.message ?? "Unable to sign out the other devices.");
+      setSessions([...(result.sessions as SignedInSession[])].sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent)));
       setMessage(
         result.revoked === 0
           ? "There were no other signed-in devices."
@@ -57,7 +78,7 @@ export function SessionManager({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Your account</p>
+          <p className="eyebrow">{eyebrow}</p>
           <h2>Signed-in devices</h2>
         </div>
         <span className="count-badge">
@@ -65,9 +86,7 @@ export function SessionManager({
         </span>
       </div>
       <p className="quiet-copy">
-        A session ends after {Math.round(idleTimeoutSeconds / 60)} minutes of inactivity, and
-        after 8 hours in any case. Sign out the others if you have left one open on a shared
-        check-in tablet.
+        {description ?? `A session ends after ${Math.round((idleTimeoutSeconds ?? 0) / 60)} minutes of inactivity, and after 8 hours in any case. Sign out the others if you have left one open on a shared check-in tablet.`}
       </p>
       <div className="activity-list">
         {visibleSessions(sessions, showAll).map((session) => (
@@ -104,8 +123,9 @@ export function SessionManager({
         disabled={busy || others.length === 0}
       >
         <LogOut aria-hidden="true" size={16} />
-        {busy ? "Signing out…" : ` Sign out ${others.length} other device${others.length === 1 ? "" : "s"}`}
+        {busy ? "Signing out…" : signOutLabel ?? ` Sign out ${others.length} other device${others.length === 1 ? "" : "s"}`}
       </button>
+      {confirmDialog}
     </section>
   );
 }

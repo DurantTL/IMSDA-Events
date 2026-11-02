@@ -134,6 +134,7 @@ describe("L5: buttons use the shared button classes", () => {
     "components/public-club-directory.tsx:styles.resetButton": "small reset link-button in the empty club list",
     "components/two-step-setup.tsx:styles.skip": "text-only 'Not now' / 'Choose a different way' step link",
     "components/sign-in-code-form.tsx:styles.linkButton": "text-only 'Resend' / 'Use a password' link inside a sentence",
+    "components/two-step-recovery-form.tsx:styles.linkButton": "text-only 'Send a new code' link under the code field, the same pattern as the sign-in code page",
     "components/merchandise-admin-workspace.tsx:styles.productSelect": "pick-one product row (an image and a name)",
     "components/form-message.tsx:styles.undo": "Undo link-button inside the shared Saved message (#1455)",
     "components/club-uniform-section.tsx:styles.chipRemove": "tiny remove (x) inside a chip",

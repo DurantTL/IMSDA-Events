@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { MessageTemplateKey, Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { attendeePublicUrl } from "@/modules/attendee-accounts/public-navigation";
 import {
   getAccountEmailSender,
@@ -26,6 +27,11 @@ import {
   reuseAttendeeSignInCode,
   revokeAttendeeSignInCode,
 } from "@/modules/attendee-accounts/sign-in-code-service";
+import {
+  attachAttendeeTwoStepRecoveryCode,
+  reuseAttendeeTwoStepRecoveryCode,
+  revokeAttendeeTwoStepRecoveryCode,
+} from "@/modules/attendee-accounts/two-step-recovery";
 import {
   attachAttendeeStepUpCode,
   reuseAttendeeStepUpCode,
@@ -51,6 +57,9 @@ export const PASSWORD_RESET_CODE_SENTINEL = "{{attendee_password_reset_code}}";
 export const EDIT_VERIFICATION_CODE_SENTINEL = "{{attendee_edit_verification_code}}";
 /** The sign-in code in the body, shown as "518 207" (#1410). Never in the subject. */
 export const SIGN_IN_CODE_DISPLAY_SENTINEL = "{{attendee_sign_in_code_display}}";
+
+/** The lost-device recovery code in the body, shown the same way (#221). Never in the subject. */
+export const TWO_STEP_RECOVERY_CODE_DISPLAY_SENTINEL = "{{attendee_two_step_recovery_code_display}}";
 
 /** "518207" as "518 207", the way the email shows it and the sign-in field accepts it. */
 export function spacedSignInCode(code: string) {
@@ -207,11 +216,53 @@ function signInCodeBody() {
   };
 }
 
+function twoStepRecoveryCodeBody() {
+  return {
+    // No code in the subject: the provider's webhook stores the subject it was sent. The code is in the body only, minted at delivery.
+    subject: "Your IMSDA Events two-step recovery code",
+    bodyText: [
+      "Enter this code to recover your two-step sign-in:",
+      "",
+      TWO_STEP_RECOVERY_CODE_DISPLAY_SENTINEL,
+      "",
+      `It works for ${SIGN_IN_CODE_LIFETIME_MINUTES} minutes, once. Entering it removes your passkeys and authenticator app and signs your other devices out. Don't share this code with anyone. IMSDA staff will never ask for it.`,
+      "",
+      // Two lines on purpose: the layout shows a short title over more text as a note box.
+      "Didn't ask for this?",
+      "Change your password. Someone may know it. You can ignore this code; it stops working on its own.",
+      "",
+      "IMSDA Events",
+    ].join("\n"),
+  };
+}
+
+/** Sent after a recovery completed. It carries no code and no link that grants access. */
+function twoStepRecoveredBody(displayName: string, occurredAt: Date) {
+  return {
+    subject: "Two-step sign-in was reset on your IMSDA Events account",
+    bodyText: [
+      `Hello ${greeting(displayName)},`,
+      "",
+      `Two-step sign-in was reset on your IMSDA Events account on ${formatInConferenceTime(occurredAt, { dateStyle: "long", timeStyle: "short" })}.`,
+      "",
+      "Your passkeys and authenticator app were removed and your other devices were signed out. You'll set up two-step sign-in again the next time you open club pages.",
+      "",
+      // Two lines on purpose: the layout shows a short title over more text as a note box.
+      "Wasn't you?",
+      "Reset your password right away and contact the conference office.",
+      "",
+      "IMSDA Events",
+    ].join("\n"),
+  };
+}
+
 type AttendeeEmailKind =
   | { kind: "verification"; alreadyRegistered: boolean; adminSent?: boolean }
   | { kind: "password-reset"; federatedOnly: boolean }
   | { kind: "edit-verification" }
-  | { kind: "sign-in-code" };
+  | { kind: "sign-in-code" }
+  | { kind: "two-step-recovery-code" }
+  | { kind: "two-step-recovered"; occurredAt: Date };
 
 function contentFor(selection: AttendeeEmailKind, displayName: string) {
   if (selection.kind === "verification") {
@@ -237,6 +288,20 @@ function contentFor(selection: AttendeeEmailKind, displayName: string) {
       templateKey: "ATTENDEE_SIGN_IN_CODE" as MessageTemplateKey,
       trigger: "ATTENDEE_SIGN_IN_CODE_REQUESTED",
       ...signInCodeBody(),
+    };
+  }
+  if (selection.kind === "two-step-recovery-code") {
+    return {
+      templateKey: "ATTENDEE_TWO_STEP_RECOVERY_CODE" as MessageTemplateKey,
+      trigger: "ATTENDEE_TWO_STEP_RECOVERY_REQUESTED",
+      ...twoStepRecoveryCodeBody(),
+    };
+  }
+  if (selection.kind === "two-step-recovered") {
+    return {
+      templateKey: "ATTENDEE_TWO_STEP_RECOVERY_NOTICE" as MessageTemplateKey,
+      trigger: "ATTENDEE_TWO_STEP_RECOVERY_COMPLETED",
+      ...twoStepRecoveredBody(displayName, selection.occurredAt),
     };
   }
   return {
@@ -295,12 +360,12 @@ export async function enqueueAttendeeEmail(input: {
  * The sign-in code (#1410), minted at delivery like the others and put into the subject and body only in the
  * message being sent. The stored outbox row keeps the sentinel, and the subject carries no code.
  */
-async function prepareSignInCodeForDelivery(input: {
+async function prepareSessionCodeForDelivery(input: {
   messageId: string;
   accountAttendeeId: string | null;
   bodyText: string;
   now: Date;
-}): Promise<{ bodyText: string; codeBox: { code: string; caption: string }; revokeOnDefinitiveFailure?: () => Promise<void> }> {
+}, kind: "sign-in" | "two-step-recovery"): Promise<{ bodyText: string; codeBox: { code: string; caption: string }; revokeOnDefinitiveFailure?: () => Promise<void> }> {
   if (!input.accountAttendeeId) {
     throw new Error("An attendee email cannot mint a code without an account.");
   }
@@ -312,12 +377,14 @@ async function prepareSignInCodeForDelivery(input: {
   if (!message || !account || message.recipientEmail.trim().toLowerCase() !== account.email.trim().toLowerCase()) {
     throw new Error("The account's address changed after this message was queued; no code is sent.");
   }
-  const reused = await reuseAttendeeSignInCode({
+  const recovery = kind === "two-step-recovery";
+  const sentinel = recovery ? TWO_STEP_RECOVERY_CODE_DISPLAY_SENTINEL : SIGN_IN_CODE_DISPLAY_SENTINEL;
+  const reused = await (recovery ? reuseAttendeeTwoStepRecoveryCode : reuseAttendeeSignInCode)({
     accountId: input.accountAttendeeId,
     messageId: input.messageId,
     now: input.now,
   });
-  const code = reused ?? await attachAttendeeSignInCode({
+  const code = reused ?? await (recovery ? attachAttendeeTwoStepRecoveryCode : attachAttendeeSignInCode)({
     accountId: input.accountAttendeeId,
     messageId: input.messageId,
     now: input.now,
@@ -328,13 +395,13 @@ async function prepareSignInCodeForDelivery(input: {
   }
   const displayCode = spacedSignInCode(code);
   return {
-    bodyText: input.bodyText.replaceAll(SIGN_IN_CODE_DISPLAY_SENTINEL, displayCode),
+    bodyText: input.bodyText.replaceAll(sentinel, displayCode),
     // The code shown large in a box (#1443): server-generated digits, so the layout can draw it without any escaping
     // exception. The same spaced code is the paragraph of `bodyText` the box replaces.
     codeBox: { code: displayCode, caption: `Works for ${SIGN_IN_CODE_LIFETIME_MINUTES} minutes` },
     ...(reused
       ? {}
-      : { revokeOnDefinitiveFailure: async () => { await revokeAttendeeSignInCode(hashOneTimeCode(code), input.now); } }),
+      : { revokeOnDefinitiveFailure: async () => { await (recovery ? revokeAttendeeTwoStepRecoveryCode : revokeAttendeeSignInCode)(hashOneTimeCode(code), input.now); } }),
   };
 }
 
@@ -351,7 +418,8 @@ export async function prepareAttendeeEmailBodyForDelivery(input: {
   bodyText: string;
   now: Date;
 }): Promise<{ bodyText: string; codeBox?: { code: string; caption: string }; revokeOnDefinitiveFailure?: () => Promise<void> }> {
-  if (input.templateKey === "ATTENDEE_SIGN_IN_CODE") return prepareSignInCodeForDelivery(input);
+  if (input.templateKey === "ATTENDEE_SIGN_IN_CODE") return prepareSessionCodeForDelivery(input, "sign-in");
+  if (input.templateKey === "ATTENDEE_TWO_STEP_RECOVERY_CODE") return prepareSessionCodeForDelivery(input, "two-step-recovery");
   const reset = input.templateKey === "ATTENDEE_PASSWORD_RESET";
   const edit = input.templateKey === "ATTENDEE_EDIT_VERIFICATION";
   const sentinel = edit
@@ -438,13 +506,20 @@ export function isAttendeeEmailConfigured() {
  */
 export async function mintAttendeeCodeWithoutSending(input: {
   accountId: string;
-  purpose: "verification" | "password-reset" | "edit-verification" | "sign-in-code";
+  purpose: "verification" | "password-reset" | "edit-verification" | "sign-in-code" | "two-step-recovery-code";
   messageId?: string;
   now?: Date;
 }) {
   const now = input.now ?? new Date();
   if (input.purpose === "sign-in-code") {
     return attachAttendeeSignInCode({
+      accountId: input.accountId,
+      messageId: input.messageId ?? `development:${input.purpose}:${input.accountId}:${now.getTime()}`,
+      now,
+    });
+  }
+  if (input.purpose === "two-step-recovery-code") {
+    return attachAttendeeTwoStepRecoveryCode({
       accountId: input.accountId,
       messageId: input.messageId ?? `development:${input.purpose}:${input.accountId}:${now.getTime()}`,
       now,

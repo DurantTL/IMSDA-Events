@@ -5,6 +5,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { revokeAllUserSessions } from "@/modules/access/session-store";
 import { revokeAllAttendeeSessions } from "@/modules/attendee-accounts/session-store";
+import { attendeeTwoStepRemovalOperations } from "@/modules/attendee-accounts/two-step-reset";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { requireSystemAdminActor } from "@/modules/account-merge/hand-link";
@@ -318,10 +319,7 @@ async function requireAttendee(accountId: string) {
 /** Removes the authenticator and every passkey; club roles set one up again at their next sign-in. */
 export async function resetAttendeeTwoStep(accountId: string, actorUserId: string, now = new Date()) {
   await requireAttendee(accountId);
-  await getPrisma().$transaction([
-    getPrisma().attendeeMfaEnrollment.deleteMany({ where: { accountId } }),
-    getPrisma().attendeePasskey.updateMany({ where: { accountId, revokedAt: null }, data: { revokedAt: now } }),
-  ]);
+  await getPrisma().$transaction([...attendeeTwoStepRemovalOperations(getPrisma(), accountId, now)]);
   await revokeAllAttendeeSessions(accountId, now);
   await writeAuditLog({
     actorUserId,

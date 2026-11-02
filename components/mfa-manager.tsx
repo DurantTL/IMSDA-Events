@@ -219,7 +219,7 @@ export function MfaManager({
             </>
           )}
           <p className="field-help">
-            Two-step sign-in stays on. If you lose your device, use a recovery code, or ask a system administrator to reset it.
+            Two-step sign-in stays on. If you lose your device, use a recovery code, or {attendee ? "use the recovery link below" : "ask a system administrator to reset it"}.
           </p>
         </>
       )}

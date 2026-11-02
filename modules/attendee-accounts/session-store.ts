@@ -112,3 +112,43 @@ export async function revokeAllAttendeeSessions(accountId: string, now = new Dat
     data: { revokedAt: now },
   });
 }
+
+/** Revokes every live session of the account except `keepSessionId`; returns how many were revoked. */
+export async function revokeOtherAttendeeSessions(accountId: string, keepSessionId: string, now = new Date()) {
+  const result = await getPrisma().attendeeSession.updateMany({
+    where: { accountId, revokedAt: null, id: { not: keepSessionId } },
+    data: { revokedAt: now },
+  });
+  return result.count;
+}
+
+export type ActiveAttendeeSession = {
+  id: string;
+  isCurrent: boolean;
+  startedAt: string;
+  lastSeenAt: string;
+};
+
+/**
+ * The sessions that can sign in as this account right now: not revoked, not expired and not idle. Only
+ * timestamps are returned. A user agent is stored as a hash, so no device name is invented.
+ */
+export async function listActiveAttendeeSessions(
+  accountId: string,
+  currentSessionId: string | null,
+  now = new Date(),
+): Promise<ActiveAttendeeSession[]> {
+  const rows = await getPrisma().attendeeSession.findMany({
+    where: { accountId, revokedAt: null, expiresAt: { gt: now } },
+    orderBy: { lastSeenAt: "desc" },
+    select: { id: true, createdAt: true, lastSeenAt: true },
+  });
+  return rows
+    .filter((row) => !isAttendeeSessionIdle(row.lastSeenAt, now))
+    .map((row) => ({
+      id: row.id,
+      isCurrent: row.id === currentSessionId,
+      startedAt: row.createdAt.toISOString(),
+      lastSeenAt: row.lastSeenAt.toISOString(),
+    }));
+}

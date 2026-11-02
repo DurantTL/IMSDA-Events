@@ -836,6 +836,97 @@ export async function checkAttendeeSignInCodeVerifyRateLimit(
 }
 
 /**
+ * Sending the emailed lost-device recovery code (#221). Charged before anything is read, for an account with
+ * or without a method to recover, so the budget itself says nothing about the account. Each send retires the
+ * previous code, so an unlimited budget would also keep a real owner's code perpetually stale.
+ */
+export async function checkAttendeeTwoStepRecoverySendRateLimit(
+  request: Request,
+  accountId: string,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const account = hashRateLimitIdentifier(
+    "attendee-two-step-recovery-send",
+    accountId,
+    configuration,
+  );
+  return evaluate([
+    {
+      policy: "attendee.two-step-recovery-send.client",
+      limit: 20,
+      windowSeconds: oneHour,
+      identifierHashes: [client],
+    },
+    {
+      policy: "attendee.two-step-recovery-send.account",
+      limit: 5,
+      windowSeconds: oneHour,
+      identifierHashes: [account],
+    },
+  ], configuration);
+}
+
+/**
+ * Entering the lost-device recovery code (#221). Each code already stops after five wrong guesses; this caps
+ * the guesses across fresh codes, per account and per client, before anything is checked.
+ */
+export async function checkAttendeeTwoStepRecoveryVerifyRateLimit(
+  request: Request,
+  accountId: string,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const account = hashRateLimitIdentifier(
+    "attendee-two-step-recovery-verify",
+    accountId,
+    configuration,
+  );
+  return evaluate([
+    {
+      policy: "attendee.two-step-recovery-verify.client",
+      limit: 30,
+      windowSeconds: fifteenMinutes,
+      identifierHashes: [client],
+    },
+    {
+      policy: "attendee.two-step-recovery-verify.account",
+      limit: 10,
+      windowSeconds: fifteenMinutes,
+      identifierHashes: [account],
+    },
+  ], configuration);
+}
+
+/** "Sign out everywhere else" (#221): it only protects the account, so the limit is light and only stops a loop. */
+export async function checkAttendeeSignOutOthersRateLimit(
+  request: Request,
+  accountId: string,
+) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const account = hashRateLimitIdentifier(
+    "attendee-sign-out-others",
+    accountId,
+    configuration,
+  );
+  return evaluate([
+    {
+      policy: "attendee.sign-out-others.client",
+      limit: 30,
+      windowSeconds: oneHour,
+      identifierHashes: [client],
+    },
+    {
+      policy: "attendee.sign-out-others.account",
+      limit: 20,
+      windowSeconds: oneHour,
+      identifierHashes: [account],
+    },
+  ], configuration);
+}
+
+/**
  * Asking for the emailed Security check code (#1480), per source and per address, per hour. Charged the same for a
  * known and an unknown address, so the limit itself says nothing about whether an account exists. Each send retires
  * the previous code, so an unlimited budget would also keep a real owner's code perpetually stale, and a sign-up

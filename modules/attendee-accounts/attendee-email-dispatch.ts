@@ -123,3 +123,40 @@ export async function queueAttendeeSignInCodeEmail(input: {
   }
   return dispatch;
 }
+
+/** Queues the lost-device recovery code email (#221). The pending code row is bound to this message so delivery can mint into it. */
+export async function queueAttendeeTwoStepRecoveryCodeEmail(input: {
+  accountId: string;
+  stepUpCodeId: string;
+  email: string;
+  displayName: string;
+}): Promise<AttendeeEmailDispatch> {
+  const dispatch = await queue({
+    accountId: input.accountId,
+    email: input.email,
+    displayName: input.displayName,
+    selection: { kind: "two-step-recovery-code" },
+  });
+  if (
+    dispatch.messageId
+    && !await bindAttendeeStepUpMessage(input.stepUpCodeId, dispatch.messageId)
+  ) {
+    throw new Error("The recovery code message could not be bound to its session.");
+  }
+  return dispatch;
+}
+
+/** Queues the "two-step sign-in was reset" notice (#221). No code and no link that grants access. */
+export async function queueAttendeeTwoStepRecoveredEmail(input: {
+  accountId: string;
+  email: string;
+  displayName: string;
+  occurredAt: Date;
+}): Promise<AttendeeEmailDispatch> {
+  return queue({
+    accountId: input.accountId,
+    email: input.email,
+    displayName: input.displayName,
+    selection: { kind: "two-step-recovered", occurredAt: input.occurredAt },
+  });
+}
