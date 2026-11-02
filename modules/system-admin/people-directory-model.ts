@@ -341,13 +341,14 @@ export function peopleFilterCount(filters: PeopleFilters): number {
 }
 
 /** `/admin/people` with the search, filters and page kept in the URL (repeated `role`, `event` and `club`). */
-export function peopleHref(input: { query?: string; page?: number; filters?: PeopleFilters }): string {
+export function peopleHref(input: { query?: string; page?: number; filters?: PeopleFilters; /** The Pending invites section's own page (#1492); the list's `page` and this one are kept apart. */ pendingPage?: number }): string {
   const params = new URLSearchParams();
   if (input.query) params.set("q", input.query);
   for (const role of input.filters?.roles ?? []) params.append("role", peopleRoleKey(role));
   for (const id of input.filters?.eventIds ?? []) params.append("event", id);
   for (const id of input.filters?.clubIds ?? []) params.append("club", id);
   if (input.page && input.page > 1) params.set("page", String(input.page));
+  if (input.pendingPage && input.pendingPage > 1) params.set("pendingPage", String(input.pendingPage));
   const text = params.toString();
   return text ? `/admin/people?${text}` : "/admin/people";
 }

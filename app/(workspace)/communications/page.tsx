@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CommunicationsWorkspace } from "@/components/communications-workspace";
 import { getPrisma } from "@/lib/prisma";
 import { loadEmailLayoutSettings } from "@/modules/communications/email-layout-settings";
+import { DELIVERY_PAGE_SIZE, parseDeliveryQuery } from "@/modules/communications/delivery-log-model";
 import { getMessagingWorkspace } from "@/modules/communications/messaging-repository";
 import { listEventAnnouncementOptOuts } from "@/modules/communications/email-preferences-repository";
 import { listAnnouncements } from "@/modules/communications/repository";
@@ -29,6 +30,7 @@ const emptyMessaging: MessagingWorkspaceData = {
   },
   templates: [],
   messages: [],
+  messageLog: { total: 0, page: 1, pageSize: DELIVERY_PAGE_SIZE, status: "ALL" },
   inlineImages: [],
   counts: {
     PENDING: 0,
@@ -87,9 +89,9 @@ const communicationViews = new Set<CommunicationsView>([
 export default async function CommunicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string; new?: string; view?: string }>;
+  searchParams: Promise<{ event?: string; new?: string; view?: string; status?: string; page?: string }>;
 }) {
-  const { event: requested, new: openNew, view: requestedView } = await searchParams;
+  const { event: requested, new: openNew, view: requestedView, status, page } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
   if (!permissions.includes("VIEW_EVENT")) {
@@ -98,7 +100,7 @@ export default async function CommunicationsPage({
   const canManage = permissions.includes("MANAGE_COMMUNICATIONS");
   const [announcements, messaging, optOuts] = await Promise.all([
     listAnnouncements(event.id),
-    canManage ? getMessagingWorkspace(event.id) : Promise.resolve(emptyMessaging),
+    canManage ? getMessagingWorkspace(event.id, parseDeliveryQuery({ status, page })) : Promise.resolve(emptyMessaging),
     canManage ? listEventAnnouncementOptOuts(event.id) : Promise.resolve([]),
   ]);
   const initialView = canManage && communicationViews.has(requestedView as CommunicationsView)

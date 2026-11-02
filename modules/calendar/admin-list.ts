@@ -6,8 +6,8 @@
 
 import { expandOccurrences, type RepeatRule } from "@/modules/calendar/recurrence";
 
-/** The most entries the admin list loads (newest start dates first). */
-export const calendarEntryListLimit = 1000;
+/** Entries per page. The list is paged and filtered in the database, so every entry is reachable (#1492). */
+export const CALENDAR_ENTRY_PAGE_SIZE = 50;
 
 export type AdminListEntry = {
   id: string;
@@ -66,6 +66,81 @@ export function parseEntryDropdownFilters(params: URLSearchParams): EntryDropdow
     time: entryTimes.find((value) => value === time) ?? defaultEntryDropdownFilters.time,
     entryType: entryTypes.find((value) => value === entryType) ?? "",
   };
+}
+
+export const entrySorts: readonly EntrySort[] = ["date", "title", "category"];
+
+/** `?sort=` is one of the listed columns; anything else is date order, so a raw value never reaches an order-by. */
+export function parseEntrySort(raw: string | null | undefined): EntrySort {
+  return entrySorts.find((value) => value === raw) ?? "date";
+}
+
+/** Everything that decides which entries a page holds: the filters (with the search), the order and the page. */
+export type CalendarEntryQuery = { filters: EntryFilters; sort: EntrySort; page: number };
+
+export const defaultEntryQuery: CalendarEntryQuery = { filters: defaultEntryFilters, sort: "date", page: 1 };
+
+/** The Entries list's address (`?q=`, the select filters, `?sort=`, `?page=`) as a query; the server page and the list endpoints read it the same way. */
+export function parseEntryQuery(params: URLSearchParams): CalendarEntryQuery {
+  const page = params.get("page") ?? "";
+  return {
+    filters: { ...parseEntryDropdownFilters(params), search: (params.get("q") ?? "").slice(0, 100) },
+    sort: parseEntrySort(params.get("sort")),
+    page: /^\d{1,9}$/.test(page.trim()) ? Math.max(1, Math.min(Number(page.trim()), 100_000)) : 1,
+  };
+}
+
+/** The same query as an address; a default value is left out. */
+export function entryQueryParams(query: CalendarEntryQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  const { filters } = query;
+  if (filters.search.trim()) params.set("q", filters.search.trim());
+  if (filters.category) params.set("category", filters.category);
+  if (filters.source) params.set("source", filters.source);
+  if (filters.state !== defaultEntryFilters.state) params.set("state", filters.state);
+  if (filters.time !== defaultEntryFilters.time) params.set("time", filters.time);
+  if (filters.entryType) params.set("entryType", filters.entryType);
+  if (query.sort !== "date") params.set("sort", query.sort);
+  if (query.page > 1) params.set("page", String(query.page));
+  return params;
+}
+
+/**
+ * The database where-clause for the filters: the same rules as `matchesFilters`. `upcomingRepeatingIds` are the repeating
+ * entries that started before `today` but still have an occurrence on or after it (worked out by `isUpcoming`, which
+ * expands the rule), so a series that began in the past is never dropped from "Upcoming" or put under "Past".
+ */
+export function buildEntryWhere(filters: EntryFilters, today: string, upcomingRepeatingIds: readonly string[]) {
+  const and: Array<Record<string, unknown>> = [];
+  const needle = filters.search.trim();
+  if (needle) {
+    and.push({ OR: [
+      { title: { contains: needle, mode: "insensitive" } },
+      { location: { contains: needle, mode: "insensitive" } },
+      { description: { contains: needle, mode: "insensitive" } },
+    ] });
+  }
+  if (filters.category === noCategoryFilter) and.push({ category: "" });
+  else if (filters.category) and.push({ category: filters.category });
+  if (filters.source === staffSourceFilter) and.push({ sourceFeedId: null });
+  else if (filters.source) and.push({ sourceFeedId: filters.source });
+  if (filters.entryType) and.push({ entryType: filters.entryType });
+  if (filters.state === "published") and.push({ isPublished: true });
+  if (filters.state === "draft") and.push({ isPublished: false });
+  if (filters.state === "hidden") and.push({ isHiddenLocally: true });
+  if (filters.state === "removed") and.push({ sourceRemovedAt: { not: null } });
+  if (filters.time === "upcoming") and.push({ OR: [{ endsOn: { gte: today } }, { id: { in: [...upcomingRepeatingIds] } }] });
+  if (filters.time === "past") and.push({ endsOn: { lt: today }, id: { notIn: [...upcomingRepeatingIds] } });
+  return and.length > 0 ? { AND: and } : {};
+}
+
+/** The order for each whitelisted sort (the same ties as `sortEntries`), ending in the id so pages never overlap. "Category" puts the no-category rows last in the repository. */
+export function entryOrderBy(sort: EntrySort) {
+  switch (sort) {
+    case "title": return [{ title: "asc" }, { startsOn: "asc" }, { endsOn: "asc" }, { id: "asc" }] as const;
+    case "category": return [{ category: "asc" }, { startsOn: "asc" }, { endsOn: "asc" }, { title: "asc" }, { id: "asc" }] as const;
+    default: return [{ startsOn: "asc" }, { endsOn: "asc" }, { title: "asc" }, { id: "asc" }] as const;
+  }
 }
 
 export const entrySortLabels: Record<EntrySort, string> = {

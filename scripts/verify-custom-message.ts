@@ -502,6 +502,30 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   console.log(`scale: ${SCALE_COUNT} recipients with 1 attachment queued in ${scaleMs} ms (transaction timeout 120000 ms)`);
   assert(scaleMs < 60_000, `the 250-recipient send stays well inside the transaction timeout, took ${scaleMs} ms`);
 
+  // The delivery log is paged in the database (#1492): 250 messages are all reachable, newest first, from this event only.
+  const logPage = (status: "ALL" | "PENDING" | "CAPTURED" | "SENT" | "FAILED" | "SUPPRESSED" | "CANCELLED", page: number) => getMessagingWorkspace(ids.scale, { status, page });
+  const logTotal = await prisma.messageOutbox.count({ where: { eventId: ids.scale } });
+  const firstLog = await logPage("ALL", 1);
+  assert(logTotal >= SCALE_COUNT && firstLog.messageLog.total === logTotal && firstLog.messages.length === 50 && firstLog.messageLog.pageSize === 50, "the first log page holds 50 of every message in the event");
+  const seenMessages = new Set<string>();
+  let newest = Infinity;
+  for (let page = 1; page <= Math.ceil(logTotal / 50); page += 1) {
+    for (const message of (await logPage("ALL", page)).messages) {
+      assert(!seenMessages.has(message.id), "no message is on two log pages");
+      seenMessages.add(message.id);
+      const at = new Date(message.createdAt).getTime();
+      assert(at <= newest, "the log runs newest first across page boundaries");
+      newest = at;
+    }
+  }
+  assert(seenMessages.size === logTotal, `every message is on exactly one log page (saw ${seenMessages.size} of ${logTotal})`);
+  assert((await logPage("ALL", 9999)).messageLog.page === Math.ceil(logTotal / 50), "a log page past the end is clamped");
+  for (const status of ["PENDING", "CAPTURED", "SENT", "FAILED", "SUPPRESSED", "CANCELLED"] as const) {
+    const filtered = await logPage(status, 1);
+    assert(filtered.messageLog.total === (await prisma.messageOutbox.count({ where: { eventId: ids.scale, status } })) && filtered.messages.every((message) => message.status === status), `the ${status} filter counts and lists in the database`);
+  }
+  assert((await prisma.messageOutbox.count({ where: { id: { in: [...seenMessages] }, eventId: ids.scale } })) === seenMessages.size, "the log lists this event's messages only");
+
   console.log("custom message verification passed");
 }
 

@@ -499,6 +499,56 @@ async function main() {
   assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("zed"), group: "STAFF", approval: "WAITING" } })), "an approval without a registration is refused");
   assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("yan"), group: "STAFF", linkVersion: 0 } })), "link version zero is refused");
 
+  // ---- The list is searched, filtered, ordered and paged in the database (#1492) -----------------------------------------
+  const { INVITATION_STATUSES, INVITATION_STATUS_LABEL } = await import("../modules/staff-invitations/domain");
+  const listQuery = await import("../modules/staff-invitations/list-query");
+  const query = (filters: Partial<{ status: string; group: string; search: string }> = {}, sort: { key: "person" | "group" | "status" | null; dir: "asc" | "desc" } = { key: null, dir: "asc" }, page = 1) =>
+    ({ filters: { status: "ALL", group: "ALL", search: "", ...filters } as never, sort, page });
+  const whole = await repo.listInvitations(eventId, query());
+  assert(whole.total === whole.totalAll && whole.rows.length === whole.total, "an unfiltered list counts every current invitation");
+  let statusTotal = 0;
+  for (const status of INVITATION_STATUSES) {
+    const byStatus = await repo.listInvitations(eventId, query({ status }));
+    assert(byStatus.total === whole.counts[status] && byStatus.rows.every((entry) => entry.status === status), `the ${status} filter finds exactly the ${whole.counts[status]} people shown with that status`);
+    statusTotal += byStatus.total;
+  }
+  assert(statusTotal === whole.total, "every invitation has exactly one status, so the status filters add up to the whole list");
+  assert((await repo.listInvitations(eventId, query({ search: "synthetic ada" }))).rows.some((entry) => entry.email === email("ada")), "a two-word search finds a person by first and last name");
+  assert((await repo.listInvitations(eventId, query({ search: "zzzzqq" }))).total === 0, "a search with no match finds nobody");
+  assert((await repo.listInvitations(eventId, query({ group: "VOLUNTEER" }))).rows.every((entry) => entry.group === "VOLUNTEER"), "the group filter keeps only that group");
+  // 2,000 more people: enough for several pages and past the most one Send takes.
+  await prisma.staffInvitation.createMany({
+    data: Array.from({ length: 2000 }, (_, index) => ({ eventId, email: email(`zbulk${String(index).padStart(4, "0")}`), firstName: `Bulk${index}`, lastName: "Zbulk", group: (["STAFF", "PASTOR", "VOLUNTEER"] as const)[index % 3] })),
+  });
+  const big = await repo.listInvitations(eventId, query());
+  assert(big.total === whole.total + 2000 && big.rows.length === 50 && big.pageSize === 50, "the first page holds 50 of every invitation");
+  const pageCount = Math.ceil(big.total / 50);
+  const last = await repo.listInvitations(eventId, query({}, { key: null, dir: "asc" }, 9999));
+  assert(last.page === pageCount && last.rows.length === big.total - (pageCount - 1) * 50, "a page past the end is clamped to the last page");
+  for (const sort of [{ key: null, dir: "asc" }, { key: "person", dir: "desc" }, { key: "group", dir: "asc" }, { key: "status", dir: "asc" }, { key: "status", dir: "desc" }] as const) {
+    const seen = new Set<string>();
+    const statusSequence: string[] = [];
+    for (let page = 1; page <= pageCount; page += 1) {
+      for (const entry of (await repo.listInvitations(eventId, query({}, { ...sort }, page))).rows) { seen.add(entry.id); statusSequence.push(entry.status); }
+    }
+    assert(seen.size === big.total, `every invitation is on exactly one page in the ${sort.key ?? "default"} ${sort.dir} order (saw ${seen.size} of ${big.total})`);
+    if (sort.key === "status") {
+      const order = listQuery.invitationStatusSortOrder(sort.dir);
+      const positions = statusSequence.map((status) => order.indexOf(status as never));
+      assert(positions.every((position, index) => index === 0 || position >= positions[index - 1]), `the status order runs in the order of the status words (${sort.dir}), across page boundaries`);
+      assert(INVITATION_STATUSES.every((status) => INVITATION_STATUS_LABEL[status]), "every status has its words");
+    }
+  }
+  const tail = await repo.listInvitations(eventId, query({ search: "Zbulk" }, { key: "person", dir: "desc" }));
+  assert(tail.total === 2000 && tail.rows[0]!.firstName === "Bulk999" && tail.rows[1]!.firstName === "Bulk998", "the person order sorts by last name then first name, and the search counts in the database");
+  const matching = await repo.listMatchingInvitationIds(eventId, { status: "ALL", group: "ALL", search: "Zbulk" });
+  assert(matching.total === 2000 && matching.ids.length === 2000 && new Set(matching.ids).size === 2000, "Select all N matching returns every matching id of this event, across pages");
+  const tooMany = await repo.listMatchingInvitationIds(eventId, { status: "ALL", group: "ALL", search: "" });
+  assert(tooMany.total === big.total && tooMany.ids.length === 0 && tooMany.limit === 2000, "past the most one Send takes only the count comes back");
+  const otherEvent = await repo.listMatchingInvitationIds(draftEventId, { status: "ALL", group: "ALL", search: "Zbulk" });
+  assert(otherEvent.total === 0 && otherEvent.ids.length === 0, "another event's invitations are never part of the selection");
+  await expectCode(repo.listMatchingInvitationIds(clubEventId, { status: "ALL", group: "ALL", search: "" }), "EVENT_NOT_SUPPORTED", "selecting in a club event");
+
   // ---- Deleting the event removes its invitations --------------------------------------------------------------------------
   const { removeEventOwnedRows } = await import("../modules/events/deletion-repository");
   await prisma.$transaction(async (tx) => {

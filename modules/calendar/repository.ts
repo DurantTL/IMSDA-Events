@@ -5,7 +5,22 @@ import { logError } from "@/lib/logger";
 import { CalendarError } from "@/modules/calendar/errors";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { calendarEntryListLimit, planBulkAction, type BulkAction, type BulkChange, type BulkSkip } from "@/modules/calendar/admin-list";
+import {
+  buildEntryWhere,
+  CALENDAR_ENTRY_PAGE_SIZE,
+  defaultEntryQuery,
+  entryOrderBy,
+  isUpcoming,
+  maxBulkEntries,
+  planBulkAction,
+  type CalendarEntryQuery,
+  type EntryFilters,
+  type BulkAction,
+  type BulkChange,
+  type BulkSkip,
+} from "@/modules/calendar/admin-list";
+import { clampPage } from "@/lib/pagination";
+import { segmentWindows } from "@/lib/segment-window";
 import {
   addDays,
   calendarDateIn,
@@ -242,18 +257,122 @@ function entryItems(entry: PublicEntryRow, from: string, to: string, expandRepea
   }));
 }
 
-export type CalendarAdminEntry = Awaited<ReturnType<typeof listCalendarEntries>>[number];
+export type CalendarAdminEntry = Awaited<ReturnType<typeof serializeCalendarEntries>>[number];
 
+const calendarEntryInclude = {
+  sourceFeed: { select: { name: true } },
+  linkedEvent: { select: { id: true, name: true, slug: true, isPublished: true, archivedAt: true, lifecycleState: true, showOnCalendar: true, startsAt: true, endsAt: true, timezone: true } },
+} as const;
+
+/**
+ * Repeating entries that began before `today` and still have an occurrence on or after it. A series that started in the
+ * past is "upcoming" while it has such an occurrence, so the time filter must not judge it by its first date alone.
+ * Only the repeating entries whose first run is over are read, and `isUpcoming` expands each rule (#1492).
+ */
+async function upcomingRepeatingEntryIds(prisma: ReturnType<typeof getPrisma>, today: string): Promise<string[]> {
+  const series = await prisma.calendarEntry.findMany({
+    where: { repeatRule: { not: null }, endsOn: { lt: today } },
+    select: { id: true, startsOn: true, endsOn: true, repeatRule: true, repeatExceptions: true },
+  });
+  return series
+    .filter((row) => isUpcoming({ startsOn: row.startsOn, endsOn: row.endsOn, repeat: parseRepeatRule(row.repeatRule), repeatExceptions: row.repeatExceptions }, today))
+    .map((row) => row.id);
+}
+
+/** The where-clause for a set of filters, with the series lookup the time filter needs. */
+async function entryWhereFor(prisma: ReturnType<typeof getPrisma>, filters: EntryFilters, today: string) {
+  const seriesIds = filters.time === "all" ? [] : await upcomingRepeatingEntryIds(prisma, today);
+  return buildEntryWhere(filters, today, seriesIds) as Prisma.CalendarEntryWhereInput;
+}
+
+export type CalendarEntryPage = {
+  entries: CalendarAdminEntry[];
+  /** Entries matching the filters, across every page. */
+  total: number;
+  page: number;
+  pageSize: number;
+  /** Every entry, whatever the filters, for "The calendar has N entries in all". */
+  totalAll: number;
+  /** The categories in use, for the Category filter and the bulk "Set category" box. */
+  categories: string[];
+};
+
+/** One page of the Entries list, filtered, ordered and counted in the database (#1492). */
+export async function listCalendarEntryPage(query: CalendarEntryQuery = defaultEntryQuery, now = new Date()): Promise<CalendarEntryPage> {
+  const prisma = getPrisma();
+  const today = calendarDateIn(now);
+  const where = await entryWhereFor(prisma, query.filters, today);
+  const [total, totalAll, categoryRows] = await Promise.all([
+    prisma.calendarEntry.count({ where }),
+    prisma.calendarEntry.count(),
+    prisma.calendarEntry.findMany({ where: { category: { not: "" } }, distinct: ["category"], select: { category: true }, orderBy: { category: "asc" } }),
+  ]);
+  const page = clampPage(query.page, total, CALENDAR_ENTRY_PAGE_SIZE);
+  const skip = (page - 1) * CALENDAR_ENTRY_PAGE_SIZE;
+  const orderBy = entryOrderBy(query.sort).map((order) => ({ ...order })) as Prisma.CalendarEntryOrderByWithRelationInput[];
+  let rows: Prisma.CalendarEntryGetPayload<{ include: typeof calendarEntryInclude }>[];
+  if (query.sort === "category") {
+    // Rows with a category come first (by category); rows with none are last. A page is a window over the two runs (#1492).
+    const runs: Array<{ where: Prisma.CalendarEntryWhereInput; orderBy: Prisma.CalendarEntryOrderByWithRelationInput[] }> = [
+      { where: { AND: [where, { category: { not: "" } }] }, orderBy },
+      { where: { AND: [where, { category: "" }] }, orderBy: orderBy.filter((order) => !("category" in order)) },
+    ];
+    const withCount = await prisma.calendarEntry.count({ where: runs[0].where });
+    const windows = segmentWindows([withCount, total - withCount], skip, CALENDAR_ENTRY_PAGE_SIZE);
+    const parts = await Promise.all(windows.map((window) => prisma.calendarEntry.findMany({
+      where: runs[window.segment]!.where,
+      orderBy: runs[window.segment]!.orderBy,
+      skip: window.skip,
+      take: window.take,
+      include: calendarEntryInclude,
+    })));
+    rows = parts.flat();
+  } else {
+    rows = await prisma.calendarEntry.findMany({ where, orderBy, skip, take: CALENDAR_ENTRY_PAGE_SIZE, include: calendarEntryInclude });
+  }
+  return {
+    entries: await serializeCalendarEntries(prisma, rows, now),
+    total,
+    page,
+    pageSize: CALENDAR_ENTRY_PAGE_SIZE,
+    totalAll,
+    categories: categoryRows.map((row) => row.category),
+  };
+}
+
+/**
+ * The ids behind "Select all N matching": every entry the filters match, found by the same where-clause as the list, up to
+ * the bulk limit. Past the limit only the count comes back, and the list asks to narrow the filters (#1492).
+ */
+export async function listMatchingCalendarEntryIds(filters: EntryFilters, now = new Date()): Promise<{ ids: string[]; total: number; limit: number }> {
+  const prisma = getPrisma();
+  const where = await entryWhereFor(prisma, filters, calendarDateIn(now));
+  const total = await prisma.calendarEntry.count({ where });
+  if (total > maxBulkEntries) return { ids: [], total, limit: maxBulkEntries };
+  const rows = await prisma.calendarEntry.findMany({ where, select: { id: true }, orderBy: [...entryOrderBy("date")].map((order) => ({ ...order })) as Prisma.CalendarEntryOrderByWithRelationInput[] });
+  return { ids: rows.map((row) => row.id), total, limit: maxBulkEntries };
+}
+
+/**
+ * What the editing endpoints send back after a change: one page of entries, newest start dates first. It is a signal that
+ * the list changed, not the list: the Entries list reads its own page, with its own filters, through `listCalendarEntryPage`
+ * (#1492). One query, so a change does not pay for the list's counts.
+ */
 export async function listCalendarEntries(now = new Date()) {
   const prisma = getPrisma();
-  const entries = await prisma.calendarEntry.findMany({
+  const rows = await prisma.calendarEntry.findMany({
     orderBy: [{ startsOn: "desc" }, { title: "asc" }],
-    take: calendarEntryListLimit,
-    include: {
-      sourceFeed: { select: { name: true } },
-      linkedEvent: { select: { id: true, name: true, slug: true, isPublished: true, archivedAt: true, lifecycleState: true, showOnCalendar: true, startsAt: true, endsAt: true, timezone: true } },
-    },
+    take: CALENDAR_ENTRY_PAGE_SIZE,
+    include: calendarEntryInclude,
   });
+  return serializeCalendarEntries(prisma, rows, now);
+}
+
+async function serializeCalendarEntries(
+  prisma: ReturnType<typeof getPrisma>,
+  entries: Prisma.CalendarEntryGetPayload<{ include: typeof calendarEntryInclude }>[],
+  now: Date,
+) {
 
   // Possible matches (#445): imported items not yet linked, against events from the last month on, minus the pairs
   // staff said are not the same. Staff see drafts here, so a draft event can be matched too.
@@ -297,7 +416,7 @@ export async function listCalendarEntries(now = new Date()) {
   ).map((match) => [match.entryId, match.eventId]));
 
   // How many items share each linked event (#1086), from the items listed.
-  // Counted in the database, not from the listed items, so the 1,000-item list limit can't skew them. "Public" uses
+  // Counted in the database, not from the listed items, so paging can't skew them. "Public" uses
   // the same filter as the public calendar.
   const listedEventIds = [...new Set(entries.flatMap((entry) => (entry.linkedEventId ? [entry.linkedEventId] : [])))];
   const linkedRows = listedEventIds.length === 0

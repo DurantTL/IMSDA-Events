@@ -103,22 +103,25 @@ export function PeopleDirectory({
   clubOptions = [],
   pending,
   pendingCount = 0,
-  pendingCapped = false,
+  pendingSlice,
+  pendingPage = 1,
 }: {
   /**
    * The Pending invites section (#1276, with Resend and Cancel): drawn between the search and the results when no role
    * filter is on, and as the results when the Pending invites filter is (#1277).
    */
   pending?: ReactNode;
-  /** How many invites that section lists. */
+  /** How many invites match in all, across every page of that section. */
   pendingCount?: number;
+  /** Where the section's page sits in the whole list (#1492); the section is one page of the three sources merged. */
+  pendingSlice?: { from: number; to: number; page: number; pageCount: number; total: number };
+  /** The section's current page, kept in the links of the main list. */
+  pendingPage?: number;
   scope?: "full" | "clubs";
   query: string;
   filters?: PeopleFilters;
   eventOptions?: readonly { id: string; name: string }[];
   clubOptions?: readonly { id: string; name: string }[];
-  /** The pending list hit its row cap, so the count is a lower bound. */
-  pendingCapped?: boolean;
   rows: readonly PeopleRow[];
   page: number;
   pageCount: number;
@@ -128,19 +131,27 @@ export function PeopleDirectory({
   const pendingOnly = filters.roles.length === 1 && filters.roles[0].kind === "pending";
   const summary = peopleFilterSummary(filters, { eventOptions, clubOptions });
   const chips = peopleFilterChips({ filters, query, scope, eventOptions, clubOptions });
+  const pendingBlock = pending && pendingSlice && pendingSlice.total > 0
+    ? (
+      <>
+        {pending}
+        <ListPager hrefFor={(next) => peopleHref({ query, filters, page: pendingOnly ? 1 : page, pendingPage: next })} label="Pending invite pages" noun="pending invites" nounOne="pending invite" slice={pendingSlice} />
+      </>
+    )
+    : pending;
   return (
     <div className={styles.wrap}>
       <PeopleQuickFilters clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
       <PeopleFilterPanel clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
       <PeopleActiveFilters chips={chips} clearHref={peopleHref({})} />
-      {peopleFilterCount(filters) === 0 || pendingOnly ? pending : null}
+      {peopleFilterCount(filters) === 0 && !pendingOnly ? pendingBlock : null}
       <p aria-live="polite" className={styles.count} id={PEOPLE_STATUS_ID} role="status" tabIndex={-1}>
         {pickEvent
           ? "Pick an event to see who has this role."
           : pendingOnly
             ? pendingCount === 0
               ? "No pending invites."
-              : `${pendingCapped ? "The newest " : ""}${pendingCount} pending ${pendingCount === 1 ? "invite" : "invites"}${query ? ` matching "${query}"` : ""}${pendingCapped ? ". Older ones are not listed; search to narrow the list." : "."}`
+              : `${pendingCount} pending ${pendingCount === 1 ? "invite" : "invites"}${query ? ` matching "${query}"` : ""}.`
             : total === 0
               ? "No people found."
               : `${total} ${total === 1 ? "person" : "people"}${summary ? ` with ${summary}` : ""}${query ? ` matching "${query}"` : ""}.`}
@@ -149,7 +160,7 @@ export function PeopleDirectory({
       {pickEvent ? (
         <p className={styles.empty}>Pick an event to see who has this role. Event roles belong to one event at a time.</p>
       ) : pendingOnly ? (
-        pendingCount === 0 ? <p className={styles.empty}>No pending invites{query ? " match that search" : ""}.</p> : pending
+        pendingCount === 0 ? <p className={styles.empty}>No pending invites{query ? " match that search" : ""}.</p> : pendingBlock
       ) : rows.length === 0 ? (
         query || peopleFilterCount(filters) > 0
           ? <NoMatchesState clear={{ href: peopleHref({}) }} noun="people" query={query} />
@@ -177,7 +188,7 @@ export function PeopleDirectory({
       )}
       {!pickEvent && !pendingOnly && total > 0 ? (
         <ListPager
-          hrefFor={(next) => peopleHref({ query, page: next, filters })}
+          hrefFor={(next) => peopleHref({ query, page: next, filters, pendingPage })}
           label="Pages"
           noun="people"
           nounOne="person"

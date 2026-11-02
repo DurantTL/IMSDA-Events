@@ -1,51 +1,53 @@
-"use client";
-
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { ColumnHeader } from "@/components/column-header";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
+import { InvitationRowActions, InvitationRowSelect, InvitationSelectionBar, InvitationSelectionProvider } from "@/components/staff-invitation-actions";
 import { ListPager } from "@/components/list-pager";
-import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
-import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
-import { Ban, Copy, MailPlus, RefreshCw, UserPlus } from "lucide-react";
+import { SortOrderNote } from "@/components/list-sort";
+import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
 import {
   INVITATION_STATUSES,
   INVITATION_STATUS_LABEL,
   STAFF_INVITATION_GROUPS,
   STAFF_INVITATION_GROUP_LABEL,
   type InvitationStatus,
-  type StaffInvitationGroupValue,
 } from "@/modules/staff-invitations/domain";
+import {
+  INVITATION_DEFAULT_SORT,
+  INVITATION_SORT_COLUMNS,
+  invitationListHref,
+  type InvitationListQuery,
+  type InvitationSortColumn,
+} from "@/modules/staff-invitations/list-query";
 import type { InvitationListRow } from "@/modules/staff-invitations/repository";
-import { paginate } from "@/lib/pagination";
+import { serverSort, sortOrderText } from "@/lib/list-sort";
+import { sliceFromCount } from "@/lib/pagination";
 import { formatPersonName } from "@/lib/person-name";
-
-type SendPreview = {
-  willSend: number;
-  skipped: number;
-  deliveryMode: string;
-  senderName: string;
-  linksOpen: boolean;
-  digest: string;
-  sample: { to: string; subject: string; bodyText: string } | null;
-};
 
 type Props = {
   eventId: string;
   rows: InvitationListRow[];
   counts: Record<InvitationStatus, number>;
-  truncated: boolean;
+  /** What the address asked for: the filters, the order and the page. The server filtered, ordered and paged the rows (#1492). */
+  query: InvitationListQuery;
+  /** Invitations matching the filters, across every page. */
+  total: number;
+  /** Every invitation of the event, whatever the filters. */
+  totalAll: number;
+  /** The page the rows are, after the server clamped it to the real total. */
+  page: number;
+  pageSize: number;
   /** MANAGE_COMMUNICATIONS: sending is a bulk communication and needs it. */
   canSend: boolean;
 };
 
-/** Invitations shown per page. */
-const PAGE_SIZE = 50;
+const LIST_PATH = "/people/staff-invitations";
 
-// Sorts from its headers (#1458); the keys here are the whitelist. Only what a column already shows is sortable.
-const INVITATION_SORT: Record<"person" | "group" | "status", ColumnSpec<InvitationListRow>> = {
-  person: { value: (row) => formatPersonName(row) || row.email, label: "person" },
-  group: { value: (row) => STAFF_INVITATION_GROUP_LABEL[row.group], label: "group" },
-  status: { value: (row) => INVITATION_STATUS_LABEL[row.status], label: "status" },
+// The sortable columns. The keys are the whitelist the server reads from the address (INVITATION_SORT_COLUMNS).
+const SORT_LABELS: Record<InvitationSortColumn, { label: string; kind: "text" | "group" | "state" }> = {
+  person: { label: "Person", kind: "text" },
+  group: { label: "Group", kind: "group" },
+  status: { label: "Status", kind: "state" },
 };
 
 function tone(status: InvitationStatus) {
@@ -68,118 +70,20 @@ function tone(status: InvitationStatus) {
  * The invite list (#804): each person's status, filters, select-all, and the actions on the selection. Revoke is for links nobody
  * has used. Sending is a person's explicit action: Send opens a preview of the exact email and how many go, and nothing is
  * queued until that is confirmed. The emails are queued in the event's outbox; this never delivers anything itself.
+ * The list is searched, filtered, ordered and paged in the database from the address (#1492); the ticks and actions are in
+ * `staff-invitation-actions.tsx`.
  */
-export function StaffInvitationList({ eventId, rows, counts, truncated, canSend }: Props) {
-  const router = useRouter();
-  const [status, setStatus] = useState<InvitationStatus | "ALL">("ALL");
-  const [group, setGroup] = useState<StaffInvitationGroupValue | "ALL">("ALL");
-  const search = useClientSearch();
-  const query = search.term;
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [sendPreview, setSendPreview] = useState<SendPreview | null>(null);
-  const [revealed, setRevealed] = useState<{ id: string; url: string } | null>(null);
-  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
-
-  const visible = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return rows.filter((row) => (
-      (status === "ALL" || row.status === status)
-      && (group === "ALL" || row.group === group)
-      && (!needle || `${row.email} ${formatPersonName(row)}`.toLowerCase().includes(needle))
-    ));
-  }, [rows, status, group, query]);
-  // The page goes back to 1 when the filters or the sort change: the stored page only counts for the filters it was chosen under.
-  const filterKey = `${status}|${group}|${query}`;
-  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
-  const sorted = useTableSort(visible, INVITATION_SORT, undefined, { onChange: () => setPageState({ key: filterKey, page: 1 }) });
-  const slice = paginate(sorted.rows, pageState.key === filterKey ? pageState.page : 1, PAGE_SIZE);
-  const visibleSelected = visible.filter((row) => selected.has(row.id));
-  const selectedIds = [...selected];
-
-  // A preview describes exactly one selection: any change to the selection discards it (and a pending revoke confirmation).
-  function changeSelection(update: (current: Set<string>) => Set<string>) {
-    setSelected(update);
-    setSendPreview(null);
-    setConfirmingRevoke(false);
-  }
-
-  function toggle(id: string) {
-    changeSelection((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  async function call(path: string, body: Record<string, unknown>) {
-    const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/staff-invitations${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const result = await response.json().catch(() => ({})) as Record<string, unknown> & { message?: string };
-    if (!response.ok) throw new Error(result.message ?? "That couldn't be done. Nothing was changed.");
-    return result;
-  }
-
-  async function run(work: () => Promise<void>) {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      await work();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That couldn't be done. Nothing was changed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const openSendPreview = () => run(async () => {
-    const result = await call("/send", { action: "preview", ids: selectedIds });
-    setSendPreview(result.preview as SendPreview);
-  });
-
-  const confirmSend = () => run(async () => {
-    if (!sendPreview) return;
-    const result = await call("/send", { action: "send", ids: selectedIds, digest: sendPreview.digest }) as { result?: { queued: number } };
-    setNotice(`${result.result?.queued ?? 0} invitation email${result.result?.queued === 1 ? "" : "s"} queued in the message outbox for delivery.`);
-    setSendPreview(null);
-    setSelected(new Set());
-    router.refresh();
-  });
-
-  const revoke = () => run(async () => {
-    const result = await call("/actions", { action: "revoke", ids: selectedIds }) as { result?: { revoked: number; skipped: number } };
-    setNotice(`${result.result?.revoked ?? 0} link${result.result?.revoked === 1 ? "" : "s"} revoked${result.result?.skipped ? `, ${result.result.skipped} skipped (already used or revoked)` : ""}.`);
-    setConfirmingRevoke(false);
-    setSelected(new Set());
-    router.refresh();
-  });
-
-  // Re-invite makes a new invitation (a new link, "not sent"); it never emails anyone. The office then selects it and uses Send.
-  const reinvite = (id: string) => run(async () => {
-    await call(`/${encodeURIComponent(id)}`, { action: "reinvite" });
-    setNotice("A new invitation was made with a new link, and the old link no longer works. Nothing was emailed: select the new invitation and use Send or resend to email it.");
-    router.refresh();
-  });
-
-  const showLink = (id: string, action: "copy" | "reissue") => run(async () => {
-    const result = await call(`/${encodeURIComponent(id)}`, { action }) as { result?: { url: string } };
-    const url = result.result?.url ?? "";
-    setRevealed({ id, url });
-    try {
-      await navigator.clipboard.writeText(url);
-      setNotice(action === "copy" ? "Link copied." : "A new link was made and copied. Earlier copies no longer work. Nothing was emailed.");
-    } catch {
-      setNotice(action === "copy" ? "Copy the link below." : "A new link was made. Copy it below. Earlier copies no longer work. Nothing was emailed.");
-    }
-    if (action === "reissue") router.refresh();
-  });
+export function StaffInvitationList({ eventId, rows, counts, query, total, totalAll, page, pageSize, canSend }: Props) {
+  const { filters, sort } = query;
+  const filtersSet = filters.status !== "ALL" || filters.group !== "ALL" || filters.search !== "";
+  const slice = sliceFromCount(rows, page, total, pageSize);
+  const bareHref = `${LIST_PATH}?event=${encodeURIComponent(eventId)}`;
+  const pageHref = (target: number) => invitationListHref(LIST_PATH, eventId, { ...query, page: target });
+  // The header links keep the filters and the event, flip the direction on the active column and drop the page.
+  const address = Object.fromEntries(new URLSearchParams(invitationListHref(LIST_PATH, eventId, { ...query, page: 1 }).split("?")[1]));
+  const sorting = serverSort<InvitationSortColumn>(LIST_PATH, address, INVITATION_SORT_COLUMNS, INVITATION_DEFAULT_SORT);
+  // The filters alone (no sort, no page), which "Select all N matching" asks the server to run again.
+  const matchingQuery = invitationListHref("", eventId, { ...query, sort: INVITATION_DEFAULT_SORT, page: 1 }).split("?")[1]!.split("&").filter((part) => !part.startsWith("event=")).join("&");
 
   return (
     <section className="panel form-stack" aria-labelledby="staff-invite-list-title">
@@ -191,177 +95,99 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
           </p>
         </div>
       </div>
-      <div className="staff-invite-filters">
+      {/* Never keyed (#1431): the shared form follows the address after Back or a link. The server filters, so a change goes to the address. */}
+      <SearchAsYouTypeForm action={LIST_PATH} aria-label="Filter invitations" className="staff-invite-filters">
+        <input name="event" type="hidden" value={eventId} />
+        {sort.key && <input name="sort" type="hidden" value={sort.key} />}
+        {sort.key && <input name="dir" type="hidden" value={sort.dir} />}
         <label>
           Status
-          <select onChange={(changeEvent) => setStatus(changeEvent.target.value as InvitationStatus | "ALL")} value={status}>
+          <select data-default-value="ALL" defaultValue={filters.status} name="status">
             <option value="ALL">All statuses</option>
             {INVITATION_STATUSES.map((entry) => <option key={entry} value={entry}>{INVITATION_STATUS_LABEL[entry]} ({counts[entry]})</option>)}
           </select>
         </label>
         <label>
           Group
-          <select onChange={(changeEvent) => setGroup(changeEvent.target.value as StaffInvitationGroupValue | "ALL")} value={group}>
+          <select data-default-value="ALL" defaultValue={filters.group} name="group">
             <option value="ALL">All groups</option>
             {STAFF_INVITATION_GROUPS.map((entry) => <option key={entry} value={entry}>{STAFF_INVITATION_GROUP_LABEL[entry]}</option>)}
           </select>
         </label>
         <label>
           Search
-          <input {...search.inputProps} placeholder="Name or email" type="search" />
+          <input defaultValue={filters.search} name="q" placeholder="Name or email" type="search" />
         </label>
-      </div>
-      <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} ${visible.length === 1 ? "invitation" : "invitations"} shown.`} />
+        {filtersSet && <Link className="text-button" href={bareHref}>Clear filters</Link>}
+      </SearchAsYouTypeForm>
+      <SearchResultStatus message={filters.search === "" ? "" : `${total} ${total === 1 ? "invitation matches" : "invitations match"}.`} />
 
-      <div className="panel selection-bar">
-        <span role="status">
-          {selected.size > 0 ? <><strong>{selected.size}</strong> selected{visibleSelected.length !== selected.size ? ` · ${visibleSelected.length} in this view` : ""}</> : "Tick people, or use Select all."}
-        </span>
-        <div className="selection-bar-actions">
-          {visibleSelected.length < visible.length && (
-            <button className="text-button" onClick={() => changeSelection((current) => new Set([...current, ...visible.map((row) => row.id)]))} type="button">Select all {visible.length} matching</button>
-          )}
-          {selected.size > 0 && (
-            <>
-              <button className="text-button" onClick={() => changeSelection(() => new Set())} type="button">Clear selection</button>
-              {canSend && (
-                <button className="secondary-button outline-action" disabled={busy} onClick={() => void openSendPreview()} type="button">
-                  <MailPlus aria-hidden="true" size={16} /> Send or resend…
-                </button>
-              )}
-              <button className="secondary-button outline-action" disabled={busy} onClick={() => setConfirmingRevoke(true)} type="button">
-                <Ban aria-hidden="true" size={16} /> Revoke…
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      <InvitationSelectionProvider canSend={canSend} eventId={eventId} matchingQuery={matchingQuery} pageIds={rows.map((row) => row.id)} total={total}>
+        <InvitationSelectionBar />
 
-      {error && <div className="inline-notice error" role="alert">{error}</div>}
-      {notice && <div className="inline-notice" role="status">{notice}</div>}
-      {revealed && (
-        <div className="staff-invite-preview">
-          <label>
-            Personal link (give it only to this person)
-            <input onFocus={(focusEvent) => focusEvent.currentTarget.select()} readOnly value={revealed.url} />
-          </label>
-          <button className="text-button" onClick={() => setRevealed(null)} type="button">Hide link</button>
-        </div>
-      )}
-
-      {confirmingRevoke && (
-        <div className="staff-invite-preview" role="alertdialog" aria-label="Confirm revoke">
-          <p>Revoke the links of the {selected.size} selected {selected.size === 1 ? "person" : "people"}? Their links stop working at once. People who have already registered are not affected, and nothing is emailed.</p>
-          <div className="intro-actions">
-            <button className="primary-button" disabled={busy} onClick={() => void revoke()} type="button">Revoke {selected.size}</button>
-            <button className="text-button" onClick={() => setConfirmingRevoke(false)} type="button">Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {sendPreview && (
-        <div className="staff-invite-preview" role="alertdialog" aria-label="Preview the invitation email">
-          {sendPreview.willSend === 0 ? (
-            <p>Nobody selected can be sent a link right now (revoked, already registered, or sent a moment ago).</p>
-          ) : (
-            <>
-              <p>
-                <strong>{sendPreview.willSend}</strong> invitation email{sendPreview.willSend === 1 ? "" : "s"} will be queued from {sendPreview.senderName}
-                {sendPreview.skipped > 0 ? `; ${sendPreview.skipped} skipped (revoked, registered, or sent a moment ago)` : ""}.
-                {sendPreview.deliveryMode === "EXTERNAL_EMAIL" ? " They will be delivered to real inboxes." : sendPreview.deliveryMode === "DISABLED" ? " Email delivery is turned off for this event, so they will be suppressed." : " This event captures email locally, so nothing leaves the system."}
-              </p>
-              {!sendPreview.linksOpen && (
-                <p className="inline-notice error" role="note">The event is not published, or it is over, so these links will not open. Publish the event before sending them.</p>
-              )}
-              {sendPreview.sample && (
-                <>
-                  <p className="field-help">The first email, to {sendPreview.sample.to}. Everyone gets the same words with their own name and their own personal link (shown here as a placeholder).</p>
-                  <p><strong>{sendPreview.sample.subject}</strong></p>
-                  <pre>{sendPreview.sample.bodyText}</pre>
-                </>
-              )}
-              <div className="intro-actions">
-                <button className="primary-button" disabled={busy} onClick={() => void confirmSend()} type="button">Send {sendPreview.willSend}</button>
-                <button className="text-button" onClick={() => setSendPreview(null)} type="button">Cancel</button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {visible.length === 0 ? (
-        rows.length === 0
-          ? (
-            <EmptyState
-              action={{ label: "Import a CSV", href: "#staff-invite-import-title" }}
-              actionClass="secondary-button"
-              canCreate
-              className="empty-state"
-              title="Nobody is invited yet"
-            >
-              Import a CSV of email addresses above to create the first personal links.
-            </EmptyState>
-          )
-          : (
-            <NoMatchesState
-              className="empty-state"
-              clear={{ onClick: () => { search.setValue(""); setStatus("ALL"); setGroup("ALL"); } }}
-              known={truncated ? undefined : `This list has ${rows.length} ${rows.length === 1 ? "invitation" : "invitations"}.`}
-              noun="invitations"
-              query={query}
-            />
-          )
-      ) : (
-        <div className="report-table-wrap card-box">
-          {sorted.note}
-          <table className="report-table staff-invite-table">
-            <thead>
-              <tr>
-                <th scope="col"><span className="sr-only">Select</span></th>
-                {sorted.header("person", "Person")}
-                {sorted.header("group", "Group")}
-                {sorted.header("status", "Status")}
-                <th scope="col">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slice.items.map((row) => (
-                <tr key={row.id}>
-                  <td><label className="staff-invite-select"><input aria-label={`Select ${row.email}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" /></label></td>
-                  <td data-label="Person">
-                    <strong>{formatPersonName(row) || row.email}</strong>
-                    {(row.firstName || row.lastName) && <><br /><span className="field-help">{row.email}</span></>}
-                  </td>
-                  <td data-label="Group">{STAFF_INVITATION_GROUP_LABEL[row.group]}</td>
-                  <td data-label="Status">
-                    <span className={`status-chip ${tone(row.status)}`}>{INVITATION_STATUS_LABEL[row.status]}</span>
-                    {row.sentAt && row.status !== "REGISTERED" && row.status !== "APPROVED" && row.status !== "DECLINED" && (
-                      <><br /><span className="field-help">Sent {row.sendCount > 1 ? `${row.sendCount} times, last ` : ""}{row.sentAt.slice(0, 16).replace("T", " ")} UTC</span></>
-                    )}
-                    {row.deliveryNote && <><br /><span className="field-help">{row.deliveryNote}</span></>}
-                    {row.confirmationCode && <><br /><span className="field-help">{row.confirmationCode}</span></>}
-                  </td>
-                  <td data-label="Actions">
-                    <div className="staff-invite-actions">
-                      {row.usable && (
-                        <button className="text-button" disabled={busy} onClick={() => void showLink(row.id, "copy")} type="button"><Copy aria-hidden="true" size={14} /> Copy link</button>
-                      )}
-                      {row.reinvitable && (
-                        <button className="text-button" disabled={busy} onClick={() => void reinvite(row.id)} type="button"><UserPlus aria-hidden="true" size={14} /> Re-invite</button>
-                      )}
-                      {row.reissuable && (
-                        <button className="text-button" disabled={busy} onClick={() => void showLink(row.id, "reissue")} type="button"><RefreshCw aria-hidden="true" size={14} /> Reissue</button>
-                      )}
-                    </div>
-                  </td>
+        {rows.length === 0 ? (
+          totalAll === 0
+            ? (
+              <EmptyState
+                action={{ label: "Import a CSV", href: "#staff-invite-import-title" }}
+                actionClass="secondary-button"
+                canCreate
+                className="empty-state"
+                title="Nobody is invited yet"
+              >
+                Import a CSV of email addresses above to create the first personal links.
+              </EmptyState>
+            )
+            : (
+              <NoMatchesState
+                className="empty-state"
+                clear={{ href: bareHref }}
+                known={`This list has ${totalAll} ${totalAll === 1 ? "invitation" : "invitations"}.`}
+                noun="invitations"
+                query={filters.search}
+              />
+            )
+        ) : (
+          <div className="report-table-wrap card-box">
+            {sort.key && <SortOrderNote>{sortOrderText(SORT_LABELS[sort.key].label.toLowerCase(), sort.dir, SORT_LABELS[sort.key].kind)}</SortOrderNote>}
+            <table className="report-table staff-invite-table">
+              <thead>
+                <tr>
+                  <th scope="col"><span className="sr-only">Select</span></th>
+                  <ColumnHeader column="person" label={SORT_LABELS.person.label} sorting={sorting} />
+                  <ColumnHeader column="group" label={SORT_LABELS.group.label} sorting={sorting} />
+                  <ColumnHeader column="status" label={SORT_LABELS.status.label} sorting={sorting} />
+                  <th scope="col">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <ListPager label="Invitation pages" noun="invitations" nounOne="invitation" onPage={(page) => setPageState({ key: filterKey, page })} slice={slice} />
-      {truncated && <p className="field-help">This list is cut off at 2,000 people. Filter it, or ask for the rest to be exported.</p>}
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    <td><InvitationRowSelect email={row.email} id={row.id} /></td>
+                    <td data-label="Person">
+                      <strong>{formatPersonName(row) || row.email}</strong>
+                      {(row.firstName || row.lastName) && <><br /><span className="field-help">{row.email}</span></>}
+                    </td>
+                    <td data-label="Group">{STAFF_INVITATION_GROUP_LABEL[row.group]}</td>
+                    <td data-label="Status">
+                      <span className={`status-chip ${tone(row.status)}`}>{INVITATION_STATUS_LABEL[row.status]}</span>
+                      {row.sentAt && row.status !== "REGISTERED" && row.status !== "APPROVED" && row.status !== "DECLINED" && (
+                        <><br /><span className="field-help">Sent {row.sendCount > 1 ? `${row.sendCount} times, last ` : ""}{row.sentAt.slice(0, 16).replace("T", " ")} UTC</span></>
+                      )}
+                      {row.deliveryNote && <><br /><span className="field-help">{row.deliveryNote}</span></>}
+                      {row.confirmationCode && <><br /><span className="field-help">{row.confirmationCode}</span></>}
+                    </td>
+                    <td data-label="Actions">
+                      <InvitationRowActions id={row.id} reinvitable={row.reinvitable} reissuable={row.reissuable} usable={row.usable} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </InvitationSelectionProvider>
+      <ListPager hrefFor={pageHref} label="Invitation pages" noun="invitations" nounOne="invitation" slice={slice} />
     </section>
   );
 }

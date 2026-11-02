@@ -22,7 +22,7 @@ import {
   AWAITING_ARRIVAL_LABEL,
   CheckInWorkspace,
 } from "@/components/check-in-workspace";
-import { DELIVERY_PAGE_SIZE, DELIVERY_SERVER_CAP } from "@/components/communications-workspace";
+import { DELIVERY_PAGE_SIZE } from "@/components/communications-workspace";
 import { projectCheckInArrivals } from "@/modules/checkin/arrival-view";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 
@@ -117,7 +117,6 @@ describe("searching a paged list (#702)", () => {
 describe("page sizes", () => {
   it("pages the delivery log, the arrival roster and the unmatched rows at 50", () => {
     expect(DELIVERY_PAGE_SIZE).toBe(50);
-    expect(DELIVERY_SERVER_CAP).toBe(150);
     expect(ARRIVALS_PAGE_SIZE).toBe(50);
     expect(UNMATCHED_PAGE_SIZE).toBe(50);
   });

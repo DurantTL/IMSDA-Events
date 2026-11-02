@@ -182,7 +182,13 @@ describe("the People list with filters", () => {
     expect(html).toContain('id="pending-section"');
     expect(html).toContain("2 pending invites.");
     expect(render({ filters: filtersFor("pending"), pending: section, pendingCount: 1 })).toContain("1 pending invite.");
-    expect(render({ filters: filtersFor("pending"), pending: section, pendingCount: 50, pendingCapped: true })).toContain("The newest 50 pending invites");
+    // Paged in the database (#1492): the count is the real total, with the shared pager and no "newest 50" cap wording.
+    const paged = render({ filters: filtersFor("pending"), pending: section, pendingCount: 60, pendingSlice: { from: 1, to: 25, page: 1, pageCount: 3, total: 60 } });
+    expect(paged).toContain("60 pending invites.");
+    expect(paged).toContain("Showing 1–25 of 60 pending invites");
+    expect(paged).toContain("pendingPage=2");
+    expect(paged).not.toContain("The newest");
+    expect(paged).not.toContain("Older ones are not listed");
     const empty = render({ filters: filtersFor("pending"), pending: null, pendingCount: 0 });
     expect(empty).toContain("No pending invites.");
     expect(empty).not.toContain("No people found.");

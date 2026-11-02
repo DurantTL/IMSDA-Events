@@ -147,7 +147,10 @@ export type MessagingSettingsRecord = {
 export type MessagingWorkspaceData = {
   settings: MessagingSettingsRecord;
   templates: MessageTemplateRecord[];
+  /** One page of the delivery log, in the database's order (#1492). */
   messages: MessageOutboxRecord[];
+  /** Where that page sits in the whole (filtered) log. */
+  messageLog: { total: number; page: number; pageSize: number; status: "ALL" | MessageOutboxStatusValue };
   /** Images already uploaded for message bodies, for the editor's picker (#824). */
   inlineImages: MessageFileRecord[];
   counts: Record<MessageOutboxStatusValue, number>;

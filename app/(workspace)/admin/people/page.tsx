@@ -5,11 +5,12 @@ import { redirect } from "next/navigation";
 import { ActAsButton } from "@/components/act-as-button";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { InvitePerson } from "@/components/invite-person";
+import { sliceFromCount } from "@/lib/pagination";
 import { PeopleDirectory } from "@/components/people-directory";
 import { PendingInvites } from "@/components/pending-invites";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { listClubOptions, listEventOptions, searchPeople } from "@/modules/system-admin/people-directory";
-import { PENDING_INVITES_CAP, listPendingInvites } from "@/modules/system-admin/pending-invites";
+import { listPendingInvitesPage } from "@/modules/system-admin/pending-invites";
 import { keepKnownFilterIds, peopleFilterCount, parsePeopleFilters, parsePeoplePage, parsePeopleQuery } from "@/modules/system-admin/people-directory-model";
 
 export const metadata: Metadata = { title: "People & access" };
@@ -21,6 +22,7 @@ export default async function PeopleAccessPage({
   searchParams: Promise<{
     q?: string | string[];
     page?: string | string[];
+    pendingPage?: string | string[];
     role?: string | string[];
     event?: string | string[];
     club?: string | string[];
@@ -47,7 +49,7 @@ export default async function PeopleAccessPage({
     pendingOnly
       ? { rows: [], page: 1, pageCount: 1, total: 0 }
       : searchPeople(query, parsePeoplePage(params.page), viewer.scope, filters),
-    showPending ? listPendingInvites({ query, scope: viewer.scope }) : { invites: [], emailConfigured: false },
+    showPending ? listPendingInvitesPage({ query, scope: viewer.scope }, parsePeoplePage(params.pendingPage)) : { invites: [], emailConfigured: false, total: 0, page: 1, pageSize: 1 },
   ]);
   return (
     <>
@@ -75,8 +77,9 @@ export default async function PeopleAccessPage({
         eventOptions={eventOptions}
         clubOptions={clubOptions}
         pending={<PendingInvites emailConfigured={pending.emailConfigured} invites={pending.invites} />}
-        pendingCount={pending.invites.length}
-        pendingCapped={pending.invites.length >= PENDING_INVITES_CAP}
+        pendingCount={pending.total}
+        pendingPage={pending.page}
+        pendingSlice={pending.total > 0 ? sliceFromCount(pending.invites, pending.page, pending.total, pending.pageSize) : undefined}
         page={result.page} pageCount={result.pageCount} query={query} rows={result.rows} total={result.total}
       />
     </>

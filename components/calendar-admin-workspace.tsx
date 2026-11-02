@@ -2,11 +2,11 @@
 
 import { ListPager } from "@/components/list-pager";
 import { StaffPageHeader } from "@/components/staff-page-header";
-import { paginate } from "@/lib/pagination";
-import { useId, useMemo, useRef, useState } from "react";
+import { sliceFromCount } from "@/lib/pagination";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
-import { useAddressParams, useClientSearch, writeAddressParams } from "@/components/search-as-you-type";
+import { TYPED_TEXT_ADDRESS_MODE, useAddressParams, useClientSearch, writeAddressParams } from "@/components/search-as-you-type";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
 import { CalendarFeedsPanel } from "@/components/calendar-feeds-panel";
@@ -23,13 +23,13 @@ import {
   defaultEntryFilters,
   describeEntryCount,
   describeEntrySort,
-  filterAndSortEntries,
   maxBulkEntries,
   noCategoryFilter,
+  CALENDAR_ENTRY_PAGE_SIZE,
+  entryQueryParams,
   parseEntryDropdownFilters,
-  calendarEntryListLimit,
-  selectAllMatching,
-  selectedMatchingIds,
+  parseEntryQuery,
+  parseEntrySort,
   staffSourceFilter,
   summarizeSkips,
   type BulkAction,
@@ -37,7 +37,7 @@ import {
   type EntryFilters,
   type EntrySort,
 } from "@/modules/calendar/admin-list";
-import { calendarDateIn, calendarStatusLabels, closureLabel, formatDateRange } from "@/modules/calendar/domain";
+import { calendarStatusLabels, closureLabel, formatDateRange } from "@/modules/calendar/domain";
 import { describeRepeat, previewOccurrences, weekdayLabels, type RepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry, CalendarAdminEvent } from "@/modules/calendar/repository";
 import { savedMessage } from "@/components/form-message";
@@ -63,7 +63,15 @@ export type RepeatDraft = {
   weekStart: RepeatRule["weekStart"];
 };
 
-const pageSize = 50;
+/** The Entries list's address: the select filters, the order and the page. The search is `?q=`. Each is a database filter, offset or order (#1492). */
+type EntryListParams = EntryDropdownFilters & { sort: EntrySort; page: string };
+const defaultEntryListParams: EntryListParams = { ...defaultEntryDropdownFilters, sort: "date", page: "1" };
+function parseEntryListParams(params: URLSearchParams): EntryListParams {
+  return { ...parseEntryDropdownFilters(params), sort: parseEntrySort(params.get("sort")), page: String(parseEntryQuery(params).page) };
+}
+
+/** Where the loaded page sits in the whole list, from the server. */
+export type EntryListInfo = { total: number; page: number; pageSize: number; totalAll: number; categories: string[] };
 
 export const noRepeat: RepeatDraft = { frequency: "NEVER", interval: 1, weekdays: [], endMode: "never", until: "", count: 10, weekStart: 0 };
 
@@ -127,8 +135,14 @@ export function CalendarAdminWorkspace({
   initialFeeds = [],
   initialReminders = { batches: [], emailConfigured: true },
   widgetEmbedCode = "",
+  initialEntryList,
+  initialQueryKey = "",
 }: {
   initialEntries: CalendarAdminEntry[];
+  /** Counts for the first page; without it the first page is taken as the whole list. */
+  initialEntryList?: EntryListInfo;
+  /** The address query the first page was read for (`?q=...` without the `?`), so the list reads again only when the address differs. */
+  initialQueryKey?: string;
   initialEvents: CalendarAdminEvent[];
   initialFeeds?: CalendarAdminFeed[];
   /** Deadline reminder batches waiting for a send (#910). */
@@ -139,6 +153,7 @@ export function CalendarAdminWorkspace({
   const [tab, setTab] = useState<CalendarTab>("entries");
   const [reminderCount, setReminderCount] = useState(initialReminders.batches.length);
   const [entries, setEntries] = useState(initialEntries);
+  const [entryList, setEntryList] = useState<EntryListInfo>(initialEntryList ?? { total: initialEntries.length, page: 1, pageSize: CALENDAR_ENTRY_PAGE_SIZE, totalAll: initialEntries.length, categories: [] });
   const [events, setEvents] = useState(initialEvents);
   const [editing, setEditing] = useState<CalendarAdminEntry | null>(null);
   const [saving, setSaving] = useState(false);
@@ -153,45 +168,116 @@ export function CalendarAdminWorkspace({
   const summaryRef = useRef<HTMLParagraphElement>(null);
   // Entries list (#796): search, filters, sort, and the rows ticked for a bulk action.
   // The filters live in the address (`?q=`, `?category=`, ...), so reload, Back and shared links keep them (rule B2, #1456).
-  const [dropdownFilters, setFilters] = useAddressParams(defaultEntryDropdownFilters, parseEntryDropdownFilters, () => startNewView());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [listParams, setListParams] = useAddressParams(defaultEntryListParams, parseEntryListParams, () => setSelected(new Set()));
+  const { sort, page: pageParam, ...dropdownFilters } = listParams;
   const search = useClientSearch(defaultEntryFilters.search, undefined, "q");
   // The list filters on the settled search term, not on every keystroke.
   const filters = useMemo(() => ({ ...dropdownFilters, search: search.term }), [dropdownFilters, search.term]);
-  const [sort, setSort] = useState<EntrySort>("date");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [page, setPage] = useState(1);
   const [bulkCategory, setBulkCategory] = useState("");
   const [bulkTarget, setBulkTarget] = useState<BulkAction | null>(null);
-  const today = calendarDateIn(new Date());
-  const matching = useMemo(() => filterAndSortEntries(entries, filters, sort, today), [entries, filters, sort, today]);
-  // Only rows still in the current list count: a stale tick (an entry edited, removed or refreshed away) never reaches the server.
-  const selectedIds = selectedMatchingIds(matching, selected);
-  const slice = paginate(matching, page, pageSize);
+  const [loadingEntries, setLoadingEntries] = useState(false);
+  const total = entryList.total;
+  const slice = sliceFromCount(entries, entryList.page, total, entryList.pageSize);
+  // The address says which page, filters and order the database is asked for; `queryKey` is that question as text.
+  const query = useMemo(() => ({ filters, sort, page: parseEntryQuery(new URLSearchParams({ page: pageParam })).page }), [filters, sort, pageParam]);
+  const queryKey = entryQueryParams(query).toString();
+  const loadedKey = useRef(initialQueryKey);
+  const requestRef = useRef(0);
+  const selectedRef = useRef(selected);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+  const mounted = useRef(false);
+
+  /** Reads the page for the current address from the server. A newer read wins; the page is clamped to the real total. */
+  async function loadEntries(key: string, afterChange = false) {
+    const request = requestRef.current + 1;
+    requestRef.current = request;
+    setLoadingEntries(true);
+    try {
+      const response = await fetch(`/api/admin/calendar/entries${key ? `?${key}` : ""}`, { cache: "no-store" });
+      const result = await response.json().catch(() => ({})) as ApiResponse & { entryPage?: EntryListInfo };
+      if (request !== requestRef.current) return;
+      if (!response.ok || !result.entries || !result.entryPage) throw new Error(result.message ?? "The entries could not be loaded.");
+      loadedKey.current = key;
+      setEntries(result.entries);
+      setEntryList(result.entryPage);
+      // A page past the end was clamped by the server: put the real page in the address.
+      if (String(result.entryPage.page) !== pageParam && key.includes("page=")) writeAddressParams({ page: result.entryPage.page > 1 ? String(result.entryPage.page) : null }, TYPED_TEXT_ADDRESS_MODE);
+      if (afterChange) await keepSelectionInList(key, result.entryPage.total);
+    } catch (caught) {
+      if (request === requestRef.current) setError(caught instanceof Error ? caught.message : "The entries could not be loaded.");
+    } finally {
+      if (request === requestRef.current) setLoadingEntries(false);
+    }
+  }
+
+  // After a change, ticks for rows that left the list (edited, removed, refreshed away) are dropped, so a stale tick never reaches the server.
+  async function keepSelectionInList(key: string, matchingTotal: number) {
+    if (selectedRef.current.size === 0) return;
+    if (matchingTotal > maxBulkEntries) { setSelected(new Set()); return; }
+    const response = await fetch(`/api/admin/calendar/entries/matching-ids${key ? `?${key}` : ""}`, { cache: "no-store" });
+    const result = await response.json().catch(() => ({})) as { ids?: string[] };
+    const inList = new Set(result.ids ?? []);
+    setSelected((current) => new Set([...current].filter((id) => inList.has(id))));
+  }
+
+  const loadEntriesRef = useRef(loadEntries);
+  useEffect(() => { loadEntriesRef.current = loadEntries; });
+  useEffect(() => {
+    // The first pass has only the defaults; the address is read right after it, and the server page already matches it.
+    if (!mounted.current) { mounted.current = true; return; }
+    if (queryKey !== loadedKey.current) void loadEntriesRef.current(queryKey);
+  }, [queryKey]);
+
+  // A changed search term starts a new view: nothing ticked, back to page 1. Only a term the person typed does: a term put
+  // back by a reload or Back comes with its own page in the address.
+  const lastTerm = useRef(search.term);
+  const typedRef = useRef(false);
+  useEffect(() => {
+    if (lastTerm.current === search.term) return;
+    lastTerm.current = search.term;
+    if (!typedRef.current) return;
+    typedRef.current = false;
+    setSelected(new Set());
+    setListParams({ page: "1" }, TYPED_TEXT_ADDRESS_MODE);
+  }, [search.term, setListParams]);
+  const searchInputProps = { ...search.inputProps, onChange: (event: React.ChangeEvent<HTMLInputElement>) => { typedRef.current = true; search.inputProps.onChange(event); } };
 
   // A new view starts with nothing ticked, so a bulk action never touches rows you can't see.
-  function startNewView() {
-    setSelected(new Set());
-    setPage(1);
-  }
-
-  // A changed search term starts a new view too, once the list has changed.
-  const [searchTermSeen, setSearchTermSeen] = useState(search.term);
-  if (searchTermSeen !== search.term) {
-    setSearchTermSeen(search.term);
-    startNewView();
-  }
-
   function changeFilters(patch: Partial<EntryDropdownFilters>) {
-    setFilters(patch);
-    startNewView();
+    setListParams({ ...patch, page: "1" });
+    setSelected(new Set());
+  }
+
+  function changeSort(next: EntrySort) {
+    setListParams({ sort: next, page: "1" });
+    setSelected(new Set());
+  }
+
+  function changePage(next: number) {
+    setListParams({ page: String(next) });
   }
 
   function resetEntryFilters() {
     // One history entry for the whole clearing, so Back brings the filters back.
-    writeAddressParams({ q: null, category: null, source: null, state: null, time: null, entryType: null }, "push");
-    setFilters(defaultEntryDropdownFilters);
+    writeAddressParams({ q: null, category: null, source: null, state: null, time: null, entryType: null, page: null }, "push");
+    setListParams({ ...defaultEntryDropdownFilters, page: "1" });
     search.setValue(defaultEntryFilters.search);
-    startNewView();
+    setSelected(new Set());
+  }
+
+  /** "Select all N matching": the server finds every entry the filters match (all pages), up to the bulk limit. */
+  async function selectAllMatchingEntries(checked: boolean) {
+    if (!checked) { setSelected(new Set()); return; }
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/calendar/entries/matching-ids${queryKey ? `?${queryKey}` : ""}`, { cache: "no-store" });
+      const result = await response.json().catch(() => ({})) as { ids?: string[]; message?: string };
+      if (!response.ok || !result.ids) throw new Error(result.message ?? "The matching entries could not be selected.");
+      setSelected(new Set(result.ids));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The matching entries could not be selected.");
+    }
   }
 
   function toggleSelected(id: string) {
@@ -211,11 +297,12 @@ export function CalendarAdminWorkspace({
       const response = await fetch("/api/admin/calendar/entries/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selectedIds, change: bulkTarget }),
+        body: JSON.stringify({ ids: [...selected], change: bulkTarget }),
       });
       const result = await response.json().catch(() => ({})) as ApiResponse;
       if (!response.ok || !result.result) throw new Error(result.message ?? result.issues?.[0]?.message ?? "The entries could not be updated.");
-      if (result.entries) setEntries(result.entries);
+      // The response carries the default first page; the list reads its own page again.
+      await loadEntries(queryKey, true);
       const { changed, skipped: skippedEntries } = result.result;
       setNotice(
         `Changed ${describeEntryCount(changed)}.` +
@@ -242,7 +329,8 @@ export function CalendarAdminWorkspace({
       });
       const result = await response.json().catch(() => ({})) as ApiResponse;
       if (!response.ok) throw new Error(result.message ?? result.issues?.[0]?.message ?? "The calendar could not be updated.");
-      if (result.entries) setEntries(result.entries);
+      // The response carries the default first page; the list reads its own page again.
+      if (result.entries) await loadEntries(queryKey, true);
       if (result.events) setEvents(result.events);
       if (result.applied === false) setNotice("Your edits are cleared. Google could not be reached, so its version arrives at the next refresh.");
       else setNotice(success);
@@ -298,7 +386,7 @@ export function CalendarAdminWorkspace({
   }
 
   const categoryOptions = [...new Set([
-    ...entries.map((entry) => entry.category),
+    ...entryList.categories,
     ...events.map((event) => event.calendarCategory),
   ].filter(Boolean))].sort();
 
@@ -324,7 +412,7 @@ export function CalendarAdminWorkspace({
         selectedKey={tab}
         onSelect={(key) => setTab(key as CalendarTab)}
         tabs={([
-          { key: "entries", label: <>Calendar entries <span>{entries.length}</span></> },
+          { key: "entries", label: <>Calendar entries <span>{entryList.totalAll}</span></> },
           { key: "events", label: <>Events <span>{events.filter((event) => event.isPublished && event.showOnCalendar).length}</span></> },
           { key: "imports", label: <>Imported calendars <span>{initialFeeds.length}</span></>, kept: true },
           { key: "reminders", label: <>Deadline reminders <span>{reminderCount}</span></>, kept: true },
@@ -344,7 +432,7 @@ export function CalendarAdminWorkspace({
 
       {/* Kept mounted so the list of feeds survives switching tabs. */}
       <TabPanel id={calendarPanelId("imports")} tabId={calendarTabId("imports")} stack={false} hidden={tab !== "imports"}>
-        <CalendarFeedsPanel initialFeeds={initialFeeds} onEntriesChange={setEntries} />
+        <CalendarFeedsPanel initialFeeds={initialFeeds} onEntriesChange={() => void loadEntries(queryKey, true)} />
       </TabPanel>
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
@@ -368,7 +456,7 @@ export function CalendarAdminWorkspace({
                 <h2>Calendar entries</h2>
               </div>
             </div>
-            {entries.length === 0 ? (
+            {entryList.totalAll === 0 ? (
               <EmptyState announce={false} hint="Use the form above to add dates for events that aren't registered here, such as rallies or camporees." icon={<CalendarDays aria-hidden="true" size={27} />} title="No entries yet">The calendar has no entries of its own.</EmptyState>
             ) : (
               <>
@@ -378,30 +466,29 @@ export function CalendarAdminWorkspace({
                 filters={filters}
                 onChange={changeFilters}
                 onReset={resetEntryFilters}
-                search={search}
-                onSort={(next) => { setSort(next); startNewView(); }}
+                search={{ ...search, inputProps: searchInputProps }}
+                onSort={changeSort}
                 sort={sort}
               />
-              <p aria-live="polite" className="calendar-list-summary" ref={summaryRef} role="status" tabIndex={-1}>
-                {describeEntryCount(matching.length)} match. {describeEntrySort(sort)}.
-                {entries.length >= calendarEntryListLimit && ` The list holds the ${calendarEntryListLimit.toLocaleString("en-US")} entries with the newest start dates; older ones are not loaded.`}
+              <p aria-busy={loadingEntries} aria-live="polite" className="calendar-list-summary" ref={summaryRef} role="status" tabIndex={-1}>
+                {describeEntryCount(total)} match. {describeEntrySort(sort)}.
               </p>
               <div className="calendar-bulk-bar">
                 <label className="checkbox-label">
                   <input
-                    checked={matching.length > 0 && selectedIds.length === matching.length}
-                    disabled={matching.length === 0 || matching.length > maxBulkEntries}
-                    onChange={(event) => setSelected(new Set(event.target.checked ? selectAllMatching(matching) : []))}
+                    checked={total > 0 && selected.size === total}
+                    disabled={total === 0 || total > maxBulkEntries}
+                    onChange={(event) => void selectAllMatchingEntries(event.target.checked)}
                     type="checkbox"
                   />{" "}
-                  Select all {matching.length} matching
+                  Select all {total} matching
                 </label>
-                {matching.length > maxBulkEntries && (
+                {total > maxBulkEntries && (
                   <small>Narrow the list to {maxBulkEntries} or fewer to change them together.</small>
                 )}
-                {selectedIds.length > 0 && (
-                  <div className="calendar-admin-actions" role="group" aria-label={`Change ${describeEntryCount(selectedIds.length)}`}>
-                    <strong>{selectedIds.length} selected</strong>
+                {selected.size > 0 && (
+                  <div className="calendar-admin-actions" role="group" aria-label={`Change ${describeEntryCount(selected.size)}`}>
+                    <strong>{selected.size} selected</strong>
                     <input
                       aria-label="Category for the selected entries"
                       list="calendar-categories"
@@ -422,8 +509,8 @@ export function CalendarAdminWorkspace({
                   </div>
                 )}
               </div>
-              {matching.length === 0 ? (
-                <NoMatchesState clear={{ onClick: resetEntryFilters }} known={`The calendar has ${entries.length} ${entries.length === 1 ? "entry" : "entries"} in all.`} noun="entries" query={search.term} />
+              {entries.length === 0 ? (
+                <NoMatchesState clear={{ onClick: resetEntryFilters }} known={`The calendar has ${entryList.totalAll} ${entryList.totalAll === 1 ? "entry" : "entries"} in all.`} noun="entries" query={search.term} />
               ) : (
               <ul className="calendar-admin-list">
                 {slice.items.map((entry) => (
@@ -514,7 +601,7 @@ export function CalendarAdminWorkspace({
                 ))}
               </ul>
               )}
-              <ListPager label="Calendar entry pages" noun="entries" nounOne="entry" onPage={setPage} slice={slice} />
+              <ListPager label="Calendar entry pages" noun="entries" nounOne="entry" onPage={changePage} slice={slice} />
               </>
             )}
           </section>
@@ -605,7 +692,7 @@ export function CalendarAdminWorkspace({
         onCancel={() => setBulkTarget(null)}
         onConfirm={() => void runBulk()}
         open={bulkTarget !== null}
-        title={bulkTarget ? bulkConfirmMessage(bulkTarget, selectedIds.length) : "Change entries?"}
+        title={bulkTarget ? bulkConfirmMessage(bulkTarget, selected.size) : "Change entries?"}
       >
         <p>Imported entries keep your changes when their calendar refreshes. Nothing is changed in Google.</p>
       </ConfirmDialog>

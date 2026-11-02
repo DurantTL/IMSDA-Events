@@ -135,8 +135,11 @@ export const INVITATION_STATUS_LABEL: Record<InvitationStatus, string> = {
 };
 
 /** Message states and provider reports that mean the email did not reach the person. */
-const FAILED_MESSAGE_STATUSES = new Set(["FAILED", "SUPPRESSED", "CANCELLED"]);
-const FAILED_PROVIDER_STATUSES = new Set(["BOUNCED", "FAILED", "COMPLAINED", "SUPPRESSED"]);
+/** The outbox and provider statuses that mean the invitation email did not reach the person; the list's "Delivery failed" is these. */
+export const INVITATION_FAILED_MESSAGE_STATUSES = ["FAILED", "SUPPRESSED", "CANCELLED"] as const;
+export const INVITATION_FAILED_PROVIDER_STATUSES = ["BOUNCED", "FAILED", "COMPLAINED", "SUPPRESSED"] as const;
+const FAILED_MESSAGE_STATUSES = new Set<string>(INVITATION_FAILED_MESSAGE_STATUSES);
+const FAILED_PROVIDER_STATUSES = new Set<string>(INVITATION_FAILED_PROVIDER_STATUSES);
 
 /**
  * Whether the office can re-invite this person (#1027): their registration was declined (or was cancelled while it waited, which

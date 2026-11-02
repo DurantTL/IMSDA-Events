@@ -4,6 +4,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { StaffInvitationImport } from "@/components/staff-invitation-import";
 import { StaffInvitationList } from "@/components/staff-invitation-list";
 import { resolveEventContext } from "@/modules/events/selection";
+import { parseInvitationQuery } from "@/modules/staff-invitations/list-query";
 import { listInvitations } from "@/modules/staff-invitations/repository";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
@@ -13,8 +14,9 @@ export const metadata: Metadata = { title: "Staff invitations" };
  * Personal staff, pastor and volunteer links (#804): import a CSV of email addresses, see each person's status, and send, resend,
  * copy, reissue or revoke their personal links. Registrations made through the links are approved on the next page.
  */
-export default async function StaffInvitationsPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
-  const { event: requested } = await searchParams;
+export default async function StaffInvitationsPage({ searchParams }: { searchParams: Promise<{ event?: string; status?: string; group?: string; q?: string; sort?: string; dir?: string; page?: string }> }) {
+  const params = await searchParams;
+  const requested = params.event;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_REGISTRATION")) {
     return (
@@ -30,7 +32,9 @@ export default async function StaffInvitationsPage({ searchParams }: { searchPar
       <NotAvailableForEvent reason="Personal staff, pastor and volunteer links are for events that are open to everyone." />
     );
   }
-  const list = await listInvitations(event.id);
+  // Searched, filtered, ordered and paged in the database from the address (#1492).
+  const query = parseInvitationQuery(params);
+  const list = await listInvitations(event.id, query);
   return (
     <section className="page-stack">
       <div className="page-intro">
@@ -53,8 +57,12 @@ export default async function StaffInvitationsPage({ searchParams }: { searchPar
         canSend={permissions.includes("MANAGE_COMMUNICATIONS")}
         counts={list.counts}
         eventId={event.id}
+        page={list.page}
+        pageSize={list.pageSize}
+        query={query}
         rows={list.rows}
-        truncated={list.truncated}
+        total={list.total}
+        totalAll={list.totalAll}
       />
     </section>
   );

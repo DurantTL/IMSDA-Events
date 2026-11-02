@@ -108,6 +108,9 @@ export function useDebouncedSearch(value: string, delayMs: number = SEARCH_DEBOU
 /** How a filter change reaches the address: a typed search replaces (one entry per search), a toggle or select pushes (Back undoes it). */
 export type AddressMode = "push" | "replace";
 
+/** How typed text writes the address (one history entry per search, not per keystroke). Lists that reset their page when the search changes use this, so `replace` is chosen here and never beside a filter select. */
+export const TYPED_TEXT_ADDRESS_MODE: AddressMode = "replace";
+
 /** The mode for a change to `target`: typed text replaces, anything else (select, checkbox, radio, button) pushes. */
 export function addressModeFor(target: EventTarget | null): AddressMode {
   return isTypedField(target) ? "replace" : "push";

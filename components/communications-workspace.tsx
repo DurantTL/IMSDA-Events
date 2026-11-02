@@ -35,7 +35,13 @@ import {
 } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { ListPager } from "@/components/list-pager";
-import { newestFirst, paginate } from "@/lib/pagination";
+import { sliceFromCount } from "@/lib/pagination";
+import {
+  DEFAULT_DELIVERY_QUERY,
+  DELIVERY_FILTERS,
+  DELIVERY_PAGE_SIZE,
+  type DeliveryLogQuery,
+} from "@/modules/communications/delivery-log-model";
 import {
   AnnouncementBroadcastReviewFacts,
   announcementBroadcastConfirmState,
@@ -195,21 +201,18 @@ function withPreviewLinks(value: string) {
     .replaceAll(REGISTRATION_MANAGE_API_SENTINEL, PREVIEW_MANAGE_API_URL)
     .replaceAll(REGISTRATION_MANAGE_LINK_SENTINEL, PREVIEW_MANAGE_URL);
 }
-/** Delivery-log rows per page (#702). */
-export const DELIVERY_PAGE_SIZE = 50;
+export { DELIVERY_PAGE_SIZE };
 
-/** The server returns at most this many messages; older ones are not listed. */
-export const DELIVERY_SERVER_CAP = 150;
+const deliveryFilters = DELIVERY_FILTERS;
 
-const deliveryFilters: Array<"ALL" | MessageOutboxStatusValue> = [
-  "ALL",
-  "PENDING",
-  "CAPTURED",
-  "FAILED",
-  "SUPPRESSED",
-  "SENT",
-  "CANCELLED",
-];
+/** The refresh address for one page of the log; the default query leaves the address bare. */
+function deliveryReadUrl(eventId: string, query: DeliveryLogQuery): string {
+  const params = new URLSearchParams();
+  if (query.status !== "ALL") params.set("status", query.status);
+  if (query.page > 1) params.set("page", String(query.page));
+  const text = params.toString();
+  return `/api/events/${eventId}/messages${text ? `?${text}` : ""}`;
+}
 
 const templateLabels: Record<string, string> = {
   REGISTRATION_CONFIRMATION_PAID: "Paid / no balance",
@@ -376,11 +379,8 @@ export function CommunicationsWorkspace({
       ? requestedMessageId!
       : messaging?.messages[0]?.id ?? "",
   );
-  const [deliveryFilter, setDeliveryFilter] = useState<"ALL" | MessageOutboxStatusValue>(
-    deliveryFilters.includes(searchParams.get("status") as "ALL" | MessageOutboxStatusValue)
-      ? searchParams.get("status") as "ALL" | MessageOutboxStatusValue
-      : "ALL",
-  );
+  // The log is paged and filtered in the database; the status and page here are what the address and the last read say (#1492).
+  const deliveryFilter: "ALL" | MessageOutboxStatusValue = messaging?.messageLog.status ?? "ALL";
   const selectedTemplate = messaging?.templates.find((template) => template.id === selectedTemplateId)
     ?? messaging?.templates[0]
     ?? null;
@@ -529,14 +529,10 @@ export function CommunicationsWorkspace({
     "These communication changes have not been published or saved. Leave and discard them?",
   );
 
-  const filteredMessages = useMemo(
-    () => newestFirst(
-      (messaging?.messages ?? []).filter((message) => deliveryFilter === "ALL" || message.status === deliveryFilter),
-      (message) => String(message.createdAt),
-    ),
-    [deliveryFilter, messaging?.messages],
-  );
-  const [deliveryPage, setDeliveryPage] = useState(1);
+  const deliveryQueryRef = useRef<DeliveryLogQuery>(DEFAULT_DELIVERY_QUERY);
+  useEffect(() => {
+    deliveryQueryRef.current = messaging ? { status: messaging.messageLog.status, page: messaging.messageLog.page } : DEFAULT_DELIVERY_QUERY;
+  }, [messaging]);
   const [refreshingDeliveries, setRefreshingDeliveries] = useState(false);
   // "Retry failed" (#860): preview, then confirm. The request id stays with one preview so a repeated click replays.
   const [retryFailedOpen, setRetryFailedOpen] = useState(false);
@@ -547,17 +543,18 @@ export function CommunicationsWorkspace({
   const retryFailedRequestRef = useRef<{ key: string; id: string } | null>(null);
   const retryFailedLoadRef = useRef(0);
   const deliverySlice = useMemo(
-    () => paginate(filteredMessages, deliveryPage, DELIVERY_PAGE_SIZE),
-    [filteredMessages, deliveryPage],
+    () => messaging ? sliceFromCount(messaging.messages, messaging.messageLog.page, messaging.messageLog.total, messaging.messageLog.pageSize) : sliceFromCount([], 1, 0, DELIVERY_PAGE_SIZE),
+    [messaging],
   );
 
-  function setQuery(nextView: CommunicationsView, resource?: { template?: string; message?: string; status?: string }) {
+  function setQuery(nextView: CommunicationsView, resource?: { template?: string; message?: string; status?: string; page?: number }) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("view", nextView);
-    for (const key of ["template", "version", "message", "status", "new"]) params.delete(key);
+    for (const key of ["template", "version", "message", "status", "page", "new"]) params.delete(key);
     if (resource?.template) params.set("template", resource.template);
     if (resource?.message) params.set("message", resource.message);
     if (resource?.status && resource.status !== "ALL") params.set("status", resource.status);
+    if (resource?.page && resource.page > 1) params.set("page", String(resource.page));
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
@@ -666,7 +663,7 @@ export function CommunicationsWorkspace({
     const refresh = async () => {
       if (stopped || document.visibilityState !== "visible") return;
       try {
-        const response = await fetch(`/api/events/${eventId}/messages`, { cache: "no-store" });
+        const response = await fetch(deliveryReadUrl(eventId, deliveryQueryRef.current), { cache: "no-store" });
         const result = await response.json().catch(() => ({})) as ApiResult;
         if (!stopped && response.ok && result.messaging) setMessaging(result.messaging);
       } catch {
@@ -704,7 +701,7 @@ export function CommunicationsWorkspace({
       if (!response.ok || !result.messaging) {
         throw new Error(result.message ?? result.issues?.[0]?.message ?? "The communication request could not be completed.");
       }
-      setMessaging(result.messaging);
+      acceptMessaging(result.messaging);
       setNotice(successMessage);
       return result.messaging;
     } catch (caught) {
@@ -1090,13 +1087,22 @@ export function CommunicationsWorkspace({
     );
   }
 
-  async function readDeliveries() {
-    const response = await fetch(`/api/events/${eventId}/messages`, { cache: "no-store" });
+  /** Reads one page of the log from the server (the status and page are the database's filter and offset). */
+  async function readDeliveries(query: DeliveryLogQuery = deliveryQueryRef.current) {
+    const response = await fetch(deliveryReadUrl(eventId, query), { cache: "no-store" });
     const result = await response.json().catch(() => ({})) as ApiResult;
     if (!response.ok || !result.messaging) {
       throw new Error(result.message ?? "The delivery log could not be refreshed.");
     }
     setMessaging(result.messaging);
+    return result.messaging;
+  }
+
+  /** A response from an action carries the log's first page; keep the page and filter the person was on. */
+  function acceptMessaging(next: MessagingWorkspaceData) {
+    setMessaging(next);
+    const query = deliveryQueryRef.current;
+    if (query.status !== "ALL" || query.page > 1) void readDeliveries(query).catch(() => {});
   }
 
   async function refreshDeliveries() {
@@ -1182,7 +1188,7 @@ export function CommunicationsWorkspace({
         throw new Error(result.message ?? result.issues?.[0]?.message ?? "The failed messages could not be retried.");
       }
       const operation = result.operation;
-      setMessaging(result.messaging);
+      acceptMessaging(result.messaging);
       retryFailedRequestRef.current = null;
       closeRetryFailed();
       setNotice(
@@ -1227,7 +1233,7 @@ export function CommunicationsWorkspace({
           ?? "The message retry could not be completed.",
         );
       }
-      setMessaging(result.messaging);
+      acceptMessaging(result.messaging);
       setSelectedMessageId(result.operation.messageId);
       setQuery("deliveries", {
         message: result.operation.messageId,
@@ -1324,7 +1330,7 @@ export function CommunicationsWorkspace({
         }
         throw new Error(result.message ?? "The shirt-size request batch could not be created.");
       }
-      setMessaging(result.messaging);
+      acceptMessaging(result.messaging);
       setShirtSizeConfirmed(false);
       setShirtSizeBatchId("");
       if (result.operation.replayed) {
@@ -1371,7 +1377,7 @@ export function CommunicationsWorkspace({
         }
         throw new Error(result.message ?? "The reminder batch could not be created.");
       }
-      setMessaging(result.messaging);
+      acceptMessaging(result.messaging);
       setReminderConfirmed(false);
       setReminderBatchId("");
       if (result.operation.replayed) {
@@ -1414,7 +1420,7 @@ export function CommunicationsWorkspace({
       if (!response.ok || !result.messaging || !result.operation?.messageId) {
         throw new Error(result.message ?? "The confirmation copy could not be created.");
       }
-      setMessaging(result.messaging);
+      acceptMessaging(result.messaging);
       setSelectedMessageId(result.operation.messageId);
       setQuery("deliveries", {
         message: result.operation.messageId,
@@ -1460,15 +1466,27 @@ export function CommunicationsWorkspace({
     setResendConfirmed(false);
     setResendRequestId("");
     setRetryRequestId("");
-    setQuery("deliveries", { message: id, status: deliveryFilter });
+    setQuery("deliveries", { message: id, status: deliveryFilter, page: messaging?.messageLog.page });
   }
 
   async function chooseDeliveryFilter(filter: "ALL" | MessageOutboxStatusValue) {
     if (filter === deliveryFilter) return;
     if (!(await confirmDiscardEditorChanges())) return;
-    setDeliveryFilter(filter);
-    setDeliveryPage(1);
-    setQuery("deliveries", { message: selectedMessageId, status: filter });
+    await goToDeliveryPage({ status: filter, page: 1 });
+  }
+
+  /** A new filter or page is a new read of the log: the database filters and offsets, the address keeps the choice. */
+  async function goToDeliveryPage(query: DeliveryLogQuery) {
+    setRefreshingDeliveries(true);
+    setError("");
+    try {
+      const next = await readDeliveries(query);
+      setQuery("deliveries", { message: selectedMessageId, status: next.messageLog.status, page: next.messageLog.page });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The delivery log could not be refreshed.");
+    } finally {
+      setRefreshingDeliveries(false);
+    }
   }
 
   const tabs: Array<{ id: CommunicationsView; label: string; icon: typeof Mail }> = [
@@ -1519,7 +1537,7 @@ export function CommunicationsWorkspace({
             label: (
               <>
                 <Icon aria-hidden="true" size={17} /> {label}
-                {id === "deliveries" && messaging && <span>{messaging.messages.length}</span>}
+                {id === "deliveries" && messaging && <span>{Object.values(messaging.counts).reduce((sum, count) => sum + count, 0)}</span>}
               </>
             ),
           }))}
@@ -2218,9 +2236,6 @@ export function CommunicationsWorkspace({
                 </button>
               ))}
             </div>
-            {(messaging.messages.length >= DELIVERY_SERVER_CAP) && (
-              <p className="inline-notice" role="status">This log holds the newest {DELIVERY_SERVER_CAP} messages. Older messages aren&apos;t loaded here.</p>
-            )}
             <div className="message-delivery-layout">
               <div className="message-delivery-list">
                 {deliverySlice.items.map((message) => (
@@ -2230,8 +2245,8 @@ export function CommunicationsWorkspace({
                     <span><span className={`status-chip ${statusTone(message.status)}`}>{friendlyStatus(message.status)}</span><small>{new Date(message.createdAt).toLocaleString()}</small></span>
                   </button>
                 ))}
-                <ListPager label="Delivery log pages" noun="messages" nounOne="message" onPage={setDeliveryPage} slice={deliverySlice} />
-                {filteredMessages.length === 0 && (deliveryFilter === "ALL"
+                <ListPager label="Delivery log pages" noun="messages" nounOne="message" onPage={(page) => void goToDeliveryPage({ status: deliveryFilter, page })} slice={deliverySlice} />
+                {messaging.messages.length === 0 && (deliveryFilter === "ALL"
                   ? <EmptyState hint="Messages are logged here as the system sends or captures them, for example after a registration or a template test." icon={<Inbox size={24} />} title="No messages yet">Nothing has been sent or captured for this event.</EmptyState>
                   : <NoMatchesState clear={{ onClick: () => void chooseDeliveryFilter("ALL") }} icon={<Inbox size={24} />} noun="messages" />)}
               </div>
