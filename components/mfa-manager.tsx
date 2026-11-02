@@ -15,9 +15,9 @@ export type MfaStatus = {
 };
 
 /**
- * Managing the second factor from account settings.
+ * Managing two-step sign-in (authenticator app) from account settings.
  *
- * An account whose role requires MFA is enrolled during sign-in instead — it
+ * An account whose role requires two-step sign-in is enrolled during sign-in instead — it
  * never reaches a session without one — so what this panel adds is enrolling
  * *before* that role is granted, and replacing recovery codes after using them.
  */
