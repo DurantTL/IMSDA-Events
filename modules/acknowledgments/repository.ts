@@ -9,7 +9,9 @@ import {
   decideActing,
   evidenceRequestHash,
   hasLiveAcceptance,
+  isLiveAcceptance,
   latestLiveAction,
+  liveActMoment,
   normalizePaperLocation,
   planAcknowledgments,
   policyContent,
@@ -77,6 +79,8 @@ export type AcknowledgmentErrorCode =
   | "EVIDENCE_NOT_WITHDRAWABLE"
   | "EVIDENCE_VOIDED"
   | "WITHDRAWN_AT_INVALID"
+  | "ACT_BEFORE_LATEST"
+  | "NOT_CURRENT_ACCEPTANCE"
   | "PAPER_LOCATION_REQUIRED"
   | "PAPER_LOCATION_NOT_ALLOWED";
 
@@ -305,15 +309,20 @@ async function findByNaturalKey(client: Client, request: RecordRequest, contentR
  * lock, released at commit or rollback. Two submissions that race, under different request keys, take turns, so the second
  * sees the first's row and ends in exactly one action event instead of two. The key never leaves the database.
  */
+function subjectFieldLockKey(registrationId: string, attendeeId: string | null, fieldKey: string) {
+  // Always carries the registration id, so a registration-level subject never shares a lock with another registration's.
+  return `acknowledgment:${registrationId}:${attendeeId ?? "registration"}:${fieldKey}`;
+}
+
 async function lockSubjectField(tx: Client, registrationId: string, attendeeId: string | null, fieldKey: string) {
-  const key = `acknowledgment:${registrationId}:${attendeeId ?? "registration"}:${fieldKey}`;
+  const key = subjectFieldLockKey(registrationId, attendeeId, fieldKey);
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
 }
 
 /** Everything recorded for one subject and field, oldest first, shaped for the status rules. */
-async function readSubjectHistory(client: Client, request: Pick<RecordRequest, "registrationId" | "attendee" | "field">) {
+async function readSubjectHistory(client: Client, registrationId: string, attendeeId: string | null, fieldKey: string) {
   const rows = await client.acknowledgmentEvidence.findMany({
-    where: { registrationId: request.registrationId, registrationAttendeeId: request.attendee?.attendeeId ?? null, fieldKey: request.field.key },
+    where: { registrationId, registrationAttendeeId: attendeeId, fieldKey },
     orderBy: [{ acknowledgedAt: "asc" }, { id: "asc" }],
     select: { ...summarySelect, contentRef: true },
   });
@@ -395,21 +404,27 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
   });
   if (!decision.allowed) throw new AcknowledgmentError(decision.code, decision.message);
 
+  // Everything below is judged on the history under the lock, so racing requests see each other.
+  const history = await readSubjectHistory(tx, request.registrationId, request.attendee?.attendeeId ?? null, request.field.key);
+  const latest = latestLiveAction(history);
   let generation = 0;
   if (action === "DECLINE") {
-    const history = await readSubjectHistory(tx, request);
     if (hasLiveAcceptance(history)) {
       throw new AcknowledgmentError("ALREADY_ACKNOWLEDGED", "This person has a standing acknowledgment. Withdraw it instead of recording a decline.");
     }
-    const latest = latestLiveAction(history);
     if (latest?.kind === "DECLINE" && latest.row.contentRef === content.contentRef) {
       return { evidence: latest.row.summary, created: false, replayed: false };
     }
   } else {
-    const existing = await findByNaturalKey(tx, request, content.contentRef);
-    if (existing && !existing.void && !existing.withdrawal) return { evidence: summarize(existing), created: false, replayed: false };
-    // A voided or withdrawn acceptance can be recorded again: the next generation (all earlier ones are voided or withdrawn, so this is their count).
-    generation = existing ? existing.generation + 1 : 0;
+    // The same content is returned only while it still stands: not voided and not ended by a later withdrawal.
+    const standing = history.find((row) => row.contentRef === content.contentRef && isLiveAcceptance(row, history));
+    if (standing) return { evidence: standing.summary, created: false, replayed: false };
+    // Every earlier acceptance of this content has ended (voided or withdrawn), so the next generation is their count.
+    generation = history.filter((row) => row.action === "ACKNOWLEDGE" && row.contentRef === content.contentRef).length;
+  }
+  // No out-of-order acts: nothing new may be dated before the latest live act, or the derived status and the guards would disagree.
+  if (latest && request.acknowledgedAt.getTime() < liveActMoment(latest)) {
+    throw new AcknowledgmentError("ACT_BEFORE_LATEST", "That date is before this person's latest recorded acknowledgment, decline or withdrawal. Check the date.");
   }
 
   const id = randomUUID();
@@ -514,6 +529,14 @@ export async function recordSubmissionAcknowledgments(tx: Prisma.TransactionClie
   const startDate = eventStartDate(input.event.startsAt, input.event.timezone);
   const refusals: AcknowledgmentRefusal[] = [];
   let recorded = 0;
+  // One transaction, several subjects and fields: take every lock up front in sorted key order, so two such transactions cannot deadlock.
+  const lockKeys = new Set<string>();
+  for (const item of planned) {
+    const attendee = item.attendeeClientId === null ? null : input.attendees.find((candidate) => candidate.clientId === item.attendeeClientId) ?? null;
+    if (item.attendeeClientId !== null && !attendee) continue;
+    lockKeys.add(subjectFieldLockKey(input.registrationId, attendee?.attendeeId ?? null, item.field.key));
+  }
+  for (const key of [...lockKeys].sort()) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
   for (const item of planned) {
     const attendee = item.attendeeClientId === null
       ? null
@@ -857,6 +880,8 @@ export async function voidAcknowledgmentEvidence(input: {
       select: { id: true, fieldKey: true, registrationAttendeeId: true },
     });
     if (!evidence) throw new AcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found.");
+    // Voiding changes what stands for this subject and field, so it takes turns with every other action on them.
+    await lockSubjectField(tx, input.registrationId, evidence.registrationAttendeeId, evidence.fieldKey);
     const existing = await tx.acknowledgmentVoid.findUnique({ where: { evidenceId: evidence.id }, select: { id: true, evidenceId: true, voidedAt: true } });
     if (existing) return { void: { id: existing.id, evidenceId: existing.evidenceId, voidedAt: existing.voidedAt.toISOString() }, created: false };
     const id = randomUUID();
@@ -927,9 +952,29 @@ export async function withdrawAcknowledgmentEvidence(input: {
     if (!evidence) throw new AcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found.");
     await lockSubjectField(tx, input.registrationId, evidence.registrationAttendeeId, evidence.fieldKey);
 
+    const registration = await tx.registration.findFirst({
+      where: { id: input.registrationId, eventId: input.eventId },
+      select: {
+        accountHolderPersonId: true,
+        event: { select: { startsAt: true, timezone: true, ageOfMajority: true } },
+        attendees: { select: { id: true, personId: true, formResponses: true, profileSnapshot: true } },
+      },
+    });
+    if (!registration) throw new AcknowledgmentError("REGISTRATION_NOT_FOUND", "That registration was not found for this event.");
+    // The subject's standing on the event's start date, read as acknowledging reads it; an attendee removed since falls back to what was recorded.
+    const attendeeRow = evidence.registrationAttendeeId ? registration.attendees.find((candidate) => candidate.id === evidence.registrationAttendeeId) : null;
+    const subjectStatus: MinorStatus["status"] = attendeeRow
+      ? minorStatusAt(
+          personAgeFromAnswers(record(attendeeRow.formResponses), record(attendeeRow.profileSnapshot)),
+          eventStartDate(registration.event.startsAt, registration.event.timezone),
+          registration.event.ageOfMajority,
+        ).status
+      : (["MINOR", "ADULT", "UNKNOWN"] as const).find((status) => status === evidence.subjectMinorStatus) ?? "ADULT";
+    // The person who withdrew, resolved before the retry check: a retry that names the default person explicitly is the same request.
+    const actedByPersonId = input.actedByPersonId ?? evidence.subjectPersonId ?? registration.accountHolderPersonId;
     // A retry replays the first result before anything else is judged, even if the acceptance has since been voided.
     const requestHash = withdrawalRequestHash({
-      eventId: input.eventId, registrationId: input.registrationId, evidenceId: evidence.id, actedByPersonId: input.actedByPersonId ?? null, channel: input.channel, paperLocation: location.value,
+      eventId: input.eventId, registrationId: input.registrationId, evidenceId: evidence.id, actedByPersonId, channel: input.channel, paperLocation: location.value,
     });
     const keyed = await tx.acknowledgmentWithdrawal.findUnique({
       where: { eventId_idempotencyKey: { eventId: input.eventId, idempotencyKey } },
@@ -954,29 +999,16 @@ export async function withdrawAcknowledgmentEvidence(input: {
     if (evidence.void) {
       throw new AcknowledgmentError("EVIDENCE_VOIDED", "That acknowledgment was voided, so there is nothing to withdraw.");
     }
-    if (withdrawnAt.getTime() < evidence.acknowledgedAt.getTime()) {
-      throw new AcknowledgmentError("WITHDRAWN_AT_INVALID", "The withdrawal date cannot be before the acknowledgment it withdraws.");
+    // A withdrawal ends every acceptance for this subject and field, so it may target only the one that is the current latest live act.
+    const history = await readSubjectHistory(tx, input.registrationId, evidence.registrationAttendeeId, evidence.fieldKey);
+    const latest = latestLiveAction(history);
+    if (!latest || latest.kind !== "ACKNOWLEDGE" || latest.row.summary.id !== evidence.id) {
+      throw new AcknowledgmentError("NOT_CURRENT_ACCEPTANCE", "Only this person's current acknowledgment can be withdrawn. A newer record has taken its place or it has already ended.");
+    }
+    if (withdrawnAt.getTime() < liveActMoment(latest)) {
+      throw new AcknowledgmentError("ACT_BEFORE_LATEST", "The withdrawal date cannot be before the acknowledgment it withdraws.");
     }
 
-    const registration = await tx.registration.findFirst({
-      where: { id: input.registrationId, eventId: input.eventId },
-      select: {
-        accountHolderPersonId: true,
-        event: { select: { startsAt: true, timezone: true, ageOfMajority: true } },
-        attendees: { select: { id: true, personId: true, formResponses: true, profileSnapshot: true } },
-      },
-    });
-    if (!registration) throw new AcknowledgmentError("REGISTRATION_NOT_FOUND", "That registration was not found for this event.");
-    // The subject's standing on the event's start date, read as acknowledging reads it; an attendee removed since falls back to what was recorded.
-    const attendeeRow = evidence.registrationAttendeeId ? registration.attendees.find((candidate) => candidate.id === evidence.registrationAttendeeId) : null;
-    const subjectStatus: MinorStatus["status"] = attendeeRow
-      ? minorStatusAt(
-          personAgeFromAnswers(record(attendeeRow.formResponses), record(attendeeRow.profileSnapshot)),
-          eventStartDate(registration.event.startsAt, registration.event.timezone),
-          registration.event.ageOfMajority,
-        ).status
-      : (["MINOR", "ADULT", "UNKNOWN"] as const).find((status) => status === evidence.subjectMinorStatus) ?? "ADULT";
-    const actedByPersonId = input.actedByPersonId ?? evidence.subjectPersonId ?? registration.accountHolderPersonId;
     const onRegistration = actedByPersonId === registration.accountHolderPersonId
       || registration.attendees.some((candidate) => candidate.personId === actedByPersonId)
       || actedByPersonId === evidence.subjectPersonId;

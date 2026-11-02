@@ -313,9 +313,32 @@ export function latestLiveAction<Row extends HistoryRow>(rows: ReadonlyArray<Row
   return events[events.length - 1]?.action ?? null;
 }
 
-/** Whether any acceptance for this subject and field is still live: not voided and not withdrawn. */
-export function hasLiveAcceptance(rows: ReadonlyArray<Pick<HistoryRow, "action" | "voidedAt" | "withdrawal">>): boolean {
-  return rows.some((row) => row.action === "ACKNOWLEDGE" && !row.voidedAt && !row.withdrawal);
+const ms = (value: string) => new Date(value).getTime();
+
+/**
+ * Whether an acceptance still stands: not voided, and not ended by a withdrawal. A withdrawal ends every acceptance for its
+ * subject and field that was given at or before its moment and recorded before it (a withdrawal whose own acceptance was
+ * voided is skipped, as in the status rules). Rows given after it are unaffected.
+ */
+export function isLiveAcceptance(row: HistoryRow, history: ReadonlyArray<HistoryRow>): boolean {
+  if (row.action !== "ACKNOWLEDGE" || row.voidedAt) return false;
+  const given = ms(row.acknowledgedAt);
+  const recorded = ms(row.recordedAt);
+  return !history.some((other) => (
+    other.withdrawal && !other.voidedAt
+    && ms(other.withdrawal.withdrawnAt) >= given
+    && (!other.withdrawal.recordedAt || ms(other.withdrawal.recordedAt) >= recorded)
+  ));
+}
+
+/** Whether the subject and field currently stand accepted: the latest live act (now) is an acceptance. One definition, used by every guard. */
+export function hasLiveAcceptance<Row extends HistoryRow>(rows: ReadonlyArray<Row>): boolean {
+  return latestLiveAction(rows)?.kind === "ACKNOWLEDGE";
+}
+
+/** The moment a live act took effect: a withdrawal's own date, otherwise the date it was given. */
+export function liveActMoment<Row extends HistoryRow>(action: LiveAction<Row>): number {
+  return action.kind === "WITHDRAWAL" ? ms(action.row.withdrawal!.withdrawnAt) : ms(action.row.acknowledgedAt);
 }
 
 /**

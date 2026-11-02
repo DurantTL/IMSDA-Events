@@ -127,7 +127,7 @@ CREATE UNIQUE INDEX "AcknowledgmentEvidence_one_per_attendee_content"
   WHERE "registrationAttendeeId" IS NOT NULL AND "action" = 'ACKNOWLEDGE';
 
 -- The evidence insert guard, with the generation rule widened: an acceptance's generation is the number of earlier
--- acceptances of this subject, field and content that were voided or withdrawn. A decline has generation 0.
+-- acceptances of this subject, field and content that were voided, withdrawn, or ended by a later withdrawal for the same subject and field. A decline has generation 0.
 CREATE OR REPLACE FUNCTION "AcknowledgmentEvidence_insert_guard"() RETURNS trigger AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM "Registration" r WHERE r."id" = NEW."registrationId" AND r."eventId" = NEW."eventId") THEN
@@ -155,6 +155,14 @@ BEGIN
         AND (
           EXISTS (SELECT 1 FROM "AcknowledgmentVoid" v WHERE v."evidenceId" = e."id")
           OR EXISTS (SELECT 1 FROM "AcknowledgmentWithdrawal" w WHERE w."evidenceId" = e."id")
+          -- A withdrawal ends every acceptance of this subject and field given at or before it (and recorded before it).
+          OR EXISTS (
+            SELECT 1 FROM "AcknowledgmentWithdrawal" w JOIN "AcknowledgmentEvidence" we ON we."id" = w."evidenceId"
+            WHERE we."registrationId" = e."registrationId"
+              AND we."registrationAttendeeId" IS NOT DISTINCT FROM e."registrationAttendeeId"
+              AND we."fieldKey" = e."fieldKey"
+              AND w."withdrawnAt" >= e."acknowledgedAt" AND w."recordedAt" >= e."recordedAt"
+          )
         )
     ) ELSE 0 END
   ) THEN

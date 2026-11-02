@@ -140,6 +140,13 @@ Three more events on the same history. None edits a row: **status is derived fro
 - **Concurrency.** Every action write (acknowledge, decline, withdraw) takes a transaction-scoped
   `pg_advisory_xact_lock` keyed on the subject and field before the dedupe checks, so two submissions that race, under
   different request ids, end in exactly one action event. The idempotency-key replay is still the first thing judged after the lock.
+- **One rule for status and guards.** No out-of-order acts: a new acknowledge, decline or withdrawal dated before the latest live
+  act for that subject and field is refused (400 `ACT_BEFORE_LATEST`; an equal moment is allowed), checked under the lock. A
+  withdrawal ends every live acceptance for the subject and field, so it may target only the current latest live acceptance
+  (409 `NOT_CURRENT_ACCEPTANCE` otherwise). "Live acceptance" means the latest live act (now) is an acceptance, for the decline
+  guard and for dedupe; an existing same-content row is returned only while it still stands (not voided, not ended by a later
+  withdrawal), and the generation trigger counts voided, withdrawn and ended rows. Voiding takes the same lock, and a submission
+  that locks several fields takes them in sorted key order.
 - **Paper location.** `paperLocation` (1 to 200 characters, trimmed) says where the paper form physically lives, for example
   "Conference office, event binder": **never what it says**. It is required when `channel` is `PAPER` for acknowledge, decline
   and withdraw, and refused for every other channel (checked in the request schema, the repository and a database check).

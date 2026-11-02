@@ -6,6 +6,7 @@ import {
   decideActing,
   evidenceRequestHash,
   hasLiveAcceptance,
+  isLiveAcceptance,
   holdAcknowledgmentAnswers,
   latestLiveAction,
   normalizePaperLocation,
@@ -295,6 +296,19 @@ describe("status from the history: decline and withdrawal (#130)", () => {
   it("settles a tie at the same moment in favor of what was recorded last", () => {
     const rows = [row({ acknowledgedAt: day(10), recordedAt: day(10), withdrawal: { withdrawnAt: day(10), recordedAt: day(11) } })];
     expect(kindAt(rows, 10)).toBe("WITHDRAWAL");
+  });
+
+  it("ends every earlier acceptance with one withdrawal, but not one given after it or at its moment and recorded later", () => {
+    const first = row({ acknowledgedAt: day(5), recordedAt: day(5) });
+    const second = row({ acknowledgedAt: day(6), recordedAt: day(6), withdrawal: { withdrawnAt: day(7), recordedAt: day(7) } });
+    const third = row({ acknowledgedAt: day(7), recordedAt: day(8) });
+    const history = [first, second, third];
+    expect(isLiveAcceptance(first, history)).toBe(false);
+    expect(isLiveAcceptance(second, history)).toBe(false);
+    expect(isLiveAcceptance(third, history)).toBe(true);
+    expect(hasLiveAcceptance(history)).toBe(true);
+    // A withdrawal whose own acceptance was voided ends nothing.
+    expect(isLiveAcceptance(first, [first, { ...second, voidedAt: day(8) }])).toBe(true);
   });
 
   it("knows whether an acceptance is still live", () => {

@@ -349,6 +349,8 @@ describe("withdrawing an acknowledgment (#130)", () => {
     ["EVIDENCE_NOT_WITHDRAWABLE", 409],
     ["IDEMPOTENCY_CONFLICT", 409],
     ["WITHDRAWN_AT_INVALID", 400],
+    ["ACT_BEFORE_LATEST", 400],
+    ["NOT_CURRENT_ACCEPTANCE", 409],
     ["ACTING_FOR_MINOR_NOT_AUTHORIZED", 403],
     ["ACTING_FOR_ANOTHER_NOT_AUTHORIZED", 403],
   ])("maps %s to %i", async (code, status) => {
