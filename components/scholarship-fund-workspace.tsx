@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Download, HandCoins, WalletCards } from "lucide-react";
 import { postJson } from "@/lib/post-json";
+import { formHasEdits } from "@/components/form-has-edits";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatCents } from "@/modules/payments/format-cents";
 import {
   CONTRIBUTION_METHODS,
@@ -41,6 +43,12 @@ export function ScholarshipFundWorkspace({
   // A sponsor is a directory church or a typed name, never both: choosing one switches the other off.
   const [pickedOrganization, setPickedOrganization] = useState("");
   const [typedSponsor, setTypedSponsor] = useState("");
+  // The contribution form's other fields (amount, date, method, note) off their starting values, and the reverse form's reason
+  // typed. The two controlled sponsor fields are counted from their own state. Recording or reversing clears each (#1468).
+  const [contributionFieldsEdited, setContributionFieldsEdited] = useState(false);
+  const [reverseEdited, setReverseEdited] = useState(false);
+  useUnsavedChangesGuard(contributionFieldsEdited || pickedOrganization !== "" || typedSponsor.trim() !== "" || (reversing !== null && reverseEdited));
+  function showReverse(id: string | null) { setReversing(id); setReverseEdited(false); }
   const { summary } = fund;
   const base = `/api/events/${encodeURIComponent(eventId)}/scholarship-fund`;
 
@@ -70,14 +78,14 @@ export function ScholarshipFundWorkspace({
       method: String(form.get("method") ?? "CHECK") as ContributionMethod,
       note: String(form.get("note") ?? "").trim() || undefined,
     }, "Unable to record the contribution.", "Contribution recorded.");
-    if (ok) { formElement.reset(); setPickedOrganization(""); setTypedSponsor(""); }
+    if (ok) { formElement.reset(); setPickedOrganization(""); setTypedSponsor(""); setContributionFieldsEdited(false); }
   }
 
   async function reverseContribution(event: React.FormEvent<HTMLFormElement>, contributionId: string) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const ok = await send(`${base}/contributions/${encodeURIComponent(contributionId)}/reverse`, { reason: String(form.get("reason") ?? "") }, "Unable to reverse the contribution.", "Contribution reversed.");
-    if (ok) setReversing(null);
+    if (ok) showReverse(null);
   }
 
   async function settle(awardId: string) {
@@ -146,7 +154,7 @@ export function ScholarshipFundWorkspace({
 
       <section className="panel" aria-label="Record a contribution">
         <h3>Record a contribution</h3>
-        <form className="form-stack" onSubmit={addContribution}>
+        <form className="form-stack" onSubmit={addContribution} onChange={(event) => setContributionFieldsEdited(formHasEdits(event.currentTarget, { ignore: ["organizationId", "sponsorName"] }))}>
           <label>Church or club from the directory
             <select name="organizationId" value={pickedOrganization} disabled={typedSponsor.trim() !== ""} onChange={(event) => setPickedOrganization(event.target.value)}>
               <option value="">Not in the directory (type a name below)</option>
@@ -195,15 +203,15 @@ export function ScholarshipFundWorkspace({
               <small>{line.reversesContributionId ? `Reversal · ${line.note ?? ""}` : line.reversed ? "Reversed" : line.note ?? ""}</small>
               {!line.reversesContributionId && !line.reversed && (
                 reversing === line.id ? (
-                  <form className="form-stack" onSubmit={(event) => reverseContribution(event, line.id)}>
+                  <form className="form-stack" onSubmit={(event) => reverseContribution(event, line.id)} onChange={(event) => setReverseEdited(formHasEdits(event.currentTarget))}>
                     <label>Reason<input name="reason" minLength={3} maxLength={200} required autoComplete="off" /></label>
                     <div className="form-actions">
-                      <button className="secondary-button" type="button" onClick={() => setReversing(null)}>Cancel</button>
+                      <button className="secondary-button" type="button" onClick={() => showReverse(null)}>Cancel</button>
                       <button className="primary-button" type="submit" disabled={saving}>Reverse</button>
                     </div>
                   </form>
                 ) : (
-                  <button className="text-button" type="button" onClick={() => { setError(""); setReversing(line.id); }}>Reverse</button>
+                  <button className="text-button" type="button" onClick={() => { setError(""); showReverse(line.id); }}>Reverse</button>
                 )
               )}
             </span>

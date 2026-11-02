@@ -3,6 +3,8 @@
 import { ExportLink } from "@/components/export-link";
 import { SubmitButton } from "@/components/submit-button";
 import { useState, type FormEvent } from "react";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { describeRate, lodgingCategories, lodgingCategoryLabels } from "@/modules/lodging/domain";
 import { savedMessage } from "@/components/form-message";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
@@ -19,7 +21,7 @@ import type { StaffLodgingRequestView, StaffLodgingRequestsView } from "@/module
 
 type ChargeResult = { priceNeedsReview?: boolean; belowMinimumAfter?: boolean; churchShare?: ChurchShareFact; churchCorrectionCents?: number; chargeDeltaCents?: number; registrantDeltaCents?: number; sponsorDeltaCents?: number; originallyChargedCents?: number; requestNowCostsCents?: number; promo?: { code: string; coversLodging: boolean; sponsored: boolean } | null };
 type Reply = { requests?: StaffLodgingRequestsView; result?: ChargeResult };
-type Run = (action: () => Promise<Reply>, success: string) => Promise<void>;
+type Run = (action: () => Promise<Reply>, success: string) => Promise<boolean>;
 
 async function call(url: string, method: string, body: unknown): Promise<Reply> {
   const response = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -70,6 +72,11 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
   const [showAcknowledged, setShowAcknowledged] = useState(false);
   const base = `/api/events/${view.eventId}/lodging`;
 
+  // Typed work in the settings, review-queue, rule and end-rule forms: any field off its starting value. A save, or a form
+  // leaving the page, clears it; a failed save keeps what was typed (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
+
   const run: Run = async (action, success) => {
     setBusy(true); setError(""); setNotice(""); setChargeChange(null);
     try {
@@ -78,8 +85,10 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
       if (result.requests) setView(result.requests);
       setNotice(success);
       if (result.result?.priceNeedsReview || result.result?.churchShare) setChargeChange(result.result);
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "That could not be saved.");
+      return false;
     } finally { setBusy(false); }
   };
 
@@ -107,7 +116,7 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
 
     <section className="panel" aria-labelledby="lodging-settings">
       <h3 id="lodging-settings">Preference settings</h3>
-      {canConfigure ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+      {canConfigure ? <form ref={edits.gone("settings")} onChange={edits.track("settings")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const deadline = String(form.get("deadline") ?? "").trim();
@@ -115,7 +124,7 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
           collectsPreferences: form.get("collects") === "on",
           preferencesDeadline: deadline === "" ? null : deadline,
           fullBehavior: form.get("fullBehavior"),
-        }), savedMessage());
+        }), savedMessage()).then((ok) => { if (ok) edits.clear("settings"); });
       }}>
         <label><input type="checkbox" name="collects" defaultChecked={view.settings.collectsPreferences} /> Registrants choose a lodging type (turn off for club events, where staff assign)</label>
         <label>Last day to change <input type="date" name="deadline" defaultValue={view.settings.preferencesDeadline ?? ""} /></label>
@@ -138,22 +147,28 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
       {queue.length === 0 ? <p>Nothing needs review.</p> : <ul>{queue.map((item) => <li key={`${item.key}:${item.fingerprint}`}>
         <strong>{reviewKindLabels[item.kind]}</strong>{item.sensitive ? " (restricted)" : ""}{item.acknowledged ? " (acknowledged)" : ""}
         <p>{item.title}. {item.detail}</p>
-        {item.roommateRequestId && !item.acknowledged ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        {item.roommateRequestId && !item.acknowledged ? <form ref={edits.gone(`roommate:${item.key}`)} onChange={edits.track(`roommate:${item.key}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
+          const formElement = event.currentTarget;
           const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-          const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
-          void run(() => call(`${base}/roommates`, "POST", { action: submitter?.value ?? "decline", requestId: item.roommateRequestId, reason }), "Roommate request updated.");
+          const reason = String(new FormData(formElement).get("reason") ?? "");
+          void run(() => call(`${base}/roommates`, "POST", { action: submitter?.value ?? "decline", requestId: item.roommateRequestId, reason }), "Roommate request updated.").then((ok) => {
+            if (ok) { formElement.reset(); edits.clear(`roommate:${item.key}`); }
+          });
         }}>
           <label>Reason <input name="reason" required maxLength={300} /></label>
           <span className="field-hint">No medical details.</span>
           <button type="submit" value="approve" disabled={busy || item.kind !== "ONE_SIDED_ROOMMATE"}>Approve as mutual</button>
           <button type="submit" value="decline" disabled={busy}>Decline</button>
         </form> : null}
-        {!item.acknowledged ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        {!item.acknowledged ? <form ref={edits.gone(`ack:${item.key}`)} onChange={edits.track(`ack:${item.key}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
+          const formElement = event.currentTarget;
           // A restricted item keeps no typed note.
-          const note = item.sensitive ? "Acknowledged" : String(new FormData(event.currentTarget).get("note") ?? "");
-          void run(() => call(`${base}/requests`, "POST", { action: "acknowledge", itemKey: item.key, fingerprint: item.fingerprint, note }), "Acknowledged.");
+          const note = item.sensitive ? "Acknowledged" : String(new FormData(formElement).get("note") ?? "");
+          void run(() => call(`${base}/requests`, "POST", { action: "acknowledge", itemKey: item.key, fingerprint: item.fingerprint, note }), "Acknowledged.").then((ok) => {
+            if (ok) { formElement.reset(); edits.clear(`ack:${item.key}`); }
+          });
         }}>
           {item.sensitive ? null : <><label>Note <input name="note" required maxLength={300} /></label><span className="field-hint">No medical details.</span></>}
           <button type="submit" disabled={busy}>Acknowledge</button>
@@ -180,10 +195,13 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
       {activeRules.length === 0 ? <p>No staff rules.</p> : <ul>{activeRules.map((rule) => <li key={rule.id}>
         <strong>{lodgingRuleKindLabels[rule.kind]}</strong>: {rule.personA}{rule.personB ? ` and ${rule.personB}` : ""}
         {rule.effectiveFrom || rule.effectiveUntil ? ` (${rule.effectiveFrom ?? "start"} to ${rule.effectiveUntil ?? "end"})` : ""}. Reason: {rule.reason}. Added {rule.createdAt.slice(0, 10)}.
-        <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        <form ref={edits.gone(`end:${rule.id}`)} onChange={edits.track(`end:${rule.id}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
-          const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
-          void run(() => call(`${base}/rules`, "POST", { action: "end", ruleId: rule.id, reason }), "Rule ended.");
+          const formElement = event.currentTarget;
+          const reason = String(new FormData(formElement).get("reason") ?? "");
+          void run(() => call(`${base}/rules`, "POST", { action: "end", ruleId: rule.id, reason }), "Rule ended.").then((ok) => {
+            if (ok) { formElement.reset(); edits.clear(`end:${rule.id}`); }
+          });
         }}>
           <label>Reason for ending <input name="reason" required maxLength={300} /></label>
           <span className="field-hint">No medical details.</span>
@@ -194,15 +212,18 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
         <summary>Ended rules ({view.rules.filter((rule) => rule.ended).length})</summary>
         <ul>{view.rules.filter((rule) => rule.ended).map((rule) => <li key={rule.id}>{lodgingRuleKindLabels[rule.kind]}: {rule.personA}{rule.personB ? ` and ${rule.personB}` : ""}. Reason: {rule.reason}. Ended: {rule.endReason}.</li>)}</ul>
       </details> : null}
-      <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+      <form onChange={edits.track("addRule")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
+        const formElement = event.currentTarget;
+        const form = new FormData(formElement);
         const text = (name: string) => { const value = String(form.get(name) ?? "").trim(); return value === "" ? null : value; };
         const kind = String(form.get("kind"));
         void run(() => call(`${base}/rules`, "POST", {
           action: "create",
           rule: { kind, personAId: text("personAId"), personBId: kind === "SPLIT_HOUSEHOLD" ? null : text("personBId"), reason: text("reason") ?? "", effectiveFrom: text("effectiveFrom"), effectiveUntil: text("effectiveUntil") },
-        }), "Rule added.");
+        }), "Rule added.").then((ok) => {
+          if (ok) { formElement.reset(); edits.clear("addRule"); }
+        });
       }}>
         <label>Rule <select name="kind">{lodgingRuleKinds.map((kind) => <option key={kind} value={kind}>{lodgingRuleKindLabels[kind]}</option>)}</select></label>
         <label>Person <select name="personAId" required>{view.people.map((person) => <option key={person.personId} value={person.personId}>{person.name} ({person.registration})</option>)}</select></label>
@@ -219,6 +240,10 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
 
 function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingRequestView; view: StaffLodgingRequestsView; base: string; busy: boolean; run: Run }) {
   const [open, setOpen] = useState(false);
+  // Typed work in this request's change form and roommate-withdraw reasons: any field off its starting value. A save, closing the
+  // details, or a form leaving the page clears it; a failed save keeps what was typed (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
   const mutual = request.roommates.filter((row) => row.direction === "OUT" && row.status === "MUTUAL").length;
   const waiting = request.roommates.filter((row) => row.direction === "OUT" && row.status === "ONE_SIDED").length;
   return <>
@@ -242,10 +267,13 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
       {request.roommates.length > 0 ? <>
         <h4>Roommate requests</h4>
         <ul>{request.roommates.map((row) => <li key={row.id}>{row.direction === "OUT" ? "Asked to room with" : "Asked for by"} {row.other}{row.fromPerson || row.targetPerson ? ` (${[row.fromPerson, row.targetPerson].filter(Boolean).join(" and ")})` : ""}: {row.status === "MUTUAL" ? `mutual (${(row.basis ?? "").toLowerCase().replaceAll("_", " ")})` : row.status === "ONE_SIDED" ? "waiting for the other side" : row.status.toLowerCase()}.
-          {row.status === "ONE_SIDED" || row.status === "MUTUAL" ? <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+          {row.status === "ONE_SIDED" || row.status === "MUTUAL" ? <form ref={edits.gone(`withdraw:${row.id}`)} onChange={edits.track(`withdraw:${row.id}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
-            const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
-            void run(() => call(`${base}/roommates`, "POST", { action: "withdraw", requestId: row.id, reason }), "Roommate request withdrawn.");
+            const formElement = event.currentTarget;
+            const reason = String(new FormData(formElement).get("reason") ?? "");
+            void run(() => call(`${base}/roommates`, "POST", { action: "withdraw", requestId: row.id, reason }), "Roommate request withdrawn.").then((ok) => {
+              if (ok) { formElement.reset(); edits.clear(`withdraw:${row.id}`); }
+            });
           }}>
             <label>Reason <input name="reason" required maxLength={300} /></label>
             <span className="field-hint">No medical details.</span>
@@ -255,9 +283,10 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
       </> : null}
       {request.churchSponsored ? <p role="note" className="usage-note"><strong>Church-sponsored registration.</strong> {CHURCH_SHARE_AUTOMATIC} Record only the registrant&apos;s share in Payments.</p> : null}
       <h4>Change this request (staff)</h4>
-      <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+      <form ref={edits.gone("change")} onChange={edits.track("change")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        const form = new FormData(event.currentTarget);
+        const formElement = event.currentTarget;
+        const form = new FormData(formElement);
         const text = (name: string) => { const value = String(form.get(name) ?? "").trim(); return value === "" ? null : value; };
         void run(() => call(`${base}/requests/${request.registrationId}`, "PUT", {
           category: text("category"),
@@ -269,7 +298,14 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
           householdPreference: form.get("householdPreference"),
           ...(view.canSeeSensitive ? { groundFloorNeeded: form.get("groundFloorNeeded") === "on", accessibleRoomNeeded: form.get("accessibleRoomNeeded") === "on" } : {}),
           reason: text("reason") ?? "",
-        }), savedMessage());
+        }), savedMessage()).then((ok) => {
+          if (ok) {
+            // The saved values become the form's defaults when the view refreshes; only the typed reason is cleared here.
+            const reason = formElement.elements.namedItem("reason");
+            if (reason instanceof HTMLInputElement) reason.value = "";
+            edits.clear("change");
+          }
+        });
       }}>
         <label>Type <select name="category" defaultValue={request.category ?? ""}><option value="">No preference</option>{lodgingCategories.map((category) => <option key={category} value={category}>{lodgingCategoryLabels[category]}</option>)}</select></label>
         <label>First night <input type="date" name="firstNight" defaultValue={request.firstNight ?? ""} /></label>

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { ListPager } from "@/components/list-pager";
 import type { PageSlice } from "@/lib/pagination";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 /**
  * Staff controls for the Billing responsibility screen (#165). Every action posts to one
@@ -162,6 +163,10 @@ export function LinkOrganizationForm({
     }
   }
 
+  // An organization chosen or an override reason typed in the open form. Searching alone is not work to keep, and the
+  // closed button (after Cancel or a save) holds nothing (#1468).
+  useUnsavedChangesGuard(open && (selected !== null || reason.trim() !== ""));
+
   if (!open) {
     return <button className="secondary-button" onClick={() => setOpen(true)} type="button">{needsReason ? "Override…" : "Link to organization…"}</button>;
   }
@@ -172,7 +177,11 @@ export function LinkOrganizationForm({
         event.preventDefault();
         if (!selected) return;
         void run({ action: "link", registrationId, organizationId: selected.id, reason: reason || undefined }).then((ok) => {
-          if (ok) setOpen(false);
+          if (ok) {
+            setOpen(false);
+            setSelected(null);
+            setReason("");
+          }
         });
       }}
     >
