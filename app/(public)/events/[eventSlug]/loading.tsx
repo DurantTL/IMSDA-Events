@@ -1,3 +1,4 @@
+import { BrandLink } from "@/components/brand-link";
 import { BrandMark } from "@/components/brand-mark";
 import { EventLoadingTransition } from "@/components/event-loading-transition";
 
@@ -6,10 +7,7 @@ export default function PublicEventLoading() {
     <main className="public-registration-page public-event-page" aria-busy="true">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <div className="public-registration-brand">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </div>
+          <BrandLink className="public-registration-brand" wordmark />
         </div>
       </header>
       <EventLoadingTransition>

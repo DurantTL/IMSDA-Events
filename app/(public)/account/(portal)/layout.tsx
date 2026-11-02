@@ -1,4 +1,3 @@
-import { NavigationLink as Link } from "@/components/navigation-link";
 import { AccountContent } from "@/components/account-content";
 import { AccountWorkspaceMenu } from "@/components/account-workspace-menu";
 import { redirect } from "next/navigation";
@@ -7,7 +6,7 @@ import { AccountAnnouncementBanner } from "@/components/account-announcement-ban
 import { AccountSectionNav, type AccountNavItem } from "@/components/account-section-nav";
 import { ActAsBanner } from "@/components/act-as-banner";
 import { AttendeeAuthReturn } from "@/components/attendee-sign-in-form";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { accountSignOutMode, otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
@@ -109,10 +108,7 @@ export default async function AccountPortalLayout({ children }: { children: Reac
       <AttendeeAuthReturn />
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
           <AccountHeaderActions
             identity={acting ? undefined : chromeAccount?.displayName}
             contexts={workspaceContexts}

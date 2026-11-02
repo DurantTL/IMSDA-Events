@@ -32,7 +32,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { AddressFieldGroup } from "@/components/address-field-group";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { PerPersonPriceNotice } from "@/components/per-person-price-notice";
 import { ChurchInvoiceNotice, ChurchInvoiceReviewFacts } from "@/components/church-invoice-notice";
@@ -3386,7 +3386,7 @@ export function PublicRegistrationForm({
       <main className="public-registration-page">
         <header className="public-registration-header">
           <div className="public-registration-header-inner">
-            <a {...eventsSiteNavigation} className="public-registration-brand public-event-brand-link" href={`/events/${event.slug}`}><BrandMark /><span><strong>IMSDA</strong><small>Events</small></span></a>
+            <BrandLink className="public-registration-brand public-event-brand-link" target={embedded ? "_top" : undefined} wordmark />
             <span className="public-registration-secure">{waitlisted ? <Clock3 size={16} aria-hidden="true" /> : <LockKeyhole size={16} aria-hidden="true" />} {waitlisted ? "Waitlist request received" : "Registration received"}</span>
           </div>
         </header>
@@ -3517,7 +3517,7 @@ export function PublicRegistrationForm({
       {!club && (<>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <a {...eventsSiteNavigation} className="public-registration-brand public-event-brand-link" href={`/events/${event.slug}`}><BrandMark /><span><strong>IMSDA</strong><small>Events</small></span></a>
+          <BrandLink className="public-registration-brand public-event-brand-link" target={embedded ? "_top" : undefined} wordmark />
           <span className="public-registration-secure">{joiningWaitlist ? <Clock3 size={16} aria-hidden="true" /> : <LockKeyhole size={16} aria-hidden="true" />} {joiningWaitlist ? "Event waitlist" : "Secure event registration"}</span>
         </div>
       </header>

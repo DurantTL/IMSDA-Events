@@ -1,3 +1,4 @@
+import { BrandLink } from "@/components/brand-link";
 import { BrandMark } from "@/components/brand-mark";
 
 export default function PublicManageLoading() {
@@ -5,10 +6,7 @@ export default function PublicManageLoading() {
     <main className="public-registration-page public-manage-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <span className="public-registration-brand">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </span>
+          <BrandLink className="public-registration-brand" wordmark />
         </div>
       </header>
       <section className="public-registration-loading" aria-live="polite">

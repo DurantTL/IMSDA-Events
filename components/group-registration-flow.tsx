@@ -1,10 +1,9 @@
 "use client";
 
 import type { SecurityCheckConfig } from "@/components/security-check/security-check";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowRight, UsersRound } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { ClassPickFields } from "@/components/class-pick-fields";
 import { ClubLocationPicker, locationUnavailableLabel } from "@/components/club-location-picker";
 import { PublicRegistrationForm, type FormResponses, type RosterAttendee } from "@/components/public-registration-form";
@@ -146,9 +145,7 @@ export function GroupRegistrationFlow({ eventSlug, ready, topContent, securityCh
       <main className="public-registration-page">
         <header className="public-registration-header">
           <div className="public-registration-header-inner">
-            <Link className="public-registration-brand public-event-brand-link" href={`/events/${encodeURIComponent(eventSlug)}`}>
-              <BrandMark /><span><strong>IMSDA</strong><small>Events</small></span>
-            </Link>
+            <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
           </div>
         </header>
         <section className="public-manage-card public-group-flow-card">

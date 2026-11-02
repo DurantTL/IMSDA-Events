@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { SquareReturnStatus } from "@/components/square-return-status";
 import { getHostedReturnStatus } from "@/modules/payments/square-hosted-return";
 
@@ -31,10 +30,7 @@ export default async function SquareReturnPage({ params }: ReturnPageProps) {
     <main className="public-registration-page public-manage-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
         </div>
       </header>
       <section className="public-manage-card">

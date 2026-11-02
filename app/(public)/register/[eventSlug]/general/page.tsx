@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { EventInfoCards } from "@/components/event-info-cards";
 import { EventContentBlocks, publicEventAssetUrl } from "@/components/event-content-blocks";
 import { GeneralLinkRegistrationFlow } from "@/components/general-link-registration-flow";
@@ -46,9 +46,7 @@ export default async function GeneralLinkPage({ params }: GeneralLinkPageProps) 
       <main className="public-registration-page">
         <header className="public-registration-header">
           <div className="public-registration-header-inner">
-            <Link className="public-registration-brand public-event-brand-link" href={`/events/${encodeURIComponent(eventSlug)}`}>
-              <BrandMark /><span><strong>IMSDA</strong><small>Events</small></span>
-            </Link>
+            <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
           </div>
         </header>
         <section className="public-manage-card public-group-state">

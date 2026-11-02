@@ -241,3 +241,24 @@ describe("which addresses a text-only body may link (#1443)", () => {
     expect(html).toContain("https://evil.example/b");
   });
 });
+
+describe("the email header wordmark links to the public calendar (#1496)", () => {
+  const calendarUrl = "https://events.example.org/calendar";
+
+  it("links the mark and the name to the absolute calendar address", () => {
+    const html = doc({ calendarUrl });
+    expect(html.match(/href="https:\/\/events\.example\.org\/calendar"/g)).toHaveLength(2);
+    expect(html).toContain('aria-label="IMSDA Events calendar"');
+    expect(html).toContain('class="em-bar-name"');
+  });
+
+  it("adds no link without a web address, so a staff preview and a bad value stay plain text", () => {
+    for (const value of [undefined, null, "", "/calendar", "javascript:alert(1)"]) {
+      expect(doc({ calendarUrl: value }), String(value)).not.toContain("/calendar");
+    }
+  });
+
+  it("escapes the address it writes into the page", () => {
+    expect(doc({ calendarUrl: "https://events.example.org/calendar?a=1&b=2" })).toContain("calendar?a=1&amp;b=2");
+  });
+});

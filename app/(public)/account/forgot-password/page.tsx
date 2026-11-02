@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { AttendeePasswordResetForm } from "@/components/attendee-password-reset-form";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
@@ -19,10 +20,8 @@ export default async function AttendeeForgotPasswordPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BackToEventsLink />
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Your registrations</p>
           <h1>Reset your password</h1>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { PasswordResetRequestForm } from "@/components/password-reset-request-form";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
@@ -19,10 +20,8 @@ export default async function ForgotPasswordPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BackToEventsLink />
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Account recovery</p>
           <h1>Reset your password</h1>

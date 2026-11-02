@@ -2,7 +2,7 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { SelectEventList } from "@/components/select-event-list";
 import { SignOutButton } from "@/components/sign-out-button";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -55,10 +55,7 @@ export default async function SelectEventPage({
   return (
     <main className="auth-page">
       <section className="auth-card select-event-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Staff workspace</p>
           <h1>Choose an event</h1>

@@ -1,6 +1,6 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { FormsHelp } from "@/components/forms-help";
 import styles from "@/components/club-portal-masthead-view.module.css";
 import { Repeat2, UserRound } from "lucide-react";
@@ -49,10 +49,7 @@ export function ClubPortalMastheadView({ model, role, formsHelpContact }: { mode
   return (
     <header className="club-masthead">
       <div className="club-masthead-inner">
-        <Link className="club-masthead-brand" href="/account">
-          <BrandMark />
-          <span><small>IMSDA Events</small><strong>Club portal</strong></span>
-        </Link>
+        <BrandLink label="IMSDA Events Club portal, calendar" className="club-masthead-brand" wordmark={<span><small>IMSDA Events</small><strong>Club portal</strong></span>} />
         <div className={styles.account}>
           {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
           {model.identity && (

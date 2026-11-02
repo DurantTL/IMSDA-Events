@@ -1,6 +1,6 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { systemRoleText } from "@/modules/access/role-descriptions";
 import type { AccountSignOutMode } from "@/modules/access/workspace-contexts";
 
@@ -54,10 +54,7 @@ export function CoordinatorMastheadView({ model }: { model: CoordinatorMastheadM
   return (
     <header className="club-masthead coordinator-masthead">
       <div className="club-masthead-inner">
-        <Link className="club-masthead-brand" href="/account/area-clubs/overview">
-          <BrandMark />
-          <span><small>IMSDA Events</small><strong>Club coordination</strong></span>
-        </Link>
+        <BrandLink label="IMSDA Events Club coordination, calendar" className="club-masthead-brand" wordmark={<span><small>IMSDA Events</small><strong>Club coordination</strong></span>} />
         <div className="club-masthead-account">
           {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
           {model.identity && (
