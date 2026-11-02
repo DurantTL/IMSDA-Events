@@ -227,6 +227,9 @@ async function settle(page: J.Page) {
   lastPage = page;
   await page.waitForLoadState("load");
   await page.waitForFunction(() => [...document.body.querySelectorAll("*")].slice(0, 400).some((node) => Object.keys(node).some((key) => key.startsWith("__reactFiber$"))), undefined, { timeout: 20_000 });
+  // A streamed page can hydrate its shell before its content arrives (a run once saw 21 characters on a no-access page).
+  // Wait for real content; a page that stays blank still fails the health check that follows.
+  await page.waitForFunction(() => (document.body?.innerText ?? "").trim().length >= 40, undefined, { timeout: 15_000 }).catch(() => undefined);
 }
 
 /** The page is loaded, healthy, and passes the passive SITE-RULES checks (with the look rules on). */
