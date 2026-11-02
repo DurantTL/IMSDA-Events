@@ -289,28 +289,25 @@ function visibleWhere(viewer: ClubFormsViewer, filter: ClubFormListFilter): Pris
   };
 }
 
-/** Submissions a viewer may list. Never reads answers, sealed or plain. */
-export async function listSubmissionsForViewer(viewer: ClubFormsViewer, filter: ClubFormListFilter = {}) {
-  const rows = await getPrisma().clubFormSubmission.findMany({
-    where: visibleWhere(viewer, filter),
-    orderBy: [{ organization: { name: "asc" } }, { template: { sortOrder: "asc" } }, { updatedAt: "desc" }],
-    take: 500,
-    select: {
-      id: true,
-      clubYear: true,
-      rosterMemberId: true,
-      subjectName: true,
-      status: true,
-      submittedAt: true,
-      updatedAt: true,
-      enteredVia: true,
-      hasSensitiveAnswers: true,
-      template: { select: { key: true, name: true } },
-      unlistedClubName: true,
-      organization: { select: { id: true, name: true } },
-    },
-  });
-  return rows.map((row) => ({
+const listSelect = {
+  id: true,
+  clubYear: true,
+  rosterMemberId: true,
+  subjectName: true,
+  status: true,
+  submittedAt: true,
+  updatedAt: true,
+  enteredVia: true,
+  hasSensitiveAnswers: true,
+  template: { select: { key: true, name: true } },
+  unlistedClubName: true,
+  organization: { select: { id: true, name: true } },
+} satisfies Prisma.ClubFormSubmissionSelect;
+
+type ListedRow = Prisma.ClubFormSubmissionGetPayload<{ select: typeof listSelect }>;
+
+function toListRow(row: ListedRow) {
+  return {
     id: row.id,
     templateKey: row.template.key,
     templateName: row.template.name,
@@ -324,7 +321,79 @@ export async function listSubmissionsForViewer(viewer: ClubFormsViewer, filter: 
     updatedAt: row.updatedAt.toISOString(),
     enteredVia: row.enteredVia,
     hasSensitiveAnswers: row.hasSensitiveAnswers,
-  }));
+  };
+}
+
+/** Submissions a viewer may list. Never reads answers, sealed or plain. */
+export async function listSubmissionsForViewer(viewer: ClubFormsViewer, filter: ClubFormListFilter = {}) {
+  const rows = await getPrisma().clubFormSubmission.findMany({
+    where: visibleWhere(viewer, filter),
+    orderBy: [{ organization: { name: "asc" } }, { template: { sortOrder: "asc" } }, { updatedAt: "desc" }],
+    take: 500,
+    select: listSelect,
+  });
+  return rows.map(toListRow);
+}
+
+/** The staff list's sortable columns (#1458). The address names one of these; this map, never the raw param, picks the `orderBy`. */
+export const CLUB_FORM_SORT_COLUMNS = ["club", "form", "subject", "submitted", "entered"] as const;
+export type ClubFormSortColumn = typeof CLUB_FORM_SORT_COLUMNS[number];
+const nullsLast = (dir: "asc" | "desc") => ({ sort: dir, nulls: "last" as const });
+const clubFormOrderBy: Record<ClubFormSortColumn, (dir: "asc" | "desc") => Prisma.ClubFormSubmissionOrderByWithRelationInput[]> = {
+  club: (dir) => [{ organization: { name: dir } }, { unlistedClubName: nullsLast(dir) }],
+  form: (dir) => [{ template: { name: dir } }],
+  subject: (dir) => [{ subjectName: dir }],
+  submitted: (dir) => [{ submittedAt: nullsLast(dir) }],
+  // The cells show only "Private link" or "Club director" (every other channel reads as the club), so the sort groups by that label: see `enteredGroups`.
+  entered: () => [],
+};
+
+/** The two label groups of the "How entered" column, in the order the sort shows them. */
+function enteredGroups(dir: "asc" | "desc"): [Prisma.ClubFormSubmissionWhereInput, Prisma.ClubFormSubmissionWhereInput] {
+  const club: Prisma.ClubFormSubmissionWhereInput = { enteredVia: { not: "LINK" } };
+  const link: Prisma.ClubFormSubmissionWhereInput = { enteredVia: "LINK" };
+  return dir === "asc" ? [club, link] : [link, club];
+}
+
+/**
+ * One sorted page of the same list `listSubmissionsForViewer` returns (same `visibleWhere`, so the same scoping), with
+ * the true count: the sort and the page are in the query, so neither can hide a match behind a row cap (#1458).
+ */
+export async function pageSubmissionsForViewer(
+  viewer: ClubFormsViewer,
+  filter: ClubFormListFilter,
+  options: { sort: { key: ClubFormSortColumn | null; dir: "asc" | "desc" }; page: number; pageSize: number },
+) {
+  const where = visibleWhere(viewer, filter);
+  const prisma = getPrisma();
+  const total = await prisma.clubFormSubmission.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / options.pageSize));
+  const page = Math.min(Math.max(1, Math.floor(options.page) || 1), pageCount);
+  const { key, dir } = options.sort;
+  const tail: Prisma.ClubFormSubmissionOrderByWithRelationInput[] = [{ organization: { name: "asc" as const } }, { template: { sortOrder: "asc" as const } }, { updatedAt: "desc" as const }, { id: "asc" as const }];
+  const skip = (page - 1) * options.pageSize;
+  let rows: ListedRow[];
+  if (key === "entered") {
+    // Two groups in the order of the label the table shows: "Club director" (A to Z first), then "Private link".
+    const groups = enteredGroups(dir);
+    const firstWhere: Prisma.ClubFormSubmissionWhereInput = { AND: [where, groups[0]] };
+    const secondWhere: Prisma.ClubFormSubmissionWhereInput = { AND: [where, groups[1]] };
+    const firstCount = await prisma.clubFormSubmission.count({ where: firstWhere });
+    const first = skip < firstCount ? await prisma.clubFormSubmission.findMany({ where: firstWhere, orderBy: tail, skip, take: options.pageSize, select: listSelect }) : [];
+    const needed = options.pageSize - first.length;
+    const second = needed > 0 ? await prisma.clubFormSubmission.findMany({ where: secondWhere, orderBy: tail, skip: Math.max(0, skip - firstCount), take: needed, select: listSelect }) : [];
+    rows = [...first, ...second];
+  } else {
+    const chosen = key && Object.hasOwn(clubFormOrderBy, key) ? clubFormOrderBy[key](dir) : [];
+    rows = await prisma.clubFormSubmission.findMany({
+      where,
+      orderBy: chosen.length > 0 ? [...chosen, { id: "asc" }] : tail,
+      skip,
+      take: options.pageSize,
+      select: listSelect,
+    });
+  }
+  return { rows: rows.map(toListRow), total, page, pageCount, pageSize: options.pageSize };
 }
 
 export type ClubFormSubmissionListRow = Awaited<ReturnType<typeof listSubmissionsForViewer>>[number];

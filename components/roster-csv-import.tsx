@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { RosterTypeDefinitions } from "@/components/roster-type-definitions";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
@@ -12,7 +13,7 @@ export function RosterCsvImport({ base, onImported }: { base: string; onImported
       help={(
         <>
           <p>
-            Fill in the <a href={`${base}/template`}>CSV template</a> (First name, Last name, Birth date, Type, Current
+            Fill in the <ExportLink href={`${base}/template`}>CSV template</ExportLink> (First name, Last name, Birth date, Type, Current
             class, Role, Gender) in Excel or Google Sheets and save it as CSV. People already on this year&apos;s roster
             are matched by name and updated with whatever the file fills in; blank cells are left as they are. New people
             need a birth date.

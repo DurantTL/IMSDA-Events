@@ -2,8 +2,9 @@ import { withRequestContext } from "@/lib/request-context";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { clubOrderApiError } from "@/modules/club-orders/api-errors";
 import { requireClubSupplyAccess } from "@/modules/club-supplies/access";
-import { classTrackingExportCsv, exportFileName } from "@/modules/reporting/director-exports";
+import { classTrackingExportCsv } from "@/modules/reporting/director-exports";
 import { auditDirectorExport, loadClassTrackingExport } from "@/modules/reporting/director-exports-repository";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 type RouteContext = { params: Promise<{ organizationId: string }> };
 
@@ -24,14 +25,7 @@ async function getHandler(request: Request, context: RouteContext) {
       access.mode === "EDIT" ? access.actor : access.viewer,
       access.mode === "READ",
     );
-    return new Response(classTrackingExportCsv({ clubName, clubYear }, rows), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": `attachment; filename="${exportFileName("class-tracking", clubYear)}"`,
-      },
-    });
+    return csvDownloadResponse(classTrackingExportCsv({ clubName, clubYear }, rows), exportFileName({ scope: organizationId, kind: `class-tracking-${clubYear}` }));
   } catch (error) {
     return clubOrderApiError(error, "Exporting class tracking");
   }

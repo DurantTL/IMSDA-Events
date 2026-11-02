@@ -2,6 +2,7 @@ import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { rosterBackgroundCsvTemplate, sterlingCsvTemplate } from "@/modules/background-checks/domain";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 /**
  * The Sterling Volunteers CSV template (#388, #427): the real roster export by
@@ -11,14 +12,7 @@ async function getHandler(request: Request) {
   try {
     await requireClubsAdministration();
     const sterling = new URL(request.url).searchParams.get("format") === "sterling";
-    return new Response(sterling ? sterlingCsvTemplate() : rosterBackgroundCsvTemplate(), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="sterling-volunteers-${sterling ? "export" : "roster"}-template.csv"`,
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return csvDownloadResponse(sterling ? sterlingCsvTemplate() : rosterBackgroundCsvTemplate(), exportFileName({ scope: "sterling-volunteers", kind: sterling ? "export-template" : "roster-template" }), { bom: false });
   } catch (error) {
     return backgroundCheckApiError(error, "Downloading the Sterling Volunteers template");
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useClientSearch } from "@/components/search-as-you-type";
 import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
@@ -699,22 +700,22 @@ export function ClubOrderWorkspace({
 
         <div className={styles.actions}>
           {onList.length > 0 ? (
-            <a className="primary-button" href={`${base}/csv?view=list`}><Download aria-hidden="true" size={14} /> Export list (CSV)</a>
+            <ExportLink className="primary-button" href={`${base}/csv?view=list`}><Download aria-hidden="true" size={14} /> Download list (CSV)</ExportLink>
           ) : (
-            <button aria-describedby="club-order-nothing" className="primary-button" disabled type="button"><Download aria-hidden="true" size={14} /> Export list (CSV)</button>
+            <button aria-describedby="club-order-nothing" className="primary-button" disabled type="button"><Download aria-hidden="true" size={14} /> Download list (CSV)</button>
           )}
           {onList.length > 0 && (
-            <a className="secondary-button" href={`${base}/csv?view=all`}><Download aria-hidden="true" size={14} /> Export everything (CSV)</a>
+            <ExportLink className="secondary-button" href={`${base}/csv?view=all`}><Download aria-hidden="true" size={14} /> Download everything (CSV)</ExportLink>
           )}
           {printHref && onList.length > 0 && (
             <a className="secondary-button" href={printHref}><Printer aria-hidden="true" size={14} /> Printable list</a>
           )}
           {onList.length > 0 || data.awardable.length > 0 ? (
-            <a className="secondary-button" href={`${base}/csv?view=picklist`}><Download aria-hidden="true" size={14} /> Pick list (who gets what)</a>
+            <ExportLink className="secondary-button" href={`${base}/csv?view=picklist`}><Download aria-hidden="true" size={14} /> Pick list (who gets what)</ExportLink>
           ) : null}
         </div>
         {onList.length > 0 && (
-          <p className={`field-help ${styles.helpText}`}>Export list has the club details and a calculated column. Export everything is one plain table: honors, uniforms and other items together, one row per item.</p>
+          <p className={`field-help ${styles.helpText}`}>Download list has the club details and a calculated column. Download everything is one plain table: honors, uniforms and other items together, one row per item.</p>
         )}
         {onList.length === 0 && <p className={`field-help ${styles.helpText}`} id="club-order-nothing">Nothing on the list to export yet.</p>}
       </section>

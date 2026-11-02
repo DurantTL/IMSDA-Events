@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { cardCell } from "@/components/table-card-labels";
@@ -58,7 +59,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
 
   const deskHref = (attendeeId: string | null) => (attendeeId ? `/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(attendeeId)}` : null);
   const holder = (row: { holderLabel: string; deskAttendeeId: string | null }) => { const href = deskHref(row.deskAttendeeId); return href ? <a href={href}>{row.holderLabel}</a> : <>{row.holderLabel}</>; };
-  const download = (section: string) => <p><a className="secondary-button report-download" href={csv(section)}>Download CSV</a></p>;
+  const download = (section: string) => <p><ExportLink className="secondary-button report-download" href={csv(section)}>Download CSV</ExportLink></p>;
   const issueTable = (title: string, rows: CloseoutRow[], section: string, empty: string) => <section className="panel form-stack">
     <h3>{title} ({rows.length})</h3>
     {download(section)}

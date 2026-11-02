@@ -184,7 +184,7 @@ describe("meal routes (#210)", () => {
     const handlers = await import("@/app/api/events/[eventId]/exports/meal-tickets/route");
     const response = await (handlers.GET as unknown as Handlers["GET"])(new Request("http://localhost/x"), { params: Promise.resolve({ eventId: "event-1" }) });
     expect(response.headers.get("content-type")).toContain("text/csv");
-    expect(response.headers.get("content-disposition")).toContain("meal-tickets.csv");
+    expect(response.headers.get("content-disposition")).toMatch(/event-1-meal-tickets-\d{4}-\d{2}-\d{2}\.csv/);
     expect(response.headers.get("cache-control")).toContain("no-store");
   });
 });

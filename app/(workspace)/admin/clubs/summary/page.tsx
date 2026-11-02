@@ -6,6 +6,7 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { AreaClubEvents, AreaClubsOverview, AreaExportLinks, AreaMonthlyReportsTable } from "@/components/area-clubs-views";
 import { StaffPoints } from "@/components/staff-points";
+import { ListPager } from "@/components/list-pager";
 import { StaffMonthlyRecords } from "@/components/staff-monthly-records";
 import { ClubDirectoryCards } from "@/components/club-directory";
 import { ClubSummaryLegacyAnchor } from "@/components/club-summary-legacy-anchor";
@@ -19,6 +20,15 @@ import { parseClubQuery, parseLeaderboardSort } from "@/modules/club-reports/are
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary, listAreaClubEvents } from "@/modules/club-reports/area-summary-repository";
 import { buildClubDirectory, clubDirectoryClubHref, clubSummaryAnchors, clubSummaryHref, parseClubSummaryView } from "@/modules/club-reports/club-directory-domain";
+import { serverSort } from "@/lib/list-sort";
+import {
+  EVENT_CLUB_DEFAULT_SORT,
+  EVENT_CLUB_SORT_COLUMNS,
+  GRID_DEFAULT_SORT,
+  OVERVIEW_DEFAULT_SORT,
+  OVERVIEW_SORT_COLUMNS,
+  gridSortColumns,
+} from "@/modules/club-reports/area-table-sort";
 import { buildStaffMonthlyRecords } from "@/modules/club-reports/staff-monthly-records-domain";
 import { buildStaffPoints } from "@/modules/club-reports/staff-points-domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
@@ -29,7 +39,7 @@ import pointsStyles from "@/components/staff-points.module.css";
 export const metadata: Metadata = { title: "Club summary" };
 export const dynamic = "force-dynamic";
 
-type Search = { year?: string; sort?: string; q?: string | string[]; view?: string; attention?: string; page?: string; month?: string; show?: string; all?: string };
+type Search = { year?: string; sort?: string; dir?: string; gridSort?: string; gridDir?: string; overviewSort?: string; overviewDir?: string; q?: string | string[]; view?: string; attention?: string; page?: string; month?: string; show?: string; all?: string };
 const views = [
   { key: "directory", label: "Club directory", icon: LayoutGrid },
   { key: "records", label: "Monthly Records", icon: ClipboardList },
@@ -63,6 +73,20 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
       ? clubSummaryHref({ clubYear, query, attention, page: directory.page, ...options })
       : clubSummaryHref({ clubYear, ...options, page: undefined });
   };
+  // Each table on a view sorts through its own params (#1458): the records table `sort`/`dir`, the two tables under
+  // "Full-year grid" `gridSort` and `overviewSort`, the event tables `sort`/`dir` on their own view.
+  // Sort links carry only the params the current view uses, so a stale filter of another view (the directory's
+  // `attention`, `page`) never rides along (#1458).
+  const viewKeys: Record<typeof view, readonly string[]> = {
+    directory: [],
+    records: ["year", "view", "month", "q", "show", "all", "sort", "dir", "gridSort", "gridDir", "overviewSort", "overviewDir"],
+    points: [],
+    events: ["year", "view", "sort", "dir"],
+  };
+  const searchParamsRecord: Record<string, string | string[] | undefined> = Object.fromEntries(Object.entries(params).filter(([name]) => viewKeys[view].includes(name)));
+  const gridSorting = serverSort("/admin/clubs/summary", searchParamsRecord, gridSortColumns(clubYear), GRID_DEFAULT_SORT, { prefix: "grid", hash: "#monthly-grid" });
+  const overviewSorting = serverSort("/admin/clubs/summary", searchParamsRecord, OVERVIEW_SORT_COLUMNS, OVERVIEW_DEFAULT_SORT, { prefix: "overview", hash: "#club-overview" });
+  const eventSorting = serverSort("/admin/clubs/summary", searchParamsRecord, EVENT_CLUB_SORT_COLUMNS, EVENT_CLUB_DEFAULT_SORT, { hash: "#club-events" });
   const links = {
     clubHref: (id: string) => clubDirectoryClubHref(id, clubYear),
     reportHref: (id: string, month: string) => `/admin/clubs/reports/${encodeURIComponent(id)}/${encodeURIComponent(month)}?year=${encodeURIComponent(clubYear)}`,
@@ -107,28 +131,25 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
       </SearchAsYouTypeForm>
       {view === "directory" && <>
         <p className={styles.note} id="club-attention-help">Needs attention: {directory.monthLabel} records that are not submitted or are submitted and awaiting review. This filter only checks that monthly record.</p>
-        <p aria-live="polite" className={styles.note} role="status">Showing {directory.from}–{directory.to} of {directory.total} {query || attention ? `matching clubs (${directory.totalClubs} active clubs in total)` : "active clubs"}. Sorted by club name.</p>
+        <ListPager hrefFor={(page) => href({ view: "directory", page })} label="Club directory pages" part="count" noun={query || attention ? `matching clubs (${directory.totalClubs} active clubs in total)` : "active clubs"} nounOne={query || attention ? `matching club (${directory.totalClubs} active clubs in total)` : "active club"} slice={directory} />
+        <p className={styles.note}>Sorted by club name.</p>
         {directory.total > 0 ? <ClubDirectoryCards clubs={directory.items} clubYear={clubYear} monthLabel={directory.monthLabel} /> : <div className="panel"><p>{directory.totalClubs === 0 ? "No active clubs for this club year." : "No clubs match these filters. Try another club or church name, or clear the filters."}</p></div>}
-        {directory.pageCount > 1 && <nav className="list-pager" aria-label="Club directory pages">
-          {directory.page > 1 && <Link className="secondary-button" href={href({ view: "directory", page: directory.page - 1 })} prefetch={false}>Previous</Link>}
-          <span>Page {directory.page} of {directory.pageCount}</span>
-          {directory.page < directory.pageCount && <Link className="secondary-button" href={href({ view: "directory", page: directory.page + 1 })} prefetch={false}>Next</Link>}
-        </nav>}
+        <ListPager hrefFor={(page) => href({ view: "directory", page })} label="Club directory pages" part="pages" slice={directory} />
         {newYearStatus && newYearStatus.clubs.length > 0 && <details className={`panel ${styles.details}`}><summary>Roster carry-forward status</summary><ClubNewYearStatus clubHref={(id) => clubDirectoryClubHref(id, newYearStatus.toClubYear)} status={newYearStatus} /></details>}
       </>}
       {view === "records" && <>
         <Link className="secondary-button" href={`/admin/clubs/reports?year=${encodeURIComponent(clubYear)}`}>Review monthly records</Link>
-        <StaffMonthlyRecords clubYear={clubYear} links={links} view={buildStaffMonthlyRecords({ clubs, clubYear, now, month: params.month, q: params.q, show: params.show, all: params.all })} />
-        <details className={`panel ${styles.details}`}>
+        <StaffMonthlyRecords clubYear={clubYear} links={links} view={buildStaffMonthlyRecords({ clubs, clubYear, now, month: params.month, q: params.q, show: params.show, all: params.all, sort: params.sort, dir: params.dir })} />
+        <details className={`panel ${styles.details}`} open={Boolean(params.gridSort || params.overviewSort) || undefined}>
           <summary>Full-year grid and yearly totals</summary>
-          <AreaMonthlyReportsTable clubYear={clubYear} clubs={clubs} links={links} />
+          <AreaMonthlyReportsTable clubYear={clubYear} clubs={clubs} links={links} sorting={gridSorting} />
           <p className={styles.note}>Directors, roster counts, report totals and Sterling Volunteers counts.</p>
-          <AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} />
+          <AreaClubsOverview clubYear={clubYear} clubs={clubs} links={links} sorting={overviewSorting} />
         </details>
       </>}
       {points && <SearchResultStatus message={`${points.matches.length} of ${points.totalClubs} clubs shown`} />}
       {points && <StaffPoints clubYear={clubYear} view={points} />}
-      {view === "events" && <AreaClubEvents clubHref={links.clubHref} events={events} />}
+      {view === "events" && <AreaClubEvents clubHref={links.clubHref} events={events} sorting={eventSorting} />}
     </section>
   );
 }

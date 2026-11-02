@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -11,8 +12,8 @@ import { clubClassLevelLabels, clubClassLevels, type ClubClassLevel } from "@/mo
 import { awardEntryTooLarge, awardStatusLabels, MAX_AWARD_NEEDS_PER_ENTRY } from "@/modules/earned-awards/domain";
 import type { EarnedAwardsWorkspaceData } from "@/modules/earned-awards/order-source";
 import { cardCell } from "@/components/table-card-labels";
-import { SortOrderNote, SortableHeader } from "@/components/list-sort";
-import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
+import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list-sort";
+import { sortByName, sortOrderText, sortRows, type SortKind, type SortState } from "@/lib/list-sort";
 import { effectiveChoice, makeSearchMatcher, matchesSearch, searchResultSummary } from "@/lib/search-match";
 import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
@@ -44,6 +45,13 @@ export function memberMatchesSearch(member: { firstName: string; lastName: strin
   // "Last, First" works too, and accents and punctuation never get in the way (#799).
   return matchesSearch([member.firstName, member.lastName, member.classLabel], query);
 }
+
+const MEMBERS_SORT_COLUMNS = ["name", "class", "status"] as const;
+type MembersSortColumn = typeof MEMBERS_SORT_COLUMNS[number];
+const MEMBERS_DEFAULT_SORT: SortState<MembersSortColumn> = { key: "name", dir: "asc" };
+const membersSortLabels: Record<MembersSortColumn, { label: string; kind: SortKind }> = {
+  name: { label: "last name", kind: "text" }, class: { label: "current class", kind: "text" }, status: { label: "class status (date completed)", kind: "date" },
+};
 
 type SearchableMember = {
   personId: string;
@@ -152,7 +160,8 @@ export function ClubEarnedAwardsWorkspace({
   const memberSearch = useClientSearch();
   const memberQuery = memberSearch.term;
   const [statusFilter, setStatusFilter] = useState<ClassStatusFilter>("");
-  const [nameDirection, setNameDirection] = useState<SortDirection>("asc");
+  // The order lives in the address (`?sort=&dir=`, #1458); name A to Z unless the address says otherwise.
+  const membersSort = useAddressSort(MEMBERS_SORT_COLUMNS, MEMBERS_DEFAULT_SORT);
   const [classLevel, setClassLevel] = useState<ClubClassLevel>("FRIEND");
   const [completedOn, setCompletedOn] = useState(today);
   // Add by hand.
@@ -334,7 +343,11 @@ export function ClubEarnedAwardsWorkspace({
 
   // The one members table: search, then the chosen class's status, sorted by name. Bulk actions count and
   // send only members that are selected and shown (a filter can hide ticked ones).
-  const tableMembers = sortByName(filterMembers(data.members, memberQuery, statusFilter, classLevel), nameDirection);
+  const byName = sortByName(filterMembers(data.members, memberQuery, statusFilter, classLevel), membersSort.key === "name" || membersSort.key === null ? membersSort.dir : "asc");
+  const tableMembers = membersSort.key === null || membersSort.key === "name" ? byName : sortRows(byName, membersSort.key, membersSort.dir, {
+    class: (member) => member.classLabel,
+    status: (member) => member.completed?.[classLevel],
+  });
   const selectedCount = visibleSelectedIds(tableMembers, selected, "").length;
   const knownSelected = data.members.filter((member) => selected.has(member.personId)).length;
   const hiddenSelected = knownSelected - selectedCount;
@@ -361,7 +374,7 @@ export function ClubEarnedAwardsWorkspace({
           <span className="count-badge">{`${data.needs.length} open`}</span>
           {(exportCsvHref || exportPrintHref) && (
             <div className="report-actions" role="group" aria-label="Export class tracking">
-              {exportCsvHref && <a className="secondary-button" href={exportCsvHref}><Download aria-hidden="true" size={14} /> Export CSV</a>}
+              {exportCsvHref && <ExportLink className="secondary-button" href={exportCsvHref}><Download aria-hidden="true" size={14} /> Download CSV</ExportLink>}
               {exportPrintHref && <Link className="secondary-button" href={exportPrintHref}>Print report</Link>}
             </div>
           )}
@@ -442,13 +455,13 @@ export function ClubEarnedAwardsWorkspace({
                 <p className="public-manage-empty" role="status"><UsersRound aria-hidden="true" size={17} /> No member matches these filters.</p>
               ) : (
                 <div className="report-table-wrap">
-                  <SortOrderNote>{sortOrderText(nameSortLabel, nameDirection)}</SortOrderNote>
+                  <SortOrderNote>{sortOrderText(membersSortLabels[membersSort.key ?? "name"].label, membersSort.dir, membersSortLabels[membersSort.key ?? "name"].kind)}</SortOrderNote>
                   <table aria-labelledby="earned-members" className="report-table table-cards class-tracking-table" data-fit-width role="table">
                     <thead role="rowgroup">
                       <tr role="row">
-                        <SortableHeader active className="class-col-name" direction={nameDirection} label="Name" onSort={() => setNameDirection(flipDirection(nameDirection))} />
-                        <th className="class-col-class" role="columnheader" scope="col">Current class</th>
-                        <th className="class-col-status" role="columnheader" scope="col">{`${clubClassLevelLabels[classLevel]} status`}</th>
+                        <SortableHeader active={membersSort.key === "name" || membersSort.key === null} className="class-col-name" direction={membersSort.dir} label="Name" onSort={() => membersSort.toggle("name")} />
+                        <SortableHeader active={membersSort.key === "class"} className="class-col-class" direction={membersSort.dir} label="Current class" onSort={() => membersSort.toggle("class")} />
+                        <SortableHeader active={membersSort.key === "status"} className="class-col-status" direction={membersSort.dir} label={`${clubClassLevelLabels[classLevel]} status`} onSort={() => membersSort.toggle("status")} />
                         <th className="class-col-history" role="columnheader" scope="col"><span className="sr-only">Class history</span></th>
                       </tr>
                     </thead>

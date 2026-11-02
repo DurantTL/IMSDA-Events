@@ -238,7 +238,7 @@ describe("the lodging report export", () => {
     mocks.findActiveMembership.mockResolvedValue(membership("EVENT_ADMIN"));
     const response = await exportGet(request("GET", {}, `${origin}/api/x?report=keys`), params);
     expect(response.headers.get("Cache-Control")).toContain("no-store");
-    expect(response.headers.get("Content-Disposition")).toContain("lodging-keys.csv");
+    expect(response.headers.get("Content-Disposition")).toMatch(/ev1-lodging-keys-\d{4}-\d{2}-\d{2}\.csv/);
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     const unknown = await exportGet(request("GET", {}, `${origin}/api/x?report=everything`), params);
     expect(unknown.status).toBe(400);

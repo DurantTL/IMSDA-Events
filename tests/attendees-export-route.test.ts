@@ -92,7 +92,7 @@ describe("attendees export route", () => {
     const response = await GET(new Request("http://localhost/x"), { params: Promise.resolve({ eventId: "evt\";\r\nX-Evil: 1" }) });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
-    expect(response.headers.get("Content-Disposition")).toBe('attachment; filename="evt----X-Evil--1-attendees.csv"');
+    expect(response.headers.get("Content-Disposition")).toMatch(/^attachment; filename="evt-x-evil-1-attendees-\d{4}-\d{2}-\d{2}\.csv"$/);
   });
 
   it("writes dietary free text for reports plus sensitive staff on a general event", async () => {

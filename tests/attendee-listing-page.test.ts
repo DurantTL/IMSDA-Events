@@ -56,6 +56,21 @@ describe("attendee listing page", () => {
     expect(html).not.toContain("Dietary details are limited");
   });
 
+  it("pages the sorted list on the server: the sort covers every attendee, and a header link drops the page (#1458)", async () => {
+    dependencies.resolveEventContext.mockResolvedValue(context(["VIEW_REPORTS", "VIEW_SENSITIVE_DATA"]));
+    dependencies.listRegistrations.mockResolvedValue(Array.from({ length: 55 }, (_, index) => registration(`R${String(index + 1).padStart(2, "0")}`)));
+    const second = await render({ event: "evt", sort: "name", dir: "desc", page: "2" });
+    expect(second).toContain("Showing 51\u201355 of 55 attendees");
+    expect(second).toContain("Page 2 of 2");
+    // Z to A over all 55 people: the last five by name are on page 2, and the first is not.
+    expect(second).toContain("WR26-R01");
+    expect(second).not.toContain("WR26-R55");
+    expect(second).toContain('aria-sort="descending"');
+    // The header links start at page 1, and the pager keeps the sort.
+    expect(second).not.toMatch(/href="[^"]*dir=asc[^"]*page=/);
+    expect(second).toMatch(/rel="prev" href="[^"]*sort=name[^"]*"/);
+  });
+
   it("hides the dietary text and says why when the viewer lacks reports access", async () => {
     dependencies.resolveEventContext.mockResolvedValue(context(["VIEW_SENSITIVE_DATA"]));
     const html = await render();

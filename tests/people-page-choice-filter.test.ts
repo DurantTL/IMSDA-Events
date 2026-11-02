@@ -90,9 +90,9 @@ describe("People page with a choice-answer filter", () => {
     const query = { event: "evt", answerQuestion: "ATTENDEE:meal_preference", answerValue: "Vegan" };
     const event = { id: "evt", slug: "wr", timezone: "UTC", waitlistEnabled: false };
     dependencies.resolveEventContext.mockResolvedValue({ event, permissions: ["VIEW_SENSITIVE_DATA"] });
-    expect(await render(query)).not.toContain("Export this list");
+    expect(await render(query)).not.toContain("Download this list");
     dependencies.resolveEventContext.mockResolvedValue({ event, permissions: ["VIEW_SENSITIVE_DATA", "VIEW_REPORTS"] });
-    expect(await render(query)).toContain("Export this list");
+    expect(await render(query)).toContain("Download this list");
   });
 
   it("with the staff viewer on a legacy form: offers the meal question, not is_minor or health questions", async () => {

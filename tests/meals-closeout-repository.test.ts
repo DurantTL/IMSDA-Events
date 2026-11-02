@@ -142,12 +142,12 @@ describe("who can open the closeout", () => {
   it("downloads the money and exceptions CSVs for finance, with matching totals, and refuses kitchen and report-only roles", async () => {
     const money = await closeoutCsv(new Request("http://localhost/x"), params);
     expect(money.status).toBe(200);
-    expect(money.headers.get("content-disposition")).toContain("evt-meals-closeout.csv");
+    expect(money.headers.get("content-disposition")).toMatch(/evt-meals-closeout-\d{4}-\d{2}-\d{2}\.csv/);
     const text = await money.text();
     const closeout = await loadMealCloseout("evt");
     expect(text).toContain(`"All services","${closeout.totals.charges / 100}"`);
     const exceptions = await closeoutCsv(new Request("http://localhost/x?part=exceptions"), params);
-    expect(exceptions.headers.get("content-disposition")).toContain("exceptions.csv");
+    expect(exceptions.headers.get("content-disposition")).toMatch(/evt-meals-closeout-exceptions-\d{4}-\d{2}-\d{2}\.csv/);
     expect(await exceptions.text()).toContain("LEDGER_MISMATCH");
     for (const role of ["KITCHEN_STAFF", "REGISTRATION_MANAGER", "READ_ONLY_STAFF"]) {
       mocks.role = role;

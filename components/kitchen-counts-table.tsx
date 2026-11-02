@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { eventLocalDateTime } from "@/modules/meals/scanner-import";
@@ -29,7 +30,7 @@ export function KitchenCountsTable({
         </div>
         <div className="intro-actions">
           {enterHref && <Link className="primary-button" href={enterHref}>Enter counts</Link>}
-          <a className="secondary-button" href={csvHref}><Download aria-hidden="true" size={16} /> Download CSV</a>
+          <ExportLink className="secondary-button" href={csvHref}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink>
         </div>
       </div>
       <dl className="kitchen-definitions field-help">

@@ -9,6 +9,8 @@ import { locationParam, resolveLocationFilter } from "@/modules/event-locations/
 import { toCsv } from "@/modules/reporting/csv";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * What each church owes for this event (#409): an estimate, billed to the
@@ -33,13 +35,7 @@ async function getHandler(
       listChurchSponsoredPromoLines(eventId),
     ]);
     const rows = churchAmountsOwedCsvRows(owed, billedSponsoredLines(sponsored));
-    return new Response(toCsv(rows), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${eventId}-church-owed.csv"`,
-        "Cache-Control": "no-store",
-      },
-    });
+    return csvDownloadResponse(toCsv(rows), exportFileName({ scope: await eventFileScope(eventId), kind: "church-owed" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json({ error: error.code, message: error.message }, { status: error.status });

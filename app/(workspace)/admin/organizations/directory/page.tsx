@@ -1,18 +1,23 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { ColumnHeader } from "@/components/column-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
-import { OrganizationListPager, OrganizationSearchControls } from "@/components/organization-search-controls";
+import { ListPager } from "@/components/list-pager";
+import { SortOrderNote } from "@/components/list-sort";
+import { OrganizationSearchControls } from "@/components/organization-search-controls";
 import { cardCell } from "@/components/table-card-labels";
 import { OrganizationStatusButton } from "@/components/organization-status-button";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listDirectoryContacts } from "@/modules/organizations/contacts-repository";
 import { disbandedNotice, organizationKindLabels, safeWebsiteHref } from "@/modules/organizations/eadventist-import";
 import { listDirectoryOrganizations, type DirectoryStatusFilter } from "@/modules/organizations/eadventist-import-repository";
-import { cleanSearchQuery } from "@/modules/organizations/search";
+import { cleanSearchQuery, listSearchParams } from "@/modules/organizations/search";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
-import { pageCountFor, parseLeadingPageParam } from "@/lib/pagination";
+import { serverSort, sortOrderText } from "@/lib/list-sort";
+import { parseLeadingPageParam, sliceFromCount } from "@/lib/pagination";
+import { DIRECTORY_DEFAULT_SORT, DIRECTORY_SORT_COLUMNS } from "@/modules/organizations/directory-sort";
 
 export const metadata: Metadata = { title: "Organization directory" };
 
@@ -25,7 +30,7 @@ const statuses: Array<{ value: DirectoryStatusFilter; label: string }> = [
 ];
 
 /** Staff list of churches, companies, groups, schools and the rest, by kind, status and search (#649, #723). */
-export default async function OrganizationDirectoryPage({ searchParams }: { searchParams: Promise<{ kind?: string; status?: string; q?: string; page?: string }> }) {
+export default async function OrganizationDirectoryPage({ searchParams }: { searchParams: Promise<{ kind?: string; status?: string; q?: string; page?: string; sort?: string; dir?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
@@ -34,9 +39,18 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
   const kind = kinds.find((candidate) => candidate === params.kind) ?? null;
   const status = statuses.find((candidate) => candidate.value === params.status)?.value ?? "ALL";
   const query = cleanSearchQuery(params.q);
-  const { organizations, total, page, pageSize } = await listDirectoryOrganizations({ kind, status, query, page: parseLeadingPageParam(params.page) });
+  // The sort is whitelisted and runs in the database, so every page is a slice of the whole sorted list (#1458).
+  const sorting = serverSort("/admin/organizations/directory", params, DIRECTORY_SORT_COLUMNS, DIRECTORY_DEFAULT_SORT);
+  const { organizations, total, page, pageSize } = await listDirectoryOrganizations({ kind, status, query, page: parseLeadingPageParam(params.page), sort: sorting.order });
   const contacts = await listDirectoryContacts(organizations.map((organization) => organization.id), { id: user.id, globalRole: user.globalRole });
-  const state = { q: query, kind: kind ?? "", status };
+  const state = { q: query, kind: kind ?? "", status, sort: params.sort && sorting.order.key ? sorting.order.key : "", dir: params.sort && sorting.order.key ? sorting.order.dir : "" };
+  const pageHref = (next: number) => {
+    const urlParams = listSearchParams({ q: query, kind, status, page: next });
+    if (state.sort) { urlParams.set("sort", state.sort); urlParams.set("dir", state.dir); }
+    const text = urlParams.toString();
+    return text ? `/admin/organizations/directory?${text}` : "/admin/organizations/directory";
+  };
+  const orderLabels = { name: "name", kind: "kind", status: "status", place: "place", parent: "parent", contact: "contact phone" } as const;
   const searching = query.trim() !== "" || kind !== null || status !== "ALL";
 
   return (
@@ -69,15 +83,16 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
             {total} {total === 1 ? "organization" : "organizations"}{searching ? " match" : ""}.
           </p>
           <div className="report-table-wrap">
+            {state.sort && <SortOrderNote>{sortOrderText(orderLabels[sorting.order.key!], sorting.order.dir, ["kind", "status"].includes(sorting.order.key!) ? "group" : "text")}</SortOrderNote>}
             <table className="report-table table-cards table-cards-wide org-directory-table" role="table">
               <thead role="rowgroup">
                 <tr role="row">
-                  <th role="columnheader" scope="col">Name</th>
-                  <th role="columnheader" scope="col">Kind</th>
-                  <th role="columnheader" scope="col">Status</th>
-                  <th role="columnheader" scope="col">Place</th>
-                  <th role="columnheader" scope="col">Parent</th>
-                  <th role="columnheader" scope="col">Contact</th>
+                  <ColumnHeader column="name" label="Name" sorting={sorting} />
+                  <ColumnHeader column="kind" label="Kind" sorting={sorting} />
+                  <ColumnHeader column="status" label="Status" sorting={sorting} />
+                  <ColumnHeader column="place" label="Place" sorting={sorting} />
+                  <ColumnHeader column="parent" label="Parent" sorting={sorting} />
+                  <ColumnHeader column="contact" label="Contact" sorting={sorting} />
                   <th role="columnheader" scope="col"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
@@ -151,7 +166,7 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
               </tbody>
             </table>
           </div>
-          <OrganizationListPager basePath="/admin/organizations/directory" page={page} pageCount={pageCountFor(total, pageSize)} pageSize={pageSize} state={state} total={total} />
+          <ListPager hrefFor={pageHref} label="Organization pages" noun="organizations" nounOne="organization" slice={sliceFromCount(organizations, page, total, pageSize)} />
         </div>
       </section>
     </>

@@ -50,14 +50,14 @@ describe("exports in their new homes", () => {
     const html = honorsMarkup({ initialRows: [row("a", [honor])] });
     expect(html).toContain('href="/api/attendee/clubs/org-1/exports/honors"');
     expect(html).toContain("/account/clubs/org-1/exports/honors");
-    expect(html).toContain("Export CSV");
+    expect(html).toContain("Download CSV");
   });
 
   it("a read-only viewer gets the CSV (the route allows an Area Coordinator) but not the club-only printable page; staff get neither", () => {
     const readOnly = honorsMarkup({ readOnly: true, initialRows: [row("a", [honor])] });
     expect(readOnly).toContain("/exports/honors");
     expect(readOnly).not.toContain("Print report");
-    expect(honorsMarkup({ staff: true, readOnly: true, initialRows: [row("a")] })).not.toContain("Export CSV");
+    expect(honorsMarkup({ staff: true, readOnly: true, initialRows: [row("a")] })).not.toContain("Download CSV");
   });
 
   it("puts the class export on the Class tracking page, pointing at the existing export route", () => {
@@ -76,7 +76,7 @@ describe("exports in their new homes", () => {
     const html = renderToStaticMarkup(createElement(ClubEarnedAwardsWorkspace, {
       initial: emptyEarnedAwardsData, organizationId: "org-1", ordersHref: "/o", readOnly: true,
     }));
-    expect(html).not.toContain("Export CSV");
+    expect(html).not.toContain("Download CSV");
   });
 });
 

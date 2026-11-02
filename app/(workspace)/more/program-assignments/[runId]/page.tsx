@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download, ShieldCheck } from "lucide-react";
@@ -62,7 +63,7 @@ export default async function ProgramAssignmentRosterPage({
         </div>
         <div className="intro-actions assignment-print-actions">
           <Link className="secondary-button" href={`/more/program-assignments?event=${encodeURIComponent(event.id)}`}>Back to assignments</Link>
-          <a className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/program-assignments/${encodeURIComponent(roster.id)}/roster`}><Download aria-hidden="true" size={15} /> CSV</a>
+          <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/program-assignments/${encodeURIComponent(roster.id)}/roster`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
           <PrintReportButton />
         </div>
       </div>

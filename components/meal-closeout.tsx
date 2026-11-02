@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import { Money } from "@/components/exact-value";
 import { Download } from "lucide-react";
 import { MealCloseoutReviewForm } from "@/components/meal-closeout-review-form";
@@ -84,7 +85,7 @@ export function MealCloseout({ eventId, closeout, csvHref, exceptionsCsvHref }: 
             </p>
           </div>
           <div className="intro-actions">
-            <a className="secondary-button" href={csvHref}><Download aria-hidden="true" size={16} /> Download CSV</a>
+            <ExportLink className="secondary-button" href={csvHref}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink>
           </div>
         </div>
         <dl className="kitchen-definitions field-help">
@@ -118,7 +119,7 @@ export function MealCloseout({ eventId, closeout, csvHref, exceptionsCsvHref }: 
             </p>
           </div>
           <div className="intro-actions">
-            <a className="secondary-button" href={exceptionsCsvHref}><Download aria-hidden="true" size={16} /> Download exceptions CSV</a>
+            <ExportLink className="secondary-button" href={exceptionsCsvHref}><Download aria-hidden="true" size={16} /> Download exceptions CSV</ExportLink>
           </div>
         </div>
         {exceptions.length > 0 && (

@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { CSSProperties } from "react";
 import { EventSetupHelp } from "@/components/event-setup-help";
 import type { Metadata } from "next";
@@ -127,13 +128,12 @@ export default async function PrintableNameBadgesPage({
             Back to check-in
           </Link>
           {labels.length > 0 && (
-            <a
+            <ExportLink
               className="secondary-button"
-              download
               href={csvHref}
             >
-              Export CSV for Avery Design &amp; Print
-            </a>
+              Download CSV for Avery Design &amp; Print
+            </ExportLink>
           )}
           {labels.length > 0 && (
             <PrintReportButton label="Print name badges" />

@@ -1,7 +1,12 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { ColumnHeader } from "@/components/column-header";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RecordsByMonthChart, ReportSummaryBand, YearStrip, shortMonth } from "@/components/club-report-charts";
+import { ListPager } from "@/components/list-pager";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
+import { sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
+import type { CoordinatorMonthSortColumn } from "@/modules/club-reports/area-table-sort";
 import type { AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
 import {
   COORDINATOR_RECORDS_PAGE_SIZE,
@@ -92,19 +97,26 @@ export function CoordinatorMonthBand({ clubs, month, now }: { clubs: readonly Ar
 }
 
 /** The club table for one month. Submitted opens that record read only; every other row opens the club. */
-export function CoordinatorMonthTable({ clubs, clubYear, month, query, now, showAll }: ViewProps & { clubs: readonly AreaClubSummary[]; now: Date; showAll: boolean }) {
-  const rows = coordinatorMonthRows(clubs, month, now);
+export function CoordinatorMonthTable({ clubs, clubYear, month, query, now, showAll, sorting }: ViewProps & { clubs: readonly AreaClubSummary[]; now: Date; showAll: boolean; sorting?: ServerSort<CoordinatorMonthSortColumn> }) {
+  const defaultRows = coordinatorMonthRows(clubs, month, now);
+  // Sorted before the page's row limit, so "Show all" and the first rows follow the chosen column (#1458).
+  const monthAccessors: Record<CoordinatorMonthSortColumn, (row: (typeof defaultRows)[number]) => SortValue> = {
+    club: (row) => row.name,
+    record: (row) => stateWords[row.status.state].word,
+  };
+  const rows = sorting?.order.key ? sortRows(defaultRows, sorting.order.key, sorting.order.dir, monthAccessors) : defaultRows;
   const limited = !showAll && rows.length > COORDINATOR_RECORDS_PAGE_SIZE;
   const shown = limited ? rows.slice(0, COORDINATOR_RECORDS_PAGE_SIZE) : rows;
   const monthLabel = reportMonthLabel(month);
   return (
     <div className={styles.tableBlock}>
+      {sorting?.order.key && <SortOrderNote>{sortOrderText(sorting.order.key === "club" ? "club name" : `${shortMonth(month)} record`, sorting.order.dir)}</SortOrderNote>}
       <table className={`report-table table-cards ${styles.table}`} role="table">
         <caption className="sr-only">Clubs and their {monthLabel} record, club year {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">
-            <th role="columnheader" scope="col">Club</th>
-            <th role="columnheader" scope="col">{shortMonth(month)} record</th>
+            <ColumnHeader column="club" label="Club" sorting={sorting} />
+            <ColumnHeader column="record" label={`${shortMonth(month)} record`} sorting={sorting} />
             <th role="columnheader" scope="col">Year so far</th>
             <th role="columnheader" scope="col"><span className="sr-only">Open</span></th>
           </tr>
@@ -147,34 +159,34 @@ export function CoordinatorMonthTable({ clubs, clubYear, month, query, now, show
       {rows.length > COORDINATOR_RECORDS_PAGE_SIZE && (
         <p className={styles.more}>
           {limited ? (
-            <Link className="text-button" href={coordinatorRecordsHref({ clubYear, month, query, all: true })}>Show all {rows.length} clubs</Link>
+            <Link className="text-button" href={coordinatorRecordsHref({ clubYear, month, query, all: true, sort: sorting?.order })}>Show all {rows.length} clubs</Link>
           ) : (
-            <Link className="text-button" href={coordinatorRecordsHref({ clubYear, month, query })}>Show fewer</Link>
+            <Link className="text-button" href={coordinatorRecordsHref({ clubYear, month, query, sort: sorting?.order })}>Show fewer</Link>
           )}
-          <span> Showing {shown.length} of {rows.length} clubs.</span>
         </p>
       )}
+      {rows.length > COORDINATOR_RECORDS_PAGE_SIZE && <ListPager label="Clubs shown" noun="clubs" nounOne="club" slice={{ from: 1, to: shown.length, total: rows.length, page: 1, pageCount: 1 }} />}
     </div>
   );
 }
 
 /** The whole month view: picker, band, chart, table. */
-export function CoordinatorMonthView({ clubs, clubYear, month, query, now, showAll }: ViewProps & { clubs: readonly AreaClubSummary[]; now: Date; showAll: boolean }) {
+export function CoordinatorMonthView({ clubs, clubYear, month, query, now, showAll, sorting }: ViewProps & { clubs: readonly AreaClubSummary[]; now: Date; showAll: boolean; sorting?: ServerSort<CoordinatorMonthSortColumn> }) {
   return (
     <div className={styles.view}>
       <CoordinatorMonthPicker clubYear={clubYear} clubs={clubs} month={month} now={now} query={query} />
       <CoordinatorMonthBand clubs={clubs} month={month} now={now} />
       <RecordsByMonthChart clubYear={clubYear} selectedMonth={month} totals={coordinatorMonthlyTotals(clubs, clubYear, now)} variant="coordinator" />
-      <CoordinatorMonthTable clubs={clubs} clubYear={clubYear} month={month} now={now} query={query} showAll={showAll} />
+      <CoordinatorMonthTable clubs={clubs} clubYear={clubYear} month={month} now={now} query={query} showAll={showAll} sorting={sorting} />
     </div>
   );
 }
 
 /** The existing full-year grid, collapsed. An empty or no-match state is shown open, since there is nothing to collapse. */
-export function CoordinatorFullYearDetails({ children, empty }: { children: React.ReactNode; empty: boolean }) {
+export function CoordinatorFullYearDetails({ children, empty, open }: { children: React.ReactNode; empty: boolean; open?: boolean }) {
   if (empty) return <>{children}</>;
   return (
-    <details className={styles.fullYear}>
+    <details className={styles.fullYear} open={open || undefined}>
       <summary>Full-year grid</summary>
       {children}
     </details>

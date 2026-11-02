@@ -50,8 +50,8 @@ describe("OperationsSearchBar", () => {
 
   it("shows the true total and links the neighbouring pages with the search kept", () => {
     const html = render(["VIEW_EVENT", "VIEW_SENSITIVE_DATA"], "q=Jane&page=2");
-    expect(html).toContain("120 registrations match");
-    expect(html).toContain("page 2 of 3");
+    expect(html).toContain("Showing 51\u2013100 of 120 registrations");
+    expect(html).toContain("Page 2 of 3");
     expect(html).toContain("/people?q=Jane&amp;event=event-a");
     expect(html).toContain("page=3");
   });
@@ -60,7 +60,7 @@ describe("OperationsSearchBar", () => {
     const html = render(["VIEW_EVENT", "VIEW_SENSITIVE_DATA"], "", true);
     expect(html).toContain('role="alert"');
     expect(html).toContain("no longer offered");
-    expect(html).not.toContain("registrations match");
+    expect(html).not.toContain("Showing");
   });
 
   it("wraps the form in a disclosure that opens only when a filter or result is showing", () => {
