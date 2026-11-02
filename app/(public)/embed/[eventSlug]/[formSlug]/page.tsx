@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { PublicRegistrationForm } from "@/components/public-registration-form";
 import { getPublicRegistrationExperience } from "@/modules/forms/public-repository";
@@ -35,7 +35,7 @@ export default async function EmbeddedRegistrationPage({
   ) {
     return (
       <main className="public-registration-embed-state">
-        <BrandMark />
+        <BrandLink target="_top" />
         <p className="public-registration-eyebrow">IMSDA Events</p>
         <h1>Online registration is not available here</h1>
         <p>Open the event page for current dates, availability, waitlist information, and help.</p>

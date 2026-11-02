@@ -1,10 +1,10 @@
 "use client";
 
 import { ExactValue } from "@/components/exact-value";
-import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Plus, Trash2 } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { PhoneInput } from "@/components/phone-input";
 import { inlinePhoneProblem } from "@/lib/field-validation";
 import { StaffInvitationQuestions, type StaffAnswers } from "@/components/staff-invitation-questions";
@@ -112,13 +112,14 @@ export function StaffInvitationRegistration({ token, event, person, questions }:
   }
 
   const header = (
-    <header className="public-registration-header">
-      <div className="public-registration-header-inner">
-        <Link className="public-registration-brand public-event-brand-link" href={`/events/${encodeURIComponent(event.slug)}`}>
-          <BrandMark /><span><strong>IMSDA</strong><small>Events</small></span>
-        </Link>
-      </div>
-    </header>
+    <>
+      <header className="public-registration-header">
+        <div className="public-registration-header-inner">
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
+        </div>
+      </header>
+      <BackToEventsLink placement="page" />
+    </>
   );
 
   if (done) {

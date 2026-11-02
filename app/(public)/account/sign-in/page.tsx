@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { AttendeeSignInForm } from "@/components/attendee-sign-in-form";
 import {
   AttendeeGoogleButton,
@@ -45,10 +46,8 @@ export default async function AttendeeSignInPage({
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BackToEventsLink />
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Your registrations</p>
           <h1>Account sign in</h1>

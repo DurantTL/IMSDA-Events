@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { FormsHelp } from "@/components/forms-help";
 import { LoginForm } from "@/components/login-form";
 import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
@@ -67,10 +68,8 @@ export default async function SignInPage({
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BackToEventsLink />
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <h1>Sign in</h1>
           <p>Use your email and password. Some accounts will be asked for a second step after the password.</p>

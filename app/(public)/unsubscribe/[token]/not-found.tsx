@@ -1,6 +1,5 @@
 import { Mail, MailX } from "lucide-react";
-import Link from "next/link";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 
 /**
  * The page behind an unsubscribe link that does not work (#1005). The page still answers 404 (it calls `notFound()`); this
@@ -12,10 +11,7 @@ export default function UnsubscribeNotFound() {
     <main className="public-registration-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
         </div>
       </header>
       <section className="public-registration-not-found" data-testid="unsubscribe-link-unavailable">

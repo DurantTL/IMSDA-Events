@@ -23,7 +23,7 @@ function listTsxFiles(dir: string): string[] {
 /** Each opening tag (possibly spanning lines) that carries the brand class. */
 function brandLinkTags(source: string): string[] {
   const tags: string[] = [];
-  const tagPattern = /<(?:a|Link)\b[^>]*>/g;
+  const tagPattern = /<(?:a|Link|BrandLink)\b[^>]*>/g;
   for (const match of source.matchAll(tagPattern)) {
     if (match[0].includes(`className="${BRAND_CLASS}"`)) tags.push(match[0]);
   }
@@ -63,6 +63,11 @@ describe("public header logo links (#470)", () => {
       const tags = brandLinkTags(readFileSync(join(process.cwd(), file), "utf8"));
       expect(tags.length, `expected a brand-link <a>/<Link> tag in ${file}`).toBeGreaterThan(0);
       for (const tag of tags) {
+        // The shared BrandLink (#1496) always links to /calendar and takes no href of its own.
+        if (tag.startsWith("<BrandLink")) {
+          expect(hrefOf(tag), `BrandLink in ${file} must not set an href`).toBeUndefined();
+          continue;
+        }
         const href = hrefOf(tag);
         expect(href, `brand link in ${file} has no href`).toBeDefined();
         // No absolute or protocol-relative URL, literal or inside an expression.

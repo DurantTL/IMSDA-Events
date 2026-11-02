@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { LockKeyhole } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { HealthRecordForm } from "@/components/health-record-form";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
@@ -53,10 +52,7 @@ export default async function PublicHealthRecordPage({ params }: { params: Promi
     <main className="public-registration-page public-manage-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
           <span className="public-registration-secure">
             <LockKeyhole size={15} aria-hidden="true" />
             Private health record link

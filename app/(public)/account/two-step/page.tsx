@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { PasskeyUnlockButton } from "@/components/passkey-unlock-button";
 import { RosterUnlockForm } from "@/components/roster-unlock-form";
 import { TwoStepGate } from "@/components/two-step-setup";
@@ -50,15 +50,15 @@ export default async function TwoStepPage({
   const hasPasskey = passkeySettings.available && passkeySettings.passkeys.length > 0;
 
   const header = (
-    <header className="public-registration-header">
-      <div className="public-registration-header-inner">
-        <Link className="public-registration-brand public-event-brand-link" href="/">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </Link>
-        <AttendeeSignOutButton />
-      </div>
-    </header>
+    <>
+      <header className="public-registration-header">
+        <div className="public-registration-header-inner">
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
+          <AttendeeSignOutButton />
+        </div>
+      </header>
+      <BackToEventsLink placement="page" />
+    </>
   );
 
   if (gate === "VERIFY") {

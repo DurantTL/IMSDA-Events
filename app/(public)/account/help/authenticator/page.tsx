@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 
 export const metadata: Metadata = {
   title: "Setting up an authenticator app",
@@ -17,10 +17,7 @@ export default function AuthenticatorHelpPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Two-step sign-in</p>
           <h1>Setting up an authenticator app</h1>

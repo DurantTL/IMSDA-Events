@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 
@@ -24,10 +25,8 @@ export default async function ProfileSignInPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BackToEventsLink />
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Edit profile</p>
           <h1>Sign in first</h1>

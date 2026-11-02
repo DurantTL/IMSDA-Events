@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { PasswordResetForm } from "@/components/password-reset-form";
 import { describeAccountToken } from "@/modules/access/auth-service";
 
@@ -16,10 +17,8 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BackToEventsLink />
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">{activating ? "Account activation" : "Account recovery"}</p>
           <h1>{activating ? "Activate your account" : "Choose a new password"}</h1>

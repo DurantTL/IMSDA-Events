@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { PublicRegistrationRecoveryForm } from "@/components/public-registration-recovery-form";
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
@@ -23,10 +23,7 @@ export default async function RecoverRegistrationPage({
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Private registration access</p>
           <h1>Manage my registration</h1>

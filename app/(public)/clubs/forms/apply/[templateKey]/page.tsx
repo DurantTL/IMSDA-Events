@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { ClubFormFillIn } from "@/components/club-form-fill-in";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { resolveOpenApplication } from "@/modules/club-forms/open-applications";
@@ -24,10 +23,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <main className="public-registration-page public-manage-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
           <div className="public-header-links">
             <BackLink href="/clubs/forms">Club forms</BackLink>
           </div>

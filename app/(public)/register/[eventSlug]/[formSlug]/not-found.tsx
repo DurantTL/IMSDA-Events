@@ -1,12 +1,12 @@
 import { CircleAlert } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 
 export default function PublicRegistrationNotFound() {
   return (
     <main className="public-registration-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <div className="public-registration-brand"><BrandMark /><span><strong>IMSDA</strong><small>Events</small></span></div>
+          <BrandLink className="public-registration-brand" wordmark />
         </div>
       </header>
       <section className="public-registration-not-found">

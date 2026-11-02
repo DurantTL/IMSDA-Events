@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarDays, ChevronRight } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { SignOutButton } from "@/components/sign-out-button";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listArchivedEventsForUser } from "@/modules/events/archive-repository";
@@ -35,10 +35,7 @@ export default async function ArchivedEventsPage() {
   return (
     <main className="auth-page">
       <section className="auth-card select-event-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Staff workspace</p>
           <h1>Archived events</h1>

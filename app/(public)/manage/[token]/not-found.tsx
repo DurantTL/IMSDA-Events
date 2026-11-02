@@ -1,19 +1,13 @@
 import { Link2Off, Mail } from "lucide-react";
 import Link from "next/link";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 
 export default function PublicManageNotFound() {
   return (
     <main className="public-registration-page public-manage-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link
-            className="public-registration-brand public-event-brand-link"
-            href="/"
-          >
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
         </div>
       </header>
       <section className="public-registration-not-found">

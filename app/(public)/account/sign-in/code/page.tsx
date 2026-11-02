@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { SignInCodeForm } from "@/components/sign-in-code-form";
 import styles from "@/components/sign-in-code-form.module.css";
 import { SIGN_IN_CODE_LIFETIME_MINUTES } from "@/modules/attendee-accounts/codes";
@@ -45,10 +46,8 @@ export default async function SignInCodePage({
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BackToEventsLink />
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <span className={styles.icon}><Mail size={22} aria-hidden="true" /></span>
           <p className="eyebrow">Step 2 of 2</p>

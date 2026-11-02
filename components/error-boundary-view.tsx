@@ -1,10 +1,9 @@
 "use client";
 
 import { ExactValue } from "@/components/exact-value";
-import Link from "next/link";
 import { useEffect } from "react";
 import { CircleAlert, RotateCw } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { DEFAULT_CLUB_HELP_EMAIL } from "@/modules/event-info-cards/help-email";
 
 const SUPPORT_EMAIL = DEFAULT_CLUB_HELP_EMAIL;
@@ -51,10 +50,7 @@ export function ErrorBoundaryView({ error, retry, variant }: ErrorBoundaryViewPr
     <main className="public-registration-page public-event-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
         </div>
       </header>
       {card}

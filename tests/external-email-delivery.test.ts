@@ -9,7 +9,7 @@ vi.mock("@/modules/lodging/message-currency", () => ({ lodgingMessageStaleReason
 
 import { renderEmailBodyHtml, renderEmailHtmlDocument } from "@/modules/communications/email-html";
 import { MessageFileDeliveryError } from "@/modules/communications/message-file-rules";
-import { resetServerEnvCache } from "@/lib/env";
+import { getServerEnv, resetServerEnvCache } from "@/lib/env";
 import { EmailProviderRequestError } from "@/integrations/email/resend";
 import {
   EMAIL_DELIVERY_LOCK_TIMEOUT_MS,
@@ -281,6 +281,7 @@ describe("external email queue", () => {
         bodyHtml: "<p>Hello <strong>Avery</strong>.</p>",
         whyLine: "You got this because you registered for an event.",
         helpLine: "Questions about this event? Email help@imsda.org.",
+        calendarUrl: new URL("/calendar", getServerEnv().APP_BASE_URL).toString(),
       }));
       // A null snapshot (a message queued with no line) is the same document.
       expect(await deliver({ preheaderSnapshot: null })).toBe(legacy);
@@ -421,7 +422,8 @@ describe("external email queue", () => {
     expect(payload!.bodyHtml).toContain("Hello [Avery](");
     expect(payload!.bodyHtml).not.toContain(">Avery</a>");
     // No address outside the site's own origin is ever a link in a text-only body.
-    expect(payload!.bodyHtml).not.toContain("<a ");
+    // The only anchors are the header wordmark's links to the calendar (#1496).
+    expect(payload!.bodyHtml).not.toMatch(/<a (?![^>]*href="[^"]*\/calendar")/);
     expect(payload!.bodyHtml).toContain("https://malicious.example");
   });
 

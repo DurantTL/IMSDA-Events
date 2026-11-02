@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 
 export default function EmbeddedRegistrationNotFound() {
   return (
     <main className="public-registration-embed-state">
-      <BrandMark />
+      <BrandLink target="_top" />
       <p className="public-registration-eyebrow">IMSDA Events</p>
       <h1>Registration form unavailable</h1>
       <p>This form may have moved or may not be published yet.</p>

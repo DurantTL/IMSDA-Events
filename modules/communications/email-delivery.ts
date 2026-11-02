@@ -352,6 +352,11 @@ function resolvePrisma(dependencies: ExternalEmailDeliveryDependencies) {
   return dependencies.prisma ?? getPrisma();
 }
 
+/** The public calendar on the site's own origin, for the email header wordmark (#1496); null without an origin. */
+function calendarUrlFor(origin: string | null): string | null {
+  return origin ? new URL("/calendar", origin).toString() : null;
+}
+
 /**
  * One file is read and hash-checked once per delivery run, however many messages carry it: an announcement to a
  * few hundred registrations sends the same attachment each time.
@@ -1353,9 +1358,10 @@ async function runDeliveryLoop(
       }
       // Staff attachments and embedded images (#824). Built from the row's own file references on every attempt, so a
       // retry sends exactly what the first attempt would have.
+      const partDependencies = resolveEmailPartDependencies(dependencies, fileCache);
       const parts = await buildEmailParts(
         { bodyHtml: preparedBody.bodyHtml ?? null, files: message.files ?? [] },
-        resolveEmailPartDependencies(dependencies, fileCache),
+        partDependencies,
       );
       if (parts.unembeddedImageCount > 0) {
         // Not an error (the QR's remote address still works), but worth seeing if it becomes common.
@@ -1433,6 +1439,9 @@ async function runDeliveryLoop(
           whyLine: layout.whyLine,
           helpLine: layout.helpLine,
           unsubscribeUrl: unsubscribe?.pageUrl ?? null,
+          // The header wordmark links to the public calendar (#1496), on the site's own address. Through the
+          // injectable `appOrigin` (null when the address is unavailable, so the header simply has no link).
+          calendarUrl: calendarUrlFor(partDependencies.appOrigin()),
         }),
         attachments: message.attachment || parts.attachments.length > 0
           ? [

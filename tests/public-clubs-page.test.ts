@@ -26,6 +26,8 @@ describe("public clubs page header and back link (#470)", () => {
     expect(html).not.toContain("imsda.org");
     expect(html).toContain("Events home");
     expect(html).not.toContain("All events");
-    expect(html.match(/href="\/"/g)?.length).toBe(2);
+    // The header logo goes to the calendar (#1496); "Events home" is the only link to "/".
+    expect(html).toContain('aria-label="IMSDA Events calendar"');
+    expect(html.match(/href="\/"/g)?.length).toBe(1);
   });
 });
