@@ -72,7 +72,7 @@ describe("public front page (#373)", () => {
     expect(html).toContain("My registrations");
     expect(html).not.toContain('href="/login"');
     expect(html).not.toContain('href="/overview"');
-    expect(html).toContain("The season ahead");
+    expect(html).toContain("Find your next gathering.");
     expect(html).toContain("Nothing scheduled yet.");
   });
 
@@ -103,7 +103,7 @@ describe("public front page (#373)", () => {
     expect(order.every((index) => index > -1)).toBe(true);
     expect([...order].sort((x, y) => x - y)).toEqual(order);
     expect(html).toContain('href="/clubs/register"');
-    expect(html).toContain("<h1>The season ahead</h1>");
+    expect(html).toContain("<h1>Find your next gathering.</h1>");
   });
 
   it("puts each item in its lane with its name and date, linked to its page (#1251)", async () => {
@@ -217,10 +217,12 @@ describe("public front page (#373)", () => {
 });
 
 describe("featured events (#1218, #1251)", () => {
-  it("shows no Featured section when nothing is featured", async () => {
+  it("shows upcoming events when nothing is featured", async () => {
     mocks.listPublicCalendarItems.mockResolvedValue([item(1), item(2)]);
     const html = await render();
-    expect(html).not.toContain("home-featured-heading");
+    expect(html).toContain("home-featured-heading");
+    expect(html).toContain('href="/events/camp-1"');
+    expect(html).toContain('href="/events/camp-2"');
   });
 
   it("leads with featured events as photo cards, under the band", async () => {
