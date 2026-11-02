@@ -438,6 +438,7 @@ const pages: PageSpec[] = [
   // The person page opened from an invite with access ready to save (#1276): nothing is saved.
   staff("people-person-chosen", "/admin/people/staff/usr_registration_manager?grant=sa%2Cca%2Cac%2Ce%3Aevt_wr26%3AEVENT_ADMIN", "system-admin"),
   staff("system-settings", "/admin/settings", "system-admin"),
+  staff("system-area-pauses", "/admin/pauses", "system-admin"),
   // Homepage & site content (#111): the editor, its preview of the draft, and the analytics view. seedHubContent fills both.
   staff("site-content", "/admin/site-content", "system-admin"),
   staff("site-content-preview", "/admin/site-content/preview", "system-admin"),

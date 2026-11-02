@@ -1440,6 +1440,31 @@ Every alert is also written to the log as a JSON line carrying `alertKey` and
 still leaves that trail for a log aggregator to match on — but nothing will be
 watching it, which is the state this replaced.
 
+## Pausing an area for a few minutes (#1518)
+
+When something needs fixing while people are using the site, a system administrator can pause one area at
+**System management > Catalogs and settings > Pause an area** (`/admin/pauses`). There are three switches, all off by
+default: **Event registration**, **Payments** and **Club portal**. Pausing asks first; resuming is one press.
+
+- **What it does:** any request that would change something in the paused area is refused on the server with a 503
+  (`AREA_PAUSED`, with a `Retry-After` of two minutes) and a friendly "paused for a few minutes, nothing you entered is
+  lost" message. Nothing is written. Pages, receipts, exports and every read stay available.
+- **What it never pauses:** webhooks (Square), the Square return page, sign-in and account security, every staff page and
+  API (`/api/admin`, `/api/events`, check-in) and the pause page itself, so a pause can always be lifted.
+- **Which requests belong to which area:** `modules/system-admin/area-pause-model.ts` (`classifyPausableArea`) is the
+  list; `withRequestContext` (`lib/request-context.ts`) enforces it before a route handler runs.
+- **How it is stored:** one row per area in the existing `NotificationSetting` table, keyed `AREA_PAUSE:EVENTS_REGISTRATION`,
+  `AREA_PAUSE:PAYMENTS` and `AREA_PAUSE:CLUB_PORTAL`. `enabled = true` means paused; no row means running. Each change is
+  audited (`AREA_PAUSE_CHANGED`: who, when, old and new value).
+- **Timing:** a server notices a change within about five seconds (at once on the server that saved it). If the database
+  cannot be read, the area is treated as running (and the failure is logged), so a pause is never applied by accident.
+- **Which switch covers what:** Event registration covers public, manage-link, account and club registrations for
+  events, including creating the registration. Payments covers the card charge, payment links and payment choices (the
+  card form posts to the manage or account `/payment` endpoint). Club portal covers the rest of club work: rosters,
+  honors, orders, reports, forms, team and invites. Read-only actions that use POST (roster export preview and CSV,
+  birth-date reveal) are never paused, and neither is roster unlock (account security).
+- **Remember to resume.** A pause does not expire by itself.
+
 ## Two-factor authentication
 
 System administrators and event administrators must carry a second factor. The
