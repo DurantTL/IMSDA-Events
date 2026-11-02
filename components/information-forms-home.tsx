@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { informationApiBase, informationBuilderHref, informationPublicPath, informationResponsesHref, type InformationBuilderConfig, type InformationFillAccess, type InformationFormStatus } from "@/components/registration-builder/information-mode";
 
@@ -46,6 +47,12 @@ export function InformationFormsHome({ config, forms, templates }: { config: Inf
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const sorted = useTableSort(forms, FORM_SORT);
+  // The new-form panel is dirty only while it is open with a name typed; closing it clears what was staged (#1468).
+  const allowNavigation = useUnsavedChangesGuard(creating && name.trim() !== "");
+
+  function closeCreating() {
+    setCreating(false); setError(""); setName(""); setFillAccess("ANYONE_WITH_LINK"); setTemplateKey("");
+  }
 
   async function create() {
     if (name.trim().length < 3) { setError("Give the form a name of at least 3 characters."); return; }
@@ -57,6 +64,7 @@ export function InformationFormsHome({ config, forms, templates }: { config: Inf
       });
       const result = await response.json().catch(() => ({})) as { form?: { id: string }; message?: unknown };
       if (!response.ok || !result.form) throw new Error(typeof result.message === "string" && result.message ? result.message : "Unable to create this form.");
+      allowNavigation();
       router.push(informationBuilderHref(config, result.form.id));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to create this form.");
@@ -69,7 +77,7 @@ export function InformationFormsHome({ config, forms, templates }: { config: Inf
       <section className="panel">
         <div className="section-heading">
           <div><p className="eyebrow">{config.scope === "EVENT" ? config.ownerLabel : "General forms"}</p><h2>{`${forms.length} information form${forms.length === 1 ? "" : "s"}`}</h2></div>
-          <button className="secondary-button" type="button" aria-expanded={creating} onClick={() => setCreating((open) => !open)}><Plus size={16} aria-hidden="true" /> New form</button>
+          <button className="secondary-button" type="button" aria-expanded={creating} onClick={() => (creating ? closeCreating() : setCreating(true))}><Plus size={16} aria-hidden="true" /> New form</button>
         </div>
         <p className="quiet-copy">Surveys, interest forms and post-event forms that gather answers only. They never register anyone, and they cannot take payment or ask for health or other sensitive answers.</p>
         {creating && (
@@ -92,7 +100,7 @@ export function InformationFormsHome({ config, forms, templates }: { config: Inf
             {error && <p className="form-error" role="alert">{error}</p>}
             <div className="form-actions">
               <button className="primary-button" type="submit" disabled={busy}>{busy ? "Creating…" : "Create form"}</button>
-              <button className="secondary-button" type="button" disabled={busy} onClick={() => { setCreating(false); setError(""); }}>Cancel</button>
+              <button className="secondary-button" type="button" disabled={busy} onClick={closeCreating}>Cancel</button>
             </div>
           </form>
         )}

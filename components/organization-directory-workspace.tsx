@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { BadgeCheck, Building2, Church, Eye, IdCard, Link2, MapPin, Pencil, Plus, Save, ShieldCheck, Trash2, UserCog, UsersRound, X } from "lucide-react";
 import { OrganizationListPager, OrganizationSearchControls, type OrganizationListState } from "@/components/organization-search-controls";
+import { identityFormDirty, organizationFormDirty } from "@/components/organization-editor-dirty";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import {
   externalSystemLabels,
@@ -88,6 +90,10 @@ export function OrganizationDirectoryWorkspace({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The add, edit and provider-identifier dialogs are dirty only while open with values that differ from the saved
+  // record (or a blank form); closing or saving clears it. The delete confirmation is a typed name, not a draft (#1468).
+  const [formDirty, setFormDirty] = useState(false);
+  useUnsavedChangesGuard(formDirty && editor !== null && editor.kind !== "delete");
   const dialogRef = useAccessibleDialog<HTMLElement>(Boolean(editor), closeEditor);
   const activeSponsors = sponsorOptions.filter((sponsor) => sponsor.isActive);
   const searching = filters.q.trim() !== "" || filters.kind !== "" || filters.status !== "ALL";
@@ -96,9 +102,11 @@ export function OrganizationDirectoryWorkspace({
     if (saving) return;
     setEditor(null);
     setError("");
+    setFormDirty(false);
   }
 
   function beginCreate() {
+    setFormDirty(false);
     setCreateType("CHURCH");
     setError("");
     setNotice("");
@@ -106,6 +114,7 @@ export function OrganizationDirectoryWorkspace({
   }
 
   function beginEdit(organization: OrganizationRecord) {
+    setFormDirty(false);
     setError("");
     setNotice("");
     setEditor({ kind: "edit", organization });
@@ -115,6 +124,7 @@ export function OrganizationDirectoryWorkspace({
     organization: OrganizationRecord,
     identity?: OrganizationRecord["externalIdentities"][number],
   ) {
+    setFormDirty(false);
     setError("");
     setNotice("");
     setEditor({ kind: "identity", organization, identity });
@@ -202,6 +212,7 @@ export function OrganizationDirectoryWorkspace({
         },
       );
       await readResponse(response);
+      setFormDirty(false);
       setEditor(null);
       setNotice(editing
         ? `${payload.name.trim()} was updated.`
@@ -243,6 +254,7 @@ export function OrganizationDirectoryWorkspace({
         },
       );
       await readResponse(response);
+      setFormDirty(false);
       setEditor(null);
       setNotice(
         existing
@@ -552,7 +564,15 @@ export function OrganizationDirectoryWorkspace({
                 </div>
               </form>
             ) : editor.kind === "identity" ? (
-              <form className="form-stack" onSubmit={saveIdentity}>
+              <form
+                className="form-stack"
+                onChange={(event) => {
+                  const data = new FormData(event.currentTarget);
+                  const text = (name: string) => String(data.get(name) ?? "");
+                  setFormDirty(identityFormDirty(editor.identity ?? null, { provider: text("provider"), providerScope: text("providerScope"), externalId: text("externalId"), displayLabel: text("displayLabel") }));
+                }}
+                onSubmit={saveIdentity}
+              >
                 <label>
                   Provider
                   <select
@@ -613,7 +633,18 @@ export function OrganizationDirectoryWorkspace({
                 </div>
               </form>
             ) : (
-              <form className="form-stack" onSubmit={saveOrganization}>
+              <form
+                className="form-stack"
+                onChange={(event) => {
+                  const data = new FormData(event.currentTarget);
+                  setFormDirty(organizationFormDirty(editor.kind === "edit" ? editor.organization : null, {
+                    name: String(data.get("name") ?? ""),
+                    parentOrganizationId: String(data.get("parentOrganizationId") ?? ""),
+                    isActive: data.get("isActive") === "on",
+                  }));
+                }}
+                onSubmit={saveOrganization}
+              >
                 {editor.kind === "create" && (
                   <label>
                     Organization type

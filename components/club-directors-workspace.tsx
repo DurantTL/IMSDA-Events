@@ -2,6 +2,7 @@
 
 import { useConfirm } from "@/components/use-confirm";
 import { SubmitButton } from "@/components/submit-button";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { useTableSort, type SortSpec } from "@/components/use-table-sort";
@@ -74,6 +75,9 @@ export function ClubDirectorsWorkspace({
   const { ask, confirmDialog } = useConfirm();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The grant form is uncontrolled: dirty once anything is typed or the role leaves its default, and clear after it is given (#1468).
+  const [grantTyped, setGrantTyped] = useState(false);
+  useUnsavedChangesGuard(grantTyped);
   const [given, setGiven] = useState<NonNullable<GrantResponse["granted"]> | null>(null);
   const base = `/api/admin/organizations/${encodeURIComponent(club.id)}/director-grants`;
 
@@ -110,6 +114,7 @@ export function ClubDirectorsWorkspace({
       });
       const result = await readResponse(response);
       formElement.reset();
+      setGrantTyped(false);
       setGiven(result.granted ?? null);
       setNotice(result.granted ? "" : "Role given. They will see this club under My club on their account.");
     } catch (caught) {
@@ -182,7 +187,14 @@ export function ClubDirectorsWorkspace({
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
       {club.isActive ? (
-        <form className="panel form-stack" onSubmit={addDirector}>
+        <form
+          className="panel form-stack"
+          onChange={(event) => {
+            const data = new FormData(event.currentTarget);
+            setGrantTyped(["email", "effectiveFrom", "effectiveTo", "reason"].some((name) => String(data.get(name) ?? "").trim() !== "") || data.get("role") !== "DIRECTOR");
+          }}
+          onSubmit={addDirector}
+        >
           <div className="section-heading">
             <div>
               <p className="eyebrow">New grant</p>
