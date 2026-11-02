@@ -102,7 +102,7 @@ describe("the staff assignment workspace", () => {
       view: view({ waitlist: [{ id: "w1", registrationId: "reg-p2", registrationCode: "CODE-p2", holder: "Sam Sample", category: "DORM_ROOM", firstNight: null, lastNight: null, partySize: 6, roomCount: 3, status: "JOINED", offerNumber: 0, offeredAt: null, offerExpiresAt: null, offerMessageStatus: null, lapsed: false, joinedAt: "2027-05-01T00:00:00.000Z", createdVia: "STAFF" }] }),
       base: "/api/events/ev1/lodging", run: async () => true, busy: false, canConfigure: true,
     }));
-    expect(html).toContain("<th scope=\"col\">Rooms</th>");
+    expect(html).toMatch(/<th [^>]*scope="col"><button [^>]*>Rooms</);
     expect(html).toContain("<td>3</td>");
   });
 

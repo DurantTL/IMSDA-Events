@@ -3,6 +3,7 @@
 import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
+import { formatPersonName } from "@/lib/person-name";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { backgroundFlagLabels } from "@/modules/background-checks/display";
 import type { BackgroundFlag } from "@/modules/background-checks/repository";
@@ -28,7 +29,7 @@ export function BackgroundCheckBadge({ state }: { state?: BackgroundFlag["state"
 
 // Sorts from its headers (#1458); the keys here are the whitelist. Only columns already shown are sortable.
 const FLAG_SORT: Record<"person" | "club" | "contact" | "check" | "registration", ColumnSpec<BackgroundFlag>> = {
-  person: { get: (person) => `${person.lastName}, ${person.firstName}`, label: "person" },
+  person: { get: (person) => formatPersonName(person, "sorted"), label: "person" },
   club: { get: (person) => person.clubName, label: "club" },
   contact: { get: (person) => person.contactEmail, label: "contact" },
   check: { get: (person) => backgroundFlagLabels[person.state], label: "check" },

@@ -35,7 +35,7 @@ const formatRate = describeRate;
 // the viewer cannot see. The lodging types table is a short fixed list in the event's set order.
 type LodgingRequest = StaffLodgingRequestView;
 type RequestColumn = "registration" | "type" | "nights" | "people" | "rooms" | "ground" | "accessible" | "private" | "household" | "version";
-const REQUEST_SORT_PLAIN = {
+export const REQUEST_SORT_PLAIN = {
   registration: { get: (request: LodgingRequest) => request.registration, label: "registration" },
   type: { get: (request: LodgingRequest) => (request.category ? lodgingCategoryLabels[request.category] : "No preference"), label: "type" },
   nights: { get: (request: LodgingRequest) => request.firstNight, label: "first night", kind: "date" },
@@ -45,7 +45,7 @@ const REQUEST_SORT_PLAIN = {
   household: { get: (request: LodgingRequest) => request.householdPreference, label: "household" },
   version: { get: (request: LodgingRequest) => request.version, label: "version", kind: "number" },
 } as unknown as Record<RequestColumn, ColumnSpec<LodgingRequest>>;
-const REQUEST_SORT_SENSITIVE: Record<RequestColumn, ColumnSpec<LodgingRequest>> = {
+export const REQUEST_SORT_SENSITIVE: Record<RequestColumn, ColumnSpec<LodgingRequest>> = {
   ...REQUEST_SORT_PLAIN,
   ground: { get: (request) => request.groundFloorNeeded, label: "ground floor" },
   accessible: { get: (request) => request.accessibleRoomNeeded, label: "accessible room" },
