@@ -623,6 +623,9 @@ async function main() {
   // Accept, withdraw, accept again: three records, the first acceptance untouched, every past moment answered as it was.
   const accepted = (await fieldRows("att_text_ack", dan.id))[0]!;
   const T0 = accepted.acknowledgedAt.getTime();
+  // Every act below is dated between T0 and now (none may be in the future or before the latest act), so let enough time pass.
+  const settle = T0 + 3500 - Date.now();
+  if (settle > 0) await new Promise((resolve) => setTimeout(resolve, settle));
   const acceptedBefore = JSON.stringify(accepted);
   assert(accepted.action === "ACKNOWLEDGE" && accepted.paperLocation === null && accepted.channel === "ONLINE", "every earlier row is an acceptance with no paper location");
   assert(statusOf(await view(), "att_text_ack", dan.id) === "ACKNOWLEDGED", "before anything else the person has acknowledged");
