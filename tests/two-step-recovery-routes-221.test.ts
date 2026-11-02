@@ -194,6 +194,11 @@ describe("POST /api/attendee/two-step-recovery/verify", () => {
     expect(await (await VERIFY(post("/api/attendee/two-step-recovery/verify", { code: "518207" }))).json()).toEqual({ ok: true, setupRequired: false });
   });
 
+  it("answers a body that is not JSON with 400, not 500", async () => {
+    const request = new Request(`${ORIGIN}/api/attendee/two-step-recovery/verify`, { method: "POST", headers: { origin: ORIGIN }, body: "not json" });
+    expect((await VERIFY(request)).status).toBe(400);
+  });
+
   it("refuses what is not six digits without checking it", async () => {
     for (const code of ["12345", "1234567", "abcdef", "", "518-207"]) {
       expect((await VERIFY(post("/api/attendee/two-step-recovery/verify", { code }))).status).toBe(400);
@@ -224,12 +229,25 @@ describe("POST /api/attendee/sessions/sign-out-others", () => {
   });
 
   it("is rate limited before it changes anything", async () => {
+    mocks.needsSignInStep.mockResolvedValue("OK");
     mocks.signOutRateLimit.mockResolvedValue(limited);
     expect((await SIGN_OUT_OTHERS(post("/api/attendee/sessions/sign-out-others"))).status).toBe(429);
     expect(mocks.signOutOthers).not.toHaveBeenCalled();
   });
 
+  it("refuses a session that still owes its sign-in step, so a password alone cannot kick the owner off", async () => {
+    for (const step of ["VERIFY", "EMAIL_CODE"]) {
+      mocks.needsSignInStep.mockResolvedValue(step);
+      const response = await SIGN_OUT_OTHERS(post("/api/attendee/sessions/sign-out-others"));
+      expect(response.status).toBe(403);
+      expect((await response.json()).error).toBe("SECOND_STEP_REQUIRED");
+    }
+    expect(mocks.signOutRateLimit).not.toHaveBeenCalled();
+    expect(mocks.signOutOthers).not.toHaveBeenCalled();
+  });
+
   it("keeps this session, signs the others out, audits ids and the count, and returns the new list", async () => {
+    mocks.needsSignInStep.mockResolvedValue("OK");
     const response = await SIGN_OUT_OTHERS(post("/api/attendee/sessions/sign-out-others"));
     expect(mocks.signOutOthers).toHaveBeenCalledWith("account-1", "session-1");
     expect(mocks.writeAuditLog).toHaveBeenCalledWith({

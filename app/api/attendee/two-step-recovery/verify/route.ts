@@ -35,7 +35,7 @@ async function postHandler(request: Request) {
         message: "Too many attempts. Wait a few minutes and try again.",
       }, { status: 429 }), rateLimit);
     }
-    const { code } = bodySchema.parse(await request.json());
+    const { code } = bodySchema.parse(await request.json().catch(() => null));
     if (!new RegExp(`^\\d{${ONE_TIME_CODE_DIGITS}}$`).test(normalizeSubmittedCode(code))) {
       return applyRateLimitHeaders(Response.json({
         error: "INVALID_CODE",

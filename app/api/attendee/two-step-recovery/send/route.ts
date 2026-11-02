@@ -1,6 +1,7 @@
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
+import { SIGN_IN_CODE_LIFETIME_MINUTES } from "@/modules/attendee-accounts/codes";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { issueTwoStepRecoveryCode } from "@/modules/attendee-accounts/two-step-recovery-issue";
 import { applyRateLimitHeaders } from "@/modules/rate-limit/domain";
@@ -37,7 +38,7 @@ async function postHandler(request: Request) {
     }
     return applyRateLimitHeaders(Response.json({
       ok: true,
-      message: `If this account can be recovered, a code is on its way to ${account.verifiedEmail}. It works for 10 minutes.`,
+      message: `If this account can be recovered, a code is on its way to ${account.verifiedEmail}. It works for ${SIGN_IN_CODE_LIFETIME_MINUTES} minutes.`,
       developmentCode: issued.developmentCode,
     }), issued.rateLimit);
   } catch (error) {
