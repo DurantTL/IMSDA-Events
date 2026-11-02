@@ -194,13 +194,16 @@ export function ClubFormFillIn(props: Props) {
 
   async function send(submit: boolean) {
     setAttempted(true);
-    if (submit) setSubmitAttempted(true);
+    // A draft drops the "is required" field messages, so the fields always agree with the summary on screen.
+    setSubmitAttempted(submit);
     lastSubmitRef.current = submit;
     setSummaryForSubmit(submit);
     const found = summaryProblems(submit);
     if (found.length > 0) {
       setError("");
       setIssues([]);
+      // An earlier "Saved." must not sit beside a summary that says there are things to fix (B10).
+      setNotice("");
       showSummary(found);
       return;
     }

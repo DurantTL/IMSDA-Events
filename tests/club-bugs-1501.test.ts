@@ -97,6 +97,30 @@ describe("club form fill-in: Save draft versus Submit with empty required answer
     }
   });
 
+  it("a Submit stopped by the summary clears an earlier Saved notice, and a later draft drops the required messages", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ submission: { id: "s1", status: "DRAFT" } }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      mounted = await mount(createElement(ClubFormFillIn, props));
+      const draft = () => [...mounted!.container.querySelectorAll("button")].find((button) => button.textContent === "Save draft")!;
+      await act(async () => { draft().click(); });
+      await flush(20);
+      expect(mounted.container.querySelector(".inline-notice.success")).not.toBeNull();
+      await submitForm(mounted.container.querySelector("form")!);
+      await flush();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(mounted.container.querySelector(".form-error-summary strong")!.textContent).toMatch(/before submitting/);
+      expect(mounted.container.querySelector(".inline-notice.success"), "no Saved notice beside the summary (B10)").toBeNull();
+      expect(mounted.container.textContent).toContain("is required.");
+      await act(async () => { draft().click(); });
+      await flush(20);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(mounted.container.textContent).not.toContain("is required.");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("Submit still stops on the empty required answers and sends nothing", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
