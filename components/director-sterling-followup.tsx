@@ -1,6 +1,5 @@
-import { ExactValue } from "@/components/exact-value";
+import { SterlingFollowUpTable } from "@/components/club-screen-tables";
 import { ClubSetupHelp } from "@/components/role-setup-help";
-import { backgroundFlagLabels } from "@/modules/background-checks/display";
 import type { DirectorSterlingPerson } from "@/modules/background-checks/director-follow-up";
 
 /**
@@ -19,28 +18,7 @@ export function DirectorSterlingFollowUp({ people, base }: { people: DirectorSte
       {people.length === 0 ? (
         <p className="public-manage-empty">Everyone registered from your club is current.</p>
       ) : (
-        <div className="report-table-wrap">
-          <table className="report-table roster-table">
-            <caption className="sr-only">Registered adults and staff who are not current with Sterling Volunteers</caption>
-            <thead>
-              <tr>
-                <th scope="col">Person</th>
-                <th scope="col">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {people.map((person) => (
-                <tr key={person.attendeeId}>
-                  <th scope="row">
-                    <ExactValue>{person.lastName}, {person.firstName}</ExactValue>
-                    <small className="quiet-copy"> · {person.attendeeType}</small>
-                  </th>
-                  <td>{backgroundFlagLabels[person.state]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <SterlingFollowUpTable people={people} />
       )}
       {people.length > 0 && base && <ClubSetupHelp base={base} context="the Sterling Volunteers follow-up" id="sterling-follow-up" />}
     </section>

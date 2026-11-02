@@ -3,10 +3,20 @@
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { cardCell } from "@/components/table-card-labels";
 import { useState } from "react";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { Award, Pencil, Plus, Save, X } from "lucide-react";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import type { HonorRecord } from "@/modules/honors/repository";
+
+/** Sorts from the headers, in the address (#1458); the catalog stays in the order the server gave until a column is chosen. */
+const HONOR_CATALOG_SORT = {
+  code: { label: "Code", value: (honor) => honor.code },
+  name: { label: "Name", value: (honor) => honor.name },
+  status: { label: "Status", value: (honor) => (honor.isActive ? "Active" : "Inactive") },
+  offered: { label: "Offered at sites", kind: "number", noteLabel: "sites offered at", value: (honor) => honor.offeringCount },
+} satisfies Record<string, SortSpec<HonorRecord>>;
 
 type CatalogResponse = { honors?: HonorRecord[]; message?: string; issues?: Array<{ message?: string }> };
 
@@ -22,6 +32,7 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
   const visible = query
     ? honors.filter((honor) => `${honor.code} ${honor.name}`.toLowerCase().includes(query))
     : honors;
+  const sorted = useTableSort(visible, HONOR_CATALOG_SORT, "catalog");
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -151,18 +162,19 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
             </label>
             <SearchResultStatus message={`${visible.length} of ${honors.length} ${honors.length === 1 ? "honor" : "honors"} shown.`} />
             <div className="report-table-wrap card-box">
+              {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
               <table className="report-table table-cards table-cards-corner table-cards-compact" role="table">
                 <thead role="rowgroup">
                   <tr role="row">
-                    <th role="columnheader" scope="col">Code</th>
-                    <th role="columnheader" scope="col">Name</th>
-                    <th role="columnheader" scope="col">Status</th>
-                    <th role="columnheader" scope="col">Offered at sites</th>
+                    <SortableHeader {...sorted.headerProps("code")} />
+                    <SortableHeader {...sorted.headerProps("name")} />
+                    <SortableHeader {...sorted.headerProps("status")} />
+                    <SortableHeader {...sorted.headerProps("offered")} />
                     <th role="columnheader" scope="col"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody role="rowgroup">
-                  {visible.map((honor) => (
+                  {sorted.rows.map((honor) => (
                     <tr key={honor.id} role="row">
                       <td {...cardCell("Code")}><code>{honor.code}</code></td>
                       <th role="rowheader" scope="row">

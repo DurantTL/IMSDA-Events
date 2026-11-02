@@ -2,12 +2,30 @@
 
 import { ExactValue } from "@/components/exact-value";
 import { useState } from "react";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { CircleAlert, Mail, Pencil, Send } from "lucide-react";
 import type { ClubAssignmentRow } from "@/modules/club-registrations/assignments-repository";
 import { CLUB_ASSIGNMENT_EMAIL_NOT_SENT_WORD, clubAssignmentStatusLabels } from "@/modules/club-registrations/assignments";
 import type { ClubAssignmentPreview } from "@/modules/communications/club-assignment-audience";
 
 type EditableFields = ClubAssignmentRow["fields"];
+
+/** Both tables sort from their headers, in the address (#1458); the order stays as given until a column is chosen. */
+const ASSIGNMENT_SORT = {
+  club: { label: "Club", value: (row) => row.organizationName },
+  preferences: { label: "Preferences", value: (row) => preferenceLines(row.preferences).join(" ") },
+  assignment: { label: "Assignment", value: (row) => [row.fields.campsiteLocation, row.fields.dutyLabel, row.fields.activityLabel].filter(Boolean).join(" ") },
+  status: { label: "Status", value: (row) => clubAssignmentStatusLabels[row.status] },
+  email: { label: "Email", value: (row) => (row.lastEmailSentAt ? (row.changedSinceSent ? "Changed since sent" : "Sent") : CLUB_ASSIGNMENT_EMAIL_NOT_SENT_WORD) },
+} satisfies Record<string, SortSpec<ClubAssignmentRow>>;
+
+type PreviewRecipient = ClubAssignmentPreview["recipients"][number];
+const RECIPIENT_SORT = {
+  club: { label: "Club", value: (recipient) => recipient.organizationName },
+  director: { label: "Director", value: (recipient) => recipient.recipientName },
+  email: { label: "Email", value: (recipient) => recipient.recipientEmail },
+} satisfies Record<string, SortSpec<PreviewRecipient>>;
 
 const emptyEdit: EditableFields = {
   campsiteLocation: "",
@@ -37,6 +55,8 @@ function preferenceLines(preferences: ClubAssignmentRow["preferences"]) {
   if (footprint) lines.push(`Footprint: ${footprint}`);
   return lines;
 }
+
+const NO_RECIPIENTS: PreviewRecipient[] = [];
 
 const deliveryModeLabels: Record<ClubAssignmentPreview["deliveryMode"], string> = {
   EXTERNAL_EMAIL: "Emails are queued, not sent; Process email queue in the Delivery log sends them.",
@@ -98,6 +118,8 @@ export function ClubAssignmentsWorkspace({
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [sendScope, setSendScope] = useState<{ scope: "ONE"; organizationId: string; teamKey?: string } | { scope: "ALL_SET" }>({ scope: "ALL_SET" });
   const [sendResult, setSendResult] = useState<string>("");
+  const assignmentSort = useTableSort(assignments, ASSIGNMENT_SORT, "assignments");
+  const recipientSort = useTableSort(preview?.recipients ?? NO_RECIPIENTS, RECIPIENT_SORT, "recipients");
   const [sendError, setSendError] = useState<string>("");
   const [batchId, setBatchId] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -243,20 +265,21 @@ export function ClubAssignmentsWorkspace({
           <p className="quiet-copy">No clubs have registered yet.</p>
         ) : (
           <div className="report-table-wrap">
+            {assignmentSort.noteText && <SortOrderNote>{assignmentSort.noteText}</SortOrderNote>}
             <table className="report-table">
               <caption className="sr-only">Club assignments</caption>
               <thead>
                 <tr>
-                  <th scope="col">Club</th>
-                  <th scope="col">Preferences</th>
-                  <th scope="col">Assignment</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Email</th>
+                  <SortableHeader {...assignmentSort.headerProps("club")} />
+                  <SortableHeader {...assignmentSort.headerProps("preferences")} />
+                  <SortableHeader {...assignmentSort.headerProps("assignment")} />
+                  <SortableHeader {...assignmentSort.headerProps("status")} />
+                  <SortableHeader {...assignmentSort.headerProps("email")} />
                   <th scope="col"><span className="sr-only">Edit</span></th>
                 </tr>
               </thead>
               <tbody>
-                {assignments.map((row) => (
+                {assignmentSort.rows.map((row) => (
                   <tr key={row.clubEventRegistrationId}>
                     <th scope="row">
                       <ExactValue>{row.organizationName}</ExactValue>
@@ -347,18 +370,19 @@ export function ClubAssignmentsWorkspace({
               )}
               {preview.recipients.length > 0 && (
                 <div className="report-table-wrap">
+                  {recipientSort.noteText && <SortOrderNote>{recipientSort.noteText}</SortOrderNote>}
                   <table className="report-table">
                     <caption className="sr-only">Clubs that will be emailed</caption>
                     <thead>
                       <tr>
-                        <th scope="col">Club</th>
-                        <th scope="col">Director</th>
-                        <th scope="col">Email</th>
+                        <SortableHeader {...recipientSort.headerProps("club")} />
+                        <SortableHeader {...recipientSort.headerProps("director")} />
+                        <SortableHeader {...recipientSort.headerProps("email")} />
                         <th scope="col">Assignment</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {preview.recipients.map((recipient) => (
+                      {recipientSort.rows.map((recipient) => (
                         <tr key={`${recipient.organizationId}:${recipient.teamKey ?? ""}`}>
                           <th scope="row">
                             <ExactValue>{recipient.organizationName}</ExactValue>

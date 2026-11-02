@@ -9,10 +9,13 @@ import { ClubFormSync } from "@/components/club-form-sync";
 import { ClubFormFillMode } from "@/components/club-form-fill-mode";
 import { ClubFormRequirement } from "@/components/club-form-requirement";
 import { ClubFormTemplateToggle } from "@/components/club-forms-actions";
+import { ColumnHeader } from "@/components/column-header";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getServerEnv } from "@/lib/env";
+import { serverSort, sortOrderText, sortRows, type SortKind, type SortValue } from "@/lib/list-sort";
 import { getRequiredFormsStatus } from "@/modules/club-forms/required";
 import { clubsWithFormsMissing } from "@/modules/club-forms/required-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
@@ -31,16 +34,37 @@ export const dynamic = "force-dynamic";
  * that was filled in is deleted. Each form can be edited in the builder, and new
  * forms created there (#712).
  */
-export default async function AdminClubFormsPage({ searchParams }: { searchParams: Promise<{ view?: string; year?: string }> }) {
+const FORM_SORT_COLUMNS = ["form", "status", "fillMode", "required", "filled", "version"] as const;
+type FormSortColumn = typeof FORM_SORT_COLUMNS[number];
+type FormRow = Awaited<ReturnType<typeof listClubFormTemplatesForAdmin>>[number];
+const formAccessors: Record<FormSortColumn, (template: FormRow) => SortValue> = {
+  form: (template) => template.name,
+  status: (template) => (template.enabled ? "On" : "Off"),
+  fillMode: (template) => template.fillMode,
+  required: (template) => template.requirement,
+  filled: (template) => template.submissionCount,
+  version: (template) => template.version,
+};
+const formSortLabels: Record<FormSortColumn, { label: string; kind: SortKind }> = {
+  form: { label: "form", kind: "text" }, status: { label: "status", kind: "text" }, fillMode: { label: "who fills it in", kind: "text" },
+  required: { label: "requirement", kind: "text" }, filled: { label: "forms filled in", kind: "number" }, version: { label: "version", kind: "number" },
+};
+
+export default async function AdminClubFormsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   // ?view=missing (#1246): the clubs behind the dashboard's "Clubs with forms missing" card, same gate as this page.
-  const { view, year } = await searchParams;
+  const params = await searchParams;
+  const view = typeof params.view === "string" ? params.view : undefined;
+  const year = typeof params.year === "string" ? params.year : undefined;
   if (view === "missing") {
     return <ClubsFormsMissingList clubYear={resolveAreaClubYear(year)} clubs={clubsWithFormsMissing(await getRequiredFormsStatus(resolveAreaClubYear(year)))} />;
   }
   const templates = await listClubFormTemplatesForAdmin();
+  // A short list in the code's order until someone clicks a header (#1458); the keys are on a fixed list.
+  const sorting = serverSort<FormSortColumn>("/admin/club-forms", params, FORM_SORT_COLUMNS, { key: null, dir: "asc" });
+  const sortedTemplates = sorting.order.key ? sortRows(templates, sorting.order.key, sorting.order.dir, formAccessors) : templates;
   const closedKeys = await listClosedOpenApplicationKeys();
   const clubYear = clubYearFor(new Date());
   const baseUrl = getServerEnv().APP_BASE_URL;
@@ -57,13 +81,14 @@ export default async function AdminClubFormsPage({ searchParams }: { searchParam
         : <p className="inline-notice" role="status">Bringing form templates up to date with the code is done by a system administrator.</p>}
       <section className="panel">
         <div className="report-table-wrap card-box">
+          {sorting.order.key && <SortOrderNote>{sortOrderText(formSortLabels[sorting.order.key].label, sorting.order.dir, formSortLabels[sorting.order.key].kind)}</SortOrderNote>}
           <table role="table" className="report-table table-cards table-cards-wide">
             <caption className="sr-only">Club forms</caption>
             <thead role="rowgroup">
-              <tr role="row"><th role="columnheader" scope="col">Form</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Who fills it in</th><th role="columnheader" scope="col">Required</th><th role="columnheader" scope="col">Filled in</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
+              <tr role="row"><ColumnHeader column="form" label="Form" sorting={sorting} /><ColumnHeader column="status" label="Status" sorting={sorting} /><ColumnHeader column="fillMode" label="Who fills it in" sorting={sorting} /><ColumnHeader column="required" label="Required" sorting={sorting} /><ColumnHeader column="filled" label="Filled in" sorting={sorting} /><ColumnHeader column="version" label="Version" sorting={sorting} /><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
             </thead>
             <tbody role="rowgroup">
-              {templates.map((template) => (
+              {sortedTemplates.map((template) => (
                 <tr role="row" key={template.key}>
                   <th role="rowheader" scope="row">{template.name}<small className="quiet-copy"> · {template.description}</small></th>
                   <td {...cardCell("Status")}>{template.enabled ? "On" : "Off"}{template.needsSync && <small className="club-report-problem"> · Needs sync: use Sync templates above</small>}</td>
