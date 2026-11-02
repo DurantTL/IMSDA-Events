@@ -147,6 +147,7 @@ Three more events on the same history. None edits a row: **status is derived fro
   guard and for dedupe; an existing same-content row is returned only while it still stands (not voided, not ended by a later
   withdrawal), and the generation trigger counts voided, withdrawn and ended rows. Voiding takes the same lock, and a submission
   that locks several fields takes them in sorted key order.
+- **A withdrawn acceptance cannot be voided** (409 `EVIDENCE_WITHDRAWN`, checked under the lock): a void would silently undo the withdrawal. Correct it by recording a fresh act. Rows are timestamped (`recordedAt`) from app time taken after the lock, and exact ties are broken by `recordedAt` then evidence id, identically in status, the live-acceptance check and the generation trigger.
 - **Paper location.** `paperLocation` (1 to 200 characters, trimmed) says where the paper form physically lives, for example
   "Conference office, event binder": **never what it says**. It is required when `channel` is `PAPER` for acknowledge, decline
   and withdraw, and refused for every other channel (checked in the request schema, the repository and a database check).

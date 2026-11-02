@@ -65,6 +65,7 @@ from the history.
   withdrawal, the person is still acknowledged; from the withdrawal on, the status is "Withdrawn".
 - **Accepting again.** After a withdrawal (or a void) the same wording can be accepted again; it is recorded as a new row. All
   three records (the first acceptance, the withdrawal, the new acceptance) are kept.
+- **A withdrawn acknowledgment cannot be voided** (409 `EVIDENCE_WITHDRAWN`): voiding would silently undo the withdrawal. Correct a mistake by recording a fresh acknowledgment, decline or withdrawal.
 - **Statuses.** In addition to the earlier ones: "Declined" and "Withdrawn". The latest decline, acceptance or withdrawal
   (by its own date) decides.
 - **Paper location.** When the channel is `PAPER`, `paperLocation` is required (1 to 200 characters): **where the paper form is

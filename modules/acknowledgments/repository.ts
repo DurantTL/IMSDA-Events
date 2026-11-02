@@ -78,6 +78,7 @@ export type AcknowledgmentErrorCode =
   | "ALREADY_ACKNOWLEDGED"
   | "EVIDENCE_NOT_WITHDRAWABLE"
   | "EVIDENCE_VOIDED"
+  | "EVIDENCE_WITHDRAWN"
   | "WITHDRAWN_AT_INVALID"
   | "ACT_BEFORE_LATEST"
   | "NOT_CURRENT_ACCEPTANCE"
@@ -335,6 +336,7 @@ async function readSubjectHistory(client: Client, registrationId: string, attend
 /** A summary as the status rules read it. */
 function historyRow(summary: EvidenceSummary): HistoryRow & { source: "TEXT" | "POLICY_VERSION"; policyVersionId: string | null } {
   return {
+    id: summary.id,
     action: summary.action,
     acknowledgedAt: summary.acknowledgedAt,
     recordedAt: summary.recordedAt,
@@ -453,6 +455,8 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
       subjectMinorStatus: request.attendee?.status ?? "ADULT",
       guardianAuthorityId: decision.guardianAuthorityId,
       acknowledgedAt: request.acknowledgedAt,
+      // App time taken after the lock, so rows for one subject and field are recorded in the order they were judged.
+      recordedAt: new Date(),
       requestMetadata: approvedRequestMetadata(request.requestMetadata) as Prisma.InputJsonValue,
       idempotencyKey: request.idempotencyKey,
       requestHash,
@@ -884,6 +888,10 @@ export async function voidAcknowledgmentEvidence(input: {
     await lockSubjectField(tx, input.registrationId, evidence.registrationAttendeeId, evidence.fieldKey);
     const existing = await tx.acknowledgmentVoid.findUnique({ where: { evidenceId: evidence.id }, select: { id: true, evidenceId: true, voidedAt: true } });
     if (existing) return { void: { id: existing.id, evidenceId: existing.evidenceId, voidedAt: existing.voidedAt.toISOString() }, created: false };
+    // Voiding a withdrawn acceptance would silently undo the withdrawal (and revive acceptances it ended): correct it by recording a fresh act.
+    if (await tx.acknowledgmentWithdrawal.findUnique({ where: { evidenceId: evidence.id }, select: { id: true } })) {
+      throw new AcknowledgmentError("EVIDENCE_WITHDRAWN", "That acknowledgment was withdrawn, so it cannot be voided. Record a new acknowledgment, decline or withdrawal instead.");
+    }
     const id = randomUUID();
     const inserted = await tx.acknowledgmentVoid.createMany({
       skipDuplicates: true,
@@ -1038,6 +1046,7 @@ export async function withdrawAcknowledgmentEvidence(input: {
         guardianAuthorityId: decision.guardianAuthorityId,
         paperLocation: location.value,
         withdrawnAt,
+        recordedAt: new Date(),
         idempotencyKey,
         requestHash,
       }],

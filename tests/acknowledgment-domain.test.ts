@@ -311,6 +311,18 @@ describe("status from the history: decline and withdrawal (#130)", () => {
     expect(isLiveAcceptance(first, [first, { ...second, voidedAt: day(8) }])).toBe(true);
   });
 
+  it("breaks exact ties the same way for status and for ending: recorded, then id", () => {
+    const a = row({ id: "a", acknowledgedAt: day(5), recordedAt: day(5), withdrawal: { withdrawnAt: day(6), recordedAt: day(6) } });
+    const b = row({ id: "b", acknowledgedAt: day(6), recordedAt: day(6) });
+    // Same moment, same record time: the higher id comes later, so b is not ended by a's withdrawal, and status agrees.
+    expect(isLiveAcceptance(b, [a, b])).toBe(true);
+    expect(latestLiveAction([a, b])?.kind).toBe("ACKNOWLEDGE");
+    const c = row({ id: "0", acknowledgedAt: day(6), recordedAt: day(6) });
+    expect(isLiveAcceptance(c, [a, c])).toBe(false);
+    expect(latestLiveAction([a, c])?.kind).toBe("WITHDRAWAL");
+    expect(latestLiveAction([c, a])?.kind).toBe("WITHDRAWAL");
+  });
+
   it("knows whether an acceptance is still live", () => {
     expect(hasLiveAcceptance([row({})])).toBe(true);
     expect(hasLiveAcceptance([row({ voidedAt: day(11) })])).toBe(false);

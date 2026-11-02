@@ -21,7 +21,8 @@ can confirm or change them.
    is overwritten; the history only grows.
 3. **Withdrawal is a new event.** A withdrawal is its own append-only record naming the acceptance it withdraws, with its own
    date, actor and channel. It changes the status from its date on. Accepting again afterward is another new record. A void
-   (a correction of a mistaken record) stays separate from a withdrawal (the person changed their mind).
+   (a correction of a mistaken record) stays separate from a withdrawal (the person changed their mind). A withdrawn
+   acceptance cannot be voided; a mistake is corrected by recording a fresh act.
 4. **Decline is recorded, and is not a withdrawal.** A decline is another evidence row: the person was shown the wording and
    said no. It is refused while an acceptance stands (withdraw it instead). Status is derived from the latest of the history,
    never stored.

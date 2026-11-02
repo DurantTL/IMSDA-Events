@@ -77,9 +77,10 @@ function expectedGeneration(row: Row) {
     sameSubject(existing) && existing.contentRef === row.contentRef && (existing.action ?? "ACKNOWLEDGE") === "ACKNOWLEDGE"
     && (existing.void || state.withdrawals.some((withdrawal) => {
       const withdrawn = state.evidence.find((candidate) => candidate.id === withdrawal.evidenceId)!;
-      return withdrawal.evidenceId === existing.id || (sameSubject(withdrawn)
-        && (withdrawal.withdrawnAt as Date).getTime() >= (existing.acknowledgedAt as Date).getTime()
-        && (withdrawal.recordedAt as Date).getTime() >= (existing.recordedAt as Date).getTime());
+      const key = [(withdrawal.withdrawnAt as Date).getTime(), (withdrawal.recordedAt as Date).getTime(), String(withdrawn.id)] as const;
+      const mine = [(existing.acknowledgedAt as Date).getTime(), (existing.recordedAt as Date).getTime(), String(existing.id)] as const;
+      const order = key[0] - mine[0] || key[1] - mine[1] || (key[2] < mine[2] ? -1 : key[2] > mine[2] ? 1 : 0);
+      return withdrawal.evidenceId === existing.id || (sameSubject(withdrawn) && order >= 0);
     }))
   )).length;
 }
@@ -140,6 +141,7 @@ function fakeTx() {
         return { count };
       }),
     },
+    acknowledgmentVoid: { findUnique: vi.fn(async () => null) },
     acknowledgmentWithdrawal: {
       findUnique: vi.fn(async ({ where }: { where: Row }) => {
         const key = where.eventId_idempotencyKey as { eventId: string; idempotencyKey: string } | undefined;
@@ -208,6 +210,7 @@ import {
   recordAcknowledgmentEvidence,
   recordStaffAcknowledgment,
   recordSubmissionAcknowledgments,
+  voidAcknowledgmentEvidence,
   withdrawAcknowledgmentEvidence,
   type RecordRequest,
 } from "@/modules/acknowledgments/repository";
@@ -1105,6 +1108,17 @@ describe("decline, withdrawal and re-acceptance (#130)", () => {
         "policy:version-1:0", "policy:version-2:0", "policy:version-1:1", "policy:version-2:1",
       ]);
       expect((await statusAt(day(12))).status).toBe("ACKNOWLEDGED");
+    });
+
+    it("refuses to void a withdrawn acceptance, so a withdrawal is never silently undone", async () => {
+      addVersion({ id: "version-2", versionNumber: 2, effectiveFrom: day(100), isMaterialChange: true });
+      const v1 = await accept({ acknowledgedAt: day(5) });
+      const v2 = await v2Request();
+      await withdraw(v2.evidence.id, { withdrawnAt: day(7) });
+      const error = await failure(voidAcknowledgmentEvidence({ eventId: "event-1", registrationId: "reg-1", evidenceId: v2.evidence.id, reason: "Synthetic reason.", actorUserId: "staff-1" }));
+      expect((error as AcknowledgmentError).code).toBe("EVIDENCE_WITHDRAWN");
+      expect((await statusAt(day(8))).status).toBe("WITHDRAWN");
+      expect(v1.created).toBe(true);
     });
 
     it("replays a withdrawal retry that names the default person explicitly instead of conflicting", async () => {

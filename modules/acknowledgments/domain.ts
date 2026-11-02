@@ -268,6 +268,8 @@ export const statusLabels: Record<AcknowledgmentStatusCode, string> = {
 
 /** One recorded act, as the status rules read it: an acceptance or decline, with whatever later corrected or withdrew it. */
 export type HistoryRow = {
+  /** The evidence row id: the last tie-break, so every reader orders exact ties the same way. */
+  id?: string;
   action: AcknowledgmentAction;
   acknowledgedAt: string;
   recordedAt: string;
@@ -283,52 +285,58 @@ export type LiveAction<Row extends HistoryRow> =
   | { kind: "WITHDRAWAL"; row: Row };
 
 const FAR_FUTURE = new Date(8_640_000_000_000_000);
+const ms = (value: string) => new Date(value).getTime();
+
+/**
+ * The one total order of events (an act at its moment, or a withdrawal at its moment): when it took effect, then when it was
+ * recorded, then the evidence row id, then an acceptance before its own withdrawal. Status and "does this withdrawal end that
+ * acceptance" both use it, so they can never disagree on an exact tie. The migration's generation trigger uses the same order.
+ */
+type EventKey = { time: number; recorded: number; id: string; sub: 0 | 1 };
+function compareEvents(a: EventKey, b: EventKey) {
+  return a.time - b.time || a.recorded - b.recorded || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) || a.sub - b.sub;
+}
+function actKey(row: HistoryRow): EventKey {
+  return { time: ms(row.acknowledgedAt), recorded: ms(row.recordedAt), id: row.id ?? "", sub: 0 };
+}
+function withdrawalKey(row: HistoryRow): EventKey {
+  const withdrawal = row.withdrawal!;
+  return { time: ms(withdrawal.withdrawnAt), recorded: ms(withdrawal.recordedAt ?? row.recordedAt), id: row.id ?? "", sub: 1 };
+}
 
 /**
  * The latest live act for one subject and field at a moment (#130): the history, never a stored status.
  *
  * Considered, at or before the moment: acceptances and declines at their `acknowledgedAt` (a row voided by then is
  * skipped), and withdrawals at their `withdrawnAt` (skipped when the acceptance behind it was voided by then). The latest
- * wins; ties go to the one recorded last. A withdrawal changes nothing before its own moment, so the acceptance it
+ * wins (see `compareEvents` for ties). A withdrawal changes nothing before its own moment, so the acceptance it
  * withdrew stays valid evidence for the period before it. Omit the moment for "everything recorded so far".
  */
 export function latestLiveAction<Row extends HistoryRow>(rows: ReadonlyArray<Row>, at: Date = FAR_FUTURE): LiveAction<Row> | null {
   const limit = at.getTime();
-  const events: Array<{ time: number; recorded: number; order: number; action: LiveAction<Row> }> = [];
+  const events: Array<{ key: EventKey; order: number; action: LiveAction<Row> }> = [];
   rows.forEach((row, index) => {
-    if (row.voidedAt && new Date(row.voidedAt).getTime() <= limit) return;
-    const given = new Date(row.acknowledgedAt).getTime();
-    if (given <= limit) {
-      events.push({ time: given, recorded: new Date(row.recordedAt).getTime(), order: index * 2, action: { kind: row.action, row } });
-    }
+    if (row.voidedAt && ms(row.voidedAt) <= limit) return;
+    const given = actKey(row);
+    if (given.time <= limit) events.push({ key: given, order: index, action: { kind: row.action, row } });
     if (row.action === "ACKNOWLEDGE" && row.withdrawal) {
-      const withdrawn = new Date(row.withdrawal.withdrawnAt).getTime();
-      if (withdrawn <= limit) {
-        const recorded = row.withdrawal.recordedAt ? new Date(row.withdrawal.recordedAt).getTime() : new Date(row.recordedAt).getTime();
-        events.push({ time: withdrawn, recorded, order: index * 2 + 1, action: { kind: "WITHDRAWAL", row } });
-      }
+      const withdrawn = withdrawalKey(row);
+      if (withdrawn.time <= limit) events.push({ key: withdrawn, order: index, action: { kind: "WITHDRAWAL", row } });
     }
   });
-  events.sort((a, b) => a.time - b.time || a.recorded - b.recorded || a.order - b.order);
+  events.sort((a, b) => compareEvents(a.key, b.key) || a.order - b.order);
   return events[events.length - 1]?.action ?? null;
 }
 
-const ms = (value: string) => new Date(value).getTime();
-
 /**
  * Whether an acceptance still stands: not voided, and not ended by a withdrawal. A withdrawal ends every acceptance for its
- * subject and field that was given at or before its moment and recorded before it (a withdrawal whose own acceptance was
- * voided is skipped, as in the status rules). Rows given after it are unaffected.
+ * subject and field that comes before it in the order of events (a withdrawal whose own acceptance was voided is skipped,
+ * as in the status rules). Rows that come after it are unaffected.
  */
 export function isLiveAcceptance(row: HistoryRow, history: ReadonlyArray<HistoryRow>): boolean {
   if (row.action !== "ACKNOWLEDGE" || row.voidedAt) return false;
-  const given = ms(row.acknowledgedAt);
-  const recorded = ms(row.recordedAt);
-  return !history.some((other) => (
-    other.withdrawal && !other.voidedAt
-    && ms(other.withdrawal.withdrawnAt) >= given
-    && (!other.withdrawal.recordedAt || ms(other.withdrawal.recordedAt) >= recorded)
-  ));
+  const mine = actKey(row);
+  return !history.some((other) => other.withdrawal && !other.voidedAt && compareEvents(withdrawalKey(other), mine) >= 0);
 }
 
 /** Whether the subject and field currently stand accepted: the latest live act (now) is an acceptance. One definition, used by every guard. */

@@ -712,6 +712,8 @@ async function main() {
   const cWithdrawn = await withdrawEvidence(cV2.evidence.id, { withdrawnAt: daysAgo(1) });
   assert(cWithdrawn.created && statusOf(await view(), "att_policy_ack", ulf.id) === "WITHDRAWN", "withdrawing the current one ends both");
   await expectCode(withdrawEvidence(cV1.evidence.id), "NOT_CURRENT_ACCEPTANCE", "the superseded row has no withdrawal of its own and still cannot be withdrawn");
+  await expectCode(voidAcknowledgmentEvidence({ eventId: ids.eventA, registrationId: regId, evidenceId: cV2.evidence.id, reason: "Synthetic reason.", actorUserId: ids.staff }), "EVIDENCE_WITHDRAWN", "a withdrawn acceptance cannot be voided");
+  assert(statusOf(await view(), "att_policy_ack", ulf.id) === "WITHDRAWN" && await prisma.acknowledgmentVoid.count({ where: { evidenceId: cV2.evidence.id } }) === 0, "so the status stays withdrawn and no void was written");
   const cV1Again = await versionAck(mainV1.id, new Date(Date.now() - 3_600_000));
   assert(cV1Again.created && cV1Again.evidence.id !== cV1.evidence.id && statusOf(await view(), "att_policy_ack", ulf.id) === "ACKNOWLEDGED", "accepting the first version again creates a new row (the database accepts its generation) and the status reads acknowledged");
   const cV2Again = await versionAck(mainV2.id, new Date());

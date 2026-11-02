@@ -284,6 +284,13 @@ describe("voiding an acknowledgment (#150)", () => {
     expect(dependencies.voidAcknowledgmentEvidence).not.toHaveBeenCalled();
   });
 
+  it("answers 409 EVIDENCE_WITHDRAWN for an acknowledgment that was withdrawn", async () => {
+    dependencies.voidAcknowledgmentEvidence.mockRejectedValue(new dependencies.MockAcknowledgmentError("EVIDENCE_WITHDRAWN", "Withdrawn."));
+    const response = await voidPost({ reason: "x" });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("EVIDENCE_WITHDRAWN");
+  });
+
   it("answers 404 for evidence that is not this registration's", async () => {
     dependencies.voidAcknowledgmentEvidence.mockRejectedValue(new dependencies.MockAcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found."));
     expect((await voidPost({ reason: "x" })).status).toBe(404);

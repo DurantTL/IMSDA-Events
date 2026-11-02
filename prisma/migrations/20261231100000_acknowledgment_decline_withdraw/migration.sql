@@ -155,13 +155,14 @@ BEGIN
         AND (
           EXISTS (SELECT 1 FROM "AcknowledgmentVoid" v WHERE v."evidenceId" = e."id")
           OR EXISTS (SELECT 1 FROM "AcknowledgmentWithdrawal" w WHERE w."evidenceId" = e."id")
-          -- A withdrawal ends every acceptance of this subject and field given at or before it (and recorded before it).
+          -- A withdrawal ends every acceptance of this subject and field that comes before it in the order of events.
           OR EXISTS (
             SELECT 1 FROM "AcknowledgmentWithdrawal" w JOIN "AcknowledgmentEvidence" we ON we."id" = w."evidenceId"
             WHERE we."registrationId" = e."registrationId"
               AND we."registrationAttendeeId" IS NOT DISTINCT FROM e."registrationAttendeeId"
               AND we."fieldKey" = e."fieldKey"
-              AND w."withdrawnAt" >= e."acknowledgedAt" AND w."recordedAt" >= e."recordedAt"
+              -- The order of events: when it took effect, when it was recorded, then the evidence id (acceptance before its own withdrawal).
+              AND (w."withdrawnAt", w."recordedAt", we."id" COLLATE "C") >= (e."acknowledgedAt", e."recordedAt", e."id" COLLATE "C")
           )
         )
     ) ELSE 0 END
