@@ -317,6 +317,8 @@ describe("the capture and check scripts", () => {
       at("fixtures.assertWalkthroughSafety(baseUrl)"),
       at("fixtures.assertSeededDatabase(prisma)"),
       at("writeRestoreMarker(markerFile"),
+      // Only a marker this run wrote is restored from or removed: the state is kept only after the write succeeds.
+      at("restoreState = before;"),
       at("fixtures.enablePasskeys(prisma)"),
       at("fixtures.hideClubs(prisma"),
       at("fixtures.setEventsPublished(prisma"),

@@ -158,10 +158,12 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
     const needsCoordinatorArea = selected.some((walkthrough) => walkthrough.audience === "coordinator");
     const hiddenClubs = needsCoordinatorArea ? await fixtures.listOtherClubIds(prisma) : [];
     const hiddenEvents = await fixtures.listOtherClubEventIds(prisma);
-    restoreState = { database, hiddenClubs, hiddenEvents, templates: await fixtures.readTemplateStates(prisma), passkeyRpId: await fixtures.readPasskeyRpId(prisma) };
-    // The marker is written BEFORE anything changes.
-    writeRestoreMarker(markerFile, restoreState);
-    // `on`, not `once`: npm and tsx relay the signal as well, and a second SIGTERM must not kill the process in the middle of the restore.
+    const before = { database, hiddenClubs, hiddenEvents, templates: await fixtures.readTemplateStates(prisma), passkeyRpId: await fixtures.readPasskeyRpId(prisma) };
+    // The marker is written BEFORE anything changes, and only a marker this run wrote is ever restored from or removed:
+    // when the write is refused (a marker already there), `restoreState` stays null and the cleanup leaves that file alone.
+    writeRestoreMarker(markerFile, before);
+    restoreState = before;
+    // `on`, not `once`: a second SIGINT/SIGTERM (Ctrl-C signals the whole process group) must not kill the process in the middle of the restore.
     process.on("SIGINT", onSigint);
     process.on("SIGTERM", onSigterm);
     // Every write below is checked against the stop flag first.
