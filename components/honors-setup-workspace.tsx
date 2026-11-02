@@ -47,8 +47,9 @@ type ApiResult = Partial<EventHonorSetup> & {
 
 /** The class form: the controlled span select and the honor pickers (their search box and ticks) are compared from state, not read from the form (#1468). */
 const classFormTracking: FormEditOptions = { ignore: ["span"], ignoreWithin: ".honor-multi-select" };
-/** The add-session form: the site starts on the first active site and the order is suggested from it, so neither counts; a typed name does (#1468). */
-const addSessionTracking: FormEditOptions = { ignore: ["locationId", "sortOrder"] };
+/** The add-session form: the site starts on the first active site, so it doesn't count. The order box is re-keyed with its suggested default when the site
+ * changes, so an untouched suggestion compares clean while a typed name or order counts (#1468). */
+const addSessionTracking: FormEditOptions = { ignore: ["locationId"] };
 const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, index) => id === b[index]);
 
 function optionalNumber(value: FormDataEntryValue | null) {
