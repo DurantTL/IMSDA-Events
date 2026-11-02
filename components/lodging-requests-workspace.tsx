@@ -35,7 +35,7 @@ const formatRate = describeRate;
 // the viewer cannot see. The lodging types table is a short fixed list in the event's set order.
 type LodgingRequest = StaffLodgingRequestView;
 type RequestColumn = "registration" | "type" | "nights" | "people" | "rooms" | "ground" | "accessible" | "private" | "household" | "version";
-export const REQUEST_SORT_PLAIN = {
+export const REQUEST_SORT_PLAIN: Omit<Record<RequestColumn, ColumnSpec<LodgingRequest>>, "ground" | "accessible"> = {
   registration: { value: (request: LodgingRequest) => request.registration, label: "registration" },
   type: { value: (request: LodgingRequest) => (request.category ? lodgingCategoryLabels[request.category] : "No preference"), label: "type" },
   nights: { value: (request: LodgingRequest) => request.firstNight, label: "first night", kind: "date" },
@@ -44,7 +44,7 @@ export const REQUEST_SORT_PLAIN = {
   private: { value: (request: LodgingRequest) => request.privateRoomRequested, label: "private room" },
   household: { value: (request: LodgingRequest) => request.householdPreference, label: "household" },
   version: { value: (request: LodgingRequest) => request.version, label: "version", kind: "number" },
-} as unknown as Record<RequestColumn, ColumnSpec<LodgingRequest>>;
+};
 export const REQUEST_SORT_SENSITIVE: Record<RequestColumn, ColumnSpec<LodgingRequest>> = {
   ...REQUEST_SORT_PLAIN,
   ground: { value: (request) => request.groundFloorNeeded, label: "ground floor" },
@@ -83,7 +83,10 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
     } finally { setBusy(false); }
   };
 
-  const requestSort = useTableSort(view.requests, view.canSeeSensitive ? REQUEST_SORT_SENSITIVE : REQUEST_SORT_PLAIN, "requests");
+  // Two views of one sort (same address params): the full spec only drives the table for staff who may see the accessibility columns.
+  const plainSort = useTableSort(view.requests, REQUEST_SORT_PLAIN, "requests");
+  const fullSort = useTableSort(view.requests, REQUEST_SORT_SENSITIVE, "requests");
+  const requestSort = view.canSeeSensitive ? fullSort : plainSort;
   const queue = view.queue.filter((item) => showAcknowledged || !item.acknowledged);
   const activeRules = view.rules.filter((rule) => !rule.ended);
 
@@ -163,7 +166,7 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
       {view.requests.length === 0 ? <p>No one has asked for lodging yet.</p> : <div className="table-wrap">{requestSort.note}<table className="report-table report-table-auto">
         <thead><tr>
           {requestSort.header("registration", "Registration")}{requestSort.header("type", "Type")}{requestSort.header("nights", "Nights")}{requestSort.header("people", "People")}{requestSort.header("rooms", "Rooms")}
-          {view.canSeeSensitive ? requestSort.header("ground", "Ground floor") : null}{view.canSeeSensitive ? requestSort.header("accessible", "Accessible room") : null}
+          {view.canSeeSensitive ? fullSort.header("ground", "Ground floor") : null}{view.canSeeSensitive ? fullSort.header("accessible", "Accessible room") : null}
           {requestSort.header("private", "Private room")}{requestSort.header("household", "Household")}<th scope="col">Roommates</th>{requestSort.header("version", "Version")}<th scope="col">Change</th>
         </tr></thead>
         <tbody>{requestSort.rows.map((request) => <RequestRow key={request.requestId} request={request} view={view} base={base} busy={busy} run={run} />)}</tbody>

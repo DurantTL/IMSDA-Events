@@ -29,12 +29,13 @@ function Table({ caption, head, rows, empty = "Nothing counted yet.", sortBy, se
   const accessors = Object.fromEntries(COLUMN_KEYS.map((key, index) => [key, (row: TableRow) => (row.values ? row.values[index] : row.cells[index])])) as Record<ColumnKey, (row: TableRow) => SortValue>;
   const shown = sorting?.order.key ? sortRows(rows, sorting.order.key, sorting.order.dir, accessors) : rows;
   // Stacked cards on phones (table-cards, #686): each cell carries its column name.
-  const sortedKind = sorting?.order.key ? (typeof shown[0]?.values?.[COLUMN_KEYS.indexOf(sorting.order.key)] === "string" ? "text" : "number") : "text";
+  // The first column of every table names the row (text); the others are counts or rates (numbers).
+  const sortedIndex = sorting?.order.key ? COLUMN_KEYS.indexOf(sorting.order.key) : -1;
+  const sortedKind = sortedIndex === 0 ? "text" : "number";
   return (
     <div className={`report-table-wrap ${styles.tableWrap}`}>
-      {sorting?.order.key && <SortOrderNote>{sortOrderText(head[COLUMN_KEYS.indexOf(sorting.order.key)].toLowerCase(), sorting.order.dir, sortedKind)}</SortOrderNote>}
       <table role="table" className={`report-table table-cards ${styles.table}`}>
-        <caption>{caption}</caption>
+        <caption>{caption}{sorting?.order.key && <SortOrderNote>{sortOrderText(head[sortedIndex].toLowerCase(), sorting.order.dir, sortedKind)}</SortOrderNote>}</caption>
         <thead role="rowgroup"><tr role="row">{head.map((label, index) => <ColumnHeader column={COLUMN_KEYS[index]} key={label} label={label} sorting={sorting} />)}</tr></thead>
         <tbody role="rowgroup">
           {shown.length === 0 ? <tr role="row"><td role="cell" colSpan={head.length}>{empty}</td></tr> : shown.map((row, index) => (
