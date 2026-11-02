@@ -1,0 +1,15 @@
+/* .auth-back-link is the shared text-link style (#1496); this places it at the top of the card or page. */
+.link {
+  min-height: 44px;
+  margin: 0 0 6px;
+}
+
+.bar {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 4px 24px 0;
+}
+
+@media (max-width: 640px) {
+  .bar { padding-inline: 16px; }
+}

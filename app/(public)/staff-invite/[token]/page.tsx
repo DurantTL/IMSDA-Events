@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { StaffInvitationRegistration } from "@/components/staff-invitation-registration";
 import { INVITATION_UNAVAILABLE_MESSAGE } from "@/modules/staff-invitations/domain";
 import { getInvitationExperience } from "@/modules/staff-invitations/repository";
@@ -20,11 +20,10 @@ function StateCard({ eyebrow, heading, children }: { eyebrow: string; heading: s
     <main className="public-registration-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark /><span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
         </div>
       </header>
+      <BackToEventsLink placement="page" />
       <section className="public-manage-card public-group-state">
         <p className="public-registration-eyebrow">{eyebrow}</p>
         <h1>{heading}</h1>

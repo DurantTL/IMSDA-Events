@@ -1,0 +1,13 @@
+/* The brand link keeps the look of the wrapper class it is given (#1496); this only guarantees the tap target. */
+.link {
+  min-width: 44px;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+/* With no wrapper class (the embed notices) the link sits on its own line, centred on the mark. */
+.standalone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

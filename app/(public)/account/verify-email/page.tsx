@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { BrandMark } from "@/components/brand-mark";
+import { BackToEventsLink } from "@/components/back-to-events-link";
+import { BrandLink } from "@/components/brand-link";
 import { AttendeeVerifyByAddressForm } from "@/components/attendee-verify-by-address-form";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +15,8 @@ export default function VerifyEmailPage() {
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BackToEventsLink />
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <h1>Verify your email</h1>
           <p>An administrator changed your sign-in email and sent a six-digit code to the new address. Enter it here.</p>

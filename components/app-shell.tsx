@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandLink } from "@/components/brand-link";
 import { StaffViewerProvider } from "@/components/staff-viewer-context";
 import type { HelpViewer } from "@/modules/help/visibility";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -14,7 +15,6 @@ import {
   LayoutDashboard,
   ShieldCheck,
 } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
 import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
@@ -388,10 +388,7 @@ export function AppShell({
       onKeyDown={(event) => { if (event.key === "Escape" && tooltip) setTooltip(null); }}>
       <a className="skip-link" href="#workspace-content">Skip to main content</a>
       <aside className="sidebar" aria-label="Application navigation" onScrollCapture={() => setTooltip(null)}>
-        <GuardedLink className="brand" href="/" aria-label="IMSDA Events home" {...tipProps("IMSDA Events home")}>
-          <BrandMark />
-          <span className="sidebar-link-label"><strong>IMSDA</strong><small>Events</small></span>
-        </GuardedLink>
+        <BrandLink guarded className="brand" wordmark={<span className="sidebar-link-label"><strong>IMSDA</strong><small>Events</small></span>} {...tipProps("IMSDA Events calendar")} />
 
         <SidebarToggle collapsed={collapsed} onToggle={toggleCollapsed} tipProps={tipProps("Expand sidebar")} />
 

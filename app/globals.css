@@ -1996,7 +1996,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   box-shadow: 0 30px 90px rgba(0, 26, 40, 0.34);
 }
 
-.auth-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 28px; color: var(--imsda-navy); }
+.auth-brand { display: flex; width: fit-content; max-width: 100%; align-items: center; gap: 11px; margin-bottom: 28px; color: var(--imsda-navy); text-decoration: none; }
 .auth-brand > span strong,
 .auth-brand > span small { display: block; }
 .auth-brand > span strong { letter-spacing: 0.08em; }
@@ -2046,7 +2046,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .recovery-code-list code { display: block; border: 1px solid #b8d7ca; border-radius: 8px; background: #fff; padding: 7px 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: max(var(--type-floor, 0px), 0.72rem); letter-spacing: 0.04em; text-align: center; }
 .auth-back-link { justify-self: center; margin-top: 3px; }
 .no-access-card { text-align: center; }
-.no-access-card .auth-brand { justify-content: center; }
+.no-access-card .auth-brand { justify-content: center; margin-inline: auto; }
 .no-access-card > .page-stack { margin-bottom: 20px; }
 .no-access-card .forbidden-state { min-height: 0; }
 .access-state-icon { display: grid; width: 58px; height: 58px; margin: 0 auto 18px; place-items: center; border-radius: 17px; background: var(--imsda-purple-soft); color: var(--imsda-purple); }

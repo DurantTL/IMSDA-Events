@@ -380,6 +380,8 @@ export type EmailLayoutInput = {
   helpLine?: string | null;
   /** An announcement's unsubscribe page, as a link in the footer. Only a web address is used. */
   unsubscribeUrl?: string | null;
+  /** The site's public calendar, as an absolute address (`${APP_BASE_URL}/calendar`, #1496). The header mark and name link to it. Only a web address is used. */
+  calendarUrl?: string | null;
 };
 
 function oneLine(value: string) {
@@ -401,6 +403,13 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
   const unsubscribe = input.unsubscribeUrl && /^https?:\/\/[^\s<>"']+$/i.test(input.unsubscribeUrl.trim())
     ? input.unsubscribeUrl.trim()
     : null;
+  const calendar = input.calendarUrl && /^https?:\/\/[^\s<>"']+$/i.test(input.calendarUrl.trim())
+    ? escapeHtml(input.calendarUrl.trim())
+    : null;
+  const brandLink = (inner: string, label?: string) =>
+    calendar
+      ? `<a href="${calendar}"${label ? ` aria-label="${label}"` : ""} style="color:inherit;text-decoration:none;">${inner}</a>`
+      : inner;
   const preheaderHtml = renderPreheaderHtml(input.preheader);
   const bodyHtml = restyleRenderedButtons(input.bodyHtml ?? renderEmailBodyHtml(input.body ?? ""));
   const footerLines = [
@@ -430,10 +439,12 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">',
     `<tr><td bgcolor="${L.bar}" class="em-bar" style="background:${L.bar};border-radius:12px 12px 0 0;border-bottom:4px solid ${L.gold};padding:16px 24px;">`,
     '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>',
-    `<td width="34" height="34" align="center" valign="middle" bgcolor="${L.gold}" style="background:${L.gold};border-radius:8px;width:34px;height:34px;font-family:Georgia,'Times New Roman',serif;font-size:21px;font-style:italic;font-weight:bold;line-height:34px;color:${L.markInk};">i</td>`,
+    `<td width="34" height="34" align="center" valign="middle" bgcolor="${L.gold}" style="background:${L.gold};border-radius:8px;width:34px;height:34px;font-family:Georgia,'Times New Roman',serif;font-size:21px;font-style:italic;font-weight:bold;line-height:34px;color:${L.markInk};">${brandLink("i", "IMSDA Events calendar")}</td>`,
     `<td style="padding-left:12px;font-family:${FONT};">`,
+    ...(calendar ? [`<a href="${calendar}" style="color:inherit;text-decoration:none;display:block;">`] : []),
     `<div class="em-bar-name" style="font-size:18px;line-height:20px;font-weight:bold;color:${L.barInk};">${escapeHtml(headerName)}</div>`,
     `<div class="em-bar-sub" style="font-size:12px;line-height:16px;color:${L.barSub};">${escapeHtml(EMAIL_HEADER_SUBLINE)}</div>`,
+    ...(calendar ? ["</a>"] : []),
     "</td></tr></table>",
     "</td></tr>",
     `<tr><td bgcolor="${L.card}" class="em-card em-body" style="background:${L.card};border:1px solid ${L.line};border-top:0;border-radius:0 0 12px 12px;padding:28px 28px 16px;font-family:${FONT};">`,

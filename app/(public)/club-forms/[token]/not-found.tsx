@@ -1,6 +1,5 @@
 import { Link2Off } from "lucide-react";
-import Link from "next/link";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 
 /** The one answer for every private form link that cannot be used (#610): nothing says why. */
 export default function ClubFormLinkUnavailable() {
@@ -8,10 +7,7 @@ export default function ClubFormLinkUnavailable() {
     <main className="public-registration-page public-manage-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
         </div>
       </header>
       <section className="public-registration-not-found">

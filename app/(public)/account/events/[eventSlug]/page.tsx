@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { AttendeeCommunityBoard } from "@/components/attendee-community-board";
 import { AttendeePassGrid } from "@/components/attendee-pass-grid";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { attendeeSignInStepPending, requireAttendeeSignInStep } from "@/modules/attendee-accounts/portal-second-step";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
@@ -150,10 +150,7 @@ export default async function AttendeeEventHubPage({
     <main className="public-registration-page attendee-event-hub">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
           <Link
             className="text-button"
             href={staffPreviewEventId

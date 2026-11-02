@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BackLink } from "@/components/back-link";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicClubDirectory } from "@/components/public-club-directory";
 import { StartAClubCallout } from "@/components/start-a-club-callout";
@@ -29,10 +29,7 @@ export default async function PublicClubsPage() {
     <main className="public-registration-page public-calendar-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
           <div className="public-header-links">
             <BackLink href="/">Events home</BackLink>
             <PublicHeaderSessionLinks />

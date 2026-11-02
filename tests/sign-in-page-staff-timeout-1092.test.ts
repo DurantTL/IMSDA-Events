@@ -16,7 +16,8 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => { mocks.redirect(to); throw new Redirected(to); },
 }));
-vi.mock("@/components/brand-mark", () => ({ BrandMark: () => null }));
+vi.mock("@/components/brand-link", () => ({ BrandLink: () => null }));
+vi.mock("@/components/back-to-events-link", () => ({ BackToEventsLink: () => null }));
 vi.mock("@/components/login-form", () => ({ LoginForm: () => null }));
 vi.mock("@/components/attendee-google-button", () => ({
   AttendeeGoogleButton: () => null,

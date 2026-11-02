@@ -1,3 +1,4 @@
+import { BrandLink } from "@/components/brand-link";
 import { BrandMark } from "@/components/brand-mark";
 
 export default function PublicRegistrationLoading() {
@@ -5,7 +6,7 @@ export default function PublicRegistrationLoading() {
     <main className="public-registration-page" aria-busy="true">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <div className="public-registration-brand"><BrandMark /><span><strong>IMSDA</strong><small>Events</small></span></div>
+          <BrandLink className="public-registration-brand" wordmark />
         </div>
       </header>
       <section className="public-registration-loading" role="status" aria-live="polite">

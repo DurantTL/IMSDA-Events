@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { NewClubApplicationForm } from "@/components/new-club-application-form";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
@@ -17,10 +16,7 @@ export async function NewClubApplicationPage({ invite }: { invite?: { token: str
     <main className="public-registration-page public-manage-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
           {/* A plain link, not <Link>: /clubs carries its own CSP for the map, so it is only reached by a full page load (#437). */}
           <a className="text-button back-link" href="/clubs">Find a club</a>
         </div>

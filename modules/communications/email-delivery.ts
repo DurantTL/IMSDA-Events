@@ -1433,6 +1433,8 @@ async function runDeliveryLoop(
           whyLine: layout.whyLine,
           helpLine: layout.helpLine,
           unsubscribeUrl: unsubscribe?.pageUrl ?? null,
+          // The header wordmark links to the public calendar (#1496), on the site's own address.
+          calendarUrl: new URL("/calendar", getServerEnv().APP_BASE_URL).toString(),
         }),
         attachments: message.attachment || parts.attachments.length > 0
           ? [

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays, CircleAlert } from "lucide-react";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 
 export const metadata: Metadata = { title: "Page not found" };
 
@@ -17,10 +17,7 @@ export default function NotFound() {
       <PublicMetricsBeacon notFound />
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
         </div>
       </header>
       <section className="public-registration-not-found">

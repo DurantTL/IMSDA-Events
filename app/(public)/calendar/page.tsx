@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { CalendarDays, CalendarRange, DoorClosed, List } from "lucide-react";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { SiteNoticesView } from "@/components/site-notices-view";
@@ -154,10 +154,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
     <main className="public-registration-page public-calendar-page">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <Link className="public-registration-brand public-event-brand-link" href="/">
-            <BrandMark />
-            <span><strong>IMSDA</strong><small>Events</small></span>
-          </Link>
+          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
           <div className="public-header-links">
             <PublicHeaderSessionLinks />
           </div>

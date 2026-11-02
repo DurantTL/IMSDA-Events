@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { BrandMark } from "@/components/brand-mark";
+import { BrandLink } from "@/components/brand-link";
 import { getPrisma } from "@/lib/prisma";
 import { getAnnouncementOptOutState, resolveUnsubscribeToken } from "@/modules/communications/email-preferences-repository";
 import {
@@ -49,10 +49,7 @@ export default async function UnsubscribePage({
   return (
     <main className="auth-page">
       <section className="auth-card">
-        <div className="auth-brand">
-          <BrandMark />
-          <span><strong>IMSDA</strong><small>Events</small></span>
-        </div>
+        <BrandLink className="auth-brand" wordmark />
         <div className="auth-heading">
           <p className="eyebrow">Email preferences</p>
           <h1>Event announcements</h1>
