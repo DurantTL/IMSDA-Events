@@ -127,9 +127,9 @@ export const clubDirectorWalkthroughActions: Record<string, WalkthroughActions> 
       "see-invite": async (ctx) => {
         await ctx.page.getByRole("dialog").getByRole("button", { name: "Add club admin" }).click();
         await ctx.page.getByRole("dialog").waitFor({ state: "hidden", ...slow });
-        const row = ctx.page.getByText(ctx.invitee.email).first();
-        await row.waitFor({ state: "visible", ...slow });
-        return row;
+        await ctx.page.getByText(ctx.invitee.email).first().waitFor({ state: "visible", ...slow });
+        // Mark the role, so the mark never covers the person's name or email.
+        return ctx.page.locator('section[aria-labelledby="club-team-heading"]').getByText("Registrar", { exact: true }).locator("visible=true").first();
       },
     },
   },

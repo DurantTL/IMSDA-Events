@@ -93,10 +93,21 @@ export const walkthroughInvitee = { id: `${W}_account_invitee`, name: "Robin Sam
 /** The synthetic supply the orders walkthrough adds to the list. */
 export const walkthroughSupplyName = "Sample Pathfinder Neckerchief";
 
-/** Refuses a non-local database or app URL and production, before anything is written. */
+/** Environment variables that switch real email sending on. */
+const emailSettings = ["ACCOUNT_EMAIL_SENDER_ADDRESS", "RESEND_API_KEY", "AWS_SES_REGION", "SES_REGION"] as const;
+
+/**
+ * Refuses a non-local database or app URL and production, and an environment with account email set up, before anything is
+ * written. The emailed sign-in code is only readable when the app has no email to send it with (it returns the code instead),
+ * and a run must never be able to send real email.
+ */
 export function assertWalkthroughSafety(baseUrl: string, env: Record<string, string | undefined> = process.env) {
   assertLocalDatabase(env, "write synthetic clubs and accounts for the help walkthroughs");
   assertLocalUrl(baseUrl, "HELP_SHOTS_BASE_URL");
+  const configured = emailSettings.filter((name) => (env[name] ?? "").trim() !== "");
+  if (configured.length > 0) {
+    throw new Error(`Refusing to run with ${configured.join(", ")} set: the walkthroughs read the emailed sign-in code from the local app, which only returns it when no account email is set up, and no run may send real email. Unset them (and restart the app without them) first.`);
+  }
 }
 
 /** Refuses a database that is not a seeded dev or CI one (the same guard as the mobile layout audit). */
@@ -156,6 +167,15 @@ export async function deleteWalkthroughFixtures(prisma: PrismaClient) {
     prisma.attendeePasskey.deleteMany({ where: { accountId: { in: fixtureAccountIds } } }),
     prisma.messageOutbox.deleteMany({ where: { OR: [{ accountAttendeeId: { in: fixtureAccountIds } }, { recipientEmail: { endsWith: "@example.test", startsWith: `${W}.` } }] } }),
   ]);
+  // The roster walkthrough's "Remove" erases the roster row but keeps the Person (their name stays on items already ordered).
+  // Delete that sample person, matched tightly: the sample name, and no roster row pointing at it.
+  const sample = await prisma.person.findMany({
+    where: { firstName: walkthroughRosterPerson.firstName, lastName: walkthroughRosterPerson.lastName, id: { not: { startsWith: `${W}_` } } },
+    select: { id: true },
+  });
+  for (const person of sample) {
+    if ((await prisma.clubRosterMember.count({ where: { personId: person.id } })) === 0) await prisma.person.delete({ where: { id: person.id } }).catch(() => undefined);
+  }
   // The club's event registrations and the event itself, then the account, profile and organizations.
   const registrations = await prisma.clubEventRegistration.findMany({ where: orgs, select: { id: true } }).catch(() => []);
   if (registrations.length > 0) await prisma.clubEventRegistration.deleteMany({ where: { id: { in: registrations.map((row) => row.id) } } });
@@ -344,14 +364,27 @@ export async function createWalkthroughFixtures(prisma: PrismaClient) {
   return { authenticatorSecret };
 }
 
-/**
- * A coordinator sees every active club, so the seeded clubs are hidden while the script runs. Returns their ids; the caller
- * puts them back with `restoreOtherClubs`.
- */
-export async function hideOtherClubs(prisma: PrismaClient): Promise<string[]> {
+/** The active clubs that are not walkthrough fixtures. A coordinator sees every active club, so these are hidden while the script runs. */
+export async function listOtherClubIds(prisma: PrismaClient): Promise<string[]> {
   const others = await prisma.organization.findMany({ where: { type: "CLUB", isActive: true, id: { notIn: allClubIds } }, select: { id: true } });
-  if (others.length > 0) await prisma.organization.updateMany({ where: { id: { in: others.map((club) => club.id) } }, data: { isActive: false } });
   return others.map((club) => club.id);
+}
+
+/**
+ * The published club events that are not the walkthrough's own. A director's Club events page and a coordinator's Overview list
+ * every open club event, so the others are unpublished while the script runs (and published again afterwards).
+ */
+export async function listOtherClubEventIds(prisma: PrismaClient): Promise<string[]> {
+  const events = await prisma.event.findMany({ where: { audience: "CLUB", isPublished: true, id: { not: walkthroughIds.event } }, select: { id: true } });
+  return events.map((event) => event.id);
+}
+
+export async function setEventsPublished(prisma: PrismaClient, ids: string[], isPublished: boolean) {
+  if (ids.length > 0) await prisma.event.updateMany({ where: { id: { in: ids } }, data: { isPublished } });
+}
+
+export async function hideClubs(prisma: PrismaClient, ids: string[]) {
+  if (ids.length > 0) await prisma.organization.updateMany({ where: { id: { in: ids } }, data: { isActive: false } });
 }
 
 export async function restoreOtherClubs(prisma: PrismaClient, ids: string[]) {
@@ -371,22 +404,28 @@ export async function enrolPlaceholderTwoStep(prisma: PrismaClient) {
   });
 }
 
-/**
- * Switches passkeys on for the local app (the setting is a platform row, off by default). Returns what was there, so the
- * caller puts it back.
- */
-export async function enablePasskeys(prisma: PrismaClient): Promise<string | null> {
+/** The passkey relying-party id now (null when passkeys are off). Throws when the settings row is missing. */
+export async function readPasskeyRpId(prisma: PrismaClient): Promise<string | null> {
   const row = await prisma.platformSettings.findUnique({ where: { id: "platform" }, select: { passkeyRpId: true } });
   if (!row) throw new Error("The platform settings row is missing. Run `npm run db:seed` on a local database first.");
-  if (row.passkeyRpId !== "localhost") await prisma.platformSettings.update({ where: { id: "platform" }, data: { passkeyRpId: "localhost" } });
   return row.passkeyRpId;
+}
+
+/** Switches passkeys on for the local app (the setting is a platform row, off by default). The caller restores it. */
+export async function enablePasskeys(prisma: PrismaClient) {
+  await prisma.platformSettings.update({ where: { id: "platform" }, data: { passkeyRpId: "localhost" } });
 }
 
 export async function restorePasskeys(prisma: PrismaClient, before: string | null) {
   await prisma.platformSettings.update({ where: { id: "platform" }, data: { passkeyRpId: before } });
 }
 
-/** Clears the local rate-limit budgets (sign-in, code send, second step), so repeated runs are not rate limited. Local database only. */
+/** The rate-limit policies a sign-in walkthrough spends: password sign-in, the emailed code (send and verify), the second step and passkeys. */
+export const signInRateLimitPolicies = ["attendee.sign-in", "attendee.roster-unlock", "attendee.passkey"] as const;
+
+/** Clears those local budgets, so repeated runs are not rate limited. Local database only. */
 export async function clearSignInRateLimits(prisma: PrismaClient) {
-  await prisma.rateLimitBucket.deleteMany({});
+  await prisma.rateLimitBucket.deleteMany({
+    where: { OR: signInRateLimitPolicies.map((prefix) => ({ policy: { startsWith: prefix } })) },
+  });
 }

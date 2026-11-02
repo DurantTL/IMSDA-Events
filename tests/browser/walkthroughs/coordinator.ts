@@ -156,7 +156,10 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
         await missingRow(ctx, noDirectorClub).getByRole("link", { name: "Open club" }).click();
         await ctx.page.waitForURL(/\/account\/area\//, slow);
         await settle(ctx);
-        return ctx.page.getByText(/No club director is assigned yet/);
+        // The whole Club admins card: a mark on the sentence alone would sit on top of its icon.
+        const card = ctx.page.locator('section[aria-labelledby="open-club-team"]');
+        await ctx.page.getByText(/No club director is assigned yet/).waitFor({ state: "visible", ...slow });
+        return card;
       },
     },
   },

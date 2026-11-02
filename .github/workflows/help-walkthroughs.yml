@@ -19,13 +19,18 @@ on:
       - "app/**"
       - "components/**"
       - "modules/**"
+      - "lib/**"
+      - "proxy.ts"
+      - "middleware.ts"
+      - "next.config.*"
+      - "package.json"
+      - "package-lock.json"
       - "prisma/**"
       - "public/help/walkthroughs/**"
       - "tests/browser/walkthroughs/**"
       - "scripts/capture-help-screenshots.ts"
       - "scripts/verify-help-walkthroughs.ts"
-      - "scripts/support/help-walkthrough-fixtures.ts"
-      - "scripts/support/walkthrough-*.ts"
+      - "scripts/support/**"
       - ".github/workflows/help-walkthroughs.yml"
   workflow_dispatch:
 
@@ -77,7 +82,8 @@ jobs:
       - run: npm run lodging:sync
       - run: npm run form-templates:sync
       - run: npm run event-content:sync
-      # Warnings only: a changed page should prompt a refresh of its pictures, not fail an unrelated pull request.
+      # Non-fatal on purpose: a changed page should prompt a refresh of its pictures, not fail an unrelated pull request.
+      # A missing picture file is an error in help:check but is caught for good by the vitest suite (tests/walkthroughs-1482.test.ts).
       - name: Check for stale walkthrough pictures
         continue-on-error: true
         run: npm run help:check

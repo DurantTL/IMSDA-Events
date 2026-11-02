@@ -7,8 +7,14 @@
  * NODE_ENV=production, a database or app URL that is not on this machine, and a database that is not a seeded dev or CI one.
  *
  * The emailed sign-in code is read from the local development mail path: with no ACCOUNT_EMAIL_* configured and outside
- * production, the app returns the code in its own sign-in response instead of sending mail. Never real email.
+ * production, the app returns the code in its own sign-in response instead of sending mail. Never real email: a run refuses to
+ * start when account email is set in its environment.
+ *
+ * A run changes a few things outside its own fixtures (passkeys, some form templates, the club events already in the database, and for
+ * coordinator walkthroughs the clubs already in the database). Their "before" state is saved to a marker file in the OS temp directory before anything changes;
+ * the end of the run, SIGINT and SIGTERM restore it, and so does the next run if this one was killed (walkthrough-restore.ts).
  */
+import { existsSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -20,6 +26,7 @@ import { walkthroughs } from "../../modules/help/walkthroughs";
 import { runWalkthrough, type StepEvent } from "../../tests/browser/walkthroughs/steps";
 import type { WalkthroughContext, WalkthroughPage, WalkthroughStart } from "../../tests/browser/walkthroughs/types";
 import * as fixtures from "./help-walkthrough-fixtures";
+import { applyRestoreState, databaseNameOf, recoverFromLeftoverMarker, removeRestoreMarker, restoreMarkerFile, writeRestoreMarker, type RestoreState } from "./walkthrough-restore";
 
 loadEnvConfig(process.cwd());
 
@@ -37,22 +44,56 @@ export type HarnessOptions = {
 
 export type HarnessResult = { walkthroughId: string; kind: WalkthroughImageKind; steps: number }[];
 
-async function loadChromium() {
+/** Every Playwright package that can be loaded here: playwright-core (npm i --no-save) first, then playwright. */
+function loadPlaywrightModules(): { name: string; chromium: { launch: (options: Record<string, unknown>) => Promise<unknown> } }[] {
+  const found: { name: string; chromium: { launch: (options: Record<string, unknown>) => Promise<unknown> } }[] = [];
   for (const name of ["playwright-core", "playwright"]) {
     try {
       // By variable name so tsc and eslint do not need the package. `require` also finds a globally installed copy (NODE_PATH).
       const loaded = createRequire(path.join(process.cwd(), "package.json"))(name);
-      if (loaded.chromium) return loaded.chromium;
+      if (loaded.chromium) found.push({ name, chromium: loaded.chromium });
     } catch {
-      try {
-        const loaded = await import(/* webpackIgnore: true */ name);
-        if (loaded.chromium) return loaded.chromium;
-      } catch {
-        // try the next one
+      // not installed
+    }
+  }
+  return found;
+}
+
+/** A Chromium already on this machine, under PLAYWRIGHT_BROWSERS_PATH or /opt/pw-browsers, for when a package's own build is missing. */
+function findInstalledChromium(): string | null {
+  for (const root of [process.env.PLAYWRIGHT_BROWSERS_PATH, "/opt/pw-browsers"]) {
+    if (!root || !existsSync(root)) continue;
+    for (const entry of readdirSync(root).filter((name) => /^chromium-\d+$/.test(name)).sort().reverse()) {
+      for (const binary of ["chrome-linux64/chrome", "chrome-linux/chrome"]) {
+        const full = path.join(root, entry, binary);
+        if (existsSync(full)) return full;
       }
     }
   }
-  throw new Error("Missing playwright-core. Run: npm i --no-save playwright-core@1.56.1");
+  return null;
+}
+
+/**
+ * Launches Chromium without needing HELP_SHOTS_BROWSER: the package's own build, then (when launching fails, for example because
+ * playwright-core 1.56 wants a build this machine does not have) a Chromium found on disk, then the next package.
+ */
+async function launchBrowser() {
+  const modules = loadPlaywrightModules();
+  if (modules.length === 0) throw new Error("Missing playwright-core. Run: npm i --no-save playwright-core@1.56.1");
+  const args = ["--no-sandbox", "--disable-dev-shm-usage"];
+  const explicit = process.env.HELP_SHOTS_BROWSER || undefined;
+  const installed = explicit ? null : findInstalledChromium();
+  const errors: string[] = [];
+  for (const { name, chromium } of modules) {
+    for (const executablePath of explicit ? [explicit] : [undefined, ...(installed ? [installed] : [])]) {
+      try {
+        return await chromium.launch({ executablePath, args });
+      } catch (error) {
+        errors.push(`${name}${executablePath ? ` (${executablePath})` : ""}: ${(error as Error).message.split("\n")[0]}`);
+      }
+    }
+  }
+  throw new Error(`Could not launch Chromium. Set HELP_SHOTS_BROWSER to a Chromium executable.\n${errors.join("\n")}`);
 }
 
 export async function runWalkthroughHarness(options: HarnessOptions): Promise<HarnessResult> {
@@ -64,28 +105,57 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
   if (selected.length === 0) throw new Error(`No walkthrough id contains "${options.only}".`);
 
   const { PrismaClient: Prisma } = await import("@prisma/client");
-  const chromium = await loadChromium();
   const prisma: PrismaClient = new Prisma();
   const sessionStore = await import("../../modules/attendee-accounts/session-store");
   const { attendeeSessionCookie } = await import("../../modules/security/session-cookies");
   const tokens: string[] = [];
   let seeded = false;
-  let templateStates: fixtures.TemplateState[] = [];
-  let passkeyRpIdBefore: string | null | undefined;
-  let hiddenClubs: string[] = [];
+  let restoreState: RestoreState | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let browser: any;
   const result: HarnessResult = [];
+  const markerFile = restoreMarkerFile();
+  let cleanupRun: Promise<void> | null = null;
+  // Puts everything back. Runs once, from the end of the run or from a SIGINT/SIGTERM, whichever comes first; the other caller
+  // waits for the same run, so the process is never closed (or the database disconnected) before the restore is done.
+  const restoreEverything = async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (browser as any)?.close().catch(() => undefined);
+    if (!seeded) return;
+    const { revokeAttendeeSession } = await import("../../modules/attendee-accounts/session-store");
+    for (const token of tokens) await revokeAttendeeSession(token).catch(() => undefined);
+    await fixtures.deleteWalkthroughFixtures(prisma).catch((error: Error) => console.error(`Could not remove the walkthrough fixtures: ${error.message}`));
+    if (restoreState) {
+      const failures = await applyRestoreState(prisma, restoreState);
+      for (const failure of failures) console.error(`Could not restore ${failure}`);
+      // Keep the marker when something could not be restored: the next run tries again.
+      if (failures.length === 0) removeRestoreMarker(markerFile);
+    }
+  };
+  const cleanup = () => (cleanupRun ??= restoreEverything());
+  const onSignal = (signal: NodeJS.Signals) => {
+    void cleanup().finally(() => prisma.$disconnect().finally(() => process.exit(signal === "SIGINT" ? 130 : 143)));
+  };
+  const onSigint = () => onSignal("SIGINT");
+  const onSigterm = () => onSignal("SIGTERM");
   try {
     await fixtures.assertSeededDatabase(prisma);
     seeded = true;
-    templateStates = await fixtures.readTemplateStates(prisma);
-    passkeyRpIdBefore = await fixtures.enablePasskeys(prisma);
-    hiddenClubs = await fixtures.hideOtherClubs(prisma);
-    browser = await chromium.launch({
-      executablePath: process.env.HELP_SHOTS_BROWSER || undefined,
-      args: ["--no-sandbox", "--disable-dev-shm-usage"],
-    });
+    const database = databaseNameOf(process.env.DATABASE_URL);
+    // A run that was killed left its marker: repair that first, so the "before" below is the real one.
+    await recoverFromLeftoverMarker(prisma, markerFile, database, log);
+    const needsCoordinatorArea = selected.some((walkthrough) => walkthrough.audience === "coordinator");
+    const hiddenClubs = needsCoordinatorArea ? await fixtures.listOtherClubIds(prisma) : [];
+    const hiddenEvents = await fixtures.listOtherClubEventIds(prisma);
+    restoreState = { database, hiddenClubs, hiddenEvents, templates: await fixtures.readTemplateStates(prisma), passkeyRpId: await fixtures.readPasskeyRpId(prisma) };
+    // The marker is written BEFORE anything changes.
+    writeRestoreMarker(markerFile, restoreState);
+    process.once("SIGINT", onSigint);
+    process.once("SIGTERM", onSigterm);
+    await fixtures.enablePasskeys(prisma);
+    await fixtures.hideClubs(prisma, hiddenClubs);
+    await fixtures.setEventsPublished(prisma, hiddenEvents, false);
+    browser = await launchBrowser();
     for (const walkthrough of selected) {
       for (const kind of options.kinds) {
         // Every run starts from the same fixtures, so the pictures come out the same.
@@ -119,16 +189,9 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
         const readSignInCode = async () => {
           for (let attempt = 0; attempt < 60; attempt += 1) {
             if (latestCode) return latestCode;
-            const queued = await prisma.messageOutbox.findFirst({
-              where: { accountAttendeeId: fixtures.walkthroughIds.director },
-              orderBy: { createdAt: "desc" },
-              select: { bodyTextSnapshot: true },
-            });
-            const found = queued?.bodyTextSnapshot.match(/\b(\d{6})\b/)?.[1];
-            if (found) return found;
             await page.waitForTimeout(250);
           }
-          throw new Error("No sign-in code arrived. Run the app outside production (npm run dev) with no ACCOUNT_EMAIL_* set, so it returns the code instead of sending mail.");
+          throw new Error("No sign-in code arrived. Run the app outside production (npm run dev) with no ACCOUNT_EMAIL_* or RESEND_API_KEY set, so it returns the code instead of sending mail.");
         };
         const begin = async (start: WalkthroughStart) => {
           if (start === "signed-out") return;
@@ -168,15 +231,9 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
       }
     }
   } finally {
-    await browser?.close().catch(() => undefined);
-    if (seeded) {
-      const { revokeAttendeeSession } = await import("../../modules/attendee-accounts/session-store");
-      for (const token of tokens) await revokeAttendeeSession(token).catch(() => undefined);
-      await fixtures.deleteWalkthroughFixtures(prisma).catch((error: Error) => console.error(`Could not remove the walkthrough fixtures: ${error.message}`));
-      await fixtures.restoreTemplateStates(prisma, templateStates).catch((error: Error) => console.error(`Could not restore the form templates: ${error.message}`));
-      await fixtures.restoreOtherClubs(prisma, hiddenClubs).catch((error: Error) => console.error(`Could not restore the seeded clubs: ${error.message}`));
-      if (passkeyRpIdBefore !== undefined) await fixtures.restorePasskeys(prisma, passkeyRpIdBefore).catch((error: Error) => console.error(`Could not restore the passkey setting: ${error.message}`));
-    }
+    process.off("SIGINT", onSigint);
+    process.off("SIGTERM", onSigterm);
+    await cleanup();
     await prisma.$disconnect();
   }
   return result;
