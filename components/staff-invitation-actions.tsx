@@ -94,7 +94,13 @@ export function InvitationSelectionProvider({ eventId, canSend, total, matchingQ
     setConfirmingRevoke(false);
   }
 
+  const limitNotice = `Only ${INVITATION_BULK_LIMIT.toLocaleString("en-US")} people can be selected at a time, so the selection stopped at ${INVITATION_BULK_LIMIT.toLocaleString("en-US")}. Send or revoke these first, then select more.`;
+
   function toggle(id: string) {
+    if (!selected.has(id) && selected.size >= INVITATION_BULK_LIMIT) {
+      setNotice(limitNotice);
+      return;
+    }
     changeSelection((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -133,7 +139,11 @@ export function InvitationSelectionProvider({ eventId, canSend, total, matchingQ
     const result = await response.json().catch(() => ({})) as { ids?: string[]; message?: string };
     if (!response.ok || !result.ids) throw new Error(result.message ?? "The matching people could not be selected.");
     const ids = result.ids;
-    changeSelection((current) => new Set([...current, ...ids]));
+    // The union never goes past the most one Send or Revoke takes, however many select-alls were made.
+    const union = new Set([...selected, ...ids]);
+    const next = union.size > INVITATION_BULK_LIMIT ? new Set([...selected, ...ids.filter((id) => !selected.has(id))].slice(0, INVITATION_BULK_LIMIT)) : union;
+    changeSelection(() => next);
+    if (union.size > INVITATION_BULK_LIMIT) setNotice(limitNotice);
   });
 
   const openSendPreview = () => run(async () => {

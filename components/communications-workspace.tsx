@@ -1099,10 +1099,11 @@ export function CommunicationsWorkspace({
   }
 
   /** A response from an action carries the log's first page; keep the page and filter the person was on. */
-  function acceptMessaging(next: MessagingWorkspaceData) {
+  function acceptMessaging(next: MessagingWorkspaceData, showNewest = false) {
     setMessaging(next);
     const query = deliveryQueryRef.current;
-    if (query.status !== "ALL" || query.page > 1) void readDeliveries(query).catch(() => {});
+    // After an action that selects a new message the first page of every status is what is shown, so it is not re-read.
+    if (!showNewest && (query.status !== "ALL" || query.page > 1)) void readDeliveries(query).catch(() => {});
   }
 
   async function refreshDeliveries() {
@@ -1233,12 +1234,10 @@ export function CommunicationsWorkspace({
           ?? "The message retry could not be completed.",
         );
       }
-      acceptMessaging(result.messaging);
+      // The new message is the newest, so show the log's first page with every status: it is on screen and in the address.
+      acceptMessaging(result.messaging, true);
       setSelectedMessageId(result.operation.messageId);
-      setQuery("deliveries", {
-        message: result.operation.messageId,
-        status: deliveryFilter,
-      });
+      setQuery("deliveries", { message: result.operation.messageId, status: "ALL", page: 1 });
       setRetryRequestId("");
       setNotice(result.operation.replayed
         ? "This exact retry was already recorded, so no duplicate delivery copy was created."
@@ -1420,12 +1419,10 @@ export function CommunicationsWorkspace({
       if (!response.ok || !result.messaging || !result.operation?.messageId) {
         throw new Error(result.message ?? "The confirmation copy could not be created.");
       }
-      acceptMessaging(result.messaging);
+      // The new message is the newest, so show the log's first page with every status: it is on screen and in the address.
+      acceptMessaging(result.messaging, true);
       setSelectedMessageId(result.operation.messageId);
-      setQuery("deliveries", {
-        message: result.operation.messageId,
-        status: deliveryFilter,
-      });
+      setQuery("deliveries", { message: result.operation.messageId, status: "ALL", page: 1 });
       setResendRecipientEmail("");
       setResendConfirmed(false);
       setResendRequestId("");

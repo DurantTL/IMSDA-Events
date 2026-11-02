@@ -78,12 +78,16 @@ const fromStaff = (user: StaffRow, now: Date): PendingInvite => {
   };
 };
 
-/** Newest first, then email, then kind and id, so the three sources merge into one stable order. */
+/**
+ * Newest first, then the id, then the kind. The ties are broken on fields the database and this comparison order the same way
+ * (a timestamp and a plain-code-unit id, never a locale-collated name or email), so a page boundary never skips or repeats a row.
+ */
 export function comparePendingInvites(a: PendingInvite, b: PendingInvite): number {
-  return (b.sentAt ?? "").localeCompare(a.sentAt ?? "")
-    || a.email.localeCompare(b.email)
-    || a.kind.localeCompare(b.kind)
-    || a.id.localeCompare(b.id);
+  const sentA = a.sentAt ?? "";
+  const sentB = b.sentAt ?? "";
+  if (sentA !== sentB) return sentA < sentB ? 1 : -1;
+  if (a.id !== b.id) return a.id < b.id ? -1 : 1;
+  return a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0;
 }
 
 type PendingOptions = { query?: string; emails?: readonly string[]; scope: PeopleScope };
@@ -161,10 +165,10 @@ export async function listPendingInvitesPage(
   const skip = (page - 1) * pageSize;
   const wanted = skip + pageSize;
   const [clubSent, clubUnsent, areaSent, areaUnsent] = await Promise.all([
-    clubCount > 0 ? prisma.clubInvite.findMany({ where: { AND: [where.club, { sentAt: { not: null } }] }, orderBy: [{ sentAt: "desc" }, { email: "asc" }, { id: "asc" }], take: wanted, select: clubSelect }) : [],
-    clubCount > 0 ? prisma.clubInvite.findMany({ where: { AND: [where.club, { sentAt: null }] }, orderBy: [{ createdAt: "desc" }, { email: "asc" }, { id: "asc" }], take: wanted, select: clubSelect }) : [],
-    areaCount > 0 ? prisma.areaCoordinatorInvite.findMany({ where: { AND: [where.area, { sentAt: { not: null } }] }, orderBy: [{ sentAt: "desc" }, { email: "asc" }, { id: "asc" }], take: wanted, select: areaSelect }) : [],
-    areaCount > 0 ? prisma.areaCoordinatorInvite.findMany({ where: { AND: [where.area, { sentAt: null }] }, orderBy: [{ createdAt: "desc" }, { email: "asc" }, { id: "asc" }], take: wanted, select: areaSelect }) : [],
+    clubCount > 0 ? prisma.clubInvite.findMany({ where: { AND: [where.club, { sentAt: { not: null } }] }, orderBy: [{ sentAt: "desc" }, { id: "asc" }], take: wanted, select: clubSelect }) : [],
+    clubCount > 0 ? prisma.clubInvite.findMany({ where: { AND: [where.club, { sentAt: null }] }, orderBy: [{ createdAt: "desc" }, { id: "asc" }], take: wanted, select: clubSelect }) : [],
+    areaCount > 0 ? prisma.areaCoordinatorInvite.findMany({ where: { AND: [where.area, { sentAt: { not: null } }] }, orderBy: [{ sentAt: "desc" }, { id: "asc" }], take: wanted, select: areaSelect }) : [],
+    areaCount > 0 ? prisma.areaCoordinatorInvite.findMany({ where: { AND: [where.area, { sentAt: null }] }, orderBy: [{ createdAt: "desc" }, { id: "asc" }], take: wanted, select: areaSelect }) : [],
   ]);
   const merged = [
     ...[...clubSent, ...clubUnsent].map((invite) => fromClub(invite, now)),

@@ -1,5 +1,6 @@
 import { parsePageParam } from "@/lib/pagination";
 import { firstParam } from "@/lib/search-params";
+import { MESSAGE_TEMPLATE_KEYS } from "@/modules/communications/templates";
 import type { MessageOutboxStatusValue } from "@/modules/communications/types";
 
 /** The pure half of the Delivery log (#1492): reading the address, the where-clause and the order. Client-safe. */
@@ -24,9 +25,18 @@ export function parseDeliveryQuery(params: { status?: unknown; page?: unknown })
   };
 }
 
-/** The event's own messages, optionally one status. The event scope is always part of the clause. */
-export function buildDeliveryWhere(eventId: string, status: DeliveryLogQuery["status"]) {
-  return status === "ALL" ? { eventId } : { eventId, status };
+/**
+ * The event's own messages, optionally one status. Rows that carry an event id but are not event messages (invoice delivery,
+ * form submissions, account email) are left out here, in the database, so the total, the status counts and the page all
+ * agree: the same conditions as `isEventScopedMessage`.
+ */
+export function buildDeliveryWhere(eventId: string, status: DeliveryLogQuery["status"] | "ANY" = "ALL") {
+  return {
+    eventId,
+    templateKey: { in: [...MESSAGE_TEMPLATE_KEYS] },
+    recipientKind: { not: "ACCOUNT" },
+    ...(status === "ALL" || status === "ANY" ? {} : { status }),
+  };
 }
 
 /** Newest first, then id so rows created in the same instant keep one order from page to page. */

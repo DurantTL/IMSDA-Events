@@ -51,6 +51,19 @@ describe("staff invitations: Select all N matching", () => {
     expect(boxes.every((box) => box.checked)).toBe(true);
   });
 
+  it("repeated select-alls never take the selection past 2,000, and the bar says so", async () => {
+    const batch = (start: number, length: number) => new Response(JSON.stringify({ ids: Array.from({ length }, (_, index) => `inv-${start + index}`), total: 1900, limit: 2000 }));
+    fetchMock.mockResolvedValueOnce(batch(0, 1000)).mockResolvedValueOnce(batch(1000, 1900));
+    mounted = await mount(list(1900));
+    await act(async () => { buttonByText(mounted.container, "Select all 1900 matching").click(); });
+    await flush();
+    expect(mounted.container.textContent).toContain("1000 selected");
+    await act(async () => { buttonByText(mounted.container, "Select all 1900 matching").click(); });
+    await flush();
+    expect(mounted.container.textContent).toContain("2000 selected");
+    expect(mounted.container.textContent).toContain("Only 2,000 people can be selected at a time");
+  });
+
   it("past the most one Send takes, says so instead of offering the button", async () => {
     mounted = await mount(list(2500));
     expect(mounted.container.textContent).toContain("Narrow the list to 2,000 or fewer to select them all.");

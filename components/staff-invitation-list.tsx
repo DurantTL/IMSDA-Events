@@ -154,9 +154,9 @@ export function StaffInvitationList({ eventId, rows, counts, query, total, total
               <thead>
                 <tr>
                   <th scope="col"><span className="sr-only">Select</span></th>
-                  <ColumnHeader column="person" label={SORT_LABELS.person.label} sorting={sorting} />
-                  <ColumnHeader column="group" label={SORT_LABELS.group.label} sorting={sorting} />
-                  <ColumnHeader column="status" label={SORT_LABELS.status.label} sorting={sorting} />
+                  <ColumnHeader column="person" label="Person" sorting={sorting} />
+                  <ColumnHeader column="group" label="Group" sorting={sorting} />
+                  <ColumnHeader column="status" label="Status" sorting={sorting} />
                   <th scope="col">Actions</th>
                 </tr>
               </thead>

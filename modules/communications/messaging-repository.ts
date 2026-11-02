@@ -881,7 +881,7 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
   await ensureEventMessagingDefaults(eventId);
   const prisma = getPrisma();
   // The delivery log is paged in the database: the filtered total first, then the page clamped to it (#1492).
-  const logWhere = buildDeliveryWhere(eventId, logQuery.status);
+  const logWhere = buildDeliveryWhere(eventId, logQuery.status) as never;
   const logTotal = await prisma.messageOutbox.count({ where: logWhere });
   const logPage = clampPage(logQuery.page, logTotal, DELIVERY_PAGE_SIZE);
   const [
@@ -919,7 +919,7 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
     }),
     prisma.messageOutbox.groupBy({
       by: ["status"],
-      where: { eventId },
+      where: buildDeliveryWhere(eventId) as never,
       _count: { _all: true },
     }),
     loadBalanceReminderState(eventId, prisma),
@@ -940,6 +940,7 @@ export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryL
       .filter(isEventTemplateRow)
       .map((template) => serializeTemplate(template, filesByVersion))
       .sort((left, right) => (keyOrder.get(left.key) ?? 99) - (keyOrder.get(right.key) ?? 99)),
+    // The where already holds only event messages (buildDeliveryWhere), so no row is dropped after the page is read.
     messages: messages
       .filter(isEventScopedMessage)
       .map((message) => serializeMessage(message, settings.deliveryMode)),

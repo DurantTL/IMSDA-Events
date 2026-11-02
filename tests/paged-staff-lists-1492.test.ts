@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { segmentWindows } from "@/lib/segment-window";
 import { parseSortParams } from "@/lib/list-sort";
 import {
@@ -66,6 +66,18 @@ describe("segmentWindows: a page across ordered runs", () => {
   });
 });
 
+describe("pending invites tie order (#1492)", () => {
+  it("breaks ties on the id with a plain comparison, newest first", async () => {
+    vi.mock("server-only", () => ({}));
+    const { comparePendingInvites } = await import("@/modules/system-admin/pending-invites");
+    const row = (id: string, sentAt: string, kind: "club" | "area" | "staff" = "club") => ({ kind, id, name: "", email: "z@example.test", what: "", sentAt, expired: false });
+    const sorted = [row("b", "2026-10-01T00:00:00.000Z"), row("a", "2026-10-02T00:00:00.000Z"), row("a", "2026-10-01T00:00:00.000Z", "area"), row("C", "2026-10-01T00:00:00.000Z")]
+      .sort(comparePendingInvites).map((entry) => `${entry.kind}:${entry.id}`);
+    // Newest first; on a tie the id by code unit ("C" before "a"), then the kind.
+    expect(sorted).toEqual(["club:a", "club:C", "area:a", "club:b"]);
+  });
+});
+
 describe("the delivery log query (#1492)", () => {
   it("reads only listed statuses and a positive page, otherwise All and page 1", () => {
     expect(parseDeliveryQuery({ status: "FAILED", page: "3" })).toEqual({ status: "FAILED", page: 3 });
@@ -76,8 +88,15 @@ describe("the delivery log query (#1492)", () => {
   });
 
   it("always scopes to the event, and narrows by status in the database", () => {
-    expect(buildDeliveryWhere("event-1", "ALL")).toEqual({ eventId: "event-1" });
-    expect(buildDeliveryWhere("event-1", "FAILED")).toEqual({ eventId: "event-1", status: "FAILED" });
+    const all = buildDeliveryWhere("event-1", "ALL") as Record<string, unknown>;
+    expect(all.eventId).toBe("event-1");
+    // Only event messages: a row with an event id but another kind of key (an invoice, a form submission) or an account recipient is not in the total, the counts or the page.
+    expect((all.templateKey as { in: string[] }).in).toContain("CUSTOM_MESSAGE");
+    expect((all.templateKey as { in: string[] }).in).not.toContain("INVOICE_DELIVERY");
+    expect((all.templateKey as { in: string[] }).in).not.toContain("INFORMATION_FORM_SUBMITTED");
+    expect(all.recipientKind).toEqual({ not: "ACCOUNT" });
+    expect(all.status).toBeUndefined();
+    expect(buildDeliveryWhere("event-1", "FAILED")).toMatchObject({ eventId: "event-1", status: "FAILED", recipientKind: { not: "ACCOUNT" } });
   });
 
   it("orders newest first and ends in the id, with 50 to a page and no cap", () => {
