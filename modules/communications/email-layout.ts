@@ -406,9 +406,10 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
   const calendar = input.calendarUrl && /^https?:\/\/[^\s<>"']+$/i.test(input.calendarUrl.trim())
     ? escapeHtml(input.calendarUrl.trim())
     : null;
-  const brandLink = (inner: string, label?: string) =>
+  // An explicit colour beside `inherit`, so Outlook does not paint the anchor link-blue.
+  const brandLink = (inner: string, ink: string, label?: string) =>
     calendar
-      ? `<a href="${calendar}"${label ? ` aria-label="${label}"` : ""} style="color:inherit;text-decoration:none;">${inner}</a>`
+      ? `<a href="${calendar}"${label ? ` aria-label="${label}"` : ""} style="color:${ink};color:inherit;text-decoration:none;">${inner}</a>`
       : inner;
   const preheaderHtml = renderPreheaderHtml(input.preheader);
   const bodyHtml = restyleRenderedButtons(input.bodyHtml ?? renderEmailBodyHtml(input.body ?? ""));
@@ -439,9 +440,9 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">',
     `<tr><td bgcolor="${L.bar}" class="em-bar" style="background:${L.bar};border-radius:12px 12px 0 0;border-bottom:4px solid ${L.gold};padding:16px 24px;">`,
     '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>',
-    `<td width="34" height="34" align="center" valign="middle" bgcolor="${L.gold}" style="background:${L.gold};border-radius:8px;width:34px;height:34px;font-family:Georgia,'Times New Roman',serif;font-size:21px;font-style:italic;font-weight:bold;line-height:34px;color:${L.markInk};">${brandLink("i", "IMSDA Events calendar")}</td>`,
+    `<td width="34" height="34" align="center" valign="middle" bgcolor="${L.gold}" style="background:${L.gold};border-radius:8px;width:34px;height:34px;font-family:Georgia,'Times New Roman',serif;font-size:21px;font-style:italic;font-weight:bold;line-height:34px;color:${L.markInk};">${brandLink("i", L.markInk, "IMSDA Events calendar")}</td>`,
     `<td style="padding-left:12px;font-family:${FONT};">`,
-    ...(calendar ? [`<a href="${calendar}" style="color:inherit;text-decoration:none;display:block;">`] : []),
+    ...(calendar ? [`<a href="${calendar}" style="color:${L.barInk};color:inherit;text-decoration:none;display:block;">`] : []),
     `<div class="em-bar-name" style="font-size:18px;line-height:20px;font-weight:bold;color:${L.barInk};">${escapeHtml(headerName)}</div>`,
     `<div class="em-bar-sub" style="font-size:12px;line-height:16px;color:${L.barSub};">${escapeHtml(EMAIL_HEADER_SUBLINE)}</div>`,
     ...(calendar ? ["</a>"] : []),

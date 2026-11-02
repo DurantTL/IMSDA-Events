@@ -1,3 +1,4 @@
+import { BackToEventsLink } from "@/components/back-to-events-link";
 import { BrandLink } from "@/components/brand-link";
 import { NewClubApplicationForm } from "@/components/new-club-application-form";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
@@ -21,6 +22,7 @@ export async function NewClubApplicationPage({ invite }: { invite?: { token: str
           <a className="text-button back-link" href="/clubs">Find a club</a>
         </div>
       </header>
+      <BackToEventsLink placement="page" />
       <section className="public-registration-hero public-manage-hero">
         <div>
           <p className="public-registration-eyebrow">Iowa-Missouri Conference</p>

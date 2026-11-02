@@ -61,9 +61,10 @@ describe("every IMSDA Events logo links to the calendar (#1496)", () => {
     const source = read("components/brand-link.tsx");
     expect(source).toContain('BRAND_LINK_HREF = "/calendar"');
     expect(source).toContain('BRAND_LINK_LABEL = "IMSDA Events calendar"');
+    expect(source).toContain("label = BRAND_LINK_LABEL");
     expect(source).toContain("GuardedLink");
     expect(source).toContain("<BrandMark");
-    expect(source).toMatch(/aria-label=\{BRAND_LINK_LABEL\}/);
+    expect(source).toMatch(/aria-label=\{label\}/);
     expect(read("components/brand-link.module.css")).toContain("min-height: 44px");
   });
 
@@ -107,6 +108,8 @@ const SIGN_IN_PAGES = [
   "app/(public)/account/two-step/page.tsx",
   "app/(public)/account/verify-email/page.tsx",
   "app/(public)/staff-invite/[token]/page.tsx",
+  // The club-invite acceptance page (/clubs/register/[token]) renders this shared page.
+  "components/new-club-application-page.tsx",
 ];
 
 describe("every sign-in page shows Back to events (#1496)", () => {

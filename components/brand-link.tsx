@@ -11,6 +11,8 @@ export const BRAND_LINK_LABEL = "IMSDA Events calendar";
 type BrandLinkProps = Omit<ComponentProps<typeof GuardedLink>, "href" | "aria-label" | "children"> & {
   /** Use `GuardedLink` (the staff app shell does). Without it a plain link is still guarded: see the note below. */
   guarded?: boolean;
+  /** The accessible name. When the link shows extra text, start it with that text (WCAG 2.5.3). */
+  label?: string;
   /** The smaller mark used where space is tight. */
   compact?: boolean;
   /** The "IMSDA Events" text beside the mark: true for the standard stacked wordmark, or your own text. */
@@ -27,11 +29,11 @@ type BrandLinkProps = Omit<ComponentProps<typeof GuardedLink>, "href" | "aria-la
  * It stays off by default because `GuardedLink` needs the app router, which a server-rendered page test lacks.
  * In the `/embed/*` iframe pass `target="_top"` so the calendar opens in the top window.
  */
-export function BrandLink({ compact = false, wordmark = false, guarded = false, className, ...rest }: BrandLinkProps) {
+export function BrandLink({ compact = false, wordmark = false, guarded = false, label = BRAND_LINK_LABEL, className, ...rest }: BrandLinkProps) {
   const classes = [styles.link, className ?? styles.standalone].join(" ");
   const Anchor = guarded ? GuardedLink : NavigationLink;
   return (
-    <Anchor {...rest} className={classes} href={BRAND_LINK_HREF} aria-label={BRAND_LINK_LABEL}>
+    <Anchor {...rest} className={classes} href={BRAND_LINK_HREF} aria-label={label}>
       <BrandMark compact={compact} />
       {wordmark === true ? <span><strong>IMSDA</strong><small>Events</small></span> : wordmark || null}
     </Anchor>

@@ -49,7 +49,7 @@ export function ClubPortalMastheadView({ model, role, formsHelpContact }: { mode
   return (
     <header className="club-masthead">
       <div className="club-masthead-inner">
-        <BrandLink className="club-masthead-brand" wordmark={<span><small>IMSDA Events</small><strong>Club portal</strong></span>} />
+        <BrandLink label="IMSDA Events Club portal, calendar" className="club-masthead-brand" wordmark={<span><small>IMSDA Events</small><strong>Club portal</strong></span>} />
         <div className={styles.account}>
           {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
           {model.identity && (

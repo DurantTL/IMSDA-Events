@@ -54,7 +54,7 @@ export function CoordinatorMastheadView({ model }: { model: CoordinatorMastheadM
   return (
     <header className="club-masthead coordinator-masthead">
       <div className="club-masthead-inner">
-        <BrandLink className="club-masthead-brand" wordmark={<span><small>IMSDA Events</small><strong>Club coordination</strong></span>} />
+        <BrandLink label="IMSDA Events Club coordination, calendar" className="club-masthead-brand" wordmark={<span><small>IMSDA Events</small><strong>Club coordination</strong></span>} />
         <div className="club-masthead-account">
           {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
           {model.identity && (
