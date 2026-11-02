@@ -4,6 +4,7 @@ import { DeleteClubFormLinkButton, RevokeClubFormLinkButton } from "@/components
 import type { PastYearGroup } from "@/modules/club-forms/past-years-domain";
 import type { ClubFormLinkRow } from "@/modules/club-forms/links";
 import type { ClubFormSubmissionListRow } from "@/modules/club-forms/submissions";
+import type { StatusWord } from "@/modules/registrations/status-words";
 import styles from "./club-forms-lists.module.css";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
@@ -22,7 +23,7 @@ const emailDeliveryLabel = {
   UNKNOWN: "",
 } as const;
 
-const linkStateLabel = { OPEN: "Waiting", USED: "Submitted", REVOKED: "Withdrawn", EXPIRED: "Expired" } as const;
+const linkStateLabel = { OPEN: "Draft", USED: "Submitted", REVOKED: "Cancelled", EXPIRED: "Expired" } as const satisfies Record<ClubFormLinkRow["state"], StatusWord | "Expired">;
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 

@@ -19,6 +19,8 @@
  *   member's open club-billed registrations waits on staff approval.
  */
 
+import type { StatusWord } from "@/modules/registrations/status-words";
+
 export const ACKNOWLEDGE_WINDOW_DAYS = 14;
 
 export function acknowledgeDueAt(initiatedAt: Date): Date {
@@ -37,13 +39,16 @@ export function isOpenTransfer(status: MemberTransferStatus) {
 }
 
 /** Staff's own labels: the full truth, for the conference queue only. */
-export const memberTransferStaffStatusLabels: Record<MemberTransferStatus, string> = {
+export const memberTransferStaffStatusLabels = {
   PENDING: "Pending approval",
-  UNMATCHED: "No match: needs staff",
+  UNMATCHED: "Pending approval",
   DECLINED: "Declined by the sending club",
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
-};
+} as const satisfies Record<MemberTransferStatus, StatusWord | "Declined by the sending club" | "Completed">;
+
+/** The line under "Pending approval" on the sending club's own queue (#1479): it is the club that has to answer. */
+export const SENDING_CLUB_NEEDS_ANSWER_LINE = "Your club needs to answer";
 
 export const memberTransferStaffReasonLabels: Record<MemberTransferStaffReason, string> = {
   NO_MATCH: "No active member of that club has exactly that name",

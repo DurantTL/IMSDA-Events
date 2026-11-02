@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useConfirm } from "@/components/use-confirm";
+import type { StatusWord } from "@/modules/registrations/status-words";
 
 type LinkRow = { id: string; recipientEmail: string; state: "OPEN" | "USED" | "REVOKED" | "EXPIRED"; expiresAt: string };
 
-const stateLabel = { OPEN: "Waiting", USED: "Submitted", REVOKED: "Withdrawn", EXPIRED: "Expired" } as const;
+const stateLabel = { OPEN: "Draft", USED: "Submitted", REVOKED: "Cancelled", EXPIRED: "Expired" } as const satisfies Record<LinkRow["state"], StatusWord | "Expired">;
 
 /** Confirm-for-the-year, send a parent link, and withdraw one (#611). No health value passes through here. */
 export function HealthRecordActions({
