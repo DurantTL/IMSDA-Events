@@ -243,7 +243,7 @@ function OutcomeForm({ busy, current, onSubmit }: { busy: boolean; current: "LOS
   const [reason, setReason] = useState("");
   // Unsaved work: a typed reason or a changed outcome, until saved (the row leaves the list once it is) (#1468).
   useUnsavedChangesGuard(reason.trim() !== "" || choice !== (current === "REPLACED" ? "RETURNED" : "WRITE_OFF"));
-  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onSubmit(choice === "WRITE_OFF" ? { action: "write_off", reason: reason.trim() } : { action: "correct", fate: choice, reason: reason.trim() }); }}>
+  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onSubmit(choice === "WRITE_OFF" ? { action: "write_off", reason: reason.trim() } : { action: "correct", fate: choice, reason: reason.trim() }).then((ok) => { if (ok) setReason(""); }); }}>
     <label>What happened <select value={choice} onChange={(event) => setChoice(event.target.value)}>
       <option value="RETURNED">{current === "LOST" ? "Found: it came back" : "It came back"}</option>
       <option value="LOST">Lost</option>
@@ -268,7 +268,8 @@ function ReviewForm({ busy, depositId, onReview, onRefund }: { busy: boolean; de
   return <form className="form-stack" onSubmit={(event) => {
     event.preventDefault();
     if (reason.trim().length < 3) return;
-    if (choice === "REFUND" && depositId) { const cents = Math.round(Number(amount) * 100); if (cents >= 1) void onRefund(depositId, cents, reason.trim()); } else void onReview(reason.trim());
+    const cleared = (ok: boolean) => { if (ok) { setReason(""); setAmount(""); } };
+    if (choice === "REFUND" && depositId) { const cents = Math.round(Number(amount) * 100); if (cents >= 1) void onRefund(depositId, cents, reason.trim()).then(cleared); } else void onReview(reason.trim()).then(cleared);
   }}>
     <label>What was done <select value={choice} onChange={(event) => setChoice(event.target.value)}>
       <option value="REVIEWED">Reviewed, nothing more to do</option>
@@ -284,7 +285,7 @@ function WaiveForm({ busy, onWaive }: { busy: boolean; onWaive: (reason: string)
   const [reason, setReason] = useState("");
   // Unsaved work: a typed waiver reason, until the charge is waived (#1468).
   useUnsavedChangesGuard(reason.trim() !== "");
-  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onWaive(reason.trim()); }}>
+  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onWaive(reason.trim()).then((ok) => { if (ok) setReason(""); }); }}>
     <label>Reason to waive <input value={reason} minLength={3} maxLength={500} required onChange={(event) => setReason(event.target.value)} /></label>
     <button className="secondary-button" type="submit" disabled={busy}>Waive</button>
   </form>;
@@ -330,7 +331,7 @@ function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
     </form> : null}
     {canConfigure && issue.targetKind === "UNIT" && !blocked ? <form className="form-stack" onSubmit={(event) => {
       event.preventDefault();
-      void post("facility", { action: "block", issueId: issue.id, block: { kind, reason: issue.title, firstNight, lastNight } }, "The room is blocked for those nights. Nobody already placed was moved.");
+      void post("facility", { action: "block", issueId: issue.id, block: { kind, reason: issue.title, firstNight, lastNight } }, "The room is blocked for those nights. Nobody already placed was moved.").then((ok) => { if (ok) { setFirstNight(""); setLastNight(""); } });
     }}>
       <label>Block the room <select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>{lodgingHoldKinds.map((value) => <option key={value} value={value}>{holdKindLabels[value]}</option>)}</select></label>
       <label>First night <input type="date" value={firstNight} required onChange={(event) => setFirstNight(event.target.value)} /></label>

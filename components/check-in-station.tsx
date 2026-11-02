@@ -332,7 +332,7 @@ function PaymentPanel({
   const payment = family.payment;
   // Unsaved work: a typed cash or check amount or check number, or an open card-note form holding an amount or receipt,
   // until it is recorded or cancelled. The lookup box and attendee ticks are not (#1468).
-  useUnsavedChangesGuard(amount.trim() !== "" || checkNumber.trim() !== "" || (squareOpen && (squareAmount.trim() !== "" || receipt.trim() !== "")));
+  useUnsavedChangesGuard(amount.trim() !== "" || (method === "CHECK" && checkNumber.trim() !== "") || (squareOpen && (squareAmount.trim() !== "" || receipt.trim() !== "")));
   // One key per submission attempt: kept across retries of the same attempt, replaced after a success or when the
   // form changes, so a lost response never records the same money twice.
   const attemptKey = useRef<string | null>(null);

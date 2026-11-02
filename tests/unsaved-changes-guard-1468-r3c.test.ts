@@ -34,6 +34,17 @@ describe("unsaved-changes helpers, round 3c (#1468)", () => {
     expect(formHasEdits(reset)).toBe(false);
   });
 
+  it("a select with no default option starts on its first option", () => {
+    const html = '<select name="s"><option value="1">1</option><option value="2">2</option></select>';
+    const el = form(html);
+    expect(formHasEdits(el)).toBe(false);
+    const select = el.elements.namedItem("s") as HTMLSelectElement;
+    select.value = "2";
+    expect(formHasEdits(el)).toBe(true);
+    select.value = "1";
+    expect(formHasEdits(el)).toBe(false);
+  });
+
   it("a return sheet is dirty once an item has an outcome, typed text or a scanned code", () => {
     const blank = { outcome: "" as const, quantity: "", note: "", evidenceRef: "", replacement: "" };
     expect(returnSheetDirty({}, [])).toBe(false);

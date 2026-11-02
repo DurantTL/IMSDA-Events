@@ -191,7 +191,10 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
           : []));
       writeQueue(scope, remaining); setQueue(remaining);
       setResult(response);
-      setItems(response.items.filter((item) => item.status === "REJECTED").map((item) => ({ code: item.code, quantity: request.items[item.index]?.quantity ?? 1 })));
+      const refusedItems = response.items.filter((item) => item.status === "REJECTED").map((item) => ({ code: item.code, quantity: request.items[item.index]?.quantity ?? 1 }));
+      setItems(refusedItems);
+      // Everything went through: the sheet is done, so its purpose, room and expected-back time go back to their defaults.
+      if (refusedItems.length === 0) { setPurpose("Issued at check-in"); setAssignmentId(""); setExpectedReturn(""); }
       router.refresh();
     } catch (cause) {
       const failure = cause as Error & { server?: boolean; details?: { items?: ItemResult[] } };

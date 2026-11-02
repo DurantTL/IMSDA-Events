@@ -10,7 +10,12 @@ export function formHasEdits(form: HTMLFormElement): boolean {
       return element.type === "checkbox" || element.type === "radio" ? element.checked !== element.defaultChecked : element.value !== element.defaultValue;
     }
     if (element instanceof HTMLTextAreaElement) return element.value !== element.defaultValue;
-    if (element instanceof HTMLSelectElement) return Array.from(element.options).some((option) => option.selected !== option.defaultSelected);
+    if (element instanceof HTMLSelectElement) {
+      const options = Array.from(element.options);
+      // A single select with no option marked as default starts on its first option, as the browser picks it.
+      const implicitFirst = !element.multiple && !options.some((option) => option.defaultSelected);
+      return options.some((option, index) => option.selected !== (option.defaultSelected || (implicitFirst && index === 0)));
+    }
     return false;
   });
 }
