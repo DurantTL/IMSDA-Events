@@ -11,3 +11,51 @@
 .homeFooterLinks ul { display: flex; flex-wrap: wrap; gap: 0 18px; margin: 0; padding: 0; list-style: none; }
 .homeFooterLinks a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; text-decoration: underline; }
 .homeAnnouncementLink:focus-visible, .homeFooterLinks a:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
+@font-face { font-family: AdventSansLogo; src: url('/brand/AdventSans-Logo.otf') format('opentype'); font-display: swap; }
+.page { --home-navy: var(--imsda-navy); --home-green: rgb(85 115 52); --home-gold: var(--imsda-gold); background: var(--paper); }
+.page :global(.public-registration-header) { background: var(--card); border-bottom: 1px solid var(--line); }
+.page :global(.public-registration-header-inner) { max-width: 1240px; gap: 20px; }
+.page :global(.public-registration-brand) { gap: 10px; color: var(--home-navy); }
+.page :global(.public-registration-brand) img { width: 54px; height: 54px; object-fit: contain; }
+.page :global(.public-registration-brand) strong { font-family: AdventSansLogo, 'Noto Sans', sans-serif; font-size: 1.65rem; letter-spacing: 0; line-height: 1.1; }
+.page :global(.public-registration-brand) small { color: var(--home-green); font-size: .75rem; letter-spacing: .04em; }
+.primaryNav { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.primaryNav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; color: var(--home-navy); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.primaryNav a:hover, .primaryNav a:focus-visible { text-decoration: underline; }
+.page :global(.public-header-links) { flex-shrink: 0; }
+.page :global(.calendar-layout) { width: min(1180px, calc(100% - 48px)); margin-top: 28px; gap: 36px; }
+.page .hero { max-width: 1180px; min-height: 300px; margin: 24px auto 0; padding: 38px 44px; background: var(--home-navy); border-radius: var(--radius-modal); }
+.page .hero :global(.season-band-text) { gap: 12px; max-width: 640px; }
+.page .hero h1 { max-width: 12ch; font-size: clamp(2.3rem, 4vw, 3.7rem); line-height: 1.05; letter-spacing: -.025em; }
+.page .hero :global(.season-band-line) { max-width: 48ch; font-size: 1.08rem; }
+.heroActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.heroActions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 18px; border-radius: var(--field-radius); font-weight: 800; text-decoration: none; }
+.heroActions :global(.primary-button) { background: var(--home-gold); color: var(--home-navy); }
+.heroActions > a:last-child { border: 1px solid var(--card); color: var(--card); }
+.page .hero :global(.season-closing) { align-self: center; border-left-color: var(--home-green); background: var(--card); color: var(--home-navy); }
+.page .hero :global(.season-closing) h2 { color: var(--home-green); }
+.page .hero :global(.season-closing-register) { background: var(--home-navy); }
+.kicker { margin: 0 0 5px; color: var(--home-green); font-size: .875rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.sectionHeading { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.sectionHeading h2, .places h2 { margin: 0; color: var(--home-navy); font-size: clamp(1.5rem, 2.3vw, 2rem); line-height: 1.2; }
+.sectionHeading > a { display: inline-flex; align-items: center; min-height: 44px; gap: 4px; color: var(--home-navy); font-weight: 800; }
+.featured :global(.event-featured-list) { gap: 18px; }
+.featured :global(.event-photo-card-featured) { border-top-color: var(--home-gold); }
+.empty { margin: 0; padding: 24px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); }
+.empty a { color: var(--home-navy); font-weight: 800; }
+.page .places :global(.home-places-list) { gap: 16px; }
+.page .places :global(.home-place) { border-left-color: var(--home-green); box-shadow: var(--shadow); }
+.page .places :global(.home-place-icon) { background: var(--home-navy); }
+.page .season { border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); padding: 18px 22px; }
+.seasonDetails summary { display: inline-flex; align-items: center; min-height: 44px; color: var(--home-navy); cursor: pointer; font-weight: 800; }
+.seasonDetails :global(.season-ribbon) { margin-top: 8px; }
+.page :global(.home-links) { border-top: 0; }
+.page :global(.home-links) ul { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.page :global(.home-links) li { border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); }
+.page :global(.home-links) a { height: 100%; min-height: 76px; padding: 16px; }
+.page :global(.home-footer) { gap: 10px; border-top-color: var(--home-navy); padding: 24px 0 36px; }
+.page :global(.home-footer) a { color: var(--home-navy); }
+@media (max-width: 1000px) { .primaryNav { gap: 0; } .page :global(.public-registration-header-inner) { flex-wrap: wrap; } }
+@media (max-width: 760px) { .page .hero { min-height: 0; margin: 12px; padding: 26px 22px; } .page .hero h1 { font-size: 2.35rem; } .page :global(.calendar-layout) { width: auto; margin: 24px 12px 40px; gap: 28px; } .page :global(.home-links) ul { grid-template-columns: 1fr; } .primaryNav { order: 3; width: 100%; overflow-x: auto; } .page :global(.public-registration-brand) img { width: 46px; height: 46px; } .page :global(.public-registration-brand) strong { font-size: 1.4rem; } }
+@media (max-width: 390px) { .page :global(.public-registration-brand) small { font-size: .65rem; } .heroActions a { width: 100%; } }

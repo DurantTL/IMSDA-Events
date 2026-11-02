@@ -179,6 +179,17 @@ describe("featured events on the homepage", () => {
     expect(html).toContain("Fictitious flagged");
     expect(html).not.toContain("outside-the-calendar-window");
   });
+
+  it("shows upcoming public events when none are featured, and an empty state when none are scheduled", async () => {
+    mocks.listPublicCalendarItems.mockResolvedValue([calendarItem("upcoming")]);
+    const html = await render(defaultHubContent());
+    expect(html).toContain("Fictitious upcoming");
+    expect(html).toContain('href="/events/upcoming"');
+    mocks.listPublicCalendarItems.mockResolvedValue([]);
+    const empty = await render(defaultHubContent());
+    expect(empty).toContain("No events are scheduled yet.");
+    expect(empty).toContain('href="/calendar"');
+  });
 });
 
 describe("pieces shared by the public pages", () => {

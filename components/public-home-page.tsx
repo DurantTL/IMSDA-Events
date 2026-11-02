@@ -28,8 +28,7 @@ const fullYearHref = "/calendar?view=year";
  * (#1009). The real homepage passes the published content and the staff preview passes the draft, so both draw through
  * this one component. Top to bottom: notices, the season band, the sections in the order staff arranged (by default
  * featured events (#1218), announcements, the six-month ribbon on wide screens and "Find your place"), the next three
- * months (phones), then the account links and the footer. Every date comes from the calendar and events. With nothing
- * curated the content is `defaultHubContent()` and the page is what it was before staff could edit it.
+ * months (phones), then the account links and the footer. Every date comes from the calendar and events.
  */
 export async function PublicHomePage({ content, preview = false }: { content: HubContent; preview?: boolean }) {
   // The staff preview sits inside the workspace's own <main>, so it draws a <div> there (one main landmark per page).
@@ -47,6 +46,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
   let featured = featuredItemsFor(items, curatedRows).slice(0, homeFeaturedLimit);
   // When none of the chosen events has a card on the public calendar, the homepage uses the events flagged featured instead.
   if (featured.length === 0) featured = featuredItemsFor(items, await listFeaturedEventRows(today)).slice(0, homeFeaturedLimit);
+  if (featured.length === 0) featured = items.filter((item) => item.kind === "EVENT" && item.href && item.status !== "CANCELLED").slice(0, homeFeaturedLimit);
   const cardImages = await listEventCardImages(featured.flatMap((item) => {
     const slug = eventSlugFromHref(item.href);
     return slug ? [slug] : [];
@@ -65,14 +65,14 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
   const seasonVisible = sections.some((section) => section.key === "season-ribbon" && section.visible);
 
   const renderers: Record<Exclude<SectionKey, "closing-soon">, (heading: string) => React.ReactNode> = {
-    featured: (heading) => featured.length > 0 && (
-      <section aria-labelledby="home-featured-heading" className="event-featured" key="featured">
-        <h2 id="home-featured-heading">{heading}</h2>
-        <ul aria-labelledby="home-featured-heading" className="event-featured-list">
+    featured: (heading) => (
+      <section aria-labelledby="home-featured-heading" className={`event-featured ${styles.featured}`} key="featured">
+        <div className={styles.sectionHeading}><div><p className={styles.kicker}>Gather together</p><h2 id="home-featured-heading">{heading}</h2></div><Link href="/events">View all events <ChevronRight size={18} aria-hidden="true" /></Link></div>
+        {featured.length > 0 ? <ul aria-labelledby="home-featured-heading" className="event-featured-list">
           {featured.map((item) => (
             <EventPhotoCard image={eventCardImage(item, cardImages)} item={item} key={item.key} transitionName={featuredNames.get(item.key)} variant="featured" />
           ))}
-        </ul>
+        </ul> : <p className={styles.empty}>No events are scheduled yet. <Link href="/calendar">Explore the calendar</Link> for other conference dates.</p>}
       </section>
     ),
     announcements: (heading) => announcements.length > 0 && (
@@ -90,12 +90,12 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
       </section>
     ),
     "season-ribbon": (heading) => (
-      <section aria-labelledby="home-season-heading" className="home-season home-season-ribbon" key="season-ribbon">
+      <section aria-labelledby="home-season-heading" className={`home-season home-season-ribbon ${styles.season}`} key="season-ribbon">
         <div className="home-season-head">
           <h2 id="home-season-heading">{heading}</h2>
           <Link className="event-photo-see-all" href={fullYearHref}>See the full year <ChevronRight size={16} aria-hidden="true" /></Link>
         </div>
-        <div className="season-ribbon">
+        <details className={styles.seasonDetails}><summary>Explore the six-month schedule</summary><div className="season-ribbon">
           <div aria-hidden="true" className="season-months-row">
             <span className="season-lane-spacer" />
             <span className="season-months-track">
@@ -128,15 +128,15 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
               </ul>
             </div>
           ))}
-        </div>
+        </div></details>
         <p className="home-more">
           <Link className="home-events-link" href="/events">See all events open for registration</Link>
         </p>
       </section>
     ),
     "find-your-place": (heading) => (
-      <section aria-labelledby="home-places-heading" className="home-places" key="find-your-place">
-        <h2 id="home-places-heading">{heading}</h2>
+      <section aria-labelledby="home-places-heading" className={`home-places ${styles.places}`} key="find-your-place">
+        <div><p className={styles.kicker}>Connect & serve</p><h2 id="home-places-heading">{heading}</h2></div>
         <ul className="home-places-list">
           {tiles.map((tile) => (
             <li key={tile.position}>
@@ -158,10 +158,11 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
   };
 
   return (
-    <Wrapper className="public-registration-page public-calendar-page public-home-page">
+    <Wrapper className={`public-registration-page public-calendar-page public-home-page ${styles.page}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
+          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" publicBrand wordmark />
+          <nav aria-label="Explore" className={styles.primaryNav}><Link href="/events">Events</Link><Link href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
           <div className="public-header-links"><PublicHeaderSessionLinks navLinks={content.navLinks} /></div>
         </div>
       </header>
@@ -169,11 +170,12 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
       {!preview && <PublicMetricsBeacon />}
       <SiteNoticesView notices={activeNotices(content, today)} />
 
-      <section className="public-registration-hero calendar-hero public-home-banner season-band">
+      <section className={`public-registration-hero calendar-hero public-home-banner season-band ${styles.hero}`}>
         <div className="season-band-text">
-          <p className="public-registration-eyebrow">Iowa-Missouri Conference</p>
-          <h1>The season ahead</h1>
-          <p className="season-band-line">Camps, clubs and conference dates for the next six months.</p>
+          <p className="public-registration-eyebrow">Iowa–Missouri Conference</p>
+          <h1>Find your next gathering.</h1>
+          <p className="season-band-line">Discover events, connect with a club, and find your place in our conference community.</p>
+          <div className={styles.heroActions}><Link className="primary-button" href="/events">Explore events <ChevronRight size={18} aria-hidden="true" /></Link><a href="/clubs">Find a club <ChevronRight size={18} aria-hidden="true" /></a></div>
         </div>
         {closing && closingSection.visible && (
           <aside aria-labelledby="season-closing-heading" className="season-closing">
