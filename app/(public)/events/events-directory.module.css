@@ -1,5 +1,11 @@
-/* Events list search and filters (#106): a plain GET form, one column on phones. */
-.eventsDirectoryForm { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 14px 0 6px; min-width: 0; }
+.directory :global(.public-registration-hero) { max-width: 1180px; margin: 24px auto 0; padding: 42px 44px; border-radius: var(--radius-modal); background: var(--imsda-navy); }
+.directory :global(.public-registration-hero) h1 { font-size: clamp(2.3rem, 4vw, 3.5rem); letter-spacing: -.025em; line-height: 1.08; }
+.directory :global(.public-header-links) { flex: 1 1 280px; }
+.heroDescription { max-width: 48ch; margin: 12px 0 0; color: #fff; font-size: 1.08rem; }
+.discovery { display: grid; gap: 14px; padding: 20px 24px; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); }
+.directory :global(.open-events-filter) { gap: 10px; }
+.directory :global(.open-events-filter) a { display: inline-flex; min-height: 44px; align-items: center; padding: 8px 18px; border-radius: 999px; font-weight: 700; }
+.eventsDirectoryForm { display: grid; grid-template-columns: 1fr; gap: 12px; min-width: 0; }
 .eventsDirectoryField { display: grid; gap: 4px; min-width: 0; }
 .eventsDirectoryField label { color: var(--ink); font-size: 1rem; font-weight: 700; }
 .eventsDirectoryField input, .eventsDirectoryField select {
@@ -11,10 +17,34 @@
 /* The search box is the shared .search-field wrapper: it draws the border and the one ring, so the input inside draws none. */
 .eventsDirectoryField :global(.search-field) input { border: 0; border-radius: 0; background: transparent; padding: 0; }
 .eventsDirectoryField :global(.search-field) input:focus-visible { outline: 0; }
+.eventsDirectoryMore { min-width: 0; }
+.eventsDirectoryMore summary { display: inline-flex; min-height: 44px; align-items: center; color: var(--imsda-navy); font-size: 1rem; font-weight: 700; cursor: pointer; }
+.eventsDirectoryMore summary:focus-visible { outline: 3px solid var(--imsda-navy); outline-offset: 2px; }
+.eventsDirectoryFields { display: grid; gap: 12px; padding: 10px 0 0; }
 .eventsDirectoryActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .eventsDirectoryActions :is(button, a) { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; font-size: 1rem; text-decoration: none; }
-.eventsDirectoryCount { margin: 4px 0 0; color: var(--muted); font-size: 1rem; font-weight: 700; }
+.resultsHeading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; margin-bottom: 16px; }
+.resultsHeading h2 { margin: 0; color: var(--imsda-navy); font-size: clamp(1.5rem, 2.3vw, 2rem); }
+.eventsDirectoryCount { margin: 0; color: var(--muted); font-size: 1rem; font-weight: 700; }
+.directory :global(.open-events-list) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 16px; }
+.directory :global(.open-events-card) { align-content: start; gap: 10px; min-width: 0; padding: 22px; border-left-color: var(--home-green); box-shadow: var(--shadow); }
+.directory :global(.open-events-card:has(.open-events-featured)) { border-left-color: var(--imsda-gold); }
+.directory :global(.open-events-card) h3 { font-size: 1.3rem; line-height: 1.25; }
+.directory :global(.open-events-card) h3 a { overflow-wrap: anywhere; }
+.directory :global(.open-events-card) :global(.calendar-agenda-meta) { display: grid; gap: 6px; }
+.directory :global(.open-events-card) :global(.calendar-agenda-meta) span { display: flex; align-items: flex-start; gap: 6px; }
+.directory :global(.open-events-card) :global(.calendar-agenda-meta) svg { flex: none; margin-top: 3px; }
+.directory :global(.calendar-empty) { padding: 36px 24px; }
 @media (min-width: 761px) {
-  .eventsDirectoryForm { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); align-items: end; }
-  .eventsDirectorySearch { grid-column: 1 / -1; }
+  .eventsDirectoryForm { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+  .eventsDirectoryMore { grid-column: 1 / -1; }
+  .eventsDirectoryActions { grid-column: 2; grid-row: 1; }
+  .eventsDirectoryFields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .directory :global(.public-registration-hero) { margin: 12px; padding: 26px 22px; }
+  .directory :global(.public-header-links) { flex-basis: 100%; flex-wrap: nowrap; justify-content: flex-start; }
+  .directory :global(.public-header-nav) { flex: 1 1 auto; overflow-x: auto; }
+  .directory :global(.public-header-nav) ul { width: max-content; flex-wrap: nowrap; }
+  .discovery { padding: 18px; }
 }

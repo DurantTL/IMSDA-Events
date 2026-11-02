@@ -170,6 +170,8 @@ describe("the page (#106)", () => {
     expect(html).toContain('<option value="" selected="">Any</option>');
     expect(html).toContain('<option value="Hill Lodge">Hill Lodge</option>');
     expect(html).toContain("Show events");
+    expect(html).toContain("<summary>More filters</summary>");
+    expect(html).toContain('aria-label="Explore"');
     expect(html).not.toContain("Clear filters");
     expect(html).toContain("2 events");
     expect(html).toContain(`class="${styles.eventsDirectoryCount}" role="status"`);
@@ -202,10 +204,19 @@ describe("the page (#106)", () => {
     expect(html).not.toContain("Fictitious old news.");
   });
 
+  it("shows the published footer links and contact line", async () => {
+    mocks.hubContent.mockResolvedValue({ ...defaultHubContent(), footer: { verse: "", contactLines: ["Iowa-Missouri Conference"], links: [{ label: "Contact", href: "/contact" }] } });
+    const html = await render();
+    expect(html).toContain('aria-label="Footer links"');
+    expect(html).toContain("Iowa-Missouri Conference");
+    expect(html).toContain('href="/contact"');
+  });
+
   it("reflects URL values, filters, and counts in words", async () => {
     const html = await render({ q: "camp", from: "2026-11-01", category: "Camp" });
     expect(html).toContain('value="camp"');
     expect(html).toContain('value="2026-11-01"');
+    expect(html).toMatch(/<details[^>]* open="">/);
     expect(html).toContain('<option value="Camp" selected="">Camp</option>');
     expect(html).toContain("1 event<");
     expect(html).toContain("Camp Meeting");

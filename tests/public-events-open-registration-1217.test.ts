@@ -129,7 +129,7 @@ describe("the /events page (#1217)", () => {
     const html = await render();
     expect(html.match(/<h1[ >]/g)).toHaveLength(1);
     expect(html).toContain("Open for registration</h1>");
-    expect(html).toMatch(/<h2 class="sr-only"[^>]*>Events open for registration<\/h2>/);
+    expect(html).toMatch(/<h2 id="open-events-heading">Events open for registration<\/h2>/);
     expect(html).toContain('<a href="/events/spring-camporee">Fictitious Spring Camporee</a>');
     expect(html).toContain('<a href="/events/family-day">Fictitious Family Day</a>');
     expect(html).not.toContain("closed-camp");
@@ -180,7 +180,7 @@ describe("the /events page (#1217)", () => {
       const html = await render(value);
       expect(html).toContain("No events are open for registration right now");
       expect(html).toContain('href="/calendar"');
-      expect(html).not.toContain("<ul");
+      expect(html).not.toContain('class="calendar-agenda-list open-events-list"');
     }
     expect(await render("clubs")).toContain("for clubs");
     expect(await render("everyone")).toContain("for everyone");
