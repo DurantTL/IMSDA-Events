@@ -7,6 +7,7 @@ import { Ban, Save, Send, UserPlus } from "lucide-react";
 import { savedMessage } from "@/components/form-message";
 import { INSTRUCTOR_EDIT_GRACE_DAYS } from "@/modules/honors/instructor-domain";
 import { classChangeEmailLabels } from "@/modules/honors/class-change-domain";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type ClassOption = { id: string; label: string };
 type Instructor = {
@@ -50,6 +51,16 @@ export function HonorsInstructorsWorkspace({
   const [draft, setDraft] = useState({ firstName: "", lastName: "", email: "", offeringIds: [] as string[] });
   const [edits, setEdits] = useState<Record<string, string[]>>({});
   const base = `/api/events/${encodeURIComponent(eventId)}/honors/instructors`;
+  // Unsaved: a started invite (any name, email or class), or a class pick on an instructor that differs from the saved
+  // classes. An invite or a class save clears its own part; a pick put back is clean (#1468).
+  const classesChanged = (instructor: Instructor) => {
+    const picked = edits[instructor.id];
+    return picked !== undefined && (picked.length !== instructor.offeringIds.length || picked.some((id) => !instructor.offeringIds.includes(id)));
+  };
+  useUnsavedChangesGuard(
+    draft.firstName.trim() !== "" || draft.lastName.trim() !== "" || draft.email.trim() !== "" || draft.offeringIds.length > 0
+    || instructors.some(classesChanged),
+  );
 
   async function refresh() {
     const response = await fetch(base, { cache: "no-store" });

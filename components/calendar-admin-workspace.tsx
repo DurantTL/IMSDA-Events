@@ -42,6 +42,9 @@ import { describeRepeat, previewOccurrences, weekdayLabels, type RepeatRule } fr
 import type { CalendarAdminEntry, CalendarAdminEvent } from "@/modules/calendar/repository";
 import { savedMessage } from "@/components/form-message";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import type { FormEditOptions } from "@/components/form-has-edits";
 
 type ApiResponse = {
   entries?: CalendarAdminEntry[];
@@ -177,6 +180,10 @@ export function CalendarAdminWorkspace({
   const [bulkCategory, setBulkCategory] = useState("");
   const [bulkTarget, setBulkTarget] = useState<BulkAction | null>(null);
   const [loadingEntries, setLoadingEntries] = useState(false);
+  // A category typed for a published event, not saved yet. Saving puts the saved category back in the box (the form is
+  // keyed by it), and a category changed back is clean (#1468).
+  const categoryEdits = useEditedForms();
+  useUnsavedChangesGuard(categoryEdits.dirty);
   const total = entryList.total;
   const slice = sliceFromCount(entries, entryList.page, total, entryList.pageSize);
   // The address says which page, filters and order the database is asked for; `queryKey` is that question as text.
@@ -640,10 +647,13 @@ export function CalendarAdminWorkspace({
                     </div>
                     <form
                       className="calendar-admin-actions"
+                      key={event.calendarCategory}
+                      onChange={categoryEdits.track(`category-${event.id}`)}
+                      ref={categoryEdits.gone(`category-${event.id}`)}
                       onSubmit={(submitEvent) => {
                         submitEvent.preventDefault();
                         const category = String(new FormData(submitEvent.currentTarget).get("category") ?? "");
-                        void call(`/api/admin/calendar/events/${encodeURIComponent(event.id)}`, "PATCH", { calendarCategory: category }, savedMessage());
+                        void call(`/api/admin/calendar/events/${encodeURIComponent(event.id)}`, "PATCH", { calendarCategory: category }, savedMessage()).then((ok) => { if (ok) categoryEdits.clear(`category-${event.id}`); });
                       }}
                     >
                       <label>
@@ -734,6 +744,9 @@ type EntryBody = {
  * dialog (#869). It owns the repeat control's state; `onSubmit` returns whether
  * the save worked, and a new entry's form clears itself when it did.
  */
+/** The start date and type are compared from state; the repeat editor's fields are controlled, so the rule is compared instead (#1468). */
+const entryFormTracking: FormEditOptions = { ignore: ["startsOn", "entryType"], ignoreWithin: ".calendar-repeat-editor" };
+
 function EntryForm({
   entry = null,
   error = "",
@@ -760,6 +773,18 @@ function EntryForm({
   const [skipped, setSkipped] = useState<string[]>(entry?.repeatExceptions ?? []);
   const [entryType, setEntryType] = useState<EntryBody["entryType"]>(entry?.entryType ?? "STANDARD");
   const editing = entry !== null;
+  // The entry form is unsaved when a typed field, or a controlled one (start date, type, repeat rule, skipped dates), differs
+  // from what the form opened with (a blank form, or the entry). The repeat is compared as the rule it would save, so repeat
+  // fields hidden under "Never" do not count. A new entry's save clears it; the edit dialog leaves the page on save or Cancel (#1468).
+  const edits = useEditedForms();
+  const initial = useMemo(() => {
+    const draft = entry ? repeatToDraft(entry.repeat) : noRepeat;
+    return { startsOn: entry?.startsOn ?? "", type: entry?.entryType ?? "STANDARD", rule: JSON.stringify(draftToRepeat(draft, entry?.startsOn ?? "")), skipped: [...(entry?.repeatExceptions ?? [])].sort().join("|") };
+  }, [entry]);
+  const rule = draftToRepeat(repeat, startsOn);
+  const controlledEdited = startsOn !== initial.startsOn || entryType !== initial.type || JSON.stringify(rule) !== initial.rule
+    || (rule !== null && [...skipped].sort().join("|") !== initial.skipped);
+  useUnsavedChangesGuard(edits.dirty || controlledEdited);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -787,11 +812,12 @@ function EntryForm({
       setSkipped([]);
       setEntryType("STANDARD");
       formElement.reset();
+      edits.clear("entry");
     }
   }
 
   return (
-    <form className={editing ? "form-stack calendar-entry-form" : "panel form-stack"} onSubmit={submit}>
+    <form className={editing ? "form-stack calendar-entry-form" : "panel form-stack"} onChange={edits.track("entry", entryFormTracking)} onSubmit={submit}>
       {heading && (
         <div className="section-heading">
           <div>

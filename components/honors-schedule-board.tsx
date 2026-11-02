@@ -6,6 +6,8 @@ import Link from "next/link";
 import { savedMessage } from "@/components/form-message";
 import { GripVertical, MoveRight, Pencil, Plus, Save, Trash2, TriangleAlert, Users, X } from "lucide-react";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   ALL_SESSIONS_COLUMN,
   type BoardCard,
@@ -39,6 +41,10 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
   const [error, setError] = useState("");
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const requestRef = useRef(0);
+  // The add-room form of each site and the open edit-room form are unsaved when a field is off what it opened with (a blank
+  // name and 20 seats, or the room's own). Adding or saving a room clears it; closing the edit form takes it off the page (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
   const base = `/api/events/${encodeURIComponent(eventId)}/honors`;
 
   const sections = useMemo(() => buildBoardSections(board), [board]);
@@ -140,6 +146,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
     });
     if (ok) {
       form.reset();
+      edits.clear(`add-room-${section.siteId ?? "none"}`);
       setNotice("Room added.");
     }
   }
@@ -264,7 +271,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
                       <Trash2 aria-hidden="true" size={13} /> Remove
                     </button>
                     {editingRoomId === room.id && (
-                      <form className="honor-inline-form schedule-room-form" key={`${room.id}-${room.capacity}-${room.name}`} onSubmit={(event) => saveRoom(event, room)}>
+                      <form className="honor-inline-form schedule-room-form" key={`${room.id}-${room.capacity}-${room.name}`} onChange={edits.track("edit-room")} onSubmit={(event) => saveRoom(event, room)} ref={edits.gone("edit-room")}>
                         <label>Room name<input defaultValue={room.name} maxLength={80} name="name" required /></label>
                         <label>Seats<input defaultValue={room.capacity} max={10000} min={1} name="capacity" required type="number" /></label>
                         <button className="primary-button" disabled={busy} type="submit"><Save aria-hidden="true" size={14} /> Save room</button>
@@ -273,7 +280,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
                   </li>
                 ))}
               </ul>
-              <form className="honor-inline-form schedule-room-form" onSubmit={(event) => addRoom(event, section)}>
+              <form className="honor-inline-form schedule-room-form" onChange={edits.track(`add-room-${siteKey}`)} onSubmit={(event) => addRoom(event, section)}>
                 <label>Room name<input maxLength={80} name="name" placeholder="e.g. Fellowship hall" required /></label>
                 <label>Seats<input defaultValue={20} max={10000} min={1} name="capacity" required type="number" /></label>
                 <button className="secondary-button" disabled={busy} type="submit"><Plus aria-hidden="true" size={14} /> Add room</button>

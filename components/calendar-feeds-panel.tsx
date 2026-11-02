@@ -11,6 +11,8 @@ import type { CalendarAdminEntry } from "@/modules/calendar/repository";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { savedMessage } from "@/components/form-message";
 import { EmptyState } from "@/components/empty-state";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type FeedResponse = {
   feeds?: CalendarAdminFeed[];
@@ -58,6 +60,10 @@ export function CalendarFeedsPanel({
   const [notice, setNotice] = useState("");
   const [preview, setPreview] = useState<{ feedId: string; data: FeedPreview } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<CalendarAdminFeed | null>(null);
+  // The feed form is unsaved when a field differs from what it opened with (a blank form, or the feed being edited; a typed
+  // address counts). It leaves the page, and so clears, on a save that closes an edit, Cancel, or choosing another feed (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
 
   async function call(url: string, method: string, body: unknown) {
     setBusy(true);
@@ -103,6 +109,7 @@ export function CalendarFeedsPanel({
       setNotice(editing ? savedMessage() : "Added. Preview it, then import.");
       setEditing(null);
       formElement.reset();
+      edits.clear("feed");
     }
   }
 
@@ -139,7 +146,7 @@ export function CalendarFeedsPanel({
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && !removeTarget && <div className="inline-notice error" role="alert">{error}</div>}
 
-      <form className="panel form-stack" key={editing?.id ?? "new"} onSubmit={save}>
+      <form className="panel form-stack" key={editing?.id ?? "new"} onChange={edits.track("feed")} onSubmit={save} ref={edits.gone("feed")}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">{editing ? "Edit imported calendar" : "Import a calendar"}</p>

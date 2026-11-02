@@ -10,6 +10,8 @@ import { Award, Pencil, Plus, Save, X } from "lucide-react";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import type { HonorRecord } from "@/modules/honors/repository";
 import { EmptyState } from "@/components/empty-state";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 /** Sorts from the headers, in the address (#1458); the catalog stays in the order the server gave until a column is chosen. */
 const HONOR_CATALOG_SORT = {
@@ -28,6 +30,10 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const search = useClientSearch();
+  // The honor form is unsaved when a field differs from what it opened with (a blank form, or the honor being edited).
+  // It leaves the page, and so clears, on a save that closes an edit, Cancel, or choosing another honor to edit (#1468).
+  const edits = useEditedForms();
+  useUnsavedChangesGuard(edits.dirty);
 
   const query = search.term.trim().toLowerCase();
   const visible = query
@@ -64,6 +70,7 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
       setNotice(editing ? "Honor updated." : "Honor added to the catalog.");
       setEditing(null);
       formElement.reset();
+      edits.clear("honor");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The honor could not be saved.");
     } finally {
@@ -100,7 +107,7 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
-      <form className="panel form-stack" key={editing?.id ?? "new"} onSubmit={save}>
+      <form className="panel form-stack" key={editing?.id ?? "new"} onChange={edits.track("honor")} onSubmit={save} ref={edits.gone("honor")}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">{editing ? "Edit honor" : "New honor"}</p>
