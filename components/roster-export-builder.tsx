@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useConfirm } from "@/components/use-confirm";
 import {
   DEFAULT_ROSTER_EXPORT_COLUMNS,
@@ -48,6 +49,8 @@ export function RosterExportBuilder({
   const [formats, setFormats] = useState(initialFormats);
   const [formatName, setFormatName] = useState("");
   const [busy, setBusy] = useState(false);
+  // Only the format being named is saved work; column picks, headers and the preview just shape a download (#1468).
+  useUnsavedChangesGuard(formatName.trim() !== "", "You typed a format name but have not saved it. Leave this page and discard it?");
   const { confirm, confirmDialog } = useConfirm();
   const saveBlocked = !formatName.trim()
     ? "Type a name for the format to save it."

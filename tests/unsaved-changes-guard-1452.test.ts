@@ -65,7 +65,6 @@ const allowlist: Record<string, string> = {
   "components/health-import-workspace.tsx": "one field",
   "components/health-privacy-acknowledgment.tsx": "action button only, no typed fields",
   "components/health-record-actions.tsx": "action button only, no typed fields",
-  "components/health-record-form.tsx": "needs guard: follow-up #1468",
   "components/homepage-ministries-editor.tsx": "needs guard: follow-up #1468",
   "components/honor-catalog-workspace.tsx": "needs guard: follow-up #1468",
   "components/honor-seat-override.tsx": "needs guard: follow-up #1468",
@@ -110,7 +109,6 @@ const allowlist: Record<string, string> = {
   "components/registration-amendment-editor.tsx": "needs guard: follow-up #1468",
   "components/registration-form-notifications-panel.tsx": "needs guard: follow-up #1468",
   "components/registration-notes-tags-panel.tsx": "needs guard: follow-up #1468",
-  "components/roster-export-builder.tsx": "needs guard: follow-up #1468",
   "components/roster-unlock-form.tsx": "sign-in",
   "components/scholarship-fund-workspace.tsx": "needs guard: follow-up #1468",
   "components/sign-in-code-form.tsx": "sign-in",
@@ -198,6 +196,8 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
       "components/club-supply-stock-workspace.tsx",
       "components/club-team-workspace.tsx",
       "components/new-club-applications-queue.tsx",
+      "components/health-record-form.tsx",
+      "components/roster-export-builder.tsx",
     ]) {
       expect(guarded(readFileSync(join(root, path), "utf8")), path).toBe(true);
     }

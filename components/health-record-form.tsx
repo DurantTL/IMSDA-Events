@@ -7,6 +7,7 @@ import { FORM_LIMITS, healthFieldLabel, tetanusNeedsCorrection } from "@/modules
 import { PhoneInput } from "@/components/phone-input";
 import { inputAttributesFor, isUnchangedFromStored, storedContactPhone, typedProblemMessage, validateByType, type FieldValueType } from "@/lib/field-validation";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 /**
  * The Pathfinder Health Record form (#611), used for a parent opening a
@@ -79,6 +80,21 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
+  // Typed answers that differ from what loaded, compared in memory only; a boolean is all the guard sees (#1468).
+  // A saved record leaves `done` true, and a director's save navigates away, so the guard is released first.
+  const startsBlank = Object.keys(initialValues).length === 0;
+  const initialContacts = contactsFrom(initialValues);
+  const unsaved = !done && (
+    textKeys.some((key) => (text[key] ?? "") !== str(initialValues, key))
+    || hasAllergies !== (startsBlank ? "NO" : str(initialValues, "hasAllergies"))
+    || hasInsurance !== (startsBlank ? "NO" : str(initialValues, "hasInsurance"))
+    || contacts.length !== initialContacts.length
+    || contacts.some((contact, index) => (Object.keys(contact) as Array<keyof Contact>).some((key) => contact[key] !== initialContacts[index]![key]))
+    || consents.emergencyTreatment || consents.activities || consents.photocopy
+    || signature !== ""
+  );
+  const allowNavigation = useUnsavedChangesGuard(unsaved, "You have unsaved changes to this health record. Leave this page and discard them?");
+
   const [attempted, setAttempted] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const touch = (key: string) => setTouched((current) => ({ ...current, [key]: true }));
@@ -146,6 +162,7 @@ export function HealthRecordForm({ mode, initialValues, consentText, clubName, s
         return;
       }
       setDone(true);
+      allowNavigation();
       if (mode.kind === "director" && doneHref) window.location.assign(doneHref);
     } catch {
       setError("The health record could not be saved. Check your connection and try again.");
