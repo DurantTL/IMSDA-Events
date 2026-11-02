@@ -11,7 +11,8 @@ import { checkAttendeeSignOutOthersRateLimit } from "@/modules/rate-limit/servic
 
 /**
  * "Sign out everywhere else" on the profile page (#221). Signs every other session of the signed-in attendee
- * account out and keeps this one. It only protects the account, so it needs no recent second step.
+ * account out and keeps this one. It only protects the account, so it needs no recent second step, but the
+ * session must have finished its sign-in step (a password alone cannot sign the owner out everywhere).
  */
 async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);

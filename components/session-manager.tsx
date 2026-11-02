@@ -59,8 +59,8 @@ export function SessionManager({
     setMessage("");
     try {
       const response = await fetch(endpoint, { method });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.message ?? "Unable to sign out the other devices.");
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(result.sessions)) throw new Error(result.message ?? "Unable to sign out the other devices.");
       setSessions([...(result.sessions as SignedInSession[])].sort((a, b) => Number(b.isCurrent) - Number(a.isCurrent)));
       setMessage(
         result.revoked === 0
