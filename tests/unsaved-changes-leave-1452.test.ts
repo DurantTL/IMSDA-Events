@@ -174,6 +174,16 @@ describe("link listener with the in-page dialog (#1452)", () => {
     expect(confirm).toHaveBeenCalledTimes(1);
   });
 
+  it("leaves a data-saves-first link alone: the page saves first and warns itself", () => {
+    const link = { ...anchor(), hasAttribute: (name: string) => name === "data-saves-first" };
+    const confirm = vi.fn(async () => true);
+    const listener = createLinkNavigationListener({ message: "m", confirm, currentHref, isAllowed: () => false });
+    const click = clickOn(link);
+    listener(click);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(click.preventDefault).not.toHaveBeenCalled();
+  });
+
   it("clicks the link itself when no retrigger is given", async () => {
     const link = anchor();
     const listener = createLinkNavigationListener({ message: "m", confirm: async () => true, currentHref, isAllowed: () => false });

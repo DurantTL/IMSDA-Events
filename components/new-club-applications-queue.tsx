@@ -55,9 +55,9 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteMessage, setInviteMessage] = useState<{ text: string; tone: "error" | "success" } | null>(null);
 
-  // Typed values not yet sent: an open decision's reason or church choice, or the invite fields (#1468).
-  // Cancelling a decision hides its form, so its leftover text no longer counts; a sent decision or invite clears them.
-  const unsentDecision = (mode?.kind === "decline" && reason.trim() !== "") || (mode?.kind === "approve" && churchChoice !== "");
+  // Typed values not yet sent: an open decline reason or the invite fields (#1468). The church dropdown is a selection,
+  // not typed text, so it does not count. Cancelling a decision hides its form, so its leftover text no longer counts.
+  const unsentDecision = mode?.kind === "decline" && reason.trim() !== "";
   useUnsavedChangesGuard(
     unsentDecision || inviteEmail.trim() !== "" || inviteName.trim() !== "",
     "You have typed something here that has not been sent. Leave this page and discard it?",
@@ -216,7 +216,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
           open === null ? (
             <div className="nca-actions button-pair">
               <button className="secondary-button" disabled={busy} onClick={() => { setMode({ id: application.id, kind: "decline" }); setReason(""); setMessage(null); }} type="button">Decline</button>
-              <button className="primary-button" disabled={busy} onClick={() => { setMode({ id: application.id, kind: "approve" }); setMessage(null); }} type="button">Approve</button>
+              <button className="primary-button" disabled={busy} onClick={() => { setMode({ id: application.id, kind: "approve" }); setChurchChoice(""); setMessage(null); }} type="button">Approve</button>
             </div>
           ) : open === "approve" ? (
             <form
@@ -245,7 +245,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
                 </label>
               )}
               <div className="nca-actions button-pair">
-                <button className="secondary-button" disabled={busy} onClick={() => setMode(null)} type="button">Cancel</button>
+                <button className="secondary-button" disabled={busy} onClick={() => { setMode(null); setChurchChoice(""); }} type="button">Cancel</button>
                 <button className="primary-button" disabled={busy || (application.church.needsChoice && !churchChoice)} type="submit">Approve and send invite</button>
               </div>
             </form>
