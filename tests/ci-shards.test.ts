@@ -23,6 +23,7 @@ const NOT_IN_CI = new Set([
   "test:translation-sim", // browser-translation.yml (#1445)
   "test:live-roster", // browser-translation.yml (#1445)
   "test:privacy-browsers", // browser-privacy.yml (#1445)
+  "test:club-journeys", // role journeys workflow (#1439, added with the CI job in part C)
   "test:club-form-roster-add", // not in ci.yml before the shards (#1233)
   "test:custom-message", // not in ci.yml before the shards (#1233)
 ]);
