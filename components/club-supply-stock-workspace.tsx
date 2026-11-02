@@ -9,6 +9,7 @@ import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { makeSearchMatcher } from "@/lib/search-match";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { EmptyState } from "@/components/empty-state";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type SaveResponse = { stock?: { itemId: string; quantityOnHand: number }; error?: string; message?: string; issues?: Array<{ message?: string }> };
 
@@ -47,6 +48,10 @@ export function ClubSupplyStockWorkspace({
   const [section, setSection] = useState<ClubSupplySection | "">("");
   const search = useClientSearch();
   const [onlyInStock, setOnlyInStock] = useState(false);
+
+  // A typed quantity that differs from what is on hand and has not been saved; a row's save clears its draft (#1468).
+  const unsavedQuantities = !readOnly && stock.some((row) => drafts[row.itemId] !== undefined && drafts[row.itemId] !== String(row.quantityOnHand));
+  useUnsavedChangesGuard(unsavedQuantities, "You have supply quantities you have not saved. Leave this page and discard them?");
 
   const groups = useMemo(() => {
     const matches = makeSearchMatcher(search.term);

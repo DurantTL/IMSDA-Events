@@ -82,6 +82,7 @@ export function ClubRosterAgeField({
         No birth date on the roster. Enter their age on {dateText ?? "the event date"}, or{" "}
         <Link
           href={href ?? `/account/clubs/${organizationId}/roster`}
+          data-saves-first={onNavigate ? "" : undefined}
           onClick={onNavigate}
           {...(newTab ? { target: "_blank", rel: "noopener" } : {})}
         >add a birth date on the roster</Link>{newTab && <> (opens in a new tab)</>}.

@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { RoleDetails } from "@/components/role-details";
 import { clubRoleText } from "@/modules/access/role-descriptions";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { ClubTeamInvite } from "@/modules/club-imports/invites";
 import {
   clubAssignableRoles,
@@ -59,7 +60,10 @@ export function ClubTeamWorkspace({
     | null
   >(null);
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/team`;
-  const closeDialog = useCallback(() => setDialogOpen(false), []);
+  // Typed values in the open add-admin dialog; closing it or a successful add clears this (#1468).
+  const [dialogEdited, setDialogEdited] = useState(false);
+  useUnsavedChangesGuard(dialogOpen && dialogEdited, "You have not added this club admin yet. Leave this page and discard them?");
+  const closeDialog = useCallback(() => { setDialogOpen(false); setDialogEdited(false); }, []);
   const dialogRef = useAccessibleDialog<HTMLElement>(dialogOpen, closeDialog);
 
   /** Adding a club admin happens in a pop-up (#435), like the roster and honor catalog. */
@@ -226,7 +230,7 @@ export function ClubTeamWorkspace({
       {dialogOpen && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) closeDialog(); }} role="presentation">
           <section aria-labelledby="club-team-dialog-title" aria-modal="true" className="modal-card" ref={dialogRef} role="dialog" tabIndex={-1}>
-            <form className="form-stack" onSubmit={add}>
+            <form className="form-stack" onChange={() => setDialogEdited(true)} onSubmit={add}>
               <div className="modal-head">
                 <div>
                   <p className="public-registration-eyebrow">Add someone</p>

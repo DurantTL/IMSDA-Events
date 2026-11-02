@@ -5,6 +5,7 @@ import { ageInputAttributes } from "@/modules/attendee-types/age-limits";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { notSavedMessage } from "@/components/form-message";
 import { settingsSaveStateLabels } from "@/components/settings-save-state";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
@@ -14,7 +15,7 @@ import {
   type FormResponses,
   type RosterAttendee,
 } from "@/components/public-registration-form";
-import { createDraftSaveQueue } from "@/modules/club-registrations/draft-save-queue";
+import { createDraftSaveQueue, registrationDraftUnsaved } from "@/modules/club-registrations/draft-save-queue";
 import { createDraftSender, DRAFT_CONFLICT_MESSAGE, draftBlockedReason } from "@/modules/club-registrations/draft-sender";
 import { restoreDraftLocation } from "@/modules/club-registrations/draft-location";
 import { rosterHrefFromRegistration } from "@/modules/club-registrations/roster-return";
@@ -135,6 +136,8 @@ export function ClubRegistrationWorkspace({
   const [leaveHref, setLeaveHref] = useState<string | null>(null);
   // The revision the saved draft is at (#659); every save names it, so a stale save from another tab is refused.
   const [conflict, setConflict] = useState(false);
+  // True from a submit until the next edit is queued; a submitted registration has no draft left to lose (#1468).
+  const [submitted, setSubmitted] = useState(false);
   const [sender] = useState(() => createDraftSender<DraftState>({
     url: `${base}/draft`,
     initialRevision: workspace.draft?.revision ?? 0,
@@ -147,6 +150,13 @@ export function ClubRegistrationWorkspace({
     },
     send: (next) => sender.send(next),
   }));
+
+  // Leaving while a change is still waiting to save, saving, or failed to save would lose it (#1468). The roster links
+  // below save first and only warn when that fails, so this covers every other way out (header, tab, Back).
+  useUnsavedChangesGuard(
+    registrationDraftUnsaved({ hasPending: queue.hasPending(), saveState, conflict, submitted }),
+    "Your latest registration changes are not saved yet. Leave this page and lose them?",
+  );
 
   /** Saves the pending draft now; true when nothing is left unsaved. */
   const flush = useCallback(async (): Promise<boolean> => {
@@ -179,7 +189,12 @@ export function ClubRegistrationWorkspace({
   const queueSave = useCallback((next: DraftState) => {
     queue.set(next);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => { timer.current = null; if (!sender.isConflicted()) void queue.flush(false); }, 1200);
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      // An edit after a submit is a new draft: warn about it again (#1468). Cleared here, not in the updater that queues it.
+      setSubmitted(false);
+      if (!sender.isConflicted()) void queue.flush(false);
+    }, 1200);
   }, [queue, sender]);
 
   const setTeamName = (next: string) => {
@@ -481,6 +496,7 @@ export function ClubRegistrationWorkspace({
     onSubmitted: (result?: { honors?: { error?: string } | null }) => {
       if (timer.current) clearTimeout(timer.current);
       queue.submitted();
+      setSubmitted(true);
       // The registration is saved even when a class filled up meanwhile; the class picker on the next screen says so.
       if (result?.honors?.error) {
         try { sessionStorage.setItem(honorsNoteKey(organizationId, workspace.event.id), result.honors.error); } catch { /* the picker still shows the picks */ }
@@ -688,7 +704,7 @@ export function ClubRegistrationWorkspace({
         <p className="inline-notice" role="status">This club will be waitlisted; pick classes after you&apos;re confirmed.</p>
       )}
       <div className={`club-registration-toolbar club-sticky-bar${barPinned ? " is-pinned" : ""}`}>
-        <Link className="secondary-button" href={rosterHref} onClick={(event) => followRosterLink(event, rosterHref)}>
+        <Link className="secondary-button" data-saves-first="" href={rosterHref} onClick={(event) => followRosterLink(event, rosterHref)}>
           <UserPlus aria-hidden="true" size={15} /> {leaving ? "Saving…" : "Add someone new to the roster"}
         </Link>
         <button

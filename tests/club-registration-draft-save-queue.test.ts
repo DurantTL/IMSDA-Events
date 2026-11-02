@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDraftSaveQueue } from "@/modules/club-registrations/draft-save-queue";
+import { createDraftSaveQueue, registrationDraftUnsaved } from "@/modules/club-registrations/draft-save-queue";
 
 function deferred() {
   let resolve!: (ok: boolean) => void;
@@ -128,5 +128,37 @@ describe("draft save queue (#643)", () => {
     expect(await timerFlush).toBe(true);
     expect(sent).toEqual(["a"]);
     expect(queue.hasPending()).toBe(true);
+  });
+});
+
+describe("registrationDraftUnsaved (#1468)", () => {
+  const idle = { hasPending: false, saveState: "saved" as const, conflict: false, submitted: false };
+
+  it("is clean when everything is saved", () => {
+    expect(registrationDraftUnsaved(idle)).toBe(false);
+    expect(registrationDraftUnsaved({ ...idle, saveState: "idle" })).toBe(false);
+  });
+
+  it("is dirty while a change waits, a save is in flight, or the last save failed", () => {
+    expect(registrationDraftUnsaved({ ...idle, hasPending: true })).toBe(true);
+    expect(registrationDraftUnsaved({ ...idle, saveState: "saving" })).toBe(true);
+    expect(registrationDraftUnsaved({ ...idle, saveState: "error" })).toBe(true);
+    expect(registrationDraftUnsaved({ ...idle, conflict: true })).toBe(true);
+  });
+
+  it("is clean after the registration was submitted", () => {
+    expect(registrationDraftUnsaved({ hasPending: false, saveState: "error", conflict: true, submitted: true })).toBe(false);
+  });
+
+  it("warns about an edit made after the submit, before its save starts", () => {
+    expect(registrationDraftUnsaved({ hasPending: true, saveState: "saved", conflict: false, submitted: true })).toBe(true);
+  });
+
+  it("follows the real queue: dirty after set, clean once the save lands", async () => {
+    const queue = createDraftSaveQueue<string>({ send: async () => true });
+    queue.set("a");
+    expect(registrationDraftUnsaved({ ...idle, hasPending: queue.hasPending() })).toBe(true);
+    await queue.flush();
+    expect(registrationDraftUnsaved({ ...idle, hasPending: queue.hasPending() })).toBe(false);
   });
 });

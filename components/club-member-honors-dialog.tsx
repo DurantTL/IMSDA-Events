@@ -5,6 +5,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HonorCombobox } from "@/components/honor-combobox";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   type MemberHonorEntryRecord,
   currentHonorsFromHistory,
@@ -52,6 +53,10 @@ export function ClubMemberHonorsDialog({
   const [notice, setNotice] = useState("");
   const [honorId, setHonorId] = useState("");
   const [saving, setSaving] = useState(false);
+  // A picked honor or any typed value in the record form, until it is recorded or the dialog closes (#1468).
+  // The roster workspace's own guard covers only its member editor, so the two are never dirty together.
+  const [edited, setEdited] = useState(false);
+  useUnsavedChangesGuard(edited || honorId !== "", "You have an honor you have not recorded yet. Leave this page and discard it?");
   const dialogRef = useAccessibleDialog<HTMLElement>(true, onClose);
   // The honors list scrolls inside a capped height, so it is a keyboard stop only while it actually scrolls.
   const listRef = useRef<HTMLUListElement>(null);
@@ -113,6 +118,7 @@ export function ClubMemberHonorsDialog({
       setNotice("Honor recorded.");
       formElement.reset();
       setHonorId("");
+      setEdited(false);
       onRecorded?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That honor could not be recorded.");
@@ -155,7 +161,7 @@ export function ClubMemberHonorsDialog({
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
         {error && <div className="inline-notice error" role="alert">{error}</div>}
         {mayRecord && history && (
-          <form className="form-stack" onSubmit={record}>
+          <form className="form-stack" onChange={() => setEdited(true)} onSubmit={record}>
             <div className="form-grid two-column">
               <HonorCombobox label="Honor" name="honorId" onChange={setHonorId} options={honors} required value={honorId} />
               <label>

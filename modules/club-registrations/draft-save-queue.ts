@@ -55,3 +55,21 @@ export function createDraftSaveQueue<T>({
     submitted() { generation += 1; pending = null; },
   };
 }
+
+/**
+ * Whether leaving the registration page now would lose answers (#1468): a change is waiting in
+ * the queue (which covers the debounce timer, set together with it), a save is in flight, the
+ * last save failed, or the draft is in conflict so its changes were refused. A registration that
+ * was just submitted has no draft left to lose.
+ */
+export function registrationDraftUnsaved(state: {
+  hasPending: boolean;
+  saveState: "idle" | "saving" | "saved" | "error";
+  conflict: boolean;
+  submitted: boolean;
+}): boolean {
+  // A submit empties the queue, so a change pending now was made after it and is always new work.
+  if (state.hasPending) return true;
+  if (state.submitted) return false;
+  return state.saveState === "saving" || state.saveState === "error" || state.conflict;
+}

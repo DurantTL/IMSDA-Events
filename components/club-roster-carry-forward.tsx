@@ -4,6 +4,7 @@ import { ExactValue } from "@/components/exact-value";
 import { formatPersonName } from "@/lib/person-name";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { postJson } from "@/lib/post-json";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { useTableSort, type SortSpec } from "@/components/use-table-sort";
@@ -60,6 +61,12 @@ export function ClubRosterCarryForward({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
+  // Ticks are a selection, not typed work; a changed type, role or class is (#1468). Started rosters are done.
+  const edited = rows.some((row) => {
+    const choice = choices[row.memberId];
+    return Boolean(choice) && (choice!.attendeeType !== row.attendeeType || choice!.role !== row.role || choice!.classLevel !== (row.classLevel ?? ""));
+  });
+  useUnsavedChangesGuard(edited && !done, "You have changed the new year's roster choices but not started it. Leave this page and discard them?");
   const ticked = useMemo(() => rows.filter((row) => choices[row.memberId]?.ticked), [rows, choices]);
 
   function change(memberId: string, patch: Partial<Choice>) {
