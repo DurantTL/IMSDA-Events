@@ -140,7 +140,7 @@ export function PeopleDirectory({
           : pendingOnly
             ? pendingCount === 0
               ? "No pending invites."
-              : `${pendingCapped ? "Showing the newest " : ""}${pendingCount} pending ${pendingCount === 1 ? "invite" : "invites"}${query ? ` matching "${query}"` : ""}${pendingCapped ? ". Search to narrow the list." : "."}`
+              : `${pendingCapped ? "The newest " : ""}${pendingCount} pending ${pendingCount === 1 ? "invite" : "invites"}${query ? ` matching "${query}"` : ""}${pendingCapped ? ". Older ones are not listed; search to narrow the list." : "."}`
             : total === 0
               ? "No people found."
               : `${total} ${total === 1 ? "person" : "people"}${summary ? ` with ${summary}` : ""}${query ? ` matching "${query}"` : ""}.`}

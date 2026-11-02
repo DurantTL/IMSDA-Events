@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { STAFF_INVITATION_GROUPS, STAFF_INVITATION_GROUP_LABEL, type StaffInvitationGroupValue } from "@/modules/staff-invitations/domain";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import type { ApprovalRow } from "@/modules/staff-invitations/repository";
 
 type Props = {
@@ -17,6 +18,15 @@ const BATCH_MAX = 200;
 type Filter = "WAITING" | "APPROVED" | "DECLINED" | "ALL";
 
 const roleLabel: Record<string, string> = { PRIMARY: "Invited person", SPOUSE: "Spouse", DEPENDANT: "Child or dependant" };
+
+// Sorts from its headers (#1458); the keys here are the whitelist. Only what a column already shows is sortable.
+const APPROVAL_SORT: Record<"registration" | "group" | "party" | "housing" | "state", ColumnSpec<ApprovalRow>> = {
+  registration: { value: (row) => row.name || row.email, label: "registration" },
+  group: { value: (row) => STAFF_INVITATION_GROUP_LABEL[row.group], label: "group" },
+  party: { value: (row) => row.party.length, label: "party size", kind: "number" },
+  housing: { value: (row) => (row.needsHousing === null ? null : row.needsHousing), label: "housing request" },
+  state: { value: (row) => row.approval, label: "state" },
+};
 
 /**
  * The approval queue (#804): registrations made through personal links, waiting for the office. They are approved or declined
@@ -36,6 +46,7 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
   const [notice, setNotice] = useState("");
 
   const visible = useMemo(() => rows.filter((row) => (filter === "ALL" || row.approval === filter) && (group === "ALL" || row.group === group)), [rows, filter, group]);
+  const sorted = useTableSort(visible, APPROVAL_SORT);
   const waitingVisible = visible.filter((row) => row.approval === "WAITING");
   const selectedRows = [...selected].flatMap((id) => rows.find((row) => row.id === id) ?? []);
   const selectedIds = selectedRows.filter((row) => row.approval === "WAITING").map((row) => row.id);
@@ -171,19 +182,20 @@ export function StaffApprovalQueue({ eventId, rows, counts }: Props) {
         <section className="panel empty-state"><h3>Nothing here</h3><p>No registrations match. People appear here after they register through their personal link.</p></section>
       ) : (
         <div className="report-table-wrap card-box">
+          {sorted.note}
           <table className="report-table staff-invite-table">
             <thead>
               <tr>
                 <th scope="col"><span className="sr-only">Select</span></th>
-                <th scope="col">Registration</th>
-                <th scope="col">Group</th>
-                <th scope="col">Party</th>
-                <th scope="col">Housing request</th>
-                <th scope="col">State</th>
+                {sorted.header("registration", "Registration")}
+                {sorted.header("group", "Group")}
+                {sorted.header("party", "Party")}
+                {sorted.header("housing", "Housing request")}
+                {sorted.header("state", "State")}
               </tr>
             </thead>
             <tbody>
-              {visible.map((row) => (
+              {sorted.rows.map((row) => (
                 <tr key={row.id}>
                   <td>
                     {(row.approval === "WAITING" || (row.approval === "APPROVED" && row.peopleWithoutMeals > 0)) && <label className="staff-invite-select"><input aria-label={`Select ${row.confirmationCode}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" /></label>}

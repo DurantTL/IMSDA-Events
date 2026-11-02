@@ -253,7 +253,7 @@ describe("search panel (#1167)", () => {
     expect(out).toMatch(/autocomplete="off"/i);
     expect(out).toContain('aria-pressed="false"');
     expect(out).toContain('aria-describedby="roster-details-help"');
-    expect(out).toContain("<strong>2 of 2</strong> people shown");
+    expect(out).toContain("Showing 1–2 of 2 people");
     expect(out).toContain('aria-live="polite"');
     // Nothing is filtered yet, so there is nothing to reset.
     expect(out).not.toContain("Clear filters");
@@ -265,13 +265,13 @@ describe("search panel (#1167)", () => {
     expect(out).toContain("No one matches this filter");
     expect(out).toContain("Clear filters");
     expect(out).not.toContain("No one is on the roster yet");
-    expect(out).toContain("<strong>0 of 2</strong>");
+    expect(out).toContain("Showing 0–0 of 2 people");
   });
 
   it("keeps the real empty roster message when nobody is on it", () => {
     const out = html({ initialMembers: [] });
     expect(out).toContain("No one is on the roster yet");
-    expect(out).toContain("<strong>0 of 0</strong>");
+    expect(out).toContain("Showing 0–0 of 0 people");
   });
 
   it("has one filled primary button on the page: Add to roster", () => {
@@ -370,7 +370,7 @@ describe("?filter=details-needed opens the filtered roster (#1167)", () => {
     expect(out).toContain("Fixture-needy");
     expect(out).not.toContain("Fixture-done");
     expect(out).toContain('aria-pressed="true"');
-    expect(out).toContain("<strong>1 of 2</strong>");
+    expect(out).toContain("Showing 1–1 of 2 people");
     expect(out).toContain("Clear filters");
   });
 
@@ -413,7 +413,7 @@ describe("filters combine and reset together (#1167 review)", () => {
 
   it("opens with ?compliance= and ?filter=details-needed combined, badge matching the rows", () => {
     const out = html({ initialMembers: people, complianceStatuses: statuses, complianceFilter: "missing", detailsNeededFirst: true });
-    expect(out).toContain("<strong>2 of 4</strong>");
+    expect(out).toContain("Showing 1–2 of 4 people");
     expect(out).toMatch(/Details needed <span class="count-badge">2<\/span>/);
     expect(out).toContain("Fixture-a");
     expect(out).toContain("Fixture-d");
@@ -460,7 +460,7 @@ describe("focus, announcements and labels after the review (#1167)", () => {
     expect(source).toContain("const query = search.term;");
     expect(source).not.toContain("useDebouncedValue");
     const out = html();
-    expect(out).toMatch(/<p aria-live="polite" class="sr-only" role="status">2 of 2 people shown<\/p>/);
+    expect(out).toMatch(/<p aria-live="polite" class="sr-only" role="status">Showing 1–2 of 2 people<\/p>/);
     // The visible count is not itself a live region, so each key does not re-announce it.
     expect(out).not.toMatch(/<p[^>]*aria-live[^>]*><strong>/);
   });

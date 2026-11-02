@@ -4,10 +4,18 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { MapPin } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import type { GeocodeReviewItem } from "@/modules/organizations/church-geocoding";
 
 type ApiError = { message?: string; issues?: Array<{ message?: string }> };
 type RunSummary = { processed: number; matched: number; noMatch: number };
+
+// Sorts from its headers (#1458); the keys here are the whitelist.
+const LOCATION_SORT: Record<"church" | "address" | "result", ColumnSpec<GeocodeReviewItem>> = {
+  church: { value: (item) => item.name, label: "church" },
+  address: { value: (item) => item.address, label: "address" },
+  result: { value: (item) => (item.status === "MATCHED" ? "Matched" : "No match"), label: "result" },
+};
 
 /**
  * "Find map locations" (#724). Staff start the lookup, then review the
@@ -19,6 +27,7 @@ export function ChurchMapLocationsWorkspace({ enabled, eligible, items }: { enab
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const sorted = useTableSort(items, LOCATION_SORT);
 
   async function post(url: string, body?: unknown) {
     const response = await fetch(url, {
@@ -86,17 +95,18 @@ export function ChurchMapLocationsWorkspace({ enabled, eligible, items }: { enab
       </p>
       {items.length > 0 && (
         <div className="report-table-wrap">
+          {sorted.note}
           <table className="report-table table-cards table-cards-wide" role="table">
             <thead role="rowgroup">
               <tr role="row">
-                <th role="columnheader" scope="col">Church</th>
-                <th role="columnheader" scope="col">Address</th>
-                <th role="columnheader" scope="col">Result</th>
+                {sorted.header("church", "Church")}
+                {sorted.header("address", "Address")}
+                {sorted.header("result", "Result")}
                 <th role="columnheader" scope="col"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody role="rowgroup">
-              {items.map((item) => (
+              {sorted.rows.map((item) => (
                 <tr key={item.organizationId} role="row">
                   <th className="org-cell-name" role="rowheader" scope="row" translate="no">{item.name}</th>
                   <td {...cardCell("Address")}>{item.address}</td>

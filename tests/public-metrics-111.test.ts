@@ -216,11 +216,11 @@ describe("the summary and who can see it", () => {
   it("is for system administrators only", async () => {
     mocks.groupBy.mockResolvedValue([]);
     mocks.getCurrentSession.mockResolvedValue({ user: null });
-    await expect(PublicAnalyticsPage()).rejects.toThrow("redirect:/login");
+    await expect(PublicAnalyticsPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("redirect:/login");
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: null } });
-    await expect(PublicAnalyticsPage()).rejects.toThrow("redirect:/no-access");
+    await expect(PublicAnalyticsPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("redirect:/no-access");
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
-    const html = renderToStaticMarkup(createElement("div", null, await PublicAnalyticsPage()));
+    const html = renderToStaticMarkup(createElement("div", null, await PublicAnalyticsPage({ searchParams: Promise.resolve({}) })));
     expect(html).toContain("Public analytics");
     expect(html).toContain("Nothing counted yet.");
   });

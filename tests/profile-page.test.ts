@@ -213,16 +213,16 @@ describe("/profile (staff, inside the workspace layout)", () => {
     expect(markup).toContain('data-manager="staff-mfa"');
   });
 
-  it("confirms two-step verification is on only when an authenticator is really active (#568)", async () => {
+  it("confirms two-step sign-in is on only when an authenticator is really active (#568)", async () => {
     signedIn({ staff, attendee: true });
     attendeePasskeys.mockResolvedValue({ available: true, passkeys: [] });
     attendeeMfaStatus.mockResolvedValue({ status: "ACTIVE" });
-    expect(await render({ twoStep: "on" })).toContain("Two-step verification is on.");
-    expect(await render()).not.toContain("Two-step verification is on.");
+    expect(await render({ twoStep: "on" })).toContain("Two-step sign-in is on.");
+    expect(await render()).not.toContain("Two-step sign-in is on.");
     attendeeMfaStatus.mockResolvedValue({ status: "NONE" });
-    expect(await render({ twoStep: "on" })).not.toContain("Two-step verification is on.");
+    expect(await render({ twoStep: "on" })).not.toContain("Two-step sign-in is on.");
     attendeePasskeys.mockResolvedValue({ available: true, passkeys: [{ id: "pk1" }] });
-    expect(await render({ twoStep: "on" })).toContain("Two-step verification is on.");
+    expect(await render({ twoStep: "on" })).toContain("Two-step sign-in is on.");
   });
 
   it("sends an attendee-only browser to /account/profile, keeping the two-step flag", async () => {
@@ -281,14 +281,14 @@ describe("/account/profile (attendee, inside the portal layout)", () => {
     expect(markup).toContain(">Sign out of registration account<");
   });
 
-  it("confirms two-step verification is on only when it really is", async () => {
+  it("confirms two-step sign-in is on only when it really is", async () => {
     signedIn({ attendee: true });
     attendeePasskeys.mockResolvedValue({ available: true, passkeys: [] });
     attendeeMfaStatus.mockResolvedValue({ status: "ACTIVE" });
-    expect(await renderPortal({ twoStep: "on" })).toContain("Two-step verification is on.");
-    expect(await renderPortal()).not.toContain("Two-step verification is on.");
+    expect(await renderPortal({ twoStep: "on" })).toContain("Two-step sign-in is on.");
+    expect(await renderPortal()).not.toContain("Two-step sign-in is on.");
     attendeeMfaStatus.mockResolvedValue({ status: "PENDING" });
-    expect(await renderPortal({ twoStep: "on" })).not.toContain("Two-step verification is on.");
+    expect(await renderPortal({ twoStep: "on" })).not.toContain("Two-step sign-in is on.");
   });
 
   it("applies the club second step first", async () => {

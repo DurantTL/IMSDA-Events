@@ -28,13 +28,20 @@ function sourceFiles(dir: string): string[] {
 const normalize = (text: string) => text.replace(/<[^>]*>/g, " ").replace(/\{[^}]*\}/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().toLowerCase();
 
 /** Header texts of one table: `<th>` bodies, and `label="..."` of the sortable header component. */
-function headerLabels(tableSource: string): string[] {
+function headerLabels(tableSource: string, fileSource = ""): string[] {
   const head = /<thead[\s\S]*?<\/thead>/.exec(tableSource)?.[0] ?? "";
   const labels: string[] = [];
   for (const match of head.matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/g)) labels.push(normalize(match[1]));
   // The sortable header components (#1458): `ColumnHeader` on server tables, `SortableHeader` on client ones.
   for (const match of head.matchAll(/<(?:SortableHeader|ColumnHeader)\b[^>]*?\blabel="([^"]+)"/g)) labels.push(normalize(match[1]));
   for (const match of head.matchAll(/<(?:SortableHeader|ColumnHeader)\b[^>]*?\blabel=\{`([^`]+)`\}/g)) labels.push(normalize(match[1].replace(/\$\{[^}]*\}/g, " ")));
+  // The client sort hook (#1458): `sort.header("key", "Label")`, or `<SortableHeader {...sort.headerProps("key")} />` whose
+  // words are the `label` of that key in the file's sort spec (or a `label: "..."` passed next to the key).
+  for (const match of head.matchAll(/\.header\("[^"]+",\s*"([^"]+)"/g)) labels.push(normalize(match[1]));
+  for (const match of head.matchAll(/\.headerProps\("([^"]+)"(?:,\s*\{[^}]*?\blabel:\s*"([^"]+)")?/g)) {
+    if (match[2]) labels.push(normalize(match[2]));
+    else for (const spec of fileSource.matchAll(new RegExp(`\\b${match[1]}:\\s*\\{[^}]*?\\blabel:\\s*"([^"]+)"`, "g"))) labels.push(normalize(spec[1]));
+  }
   // A string literal inside a header expression, e.g. {active ? "Name ▲" : "Name"}.
   for (const match of head.matchAll(/<th\b[^>]*>\s*\{[^}]*"([^"]+)"[^}]*\}\s*<\/th>/g)) labels.push(normalize(match[1]));
   // Headers built from a label map at run time: read the same map the component reads.
@@ -66,10 +73,11 @@ describe("card labels match their column headers", () => {
   it("every literal data-label or cardCell label is the text of a header in the same table", () => {
     const problems: string[] = [];
     for (const file of files) {
-      for (const table of tables(readFileSync(file, "utf8"))) {
+      const source = readFileSync(file, "utf8");
+      for (const table of tables(source)) {
         const labels = cellLabels(table);
         if (labels.length === 0) continue;
-        const headers = headerLabels(table);
+        const headers = headerLabels(table, source);
         for (const label of new Set(labels)) {
           const wanted = normalize(label);
           // An exact match, or the label followed by a separator ("honors, newest first"), never a longer word.
@@ -85,6 +93,8 @@ describe("card labels match their column headers", () => {
   it("the helper reads headers and labels as intended", () => {
     const sample = `<table><thead><tr><th>Club</th><SortableHeader label="Name" /><ColumnHeader column="x" label={\`\${m} record\`} sorting={s} /></tr></thead><tbody><tr><td data-label="Club" /><td {...cardCell("Name")} /></tr></tbody></table>`;
     expect(headerLabels(sample)).toEqual(["club", "name", "record"]);
+    const hook = `<table><thead><tr>{sort.header("qty", "Qty")}<SortableHeader {...sort.headerProps("club")} /></tr></thead></table>`;
+    expect(headerLabels(hook, `const SPEC = { club: { label: "Club", value: (row) => row.club } };`)).toEqual(["qty", "club"]);
     expect(cellLabels(sample)).toEqual(["Club", "Name"]);
   });
 });

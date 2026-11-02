@@ -2,7 +2,9 @@
 
 import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
-import { useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { Download } from "lucide-react";
 import { clubYearMonths, isLockedForClub, monthNotDueForClub, yearToDate } from "@/modules/club-reports/domain";
 import type { ClubYearSummary } from "@/modules/club-reports/repository";
@@ -31,6 +33,19 @@ export function ClubReportsConference({
   const [error, setError] = useState("");
   const months = clubYearMonths(clubYear);
   const today = new Date(now);
+  // Sortable from the headers (#1458): the club, each month of this club year, the registration tick and the year to date.
+  // The month columns come from the club year, so the address can only name a month that is on this table.
+  const sortSpec = useMemo(() => {
+    const spec: Record<string, SortSpec<ClubYearSummary>> = {
+      club: { label: "Club", value: (club) => club.name },
+      registration: { label: "Yearly registration", noteLabel: "yearly registration", value: (club) => club.registrationOnTime },
+      ytd: { label: "Year to date", kind: "number", value: (club) => yearToDate(Object.values(club.reports), club.registrationOnTime) },
+    };
+    for (const month of months) spec[`month-${month}`] = { label: shortMonth(month), kind: "number", noteLabel: `${shortMonth(month)} points`, value: (club) => club.reports[month]?.totalPoints };
+    return spec;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `months` is a pure function of `clubYear`.
+  }, [clubYear]);
+  const sorted = useTableSort(clubs, sortSpec, "records");
 
   async function toggleRegistration(club: ClubYearSummary, registrationOnTime: boolean) {
     setError("");
@@ -75,18 +90,19 @@ export function ClubReportsConference({
         <div className="panel"><p className="report-empty">No active clubs yet.</p></div>
       ) : (
         <div className="report-table-wrap club-reports-grid">
+          {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
           <table role="table" className="report-table table-cards table-cards-xwide">
             <caption className="sr-only">{`Monthly Record points by club for ${clubYear}`}</caption>
             <thead role="rowgroup">
               <tr role="row">
-                <th role="columnheader" scope="col">Club</th>
-                {months.map((month) => <th key={month} role="columnheader" scope="col">{shortMonth(month)}</th>)}
-                <th role="columnheader" scope="col">Yearly registration</th>
-                <th role="columnheader" scope="col">Year to date</th>
+                <SortableHeader {...sorted.headerProps("club")} />
+                {months.map((month) => <Fragment key={month}><SortableHeader {...sorted.headerProps(`month-${month}`)} /></Fragment>)}
+                <SortableHeader {...sorted.headerProps("registration")} />
+                <SortableHeader {...sorted.headerProps("ytd")} />
               </tr>
             </thead>
             <tbody role="rowgroup">
-              {clubs.map((club) => (
+              {sorted.rows.map((club) => (
                 <tr role="row" key={club.id}>
                   <th role="rowheader" scope="row" translate="no">{club.name}{club.church && <small>{club.church}</small>}</th>
                   {months.map((month) => {

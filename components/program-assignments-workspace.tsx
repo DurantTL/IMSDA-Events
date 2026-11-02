@@ -21,6 +21,8 @@ import type {
 } from "@/modules/program-assignments/repository";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { formatPersonName } from "@/lib/person-name";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 
 type AppliedRun = {
   id: string;
@@ -51,6 +53,37 @@ function localDate(value: string) {
 
 function fieldIdentity(field: ProgramAssignmentWorkspaceField) {
   return `${field.formVersionId}::${field.fieldId}`;
+}
+
+type PreviewChoice = RankedAssignmentPreview["choices"][number];
+type PreviewAssignment = RankedAssignmentPreview["assignments"][number];
+const NO_CHOICES: PreviewChoice[] = [];
+const NO_ASSIGNMENTS: PreviewAssignment[] = [];
+
+/** The two preview tables sort from their headers, in the address (#1458); rows keep the preview's order until a column is chosen. */
+const CHOICE_SORT = {
+  option: { label: "Room / choice", noteLabel: "room", value: (choice) => choice.option },
+  limit: { label: "Limit", kind: "number", value: (choice) => choice.capacity },
+  interest: { label: "Interest", kind: "number", value: (choice) => choice.demand },
+  assigned: { label: "Assigned", kind: "number", value: (choice) => choice.assigned },
+  first: { label: "1st", kind: "number", noteLabel: "first choices", value: (choice) => choice.firstChoiceAssigned },
+  second: { label: "2nd", kind: "number", noteLabel: "second choices", value: (choice) => choice.secondChoiceAssigned },
+  open: { label: "Open", kind: "number", noteLabel: "open seats", value: (choice) => choice.remaining },
+} satisfies Record<string, SortSpec<PreviewChoice>>;
+
+const ATTENDEE_SORT = {
+  attendee: { label: "Attendee", value: (assignment) => formatPersonName(assignment, "sorted") },
+  assignment: { label: "Assignment", value: (assignment) => assignment.assignedOption ?? "Unassigned" },
+  result: { label: "Result", value: (assignment) => assignmentResultLabel(assignment) },
+  registration: { label: "Registration", value: (assignment) => assignment.confirmationCode },
+} satisfies Record<string, SortSpec<PreviewAssignment>>;
+
+function assignmentResultLabel(assignment: PreviewAssignment) {
+  return assignment.unassignedReason === "NO_RANKED_CHOICES"
+    ? "No ranking submitted"
+    : assignment.unassignedReason === "CAPACITY_FULL"
+      ? "No ranked room available"
+      : assignedRankLabel(assignment.preferenceRank);
 }
 
 function assignedRankLabel(rank: number | null) {
@@ -96,6 +129,8 @@ export function ProgramAssignmentsWorkspace({
     && field.formVersionId === selectedVersionId
   )) ?? availableFields[0] ?? null;
   const [preview, setPreview] = useState<RankedAssignmentPreview | null>(null);
+  const choiceSort = useTableSort(preview?.choices ?? NO_CHOICES, CHOICE_SORT, "capacity");
+  const attendeeSort = useTableSort(preview?.assignments ?? NO_ASSIGNMENTS, ATTENDEE_SORT, "attendees");
   const [leaveOut, setLeaveOut] = useState<string[]>([]);
   const [runs, setRuns] = useState(initialRuns);
   const [loading, setLoading] = useState(false);
@@ -373,21 +408,22 @@ export function ProgramAssignmentsWorkspace({
               )}
 
               <div className="report-table-wrap">
+                {choiceSort.noteText && <SortOrderNote>{choiceSort.noteText}</SortOrderNote>}
                 <table className="report-table assignment-capacity-table">
                   <caption className="sr-only">Capacity and assignment results</caption>
                   <thead>
                     <tr>
-                      <th scope="col">Room / choice</th>
-                      <th scope="col">Limit</th>
-                      <th scope="col">Interest</th>
-                      <th scope="col">Assigned</th>
-                      <th scope="col">1st</th>
-                      <th scope="col">2nd</th>
-                      <th scope="col">Open</th>
+                      <SortableHeader {...choiceSort.headerProps("option")} />
+                      <SortableHeader {...choiceSort.headerProps("limit")} />
+                      <SortableHeader {...choiceSort.headerProps("interest")} />
+                      <SortableHeader {...choiceSort.headerProps("assigned")} />
+                      <SortableHeader {...choiceSort.headerProps("first")} />
+                      <SortableHeader {...choiceSort.headerProps("second")} />
+                      <SortableHeader {...choiceSort.headerProps("open")} />
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.choices.map((choice) => (
+                    {choiceSort.rows.map((choice) => (
                       <tr key={choice.option}>
                         <th scope="row">{choice.option}</th>
                         <td>{choice.capacity ?? "Unlimited*"}</td>
@@ -405,21 +441,18 @@ export function ProgramAssignmentsWorkspace({
               <details className="assignment-detail" open={preview.summary.unassigned > 0}>
                 <summary>Review attendee results ({preview.assignments.length})</summary>
                 <div className="report-table-wrap">
+                  {attendeeSort.noteText && <SortOrderNote>{attendeeSort.noteText}</SortOrderNote>}
                   <table className="report-table">
                     <caption className="sr-only">Previewed attendee assignments</caption>
                     <thead>
-                      <tr><th scope="col">Attendee</th><th scope="col">Assignment</th><th scope="col">Result</th><th scope="col">Registration</th></tr>
+                      <tr><SortableHeader {...attendeeSort.headerProps("attendee")} /><SortableHeader {...attendeeSort.headerProps("assignment")} /><SortableHeader {...attendeeSort.headerProps("result")} /><SortableHeader {...attendeeSort.headerProps("registration")} /></tr>
                     </thead>
                     <tbody>
-                      {preview.assignments.map((assignment) => (
+                      {attendeeSort.rows.map((assignment) => (
                         <tr key={assignment.attendeeId}>
                           <th scope="row">{formatPersonName(assignment)}</th>
                           <td>{assignment.assignedOption ?? "Unassigned"}</td>
-                          <td>{assignment.unassignedReason === "NO_RANKED_CHOICES"
-                            ? "No ranking submitted"
-                            : assignment.unassignedReason === "CAPACITY_FULL"
-                              ? "No ranked room available"
-                              : assignedRankLabel(assignment.preferenceRank)}</td>
+                          <td>{assignmentResultLabel(assignment)}</td>
                           <td>{assignment.confirmationCode}</td>
                         </tr>
                       ))}

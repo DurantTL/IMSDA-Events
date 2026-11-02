@@ -1,6 +1,10 @@
+"use client";
+
 import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
+import { formatPersonName } from "@/lib/person-name";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { backgroundFlagLabels } from "@/modules/background-checks/display";
 import type { BackgroundFlag } from "@/modules/background-checks/repository";
 
@@ -23,6 +27,15 @@ export function BackgroundCheckBadge({ state }: { state?: BackgroundFlag["state"
   );
 }
 
+// Sorts from its headers (#1458); the keys here are the whitelist. Only columns already shown are sortable.
+const FLAG_SORT: Record<"person" | "club" | "contact" | "check" | "registration", ColumnSpec<BackgroundFlag>> = {
+  person: { value: (person) => formatPersonName(person, "sorted"), label: "person" },
+  club: { value: (person) => person.clubName, label: "club" },
+  contact: { value: (person) => person.contactEmail, label: "contact" },
+  check: { value: (person) => backgroundFlagLabels[person.state], label: "check" },
+  registration: { value: (person) => person.confirmationCode, label: "registration code" },
+};
+
 /**
  * Everyone at a youth or children's event missing a current check. Staff and
  * event managers only. `registrationHref` links a row to the registration.
@@ -36,25 +49,27 @@ export function BackgroundCheckList({
   registrationHref?: { base: string; query: string };
   showClub?: boolean;
 }) {
+  const sorted = useTableSort(people, FLAG_SORT, "sterling");
   if (people.length === 0) {
     return <p className="report-empty">Every adult registered is current with Sterling Volunteers.</p>;
   }
   const hasContact = people.some((person) => person.contactEmail);
   return (
     <div className="report-table-wrap">
+      {sorted.note}
       <table className="report-table roster-table">
         <caption className="sr-only">Adults needing Sterling Volunteers</caption>
         <thead>
           <tr>
-            <th scope="col">Person</th>
-            {showClub && <th scope="col">Club</th>}
-            {hasContact && <th scope="col">Contact</th>}
-            <th scope="col">Check</th>
-            <th scope="col">Registration</th>
+            {sorted.header("person", "Person")}
+            {showClub && sorted.header("club", "Club")}
+            {hasContact && sorted.header("contact", "Contact")}
+            {sorted.header("check", "Check")}
+            {sorted.header("registration", "Registration")}
           </tr>
         </thead>
         <tbody>
-          {people.map((person) => (
+          {sorted.rows.map((person) => (
             <tr key={person.attendeeId}>
               <th scope="row">
                 <ExactValue>{person.lastName}, {person.firstName}</ExactValue>

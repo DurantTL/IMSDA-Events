@@ -2227,7 +2227,7 @@ export function CommunicationsWorkspace({
               ))}
             </div>
             {(messaging.messages.length >= DELIVERY_SERVER_CAP) && (
-              <p className="inline-notice" role="status">Showing the newest {DELIVERY_SERVER_CAP} messages only. Older messages aren&apos;t listed here.</p>
+              <p className="inline-notice" role="status">This log holds the newest {DELIVERY_SERVER_CAP} messages. Older messages aren&apos;t loaded here.</p>
             )}
             <div className="message-delivery-layout">
               <div className="message-delivery-list">
@@ -2238,7 +2238,7 @@ export function CommunicationsWorkspace({
                     <span><span className={`status-chip ${statusTone(message.status)}`}>{friendlyStatus(message.status)}</span><small>{new Date(message.createdAt).toLocaleString()}</small></span>
                   </button>
                 ))}
-                <ListPager label="Delivery log pages" onPage={setDeliveryPage} slice={deliverySlice} />
+                <ListPager label="Delivery log pages" noun="messages" nounOne="message" onPage={setDeliveryPage} slice={deliverySlice} />
                 {filteredMessages.length === 0 && <div className="empty-state"><Inbox size={24} /><h3>No matching messages</h3><p>Submit a public registration or capture a template test to create a local row.</p></div>}
               </div>
               <aside className="message-delivery-detail">

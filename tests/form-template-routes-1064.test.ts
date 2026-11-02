@@ -154,7 +154,7 @@ describe("form template routes", () => {
 describe("form template pages", () => {
   it("send a visitor who is not signed in to sign in, and read nothing", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: null });
-    await expect(AdminFormTemplatesPage()).rejects.toMatchObject({ to: "/login" });
+    await expect(AdminFormTemplatesPage({ searchParams: Promise.resolve({}) })).rejects.toMatchObject({ to: "/login" });
     await expect(FormTemplateEditorPage({ params: key.params })).rejects.toMatchObject({ to: "/login" });
     expect(mocks.listFormTemplateLibrary).not.toHaveBeenCalled();
     expect(mocks.getFormTemplateForEditor).not.toHaveBeenCalled();
@@ -162,14 +162,14 @@ describe("form template pages", () => {
 
   it("refuse a signed-in user who is not a system administrator, and read nothing", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: eventAdmin });
-    await expect(AdminFormTemplatesPage()).rejects.toMatchObject({ to: "/no-access" });
+    await expect(AdminFormTemplatesPage({ searchParams: Promise.resolve({}) })).rejects.toMatchObject({ to: "/no-access" });
     await expect(FormTemplateEditorPage({ params: key.params })).rejects.toMatchObject({ to: "/no-access" });
     expect(mocks.listFormTemplateLibrary).not.toHaveBeenCalled();
     expect(mocks.getFormTemplateForEditor).not.toHaveBeenCalled();
   });
 
   it("open for a system administrator, and answer not found for an unknown template", async () => {
-    await expect(AdminFormTemplatesPage()).resolves.toBeTruthy();
+    await expect(AdminFormTemplatesPage({ searchParams: Promise.resolve({}) })).resolves.toBeTruthy();
     expect(mocks.listFormTemplateLibrary).toHaveBeenCalledTimes(1);
     mocks.getFormTemplateForEditor.mockResolvedValue(null);
     await expect(FormTemplateEditorPage({ params: key.params })).rejects.toThrow("NOT_FOUND");

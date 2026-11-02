@@ -6,6 +6,8 @@ import { useMemo, useState } from "react";
 import { Award, CalendarRange, ClipboardList, Copy, Pencil, Plus, Power, Save, Trash2, TriangleAlert, UsersRound, X } from "lucide-react";
 import { clubClassLevelLabels, clubClassLevels } from "@/modules/club-rosters/domain";
 import { cardCell } from "@/components/table-card-labels";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
+import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { honorOfferingSpanLabels, offeringPlacementPatch, sessionEditPatch } from "@/modules/honors/domain";
 import { honorSetChange, honorsNeedConfirmationMessage } from "@/modules/honors/offering-honors";
 import { HonorMultiSelect } from "@/components/honor-multi-select";
@@ -15,6 +17,18 @@ import { groupSessionsBySite, nextSessionOrder, sessionClassWarning, sharedSessi
 import type { EventHonorSetup } from "@/modules/honors/repository";
 
 type Offering = EventHonorSetup["offerings"][number];
+/** Every session's table sorts the same way, from one pair of address params (#1458); rows keep the server's order until a column is chosen. */
+const CLASS_SORT = {
+  honors: { label: "Honors", value: (offering) => offering.honors.map((honor) => honor.name).join(", ") },
+  seats: { label: "Youth seats taken", kind: "number", noteLabel: "youth seats taken", value: (offering) => offering.seatsTaken },
+  minimumAge: { label: "Min. age", kind: "number", noteLabel: "minimum age", value: (offering) => offering.minimumAge },
+  requires: { label: "Requires", value: (offering) => [offering.minimumClassLevel === null ? "" : clubClassLevelLabels[offering.minimumClassLevel], ...offering.prerequisiteHonors.map((honor) => honor.name)].filter(Boolean).join(", ") },
+  perClub: { label: "Per club", kind: "number", noteLabel: "per-club limit", value: (offering) => offering.perClubLimit },
+  teacher: { label: "Teacher", value: (offering) => offering.teacherName },
+  location: { label: "Location", value: (offering) => offering.location },
+  status: { label: "Status", value: (offering) => (offering.isActive ? "Active" : "Inactive") },
+} satisfies Record<string, SortSpec<Offering>>;
+
 type SetupSession = EventHonorSetup["sessions"][number];
 type ApiResult = Partial<EventHonorSetup> & {
   error?: string;
@@ -54,6 +68,7 @@ export function HonorsSetupWorkspace({
   otherEvents: Array<{ id: string; name: string }>;
 }) {
   const [setup, setSetup] = useState(initialSetup);
+  const classSort = useTableSort(setup.offerings, CLASS_SORT, "classes");
   const [newSessionSite, setNewSessionSite] = useState(initialSetup.locations.find((location) => location.isActive)?.id ?? "");
   const [span, setSpan] = useState<"SINGLE_SESSION" | "ALL_SESSIONS">("SINGLE_SESSION");
   const [editing, setEditing] = useState<Offering | null>(null);
@@ -663,22 +678,23 @@ export function HonorsSetupWorkspace({
         ) : groups.filter((group) => group.offerings.length > 0).map((group) => (
           <div className="report-table-wrap honor-table-wrap" key={group.key}>
             <h3 className="honor-group-heading">{group.title}</h3>
+            {classSort.noteText && <SortOrderNote>{classSort.noteText}</SortOrderNote>}
             <table className="report-table table-cards table-cards-xwide" role="table">
               <thead role="rowgroup">
                 <tr role="row">
-                  <th role="columnheader" scope="col">Honors</th>
-                  <th role="columnheader" scope="col">Youth seats taken</th>
-                  <th role="columnheader" scope="col">Min. age</th>
-                  <th role="columnheader" scope="col">Requires</th>
-                  <th role="columnheader" scope="col">Per club</th>
-                  <th role="columnheader" scope="col">Teacher</th>
-                  <th role="columnheader" scope="col">Location</th>
-                  <th role="columnheader" scope="col">Status</th>
+                  <SortableHeader {...classSort.headerProps("honors", { hiddenLabel: group.title })} />
+                  <SortableHeader {...classSort.headerProps("seats", { hiddenLabel: group.title })} />
+                  <SortableHeader {...classSort.headerProps("minimumAge", { hiddenLabel: group.title })} />
+                  <SortableHeader {...classSort.headerProps("requires", { hiddenLabel: group.title })} />
+                  <SortableHeader {...classSort.headerProps("perClub", { hiddenLabel: group.title })} />
+                  <SortableHeader {...classSort.headerProps("teacher", { hiddenLabel: group.title })} />
+                  <SortableHeader {...classSort.headerProps("location", { hiddenLabel: group.title })} />
+                  <SortableHeader {...classSort.headerProps("status", { hiddenLabel: group.title })} />
                   <th role="columnheader" scope="col"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody role="rowgroup">
-                {group.offerings.map((offering) => (
+                {classSort.apply(group.offerings).map((offering) => (
                   <tr key={offering.id} role="row">
                     <th className="roster-card-name" role="rowheader" scope="row">
                       {/* One line per honor the class teaches (#812). */}

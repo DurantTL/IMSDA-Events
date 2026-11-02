@@ -3,7 +3,8 @@ import { firstParam } from "@/lib/search-params";
 
 /** The pure half of the Club leaders list (#1277): reading the URL, the where-clause and the sort order. */
 
-export const CLUB_LEADERS_MAX_ROWS = 2000;
+/** One page of roles. The list is paged in the database, in the order below, so every page is a slice of the whole list (#1458). */
+export const CLUB_LEADERS_PAGE_SIZE = 50;
 
 export type ClubLeaderFilters = { clubId: string | null; role: ClubRoleValue | null };
 
@@ -59,10 +60,20 @@ export function leaderRoleLabel(role: ClubRoleValue): string {
   return CLUB_ROLE_LABELS[role];
 }
 
-export function clubLeadersHref(filters: ClubLeaderFilters): string {
+/** The same order, as a database `orderBy`: club name, role in the enum's order (Director first), person name, then id. */
+export const CLUB_LEADERS_ORDER_BY = [
+  { organization: { name: "asc" } },
+  { role: "asc" },
+  { attendeeAccount: { displayName: "asc" } },
+  { attendeeAccount: { email: "asc" } },
+  { id: "asc" },
+] as const;
+
+export function clubLeadersHref(filters: ClubLeaderFilters, page = 1): string {
   const params = new URLSearchParams();
   if (filters.clubId) params.set("club", filters.clubId);
   if (filters.role) params.set("role", filters.role.toLowerCase());
+  if (page > 1) params.set("page", String(page));
   const query = params.toString();
   return query ? `/admin/clubs/leaders?${query}` : "/admin/clubs/leaders";
 }

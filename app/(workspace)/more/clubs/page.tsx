@@ -9,13 +9,18 @@ import { getTeamSettings } from "@/modules/club-teams/settings-repository";
 import { listRegisteredClubs, resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { cardCell } from "@/components/table-card-labels";
+import { ColumnHeader } from "@/components/column-header";
+import { SortOrderNote } from "@/components/list-sort";
+import { serverSort, sortRows } from "@/lib/list-sort";
+import { EVENT_CLUBS_SORT_COLUMNS, UNSORTED, sortLine } from "@/lib/staff-sort-columns";
 
 export const metadata: Metadata = { title: staffPageTitles.clubs };
 export const dynamic = "force-dynamic";
 
 /** Every club registered for this Pathfinder event, for its event managers (#387). */
-export default async function EventClubsPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
-  const { event: requested } = await searchParams;
+export default async function EventClubsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const query = await searchParams;
+  const requested = typeof query.event === "string" ? query.event : undefined;
   const { event, allowed, clubEvent } = await resolveClubOversight(requested);
   if (!allowed && !clubEvent) {
     return <NotAvailableForEvent reason="Clubs register for Pathfinder events only, and this event is not one." />;
@@ -34,6 +39,16 @@ export default async function EventClubsPage({ searchParams }: { searchParams: P
   for (const person of backgroundFlags?.people ?? []) {
     if (person.organizationId) neededByClub.set(person.organizationId, (neededByClub.get(person.organizationId) ?? 0) + 1);
   }
+  // A team after the first shows "Club-wide, shown above" for Sterling Volunteers, so the row's place in the unsorted list is kept (#809).
+  const firstRowOfClub = new Map<string, number>();
+  clubs.forEach((club, index) => { if (!firstRowOfClub.has(club.organizationId)) firstRowOfClub.set(club.organizationId, index); });
+  const sorting = serverSort("/more/clubs", query, EVENT_CLUBS_SORT_COLUMNS, UNSORTED);
+  const rows = sortRows(clubs.map((club, index) => ({ club, first: firstRowOfClub.get(club.organizationId) === index })), sorting.order.key, sorting.order.dir, {
+    club: ({ club }) => (club.teamName ? `${club.teamName} (${club.name})` : club.name),
+    going: ({ club }) => club.attendeeCount,
+    sterling: ({ club, first }) => (first ? (neededByClub.get(club.organizationId) ?? 0) : null),
+    registration: ({ club }) => club.confirmationCode,
+  });
   return (
     <section className="page-stack">
       <div className="intro-actions club-admin-links">
@@ -54,18 +69,19 @@ export default async function EventClubsPage({ searchParams }: { searchParams: P
           <p className="quiet-copy"><UsersRound aria-hidden="true" size={15} /> No clubs have registered yet.</p>
         ) : (
           <div className="report-table-wrap">
+            {sorting.order.key && <SortOrderNote>{sortLine(sorting.order)}</SortOrderNote>}
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Registered clubs</caption>
-              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Club</th><th role="columnheader" scope="col">Going</th>{backgroundFlags && <th role="columnheader" scope="col">Sterling Volunteers</th>}<th role="columnheader" scope="col">Registration</th><th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr></thead>
+              <thead role="rowgroup"><tr role="row"><ColumnHeader column="club" label="Club" sorting={sorting} /><ColumnHeader column="going" label="Going" sorting={sorting} />{backgroundFlags && <ColumnHeader column="sterling" label="Sterling Volunteers" sorting={sorting} />}<ColumnHeader column="registration" label="Registration" sorting={sorting} /><th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr></thead>
               <tbody role="rowgroup">
-                {clubs.map((club, index) => (
+                {rows.map(({ club, first }) => (
                   <tr role="row" key={`${club.organizationId}:${club.teamKey}`}>
                     <th role="rowheader" scope="row" translate="no">{club.teamName ? `${club.teamName} (${club.name})` : club.name}{club.sponsoringChurch && <small> · {club.sponsoringChurch}</small>}</th>
                     <td {...cardCell("Going")}>{club.attendeeCount}</td>
                     {backgroundFlags && (
                       <td {...cardCell("Sterling Volunteers")}>
                         {/* Sterling Volunteers records are the club's, not a team's (#809): a club's count shows once, on its first team. */}
-                        {clubs.findIndex((other) => other.organizationId === club.organizationId) !== index
+                        {!first
                           ? <small className="quiet-copy">Club-wide, shown above</small>
                           : neededByClub.get(club.organizationId)
                             ? <><BackgroundCheckBadge /> <small className="quiet-copy">{neededByClub.get(club.organizationId)}{club.teamName ? " (club-wide)" : ""}</small></>

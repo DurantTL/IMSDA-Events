@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { CLUB_ROLE_LABELS, CLUB_ROLE_VALUES } from "@/modules/system-admin/people-directory-model";
-import { CLUB_LEADERS_MAX_ROWS, type ClubLeader, type ClubLeaderFilters } from "@/modules/system-admin/club-leaders-model";
+import { ListPager } from "@/components/list-pager";
+import { sliceFromCount, type PageSlice } from "@/lib/pagination";
+import { CLUB_LEADERS_PAGE_SIZE, type ClubLeader, type ClubLeaderFilters } from "@/modules/system-admin/club-leaders-model";
 import styles from "./people-directory.module.css";
 
 /** The Club leaders list (#1277): club and role filters (a GET form), then one row per current role. Names link to the person page only when the viewer may open it. */
@@ -9,12 +11,18 @@ export function ClubLeadersList({
   clubs,
   filters,
   canOpenPeople,
+  slice,
+  hrefFor,
 }: {
   leaders: readonly ClubLeader[];
   clubs: readonly { id: string; name: string }[];
   filters: ClubLeaderFilters;
   canOpenPeople: boolean;
+  /** Where this page sits in the whole list; a list that fits on one page needs none. */
+  slice?: Pick<PageSlice<unknown>, "from" | "page" | "pageCount" | "to" | "total">;
+  hrefFor?: (page: number) => string;
 }) {
+  const position = slice ?? sliceFromCount([...leaders], 1, leaders.length, CLUB_LEADERS_PAGE_SIZE);
   const filtered = Boolean(filters.clubId || filters.role);
   // Leaders are added on the club's own page (Club admins). With one club picked, go straight there.
   const addHref = filters.clubId ? `/admin/organizations/${encodeURIComponent(filters.clubId)}/directors` : "/admin/clubs";
@@ -42,9 +50,9 @@ export function ClubLeadersList({
         <button className="primary-button" type="submit">Show</button>
         {filtered ? <Link className="secondary-button" href="/admin/clubs/leaders">Clear filters</Link> : null}
       </form>
-      <p className={styles.count} role="status">
-        {leaders.length === 0 ? "No current club leaders found." : leaders.length >= CLUB_LEADERS_MAX_ROWS ? `Showing the first ${leaders.length} current roles. Pick a club or role to narrow the list.` : `${leaders.length} current ${leaders.length === 1 ? "role" : "roles"}.`}
-      </p>
+      {leaders.length === 0
+        ? <p className={styles.count} role="status">No current club leaders found.</p>
+        : <ListPager hrefFor={hrefFor} label="Club leader pages" noun="current roles" nounOne="current role" part="count" slice={position} />}
       {leaders.length === 0 ? (
         <p className={styles.empty}>{filtered ? "Nobody currently holds that role." : "No club has a current Director, Deputy, Registrar or Reporter."}</p>
       ) : (
@@ -72,6 +80,7 @@ export function ClubLeadersList({
           })}
         </ul>
       )}
+      {leaders.length > 0 && <ListPager hrefFor={hrefFor} label="Club leader pages" noun="current roles" nounOne="current role" part="pages" slice={position} />}
     </div>
   );
 }
