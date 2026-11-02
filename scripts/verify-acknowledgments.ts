@@ -19,7 +19,14 @@
  *   (registration, person, form version and policy version cannot be deleted from under it), a policy version of
  *   another event, of another kind, or a draft is refused, a minor row without authority, unapproved metadata and a
  *   duplicate are refused;
- * - an event that holds evidence cannot be deleted, and no export-bound row, audit row or message holds the wording.
+ * - an event that holds evidence cannot be deleted, and no export-bound row, audit row or message holds the wording;
+ * - decline and withdrawal (#130) are further events on the same history, never edits: accept, withdraw and accept
+ *   again leaves all three records, the first acceptance untouched and still the answer for the period before the
+ *   withdrawal; a decline is refused while a live acceptance stands; two real concurrent submissions under different
+ *   request ids end in exactly one acceptance, one decline and one withdrawal; withdrawals are append-only in the
+ *   database (no update, delete or truncate) and the database refuses a withdrawal of a decline, of another event's
+ *   evidence, or dated before its acceptance; a paper form needs the place it is kept, which never reaches a summary or
+ *   an audit row; and status at a past moment keeps the answer it had.
  *
  * Uses fictitious rows it creates and removes itself (removal of evidence needs the superuser bypass the local and CI
  * databases allow, because the product itself can never delete it).
@@ -38,6 +45,7 @@ import {
   assertAcknowledgmentPoliciesAvailable,
   getAcknowledgmentEvidencePayload,
   voidAcknowledgmentEvidence,
+  withdrawAcknowledgmentEvidence,
   listRegistrationAcknowledgments,
   recordAcknowledgmentEvidence,
   recordStaffAcknowledgment,
@@ -75,6 +83,9 @@ const PROGRAM_WORDING = "Synthetic program acknowledgment wording for the condit
 const ACTIVITY_WORDING = "Synthetic activity acknowledgment wording for the attendee conditional field.";
 const MAIN_BODY = "Synthetic policy body text that must only ever be read by exact version id.";
 const USER_AGENT = "Synthetic Agent/1.0";
+// Where a paper form lives (never what it says); must never reach a summary or an audit row.
+const PAPER_PLACE = "Synthetic office, event binder";
+const WITHDRAW_PLACE = "Synthetic cabinet, drawer two";
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000);
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -97,6 +108,7 @@ async function cleanup() {
   // The product can never delete evidence or a published policy version; the superuser bypass lets this check clear its own rows.
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SET LOCAL session_replication_role = replica`;
+    await tx.$executeRaw`DELETE FROM "AcknowledgmentWithdrawal" WHERE "eventId" IN (${Prisma.join(eventIds)})`;
     await tx.$executeRaw`DELETE FROM "AcknowledgmentVoid" WHERE "eventId" IN (${Prisma.join(eventIds)})`;
     await tx.$executeRaw`DELETE FROM "AcknowledgmentEvidence" WHERE "eventId" IN (${Prisma.join(eventIds)})`;
     await tx.$executeRaw`DELETE FROM "ConsentPolicyVersion" WHERE "policyId" IN (SELECT "id" FROM "ConsentPolicy" WHERE "eventId" IN (${Prisma.join(eventIds)}))`;
@@ -350,19 +362,19 @@ async function main() {
   const regId = family.registration.id;
   const paperRequest = randomUUID();
   const paper = await recordStaffAcknowledgment({
-    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_material_ack", attendeeId: dan.id, channel: "PAPER",
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_material_ack", attendeeId: dan.id, channel: "PAPER", paperLocation: PAPER_PLACE,
     acknowledgedAt: daysAgo(60), actorUserId: ids.staff, clientRequestId: paperRequest,
   });
   assert(paper.created && !paper.replayed && paper.evidence.channel === "PAPER" && paper.evidence.actedByPersonId === dan.personId, "a paper acknowledgment is recorded for the person themselves");
   const paperRow = await prisma.acknowledgmentEvidence.findUniqueOrThrow({ where: { id: paper.evidence.id } });
   assert(paperRow.recordedByUserId === ids.staff && paperRow.policyVersionId === histV1 && paperRow.shownText === null && Math.abs(paperRow.acknowledgedAt.getTime() - daysAgo(60).getTime()) < 60_000, "it names the staff member, the policy version of the registration's own form, and the paper's date");
   const again = await recordStaffAcknowledgment({
-    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_material_ack", attendeeId: dan.id, channel: "PAPER",
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_material_ack", attendeeId: dan.id, channel: "PAPER", paperLocation: PAPER_PLACE,
     acknowledgedAt: daysAgo(1), actorUserId: ids.staff, clientRequestId: paperRequest,
   });
   assert(again.replayed && !again.created && again.evidence.id === paper.evidence.id, "a retried staff request returns the first result");
   const sameContent = await recordStaffAcknowledgment({
-    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_material_ack", attendeeId: dan.id, channel: "PAPER",
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_material_ack", attendeeId: dan.id, channel: "PAPER", paperLocation: PAPER_PLACE,
     acknowledgedAt: daysAgo(2), actorUserId: ids.staff, clientRequestId: randomUUID(),
   });
   assert(!sameContent.created && !sameContent.replayed && sameContent.evidence.id === paper.evidence.id, "the same content entered again under a new request returns the row already on file");
@@ -378,7 +390,7 @@ async function main() {
   assert(typed.created && typed.evidence.channel === "STAFF_ENTERED", "an acknowledgment staff typed in for the person is recorded");
   // A minor on paper: only the declared adult can have signed.
   const minorRequest = (actedByPersonId: string | null) => recordStaffAcknowledgment({
-    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_material_ack", attendeeId: sam.id, channel: "PAPER",
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_material_ack", attendeeId: sam.id, channel: "PAPER", paperLocation: PAPER_PLACE,
     acknowledgedAt: daysAgo(60), actorUserId: ids.staff, clientRequestId: randomUUID(), actedByPersonId,
   });
   await expectCode(minorRequest(null), "ACTING_FOR_MINOR_NOT_AUTHORIZED", "the minor's own tick is not authority");
@@ -387,12 +399,12 @@ async function main() {
   const declared = await minorRequest(dan.personId);
   assert(declared.created && declared.evidence.guardianAuthorityId === samAuthority.id && declared.evidence.actedByPersonId === dan.personId, "the declared responsible adult can sign for the minor");
   await expectCode(recordStaffAcknowledgment({
-    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: ulf.id, channel: "PAPER",
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: ulf.id, channel: "PAPER", paperLocation: PAPER_PLACE,
     acknowledgedAt: daysAgo(10), actorUserId: ids.staff, clientRequestId: randomUUID(), actedByPersonId: dan.personId,
   }), "ACTING_FOR_ANOTHER_NOT_AUTHORIZED", "nobody signs for another adult");
   assert(await prisma.acknowledgmentEvidence.count({ where: { registrationId: regId, subjectPersonId: ulf.personId } }) === 0, "a refused entry records nothing");
   const bad = (overrides: Partial<Parameters<typeof recordStaffAcknowledgment>[0]>) => recordStaffAcknowledgment({
-    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: dan.id, channel: "PAPER", actorUserId: ids.staff, clientRequestId: randomUUID(), ...overrides,
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: dan.id, channel: "PAPER", paperLocation: PAPER_PLACE, actorUserId: ids.staff, clientRequestId: randomUUID(), ...overrides,
   });
   await expectCode(bad({ fieldKey: "no_such_field" }), "FIELD_NOT_FOUND", "an unknown field is refused");
   await expectCode(bad({ fieldKey: "first_name" }), "FIELD_NOT_FOUND", "a field that is not an acknowledgment is refused");
@@ -404,7 +416,7 @@ async function main() {
   await expectCode(bad({ fieldKey: "att_text_ack", attendeeId: ulf.id }), "FIELD_NOT_APPLICABLE", "a conditional acknowledgment that does not apply to the person is refused");
   await expectCode(bad({ actedByPersonId: "not-a-person" }), "ACTOR_NOT_FOUND", "the person who acknowledged must exist");
   const registrationLevel = await recordStaffAcknowledgment({
-    eventId: ids.eventA, registrationId: (await load(hidden.confirmationCode)).registration.id, fieldKey: "program_ack", channel: "PAPER", actorUserId: ids.staff, clientRequestId: randomUUID(),
+    eventId: ids.eventA, registrationId: (await load(hidden.confirmationCode)).registration.id, fieldKey: "program_ack", channel: "PAPER", paperLocation: PAPER_PLACE, actorUserId: ids.staff, clientRequestId: randomUUID(),
   }).then(() => "recorded", (error: unknown) => (error instanceof AcknowledgmentError ? error.code : String(error)));
   assert(registrationLevel === "FIELD_NOT_APPLICABLE", "a registration-level condition is judged on the stored answers");
 
@@ -531,14 +543,14 @@ async function main() {
   const voidAudit = await prisma.auditLog.findMany({ where: { eventId: ids.eventA, action: "ACKNOWLEDGMENT_VOIDED" } });
   assert(voidAudit.length === 1 && !JSON.stringify(voidAudit[0]).includes("Synthetic reason") && (voidAudit[0]!.metadata as Record<string, unknown>).evidenceId === typed.evidence.id, "audited once, with ids only and no reason");
   const reRecorded = await recordStaffAcknowledgment({
-    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: dan.id, channel: "PAPER",
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: dan.id, channel: "PAPER", paperLocation: PAPER_PLACE,
     acknowledgedAt: daysAgo(1), actorUserId: ids.staff, clientRequestId: randomUUID(),
   });
   assert(reRecorded.created && reRecorded.evidence.id !== typed.evidence.id && reRecorded.evidence.voidedAt === null, "a new acknowledgment can then be recorded");
   assert((await prisma.acknowledgmentEvidence.findUniqueOrThrow({ where: { id: reRecorded.evidence.id } })).generation === 1, "as the next generation");
   assert(statusOf(await view(), "hist_soft_ack", dan.id) === "ACKNOWLEDGED_EARLIER_VERSION", "and it counts again");
   const reAgain = await recordStaffAcknowledgment({
-    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: dan.id, channel: "PAPER",
+    eventId: ids.eventA, registrationId: regId, fieldKey: "hist_soft_ack", attendeeId: dan.id, channel: "PAPER", paperLocation: PAPER_PLACE,
     acknowledgedAt: daysAgo(1), actorUserId: ids.staff, clientRequestId: randomUUID(),
   });
   assert(!reAgain.created && reAgain.evidence.id === reRecorded.evidence.id, "recording it a third time while the new one stands returns that row");
@@ -599,6 +611,164 @@ async function main() {
   await prisma.event.update({ where: { id: ids.eventC }, data: { generalRegistrationLinkEnabled: false } });
   assert(await formError(updateRegistrationForm(ids.eventC, clubDraft.id, ids.staff, { definition: clubDraftDefinition("ATTENDEE"), expectedUpdatedAt: await expectedAt() })) === null, "an ordinary individual-registration event accepts it");
 
+  // ---- Decline, withdrawal and re-acceptance (#130) ----
+  const staffAck = (overrides: Partial<Parameters<typeof recordStaffAcknowledgment>[0]>) => recordStaffAcknowledgment({
+    eventId: ids.eventA, registrationId: regId, fieldKey: "att_text_ack", attendeeId: dan.id, channel: "STAFF_ENTERED", actorUserId: ids.staff, clientRequestId: randomUUID(), ...overrides,
+  });
+  const withdrawEvidence = (evidenceId: string, overrides: Partial<Parameters<typeof withdrawAcknowledgmentEvidence>[0]> = {}) => withdrawAcknowledgmentEvidence({
+    eventId: ids.eventA, registrationId: regId, evidenceId, channel: "STAFF_ENTERED", actorUserId: ids.staff, clientRequestId: randomUUID(), ...overrides,
+  });
+  const fieldRows = (fieldKey: string, attendeeId: string) => prisma.acknowledgmentEvidence.findMany({ where: { registrationId: regId, registrationAttendeeId: attendeeId, fieldKey }, orderBy: [{ generation: "asc" }, { recordedAt: "asc" }] });
+
+  // Accept, withdraw, accept again: three records, the first acceptance untouched, every past moment answered as it was.
+  const accepted = (await fieldRows("att_text_ack", dan.id))[0]!;
+  const T0 = accepted.acknowledgedAt.getTime();
+  // Every act below is dated between T0 and now (none may be in the future or before the latest act), so let enough time pass.
+  const settle = T0 + 3500 - Date.now();
+  if (settle > 0) await new Promise((resolve) => setTimeout(resolve, settle));
+  const acceptedBefore = JSON.stringify(accepted);
+  assert(accepted.action === "ACKNOWLEDGE" && accepted.paperLocation === null && accepted.channel === "ONLINE", "every earlier row is an acceptance with no paper location");
+  assert(statusOf(await view(), "att_text_ack", dan.id) === "ACKNOWLEDGED", "before anything else the person has acknowledged");
+  await expectCode(staffAck({ action: "DECLINE" }), "ALREADY_ACKNOWLEDGED", "a decline is refused while a live acceptance stands");
+  assert(await prisma.acknowledgmentEvidence.count({ where: { registrationId: regId, action: "DECLINE" } }) === 0, "and records nothing");
+  await expectCode(withdrawEvidence(accepted.id, { channel: "PAPER" }), "PAPER_LOCATION_REQUIRED", "a paper withdrawal needs the place the paper is kept");
+  await expectCode(withdrawEvidence(accepted.id, { paperLocation: WITHDRAW_PLACE }), "PAPER_LOCATION_NOT_ALLOWED", "and a staff-entered one has none");
+  await expectCode(withdrawEvidence(accepted.id, { withdrawnAt: new Date(Date.now() + 86_400_000) }), "WITHDRAWN_AT_INVALID", "a withdrawal dated in the future is refused");
+  await expectCode(withdrawEvidence(accepted.id, { withdrawnAt: new Date(T0 - 1000) }), "ACT_BEFORE_LATEST", "so is one dated before the acceptance");
+  await expectCode(withdrawEvidence(accepted.id, { actedByPersonId: ulf.personId }), "ACTING_FOR_ANOTHER_NOT_AUTHORIZED", "nobody withdraws for another adult");
+  await expectCode(withdrawEvidence(accepted.id, { eventId: ids.eventB }), "EVIDENCE_NOT_FOUND", "another event cannot withdraw it");
+  assert(await prisma.acknowledgmentWithdrawal.count({ where: { registrationId: regId } }) === 0, "refused withdrawals record nothing");
+  const withdrawKey = randomUUID();
+  const withdrawal = await withdrawEvidence(accepted.id, { channel: "PAPER", paperLocation: `  ${WITHDRAW_PLACE}  `, withdrawnAt: new Date(T0 + 1000), clientRequestId: withdrawKey });
+  assert(withdrawal.created && !withdrawal.replayed && withdrawal.withdrawal.evidenceId === accepted.id, "the person withdraws");
+  const withdrawalReplay = await withdrawEvidence(accepted.id, { channel: "PAPER", paperLocation: WITHDRAW_PLACE, withdrawnAt: new Date(T0 + 1000), clientRequestId: withdrawKey });
+  assert(withdrawalReplay.replayed && !withdrawalReplay.created && withdrawalReplay.withdrawal.id === withdrawal.withdrawal.id, "a retried request returns the first withdrawal");
+  const withdrawalAgain = await withdrawEvidence(accepted.id);
+  assert(!withdrawalAgain.created && withdrawalAgain.withdrawal.id === withdrawal.withdrawal.id, "withdrawing again under a new request id is the same withdrawal");
+  await expectCode(withdrawEvidence(accepted.id, { channel: "PAPER", paperLocation: "Another place", clientRequestId: withdrawKey }), "IDEMPOTENCY_CONFLICT", "one request id cannot describe a different withdrawal");
+  const withdrawalRow = await prisma.acknowledgmentWithdrawal.findUniqueOrThrow({ where: { evidenceId: accepted.id } });
+  assert(withdrawalRow.paperLocation === WITHDRAW_PLACE && withdrawalRow.recordedByUserId === ids.staff && withdrawalRow.channel === "PAPER" && withdrawalRow.actedByPersonId === dan.personId && withdrawalRow.withdrawnAt.getTime() === T0 + 1000, "it names the staff member, the person, the channel, the date and the trimmed place");
+  assert(JSON.stringify(await prisma.acknowledgmentEvidence.findUniqueOrThrow({ where: { id: accepted.id } })) === acceptedBefore, "the acceptance row is exactly as it was written");
+  assert(statusOf(await view(), "att_text_ack", dan.id) === "WITHDRAWN", "now the status is withdrawn");
+  await expectCode(staffAck({ acknowledgedAt: new Date(T0 + 500), clientRequestId: randomUUID() }), "ACT_BEFORE_LATEST", "A: a back-dated re-acceptance after the withdrawal is refused, so the status and the guards cannot disagree");
+  await expectCode(staffAck({ action: "DECLINE", acknowledgedAt: new Date(T0 + 500) }), "ACT_BEFORE_LATEST", "and so is a back-dated decline");
+  assert(statusOf(await view(), "att_text_ack", dan.id) === "WITHDRAWN", "the person still reads as withdrawn");
+  const reaccepted = await staffAck({ acknowledgedAt: new Date(T0 + 2000) });
+  const acceptedRows = await fieldRows("att_text_ack", dan.id);
+  assert(reaccepted.created && reaccepted.evidence.id !== accepted.id && acceptedRows.length === 2 && acceptedRows[1]!.generation === 1, "accepting again appends the next generation");
+  assert(await prisma.acknowledgmentWithdrawal.count({ where: { registrationId: regId } }) === 1, "three records in all: two acceptances and one withdrawal");
+  assert(statusOf(await view(new Date(T0 - 1000)), "att_text_ack", dan.id) === "NOT_ACKNOWLEDGED", "before the first acceptance: not acknowledged");
+  assert(statusOf(await view(new Date(T0 + 500)), "att_text_ack", dan.id) === "ACKNOWLEDGED", "at a past moment before the withdrawal the first acceptance still stands");
+  assert(statusOf(await view(new Date(T0 + 1500)), "att_text_ack", dan.id) === "WITHDRAWN", "between the withdrawal and the new acceptance: withdrawn");
+  assert(statusOf(await view(new Date(T0 + 3000)), "att_text_ack", dan.id) === "ACKNOWLEDGED", "after the new acceptance: acknowledged");
+  assert(statusOf(await view(), "att_text_ack", dan.id) === "ACKNOWLEDGED", "and today");
+  const acceptedPayload = await getAcknowledgmentEvidencePayload(ids.eventA, regId, accepted.id);
+  assert(acceptedPayload.shownText === ACTIVITY_WORDING && acceptedPayload.withdrawal?.paperLocation === WITHDRAW_PLACE, "the earlier acceptance is still on record, wording and withdrawal included, in the payload read");
+  const danView = (await view()).find((candidate) => candidate.fieldKey === "att_text_ack" && candidate.subject.kind === "ATTENDEE" && candidate.subject.attendeeId === dan.id)!;
+  assert(danView.evidence.length === 2 && danView.evidence[0]!.withdrawal?.channel === "PAPER" && danView.evidence[1]!.withdrawal === null, "the status read lists both acceptances and the withdrawal's time and channel");
+  assert(!JSON.stringify(await view()).includes(WITHDRAW_PLACE) && !JSON.stringify(await view()).includes(PAPER_PLACE), "and never a paper location");
+
+  // A minor's withdrawal needs the declared responsible adult, like the acceptance did.
+  const samAccepted = (await fieldRows("att_policy_ack", sam.id))[0]!;
+  await expectCode(withdrawEvidence(samAccepted.id), "ACTING_FOR_MINOR_NOT_AUTHORIZED", "the minor's own withdrawal is not authority");
+  await expectCode(withdrawEvidence(samAccepted.id, { actedByPersonId: ulf.personId }), "ACTING_FOR_MINOR_NOT_AUTHORIZED", "an adult who was not declared is refused");
+  const samWithdrawn = await withdrawEvidence(samAccepted.id, { actedByPersonId: dan.personId, channel: "PAPER", paperLocation: WITHDRAW_PLACE });
+  const samWithdrawalRow = await prisma.acknowledgmentWithdrawal.findUniqueOrThrow({ where: { id: samWithdrawn.withdrawal.id } });
+  assert(samWithdrawn.created && samWithdrawalRow.guardianAuthorityId === samAuthority.id && samWithdrawalRow.subjectMinorStatus === "MINOR", "the declared responsible adult can withdraw for the minor, naming the authority");
+
+  // Two real concurrent submissions under different request ids end in exactly one action event.
+  const acceptRace = await Promise.all(Array.from({ length: 6 }, () => staffAck({ fieldKey: "hist_soft_ack", attendeeId: ulf.id })));
+  assert(acceptRace.filter((outcome) => outcome.created).length === 1 && new Set(acceptRace.map((outcome) => outcome.evidence.id)).size === 1, "six concurrent acceptances, different request ids: one created, all see the same row");
+  assert((await fieldRows("hist_soft_ack", ulf.id)).length === 1, "exactly one acceptance row exists");
+  const ulfAccepted = acceptRace[0]!.evidence;
+  const withdrawRace = await Promise.all(Array.from({ length: 6 }, () => withdrawEvidence(ulfAccepted.id)));
+  assert(withdrawRace.filter((outcome) => outcome.created).length === 1 && new Set(withdrawRace.map((outcome) => outcome.withdrawal.id)).size === 1, "six concurrent withdrawals: one created, all see the same one");
+  assert(await prisma.acknowledgmentWithdrawal.count({ where: { evidenceId: ulfAccepted.id } }) === 1, "exactly one withdrawal row exists");
+  const ulfAgain = await staffAck({ fieldKey: "hist_soft_ack", attendeeId: ulf.id });
+  assert(ulfAgain.created && (await fieldRows("hist_soft_ack", ulf.id)).map((row) => row.generation).join() === "0,1", "and accepting again after the withdrawal is the next generation");
+  const declineRace = await Promise.all(Array.from({ length: 6 }, () => staffAck({ fieldKey: "hist_material_ack", attendeeId: ulf.id, action: "DECLINE", channel: "PAPER", paperLocation: PAPER_PLACE })));
+  const declineRows = await fieldRows("hist_material_ack", ulf.id);
+  assert(declineRace.filter((outcome) => outcome.created).length === 1 && declineRows.length === 1 && declineRows[0]!.action === "DECLINE" && declineRows[0]!.generation === 0, "six concurrent declines: exactly one decline row");
+  assert(declineRows[0]!.paperLocation === PAPER_PLACE && declineRows[0]!.shownText === null && declineRows[0]!.policyVersionId === histV1, "it records the place the paper is kept and the version shown");
+  assert(statusOf(await view(), "hist_material_ack", ulf.id) === "DECLINED", "the status is declined");
+  await expectCode(withdrawEvidence(declineRows[0]!.id), "EVIDENCE_NOT_WITHDRAWABLE", "a decline cannot be withdrawn");
+  const declineRepeat = await staffAck({ fieldKey: "hist_material_ack", attendeeId: ulf.id, action: "DECLINE", channel: "PAPER", paperLocation: PAPER_PLACE });
+  assert(!declineRepeat.created && declineRepeat.evidence.id === declineRows[0]!.id, "a repeat decline returns the one on file");
+  await expectCode(staffAck({ fieldKey: "hist_material_ack", attendeeId: ulf.id, acknowledgedAt: daysAgo(5) }), "ACT_BEFORE_LATEST", "B: a back-dated acceptance before the decline is refused");
+  assert(statusOf(await view(), "hist_material_ack", ulf.id) === "DECLINED", "the decline still stands");
+  const afterDecline = await staffAck({ fieldKey: "hist_material_ack", attendeeId: ulf.id });
+  assert(afterDecline.created && statusOf(await view(), "hist_material_ack", ulf.id) === "REACKNOWLEDGMENT_REQUIRED", "accepting after a decline is allowed; version 2 is a material change, so a fresh agreement is still required");
+  const declineAudit = await prisma.auditLog.findMany({ where: { eventId: ids.eventA, action: "ACKNOWLEDGMENT_DECLINED" } });
+  assert(declineAudit.length === 1, "the decline is audited once");
+
+  // C: two versions accepted, then one withdrawal ends both; only the current acceptance can be withdrawn.
+  const mainV2 = await prisma.consentPolicyVersion.findFirstOrThrow({ where: { policyId: main.id, versionNumber: 2 } });
+  const versionAck = (policyVersionId: string, acknowledgedAt: Date) => prisma.$transaction((tx) => recordAcknowledgmentEvidence(tx, {
+    eventId: ids.eventA, registrationId: regId, formVersionId: ids.formVersion, field: policyField(policyVersionId),
+    attendee: { attendeeId: ulf.id, personId: ulf.personId, status: "ADULT" }, actedByPersonId: ulf.personId, channel: "STAFF_ENTERED", recordedByUserId: ids.staff,
+    acknowledgedAt, idempotencyKey: randomUUID(),
+  }));
+  const cV1 = await versionAck(mainV1.id, daysAgo(3));
+  const cV2 = await versionAck(mainV2.id, daysAgo(2));
+  assert(cV1.created && cV2.created, "two versions of one policy are both accepted");
+  await expectCode(withdrawEvidence(cV1.evidence.id, { withdrawnAt: daysAgo(1) }), "NOT_CURRENT_ACCEPTANCE", "C: withdrawing the superseded version is refused");
+  const cWithdrawn = await withdrawEvidence(cV2.evidence.id, { withdrawnAt: daysAgo(1) });
+  assert(cWithdrawn.created && statusOf(await view(), "att_policy_ack", ulf.id) === "WITHDRAWN", "withdrawing the current one ends both");
+  await expectCode(withdrawEvidence(cV1.evidence.id), "NOT_CURRENT_ACCEPTANCE", "the superseded row has no withdrawal of its own and still cannot be withdrawn");
+  await expectCode(voidAcknowledgmentEvidence({ eventId: ids.eventA, registrationId: regId, evidenceId: cV2.evidence.id, reason: "Synthetic reason.", actorUserId: ids.staff }), "EVIDENCE_WITHDRAWN", "a withdrawn acceptance cannot be voided");
+  assert(statusOf(await view(), "att_policy_ack", ulf.id) === "WITHDRAWN" && await prisma.acknowledgmentVoid.count({ where: { evidenceId: cV2.evidence.id } }) === 0, "so the status stays withdrawn and no void was written");
+  const cV1Again = await versionAck(mainV1.id, new Date(Date.now() - 3_600_000));
+  assert(cV1Again.created && cV1Again.evidence.id !== cV1.evidence.id && statusOf(await view(), "att_policy_ack", ulf.id) === "ACKNOWLEDGED", "accepting the first version again creates a new row (the database accepts its generation) and the status reads acknowledged");
+  const cV2Again = await versionAck(mainV2.id, new Date());
+  assert(cV2Again.created && cV2Again.evidence.id !== cV2.evidence.id, "so does the second");
+  assert((await fieldRows("att_policy_ack", ulf.id)).map((row) => row.generation).join() === "0,0,1,1", "generations count the ended rows of each content");
+  assert(!(await versionAck(mainV1.id, new Date())).created, "and a repeat of a standing acceptance returns it");
+  // A withdrawal retry that names the default person explicitly replays.
+  const defaultKey = randomUUID();
+  const wDefault = await withdrawEvidence(cV2Again.evidence.id, { clientRequestId: defaultKey });
+  const wExplicit = await withdrawEvidence(cV2Again.evidence.id, { clientRequestId: defaultKey, actedByPersonId: ulf.personId });
+  assert(wDefault.created && wExplicit.replayed && wExplicit.withdrawal.id === wDefault.withdrawal.id, "a retry naming the default person replays instead of conflicting");
+
+  // The database: withdrawals are append-only and checked on insert.
+  assert(await rejects(prisma.acknowledgmentWithdrawal.update({ where: { id: withdrawal.withdrawal.id }, data: { paperLocation: "Rewritten" } }), /append-only/), "a withdrawal is not edited");
+  assert(await rejects(prisma.acknowledgmentWithdrawal.delete({ where: { id: withdrawal.withdrawal.id } }), /append-only/), "a withdrawal is not deleted");
+  assert(await rejects(prisma.acknowledgmentWithdrawal.deleteMany({ where: { eventId: ids.eventA } }), /append-only/), "a bulk delete is refused too");
+  assert(await rejects(prisma.$executeRawUnsafe('TRUNCATE TABLE "AcknowledgmentWithdrawal"'), /append-only/), "and TRUNCATE");
+  assert(await rejects(prisma.$executeRawUnsafe(`DELETE FROM "AcknowledgmentWithdrawal" WHERE "id" = '${withdrawal.withdrawal.id}'`), /append-only/), "and a raw delete, with no exception for anyone");
+  assert(await rejects(prisma.acknowledgmentEvidence.delete({ where: { id: accepted.id } }), /append-only|foreign key|violates/i), "the withdrawn acceptance cannot be deleted either");
+  const withdrawalBase = {
+    eventId: ids.eventA, registrationId: regId, evidenceId: ulfAgain.evidence.id, actedByPersonId: ulf.personId, recordedByUserId: ids.staff, channel: "STAFF_ENTERED" as const,
+    subjectMinorStatus: "ADULT", withdrawnAt: new Date(), requestHash: "raw",
+  };
+  const rawWithdrawal = (overrides: Record<string, unknown>) => prisma.acknowledgmentWithdrawal.create({ data: { ...withdrawalBase, idempotencyKey: `${P}-rw-${randomUUID()}`, ...overrides } as Prisma.AcknowledgmentWithdrawalUncheckedCreateInput });
+  assert(await rejects(rawWithdrawal({ evidenceId: declineRows[0]!.id }), /must name an acceptance/), "the database refuses a withdrawal of a decline");
+  assert(await rejects(rawWithdrawal({ eventId: ids.eventB }), /must name an acceptance/), "or of another event's evidence");
+  assert(await rejects(rawWithdrawal({ withdrawnAt: new Date(new Date(ulfAgain.evidence.acknowledgedAt).getTime() - 1000) }), /before the acceptance/), "or one dated before its acceptance");
+  assert(await rejects(rawWithdrawal({ evidenceId: accepted.id }), /unique/i), "a second withdrawal of the same acceptance, whatever the request id");
+  assert(await rejects(rawWithdrawal({ channel: "ONLINE" }), /channel_check|check constraint/i), "an online withdrawal naming a staff recorder");
+  assert(await rejects(rawWithdrawal({ paperLocation: "Not paper" }), /paper_location_check|check constraint/i), "a paper location on a staff-entered withdrawal");
+  assert(await rejects(rawWithdrawal({ channel: "PAPER", paperLocation: "x".repeat(201) }), /paper_location_check|check constraint/i), "a paper location over 200 characters");
+  assert(await rejects(rawWithdrawal({ subjectMinorStatus: "MINOR", guardianAuthorityId: null }), /minor_check|check constraint/i), "a minor's withdrawal without authority");
+  // Evidence-side guards for the new columns.
+  assert(await rejects(raw({ action: "DECLINE" }), /decline_channel_check|check constraint/i), "an online decline is refused by the database");
+  assert(await rejects(raw({ channel: "STAFF_ENTERED", recordedByUserId: ids.staff, paperLocation: "Not paper" }), /paper_location_check|check constraint/i), "a paper location on a row that is not paper is refused");
+  assert(await rejects(raw({ channel: "PAPER", recordedByUserId: ids.staff, paperLocation: "   " }), /paper_location_check|check constraint/i), "a blank paper location is refused");
+  const ulfDeclineBase = {
+    registrationAttendeeId: ulf.id, subjectPersonId: ulf.personId, actedByPersonId: ulf.personId, channel: "STAFF_ENTERED", recordedByUserId: ids.staff, action: "DECLINE",
+    fieldId: `${P}_a_hist_ack`, fieldKey: "hist_material_ack", policyVersionId: histV1, contentHash: "hash", contentRef: `policy:${histV1}`,
+  };
+  await raw({ ...ulfDeclineBase });
+  await raw({ ...ulfDeclineBase });
+  assert((await fieldRows("hist_material_ack", ulf.id)).filter((row) => row.action === "DECLINE").length === 3, "decline rows are outside the unique indexes: the database allows more than one");
+  assert(await rejects(raw({ ...ulfDeclineBase, generation: 1 }), /generation must equal/), "but a decline's generation is always 0");
+  assert(await rejects(raw({ ...ulfDeclineBase, action: "ACKNOWLEDGE", fieldKey: "hist_soft_ack", fieldId: `${P}_a_soft_ack`, policyVersionId: softV1, contentRef: `policy:${softV1}`, generation: 0 }), /generation must equal/), "and an acceptance of content that was withdrawn must be the next generation");
+
+  // Audit rows for the new events hold ids and flags only.
+  const withdrawalAudits = await prisma.auditLog.findMany({ where: { eventId: ids.eventA, action: "ACKNOWLEDGMENT_WITHDRAWN" } });
+  assert(withdrawalAudits.length === await prisma.acknowledgmentWithdrawal.count({ where: { eventId: ids.eventA } }), "every withdrawal is audited once");
+  const newAudits = JSON.stringify([...withdrawalAudits, ...declineAudit]);
+  assert(!newAudits.includes(WITHDRAW_PLACE) && !newAudits.includes(PAPER_PLACE) && !newAudits.includes(ACTIVITY_WORDING), "no audit row holds a paper location or wording");
+
   // ---- Event deletion refuses while evidence exists ----
   const actor = { userId: ids.staff, globalRole: "SYSTEM_ADMIN" as const };
   const preview = await getEventDeletionPreview(ids.eventA, actor);
@@ -617,11 +787,11 @@ async function main() {
     audit: await prisma.auditLog.findMany({ where: { eventId: ids.eventA } }),
     messages: await prisma.messageOutbox.findMany({ where: { registrationId: { in: allRegistrations } } }),
   });
-  for (const secret of [TEXT_WORDING, PROGRAM_WORDING, ACTIVITY_WORDING, MAIN_BODY, sha256(TEXT_WORDING)]) {
+  for (const secret of [TEXT_WORDING, PROGRAM_WORDING, ACTIVITY_WORDING, MAIN_BODY, sha256(TEXT_WORDING), PAPER_PLACE, WITHDRAW_PLACE]) {
     assert(!surfaces.includes(JSON.stringify(secret).slice(1, -1)), "the wording appears in no response snapshot, registration row, audit row or message");
   }
-  const audits = await prisma.auditLog.findMany({ where: { eventId: ids.eventA, action: "ACKNOWLEDGMENT_RECORDED" } });
-  assert(audits.length === await prisma.acknowledgmentEvidence.count({ where: { eventId: ids.eventA } }), "every evidence row is audited once");
+  const audits = await prisma.auditLog.findMany({ where: { eventId: ids.eventA, action: { in: ["ACKNOWLEDGMENT_RECORDED", "ACKNOWLEDGMENT_DECLINED"] } } });
+  assert(audits.length === await prisma.acknowledgmentEvidence.count({ where: { eventId: ids.eventA, NOT: { idempotencyKey: { startsWith: `${P}-raw` } } } }), "every evidence row is audited once");
   for (const entry of audits) {
     const metadata = entry.metadata as Record<string, unknown>;
     assert(!("shownText" in metadata) && !("fieldLabel" in metadata) && !("requestMetadata" in metadata) && !("userAgentHash" in metadata), "an evidence audit row carries ids and flags only");

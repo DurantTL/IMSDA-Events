@@ -48,10 +48,46 @@ How it works is in `modules/acknowledgments/README.md`. This page records what a
   (`ACKNOWLEDGMENT_VOIDED`) holds ids only, and the status read shows only the time of the void.
 - There is no screen for it yet; it is an API.
 
+## Declining, withdrawing and accepting again (#130)
+
+All of this is staff-recorded through the API. Nothing is edited: each is a new record, and where a person stands is worked out
+from the history.
+
+- **Decline.** `POST .../acknowledgments` with `"action": "DECLINE"` (the default is `"ACKNOWLEDGE"`). Same rules as an
+  acknowledgment: the person must be the subject or, for a minor, the declared responsible adult; the wording is read from the
+  registration's own form version. If the person already has a standing acknowledgment, the answer is 409 `ALREADY_ACKNOWLEDGED`:
+  withdraw it instead. Recording the same decline again returns the one on file. There is no online decline: leaving a box
+  unticked is not a decline.
+- **Withdraw.** `POST .../acknowledgments/{evidenceId}/withdraw` with `{ "channel": "STAFF_ENTERED" | "PAPER", "withdrawnAt"?,
+  "actedByPersonId"?, "paperLocation"?, "clientRequestId" }` (MANAGE_REGISTRATION). The date cannot be in the future or before
+  the acknowledgment. A voided acknowledgment or a decline cannot be withdrawn. Withdrawing twice is the same withdrawal.
+- **The earlier acknowledgment stays on record.** A withdrawal never changes the acceptance row. Asked about a date before the
+  withdrawal, the person is still acknowledged; from the withdrawal on, the status is "Withdrawn".
+- **Accepting again.** After a withdrawal (or a void) the same wording can be accepted again; it is recorded as a new row. All
+  three records (the first acceptance, the withdrawal, the new acceptance) are kept.
+- **A withdrawn acknowledgment cannot be voided** (409 `EVIDENCE_WITHDRAWN`): voiding would silently undo the withdrawal. Correct a mistake by recording a fresh acknowledgment, decline or withdrawal.
+- **Statuses.** In addition to the earlier ones: "Declined" and "Withdrawn". The latest decline, acceptance or withdrawal
+  (by its own date) decides.
+- **Paper location.** When the channel is `PAPER`, `paperLocation` is required (1 to 200 characters): **where the paper form is
+  kept** (for example "Conference office, event binder"), never what it says. It is refused for other channels, appears only in the
+  sensitive payload read (VIEW_SENSITIVE_DATA), and is never in a status read, an audit entry, a log or an export.
+- **Re-consent after a material change.** Declared in `modules/acknowledgments/reconsent-rule.ts`: when a later policy version is
+  marked a material change, the person must agree again (status "Needs to acknowledge the updated policy") and their earlier
+  acknowledgment stays valid evidence for the period it covered; a non-material change carries forward. This is proposed in
+  `docs/decisions/0016-consent-withdrawal-and-reconsent.md` and **waits for the owner to confirm**.
+- **Two submissions at once.** Staff pressing the button twice, or two people entering the same record, end in exactly one record
+  even with different request ids.
+
+### Known gaps for decline and withdrawal
+
+- There is no separate record of "what was presented" apart from the evidence row (which already holds the exact text, or the
+  policy version by id). A separate table is deferred.
+- No online or attendee-portal decline or withdrawal, and no staff screen: API only.
+
 ## Staff recording an acknowledgment (API)
 
-`POST /api/events/{eventId}/registrations/{registrationId}/acknowledgments` with `channel` `STAFF_ENTERED` or `PAPER`. Keep the
-same `clientRequestId` when retrying. For a minor, name the declared responsible adult as `actedByPersonId`. See the module
+`POST /api/events/{eventId}/registrations/{registrationId}/acknowledgments` with `channel` `STAFF_ENTERED` or `PAPER` (a `PAPER`
+record also needs `paperLocation`: where the paper is kept, never what it says). Keep the same `clientRequestId` when retrying. For a minor, name the declared responsible adult as `actedByPersonId`. See the module
 README for the request and the refusals. There is no screen for this yet.
 
 ## Checking a person's status
@@ -61,8 +97,9 @@ a moment. It never includes the wording; staff with sensitive-data access can op
 
 ## Verification
 
-`npm run test:acknowledgments` (real PostgreSQL, wired into CI) and the Vitest files `tests/acknowledgment-*.test.ts` and
-`tests/guardian-active-authority.test.ts`.
+`npm run test:acknowledgments` (real PostgreSQL, wired into CI; it includes real concurrent submissions, accept, withdraw and accept
+again, the append-only guards on withdrawals, and status at a past date) and the Vitest files `tests/acknowledgment-*.test.ts`
+and `tests/guardian-active-authority.test.ts`.
 
 ## Typed signatures (#1265)
 

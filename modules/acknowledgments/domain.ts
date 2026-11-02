@@ -6,6 +6,7 @@ import {
 } from "@/modules/forms/definition";
 import type { MinorStatus } from "@/modules/guardian-authority/domain";
 import { acknowledgmentFields } from "@/modules/acknowledgments/fields";
+import { RECONSENT_RULE, type ReconsentRule } from "@/modules/acknowledgments/reconsent-rule";
 
 // The client-safe pieces live in `fields.ts`; re-exported so server callers keep importing from here.
 export { acknowledgmentFields } from "@/modules/acknowledgments/fields";
@@ -21,6 +22,10 @@ export type { AcknowledgmentDisplay } from "@/modules/acknowledgments/fields";
 
 export const acknowledgmentChannels = ["ONLINE", "STAFF_ENTERED", "PAPER"] as const;
 export type AcknowledgmentChannel = (typeof acknowledgmentChannels)[number];
+
+/** What a recorded act was: the person agreed, or was shown the wording and declined. Withdrawing is its own record (#130). */
+export const acknowledgmentActions = ["ACKNOWLEDGE", "DECLINE"] as const;
+export type AcknowledgmentAction = (typeof acknowledgmentActions)[number];
 
 export const channelLabels: Record<AcknowledgmentChannel, string> = {
   ONLINE: "Online",
@@ -163,6 +168,34 @@ export function planAcknowledgments(
 // Retries
 // ---------------------------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------------------------
+// Where the paper lives
+// ---------------------------------------------------------------------------------------------
+
+export const PAPER_LOCATION_MAX = 200;
+export const PAPER_LOCATION_HELP = "Enter where the paper form is kept (for example, an office or binder name). Never write what the paper says.";
+
+export type PaperLocationResult =
+  | { ok: true; value: string | null }
+  | { ok: false; code: "PAPER_LOCATION_REQUIRED" | "PAPER_LOCATION_NOT_ALLOWED"; message: string };
+
+/**
+ * A paper form's physical location (#130): required, 1 to 200 characters once trimmed, when the channel is PAPER, and refused
+ * for every other channel. It says where the paper is, never its contents, so it is never put in an audit row or an export.
+ */
+export function normalizePaperLocation(channel: AcknowledgmentChannel, raw: string | null | undefined): PaperLocationResult {
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (channel !== "PAPER") {
+    return value.length > 0
+      ? { ok: false, code: "PAPER_LOCATION_NOT_ALLOWED", message: "A paper location only applies to a paper form." }
+      : { ok: true, value: null };
+  }
+  if (value.length === 0 || value.length > PAPER_LOCATION_MAX) {
+    return { ok: false, code: "PAPER_LOCATION_REQUIRED", message: PAPER_LOCATION_HELP };
+  }
+  return { ok: true, value };
+}
+
 export type EvidenceIdentity = {
   eventId: string;
   registrationId: string;
@@ -171,6 +204,10 @@ export type EvidenceIdentity = {
   actedByPersonId: string;
   channel: AcknowledgmentChannel;
   contentRef: string;
+  /** Left out of the hash for an acknowledgment, so a row written before declines existed still replays. */
+  action?: AcknowledgmentAction;
+  /** Left out of the hash when null, for the same reason. */
+  paperLocation?: string | null;
 };
 
 /**
@@ -186,7 +223,14 @@ export function evidenceRequestHash(identity: EvidenceIdentity) {
     identity.actedByPersonId,
     identity.channel,
     identity.contentRef,
+    ...(identity.action && identity.action !== "ACKNOWLEDGE" ? [identity.action] : []),
+    ...(identity.paperLocation ? [identity.paperLocation] : []),
   ]));
+}
+
+/** What a withdrawal request means, for telling a retry from a different request that reuses a key. The moment is left out. */
+export function withdrawalRequestHash(identity: { eventId: string; registrationId: string; evidenceId: string; actedByPersonId: string | null; channel: AcknowledgmentChannel; paperLocation: string | null }) {
+  return sha256(JSON.stringify(["withdraw", identity.eventId, identity.registrationId, identity.evidenceId, identity.actedByPersonId, identity.channel, identity.paperLocation]));
 }
 
 /** The key a registration form submission gives each acknowledgment it records, stable across a retried submission. */
@@ -208,6 +252,8 @@ export const acknowledgmentStatuses = [
   "ACKNOWLEDGED",
   "ACKNOWLEDGED_EARLIER_VERSION",
   "REACKNOWLEDGMENT_REQUIRED",
+  "DECLINED",
+  "WITHDRAWN",
 ] as const;
 export type AcknowledgmentStatusCode = (typeof acknowledgmentStatuses)[number];
 
@@ -216,33 +262,126 @@ export const statusLabels: Record<AcknowledgmentStatusCode, string> = {
   ACKNOWLEDGED: "Acknowledged",
   ACKNOWLEDGED_EARLIER_VERSION: "Acknowledged an earlier version",
   REACKNOWLEDGMENT_REQUIRED: "Needs to acknowledge the updated policy",
+  DECLINED: "Declined",
+  WITHDRAWN: "Withdrawn",
 };
 
+/** One recorded act, as the status rules read it: an acceptance or decline, with whatever later corrected or withdrew it. */
+export type HistoryRow = {
+  /** The evidence row id: the last tie-break, so every reader orders exact ties the same way. */
+  id?: string;
+  action: AcknowledgmentAction;
+  acknowledgedAt: string;
+  recordedAt: string;
+  /** When staff voided it (a correction); null while it stands. */
+  voidedAt?: string | null;
+  /** When it was withdrawn (acceptances only). */
+  withdrawal?: { withdrawnAt: string; recordedAt?: string | null } | null;
+};
+
+export type LiveAction<Row extends HistoryRow> =
+  | { kind: "ACKNOWLEDGE"; row: Row }
+  | { kind: "DECLINE"; row: Row }
+  | { kind: "WITHDRAWAL"; row: Row };
+
+const FAR_FUTURE = new Date(8_640_000_000_000_000);
+const ms = (value: string) => new Date(value).getTime();
+
 /**
- * Where a person stands at a moment, from their latest evidence at or before it.
+ * The one total order of events (an act at its moment, or a withdrawal at its moment): when it took effect, then when it was
+ * recorded, then the evidence row id, then an acceptance before its own withdrawal. Status and "does this withdrawal end that
+ * acceptance" both use it, so they can never disagree on an exact tie. The migration's generation trigger uses the same order.
+ */
+type EventKey = { time: number; recorded: number; id: string; sub: 0 | 1 };
+function compareEvents(a: EventKey, b: EventKey) {
+  return a.time - b.time || a.recorded - b.recorded || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) || a.sub - b.sub;
+}
+function actKey(row: HistoryRow): EventKey {
+  return { time: ms(row.acknowledgedAt), recorded: ms(row.recordedAt), id: row.id ?? "", sub: 0 };
+}
+function withdrawalKey(row: HistoryRow): EventKey {
+  const withdrawal = row.withdrawal!;
+  return { time: ms(withdrawal.withdrawnAt), recorded: ms(withdrawal.recordedAt ?? row.recordedAt), id: row.id ?? "", sub: 1 };
+}
+
+/**
+ * The latest live act for one subject and field at a moment (#130): the history, never a stored status.
  *
- * - No evidence yet: not acknowledged.
+ * Considered, at or before the moment: acceptances and declines at their `acknowledgedAt` (a row voided by then is
+ * skipped), and withdrawals at their `withdrawnAt` (skipped when the acceptance behind it was voided by then). The latest
+ * wins (see `compareEvents` for ties). A withdrawal changes nothing before its own moment, so the acceptance it
+ * withdrew stays valid evidence for the period before it. Omit the moment for "everything recorded so far".
+ */
+export function latestLiveAction<Row extends HistoryRow>(rows: ReadonlyArray<Row>, at: Date = FAR_FUTURE): LiveAction<Row> | null {
+  const limit = at.getTime();
+  const events: Array<{ key: EventKey; order: number; action: LiveAction<Row> }> = [];
+  rows.forEach((row, index) => {
+    if (row.voidedAt && ms(row.voidedAt) <= limit) return;
+    const given = actKey(row);
+    if (given.time <= limit) events.push({ key: given, order: index, action: { kind: row.action, row } });
+    if (row.action === "ACKNOWLEDGE" && row.withdrawal) {
+      const withdrawn = withdrawalKey(row);
+      if (withdrawn.time <= limit) events.push({ key: withdrawn, order: index, action: { kind: "WITHDRAWAL", row } });
+    }
+  });
+  events.sort((a, b) => compareEvents(a.key, b.key) || a.order - b.order);
+  return events[events.length - 1]?.action ?? null;
+}
+
+/**
+ * Whether an acceptance still stands: not voided, and not ended by a withdrawal. A withdrawal ends every acceptance for its
+ * subject and field that comes before it in the order of events (a withdrawal whose own acceptance was voided is skipped,
+ * as in the status rules). Rows that come after it are unaffected.
+ */
+export function isLiveAcceptance(row: HistoryRow, history: ReadonlyArray<HistoryRow>): boolean {
+  if (row.action !== "ACKNOWLEDGE" || row.voidedAt) return false;
+  const mine = actKey(row);
+  return !history.some((other) => other.withdrawal && !other.voidedAt && compareEvents(withdrawalKey(other), mine) >= 0);
+}
+
+/** Whether the subject and field currently stand accepted: the latest live act (now) is an acceptance. One definition, used by every guard. */
+export function hasLiveAcceptance<Row extends HistoryRow>(rows: ReadonlyArray<Row>): boolean {
+  return latestLiveAction(rows)?.kind === "ACKNOWLEDGE";
+}
+
+/** The moment a live act took effect: a withdrawal's own date, otherwise the date it was given. */
+export function liveActMoment<Row extends HistoryRow>(action: LiveAction<Row>): number {
+  return action.kind === "WITHDRAWAL" ? ms(action.row.withdrawal!.withdrawnAt) : ms(action.row.acknowledgedAt);
+}
+
+/**
+ * Where a person stands at a moment, from their latest live act at or before it (see `latestLiveAction`).
+ *
+ * - No act yet: not acknowledged.
+ * - The latest act is a decline: declined. The latest is a withdrawal: withdrawn.
  * - Text, or the policy version still in force (or none in force): acknowledged.
- * - A later version took effect: if any version after the one they saw, up to the one in force, was marked a material
- *   change by a human, they must acknowledge again; otherwise they acknowledged an earlier version that still stands.
+ * - A later version took effect: the declared re-consent rule decides. Under the default, any version after the one they
+ *   saw, up to the one in force, that a human marked a material change means they must acknowledge again; otherwise they
+ *   acknowledged an earlier version that still stands.
  *
  * Judgment about materiality is never inferred here: the flag is the publisher's, recorded at publish time (#129).
  */
-export function resolveAcknowledgmentStatus(input: {
-  evidence: { source: "TEXT" | "POLICY_VERSION" } | null;
-  /** Only for a policy-version acknowledgment. */
-  policy?: {
-    evidenceVersionNumber: number;
-    /** The version in force at the moment asked about; null when none is. */
-    effective: { versionNumber: number } | null;
-    /** Whether any version after the evidence's, up to the one in force, is a material change. */
-    laterVersionIsMaterial: boolean;
-  };
-}): AcknowledgmentStatusCode {
+export function resolveAcknowledgmentStatus(
+  input: {
+    evidence: { source: "TEXT" | "POLICY_VERSION"; /** Defaults to an acceptance. */ action?: AcknowledgmentAction | "WITHDRAWAL" } | null;
+    /** Only for a policy-version acknowledgment. */
+    policy?: {
+      evidenceVersionNumber: number;
+      /** The version in force at the moment asked about; null when none is. */
+      effective: { versionNumber: number } | null;
+      /** Whether any version after the evidence's, up to the one in force, is a material change. */
+      laterVersionIsMaterial: boolean;
+    };
+  },
+  rule: ReconsentRule = RECONSENT_RULE,
+): AcknowledgmentStatusCode {
   if (!input.evidence) return "NOT_ACKNOWLEDGED";
+  if (input.evidence.action === "DECLINE") return "DECLINED";
+  if (input.evidence.action === "WITHDRAWAL") return "WITHDRAWN";
   if (input.evidence.source === "TEXT" || !input.policy || !input.policy.effective) return "ACKNOWLEDGED";
   if (input.policy.effective.versionNumber <= input.policy.evidenceVersionNumber) return "ACKNOWLEDGED";
-  return input.policy.laterVersionIsMaterial ? "REACKNOWLEDGMENT_REQUIRED" : "ACKNOWLEDGED_EARLIER_VERSION";
+  const response = input.policy.laterVersionIsMaterial ? rule.materialChange : rule.nonMaterialChange;
+  return response === "REQUIRE_FRESH_AGREEMENT" ? "REACKNOWLEDGMENT_REQUIRED" : "ACKNOWLEDGED_EARLIER_VERSION";
 }
 
 // ---------------------------------------------------------------------------------------------

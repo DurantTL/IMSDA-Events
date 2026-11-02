@@ -12,8 +12,10 @@ import { withRequestContext } from "@/lib/request-context";
  * Acknowledgment status and staff-recorded evidence for one registration (#150).
  *
  * GET answers where each person stands on each acknowledgment, as of `?at=` (default now): summaries only, never the
- * wording shown or request metadata. POST records an acknowledgment given on screen or on paper; the wording comes from
- * the registration's own form version. Both need MANAGE_REGISTRATION on the event in the URL, which the repository
+ * wording shown, request metadata or paper location. POST records an acknowledgment, or with `action: "DECLINE"` a decline,
+ * given on screen or on paper; the wording comes from the registration's own form version. A decline while a live
+ * acceptance stands answers 409 ALREADY_ACKNOWLEDGED (withdraw it instead). A paper form needs `paperLocation` (where the paper
+ * is kept, never what it says). Both need MANAGE_REGISTRATION on the event in the URL, which the repository
  * checks again by refusing any registration or attendee that is not on that event. POST is same-origin only and takes
  * the acting staff user from the session, never the body.
  */
@@ -43,10 +45,12 @@ async function postHandler(request: Request, context: RouteContext) {
     const outcome = await recordStaffAcknowledgment({
       eventId,
       registrationId,
+      action: body.action,
       fieldKey: body.fieldKey,
       attendeeId: body.attendeeId ?? null,
       actedByPersonId: body.actedByPersonId ?? null,
       channel: body.channel,
+      paperLocation: body.paperLocation ?? null,
       acknowledgedAt: body.acknowledgedAt ? new Date(body.acknowledgedAt) : null,
       actorUserId: user.id,
       clientRequestId: body.clientRequestId,

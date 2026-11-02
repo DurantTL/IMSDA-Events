@@ -31,6 +31,7 @@ const emptyCounts: EventDeletionCounts = {
   healthSnapshots: 0,
   heldHealthSnapshots: 0,
   acknowledgmentEvidence: 0,
+  acknowledgmentWithdrawals: 0,
   signatureEvidence: 0,
 };
 

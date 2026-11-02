@@ -116,9 +116,57 @@ same content can be recorded again as the next `generation` (the insert trigger 
 for that subject, field and content, and the unique indexes include it). The reason is on the void row and in the payload read
 only; the audit entry carries ids.
 
+## Decline, withdrawal and re-consent (#130)
+
+Three more events on the same history. None edits a row: **status is derived from the history, never stored**.
+
+- **Decline.** `POST .../acknowledgments` takes `action: "ACKNOWLEDGE" | "DECLINE"` (default `ACKNOWLEDGE`). A decline is another
+  `AcknowledgmentEvidence` row (`action = DECLINE`, generation 0, outside the two unique indexes) recorded from the same
+  content source (the registration's own form version), by the same actor rules (`decideActing`, the declared #131 authority for
+  a minor) and the same idempotency (`clientRequestId`). It is staff-recorded only: a database check refuses an `ONLINE`
+  decline, and an unticked box on the public form is **not** a decline. A decline is refused with 409 `ALREADY_ACKNOWLEDGED`
+  while a live (not voided, not withdrawn) acceptance exists for that subject and field: withdraw it instead. A repeat decline
+  of the same content, when the latest live act is already that decline, returns the row on file (`created: false`).
+- **Withdraw.** `POST .../acknowledgments/{evidenceId}/withdraw` (MANAGE_REGISTRATION, same-origin) takes
+  `{ channel: STAFF_ENTERED | PAPER, actedByPersonId?, withdrawnAt?, paperLocation?, clientRequestId }`. It appends an
+  `AcknowledgmentWithdrawal` row (its own append-only table, one per acceptance: `evidenceId` is unique) and never touches the
+  acceptance. `withdrawnAt` defaults to now, is never in the future and never before the acceptance. The actor follows the same
+  rules as acknowledging for that subject. A voided acceptance or a decline cannot be withdrawn (409 `EVIDENCE_VOIDED`,
+  `EVIDENCE_NOT_WITHDRAWABLE`); a second withdrawal returns the first (`created: false`). Triggers refuse every UPDATE and
+  DELETE (event deletion included) and require an `ACKNOWLEDGE` row of the same event and registration with `withdrawnAt` not before it.
+- **Accept again.** After a void or a withdrawal the same content can be accepted again as the next `generation`: the insert
+  trigger requires an acceptance's generation to equal the number of earlier acceptances of that subject, field and content that
+  were voided **or withdrawn** (a decline's is 0).
+- **Concurrency.** Every action write (acknowledge, decline, withdraw) takes a transaction-scoped
+  `pg_advisory_xact_lock` keyed on the subject and field before the dedupe checks, so two submissions that race, under
+  different request ids, end in exactly one action event. The idempotency-key replay is still the first thing judged after the lock.
+- **One rule for status and guards.** No out-of-order acts: a new acknowledge, decline or withdrawal dated before the latest live
+  act for that subject and field is refused (400 `ACT_BEFORE_LATEST`; an equal moment is allowed), checked under the lock. A
+  withdrawal ends every live acceptance for the subject and field, so it may target only the current latest live acceptance
+  (409 `NOT_CURRENT_ACCEPTANCE` otherwise). "Live acceptance" means the latest live act (now) is an acceptance, for the decline
+  guard and for dedupe; an existing same-content row is returned only while it still stands (not voided, not ended by a later
+  withdrawal), and the generation trigger counts voided, withdrawn and ended rows. Voiding takes the same lock, and a submission
+  that locks several fields takes them in sorted key order.
+- **A withdrawn acceptance cannot be voided** (409 `EVIDENCE_WITHDRAWN`, checked under the lock): a void would silently undo the withdrawal. Correct it by recording a fresh act. Rows are timestamped (`recordedAt`) from app time taken after the lock, and exact ties are broken by `recordedAt` then evidence id, identically in status, the live-acceptance check and the generation trigger.
+- **Paper location.** `paperLocation` (1 to 200 characters, trimmed) says where the paper form physically lives, for example
+  "Conference office, event binder": **never what it says**. It is required when `channel` is `PAPER` for acknowledge, decline
+  and withdraw, and refused for every other channel (checked in the request schema, the repository and a database check).
+  It is read only in the payload read (VIEW_SENSITIVE_DATA); it is never in the status summaries, an audit row, a log or an export.
+- **Status at a moment `t`** (`latestLiveAction`, then `resolveAcknowledgmentStatus`). Considered: acceptances and declines at
+  `acknowledgedAt` (a row voided by `t` is skipped) and withdrawals at `withdrawnAt` (skipped if their acceptance was voided by
+  `t`). The latest wins, ties by `recordedAt`. The latest acceptance gives `ACKNOWLEDGED`, `ACKNOWLEDGED_EARLIER_VERSION` or
+  `REACKNOWLEDGMENT_REQUIRED` as before; the latest withdrawal gives `WITHDRAWN`; the latest decline gives `DECLINED`. A withdrawal
+  changes nothing before `withdrawnAt`, so the earlier acceptance stays valid evidence for its period. Summaries gain `action` and
+  `withdrawal` (`id`, `withdrawnAt`, `recordedAt`, `channel`): no wording, no metadata, no paper location.
+- **Re-consent rule.** `reconsent-rule.ts` declares `RECONSENT_RULE`: a material change is `REQUIRE_FRESH_AGREEMENT`, a
+  non-material one `CARRY_FORWARD`. `resolveAcknowledgmentStatus` takes the rule as an optional parameter defaulting to it, and is
+  tested both ways. Materiality is still only the publisher's recorded flag (#129). ADR `docs/decisions/0016-consent-withdrawal-and-reconsent.md`
+  records this as "Proposed, owner to confirm".
+
 ## Kept out of the general flow
 
-Nothing in reporting, messaging, exports, search or analytics reads the table or imports this module (a test scans for it).
+Nothing in reporting, messaging, exports, search or analytics reads the tables or imports this module (a test scans for it, and for
+withdrawals and paper locations too).
 Audit rows carry ids and flags only (no wording, no label, no metadata). Errors are logged by class and code only (the logger
 never prints a Prisma message, which would echo the wording). The attendee roster export omits the field. Confirmation emails
 and reports use the stored answer, which is only `true`.
@@ -132,6 +180,11 @@ RESTRICT references and the append-only trigger would stop the delete even if th
 and a policy version someone acknowledged must not vanish. An event with evidence is unpublished instead.
 
 ## Known gaps (deliberate)
+
+- **No separate presentation record.** The evidence row already records exactly what was shown (the text, or the policy version
+  by id). A separate "was shown" table (#130's first criterion) is deferred.
+- **Decline and withdrawal are staff-recorded only.** There is no online or attendee-portal decline or withdrawal, and no screen
+  for either: they are API routes, like the staff route and voiding.
 
 - **Adults cannot acknowledge for each other online.** A roster form with a required attendee-level acknowledgment cannot be
   submitted for a household of several adults by one person; use a registration-level acknowledgment, or have each adult's
