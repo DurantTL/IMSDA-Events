@@ -231,7 +231,8 @@ function RateRow({ category, view, base, busy, run }: {
   return <tr>
     <th scope="row">{lodgingCategoryLabels[category]}</th>
     <td>{rate ? formatRate(rate) : category === "TENT_WITH_POWER" && view.rates.TENT ? "Uses the tent rate" : "Included or free"}</td>
-    <td><form onChange={edits.track("rate")} onSubmit={(event) => {
+    {/* Keyed on the saved rate so a save re-mounts the form with defaults that match what is shown ("12.5" becomes "12.50"). */}
+    <td><form key={rate ? `${rate.amountCents}:${rate.basis}:${rate.minimumNights ?? ""}` : "none"} onChange={edits.track("rate")} onSubmit={(event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const dollars = Number(form.get("amount"));

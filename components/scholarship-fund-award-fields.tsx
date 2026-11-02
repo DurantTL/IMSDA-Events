@@ -1,7 +1,7 @@
 "use client";
 
 import { Money } from "@/components/exact-value";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatCents } from "@/modules/payments/format-cents";
 import type { FundView, SponsorDirectoryEntry } from "@/modules/scholarship-funds/repository";
 
@@ -10,7 +10,7 @@ import type { FundView, SponsorDirectoryEntry } from "@/modules/scholarship-fund
  * plain named inputs the form reads on submit (`useFund`, `fundOrganizationId`, `fundSponsorName`, `fundPledged`);
  * the server checks the balance again, so what is shown here is only a hint.
  */
-export function ScholarshipFundAwardFields({ eventId }: { eventId: string }) {
+export function ScholarshipFundAwardFields({ eventId, onEdited }: { eventId: string; /** Told whether any fund field holds work, from this component's own state (#1468). Reports false when the fields leave the page. */ onEdited?: (edited: boolean) => void }) {
   const [useFund, setUseFund] = useState(false);
   const [pledged, setPledged] = useState(false);
   // A sponsor is a directory church or a typed name, never both: choosing one switches the other off.
@@ -18,6 +18,12 @@ export function ScholarshipFundAwardFields({ eventId }: { eventId: string }) {
   const [typedSponsor, setTypedSponsor] = useState("");
   const [info, setInfo] = useState<{ fund: FundView; directory: SponsorDirectoryEntry[] } | null>(null);
   const [loadError, setLoadError] = useState("");
+
+  const edited = useMemo(() => useFund || pledged || pickedOrganization !== "" || typedSponsor.trim() !== "", [useFund, pledged, pickedOrganization, typedSponsor]);
+  useEffect(() => {
+    onEdited?.(edited);
+    return () => onEdited?.(false);
+  }, [edited, onEdited]);
 
   useEffect(() => {
     if (!useFund || info) return;

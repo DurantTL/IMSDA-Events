@@ -72,10 +72,12 @@ export function FinanceWorkspace({
   // Typed work in the open payment, refund, adjustment or reversal form: any field off its starting value. Moving to another
   // view (Back, close, or a successful save) clears it; a failed save keeps what was typed (#1468).
   const [formEdited, setFormEdited] = useState(false);
-  useUnsavedChangesGuard(formEdited);
+  const [fundEdited, setFundEdited] = useState(false);
   function setModal(next: typeof modal) { setModalState(next); setFormEdited(false); }
-  const trackForm = (event: FormEvent<HTMLFormElement>) => setFormEdited(formHasEdits(event.currentTarget));
+  const trackForm = (event: FormEvent<HTMLFormElement>) => setFormEdited(formHasEdits(event.currentTarget, { ignore: ["adjustKind", "useFund", "fundOrganizationId", "fundSponsorName", "fundPledged"] }));
   const [adjustKind, setAdjustKind] = useState<AdjustmentKind>("SCHOLARSHIP");
+  // The fund fields and the adjustment Type are controlled, so they are counted from their own state, not from the form.
+  useUnsavedChangesGuard(formEdited || (modal === "adjust" && (adjustKind !== "SCHOLARSHIP" || fundEdited)));
   const [selectedAdjustment, setSelectedAdjustment] = useState<AdjustmentRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -338,7 +340,7 @@ export function FinanceWorkspace({
               <form className="form-stack" onChange={trackForm} onSubmit={saveAdjustment}>
                 <div className="inline-notice">{selected.isDeferredOrganizationBilling ? `Current estimated ${selected.isGroup ? "amount" : "church amount"} ${formatCents(selected.totalAmountCents)}. ${selected.isGroup ? groupBillingFinalNote : churchBillingFinalNote}` : `Current total ${formatCents(selected.totalAmountCents)} · paid ${formatCents(selected.paidCents)} · balance ${formatCents(selected.balanceCents)}`}</div>
                 <label>Type
-                  <select value={adjustKind} onChange={(event) => { setAdjustKind(event.target.value as AdjustmentKind); setError(""); }}>
+                  <select name="adjustKind" value={adjustKind} onChange={(event) => { setAdjustKind(event.target.value as AdjustmentKind); setError(""); }}>
                     <option value="SCHOLARSHIP">{`Scholarship — ${wording.lowers}`}</option>
                     <option value="DISCOUNT">{`Discount — ${wording.lowers}`}</option>
                     <option value="PROMO_CODE">Promo code — apply an event code now</option>
@@ -364,7 +366,7 @@ export function FinanceWorkspace({
                       <label>Direction<select name="direction" defaultValue="LOWER"><option value="LOWER">{wording.lower}</option><option value="RAISE">{wording.raise}</option></select></label>
                     )}
                     <label>Amount<input name="amount" type="number" min="0.01" step="0.01" required /></label>
-                    {adjustKind === "SCHOLARSHIP" && !selected.isDeferredOrganizationBilling && <ScholarshipFundAwardFields eventId={eventId} />}
+                    {adjustKind === "SCHOLARSHIP" && !selected.isDeferredOrganizationBilling && <ScholarshipFundAwardFields eventId={eventId} onEdited={setFundEdited} />}
                   </>
                 )}
                 <label>Reason<textarea name="reason" minLength={3} maxLength={500} rows={3} required placeholder="For example: WR26 scholarship approved by the committee" /></label>

@@ -72,6 +72,21 @@ describe("unsaved-changes helpers, round 3d (#1468)", () => {
     await act(async () => root.unmount());
   });
 
+  it("the merge dialog is clean when it opens with the first person pre-selected, and dirty only on a different pick or a reason", () => {
+    const src = readFileSync(join(__dirname, "..", "components/duplicate-match-review-workspace.tsx"), "utf8");
+    expect(src).toContain("primaryPersonId !== merging.personA.id || mergeReason.trim() !== \"\"");
+    expect(src).toContain("setMerging(candidate); setPrimaryPersonId(candidate.personA.id)");
+  });
+
+  it("the finance adjustment form counts the controlled fund and Type fields from state", () => {
+    const src = readFileSync(join(__dirname, "..", "components/finance-workspace.tsx"), "utf8");
+    expect(src).toContain('adjustKind !== "SCHOLARSHIP" || fundEdited');
+    expect(src).toContain("onEdited={setFundEdited}");
+    const fields = readFileSync(join(__dirname, "..", "components/scholarship-fund-award-fields.tsx"), "utf8");
+    expect(fields).toContain('typedSponsor.trim() !== ""');
+    expect(fields).toContain("return () => onEdited?.(false)");
+  });
+
   it("each form changed in this round mounts the guard", () => {
     for (const path of [
       "components/finance-workspace.tsx",
