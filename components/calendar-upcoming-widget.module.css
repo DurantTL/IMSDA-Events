@@ -30,7 +30,7 @@
   border: 1px solid #d5dbe4;
   border-left-width: 4px;
   border-radius: var(--radius-sm);
-  background: #ffffff;
+  background: var(--card);
   overflow-wrap: anywhere;
 }
 

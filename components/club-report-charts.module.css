@@ -12,7 +12,7 @@
   min-width: 0;
   border: 1px solid var(--line, #d6dee2);
   border-radius: var(--radius-sm);
-  background: #fff;
+  background: var(--card);
 }
 
 .tileBody,
@@ -61,7 +61,7 @@
   display: block;
   width: 100%;
   height: 160px;
-  background: #fff;
+  background: var(--card);
 }
 
 .months {
@@ -117,7 +117,7 @@
 }
 .seriesPale { background: var(--imsda-navy-soft); color: #1f2a30; }
 .stripDraft { background: #fff7e0; color: #5c4300; }
-.stripDue { background: #ffffff; color: #1f2a30; }
+.stripDue { background: var(--card); color: #1f2a30; }
 
 .details {
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);

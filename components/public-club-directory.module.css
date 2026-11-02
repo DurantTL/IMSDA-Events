@@ -48,7 +48,7 @@
   text-align: left;
   border: 1px solid var(--line);
   border-radius: var(--field-radius, 10px);
-  background: #fff;
+  background: var(--card);
   padding: 10px 12px;
   cursor: pointer;
 }
@@ -162,7 +162,7 @@
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--card);
   color: var(--ink);
   cursor: pointer;
 }
@@ -241,7 +241,7 @@
     min-height: 44px;
     border: 1px solid var(--line);
     border-radius: 10px;
-    background: #fff;
+    background: var(--card);
     color: var(--ink);
     cursor: pointer;
   }

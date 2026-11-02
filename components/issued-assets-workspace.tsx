@@ -186,13 +186,13 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
           <td>{asset.scanCode}</td>
           {serialized ? null : <td>{asset.quantityTotal}</td>}
           <td>{asset.outQuantity}</td>
-          <td><label className="visually-hidden" htmlFor={`cond-${asset.id}`}>Condition of {asset.identifier}</label>
+          <td><label className="sr-only" htmlFor={`cond-${asset.id}`}>Condition of {asset.identifier}</label>
             <select id={`cond-${asset.id}`} value={asset.condition} disabled={busy} onChange={(event) => void run(`${base}/items`, { action: "update", assetId: asset.id, condition: event.target.value as AssetCondition }, () => `${asset.identifier} updated.`)}>{assetConditions.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></td>
           <td><form className="form-stack" onSubmit={(event) => {
             event.preventDefault();
             void run(`${base}/items`, { action: "update", assetId: asset.id, location: new FormData(event.currentTarget).get("location") ?? "" }, () => `${asset.identifier} updated.`);
-          }}><label className="visually-hidden" htmlFor={`loc-${asset.id}`}>Location of {asset.identifier}</label><input id={`loc-${asset.id}`} name="location" maxLength={120} defaultValue={asset.location ?? ""} /><button className="secondary-button" type="submit" disabled={busy}>Save</button></form></td>
-          <td><label className="visually-hidden" htmlFor={`avail-${asset.id}`}>Status of {asset.identifier}</label>
+          }}><label className="sr-only" htmlFor={`loc-${asset.id}`}>Location of {asset.identifier}</label><input id={`loc-${asset.id}`} name="location" maxLength={120} defaultValue={asset.location ?? ""} /><button className="secondary-button" type="submit" disabled={busy}>Save</button></form></td>
+          <td><label className="sr-only" htmlFor={`avail-${asset.id}`}>Status of {asset.identifier}</label>
             <select id={`avail-${asset.id}`} value={asset.availability} disabled={busy} onChange={(event) => void run(`${base}/items`, { action: "update", assetId: asset.id, availability: event.target.value as AssetAvailability }, () => `${asset.identifier} updated.`)}>{assetAvailabilities.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></td>
         </tr>)}</tbody>
       </table></div>

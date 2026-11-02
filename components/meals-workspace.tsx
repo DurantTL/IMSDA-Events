@@ -93,7 +93,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
     <section className="panel">
       <h3>Meal services</h3>
       {view.services.length === 0 ? <><p>No meal services yet. Add one below.</p><EventSetupHelp context="meal services" id="meals-no-services" /></> : <div className="table-wrap"><table className="report-table report-table-auto">
-        <thead><tr><th scope="col">Service</th><th scope="col">When</th><th scope="col">Where</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
+        <thead><tr><th scope="col">Service</th><th scope="col">When</th><th scope="col">Where</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
         <tbody>{view.services.map((service) => <ServiceRow key={service.id} service={service} base={base} busy={busy} run={run} canManageFinance={canManageFinance} canConfigure={canConfigure} />)}</tbody>
       </table></div>}
       {canConfigure ? <ServiceForm title="Add a meal service" submitLabel="Add service" busy={busy} onSubmit={(input) => run(() => call(`${base}/services`, "POST", input), "Meal service added.")} /> : <p>Only event administrators can add or edit meal services.</p>}
@@ -130,7 +130,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
       {canManageFinance ? <WalkUpForm services={activeServices} plans={view.plans.filter((plan) => plan.payer === "ATTENDEE" && plan.isActive)} base={base} busy={busy} run={run} /> : <p>Only staff who manage finance can take orders.</p>}
       {view.recentOrders.length > 0 ? <div className="table-wrap"><table className="report-table report-table-auto">
         <caption>Recent staff, walk-up and entitlement selections</caption>
-        <thead><tr><th scope="col">Meal</th><th scope="col">For</th><th scope="col">Qty</th><th scope="col">Each</th><th scope="col">Source</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
+        <thead><tr><th scope="col">Meal</th><th scope="col">For</th><th scope="col">Qty</th><th scope="col">Each</th><th scope="col">Source</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
         <tbody>{view.recentOrders.map((order) => <tr key={order.id}>
           <th scope="row">{mealTypeLabels[order.mealType as MealTypeValue]} ({mealAgeGroupLabels[order.ageGroup as MealAgeGroupValue]}){order.serviceName ? `, ${order.serviceName}` : ""}</th>
           <td>{order.confirmationCode ?? order.orderLabel ?? "Walk-up"}</td><td>{order.quantity}</td>
@@ -261,7 +261,7 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
             if (!Number.isFinite(cents) || cents < 0 || raw === "") { void run(async () => { throw new Error("Enter a price in dollars, such as 7 or 7.50."); }, ""); return; }
             void run(() => call(`${base}/plans/${plan.id}/prices`, "PUT", { mealType, ageGroup: group, attendeeTypeId: null, amountCents: cents }), "Price saved.");
           }}>
-            <label className="visually-hidden" htmlFor={`price-${plan.id}-${mealType}-${group}`}>{plan.name} {mealTypeLabels[mealType]} {mealAgeGroupLabels[group]} price in dollars</label>
+            <label className="sr-only" htmlFor={`price-${plan.id}-${mealType}-${group}`}>{plan.name} {mealTypeLabels[mealType]} {mealAgeGroupLabels[group]} price in dollars</label>
             <input id={`price-${plan.id}-${mealType}-${group}`} name="amount" inputMode="decimal" defaultValue={price ? (price.amountCents / 100).toFixed(2) : ""} placeholder="not set" />
             <button type="submit" disabled={busy}>Save</button>
           </form> : price ? formatCents(price.amountCents) : "Not set"}</td>;

@@ -5,10 +5,9 @@ import { AlertCircle, BedDouble, CheckCircle2 } from "lucide-react";
 import { beddingNote, extraBeddingNote, heldRoomsFor, partyExceedsBeds } from "@/modules/lodging/preferences-domain";
 import { describeRate, quoteStay, stayNights, addDays, type LodgingCategory } from "@/modules/lodging/domain";
 import type { RegistrantLodgingView } from "@/modules/lodging/preferences-service";
+import { formatCentsPlain as money } from "@/modules/payments/format-cents";
 
 type Status = { kind: "idle" | "saving" | "saved" | "error"; message: string };
-
-const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
 type Sent = { lodging: RegistrantLodgingView; changeRequested: boolean };
 

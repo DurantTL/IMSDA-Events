@@ -78,7 +78,7 @@
   gap: 4px;
   margin-top: 4px;
   border: 1px solid #d9c9ea;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--imsda-purple-soft);
   color: #3f1f5e;
   padding: 12px 14px;

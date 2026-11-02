@@ -9,7 +9,7 @@
   margin: 0 auto;
   padding: 16px;
 }
-.cisCard { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: white; padding: 18px; }
+.cisCard { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--card); padding: 18px; }
 .cisCard h1, .cisHeader h1 { margin: 0; font-size: 1.5rem; line-height: 1.25; overflow-wrap: anywhere; }
 .cisCard h2 { margin: 0 0 8px; font-size: 1.2rem; line-height: 1.3; overflow-wrap: anywhere; }
 .cisPayment h3 { margin: 0 0 6px; font-size: 1.05rem; }
@@ -21,7 +21,7 @@
 .cisLookup label { font-size: 1rem; }
 .cisLookupRow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .cisShell input[type="text"], .cisShell input:not([type]) {
-  min-height: 48px; min-width: 0; border: 1px solid var(--field-border); border-radius: 10px; background: white; color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1.05rem;
+  min-height: 48px; min-width: 0; border: 1px solid var(--field-border); border-radius: 10px; background: var(--card); color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1.05rem;
 }
 .cisLookupRow input { flex: 1 1 14rem; }
 .cisForm input[inputmode] { width: 100%; }

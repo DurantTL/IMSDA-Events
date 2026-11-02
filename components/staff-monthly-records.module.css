@@ -1,9 +1,9 @@
 .root { display: grid; gap: 16px; min-width: 0; }
 .heading { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); line-height: 1.35; }
 .muted, .note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
-.picker { container: picker / inline-size; display: grid; gap: 8px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-info); background: white; }
+.picker { container: picker / inline-size; display: grid; gap: 8px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); }
 .months { display: none; grid-template-columns: repeat(12, minmax(44px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
-.monthLink { display: grid; justify-items: center; align-content: center; min-height: 44px; min-width: 44px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: none; background: white; }
+.monthLink { display: grid; justify-items: center; align-content: center; min-height: 44px; min-width: 44px; padding: 4px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: none; background: var(--card); }
 .monthLink small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; color: #3f4b52; }
 .monthLink[aria-current="true"] { background: var(--imsda-navy); border-color: var(--imsda-navy); color: white; }
 .monthLink[aria-current="true"] small { color: white; }
@@ -14,12 +14,12 @@
 .search button.secondary-button, .search a.secondary-button { flex: 0 0 auto; width: auto; max-width: none; min-width: 64px; min-height: 44px; padding: 0 14px; }
 .phoneMonth :focus-visible { outline-offset: 2px; }
 .stripNote { display: block; }
-.step, .stepOff { flex: 0 0 44px; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--imsda-navy); font-size: 1.25rem; text-decoration: none; background: white; }
+.step, .stepOff { flex: 0 0 44px; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--imsda-navy); font-size: 1.25rem; text-decoration: none; background: var(--card); }
 .stepOff { opacity: 0.4; }
-.card { container: card / inline-size; display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-info); background: white; }
+.card { container: card / inline-size; display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); }
 .head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius-pill); color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: none; background: white; }
+.chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius-pill); color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; text-decoration: none; background: var(--card); }
 .chip[aria-current="true"] { background: var(--imsda-navy); border-color: var(--imsda-navy); color: white; }
 .search { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
 .search label { display: grid; gap: 4px; flex: 1 1 220px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
