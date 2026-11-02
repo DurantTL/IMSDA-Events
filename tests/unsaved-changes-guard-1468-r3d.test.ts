@@ -83,7 +83,7 @@ describe("unsaved-changes helpers, round 3d (#1468)", () => {
     expect(src).toContain('adjustKind !== "SCHOLARSHIP" || fundEdited');
     expect(src).toContain("onEdited={setFundEdited}");
     const fields = readFileSync(join(__dirname, "..", "components/scholarship-fund-award-fields.tsx"), "utf8");
-    expect(fields).toContain('typedSponsor.trim() !== ""');
+    expect(fields).toContain("const edited = useFund;");
     expect(fields).toContain("return () => onEdited?.(false)");
   });
 

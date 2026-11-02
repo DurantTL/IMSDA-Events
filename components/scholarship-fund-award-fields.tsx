@@ -1,7 +1,7 @@
 "use client";
 
 import { Money } from "@/components/exact-value";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { formatCents } from "@/modules/payments/format-cents";
 import type { FundView, SponsorDirectoryEntry } from "@/modules/scholarship-funds/repository";
 
@@ -19,7 +19,8 @@ export function ScholarshipFundAwardFields({ eventId, onEdited }: { eventId: str
   const [info, setInfo] = useState<{ fund: FundView; directory: SponsorDirectoryEntry[] } | null>(null);
   const [loadError, setLoadError] = useState("");
 
-  const edited = useMemo(() => useFund || pledged || pickedOrganization !== "" || typedSponsor.trim() !== "", [useFund, pledged, pickedOrganization, typedSponsor]);
+  // The other fund fields only show while the fund option is ticked, so a hidden sponsor name is not work to lose.
+  const edited = useFund;
   useEffect(() => {
     onEdited?.(edited);
     return () => onEdited?.(false);
