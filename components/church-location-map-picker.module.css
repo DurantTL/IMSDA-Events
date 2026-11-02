@@ -29,7 +29,7 @@
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
   background: var(--imsda-purple, #4a2e83);
-  border: 2px solid #fff;
+  border: 2px solid var(--card);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   cursor: grab;
 }

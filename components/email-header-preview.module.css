@@ -25,7 +25,7 @@
   padding: 16px 24px;
   background: var(--imsda-navy, #003b5c);
   border-bottom: 4px solid var(--imsda-gold, #f0b323);
-  border-radius: 12px 12px 0 0;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
 }
 
 .mark {
@@ -35,7 +35,7 @@
   justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--imsda-gold, #f0b323);
   color: var(--imsda-navy-deep, #002c45);
   font-family: Georgia, "Times New Roman", serif;

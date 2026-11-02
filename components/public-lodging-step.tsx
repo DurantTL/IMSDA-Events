@@ -12,8 +12,7 @@ import {
   type LodgingChoice,
   type LodgingStepOffer,
 } from "@/modules/lodging/form-step";
-
-const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+import { formatCentsPlain as money } from "@/modules/payments/format-cents";
 
 /**
  * The lodging step of the registration form (#199). It is a step like the form's others: its answers travel with the

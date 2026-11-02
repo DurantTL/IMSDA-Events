@@ -40,7 +40,7 @@ section.card {
   max-width: min(360px, 100vw - 32px);
   max-height: min(80vh, 560px);
   padding: 12px 14px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-info);
   overflow-y: auto;
 }
 

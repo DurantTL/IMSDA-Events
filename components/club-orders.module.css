@@ -18,7 +18,7 @@
 .numbers div { display: grid; gap: 2px; min-width: 0; }
 .numbers dt { color: var(--muted); font-size: max(var(--type-body-floor, 0px), .58rem); }
 .numbers dd { display: flex; align-items: center; min-height: 44px; margin: 0; font-size: max(var(--type-body-floor, 0px), .8rem); }
-.number { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: var(--radius-sm); background: #fff; padding: 8px; font-size: 16px; text-align: right; }
+.number { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: var(--radius-sm); background: var(--card); padding: 8px; font-size: 16px; text-align: right; }
 .flag { display: flex; align-items: flex-start; gap: 6px; margin: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); padding: 8px 10px; color: var(--ink); font-size: max(var(--type-floor, 0px), .66rem); line-height: 1.5; }
 .flag svg { flex: 0 0 auto; margin-top: 3px; }
 .unmatched { display: grid; gap: 4px; min-width: 0; }
@@ -43,13 +43,13 @@
 .promptCopy { margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), .68rem); line-height: 1.5; }
 .dateSelect { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: max(var(--type-body-floor, 0px), .68rem); }
 .dateSelect :global(.secondary-button) { min-height: 44px; }
-.date { min-height: 44px; min-width: 0; max-width: 100%; border: 1px solid var(--field-border); border-radius: var(--radius-sm); background: #fff; padding: 6px 8px; font-size: 16px; }
+.date { min-height: 44px; min-width: 0; max-width: 100%; border: 1px solid var(--field-border); border-radius: var(--radius-sm); background: var(--card); padding: 6px 8px; font-size: 16px; }
 .actions :global(.text-button) { min-height: 44px; min-width: 44px; padding-inline: 10px; }
 
 /* Uniforms (#497): item and size pickers, chosen-item chips. */
 .pickerRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 10px; }
 .pickerField { display: grid; flex: 1 1 200px; gap: 4px; min-width: 0; font-size: max(var(--type-body-floor, 0px), .68rem); }
-.select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: var(--radius-sm); background: #fff; padding: 8px; font-size: 16px; }
+.select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: var(--radius-sm); background: var(--card); padding: 8px; font-size: 16px; }
 .pickerRow :global(.secondary-button) { min-height: 44px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .chips li { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 2px 4px 2px 12px; font-size: max(var(--type-body-floor, 0px), .72rem); }
@@ -62,7 +62,7 @@
 .printHeader dt { color: var(--muted); font-size: max(var(--type-body-floor, 0px), .63rem); }
 .printHeader dd { margin: 0; font-size: max(var(--type-body-floor, 0px), .78rem); overflow-wrap: anywhere; }
 .printSection { display: grid; gap: 6px; margin-top: 14px; break-inside: avoid; }
-.printSection h3 { margin: 0; color: var(--imsda-navy); font-size: .86rem; }
+.printSection h3 { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), .86rem); }
 .printTable { width: 100%; border-collapse: collapse; font-size: max(var(--type-floor, 0px), .74rem); }
 .printTable th, .printTable td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; overflow-wrap: anywhere; }
 .noPrint { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }

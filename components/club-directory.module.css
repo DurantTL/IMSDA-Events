@@ -15,7 +15,7 @@
   padding: 20px;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: white;
+  background: var(--card);
   box-shadow: 0 5px 18px rgb(0 59 92 / 4%);
   overflow-wrap: anywhere;
 }
@@ -77,7 +77,7 @@
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius-info);
-  background: white;
+  background: var(--card);
 }
 
 .toolbar label {
@@ -115,7 +115,7 @@
   padding: 10px 16px;
   border: 1px solid #72858f;
   border-radius: 10px;
-  background: white;
+  background: var(--card);
   color: var(--imsda-navy);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   font-weight: 700;

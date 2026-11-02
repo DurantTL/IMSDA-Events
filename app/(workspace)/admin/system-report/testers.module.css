@@ -13,7 +13,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  background: #fff;
+  background: var(--card);
   box-shadow: 0 8px 28px rgba(0, 59, 92, 0.045);
 }
 
@@ -72,7 +72,7 @@
   margin: 0;
   padding: 10px 12px;
   border: 1px solid #eaf0f2;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--secondary-bg, #f9fbfb);
   color: var(--ink);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
@@ -133,7 +133,7 @@
   padding: 0 12px;
   border: 1px solid var(--field-border);
   border-radius: 10px;
-  background: #fff;
+  background: var(--card);
   color: var(--ink);
   font-size: max(var(--type-staff-floor, 0px), 0.9375rem);
 }
@@ -191,7 +191,7 @@
   height: 28px;
   border: 2px solid var(--line);
   border-radius: 50%;
-  background: #fff;
+  background: var(--card);
   color: var(--muted);
 }
 
@@ -246,7 +246,7 @@
   gap: 6px;
   padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
 
@@ -368,7 +368,7 @@
   min-height: 44px;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 

@@ -12,6 +12,7 @@ import {
   type LodgingRateBasis,
 } from "@/modules/lodging/domain";
 import type { LodgingUnitView, LodgingView } from "@/modules/lodging/service";
+import { formatCentsPlain } from "@/modules/payments/format-cents";
 
 async function call(url: string, method: string, body: unknown): Promise<{ lodging: LodgingView }> {
   const response = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -113,7 +114,7 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
 }
 
 function formatRate(rate: { amountCents: number; basis: LodgingRateBasis; minimumNights: number | null }) {
-  return `$${(rate.amountCents / 100).toFixed(2)} ${lodgingRateBasisLabels[rate.basis]}${rate.minimumNights ? `, ${rate.minimumNights}+ nights` : ""}`;
+  return `${formatCentsPlain(rate.amountCents)} ${lodgingRateBasisLabels[rate.basis]}${rate.minimumNights ? `, ${rate.minimumNights}+ nights` : ""}`;
 }
 
 function UnitRow({ unit, nights, base, busy, run }: {
@@ -135,7 +136,7 @@ function UnitRow({ unit, nights, base, busy, run }: {
           const raw = String(new FormData(event.currentTarget).get("capacity") ?? "").trim();
           void run(() => call(`${base}/units/${unit.eventUnitId}`, "PATCH", { capacityOverride: raw === "" ? null : Number(raw) }), `Capacity for ${unit.name} saved.`);
         }}>
-          <label className="visually-hidden" htmlFor={`cap-${unit.eventUnitId}`}>Sleeps up to for {unit.name}</label>
+          <label className="sr-only" htmlFor={`cap-${unit.eventUnitId}`}>Sleeps up to for {unit.name}</label>
           <input id={`cap-${unit.eventUnitId}`} name="capacity" type="number" min={0} max={500} defaultValue={unit.capacityOverride ?? ""} placeholder={unit.defaultCapacity === null ? "no limit" : String(unit.defaultCapacity)} />
           <button type="submit" disabled={busy}>Save</button>
         </form>
