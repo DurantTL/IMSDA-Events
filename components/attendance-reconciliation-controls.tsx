@@ -3,6 +3,7 @@
 import { formatCents } from "@/modules/payments/format-cents";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 /**
  * Staff controls for the Attendance reconciliation screen (#166). Every action posts to one
@@ -116,6 +117,8 @@ export function AcknowledgeForm({
   const [reason, setReason] = useState("");
   const [choice, setChoice] = useState<"PER_PERSON" | "PRORATED">("PRORATED");
   const reasonId = useId();
+  // Unsaved work: a typed reason while the form is open, until saved or cancelled (#1468).
+  useUnsavedChangesGuard(open && reason.trim() !== "");
   if (!open) {
     return <button className="secondary-button" onClick={() => setOpen(true)} type="button">{changing ? "Change choice…" : "Acknowledge…"}</button>;
   }
@@ -169,6 +172,8 @@ export function CorrectionForm({
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const reasonId = useId();
+  // Unsaved work: a typed reason while the form is open, until saved or cancelled (#1468).
+  useUnsavedChangesGuard(open && reason.trim() !== "");
   const kind = attended ? "MARK_NOT_ATTENDED" : "MARK_ATTENDED";
   if (!open) {
     return <button className="secondary-button" onClick={() => setOpen(true)} type="button">Correct…</button>;

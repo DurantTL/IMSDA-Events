@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { cardCell } from "@/components/table-card-labels";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { chargeCategoryLabels, facilitySeverities, holdKindLabels, returnOutcomeLabels, type ReturnOutcome } from "@/modules/issued-assets/returns-domain";
 import { lodgingHoldKinds } from "@/modules/lodging/domain";
@@ -43,6 +44,11 @@ function writeQueue(scope: string, queue: SavedReturn[]) {
 }
 const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `k${Date.now()}${Math.random().toString(16).slice(2)}`);
 const emptyChoice: Choice = { outcome: "", quantity: "", note: "", evidenceRef: "", replacement: "" };
+/** A return sheet holds unsaved work once any item has an outcome, a typed value, or a scanned code waiting to be recorded (#1468). */
+export function returnSheetDirty(choices: Record<string, Choice>, scanned: string[]): boolean {
+  if (scanned.length > 0) return true;
+  return Object.values(choices).some((entry) => entry.outcome !== "" || [entry.quantity, entry.note, entry.evidenceRef, entry.replacement].some((text) => text.trim() !== ""));
+}
 const stateWords: Record<string, string> = { RETURNED: "returned", DAMAGED: "returned damaged", LOST: "lost", OUTSTANDING: "still out", UNACCOUNTED: "no recorded outcome", CORRECTED: "withdrawn in error", CONTINUED: "continued" };
 
 export function AssetReturnPanel({ eventId, userId, person, money, types, canConfigure, canManageMoney }: {
@@ -71,6 +77,8 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
   const choice = (id: string) => choices[id] ?? emptyChoice;
   const setChoice = (id: string, patch: Partial<Choice>) => setChoices((current) => ({ ...current, [id]: { ...(current[id] ?? emptyChoice), ...patch } }));
   const pendingKey = useRef(newKey());
+  // Unsaved work: the check-out sheet (outcomes, typed notes, scanned codes) until it is recorded or cleared (#1468).
+  useUnsavedChangesGuard(returnSheetDirty(choices, scanned));
 
   useEffect(() => {
     const timer = window.setTimeout(() => setQueue(readQueue(scope)), 0);
@@ -252,6 +260,8 @@ export function AssetReturnPanel({ eventId, userId, person, money, types, canCon
 function DepositForm({ type, rows, busy, onSubmit }: { type: DeskType; rows: IssuanceRow[]; busy: boolean; onSubmit: (amountCents: number) => Promise<void> }) {
   const [amount, setAmount] = useState((type.depositCents / 100).toFixed(2));
   const cents = Math.round(Number(amount) * 100);
+  // Unsaved work: a deposit amount changed from the usual one, until it is recorded (#1468).
+  useUnsavedChangesGuard(amount !== (type.depositCents / 100).toFixed(2));
   return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (cents >= 1) void onSubmit(cents); }}>
     <p>{rows.map((row) => row.identifier).join(", ")} ({type.name}) has no deposit yet. Usual deposit {formatCentsPlain(type.depositCents)}.</p>
     <label>Cash taken (dollars) <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
@@ -267,6 +277,8 @@ function ChargeForm({ row, lost, fee, keptByDeposit, canManageMoney, busy, onCha
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<"REPLACEMENT" | "DAMAGE" | "OTHER">(lost ? "REPLACEMENT" : "DAMAGE");
   const [reason, setReason] = useState("");
+  // Unsaved work: a typed amount or reason for a charge, until it is recorded or the form is closed (#1468).
+  useUnsavedChangesGuard((keptByDeposit > 0 || custom) && (amount.trim() !== "" || reason.trim() !== ""));
   const what = `${row.identifier} (${row.typeName}) ${lost ? "was lost" : "came back damaged"}`;
   if (keptByDeposit > 0) {
     return <div>
@@ -281,7 +293,7 @@ function ChargeForm({ row, lost, fee, keptByDeposit, canManageMoney, busy, onCha
   return <div>
     <p>{what}. {fee > 0 ? `The standard replacement fee is ${formatCentsPlain(fee)}. If the cash deposit is settled before this is charged, it will not be kept for this item as well.` : "This kind has no standard replacement fee."}</p>
     {fee > 0 ? <button className="secondary-button" type="button" disabled={busy} onClick={() => void onCharge("REPLACEMENT", fee, `Replacement fee for ${row.identifier}`)}>Charge {formatCentsPlain(fee)} to the registration</button> : null}
-    {canManageMoney ? <>{" "}<button className="secondary-button" type="button" onClick={() => setCustom(!custom)}>{custom ? "Cancel" : "Another amount"}</button></> : null}
+    {canManageMoney ? <>{" "}<button className="secondary-button" type="button" onClick={() => { if (custom) { setAmount(""); setReason(""); } setCustom(!custom); }}>{custom ? "Cancel" : "Another amount"}</button></> : null}
     {custom && canManageMoney ? <form className="form-stack" onSubmit={(event) => { event.preventDefault(); const cents = Math.round(Number(amount) * 100); if (cents >= 1 && reason.trim().length >= 3) void onCharge(category, cents, reason.trim()); }}>
       <label>Kind of charge <select value={category} onChange={(event) => setCategory(event.target.value as typeof category)}>{(["REPLACEMENT", "DAMAGE", "OTHER"] as const).map((value) => <option key={value} value={value}>{chargeCategoryLabels[value]}</option>)}</select></label>
       <label>Amount (dollars) <input type="number" min="0.01" step="0.01" style={{ width: "100%" }} value={amount} onChange={(event) => setAmount(event.target.value)} required /></label>
@@ -300,6 +312,8 @@ function FacilityForm({ rooms, issuanceId, canConfigure, busy, onSubmit }: { roo
   const [kind, setKind] = useState<(typeof lodgingHoldKinds)[number]>("DAMAGE");
   const [firstNight, setFirstNight] = useState(rooms[0]?.lastNight ?? "");
   const [lastNight, setLastNight] = useState(rooms[0]?.lastNight ?? "");
+  // Unsaved work: a typed problem title or details, or a room block switched on, until reported (#1468).
+  useUnsavedChangesGuard(title.trim() !== "" || description.trim() !== "" || block);
   if (rooms.length === 0) return <p>This person has no room on record, so there is no room to inspect.</p>;
   return <form className="form-stack" onSubmit={(event) => {
     event.preventDefault();

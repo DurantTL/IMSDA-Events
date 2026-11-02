@@ -7,6 +7,7 @@ import { savedMessage } from "@/components/form-message";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { cardCell } from "@/components/table-card-labels";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { notificationCatalog, type NotificationDefinition, type NotificationKey } from "@/modules/notifications/catalog";
 import type { EventStaffListSummary } from "@/modules/notifications/event-lists";
 import type { NotificationSwitch } from "@/modules/notifications/settings";
@@ -65,6 +66,8 @@ export function NotificationsWorkspace({
   const [addressError, setAddressError] = useState("");
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftFrom(addresses));
+  // Unsaved work: the three platform addresses differ from the saved ones, until saved. The on/off switches save instantly (#1468).
+  useUnsavedChangesGuard(dirty);
   const isOn = (key: NotificationKey) => switches.find((entry) => entry.key === key)?.enabled ?? true;
 
   async function change(definition: NotificationDefinition, enabled: boolean, confirmed: boolean) {
