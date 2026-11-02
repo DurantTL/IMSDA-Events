@@ -7,6 +7,8 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { LocationFilter } from "@/components/location-filter";
 import { HonorPickRemoveButton, HonorSeatPlacementForm } from "@/components/honor-seat-override";
+import { ColumnHeader } from "@/components/column-header";
+import { SortOrderNote } from "@/components/list-sort";
 import { PrintReportButton } from "@/components/print-report-button";
 import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -20,6 +22,8 @@ import {
 } from "@/modules/honors/roster-domain";
 import { getHonorRosterData } from "@/modules/honors/roster-repository";
 import { backgroundFlaggedAttendeeIds } from "@/modules/background-checks/repository";
+import { serverSort, sortRows } from "@/lib/list-sort";
+import { HONOR_CLASS_SORT_COLUMNS, HONOR_SCHEDULE_SORT_COLUMNS, HONOR_SITE_SORT_COLUMNS, HONOR_TOTALS_SORT_COLUMNS, UNSORTED, sortLine } from "@/lib/staff-sort-columns";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
@@ -37,7 +41,7 @@ function ageText(age: number | null) {
 export default async function HonorRostersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string; view?: string; club?: string; location?: string }>;
+  searchParams: Promise<{ event?: string; view?: string; club?: string; location?: string; sort?: string; dir?: string; totalsSort?: string; totalsDir?: string }>;
 }) {
   const query = await searchParams;
   const { event, permissions, user } = await resolveEventContext(query.event);
@@ -72,6 +76,29 @@ export default async function HonorRostersPage({
     seats[clubId] = (seats[clubId] ?? 0) + 1;
     clubSeatsByClass.set(row.offeringId, seats);
   }
+  // Each table sorts from its column headers, from a fixed list of columns; no column chosen keeps the page's order (#1458).
+  // Only one view shows at a time, so the class sheets, the site roster and the club schedules share `sort` and `dir`.
+  const honorsPath = "/more/honors/rosters";
+  const classSorting = serverSort(honorsPath, query, HONOR_CLASS_SORT_COLUMNS, UNSORTED);
+  const totalsSorting = serverSort(honorsPath, query, HONOR_TOTALS_SORT_COLUMNS, UNSORTED, { prefix: "totals" });
+  const siteSorting = serverSort(honorsPath, query, HONOR_SITE_SORT_COLUMNS, UNSORTED);
+  const scheduleSorting = serverSort(honorsPath, query, HONOR_SCHEDULE_SORT_COLUMNS, UNSORTED);
+  const nameOf = (person: { lastName: string; firstName: string }) => `${person.lastName}, ${person.firstName}`;
+  const sortedTotals = sortRows(siteRoster.clubs, totalsSorting.order.key, totalsSorting.order.dir, {
+    club: (club) => club.clubName,
+    youth: (club) => club.YOUTH,
+    staff: (club) => club.STAFF,
+    adults: (club) => club.ADULT,
+  });
+  const sortedSitePeople = sortRows(siteRoster.people, siteSorting.order.key, siteSorting.order.dir, {
+    checkedIn: (person) => person.checkedIn,
+    name: nameOf,
+    club: (person) => person.clubName,
+    site: (person) => person.locationName,
+    age: (person) => person.ageOnEventDate,
+    type: (person) => rosterGroupLabels[rosterGroupOf(person.attendeeType)],
+    dietary: (person) => person.dietary,
+  });
   const selectedClubs = query.club ? data.clubs.filter((club) => club.id === query.club) : data.clubs;
 
   return (
@@ -165,11 +192,17 @@ export default async function HonorRostersPage({
                 <p className="report-empty">No one has chosen this class yet.</p>
               ) : (
                 <div className="report-table-wrap">
+                  {classSorting.order.key && <SortOrderNote>{sortLine(classSorting.order)}</SortOrderNote>}
                   <table className="report-table">
                     <caption className="sr-only">People in {roster.offering.honorName}</caption>
-                    <thead><tr><th scope="col">Name</th><th scope="col">Club</th><th scope="col">Age</th><th scope="col">Type</th><th scope="col">Present</th>{canOverrideSeats && <th scope="col" className="honor-seat-override">Pick</th>}</tr></thead>
+                    <thead><tr><ColumnHeader column="name" label="Name" sorting={classSorting} /><ColumnHeader column="club" label="Club" sorting={classSorting} /><ColumnHeader column="age" label="Age" sorting={classSorting} /><ColumnHeader column="type" label="Type" sorting={classSorting} /><th scope="col">Present</th>{canOverrideSeats && <th scope="col" className="honor-seat-override">Pick</th>}</tr></thead>
                     <tbody>
-                      {roster.people.map((person) => {
+                      {sortRows(roster.people, classSorting.order.key, classSorting.order.dir, {
+                        name: nameOf,
+                        club: (person) => person.clubName,
+                        age: (person) => person.ageOnEventDate,
+                        type: (person) => rosterGroupLabels[rosterGroupOf(person.attendeeType)],
+                      }).map((person) => {
                         const pick = roster.picks.find((candidate) => candidate.attendeeId === person.id);
                         return (
                           <tr key={person.id}>
@@ -217,11 +250,12 @@ export default async function HonorRostersPage({
           </div>
           {siteRoster.clubs.length > 0 && (
             <div className="report-table-wrap">
+              {totalsSorting.order.key && <SortOrderNote>{sortLine(totalsSorting.order)}</SortOrderNote>}
               <table className="report-table">
                 <caption className="sr-only">Totals by club</caption>
-                <thead><tr><th scope="col">Club</th><th scope="col">Youth</th><th scope="col">Staff</th><th scope="col">Adults</th></tr></thead>
+                <thead><tr><ColumnHeader column="club" label="Club" sorting={totalsSorting} /><ColumnHeader column="youth" label="Youth" sorting={totalsSorting} /><ColumnHeader column="staff" label="Staff" sorting={totalsSorting} /><ColumnHeader column="adults" label="Adults" sorting={totalsSorting} /></tr></thead>
                 <tbody>
-                  {siteRoster.clubs.map((club) => (
+                  {sortedTotals.map((club) => (
                     <tr key={club.clubName}><th scope="row" translate="no">{club.clubName}</th><td>{club.YOUTH}</td><td>{club.STAFF}</td><td>{club.ADULT}</td></tr>
                   ))}
                 </tbody>
@@ -232,16 +266,17 @@ export default async function HonorRostersPage({
             <p className="report-empty">No club has registered for this site yet.</p>
           ) : (
             <div className="report-table-wrap">
+              {siteSorting.order.key && <SortOrderNote>{sortLine(siteSorting.order)}</SortOrderNote>}
               <table className="report-table">
                 <caption className="sr-only">Everyone registered for this site</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Checked in</th><th scope="col">Name</th><th scope="col">Club</th>{data.hasLocations && <th scope="col">Site</th>}<th scope="col">Age</th><th scope="col">Type</th>
-                    {includeDietary && <th scope="col">Dietary notes</th>}
+                    <ColumnHeader column="checkedIn" label="Checked in" sorting={siteSorting} /><ColumnHeader column="name" label="Name" sorting={siteSorting} /><ColumnHeader column="club" label="Club" sorting={siteSorting} />{data.hasLocations && <ColumnHeader column="site" label="Site" sorting={siteSorting} />}<ColumnHeader column="age" label="Age" sorting={siteSorting} /><ColumnHeader column="type" label="Type" sorting={siteSorting} />
+                    {includeDietary && <ColumnHeader column="dietary" label="Dietary notes" sorting={siteSorting} />}
                   </tr>
                 </thead>
                 <tbody>
-                  {siteRoster.people.map((person) => (
+                  {sortedSitePeople.map((person) => (
                     <tr key={person.id}>
                       <td className="honor-roster-box">{person.checkedIn ? "✓" : ""}</td>
                       <th scope="row"><ExactValue>{person.lastName}, {person.firstName}</ExactValue>{flagged.has(person.id) && <> <BackgroundCheckBadge /></>}</th>
@@ -284,16 +319,17 @@ export default async function HonorRostersPage({
                   <ExportLink className="secondary-button report-download" href={csv("club", club.id)}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
                 </div>
                 <div className="report-table-wrap">
+                  {scheduleSorting.order.key && <SortOrderNote>{sortLine(scheduleSorting.order)}</SortOrderNote>}
                   <table className="report-table">
                     <caption className="sr-only">Classes for {club.name}</caption>
                     <thead>
                       <tr>
-                        <th scope="col">Name</th><th scope="col">Age</th>
+                        <ColumnHeader column="name" label="Name" sorting={scheduleSorting} /><ColumnHeader column="age" label="Age" sorting={scheduleSorting} />
                         {schedule.sessions.map((session) => <th key={session.id} scope="col">{session.name}</th>)}
                       </tr>
                     </thead>
                     <tbody>
-                      {schedule.people.map((row) => (
+                      {sortRows(schedule.people, scheduleSorting.order.key, scheduleSorting.order.dir, { name: (row) => nameOf(row.person), age: (row) => row.person.ageOnEventDate }).map((row) => (
                         <tr key={row.person.id}>
                           <th scope="row"><ExactValue>{row.person.lastName}, {row.person.firstName}</ExactValue>{flagged.has(row.person.id) && <> <BackgroundCheckBadge /></>}</th>
                           <td>{ageText(row.person.ageOnEventDate)}</td>
