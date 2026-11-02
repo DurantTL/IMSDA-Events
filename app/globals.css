@@ -12689,6 +12689,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .attention-bell { overflow: visible; width: 44px; height: 44px; }
 .attention-bell:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
 .attention-badge {
+  justify-content: center;
   position: absolute;
   top: -6px;
   right: -6px;

@@ -35,10 +35,12 @@ export type FormMessageProps = {
   /** Only where the reverse action already exists in the same component. */
   undo?: FormMessageUndo;
   className?: string;
+  /** Keep an empty polite live region mounted while there is no message, so the result is announced when it arrives. */
+  alwaysMounted?: boolean;
 };
 
-export function FormMessage({ tone, message, undo, className }: FormMessageProps) {
-  if (!message) return null;
+export function FormMessage({ tone, message, undo, className, alwaysMounted }: FormMessageProps) {
+  if (!message) return alwaysMounted ? <div aria-live="polite" className="sr-only" role="status" /> : null;
   const classes = ["inline-notice", tone === "error" ? "error" : "success", styles.message, className].filter(Boolean).join(" ");
   return (
     <div className={classes} role={tone === "error" ? "alert" : "status"}>

@@ -51,10 +51,12 @@ export function PhoneInput({ label, stored, value, defaultValue = "", onValueCha
         inputMode={attributes.inputMode}
         onBlur={(event) => {
           setLeft(true);
+          // A locked (read-only or disabled) value is never rewritten.
+          const locked = Boolean(rest.readOnly || rest.disabled);
           // Tidy a valid number on leaving the field (#1451): "5155550134" becomes "(515) 555-0134". A number that
           // does not pass, such as an old saved one, is left exactly as it is.
           const check = validatePhone(current);
-          if (check.ok && check.value !== current) {
+          if (!locked && check.ok && check.value !== current) {
             setOwn(check.value);
             onValueChange?.(check.value);
           }

@@ -167,6 +167,8 @@ export function CancellationRequestPanel({
       }
       setView(payload.view as RegistrantRequestView);
       setMessage({ kind: "ok", text: "Your request was withdrawn. Your registration was not changed." });
+      // The withdraw button is gone now, so focus goes to the message instead of falling to the page.
+      window.requestAnimationFrame(() => messageRef.current?.focus());
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : "The request could not be withdrawn. Try again." });
     } finally {

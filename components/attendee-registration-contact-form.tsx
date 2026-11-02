@@ -5,7 +5,7 @@ import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { KeyRound, Save } from "lucide-react";
-import { FormMessage, savedMessage } from "@/components/form-message";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import { formatPersonName } from "@/lib/person-name";
@@ -85,15 +85,15 @@ export function AttendeeRegistrationContactForm({
     // The saved phone is the one the server compares with (#871); the same number never blocks.
     // The browser's required and email checks are off (noValidate); the app says what is missing.
     if (!contact.firstName.trim() || !contact.lastName.trim() || !contact.email.trim()) {
-      setNotice({ tone: "error", message: "Enter the first name, last name and email address, then save again." });
+      setNotice({ tone: "error", message: notSavedMessage("Enter the first name, last name and email address, then save again.") });
       return;
     }
     if (emailBlockingMessage("Email", contact.email, savedContact.email)) {
-      setNotice({ tone: "error", message: "Fix the highlighted email address and save again." });
+      setNotice({ tone: "error", message: notSavedMessage("Fix the highlighted email address and save again.") });
       return;
     }
     if (phoneBlocks("Phone", contact.phone, savedContact.phone)) {
-      setNotice({ tone: "error", message: "Fix the highlighted phone number and save again." });
+      setNotice({ tone: "error", message: notSavedMessage("Fix the highlighted phone number and save again.") });
       return;
     }
     setSaving(true);
@@ -124,7 +124,7 @@ export function AttendeeRegistrationContactForm({
     } catch (error) {
       setNotice({
         tone: "error",
-        message: error instanceof Error ? error.message : "The contact details could not be saved.",
+        message: notSavedMessage(error instanceof Error ? error.message : "The contact details could not be saved."),
       });
     } finally {
       setSaving(false);
@@ -173,7 +173,7 @@ export function AttendeeRegistrationContactForm({
             {saving ? "Saving…" : "Save with code"}
           </button>
         </div>
-        <FormMessage tone={notice.tone === "error" ? "error" : "success"} message={notice.message} />
+        <FormMessage tone={notice.tone === "error" ? "error" : "success"} message={notice.message} alwaysMounted />
         {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving || requesting} onRetry={() => retryRef.current?.()} />}
       </form>
     </details>
