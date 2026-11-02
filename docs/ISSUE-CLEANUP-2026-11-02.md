@@ -106,7 +106,7 @@ Each comment names what exists (file paths, PRs) and what's left as a checklist.
 | #76 Historical imports and exports | CSV, WR26 bundle and Google Sheets imports with checksums |
 | #84 No-code event site builder | Event page content sections, Open Graph metadata |
 | #100 Session scheduling | Honors sessions, waitlists, attendance; program assignment runs |
-| #113 NCS Risk import profile | Fixed-format Sterling background-check import |
+| #113 NCS Risk import profile | Fixed-format Sterling Volunteers import |
 | #130 Consent evidence | Acknowledgment evidence tied to policy versions |
 | #134 Pricing engine | Form prices, one late-pricing date, meal prices by attendee type |
 | #146 Merchandise quotes (on hold) | Server-side order drafts with replay |
@@ -134,8 +134,8 @@ Answer yes (close) or no (keep) for each row.
 | Issue | Title | What replaced it | Confidence | Close? |
 | --- | --- | --- | --- | --- |
 | #183 | Ministry units, seasons, roster history | Club-year rosters (`ClubRosterMember`), carry-forward (PR #937), transfers (PR #534) | medium | |
-| #113 | NCS Risk CSV import profile | Sterling background-check CSV import (PRs #440, #535, #578) | medium | |
-| #204, #205, #206 | Transportation routes, riders, manifests | Nothing built; the driver feature was removed in #544 (driver clearance now comes from the background-check list). Still wanted? | medium | |
+| #113 | NCS Risk CSV import profile | Sterling Volunteers CSV import (PRs #440, #535, #578) | medium | |
+| #204, #205, #206 | Transportation routes, riders, manifests | Nothing built; the driver feature was removed in #544 (driver clearance now comes from the Sterling Volunteers list). Still wanted? | medium | |
 | #252–#256 | Staff recruiting, onboarding, deployment, offboarding | Nothing built; you chose Oct 27 to leave staff-record policy for a later phase. Keep for later or close? | medium | |
 | #257–#261 | Incident cases, missing person, escalation | Emergency plans (#114, PR #1339) this season; you chose Oct 27 to leave incident policy for later. Keep for later or close? | medium | |
 | #311, #312, #314 | Community profiles, directory, photos | Your Oct 27 decision on #495: none in 2026–27. Keep for later or close? | high (decision) | |
