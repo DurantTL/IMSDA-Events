@@ -11,12 +11,13 @@ const mocks = vi.hoisted(() => ({
   userFindMany: vi.fn(),
   accountFindMany: vi.fn(),
   grantFindMany: vi.fn(),
+  grantCount: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     user: { findMany: mocks.userFindMany },
     attendeeAccount: { findMany: mocks.accountFindMany },
-    clubDirectorGrant: { findMany: mocks.grantFindMany },
+    clubDirectorGrant: { findMany: mocks.grantFindMany, count: mocks.grantCount },
   }),
 }));
 
@@ -24,7 +25,7 @@ import { ClubLeadersList } from "@/components/club-leaders-list";
 import { PeopleDirectory } from "@/components/people-directory";
 import { clubsAdminTabs } from "@/modules/club-reports/clubs-admin-home-model";
 import { listClubLeaders } from "@/modules/system-admin/club-leaders";
-import { buildLeadersWhere, parseLeaderFilters, sortClubLeaders } from "@/modules/system-admin/club-leaders-model";
+import { buildLeadersWhere, clubLeadersHref, parseLeaderFilters, sortClubLeaders } from "@/modules/system-admin/club-leaders-model";
 import { findPeopleByRole } from "@/modules/system-admin/people-directory";
 import {
   buildRoleWhere,
@@ -211,7 +212,9 @@ describe("Club leaders", () => {
     mocks.grantFindMany.mockResolvedValue([
       grant("1", "Beta Club", "DIRECTOR", "Zed"), grant("2", "Alpha Club", "REPORTER", "Amy"), grant("3", "Alpha Club", "DIRECTOR", "Bob"), grant("4", "Alpha Club", "DEPUTY", "Cy"), grant("5", "Alpha Club", "DEPUTY", "Abe"),
     ]);
-    const leaders = await listClubLeaders({ clubId: null, role: null }, now);
+    mocks.grantCount.mockResolvedValue(5);
+    const { leaders, total } = await listClubLeaders({ clubId: null, role: null }, 1, now);
+    expect(total).toBe(5);
     expect(leaders.map((leader) => leader.key)).toEqual(["3", "5", "4", "2", "1"]);
     expect(mocks.grantFindMany.mock.calls[0][0].where.organization).toEqual({ type: "CLUB", isActive: true });
     expect(sortClubLeaders([])).toEqual([]);
@@ -226,10 +229,23 @@ describe("Club leaders", () => {
     expect(plain).toContain("Dee Director");
   });
 
-  it("says when the list is capped", () => {
-    const many = Array.from({ length: 2000 }, (_, i) => ({ key: `k${i}`, accountId: `a${i}`, name: "N", email: "n@example.test", clubId: "o", clubName: "C", role: "DIRECTOR" as const, roleLabel: "Director", twoStepOn: false }));
-    const html = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: many, clubs: [], filters: { clubId: null, role: null }, canOpenPeople: false }));
-    expect(html).toContain("Showing the first 2000 current roles");
+  it("pages in the database, in order, and says where the page sits", async () => {
+    mocks.grantCount.mockResolvedValue(120);
+    mocks.grantFindMany.mockResolvedValue([]);
+    const result = await listClubLeaders({ clubId: null, role: null }, 3, now);
+    expect(result).toMatchObject({ total: 120, page: 3, pageSize: 50 });
+    const query = mocks.grantFindMany.mock.calls.at(-1)![0];
+    expect(query).toMatchObject({ skip: 100, take: 50 });
+    expect(query.orderBy).toEqual([{ organization: { name: "asc" } }, { role: "asc" }, { attendeeAccount: { displayName: "asc" } }, { attendeeAccount: { email: "asc" } }, { id: "asc" }]);
+    // A page past the end is the last page, never an empty one.
+    expect((await listClubLeaders({ clubId: null, role: null }, 99, now)).page).toBe(3);
+    const rows = Array.from({ length: 20 }, (_, i) => ({ key: `k${i}`, accountId: `a${i}`, name: "N", email: "n@example.test", clubId: "o", clubName: "C", role: "DIRECTOR" as const, roleLabel: "Director", twoStepOn: false }));
+    const html = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: rows, clubs: [], filters: { clubId: "o", role: null }, canOpenPeople: false, slice: { from: 101, to: 120, page: 3, pageCount: 3, total: 120 }, hrefFor: (next) => clubLeadersHref({ clubId: "o", role: null }, next) }));
+    expect(html).toContain("Showing 101–120 of 120 current roles");
+    expect(html).toContain('href="/admin/clubs/leaders?club=o&amp;page=2"');
+    expect(html).not.toContain("Showing the first");
+    const one = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: rows.slice(0, 1), clubs: [], filters: { clubId: null, role: null }, canOpenPeople: false }));
+    expect(one).toContain("Showing 1–1 of 1 current role");
   });
 
   it("is a Clubs tab", () => {
