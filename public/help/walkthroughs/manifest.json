@@ -1,35 +1,35 @@
 {
   "walkthrough-coordinator-clubs": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "4c799fecc0c300b283ce592e1aef9d3469955e164748913834a98dd17f752476"
+    "sourceHash": "f3a5447c84c9553e203d2de6503b8f36196ffde855fbe76af66d2a81dc521c12"
   },
   "walkthrough-coordinator-follow-up": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "5e757861eeb0df0614d47df532782d0cb41deb355c0eff1ab5817fe4ba10abab"
+    "sourceHash": "b74248dc6847a7e5cbb687235514f9f4a48cce888fc287a242a0513b3eec75fd"
   },
   "walkthrough-coordinator-no-director": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "92a7e4840475069f82f2cb79891f9409ea4ad22b75f0b11410e590d7a51c108e"
+    "sourceHash": "15a8fd3162dc329baaef84f5864a46561edffc658287db684b1387c7d83ccee8"
   },
   "walkthrough-coordinator-points": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "8a5f809fd07acd5ca6ba17e8da2006d2b0ecc118fec0ab2519d74da8c3a44cf5"
+    "sourceHash": "937b370a894274379d727a669ac70bf02b256a4c2a6cb88532aaf228bebdf24e"
   },
   "walkthrough-coordinator-records": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "619692f99da6924e999da88ced4afb12f707201ecabb3098f5944a276199062e"
+    "sourceHash": "50b0ad00ed3f1a943672dd5446c7db9bfe64592924a8a4449a11697efbef4633"
   },
   "walkthrough-coordinator-sign-in": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "e4ae2e9b3b495059245a8997958d0ea13dba05916212ee6af9944c222c7f7ae9"
+    "sourceHash": "0d2abc032147f8bd1228e083425312016c7749e7f3dd37fea3ee38054a9f7472"
   },
   "walkthrough-director-club-forms": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "20dc0d1089992a4476133c32318c57773bf7a3d17a9990b90c22de5242e5df7b"
+    "sourceHash": "a400f45e12d6cd4bfb5b91c7307f8f9ec929800c0d4fd4a007bc004bfe7e665f"
   },
   "walkthrough-director-first-sign-in": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "e79617a483781941d2c2e7a2ff365258ef2668af177eb4fc196cc384323ff330"
+    "sourceHash": "7dcd18062950cfb85c15403d94ab48e991b50bbba379afa4340926582abec5f8"
   },
   "walkthrough-director-get-help": {
     "capturedFor": "2026-11-02",
@@ -41,11 +41,11 @@
   },
   "walkthrough-director-monthly-records": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "d2a2f34e8c2ba07fe542df67ee359e3662375a4b8975f36e22365e770daef8d7"
+    "sourceHash": "70a2c9a43ca90c7f1109ceebcff0a4ea2a0b524abe5b6d2a0b59c0f6058d58b7"
   },
   "walkthrough-director-orders": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "bcc07e88da69abd27779dd616857b0ea6fb9e4d858c1f19d7218e37c8d2b1bf6"
+    "sourceHash": "c135eedc1dc7c560ecbb198da3a14c78e03047c5e217fb1dc7bd036bac448d7e"
   },
   "walkthrough-director-register-event": {
     "capturedFor": "2026-11-02",
@@ -53,7 +53,7 @@
   },
   "walkthrough-director-roster": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "bcd33cdae3d2166f87db7dc1c8c3ffd1f3d9a610cd08234089e8faa344cd1988"
+    "sourceHash": "7bfecd1ef2f82ace4397f04ef8d72a3e15a61798fdd97bdff2c8bd5056d59ca5"
   },
   "walkthrough-director-two-step": {
     "capturedFor": "2026-11-02",
@@ -61,6 +61,6 @@
   },
   "walkthrough-director-year-end": {
     "capturedFor": "2026-11-02",
-    "sourceHash": "0b1ce5d9c98cc41a0b32b9a7e6489c4bef7b943cd48822d288f6c6581052b519"
+    "sourceHash": "5842cc9b15d0ee4d438d333cee88add8b61b11c86fe209d97ee81e10d112c424"
   }
 }
