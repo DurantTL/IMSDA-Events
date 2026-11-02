@@ -7,6 +7,7 @@ import { useId, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { CancellationCarryOut } from "@/components/cancellation-carry-out";
 import { postJson } from "@/lib/post-json";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 import type { CarryOutPanel } from "@/modules/cancellation-execution/views";
 import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { requestStatuses, requestStatusLabels, type RequestStatus } from "@/modules/cancellation-requests/domain";
@@ -30,7 +31,8 @@ const filters: Array<{ value: string; label: string }> = [
 const scopeWords = { FULL_REGISTRATION: "Whole registration", ATTENDEE: "Attendees", COMPONENT: "Items" } as const;
 
 function when(iso: string, timezone: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: timezone }).format(new Date(iso));
+  // The shared formatter adds the zone label ("1:40 AM CT" style), so no time is shown without its zone (B13).
+  return formatInTimeZone(iso, timezone, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export function CancellationRequestsWorkspace({

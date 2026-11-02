@@ -138,7 +138,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
       }}
     >
       <div className="fb-step-head">
-        <span className="fb-step-badge">Step {sectionIndex + 1}</span>
+        <span className="count-badge fb-step-badge">Step {sectionIndex + 1}</span>
         <h3 id={`fb-step-title-${section.id}`}>{section.title || "Untitled step"}</h3>
         {review && <span className="fb-step-tag">Final review</span>}
         <button type="button" className="fb-link-button" aria-expanded={settingsOpen} aria-controls={`fb-step-settings-${section.id}`} onClick={() => setSettingsOpen((open) => !open)}>
@@ -178,7 +178,7 @@ function CanvasStep({ section, sectionIndex, paletteDrag, onSelect, onAction, on
                       <span className="fb-control" aria-hidden="true"><FieldPreviewControl field={field} /></span>
                       {field.helpText && <span className="fb-field-help" aria-hidden="true">{field.helpText}</span>}
                       {/* Text chips, never colour alone; plain spans inside the button, so they add no tab stops. They are in the button's name above. */}
-                      <span className="fb-chips" aria-hidden="true">{chips.map((chip) => <span className={`fb-q-chip fb-q-chip-${chip.kind}`} key={chip.kind}>{chip.label}</span>)}</span>
+                      <span className="fb-chips" aria-hidden="true">{chips.map((chip) => <span className={`count-badge fb-q-chip fb-q-chip-${chip.kind}`} key={chip.kind}>{chip.label}</span>)}</span>
                     </button>
                     <InformationFieldIssues fieldId={field.id} />
                     {canEdit && selected && <FieldToolbar section={section} field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} onAction={onAction} />}

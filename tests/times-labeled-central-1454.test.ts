@@ -214,7 +214,6 @@ const pendingOtherBuilds: Record<string, string> = {
   "components/asset-issue-desk.tsx": PENDING,
   "components/attendee-community-board.tsx": PENDING,
   "components/cancellation-policy-workspace.tsx": PENDING,
-  "components/cancellation-requests-workspace.tsx": PENDING,
   "components/check-in-workspace.tsx": PENDING,
   "components/communications-workspace.tsx": PENDING,
   "components/duplicate-match-review-workspace.tsx": PENDING,

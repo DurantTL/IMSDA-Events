@@ -27,7 +27,7 @@ export const SCHEDULED_EMAIL_STATUSES = ["SCHEDULED", "ACTIVE", "PAUSED", "CANCE
 export type ScheduledEmailStatus = (typeof SCHEDULED_EMAIL_STATUSES)[number];
 
 export const SCHEDULED_EMAIL_STATUS_LABELS: Record<ScheduledEmailStatus, string> = {
-  SCHEDULED: "Waiting for approval",
+  SCHEDULED: "Pending approval",
   ACTIVE: "Approved and scheduled",
   PAUSED: "Paused",
   CANCELLED: "Cancelled",

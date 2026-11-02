@@ -91,7 +91,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
       <section className="panel" aria-label="Meal totals">
         <ul className="choice-filter-counts">
           {totals.filter((total) => (total.value !== "other" && total.value !== "none") || total.count > 0).map((total) => (
-            <li key={total.value}><span className="choice-chip muted"><span>{total.label}</span><strong>{total.count}</strong></span></li>
+            <li key={total.value}><span className="count-badge"><span>{total.label}</span><strong>{total.count}</strong></span></li>
           ))}
         </ul>
       </section>

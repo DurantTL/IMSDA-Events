@@ -246,7 +246,7 @@ export default async function AttendeeRegistrationsPage({
                         aria-current={key === filter ? "true" : undefined}
                         href={key === "all" ? "/account/registrations" : `/account/registrations?show=${key}`}
                       >
-                        {filterLabels[key]} <span className="attendee-reg-count">({counts[key]})</span>
+                        {filterLabels[key]} <span className="count-badge">({counts[key]})</span>
                       </Link>
                     </li>
                   ))}

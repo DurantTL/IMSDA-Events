@@ -95,84 +95,8 @@ loadEnvConfig(process.cwd());
 
 const turnstileBase = (process.env.JOURNEY_TURNSTILE_BASE_URL ?? "http://localhost:3002").replace(/\/$/, "");
 
-/** Every staff page the staff journeys visit: the staff shell (header, role switcher) is on each of them. */
-const staffPages = [
-  "Start from template", "Overview (setting up an event)", "Attendee setup", "Event settings", "Registration builder", "Registration builder (preview and test)",
-  "Event settings (ready to publish)", "Overview (event published)", "Attendee list", "Cancellation requests (check-in staff)", "Scheduled emails (check-in staff)",
-  "Check-in desk", "Scheduled emails", "Scheduled emails (new schedule)", "Scheduled emails (saved schedule)", "Scheduled emails (after sending)",
-  "Cancellation requests (staff)", "Cancellation request (staff review)",
-];
-/** What the staff pages draw as a chip or badge of their own: the shell's two, and each page's (the attendee list's meal totals, the builder's labels, the template page's count). */
-const STAFF_PILL_OFFENDERS = ["span.staff-pill", "a.admin-role-pill", "span.choice-chip", "span.fb-q-chip", "span.live-preview-badge", "span.fb-step-badge", "span.attention-badge", "button.fb-phone-step-pill"];
-const registrationsPages = ["My registrations", "My registrations (filters)", "My registrations (contact updated)", "My registrations (request cancellation)", "My registrations (cancelled)", "My registrations (after cancelling)"];
 /** Failures that are the site's fault (found by these journeys). The label is what the failing check prints. */
-export const KNOWN_BUGS: KnownBug[] = [
-  {
-    id: "sign-up-email-browser-only",
-    description: "Create account: components/attendee-sign-up-form.tsx:185 is a raw type=\"email\" input with no noValidate and no EmailInput, so a bad address shows only the browser's own bubble on submit, never the shared message when the field is left (B8). tests/field-checks-1451.test.ts:57 lists the file as \"Not yet on EmailInput\".",
-    checks: [{ label: "Create account (Security check blocked) | B8 | a bad email gets the shared message", detail: "shows no shared message" }],
-  },
-  {
-    id: "search-clear-button-42px",
-    description: "Search fields on desktop: app/globals.css:1262 sizes .search-field-clear 44px wide but height: 42px (only the phone rule at app/globals.css:9451 makes it --touch-target tall), so the clear button is 44x42 (L1 \"clear buttons are 44px\", C2).",
-    checks: ["Events list", ...staffPages].map((page) => ({ label: `${page} | L1 | the clear button is 44px`, offenders: ["44x42"] })),
-    only: "desktop",
-  },
-  {
-    id: "public-registration-phone-not-tidied",
-    description: "Registration form: components/public-registration-form.tsx:2337 draws a PHONE answer with a generic input that has no tidy-on-leave, so \"5155550134\" stays as typed, while PhoneInput (components/phone-input.tsx:52) turns it into \"(515) 555-0134\" when the field is left (B8, formatted the same way in every form). The shared message is the same; only the tidy differs.",
-    checks: [{ label: "Registration form: About you | B8 | a good phone is tidied to (515) 555-0134", detail: "the phone stayed" }],
-  },
-  {
-    id: "forms-help-trigger-module-button",
-    description: "Forms help: components/forms-help.tsx:25 gives its <button> only the module class styles.trigger (components/forms-help.module.css .trigger) unless a className is passed, so it is a button look of its own. tests/look-guard-1440.test.ts's reviewed list misses it because it reads `className={styles.x}` and this is `className ?? styles.trigger` (L5).",
-    checks: ["Registration form: About you", "Registration form: choices and payment"].map((page) => ({ label: `${page} | L5 | buttons use the shared classes`, offenders: ["button.forms-help-module__trigger"] })),
-  },
-  {
-    id: "disabled-buttons-wait-cursor",
-    description: "Disabled buttons use cursor: wait, not not-allowed (L5): app/globals.css:5514 .public-square-pay-button:disabled (the card step's Pay button, disabled until the card form is ready) and app/globals.css:5624 .public-manage-contact-actions > button:disabled, with the same wording at :4347, :5473 and :5536.",
-    checks: [
-      { label: "Card payment step | L5 | a disabled button shows the not-allowed cursor", offenders: ["Pay $79.10:wait"] },
-      // The Continue payment panel and the contact form are both open on this page.
-      { label: "My registrations (contact updated) | L5 | a disabled button shows the not-allowed cursor", offenders: ["Pay $79.10:wait", "Save with code:wait"] },
-    ],
-  },
-  {
-    id: "attendee-status-pill-not-shared-chip",
-    description: "My registrations: the status of each registration card (\"Pending payment\", \"Cancelled\") is a span.attendee-status-pill (components/account-registration-card.tsx:63, styled at app/globals.css:5083 with its own colors), not the shared .status-chip (L4).",
-    checks: registrationsPages.map((page) => ({ label: `${page} | L4 | chips and badges use the shared classes`, offenders: ["span.attendee-status-pill"] })),
-  },
-  {
-    id: "attendee-filter-counts-plain-span",
-    description: "My registrations: the status filter links write their counts as a plain span.attendee-reg-count \"(1)\" (app/(public)/account/(portal)/registrations/page.tsx:249), not the navy .count-badge (L4: filter counts use the count badge).",
-    checks: registrationsPages.map((page) => ({ label: `${page} | L4 | filter counts use the count badge`, offenders: [".attendee-reg-count"] })),
-  },
-  {
-    id: "staff-shell-pills-not-shared-chip",
-    description: "Every staff page: the header's \"Staff mode\" badge is a span.staff-pill (components/app-shell.tsx:665) and the role switcher's roles are a.admin-role-pill (components/admin-role-switcher.tsx:40), each with its own look, not the shared .status-chip / .count-badge (L4). Pages add their own: the attendee list's meal totals are span.choice-chip (app/(workspace)/people/attendees/page.tsx:94), the builder's step labels span.fb-step-badge.",
-    checks: staffPages.map((page) => ({ label: `${page} | L4 | chips and badges use the shared classes`, offenders: STAFF_PILL_OFFENDERS })),
-  },
-  {
-    id: "scheduled-email-status-words",
-    description: "Scheduled emails: a schedule waiting to be approved shows the chip \"Waiting for approval\" (modules/communications/scheduled-email-options.ts:30, drawn at components/scheduled-emails-workspace.tsx:448), but the approved word for that state is \"Pending approval\" (B12).",
-    checks: [{ label: "Scheduled emails (saved schedule) | B12 | status chip words", detail: "Waiting for approval" }],
-  },
-  {
-    id: "cancellation-queue-times-without-ct",
-    description: "Cancellation requests (staff): components/cancellation-requests-workspace.tsx:33 formats every time (the queue rows, the request's timeline) in the event's zone but without a zone label, so \"Nov 2, 2026, 1:40 AM\" never says CT (B13).",
-    checks: ["Cancellation requests (staff)", "Cancellation request (staff review)"].map((page) => ({ label: `${page} | B13 | times show CT`, detail: "time without" })),
-  },
-  {
-    id: "contact-form-saved-words",
-    description: "Update contact details: components/attendee-registration-contact-form.tsx:122 confirms with \"Contact details saved. The code has been used.\", not the shared \"Saved.\" message (savedMessage in components/form-message.tsx) every other form uses (B5). The form also still writes its own message paragraph instead of FormMessage.",
-    checks: [{ label: "Update contact details | B5 | contact details: one \"Saved.\" message after saving", detail: "Contact details saved." }],
-  },
-  {
-    id: "withdraw-request-inline-confirm",
-    description: "My registrations: withdrawing a cancellation request asks in its own inline step (components/cancellation-request-panel.tsx:234, \"Yes, withdraw it\" / \"Keep it\"), not in the shared confirm dialog every other cancel uses (B9). The flow does ask first and does offer Undo, only the style differs.",
-    checks: [{ label: "My registrations (request cancellation) | B9 | withdrawing asks in the shared dialog", detail: "own inline step" }],
-  },
-];
+export const KNOWN_BUGS: KnownBug[] = [];
 
 type Viewport = { name: "desktop" | "phone"; width: number };
 const viewports: Viewport[] = [{ name: "desktop", width: 1280 }, { name: "phone", width: 390 }];
@@ -604,7 +528,7 @@ const portalCard = (page: J.Page, ctx: Ctx) => page.locator("article.attendee-ov
 
 /** B12 for the registration card's own status pill: one of the approved words. */
 async function checkCardStatus(ctx: Ctx, page: J.Page, name: string, expected?: string) {
-  const pill = clean((await portalCard(page, ctx).locator(".attendee-status-pill").first().textContent()) ?? "");
+  const pill = clean((await portalCard(page, ctx).locator(".attendee-ov-card-title .status-chip").first().textContent()) ?? "");
   const approved = APPROVED_STATUS_WORDS.some((word) => word.toLowerCase() === pill.toLowerCase());
   ctx.rec.record(name, "B12", "the registration's status shows an approved word", approved && (!expected || pill === expected) ? "pass" : "fail", `the card's status says "${pill}"${expected ? ` (expected "${expected}")` : ""}`);
 }
@@ -1229,7 +1153,7 @@ async function scheduledEmailJourney(ctx: Ctx, page: J.Page) {
   await editor.getByRole("button", { name: /Save schedule/ }).click();
   const card = page.locator("li.scheduled-email-card").filter({ hasText: scheduleName });
   await card.waitFor({ state: "visible", timeout: 20_000 });
-  assert(/Waiting for approval/.test(clean(await card.innerText())), "a saved schedule is not waiting for approval");
+  assert(/Pending approval/.test(clean(await card.innerText())), "a saved schedule is not pending approval");
   // B13: the time it will be sent is in Central and labelled.
   const sends = clean(await card.locator("dd").filter({ hasText: /\d{1,2}:\d{2}/ }).first().innerText().catch(() => ""));
   rec.record("Scheduled emails (saved schedule)", "B13", "the schedule's time is shown in Central, labelled", /\b(CT|CDT|CST|Central)\b/.test(sends) ? "pass" : "fail", `the card says it sends: "${sends}"`);

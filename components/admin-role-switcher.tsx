@@ -37,7 +37,7 @@ export function AdminRoleSwitcher({
           return (
             <a
               aria-current={role === active ? "page" : undefined}
-              className="admin-role-pill"
+              className="admin-role-link"
               href={adminRoleSwitchHref(role)}
               key={role}
             >

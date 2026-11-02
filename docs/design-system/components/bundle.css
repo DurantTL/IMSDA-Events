@@ -25,7 +25,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .primary-button, .secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 10px; cursor: pointer; padding: 9px 12px; font-size: 0.875rem; font-weight: 700; text-decoration: none; }
 .secondary-button { border: 1px solid var(--line); background: #f9fbfb; color: var(--imsda-navy); }
 .primary-button { border: 1px solid var(--imsda-navy); background: var(--imsda-navy); color: white; }
-.primary-button:disabled, .secondary-button:disabled { cursor: wait; opacity: 0.58; }
+.primary-button:disabled, .secondary-button:disabled { cursor: not-allowed; opacity: 0.58; }
 .primary-button.cta { min-height: 48px; font-size: 1rem; }
 .text-button { border: 0; background: transparent; color: var(--imsda-purple); cursor: pointer; padding: 5px; font-size: 0.875rem; font-weight: 700; }
 .danger-outline-button { display: inline-flex; align-items: center; gap: 7px; border: 2px solid var(--danger); border-radius: 10px; background: #fff; color: var(--danger); padding: 8px 12px; font-size: 0.875rem; font-weight: 700; cursor: pointer; }

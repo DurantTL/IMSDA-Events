@@ -1,5 +1,6 @@
 "use client";
 
+import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -48,7 +49,7 @@ export function AttendeeSignUpForm({
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState(initialEmail);
-  const emailRef = useRef<HTMLInputElement>(null);
+  const [attempted, setAttempted] = useState(false);
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   /** Only ever set by a development server with no account email configured. */
   const [developmentCode, setDevelopmentCode] = useState<string | null>(null);
@@ -58,8 +59,9 @@ export function AttendeeSignUpForm({
     attendeeAuthReturnPathFromHash(window.location.hash);
     const fragment = new URLSearchParams(window.location.hash.slice(1));
     const prefill = attendeeSignUpEmailPrefill(fragment.get("email") ?? undefined);
-    if (!initialEmail && prefill && emailRef.current) {
-      emailRef.current.value = prefill;
+    if (!initialEmail && prefill) {
+      // The address arrives in the URL fragment, which only the browser can read.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmail(prefill);
     }
     removeAttendeeAuthFragment();
@@ -117,8 +119,15 @@ export function AttendeeSignUpForm({
 
   function submitDetails(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setAttempted(true);
+    // The form is noValidate so the browser's own bubble never competes with the shared email message.
     const form = new FormData(event.currentTarget);
-    void send("details", { email: String(form.get("email") ?? ""), displayName: form.get("displayName"), password: form.get("password") });
+    if (!String(form.get("displayName") ?? "").trim() || !email.trim() || !password) {
+      setError("Enter your name, email address and a password.");
+      return;
+    }
+    if (emailBlockingMessage("Email address", email)) return;
+    void send("details", { email, displayName: form.get("displayName"), password: form.get("password") });
   }
 
   function submitCode(event: React.FormEvent<HTMLFormElement>) {
@@ -166,7 +175,7 @@ export function AttendeeSignUpForm({
   }
 
   return (
-    <form className="auth-form" onSubmit={submitDetails}>
+    <form className="auth-form" noValidate onSubmit={submitDetails}>
       <label>
         Your name
         <input
@@ -180,15 +189,15 @@ export function AttendeeSignUpForm({
       </label>
       <label>
         Email address
-        <input
-          name="email"
-          type="email"
+        <EmailInput
           autoComplete="username"
-          required
+          label="Email address"
           maxLength={254}
-          defaultValue={initialEmail}
-          ref={emailRef}
-          onChange={(event) => setEmail(event.target.value)}
+          name="email"
+          onValueChange={setEmail}
+          required
+          showNow={attempted}
+          value={email}
         />
       </label>
       <p className="field-help">
@@ -218,7 +227,7 @@ export function AttendeeSignUpForm({
       </label>
       <PasswordRequirementsChecklist password={password} owner={{ email, displayName }} />
       {retryNotice}
-      <SecurityCheck config={securityCheck} action="attendee-sign-up" handleRef={check} emailCode={{ getEmail: () => emailRef.current?.value ?? email }} />
+      <SecurityCheck config={securityCheck} action="attendee-sign-up" handleRef={check} emailCode={{ getEmail: () => email }} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button
         className="primary-button full-button"

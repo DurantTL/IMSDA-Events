@@ -4,6 +4,7 @@ import { ExactValue } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { AccountComingSoonNotice } from "@/components/account-coming-soon-notice";
 import { isChurchTickMode, normalizeTickCode, personPromoView, ticksToRewrite } from "@/modules/promo-codes/church-tick";
+import { PhoneInput } from "@/components/phone-input";
 import { useConfirm } from "@/components/use-confirm";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
 import { isCodeLikeAnswer } from "@/modules/forms/review-answer-code";
@@ -2330,14 +2331,31 @@ export function PublicRegistrationForm({
             aria-describedby={description}
             onChange={(inputEvent) => context.setValue(field.key, inputEvent.target.value)}
           />
+        ) : field.type === "PHONE" ? (
+          <PhoneInput
+            id={id}
+            label={field.label}
+            value={value}
+            stored={typeof storedAnswer === "string" ? storedAnswer : null}
+            autoComplete={autoComplete}
+            required={field.required && !excused}
+            readOnly={context.attendeeIndex !== null && lockedAttendeeFieldKeys.has(field.key)}
+            placeholder={field.placeholder ?? ""}
+            aria-invalid={Boolean(issue) || typed.invalid}
+            aria-describedby={[description, typedNote ? typedNoteId : ""].filter(Boolean).join(" ") || undefined}
+            error={typedNote}
+            errorId={typedNoteId}
+            onBlur={() => setTypedTouched((current) => (current[id] ? current : { ...current, [id]: true }))}
+            onValueChange={(next) => context.setValue(field.key, next)}
+          />
         ) : (
           <input
             id={id}
             value={value}
-            type={field.type === "EMAIL" ? "email" : field.type === "PHONE" ? "tel" : field.type === "DATE" ? "date" : field.type === "NUMBER" ? "number" : "text"}
+            type={field.type === "EMAIL" ? "email" : field.type === "DATE" ? "date" : field.type === "NUMBER" ? "number" : "text"}
             min={field.type === "NUMBER" ? numberFieldBounds(field)?.minimumAge ?? 0 : field.type === "DATE" ? dateFieldBounds(field).min : undefined}
             max={field.type === "NUMBER" ? numberFieldBounds(field)?.maximumAge : field.type === "DATE" ? (isBirthDateField(field) ? pricingDate : undefined) : undefined}
-            inputMode={field.type === "PHONE" ? "tel" : field.type === "EMAIL" ? "email" : field.type === "NUMBER" ? "numeric" : undefined}
+            inputMode={field.type === "EMAIL" ? "email" : field.type === "NUMBER" ? "numeric" : undefined}
             autoComplete={autoComplete}
             required={field.required && !excused}
             readOnly={context.attendeeIndex !== null && lockedAttendeeFieldKeys.has(field.key)}
@@ -2358,7 +2376,7 @@ export function PublicRegistrationForm({
         )}
         {field.type === "DATE" && <DateGuidance className="public-registration-date-guidance" id={`${id}_date_guidance`} typed={PUBLIC_DATE_GUIDANCE} />}
         {fieldSupport(field, context)}
-        {typedNote && <FieldError className="public-registration-field-error" id={typedNoteId}>{typedNote}</FieldError>}
+        {typedNote && field.type !== "PHONE" && <FieldError className="public-registration-field-error" id={typedNoteId}>{typedNote}</FieldError>}
       </label>
     );
   }

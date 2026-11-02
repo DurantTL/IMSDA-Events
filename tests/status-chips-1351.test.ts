@@ -34,3 +34,17 @@ describe("status chips and badges use the shared classes (#1351)", () => {
     expect(read("components/master-award-rules-workspace.tsx")).toContain("Manual check");
   });
 });
+
+describe("a record waiting for approval says the approved word (B12, #1506)", () => {
+  it("shows a scheduled email waiting to be approved as Pending approval", async () => {
+    const { SCHEDULED_EMAIL_STATUS_LABELS } = await import("@/modules/communications/scheduled-email-options");
+    expect(SCHEDULED_EMAIL_STATUS_LABELS.SCHEDULED).toBe("Pending approval");
+    expect(Object.values(SCHEDULED_EMAIL_STATUS_LABELS)).not.toContain("Waiting for approval");
+  });
+
+  it("keeps the registration card's status and the staff pills on the shared chip and badge", () => {
+    expect(read("components/account-registration-card.tsx")).toContain("status-chip ${REGISTRATION_STATUS_CHIP_TONE");
+    expect(read("components/app-shell.tsx")).toContain('className="count-badge staff-pill"');
+    expect(read("app/(public)/account/(portal)/registrations/page.tsx")).toContain('<span className="count-badge">({counts[key]})</span>');
+  });
+});

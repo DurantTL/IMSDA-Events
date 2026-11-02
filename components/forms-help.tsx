@@ -22,7 +22,7 @@ export function FormsHelp({ contact, className }: { contact: FormsHelpContact; c
     <>
       <button
         aria-haspopup="dialog"
-        className={className ?? styles.trigger}
+        className={className ?? `text-button ${styles.trigger}`}
         data-forms-help-trigger=""
         onClick={() => setOpen(true)}
         type="button"

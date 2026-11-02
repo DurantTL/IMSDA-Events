@@ -54,7 +54,6 @@ describe("email inputs", () => {
     "components/password-reset-request-form.tsx": NOT_YET,
     "components/attendee-verify-by-address-form.tsx": NOT_YET,
     "components/attendee-sign-in-form.tsx": NOT_YET,
-    "components/attendee-sign-up-form.tsx": NOT_YET,
     "components/public-registration-recovery-form.tsx": NOT_YET,
     "components/club-directors-workspace.tsx": NOT_YET,
     "components/club-team-workspace.tsx": NOT_YET,
@@ -86,7 +85,7 @@ describe("email inputs", () => {
   });
 
   it("uses EmailInput on the forms the issue names", () => {
-    for (const file of ["components/club-year-end-report-form.tsx", "components/attendee-registration-contact-form.tsx", "components/public-registration-contact-form.tsx", "components/new-club-application-form.tsx", "components/club-profile-form.tsx", "components/roster-guardian-fields.tsx", "components/club-form-roster-add.tsx", "components/login-form.tsx", "components/invite-person.tsx"]) {
+    for (const file of ["components/club-year-end-report-form.tsx", "components/attendee-registration-contact-form.tsx", "components/public-registration-contact-form.tsx", "components/new-club-application-form.tsx", "components/club-profile-form.tsx", "components/roster-guardian-fields.tsx", "components/club-form-roster-add.tsx", "components/login-form.tsx", "components/invite-person.tsx", "components/attendee-sign-up-form.tsx"]) {
       expect(readFileSync(path.join(root, file), "utf8"), file).toContain("<EmailInput");
     }
   });

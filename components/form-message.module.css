@@ -19,6 +19,6 @@
 }
 
 .undo:disabled {
-  cursor: progress;
+  cursor: var(--cursor-busy);
   opacity: 0.7;
 }

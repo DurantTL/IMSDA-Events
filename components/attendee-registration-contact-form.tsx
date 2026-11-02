@@ -4,7 +4,8 @@ import { useRef, useState, type FormEvent } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
-import { AlertCircle, CheckCircle2, KeyRound, Save } from "lucide-react";
+import { KeyRound, Save } from "lucide-react";
+import { FormMessage, savedMessage } from "@/components/form-message";
 import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import { formatPersonName } from "@/lib/person-name";
@@ -50,7 +51,7 @@ export function AttendeeRegistrationContactForm({
     if (requesting) return;
     setSiteUpdating(false);
     setRequesting(true);
-    setNotice({ tone: "idle", message: "Requesting a code…" });
+    setNotice({ tone: "idle", message: "" });
     try {
       const response = await submitJson("/api/attendee/step-up", {});
       if (response.unavailable) {
@@ -96,7 +97,7 @@ export function AttendeeRegistrationContactForm({
       return;
     }
     setSaving(true);
-    setNotice({ tone: "idle", message: "Saving contact details…" });
+    setNotice({ tone: "idle", message: "" });
     try {
       const response = await submitJson(
         `/api/attendee/registrations/${encodeURIComponent(registrationId)}`,
@@ -119,7 +120,7 @@ export function AttendeeRegistrationContactForm({
       setContact(payload.contact);
       setSavedContact(payload.contact);
       setCode("");
-      setNotice({ tone: "saved", message: "Contact details saved. The code has been used." });
+      setNotice({ tone: "saved", message: savedMessage("The code has been used.") });
     } catch (error) {
       setNotice({
         tone: "error",
@@ -171,12 +172,8 @@ export function AttendeeRegistrationContactForm({
             <Save size={17} aria-hidden="true" />
             {saving ? "Saving…" : "Save with code"}
           </button>
-          <p className={notice.tone === "error" ? "is-error" : notice.tone === "saved" ? "is-saved" : ""} role={notice.tone === "error" ? "alert" : "status"} aria-live="polite">
-            {notice.tone === "error" && <AlertCircle size={16} aria-hidden="true" />}
-            {notice.tone === "saved" && <CheckCircle2 size={16} aria-hidden="true" />}
-            {notice.message}
-          </p>
         </div>
+        <FormMessage tone={notice.tone === "error" ? "error" : "success"} message={notice.message} />
         {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving || requesting} onRetry={() => retryRef.current?.()} />}
       </form>
     </details>

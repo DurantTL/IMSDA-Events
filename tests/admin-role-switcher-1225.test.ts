@@ -18,7 +18,7 @@ describe("AdminRoleSwitcher", () => {
     expect(html).not.toContain("System administrator");
     expect(html.match(/<a /g)).toHaveLength(2);
     expect(html.indexOf('href="/admin-role/EVENTS_ADMIN"')).toBeLessThan(html.indexOf('href="/admin-role/CLUBS_ADMIN"'));
-    expect(html).toMatch(/<a aria-current="page" class="admin-role-pill" href="\/admin-role\/CLUBS_ADMIN">/);
+    expect(html).toMatch(/<a aria-current="page" class="admin-role-link" href="\/admin-role\/CLUBS_ADMIN">/);
     expect(html.match(/aria-current="page"/g)).toHaveLength(1);
     // No form, no button, nothing posting to /api: Cloudflare challenged that on every click.
     expect(html).not.toContain("<form");
@@ -74,11 +74,11 @@ describe("the switcher styles", () => {
 
   it("is placed before the form builder marker, keeps 44px targets, the staff text floor and wraps on a phone", () => {
     expect(block.length).toBeGreaterThan(100);
-    expect(block).toMatch(/\.admin-role-pill \{[^}]*min-height: 44px/);
-    expect(block).toMatch(/\.admin-role-pill \{[^}]*font-size: max\(var\(--type-staff-floor, 0px\), 0\.875rem\)/);
+    expect(block).toMatch(/\.admin-role-link \{[^}]*min-height: 44px/);
+    expect(block).toMatch(/\.admin-role-link \{[^}]*font-size: max\(var\(--type-staff-floor, 0px\), 0\.875rem\)/);
     expect(block).toMatch(/\.admin-role-pills \{[^}]*flex-wrap: wrap/);
-    expect(block).toMatch(/\.admin-role-pill \{[^}]*text-decoration: none/);
-    expect(block).toContain('.admin-role-pill[aria-current="page"]');
+    expect(block).toMatch(/\.admin-role-link \{[^}]*text-decoration: none/);
+    expect(block).toContain('.admin-role-link[aria-current="page"]');
     expect(block).not.toContain(":hover");
   });
 });
