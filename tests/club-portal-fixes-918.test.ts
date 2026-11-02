@@ -105,8 +105,8 @@ describe("1. roster: the name is the most prominent thing in the row", () => {
     expect(size(name)).toBeGreaterThan(size(link) + 0.15);
     expect(weight(name)).toBeGreaterThan(weight(link));
     expect(link).toContain("underline");
-    // The phone card keeps the same size (its old 0.9rem cell size must not shrink the name).
-    expect(css).toMatch(/\.roster-card-table td\.roster-card-name\[data-label\] \{ font-size: max\(var\(--type-body-floor, 0px\), 1\.0625rem\); \}/);
+    // The card heading is the name itself (a row header, #1457): the module's name rule sets its size, so the shared card's smaller row-header size cannot shrink it.
+    expect(rosterCss).toContain(":global(.roster-card-name) .rosterMemberName { display: block;");
   });
 });
 

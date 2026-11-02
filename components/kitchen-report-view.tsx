@@ -1,5 +1,6 @@
 import { ExportLink } from "@/components/export-link";
 import { Download } from "lucide-react";
+import { cardCell } from "@/components/table-card-labels";
 import { PrintReportButton } from "@/components/print-report-button";
 import type { KitchenReport } from "@/modules/registrations/kitchen-report";
 
@@ -24,10 +25,10 @@ export function KitchenReportView({ eventName, report, csvHref }: { eventName: s
 
       <section className="panel" aria-label="Meal types">
         <h3>Meal types</h3>
-        <div className="report-table-wrap"><table className="report-table report-table-auto">
-          <thead><tr><th scope="col">Meal type</th><th scope="col">People</th></tr></thead>
-          <tbody>
-            {report.meals.map((meal) => <tr key={meal.value}><th scope="row">{meal.label}</th><td>{meal.count}</td></tr>)}
+        <div className="report-table-wrap"><table className="report-table report-table-auto table-cards" role="table">
+          <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Meal type</th><th role="columnheader" scope="col">People</th></tr></thead>
+          <tbody role="rowgroup">
+            {report.meals.map((meal) => <tr key={meal.value} role="row"><th role="rowheader" scope="row">{meal.label}</th><td {...cardCell("People")}>{meal.count}</td></tr>)}
           </tbody>
         </table></div>
       </section>
@@ -36,10 +37,10 @@ export function KitchenReportView({ eventName, report, csvHref }: { eventName: s
         <section className="panel" aria-label="Meals covered by the conference">
           <h3>Meals covered by the conference</h3>
           <p className="field-help">Staff, pastors and volunteers (with their immediate family) have every meal covered and chose no meal tickets. They are counted in the totals above.</p>
-          <div className="report-table-wrap"><table className="report-table report-table-auto">
-            <thead><tr><th scope="col">Group</th><th scope="col">People</th></tr></thead>
-            <tbody>
-              {report.conferenceCovered.map((entry) => <tr key={entry.group}><th scope="row">{entry.group}</th><td>{entry.count}</td></tr>)}
+          <div className="report-table-wrap"><table className="report-table report-table-auto table-cards" role="table">
+            <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Group</th><th role="columnheader" scope="col">People</th></tr></thead>
+            <tbody role="rowgroup">
+              {report.conferenceCovered.map((entry) => <tr key={entry.group} role="row"><th role="rowheader" scope="row">{entry.group}</th><td {...cardCell("People")}>{entry.count}</td></tr>)}
             </tbody>
           </table></div>
         </section>
@@ -49,13 +50,13 @@ export function KitchenReportView({ eventName, report, csvHref }: { eventName: s
         <section className="panel" aria-label="Conference-paid meals by service">
           <h3>Conference-paid meals by service</h3>
           <p className="field-help">How many approved staff, pastor and volunteer people the conference-paid meal plan covers at each meal. Registrations waiting for approval and declined ones are never counted.</p>
-          <div className="report-table-wrap"><table className="report-table report-table-auto">
-            <thead><tr><th scope="col">Service</th><th scope="col">Staff</th><th scope="col">Pastor</th><th scope="col">Volunteer</th><th scope="col">Total</th></tr></thead>
-            <tbody>
+          <div className="report-table-wrap"><table className="report-table report-table-auto table-cards" role="table">
+            <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Service</th><th role="columnheader" scope="col">Staff</th><th role="columnheader" scope="col">Pastor</th><th role="columnheader" scope="col">Volunteer</th><th role="columnheader" scope="col">Total</th></tr></thead>
+            <tbody role="rowgroup">
               {report.conferenceMealServices.map((entry) => (
-                <tr key={entry.serviceId}>
-                  <th scope="row">{entry.serviceName}<br /><span className="field-help">{entry.serviceDate} · {entry.mealLabel}</span></th>
-                  <td>{entry.counts.STAFF}</td><td>{entry.counts.PASTOR}</td><td>{entry.counts.VOLUNTEER}</td><td>{entry.total}</td>
+                <tr key={entry.serviceId} role="row">
+                  <th role="rowheader" scope="row">{entry.serviceName}<br /><span className="field-help">{entry.serviceDate} · {entry.mealLabel}</span></th>
+                  <td {...cardCell("Staff")}>{entry.counts.STAFF}</td><td {...cardCell("Pastor")}>{entry.counts.PASTOR}</td><td {...cardCell("Volunteer")}>{entry.counts.VOLUNTEER}</td><td {...cardCell("Total")}>{entry.total}</td>
                 </tr>
               ))}
             </tbody>
@@ -66,11 +67,11 @@ export function KitchenReportView({ eventName, report, csvHref }: { eventName: s
       <section className="panel" aria-label="Dietary needs">
         <h3>Dietary needs</h3>
         <p className="field-help">People with any dietary need: <strong>{report.peopleWithNeeds}</strong>. One person can give more than one answer.</p>
-        <div className="report-table-wrap"><table className="report-table report-table-auto">
-          <thead><tr><th scope="col">Answer</th><th scope="col">People</th></tr></thead>
-          <tbody>
-            {report.needs.length === 0 && <tr><td colSpan={2}>No dietary needs reported.</td></tr>}
-            {report.needs.map((need) => <tr key={need.answer}><td>{need.answer}</td><td>{need.count}</td></tr>)}
+        <div className="report-table-wrap"><table className="report-table report-table-auto table-cards" role="table">
+          <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Answer</th><th role="columnheader" scope="col">People</th></tr></thead>
+          <tbody role="rowgroup">
+            {report.needs.length === 0 && <tr role="row"><td colSpan={2} role="cell">No dietary needs reported.</td></tr>}
+            {report.needs.map((need) => <tr key={need.answer} role="row"><th role="rowheader" scope="row">{need.answer}</th><td {...cardCell("People")}>{need.count}</td></tr>)}
           </tbody>
         </table></div>
       </section>

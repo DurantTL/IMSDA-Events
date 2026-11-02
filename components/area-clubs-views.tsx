@@ -117,9 +117,9 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query, sorting
   const rows = key ? sortRows(clubs, key, sorting!.order.dir, gridAccessors(clubYear)) : clubs;
   const sortedLabel = key === null ? null : key.startsWith("month-") ? `${reportMonthLabel(key.slice(6))} points` : { club: "club", submitted: "submitted", drafts: "drafts", missing: "missing", points: "total points" }[key as "club"];
   return (
-    <div className="report-table-wrap club-reports-grid scroll-cue" data-scroll-cue id="monthly-grid">
+    <div className="report-table-wrap club-reports-grid" id="monthly-grid">
       {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : "number")}</SortOrderNote>}
-      <table role="table" className="report-table table-cards">
+      <table role="table" className="report-table table-cards table-cards-xwide">
         <caption className="sr-only">Monthly Record status and points by club for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">
@@ -200,10 +200,10 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
               ))}
             </ul>
           </figure>
-          {/* With `links` (the coordinator's view, #1187) each row also lists the submitted records the points rest on, and the grid sits in a labelled scroll region. */}
+          {/* With `links` (the coordinator's view, #1187) each row also lists the submitted records the points rest on, and the grid sits in a labelled region. */}
           <div
-            {...(links ? { "aria-label": `Points by club for ${clubYear}. Scroll sideways to see every column.`, role: "region", tabIndex: 0, "data-scroll-cue": true } : {})}
-            className={links ? "report-table-wrap scroll-cue coordinator-scroll" : "report-table-wrap"}
+            {...(links ? { "aria-label": `Points by club for ${clubYear}`, role: "region" } : {})}
+            className={links ? "report-table-wrap coordinator-scroll" : "report-table-wrap"}
           >
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Total points per club for {clubYear}, in chart order</caption>

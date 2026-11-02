@@ -283,23 +283,23 @@ export function CalendarFeedsPanel({
             <p>Nothing would change.</p>
           ) : (
             <div className="table-wrap">
-              <table className="report-table report-table-auto table-cards">
-                <thead>
-                  <tr><th scope="col">What</th><th scope="col">Title</th><th scope="col">Dates</th><th scope="col">Time</th><th scope="col">Repeats</th></tr>
+              <table className="report-table report-table-auto table-cards" role="table">
+                <thead role="rowgroup">
+                  <tr role="row"><th role="columnheader" scope="col">What</th><th role="columnheader" scope="col">Title</th><th role="columnheader" scope="col">Dates</th><th role="columnheader" scope="col">Time</th><th role="columnheader" scope="col">Repeats</th></tr>
                 </thead>
-                <tbody>
+                <tbody role="rowgroup">
                   {preview.data.rows.map((row, index) => {
                     const rule = parseRepeatRule(row.repeatRule);
                     return (
-                      <tr key={`${row.action}-${index}`}>
-                        <td data-label="What">
+                      <tr key={`${row.action}-${index}`} role="row">
+                        <th role="rowheader" scope="row">
                           {actionLabels[row.action]}
                           {row.changedFields.length > 0 && <small> ({row.changedFields.map((name) => fieldLabels[name] ?? name).join(", ")})</small>}
-                        </td>
-                        <td data-label="Title">{row.title}</td>
-                        <td data-label="Dates">{row.startsOn ? formatDateRange(row.startsOn, row.endsOn || row.startsOn) : ""}</td>
-                        <td data-label="Time">{row.timeLabel}</td>
-                        <td data-label="Repeats">{rule ? describeRepeat(rule) : ""}</td>
+                        </th>
+                        <td data-label="Title" role="cell">{row.title}</td>
+                        <td data-label="Dates" role="cell">{row.startsOn ? formatDateRange(row.startsOn, row.endsOn || row.startsOn) : ""}</td>
+                        <td data-label="Time" role="cell">{row.timeLabel}</td>
+                        <td data-label="Repeats" role="cell">{rule ? describeRepeat(rule) : ""}</td>
                       </tr>
                     );
                   })}

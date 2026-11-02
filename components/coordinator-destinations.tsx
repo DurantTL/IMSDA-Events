@@ -69,10 +69,10 @@ export function CoordinatorNoMatch({ query, clearHref }: { query: string; clearH
   );
 }
 
-/** A wide grid in its own labelled, keyboard-reachable scroll region, so the page itself never scrolls sideways. */
+/** A wide grid in its own labelled region. It never scrolls sideways: a grid that does not fit its box is cards (table-cards, #1457). */
 export function CoordinatorScrollRegion({ label, className = "", children }: { label: string; className?: string; children: React.ReactNode }) {
   return (
-    <div aria-label={label} className={`report-table-wrap scroll-cue coordinator-scroll ${className}`.trim()} data-scroll-cue role="region" tabIndex={0}>
+    <div aria-label={label} className={`report-table-wrap coordinator-scroll ${className}`.trim()} role="region">
       {children}
     </div>
   );
@@ -117,9 +117,9 @@ export function CoordinatorMonthlyRecords({
   const rows = key ? sortRows(clubs, key, sorting!.order.dir, { [key]: accessor(key) } as Record<RecordsGridColumn, (club: AreaClubSummary) => SortValue>) : clubs;
   const sortedLabel = key === null ? null : key.startsWith("month-") ? `${months.find((entry) => `month-${entry.month}` === key)?.short ?? "month"} record` : { club: "club name", submitted: "submitted", notSubmitted: "not submitted" }[key as "club"];
   return (
-    <CoordinatorScrollRegion className="club-reports-grid" label={`Monthly Records by club and month, ${clubYear}. Scroll sideways to see every month.`}>
+    <CoordinatorScrollRegion className="club-reports-grid" label={`Monthly Records by club and month, ${clubYear}`}>
       {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : key?.startsWith("month-") ? "state" : "number")}</SortOrderNote>}
-      <table className="report-table table-cards" role="table">
+      <table className="report-table table-cards table-cards-xwide" role="table">
         <caption className="sr-only">Monthly Record status by club for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">

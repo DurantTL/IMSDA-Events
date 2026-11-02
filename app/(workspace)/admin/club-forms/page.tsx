@@ -57,7 +57,7 @@ export default async function AdminClubFormsPage({ searchParams }: { searchParam
         : <p className="inline-notice" role="status">Bringing form templates up to date with the code is done by a system administrator.</p>}
       <section className="panel">
         <div className="report-table-wrap card-box">
-          <table role="table" className="report-table table-cards table-cards-tablet">
+          <table role="table" className="report-table table-cards table-cards-wide">
             <caption className="sr-only">Club forms</caption>
             <thead role="rowgroup">
               <tr role="row"><th role="columnheader" scope="col">Form</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Who fills it in</th><th role="columnheader" scope="col">Required</th><th role="columnheader" scope="col">Filled in</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>

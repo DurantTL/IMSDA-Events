@@ -94,7 +94,7 @@ export function MealCloseout({ eventId, closeout, csvHref, exceptionsCsvHref }: 
         {rows.length === 0 ? (
           <p>This event has no meal orders, tickets or kitchen counts, so there is nothing to close out.</p>
         ) : (
-          <div className="report-table-wrap"><table role="table" className="report-table report-table-auto table-cards">
+          <div className="report-table-wrap"><table role="table" className="report-table report-table-auto table-cards table-cards-tablet">
             <caption className="sr-only">Meal charges, credits, ordered and served meals, conference billing and kitchen counts by service</caption>
             <thead role="rowgroup"><tr role="row">
               <th role="columnheader" scope="col">Service</th><th role="columnheader" scope="col">Charges and credits</th><th role="columnheader" scope="col">Where the net went</th>

@@ -66,7 +66,7 @@ export function ClubYearEndConference({ reportYear, initialRows }: { reportYear:
           <tbody role="rowgroup">
             {rows.map((row) => (
               <tr role="row" key={row.id}>
-                <td {...cardCell("Club")}>{row.name}</td>
+                <th role="rowheader" scope="row">{row.name}</th>
                 <td {...cardCell("Sponsoring church")}>{row.church}</td>
                 <td {...cardCell("Status")}>{statusText[row.status]}{row.status === "SUBMITTED" && row.late ? " (late)" : ""}</td>
                 <td {...cardCell("Total membership")}>{row.totalMembership ?? ""}</td>

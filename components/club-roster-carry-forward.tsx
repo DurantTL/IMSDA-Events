@@ -110,25 +110,25 @@ export function ClubRosterCarryForward({
         <button className="secondary-button" onClick={() => setAll(false)} type="button">Untick everyone</button>
       </div>
       <div className="report-table-wrap">
-        <table className="report-table table-cards">
+        <table className="report-table table-cards" role="table">
           <caption className="sr-only">{`People on the ${fromClubYear} roster`}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Carry forward</th>
-              <th scope="col">Name</th>
-              <th scope="col">Age</th>
-              <th scope="col">{`${toClubYear} type`}</th>
-              <th scope="col">Role</th>
-              <th scope="col">Class</th>
+          <thead role="rowgroup">
+            <tr role="row">
+              <th role="columnheader" scope="col">Carry forward</th>
+              <th role="columnheader" scope="col">Name</th>
+              <th role="columnheader" scope="col">Age</th>
+              <th role="columnheader" scope="col">{`${toClubYear} type`}</th>
+              <th role="columnheader" scope="col">Role</th>
+              <th role="columnheader" scope="col">Class</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {rows.map((row) => {
               const choice = choices[row.memberId]!;
               const fullName = `${row.firstName} ${row.lastName}`.trim();
               return (
-                <tr key={row.memberId}>
-                  <td data-label="Carry forward">
+                <tr key={row.memberId} role="row">
+                  <td data-label="Carry forward" role="cell">
                     <input
                       aria-label={`Carry ${fullName} forward`}
                       checked={choice.ticked}
@@ -136,13 +136,13 @@ export function ClubRosterCarryForward({
                       type="checkbox"
                     />
                   </td>
-                  <th scope="row">
+                  <th role="rowheader" scope="row">
                     <ExactValue>{fullName}</ExactValue>
                     {row.transferring && <small> Transferring to another club</small>}
                     {row.transferWithStaff && <small> Transfer request is with conference staff</small>}
                   </th>
-                  <td data-label="Age">{row.age ?? "—"}</td>
-                  <td data-label={`${toClubYear} type`}>
+                  <td data-label="Age" role="cell">{row.age ?? "—"}</td>
+                  <td data-label={`${toClubYear} type`} role="cell">
                     <select
                       aria-label={`${fullName} type`}
                       disabled={!choice.ticked}
@@ -152,7 +152,7 @@ export function ClubRosterCarryForward({
                       {Object.entries(clubRosterAttendeeTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                     </select>
                   </td>
-                  <td data-label="Role">
+                  <td data-label="Role" role="cell">
                     <input
                       aria-label={`${fullName} role`}
                       disabled={!choice.ticked}
@@ -161,7 +161,7 @@ export function ClubRosterCarryForward({
                       value={choice.role}
                     />
                   </td>
-                  <td data-label="Class">
+                  <td data-label="Class" role="cell">
                     <select
                       aria-label={`${fullName} class`}
                       disabled={!choice.ticked || choice.attendeeType !== "YOUTH"}
