@@ -4,7 +4,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FormTemplateCopy } from "@/components/form-template-copy";
+import { ColumnHeader } from "@/components/column-header";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
+import { serverSort, sortOrderText, sortRows, type SortKind, type SortValue } from "@/lib/list-sort";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listFormTemplateLibrary } from "@/modules/forms/form-template-library";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
@@ -18,11 +21,26 @@ export const dynamic = "force-dynamic";
  * calls). Event staff pick templates when they create a form but cannot change
  * them. Distinct from whole-event templates, saved questions and club forms.
  */
-export default async function AdminFormTemplatesPage() {
+const TEMPLATE_SORT_COLUMNS = ["template", "audience", "version", "used"] as const;
+type TemplateSortColumn = typeof TEMPLATE_SORT_COLUMNS[number];
+type TemplateRow = Awaited<ReturnType<typeof listFormTemplateLibrary>>[number];
+const templateAccessors: Record<TemplateSortColumn, (template: TemplateRow) => SortValue> = {
+  template: (template) => template.name,
+  audience: (template) => template.audience,
+  version: (template) => template.version,
+  used: (template) => template.usedByForms,
+};
+const templateSortLabels: Record<TemplateSortColumn, { label: string; kind: SortKind }> = {
+  template: { label: "template", kind: "text" }, audience: { label: "audience", kind: "text" }, version: { label: "version", kind: "number" }, used: { label: "forms created from it", kind: "number" },
+};
+
+export default async function AdminFormTemplatesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
   const templates = await listFormTemplateLibrary();
+  const sorting = serverSort<TemplateSortColumn>("/admin/form-templates", await searchParams, TEMPLATE_SORT_COLUMNS, { key: null, dir: "asc" });
+  const sortedTemplates = sorting.order.key ? sortRows(templates, sorting.order.key, sorting.order.dir, templateAccessors) : templates;
 
   return (
     <section className="page-stack">
@@ -32,13 +50,14 @@ export default async function AdminFormTemplatesPage() {
       />
       <section className="panel">
         <div className="report-table-wrap">
+          {sorting.order.key && <SortOrderNote>{sortOrderText(templateSortLabels[sorting.order.key].label, sorting.order.dir, templateSortLabels[sorting.order.key].kind)}</SortOrderNote>}
           <table role="table" className="report-table table-cards">
             <caption className="sr-only">Form templates</caption>
             <thead role="rowgroup">
-              <tr role="row"><th role="columnheader" scope="col">Template</th><th role="columnheader" scope="col">For</th><th role="columnheader" scope="col">Version</th><th role="columnheader" scope="col">Forms created from it</th><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
+              <tr role="row"><ColumnHeader column="template" label="Template" sorting={sorting} /><ColumnHeader column="audience" label="For" sorting={sorting} /><ColumnHeader column="version" label="Version" sorting={sorting} /><ColumnHeader column="used" label="Forms created from it" sorting={sorting} /><th role="columnheader" scope="col"><span className="sr-only">Change</span></th></tr>
             </thead>
             <tbody role="rowgroup">
-              {templates.map((template) => (
+              {sortedTemplates.map((template) => (
                 <tr role="row" key={template.key}>
                   <th role="rowheader" scope="row">{template.name}{template.appCreated && <small className="quiet-copy"> · Created in the app</small>}</th>
                   <td {...cardCell("For")}>{template.audience}</td>
