@@ -54,7 +54,9 @@ describe("tables that became phone cards (#447)", () => {
     // The link-mode SortableHeader renders through PhoneHiddenSortLink (#1458).
     expect(attendeeListing).toContain("<SortableHeader");
     expect(read("components/list-sort.tsx")).toContain("<PhoneHiddenSortLink");
-    expect(read("components/phone-hidden-sort-link.tsx")).toContain("tabIndex={onPhone ? -1 : undefined}");
+    // Card mode shows the sortable headers as a visible "Sort by" row (#1457), so the link stays a Tab stop.
+    expect(read("components/phone-hidden-sort-link.tsx")).not.toContain("tabIndex");
+    expect(css).toContain('table.table-cards.table-cards > thead:has(.table-sort-button) > tr::before { content: "Sort by";');
     expect(enclosingMedia(css, ".attendee-sort-phone { display: contents; }")).toBe("@media screen and (max-width: 600px)");
   });
 

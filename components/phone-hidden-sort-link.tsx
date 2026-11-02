@@ -1,25 +1,11 @@
-"use client";
-
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
 
 /**
- * A column-header sort link in a `table-cards` table. Under 600px the header row
- * is visually hidden (the cards replace it) but stays in the accessibility tree
- * so each cell keeps its column name; the link inside it must not be a stray,
- * invisible Tab stop there. The phone gets Sort and Direction selects in the
- * filter form instead (docs/RESPONSIVE.md). The first server render is
- * focusable, and the media query takes it out of the tab order once mounted.
+ * A column-header sort link (#1458). It used to leave the tab order on a phone, when the header row of a
+ * `table-cards` table was hidden under its cards. Since #1457 a card-mode table shows its sortable headers as a
+ * visible "Sort by" row above the cards (at every width where it is cards), so the link is always visible and
+ * always a Tab stop. The name is kept so the server-sorted list and its tests keep one import.
  */
-const phoneQuery = "(max-width: 600px)";
-
-function subscribe(onChange: () => void) {
-  const list = window.matchMedia(phoneQuery);
-  list.addEventListener("change", onChange);
-  return () => list.removeEventListener("change", onChange);
-}
-
 export function PhoneHiddenSortLink({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
-  const onPhone = useSyncExternalStore(subscribe, () => window.matchMedia(phoneQuery).matches, () => false);
-  return <Link className={className} href={href} tabIndex={onPhone ? -1 : undefined}>{children}</Link>;
+  return <Link className={className} href={href}>{children}</Link>;
 }

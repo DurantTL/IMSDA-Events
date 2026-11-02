@@ -168,20 +168,13 @@ person's name (or the item's title) the row header (`<th scope="row">`): it
 becomes the card's title. On a desktop the row header looks like a normal cell
 if the table has no `.report-table` styling; check the wide table too.
 
-The header row is visually hidden on a phone, so a **sortable column's header
-control is not usable on cards**. Say how the list is ordered with a
-`SortOrderNote`, and give the phone another way to change it:
-
-- a client-sorted list (honors) keeps its order and its note;
-- a server-sorted list (the attendee listing) adds Sort and Direction selects to
-  its GET filter form, shown at 600 px and under (`.attendee-sort-phone`), and
-  its header links are `PhoneHiddenSortLink`, which is out of the tab order on a
-  phone so there are no invisible Tab stops. The header row itself stays in the
-  accessibility tree so each cell keeps its column name.
-
-If a list cannot give up its sort header, keep the table in its scroll box and
-record the exception in `acceptedFindings`. Used by: roster
-(`.roster-card-table`), club reports, honors, area overview and points,
+The header row is visually hidden in card mode, except on a table with sortable columns (#1457): its
+sortable headers show as a "Sort by" row of 44px pill buttons above the cards, at every width where the
+table is cards, and the active sort is highlighted. The other column headers stay visually hidden but in the
+accessibility tree, so each cell keeps its column name. Say how the list is ordered with a `SortOrderNote`.
+A server-sorted list (the attendee listing) also keeps its Sort and Direction selects in the GET filter form
+at 600 px and under (`.attendee-sort-phone`); its header links (`PhoneHiddenSortLink`) are ordinary, focusable
+links. Used by: roster, club reports, honors, area overview and points, coordinator records and destinations,
 invites, Sterling Volunteers, team, accounts, club forms, attendee listing.
 
 ### Tables on a wide screen: padding, minimum widths, and no overlap (#811)

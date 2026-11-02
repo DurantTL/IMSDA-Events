@@ -9778,6 +9778,69 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   table.table-cards-xwide.table-cards-xwide > tbody > tr > td:empty { display: none; }
   table.table-cards-xwide.table-cards-xwide > tbody > tr > td[colspan] { display: block; margin-top: 0; padding: 4px 0; border-top: 0; }
 }
+/* Sorting on cards (#1457, #1458): the header row is hidden in card mode, so a table with sortable columns shows its sort buttons
+   as a "Sort by" row of 44px pills above the cards, at every width where it is cards. The other column headers stay visually hidden
+   but in the accessibility tree, so each cell keeps its column name. */
+@container table-box (max-width: 600px) {
+  table.table-cards.table-cards > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards.table-cards > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+@container table-box (min-width: 601px) and (max-width: 760px) {
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards-tablet.table-cards-tablet > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+@container table-box (max-width: 860px) {
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards-wide.table-cards-wide > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+@container table-box (max-width: 1100px) {
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards-xwide.table-cards-xwide > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+@container table-box (max-width: 1260px) {
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards-max.table-cards-max > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
 /* Month grids at the wider thresholds: the same two short "Sep  81" cells per line (#1457). */
 @container table-box (min-width: 601px) and (max-width: 1100px) {
   .club-reports-grid table.table-cards-xwide.table-cards-xwide { min-width: 0; }

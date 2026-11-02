@@ -208,3 +208,19 @@ describe("every table is the shared card pattern or is allow-listed (rule B3, #1
     expect(css).not.toMatch(/@media[^{]*\{\s*table\.table-cards\.table-cards,/);
   });
 });
+
+describe("sorting stays usable on cards (#1457, #1458)", () => {
+  const globals = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
+  it.each(["table-cards", "table-cards-tablet", "table-cards-wide", "table-cards-xwide", "table-cards-max"])(
+    "%s shows its sortable headers as a visible Sort by row of 44px buttons in card mode",
+    (variant) => {
+      const head = `table.${variant}.${variant} > thead:has(.table-sort-button)`;
+      expect(globals).toContain(`${head} { position: static; display: block;`);
+      expect(globals).toContain(`${head} > tr::before { content: "Sort by";`);
+      expect(globals).toMatch(new RegExp(`${head.replace(/[.()>:-]/g, "\\$&")} > tr > th > \\.table-sort-button \\{[^}]*min-height: 44px`));
+    },
+  );
+  it("keeps the sort links in the tab order", () => {
+    expect(readFileSync(path.join(process.cwd(), "components/phone-hidden-sort-link.tsx"), "utf8")).not.toContain("tabIndex");
+  });
+});
