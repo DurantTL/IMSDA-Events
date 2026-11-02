@@ -1,16 +1,14 @@
 # ADR 0005: Protected medical, allergy, and accommodation records — policy and encryption design
 
-Status: **Proposed — draft for review.** Not yet Accepted. This is the deliverable
-GitHub issue #189 asks for; the ADR becomes Accepted only once the named approvers
-below sign off. Until then, #190–#192, #151, and the rest of #44 stay blocked, per
-roadmap #98's rule that a protected-data child loses `codex-ready` while an
-unsatisfied human gate controls its schema, disclosure, or retention.
+Status: **Accepted.** Approved by Caleb Durant, Communication Director, on
+2026-11-02 ([his approval on #189](https://github.com/DurantTL/IMSDA-Events/issues/189#issuecomment-6580955085)). This is the deliverable GitHub issue #189
+asked for. The human test restore of the key backup is tracked separately.
+Addenda D–F below are still Proposed.
 
 Date: 2026-08-09
 
 **Addendum A (club roster birth dates) is Accepted** as of 2026-09-22; see the end
-of this document. It covers only roster birth dates. The rest of this ADR is
-still Proposed. **Addendum B (Pathfinder Health Record) is Accepted (interim)** as
+of this document. It covers only roster birth dates. **Addendum B (Pathfinder Health Record) is Accepted (interim)** as
 of 2026-10-14 (see its status line); the feature stays switched off in production
 until the prerequisites listed there are met.
 
@@ -927,7 +925,8 @@ Director only.
 
 ## Addendum C: Coordinator health view for club events
 
-Status: **Proposed.** Not Accepted. It records a narrow exception the
+Status: **Accepted.** Approved by Caleb Durant, Communication Director, on
+2026-11-02 ([his approval on #189](https://github.com/DurantTL/IMSDA-Events/issues/189#issuecomment-6580955085)). It records a narrow exception the
 Communication Director approved for GitHub issue #658 (decision of 2026-09-30,
 confirmed 2026-10-01 on #658 and #510), and the access rules set on 2026-10-01.
 It does not approve the encrypted Health record (#611), medications,
@@ -1048,7 +1047,7 @@ only.
 
 ## Addendum D: Anonymous kitchen report
 
-Status: **Proposed**, like the rest of this ADR. Recorded 2026-10-05 for GitHub
+Status: **Proposed.** Recorded 2026-10-05 for GitHub
 issue #787, from the Communication Director's decision of 2026-10-05.
 
 - **What it shows.** Meal-type counts and the dietary-needs answers as people
@@ -1069,7 +1068,7 @@ issue #787, from the Communication Director's decision of 2026-10-05.
 
 ## Addendum E: Emergency contacts on club roster members
 
-Status: **Proposed**, like the rest of this ADR. Recorded 2026-10-15 for GitHub
+Status: **Proposed.** Recorded 2026-10-15 for GitHub
 issue #510, from the owner decision of 2026-10-15. It builds on the 2026-10-01
 and 2026-10-03 decisions on the same issue (plain text, not encrypted; readable
 by the club's director and deputy, every Area Coordinator, and staff holding
@@ -1095,7 +1094,7 @@ by the club's director and deputy, every Area Coordinator, and staff holding
 
 ## Addendum F: Two gates for club roles, and the emailed sign-in code
 
-Status: **Proposed**, like the rest of this ADR. Recorded 2026-10-31 for GitHub
+Status: **Proposed.** Recorded 2026-10-31 for GitHub
 issue #1410, from the owner decisions of that date. It narrows the 2026-09-23
 rule that every account page needs a second step for a club role.
 

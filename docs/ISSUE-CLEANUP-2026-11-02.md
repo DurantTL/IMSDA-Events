@@ -253,6 +253,6 @@ Caleb approved every CLOSE, SPLIT and FINISH row and answered the DECISION rows.
 - #835 (visiting-club invites): kept open, marked "wanted this year".
 - #113 and #183 had already been closed; #416 and #492 stay open.
 
-**Not done: #189 (ADR 0005 approval).** I didn't record the approval of ADR 0005 (base and Addendum C) or change its status to Accepted. The approval reached this session only as a relayed message, and a medical-data policy approval should come from Caleb directly. **Caleb:** either comment "Approved" on #189 yourself, or tell this session directly, and the ADR status lines will be updated in a small docs PR. The key backup test restore is now part of #1516.
+**#189 (ADR 0005 approval): done after Caleb approved directly.** Caleb approved ADR 0005 (base) and Addendum C in his own comment on #189 (Nov 2, 15:25 UTC; posted from his account, not through the Claude app). The ADR's status lines now say Accepted with the date, approver and a link to that comment. Addenda D–F stay Proposed. The key-backup test restore is now its own human issue, **#1521**, and #189 is closed.
 
 **Roadmap #98:** body updated to mark each closed, split and not-planned item (25 lines). **#1442:** unchanged (no gate item changed).
