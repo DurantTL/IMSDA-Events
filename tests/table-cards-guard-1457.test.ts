@@ -168,13 +168,12 @@ describe("every table is the shared card pattern or is allow-listed (rule B3, #1
   // The "fits" reason is only true while nothing scrolls it. components/club-report-charts.tsx sat on the list with
   // "fits" while its tables were wrapped in a "Scroll sideways" region and overflowed at 390px (#1501), so the count above was
   // never the problem: the wrapper is. A table inside a sideways-scroll region is not "fits"; it is a bug unless printed.
-  it("no allow-listed table sits in a region that scrolls sideways, except where that is listed", () => {
-    const sideways: Record<string, string> = {};
+  it("no allow-listed table sits in a region that scrolls sideways", () => {
     const offenders: string[] = [];
     for (const file of Object.keys(allowList)) {
       if (allowList[file]!.reason === printed) continue;
       const source = readFileSync(path.join(root, file), "utf8");
-      if (/Scroll sideways|role="region"[^>]*tabIndex|tabIndex=\{0\}[^>]*role="region"/.test(source) && !(file in sideways)) offenders.push(file);
+      if (/Scroll sideways|role="region"[^>]*tabIndex|tabIndex=\{0\}[^>]*role="region"/.test(source)) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });

@@ -218,7 +218,22 @@ export function ClubOrderWorkspace({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   // The line just taken off the list and the quantity to put back, for Undo (B9, #1448, #1455); cleared by the next action.
-  const [undoRemove, setUndoRemove] = useState<{ key: string; quantity: number | null; name: string } | null>(null);
+  type UndoRemove = { key: string; quantity: number | null; name: string };
+  const [undoRemove, setUndoRemove] = useState<UndoRemove | null>(null);
+  // After a remove or Undo the pressed button is gone: the message (or its Undo) takes focus, as on the roster.
+  const messageWanted = useRef(false);
+  const messageSlot = useRef<HTMLDivElement>(null);
+  const [messageTick, setMessageTick] = useState(0);
+  useEffect(() => {
+    if (!messageWanted.current) return;
+    messageWanted.current = false;
+    window.requestAnimationFrame(() => {
+      const slot = messageSlot.current;
+      if (!slot) return;
+      (slot.querySelector<HTMLElement>("button") ?? slot).focus();
+      slot.scrollIntoView?.({ block: "nearest", behavior: "auto" });
+    });
+  }, [messageTick]);
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const base = ordersBase(organizationId);
   const uniformsBase = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/uniforms`;
@@ -298,20 +313,31 @@ export function ClubOrderWorkspace({
   }
   const post = (url: string, body: unknown) => send(url, "POST", body);
 
-  async function act(run: () => Promise<string>) {
+  /**
+   * Runs one change. `undo.onSuccess` is offered with the success message the moment the change is saved (not after the
+   * list reloads); `undo.onError` keeps a failed Undo on offer next to the error so it can be retried. `undo.focus`
+   * moves focus to the message afterwards, because the button that was pressed is gone (#1448, #1455).
+   */
+  async function act(run: () => Promise<string>, undo: { onSuccess?: UndoRemove; onError?: UndoRemove; focus?: boolean } = {}) {
     setBusy(true);
     setNotice("");
     setError("");
     setUndoRemove(null);
     try {
       setNotice(await run());
+      setUndoRemove(undo.onSuccess ?? null);
       return true;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That could not be saved.");
+      setUndoRemove(undo.onError ?? null);
       return false;
     } finally {
       await refresh().catch(() => undefined);
       setBusy(false);
+      if (undo.focus) {
+        messageWanted.current = true;
+        setMessageTick((tick) => tick + 1);
+      }
     }
   }
 
@@ -320,7 +346,7 @@ export function ClubOrderWorkspace({
    * `key` is a catalog item id, or `honor:<id>` for an honor with no catalog item (#1330), whose
    * line is removed by 0 or `null` alike.
    */
-  function setQuantity(key: string, quantity: number | null, message: string) {
+  function setQuantity(key: string, quantity: number | null, message: string, undo?: Parameters<typeof act>[1]) {
     return act(async () => {
       await send(`${base}/${lineTarget(key)}`, "PUT", { quantity });
       setDrafts((current) => {
@@ -329,7 +355,7 @@ export function ClubOrderWorkspace({
         return next;
       });
       return message;
-    });
+    }, undo);
   }
 
   function saveDraft(line: HelperLine) {
@@ -361,13 +387,15 @@ export function ClubOrderWorkspace({
     // Undo puts the line back the way it was: the director's own quantity, or the computed count when nobody had edited it.
     const previous = line.edited ? line.needed : null;
     // A line nothing calls for was added by hand: forget it. Otherwise keep a 0 so it stays off the list.
-    if (await setQuantity(key, line.computedNeeded > 0 ? 0 : null, `Took ${label} off the list.`)) setUndoRemove({ key, quantity: previous, name: label });
+    const back: UndoRemove = { key, quantity: previous, name: label };
+    await setQuantity(key, line.computedNeeded > 0 ? 0 : null, `Took ${label} off the list.`, { onSuccess: back, focus: true });
   }
 
   function undoRemoveLine() {
     if (!undoRemove) return;
     const { key, quantity, name } = undoRemove;
-    return setQuantity(key, quantity, `Put ${name} back on the list.`);
+    // A failed Undo stays on offer beside its error; either way the message takes focus.
+    return setQuantity(key, quantity, `Put ${name} back on the list.`, { onError: undoRemove, focus: true });
   }
 
   async function addLine() {
@@ -491,8 +519,11 @@ export function ClubOrderWorkspace({
         <p className={`field-help ${styles.helpText}`}>Completed honors, uniform needs, and earned awards that haven&apos;t been handed out appear here on their own. Change a quantity, add an item, or take one off. Stock on hand comes off what you need.</p>
       )}
       {confirmDialog}
-      <FormMessage message={notice} tone="success" undo={undoRemove ? { busy, onUndo: () => void undoRemoveLine() } : undefined} />
-      {error && <p className="inline-notice error" role="alert">{error}</p>}
+      <div id="club-order-message-slot" ref={messageSlot} tabIndex={-1}>
+        {error
+          ? <FormMessage message={error} tone="error" undo={undoRemove ? { busy, onUndo: () => void undoRemoveLine() } : undefined} />
+          : <FormMessage message={notice} tone="success" undo={undoRemove ? { busy, onUndo: () => void undoRemoveLine() } : undefined} />}
+      </div>
 
       {showPrompt && (
         <section aria-labelledby="club-order-earlier" className={`${styles.block} ${styles.prompt}`}>

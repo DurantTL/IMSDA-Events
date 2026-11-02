@@ -31,6 +31,8 @@ vi.mock("react", async (importOriginal) => {
     useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
   };
 });
+// These tests call components as plain functions with a stubbed useState; the confirm hook needs a real dispatcher (useId), so it is stubbed.
+vi.mock("@/components/use-confirm", () => ({ useConfirm: () => ({ confirm: async () => true, ask: async () => null, confirmDialog: null }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), notFound: vi.fn(), redirect: vi.fn() }));
 
 import { ClubEarnedAwardsWorkspace, emptyEarnedAwardsData } from "@/components/club-earned-awards-workspace";

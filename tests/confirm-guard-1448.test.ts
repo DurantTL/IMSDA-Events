@@ -109,10 +109,22 @@ describe("deletes always confirm (#1448, B9)", () => {
 const sendsAnything = /fetch\(|\bsend\(|\bpost\(|setQuantity\(|\bact\(|\bsubmitJson\(/;
 const asksFirst = /\b(?:askConfirm|confirm|ask|requestConfirm)\(/;
 
+/** The text of the function that starts at `start`: from its first `{` that opens the body to the matching `}` (by depth). */
+export function handlerBody(code: string, start: number) {
+  const open = code.indexOf("{", code.indexOf(")", start));
+  if (open === -1) return "";
+  let depth = 0;
+  for (let index = open; index < code.length; index += 1) {
+    if (code[index] === "{") depth += 1;
+    else if (code[index] === "}" && --depth === 0) return code.slice(start, index + 1);
+  }
+  return code.slice(start);
+}
+
 export function unconfirmedRemoveHandlers(rel: string, code: string) {
   const found: string[] = [];
   for (const match of code.matchAll(/(?:function|const)\s+((?:remove|delete)[A-Z]\w*)\s*(?:=|\()/g)) {
-    const body = code.slice(match.index, match.index + 700).split(/\n {2}\};?\n|\n {2}\}\n/)[0]!;
+    const body = handlerBody(code, match.index);
     if (sendsAnything.test(body) && !asksFirst.test(body)) found.push(`${rel}:${match[1]}`);
   }
   return found;
@@ -140,6 +152,12 @@ describe("remove and delete handlers ask first (#1501, B9)", () => {
       if (/^\s*["']use client["']/.test(file.text)) for (const entry of unconfirmedRemoveHandlers(file.rel, withoutComments(file.text))) seen.add(entry);
     }
     for (const entry of Object.keys(removeHandlerAllowlist)) expect(seen.has(entry), `${entry} no longer needs its allow-list entry`).toBe(true);
+  });
+
+  it("reads a long handler to its closing brace, not a fixed length", () => {
+    const filler = "    const x = 1;\n".repeat(80);
+    const long = `async function removeThing(id: string) {\n${filler}    if (!(await askConfirm({ title: "t" }))) return;\n    await send("/x", "PUT", {});\n  }\n`;
+    expect(unconfirmedRemoveHandlers("components/a.tsx", long)).toEqual([]);
   });
 
   it("would have caught the order line that was removed at once", () => {

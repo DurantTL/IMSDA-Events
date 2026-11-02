@@ -142,6 +142,10 @@ export function ClubFormFillIn(props: Props) {
   // Inline checks (#855): the same validators the server runs. An old answer that fails and was not changed is
   // flagged for correction but never blocks saving the rest of the form.
   const [attempted, setAttempted] = useState(false);
+  // Missing required answers are only shown once a submit was tried; a draft may leave them empty.
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  // Which action the summary on screen is about: it says "submitting" or "saving" (a draft).
+  const [summaryForSubmit, setSummaryForSubmit] = useState(true);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
   const isSkipped = (field: RegistrationFormField) => !isFieldVisible(field, answers) || (props.mode !== "club" && field.autoDate === "TODAY");
@@ -150,7 +154,7 @@ export function ClubFormFillIn(props: Props) {
     !isSkipped(field) && isFieldRequired(field, answers) && !answerIsGiven(answers[field.key]) ? `${fieldDisplayLabel(field)} is required.` : ""
   );
   const problemFor = (field: RegistrationFormField) => {
-    if (attempted) {
+    if (submitAttempted) {
       const missing = missingFor(field);
       if (missing) return missing;
     }
@@ -167,13 +171,15 @@ export function ClubFormFillIn(props: Props) {
   const clubChoiceProblem = props.mode === "open" && !clubChoice ? "Choose your club, or choose Not listed." : "";
   const clubNameProblem = props.mode === "open" && clubChoice === "NOT_LISTED" && !unlistedClubName.trim() ? "Your club's name is required." : "";
   /** Every problem that stops a send, each linked to its control (the shared summary, #1450). */
-  function summaryProblems(): ErrorSummaryItem[] {
+  function summaryProblems(submit = true): ErrorSummaryItem[] {
+    // A draft saves with required answers still empty (the server allows it); only a submit needs them.
+    const needsAnswer = (field: RegistrationFormField) => submit && Boolean(missingFor(field));
     return [
       ...(clubChoiceProblem ? [{ targetId: "club-form-apply-club", message: summaryMessage("Club", clubChoiceProblem) }] : []),
       ...(clubNameProblem ? [{ targetId: "club-form-apply-club-name", message: clubNameProblem }] : []),
       ...allFields
-        .filter((field) => missingFor(field) || blockingProblems.includes(field))
-        .map((field) => ({ targetId: `club-form-${field.id}`, message: summaryMessage(fieldDisplayLabel(field), missingFor(field) || typedAnswerProblem(field, answers[field.key]) || "") })),
+        .filter((field) => needsAnswer(field) || blockingProblems.includes(field))
+        .map((field) => ({ targetId: `club-form-${field.id}`, message: summaryMessage(fieldDisplayLabel(field), (submit && missingFor(field)) || typedAnswerProblem(field, answers[field.key]) || "") })),
     ];
   }
   // A fixed answer drops its summary item; focus never moves.
@@ -188,7 +194,10 @@ export function ClubFormFillIn(props: Props) {
 
   async function send(submit: boolean) {
     setAttempted(true);
-    const found = summaryProblems();
+    if (submit) setSubmitAttempted(true);
+    lastSubmitRef.current = submit;
+    setSummaryForSubmit(submit);
+    const found = summaryProblems(submit);
     if (found.length > 0) {
       setError("");
       setIssues([]);
@@ -285,7 +294,7 @@ export function ClubFormFillIn(props: Props) {
         void send(true);
       }}
     >
-      {summaryItems.length > 0 && <FormErrorSummary action="submitting" items={summaryItems} ref={summaryRef} />}
+      {summaryItems.length > 0 && <FormErrorSummary action={summaryForSubmit ? "submitting" : "saving"} items={summaryItems} ref={summaryRef} />}
       {props.mode === "club" && (
         <fieldset className="public-manage-card form-stack" disabled={saving || Boolean(savedId)}>
           <ClubFormSectionTitle>Who is this form for?</ClubFormSectionTitle>
