@@ -5,6 +5,7 @@ import { AlertCircle, BedDouble, CheckCircle2 } from "lucide-react";
 import { beddingNote, extraBeddingNote, heldRoomsFor, partyExceedsBeds } from "@/modules/lodging/preferences-domain";
 import { describeRate, quoteStay, stayNights, addDays, type LodgingCategory } from "@/modules/lodging/domain";
 import type { RegistrantLodgingView } from "@/modules/lodging/preferences-service";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatCentsPlain as money } from "@/modules/payments/format-cents";
 
 type Status = { kind: "idle" | "saving" | "saved" | "error"; message: string };
@@ -32,6 +33,11 @@ export function PublicLodgingPreferences({ token, initialView }: { token: string
   const [partySize, setPartySize] = useState(initialView.request?.partySize ?? Math.max(1, initialView.people.length));
   const [roomCount, setRoomCount] = useState(initialView.request?.roomCount ?? 1);
   const [bringsExtraBedding, setBringsExtraBedding] = useState(initialView.request?.bringsExtraBedding ?? false);
+  // Any edit since the request was loaded or last saved, in the lodging form or the roommate-by-code form (B6, #1468);
+  // the form's change event marks it, a successful save clears it.
+  const [dirty, setDirty] = useState(false);
+  const [roommateDirty, setRoommateDirty] = useState(false);
+  useUnsavedChangesGuard(view.canEdit && (dirty || roommateDirty), "You have unsaved lodging changes. Leave this page and discard them?");
   const base = `/api/public/manage/${encodeURIComponent(token)}/lodging`;
   const disabled = !view.canEdit || status.kind === "saving";
 
@@ -52,14 +58,16 @@ export function PublicLodgingPreferences({ token, initialView }: { token: string
     return quoteStay({ rates: chosen.rate ? { [chosen.category]: chosen.rate } : {}, category: chosen.category, nights: nightCount, partySize, units: chosen.roomBased ? rooms : 1 });
   }, [view.offered, category, nightCount, partySize, rooms]);
 
-  async function run(action: () => Promise<Sent>, success: string) {
+  async function run(action: () => Promise<Sent>, success: string): Promise<boolean> {
     setStatus({ kind: "saving", message: "Saving…" });
     try {
       const sent = await action();
       setView(sent.lodging);
       setStatus({ kind: "saved", message: sent.changeRequested ? "Thank you. This change needs the event team, so it was sent to them and has not been applied yet." : success });
+      return true;
     } catch (error) {
       setStatus({ kind: "error", message: error instanceof Error ? error.message : "That could not be saved. Try again." });
+      return false;
     }
   }
 
@@ -77,7 +85,7 @@ export function PublicLodgingPreferences({ token, initialView }: { token: string
       householdPreference: form.get("householdPreference"),
       // After the first save these go through the event team, so a locked form does not send them.
       ...(view.flagsLocked ? {} : { groundFloorNeeded: form.get("groundFloorNeeded") === "on", accessibleRoomNeeded: form.get("accessibleRoomNeeded") === "on" }),
-    }), "Saved. You can change this until the deadline.");
+    }), "Saved. You can change this until the deadline.").then((saved) => { if (saved) setDirty(false); });
   }
 
   const request = view.request;
@@ -92,7 +100,7 @@ export function PublicLodgingPreferences({ token, initialView }: { token: string
           {view.changeRequested ? " A change you asked for is waiting for the event team." : ""}
         </p>
       </div>
-      <form onSubmit={save}>
+      <form onChange={() => setDirty(true)} onSubmit={save}>
         <fieldset disabled={disabled}>
           <legend>Lodging type</legend>
           <label><input type="radio" name="category" checked={category === ""} onChange={() => setCategory("")} /> No preference</label>
@@ -169,7 +177,7 @@ export function PublicLodgingPreferences({ token, initialView }: { token: string
         {request ? <p>{`Saved version ${request.version}${view.earlierVersions > 0 ? `, ${view.earlierVersions} earlier version${view.earlierVersions === 1 ? "" : "s"} kept by the event team` : ""}.`}</p> : null}
       </form>
 
-      <Roommates token={token} view={view} base={base} run={run} disabled={disabled} />
+      <Roommates token={token} view={view} base={base} run={run} disabled={disabled} onDirtyChange={setRoommateDirty} />
 
       <p role={status.kind === "error" ? "alert" : "status"} aria-live="polite">
         {status.kind === "saved" && <CheckCircle2 size={16} aria-hidden="true" />}
@@ -180,12 +188,13 @@ export function PublicLodgingPreferences({ token, initialView }: { token: string
   );
 }
 
-function Roommates({ view, base, run, disabled }: {
+function Roommates({ view, base, run, disabled, onDirtyChange }: {
   token: string;
   view: RegistrantLodgingView;
   base: string;
-  run: (action: () => Promise<Sent>, success: string) => Promise<void>;
+  run: (action: () => Promise<Sent>, success: string) => Promise<boolean>;
   disabled: boolean;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   return (
     <div>
@@ -196,7 +205,7 @@ function Roommates({ view, base, run, disabled }: {
         {view.canEdit ? <button type="button" disabled={disabled} onClick={() => void run(() => send(`${base}/roommates`, "POST", { action: "withdraw", requestId: row.id }), "Request withdrawn.")}>Withdraw</button> : null}
       </li>)}</ul> : null}
       {view.canEdit ? <>
-        <form onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        <form onChange={() => onDirtyChange(true)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
           const fromPersonId = String(form.get("fromPersonId") ?? "");
@@ -205,7 +214,7 @@ function Roommates({ view, base, run, disabled }: {
             name: form.get("name"),
             confirmationCode: form.get("confirmationCode"),
             ...(fromPersonId ? { fromPersonId } : {}),
-          }), "Request sent. It stays private until they ask for you too.");
+          }), "Request sent. It stays private until they ask for you too.").then((sent) => { if (sent) onDirtyChange(false); });
         }}>
           <label>Their full name <input name="name" required maxLength={120} autoComplete="off" /></label>
           <label>Their confirmation code <input name="confirmationCode" required maxLength={40} autoComplete="off" /></label>

@@ -15,6 +15,7 @@ import {
 import { rosterOwnedResponses, rosterRolePrefill } from "@/modules/club-registrations/domain";
 import { groupSeatType, MAX_GROUP_ATTENDEES } from "@/modules/group-registrations/domain";
 import type { GroupRegistrationWorkspace } from "@/modules/group-registrations/repository";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 
 type Workspace = GroupRegistrationWorkspace & { experience: NonNullable<GroupRegistrationWorkspace["experience"]> };
@@ -39,6 +40,9 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
   const [step, setStep] = useState<"who" | "form">("who");
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
+  // The add-person form is typed into while open (B6, #1468); Add, Cancel and closing the editor all clear it.
+  const [addDirty, setAddDirty] = useState(false);
+  useUnsavedChangesGuard(open && step === "who" && adding && addDirty, "You have typed a person who is not added yet. Leave this page and discard them?");
   const definition = workspace.experience.form.definition;
   const ageKey = workspace.attendeeAgeKey;
   const registered = workspace.registration.attendees;
@@ -76,6 +80,7 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
     if (goingCount >= MAX_GROUP_ATTENDEES) return setError(`Add up to ${MAX_GROUP_ATTENDEES} people.`);
     setError("");
     setAdding(false);
+    setAddDirty(false);
     setNewPeople((current) => [...current, { clientId: newClientId(), firstName, lastName, age }]);
   }
 
@@ -253,25 +258,25 @@ export function GroupRegistrationEditor({ token, workspace }: { token: string; w
         ))}
       </ul>
       {!adding && (
-        <button className="secondary-button" onClick={() => { setError(""); setAdding(true); }} type="button">
+        <button className="secondary-button" onClick={() => { setError(""); setAddDirty(false); setAdding(true); }} type="button">
           <UserPlus aria-hidden="true" size={14} /> Add a person
         </button>
       )}
       {adding && (
-        <form className="club-guest-form" onSubmit={addPerson}>
+        <form className="club-guest-form" onChange={() => setAddDirty(true)} onSubmit={addPerson}>
           <div className="form-grid two-column">
             <label>First name<input autoComplete="off" maxLength={80} name="firstName" required /></label>
             <label>Last name<input autoComplete="off" maxLength={80} name="lastName" required /></label>
             <label>Age on the first day of the event<input {...ageInputAttributes} name="age" required type="number" /></label>
           </div>
           <div className="club-registration-toolbar">
-            <button className="secondary-button" onClick={() => { setError(""); setAdding(false); }} type="button">Cancel</button>
+            <button className="secondary-button" onClick={() => { setError(""); setAdding(false); setAddDirty(false); }} type="button">Cancel</button>
             <button className="primary-button" type="submit"><UserPlus aria-hidden="true" size={15} /> Add</button>
           </div>
         </form>
       )}
       <div className="club-registration-toolbar">
-        <button className="secondary-button" onClick={() => { setError(""); setOpen(false); }} type="button">
+        <button className="secondary-button" onClick={() => { setError(""); setAddDirty(false); setAdding(false); setOpen(false); }} type="button">
           <X aria-hidden="true" size={15} /> Cancel
         </button>
         <button
