@@ -180,9 +180,9 @@ describe("ClubOrderWorkspace (#654)", () => {
     expect(render(false, { ...data, unmatched: [] })).not.toContain("no matching catalog item");
   });
 
-  it("offers Export everything (CSV) next to the list export, and not when the list is empty (#1324)", () => {
+  it("offers Download everything (CSV) next to the list export, and not when the list is empty (#1324)", () => {
     expect(render(false)).toContain("/api/attendee/clubs/club-1/orders/csv?view=all");
-    expect(render(true)).toContain("Export everything (CSV)");
+    expect(render(true)).toContain("Download everything (CSV)");
     expect(render(false, { ...data, helper: [], awardable: [] })).not.toContain("view=all");
   });
 

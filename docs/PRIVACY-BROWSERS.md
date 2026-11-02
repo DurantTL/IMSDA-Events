@@ -12,7 +12,7 @@ Related: `docs/SERVER-CALCULATIONS-AUDIT.md` (the server, not the browser, decid
 | Dependency | What it is | What blocks it | What the person sees when it is blocked | Code |
 | --- | --- | --- | --- | --- |
 | Square Web Payments (card, Apple Pay, Google Pay) | Script from `web.squarecdn.com` (sandbox: `sandbox.web.squarecdn.com`), card fields in Square's own iframe, tokenisation at `pci-connect.squareup.com`, fonts from `square-fonts-production-f.squarecdn.com`, error telemetry to `*.ingest.sentry.io`. Used on the private registration page (`/manage/<token>`), the account's registration page and club payments. | Brave Shields (aggressive), Avast Anti-Tracking, uBlock-style lists, corporate filters, strict iframe blocking | A red notice: "The secure card form could not load. A browser privacy setting, an ad blocker or the network may be blocking Square. Your registration is saved." It names the other ways to pay (Pay later in the options above, **Pay on Square** where the event offers it, or in person) and has a **Try again** button that loads the script and builds the card form again. A script request that is held open (not refused) gives up after 20 seconds and shows the same notice. The amount shown (`Pay $74.46 securely with Square`) is the server's. | `components/public-square-payment.tsx` (`sdkFailed`, `retrySquareLoad`) |
-| Cloudflare Turnstile ("Security check") | Script from `challenges.cloudflare.com`, widget in a Cloudflare iframe. One shared widget on sign-in, sign-up, password reset, registration recovery, public and group registration, club applications, information forms and club forms. Off until `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are set. | Brave Shields, Avast, VPNs and ad blockers, strict iframe blocking | "The security check could not load. A browser privacy setting, ad blocker or VPN may be blocking it. Turn it off for this site, then press Try again. Your answers are still here." with a **Try again** button that tears the widget down and asks for the script again. Pressing Submit without a token sends nothing and says "Finish the security check above". Nothing skips the check: the server still fails closed. A script request held open gives up after 15 seconds. **Open decision:** what lets a real person through when the check cannot run at all (see "Turnstile fallback options" below). | `components/security-check/security-check.tsx` |
+| Cloudflare Turnstile ("Security check") | Script from `challenges.cloudflare.com`, widget in a Cloudflare iframe. One shared widget on sign-in, sign-up, password reset, registration recovery, public and group registration, club applications, information forms and club forms. Off until `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are set. | Brave Shields, Avast, VPNs and ad blockers, strict iframe blocking | "The security check could not load. A browser privacy setting, ad blocker or VPN may be blocking it. Turn it off for this site, then press Try again. Your answers are still here." with a **Try again** button that tears the widget down and asks for the script again. Pressing Submit without a token while the check is still working sends nothing and says "Finish the security check above". When the check cannot run at all, the box also shows the office contact and the fallback described in "Blocked-check fallback (#1480)" below. The server still fails closed on an invalid token. A script request held open gives up after 15 seconds. | `components/security-check/security-check.tsx` |
 | Analytics beacon | First-party `navigator.sendBeacon("/api/public-metrics")` and web-vitals, from `components/public-metrics-beacon.tsx`. No cookie, no identifier, no third-party script. Off by itself under Global Privacy Control or Do Not Track. | EasyPrivacy-style path rules (`/metrics`, `/beacon`, `/analytics`), Brave, Avast | Nothing. The send is wrapped; a refused `sendBeacon` falls back to `fetch(...).catch(() => undefined)`. The browser may log a blocked request in its network panel; that is not a page error. | `components/public-metrics-beacon.tsx` |
 | Google sign-in | A plain link (`/api/attendee/oauth/google/start`) that leaves our site for `accounts.google.com` and comes back. No Google script runs on our pages. | A blocker that refuses `accounts.google.com`, or Google's own page failing | The browser shows its own error page for Google; our page is unchanged and the password, email-code and passkey sign-in beside the button still work. A cancelled or expired Google sign-in returns to our sign-in with a plain message ("You can try again, or use a password."). | `components/attendee-google-button.tsx` |
 | Passkeys (WebAuthn) | The device's own prompt through `@simplewebauthn/browser` (bundled with the app, nothing third-party). | A browser or policy without WebAuthn, or a prompt the person closes | Staff sign-in hides the passkey button when WebAuthn is missing (password sign-in stays). The second-step page says "This browser can't use passkeys. Use your authenticator code instead." A closed or failed prompt shows a plain message under the button. | `components/passkey-*.tsx`, `staff-passkey-sign-in-button.tsx` |
@@ -21,7 +21,7 @@ Related: `docs/SERVER-CALCULATIONS-AUDIT.md` (the server, not the browser, decid
 | Service worker and offline pieces | There is no service worker and no web manifest. "Offline check-in" is an in-page queue in `localStorage`, not a cache of pages. Live lists are never cached by an app layer. | n/a | n/a | `components/use-offline-check-in-queue.ts` |
 | `localStorage`, `sessionStorage` | Convenience only: saved form drafts, collapsed sections, dismissed banners, the sign-in return path, the offline check-in queue, a one-time reload guard. IndexedDB is not used. | Private windows, "block all site data", some embedded frames (the property read itself throws), a full quota | Every page renders and works without storage; the convenience is simply not remembered. All access goes through try/catch (`lib/safe-storage.ts`, or an inline try in the component), and `tests/safe-storage-1445.test.ts` fails when a raw access is added without one. The offline check-in queue says "Browser storage is unavailable. Nothing new can be queued until storage access is restored" instead of losing an action silently. | `lib/safe-storage.ts` |
 
-## Turnstile fallback options (decision for Caleb)
+## Turnstile fallback options (decision made: see the next section)
 
 Today, with Turnstile on, a person whose browser cannot run the check cannot submit. They see the message and can turn
 off their blocker, but a person on a locked-down device is stuck. Options, safest first. None is built; none weakens
@@ -41,6 +41,38 @@ server verification until Caleb picks one.
 
 Recommendation: 1 for the sign-in pages, 2 for public registration, plus 4's contact line on both. All are human
 decisions (they change what the server accepts).
+
+## Blocked-check fallback (#1480)
+
+Caleb approved options 1 and 2 above plus 4's contact line on Nov 1, 2026. "Blocked" means the script failed, timed out or
+the widget reported an error, so no token can be produced. It never means the server said a token was invalid.
+
+| Where | What the person sees when blocked | What the server does |
+| --- | --- | --- |
+| Sign-in (`/login`, `/sign-in`, `/account/sign-in`), sign-up, both password resets | The blocked message, the office contact, and **Email me a code instead**. They press it, get "If that address can use this, we sent a code. It works for 10 minutes.", type the code into **Code from your email**, and press the form's own button. | `POST /api/security-check/email-code` sends a code only when an active account exists (sign-up: always). The form sends it in `x-security-check-code` with no token; `requireTurnstile` checks it for that action and address, spends it, and lets that one request through. A wrong, expired or used code gets the "security_check_failed" answer. |
+| Every other public form (registrations, group and general-link registrations, club applications, club form applications, information forms, registration recovery) | The blocked message and the office contact. Submit works. | No token is accepted only under the limits below, and each accepted submission writes a `SECURITY_CHECK_FALLBACK_ACCEPTED` audit entry (action and route only, no personal data). Over the limit: 429, "Too many tries without the security check. Try again in an hour, or contact the conference office." |
+
+An invalid token is always rejected (403), and any code or fallback beside it is ignored.
+
+Limits, in `modules/rate-limit/service.ts`, all per hour:
+
+| Constant | Value | Reason |
+| --- | --- | --- |
+| `SECURITY_CHECK_FALLBACK_BUDGETS.client` | 3 per source address | A family on a blocking browser can send a registration, a recovery email and an information form. A bot behind one address cannot do more. Venue Wi-Fi shares an address, so this is a real cost there and the office contact is the way out. |
+| `SECURITY_CHECK_FALLBACK_BUDGETS.email` | 2 per address typed in the form | A typo is fixed once. A script cannot flood one registration contact. Forms with no email answer are limited per source only. |
+| `SECURITY_CHECK_CODE_SEND_BUDGETS` | 10 per source, 5 per address | Each new code retires the last. Charged the same for known and unknown addresses. |
+| `SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET` | 200 sign-up codes in total | A sign-up code goes to any address typed, so this caps the mail a spread-out script can cause. |
+
+The honeypot runs first: every public form's schema (`website` field, `modules/security/honeypot.ts`) parses before
+`requireTurnstile`, so a filled honeypot is refused before the fallback is considered. That includes the club form
+application, information form and recovery routes; the code request carries the field too.
+
+Rotating `RATE_LIMIT_HASH_SECRET` changes the keyed address hash, so codes issued in the last 10 minutes stop working (the person asks for a new one). In development with no account email configured, the code in the response reveals whether an address has an account; production never reaches that branch, the same as #1410.
+
+Codes: six digits, ten minutes, five tries, hashed like the #1410 sign-in code, stored in `SecurityCheckCode` (the address
+only as a keyed hash), minted when the message is delivered. A code is spent by the request that uses it, so a wrong password
+after a valid code needs a fresh code. Audit entries (`SECURITY_CHECK_CODE_SENT`, `_VERIFIED`, `_FAILED`) carry the code's id
+and the action name, never the address, code or a hash.
 
 ## The browser test
 

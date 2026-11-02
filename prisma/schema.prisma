@@ -599,6 +599,8 @@ enum MessageTemplateKey {
   ATTENDEE_EDIT_VERIFICATION
   /// The emailed sign-in code for a club-role account that has not set up two-step sign-in (#1410).
   ATTENDEE_SIGN_IN_CODE
+  /// The emailed code that stands in for the Security check when a privacy browser blocks it (#1480). No account needed.
+  SECURITY_CHECK_CODE
   REGISTRATION_CONFIRMATION_ORGANIZATION_BILLED
   CLUB_INVITE
   CLUB_ASSIGNMENTS
@@ -1372,6 +1374,32 @@ model AttendeeStepUpCode {
   account AttendeeAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([accountId, purpose, consumedAt])
+  @@index([expiresAt])
+  @@index([codeExpiresAt])
+}
+
+/**
+ * The emailed code that stands in for the Security check (Turnstile) when a privacy browser blocks it (#1480), on
+ * sign-in, sign-up and password reset. Not bound to an account: a sign-up has none, and a staff sign-in has not
+ * proved a password yet. Bound to one (action, address) instead; the address is kept only as a keyed hash of its
+ * lowercase form, never as text. `sealedCode` exists only so a delivery retry resends the SAME code, as #1410's does.
+ * A valid code is spent on use and satisfies the check for one request.
+ */
+model SecurityCheckCode {
+  id                String    @id @default(cuid())
+  /// One of TURNSTILE_ACTIONS: staff-sign-in, attendee-sign-in, attendee-sign-up or forgot-password.
+  action            String
+  emailHash         String
+  codeHash          String?   @unique
+  deliveryMessageId String?   @unique
+  sealedCode        String?
+  codeExpiresAt     DateTime?
+  expiresAt         DateTime
+  attempts          Int       @default(0)
+  consumedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([action, emailHash, consumedAt])
   @@index([expiresAt])
   @@index([codeExpiresAt])
 }

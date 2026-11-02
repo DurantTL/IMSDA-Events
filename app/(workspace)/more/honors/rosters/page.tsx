@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -116,7 +117,7 @@ export default async function HonorRostersPage({
       {view === "classes" && (
         <>
           <div className="report-actions honor-roster-downloads">
-            <a className="secondary-button report-download" href={csv("classes")}><Download aria-hidden="true" size={15} /> Download class rosters CSV</a>
+            <ExportLink className="secondary-button report-download" href={csv("classes")}><Download aria-hidden="true" size={15} /> Download class rosters CSV</ExportLink>
           </div>
           {canOverrideSeats && classRosters.length > 0 && (
             <HonorSeatPlacementForm
@@ -212,7 +213,7 @@ export default async function HonorRostersPage({
                 </p>
               </div>
             </div>
-            <a className="secondary-button report-download" href={csv("site")}><Download aria-hidden="true" size={15} /> Download site roster CSV</a>
+            <ExportLink className="secondary-button report-download" href={csv("site")}><Download aria-hidden="true" size={15} /> Download site roster CSV</ExportLink>
           </div>
           {siteRoster.clubs.length > 0 && (
             <div className="report-table-wrap">
@@ -280,7 +281,7 @@ export default async function HonorRostersPage({
                     <span className="report-icon green"><UsersRound aria-hidden="true" size={19} /></span>
                     <div><p className="eyebrow">Club schedule</p><h2 translate="no">{club.name}</h2><p>{schedule.people.length} people{schedule.siteName ? <> · Site: <span translate="no">{schedule.siteName}</span></> : null}</p></div>
                   </div>
-                  <a className="secondary-button report-download" href={csv("club", club.id)}><Download aria-hidden="true" size={15} /> Download CSV</a>
+                  <ExportLink className="secondary-button report-download" href={csv("club", club.id)}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
                 </div>
                 <div className="report-table-wrap">
                   <table className="report-table">

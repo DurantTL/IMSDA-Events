@@ -1,9 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import { Printer } from "lucide-react";
+import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list-sort";
+import { sortOrderText, sortRows, type SortKind, type SortState, type SortValue } from "@/lib/list-sort";
 import { DeleteClubFormLinkButton, RevokeClubFormLinkButton } from "@/components/club-forms-actions";
 import type { PastYearGroup } from "@/modules/club-forms/past-years-domain";
 import type { ClubFormLinkRow } from "@/modules/club-forms/links";
 import type { ClubFormSubmissionListRow } from "@/modules/club-forms/submissions";
+import type { StatusWord } from "@/modules/registrations/status-words";
 import styles from "./club-forms-lists.module.css";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
@@ -22,20 +27,55 @@ const emailDeliveryLabel = {
   UNKNOWN: "",
 } as const;
 
-const linkStateLabel = { OPEN: "Waiting", USED: "Submitted", REVOKED: "Withdrawn", EXPIRED: "Expired" } as const;
+const linkStateLabel = { OPEN: "Draft", USED: "Submitted", REVOKED: "Cancelled", EXPIRED: "Expired" } as const satisfies Record<ClubFormLinkRow["state"], StatusWord | "Expired">;
+
+/** Both tables sort in the address (#1458); a second table on the page (a past year) passes its own `sortPrefix`, so the two do not share a sort. */
+const LINK_SORT_COLUMNS = ["form", "sentTo", "status", "email", "expires"] as const;
+type LinkSortColumn = typeof LINK_SORT_COLUMNS[number];
+const NO_SORT_LINKS: SortState<LinkSortColumn> = { key: null, dir: "asc" };
+const linkAccessors: Record<LinkSortColumn, (link: ClubFormLinkRow) => SortValue> = {
+  form: (link) => link.templateName,
+  sentTo: (link) => link.recipientEmail,
+  status: (link) => linkStateLabel[link.state],
+  email: (link) => emailDeliveryLabel[link.delivery],
+  expires: (link) => link.expiresAt,
+};
+const LINK_SORT_LABELS: Record<LinkSortColumn, { label: string; kind: SortKind }> = {
+  form: { label: "form", kind: "text" }, sentTo: { label: "recipient", kind: "text" }, status: { label: "status", kind: "text" },
+  email: { label: "email status", kind: "text" }, expires: { label: "expiry date", kind: "date" },
+};
+
+const FILLED_SORT_COLUMNS = ["form", "subject", "status", "date"] as const;
+type FilledSortColumn = typeof FILLED_SORT_COLUMNS[number];
+const NO_SORT_FILLED: SortState<FilledSortColumn> = { key: null, dir: "asc" };
+const filledAccessors: Record<FilledSortColumn, (row: ClubFormSubmissionListRow) => SortValue> = {
+  form: (row) => row.templateName,
+  subject: (row) => row.subjectName,
+  status: (row) => (row.status === "DRAFT" ? "Draft" : "Submitted"),
+  date: (row) => row.submittedAt ?? row.updatedAt,
+};
+const FILLED_SORT_LABELS: Record<FilledSortColumn, { label: string; kind: SortKind }> = {
+  form: { label: "form", kind: "text" }, subject: { label: "member or subject", kind: "text" }, status: { label: "status", kind: "text" }, date: { label: "date", kind: "date" },
+};
+// Always prefixed ("linksSort", "filledSort"), since the Forms page shows both tables, and "form" is a column of each.
+const prefixFor = (sortPrefix: string | undefined, table: string) => `${(sortPrefix ?? "").replace(/[^A-Za-z0-9]/g, "")}${table}`;
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-export function ClubFormLinksTable({ links, organizationId, base, caption = "Private links" }: { links: ClubFormLinkRow[]; organizationId: string; base: string; caption?: string }) {
+export function ClubFormLinksTable({ links, organizationId, base, caption = "Private links", sortPrefix }: { links: ClubFormLinkRow[]; organizationId: string; base: string; caption?: string; sortPrefix?: string }) {
+  const sort = useAddressSort(LINK_SORT_COLUMNS, NO_SORT_LINKS, undefined, prefixFor(sortPrefix, "links"));
+  const rows = sort.key ? sortRows(links, sort.key, sort.dir, linkAccessors) : links;
+  const header = (column: LinkSortColumn, label: string) => <SortableHeader active={sort.key === column} direction={sort.dir} label={label} onSort={() => sort.toggle(column)} />;
   return (
     <div className="report-table-wrap">
+      {sort.key && <SortOrderNote>{sortOrderText(LINK_SORT_LABELS[sort.key].label, sort.dir, LINK_SORT_LABELS[sort.key].kind)}</SortOrderNote>}
       <table className="report-table">
         <caption className="sr-only">{caption}</caption>
         <thead>
-          <tr><th scope="col">Form</th><th scope="col">Sent to</th><th scope="col">Status</th><th scope="col">Email</th><th scope="col">Expires</th><th scope="col"><span className="sr-only">Actions</span></th></tr>
+          <tr>{header("form", "Form")}{header("sentTo", "Sent to")}{header("status", "Status")}{header("email", "Email")}{header("expires", "Expires")}<th scope="col"><span className="sr-only">Actions</span></th></tr>
         </thead>
         <tbody>
-          {links.map((link) => (
+          {rows.map((link) => (
             <tr key={link.id}>
               <th scope="row">{link.templateName}</th>
               <td translate="no">{link.recipientEmail}{link.subjectName ? ` · ${link.subjectName}` : ""}</td>
@@ -55,16 +95,20 @@ export function ClubFormLinksTable({ links, organizationId, base, caption = "Pri
   );
 }
 
-export function FilledFormsTable({ submissions, base, caption = "Filled forms" }: { submissions: ClubFormSubmissionListRow[]; base: string; caption?: string }) {
+export function FilledFormsTable({ submissions, base, caption = "Filled forms", sortPrefix }: { submissions: ClubFormSubmissionListRow[]; base: string; caption?: string; sortPrefix?: string }) {
+  const sort = useAddressSort(FILLED_SORT_COLUMNS, NO_SORT_FILLED, undefined, prefixFor(sortPrefix, "filled"));
+  const rows = sort.key ? sortRows(submissions, sort.key, sort.dir, filledAccessors) : submissions;
+  const header = (column: FilledSortColumn, label: string) => <SortableHeader active={sort.key === column} direction={sort.dir} label={label} onSort={() => sort.toggle(column)} />;
   return (
     <div className="report-table-wrap">
+      {sort.key && <SortOrderNote>{sortOrderText(FILLED_SORT_LABELS[sort.key].label, sort.dir, FILLED_SORT_LABELS[sort.key].kind)}</SortOrderNote>}
       <table className="report-table">
         <caption className="sr-only">{caption}</caption>
         <thead>
-          <tr><th scope="col">Form</th><th scope="col">Member or subject</th><th scope="col">Status</th><th scope="col">Date</th><th scope="col"><span className="sr-only">Open</span></th></tr>
+          <tr>{header("form", "Form")}{header("subject", "Member or subject")}{header("status", "Status")}{header("date", "Date")}<th scope="col"><span className="sr-only">Open</span></th></tr>
         </thead>
         <tbody>
-          {submissions.map((row) => (
+          {rows.map((row) => (
             <tr key={row.id}>
               <th scope="row">{row.templateName}</th>
               <td translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
@@ -118,13 +162,13 @@ export function PastYearsSection({ years, organizationId, base }: { years: PastY
                 {year.submissions.length > 0 && (
                   <div>
                     <h4>Filled forms</h4>
-                    <FilledFormsTable base={base} caption={`Filled forms, ${year.clubYear}`} submissions={year.submissions} />
+                    <FilledFormsTable base={base} caption={`Filled forms, ${year.clubYear}`} sortPrefix={year.clubYear} submissions={year.submissions} />
                   </div>
                 )}
                 {year.links.length > 0 && (
                   <div>
                     <h4>Private links</h4>
-                    <ClubFormLinksTable base={base} caption={`Private links, ${year.clubYear}`} links={year.links} organizationId={organizationId} />
+                    <ClubFormLinksTable base={base} caption={`Private links, ${year.clubYear}`} links={year.links} organizationId={organizationId} sortPrefix={year.clubYear} />
                   </div>
                 )}
               </div>

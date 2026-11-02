@@ -19,7 +19,7 @@ function subscribe(onChange: () => void) {
   return () => list.removeEventListener("change", onChange);
 }
 
-export function PhoneHiddenSortLink({ href, children }: { href: string; children: React.ReactNode }) {
+export function PhoneHiddenSortLink({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
   const onPhone = useSyncExternalStore(subscribe, () => window.matchMedia(phoneQuery).matches, () => false);
-  return <Link href={href} tabIndex={onPhone ? -1 : undefined}>{children}</Link>;
+  return <Link className={className} href={href} tabIndex={onPhone ? -1 : undefined}>{children}</Link>;
 }

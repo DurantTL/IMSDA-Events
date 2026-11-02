@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { serverSort } from "@/lib/list-sort";
+import { EVENT_CLUB_SORT_COLUMNS } from "@/modules/club-reports/area-table-sort";
 import { notFound } from "next/navigation";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { CoordinatorUnavailable } from "@/components/coordinator-overview";
@@ -18,7 +20,7 @@ export const dynamic = "force-dynamic";
  * report). No payment action exists here, whoever is billed. A failed read says
  * "unavailable", never "no events".
  */
-export default async function AreaEventsPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string }> }) {
+export default async function AreaEventsPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string; sort?: string; dir?: string }> }) {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
   if (!(await currentAreaCoordinatorViewerActive())) notFound();
   const params = await searchParams;
@@ -41,7 +43,7 @@ export default async function AreaEventsPage({ searchParams }: { searchParams: P
         <>
           <CoordinatorClubEventsHelp />
           <AreaClubSearch basePath="/account/area-clubs/events" clubYear={clubYear} query={query} shown={shown} total={total} />
-          <CoordinatorClubEvents clearHref={`/account/area-clubs/events?year=${encodeURIComponent(clubYear)}`} events={allEvents} query={query} />
+          <CoordinatorClubEvents clearHref={`/account/area-clubs/events?year=${encodeURIComponent(clubYear)}`} events={allEvents} query={query} sorting={serverSort("/account/area-clubs/events", params, EVENT_CLUB_SORT_COLUMNS, { key: null, dir: "asc" })} />
         </>
       )}
     </section>

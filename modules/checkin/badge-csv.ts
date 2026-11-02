@@ -151,11 +151,3 @@ function answerText(field: RegistrationFormField, value: unknown) {
     ? (field.optionLabels?.[raw] ?? raw).trim()
     : raw;
 }
-
-export function badgeCsvFilename(eventSlug: string) {
-  const slug = eventSlug
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return `${slug || "event"}-avery-94237.csv`;
-}

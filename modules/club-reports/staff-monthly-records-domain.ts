@@ -12,6 +12,7 @@ import {
 } from "@/modules/club-reports/area-summary-domain";
 import { chooseReportMonth, clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 import { recordState, recordsToReviewHref } from "@/modules/club-reports/review-domain";
+import { parseSortParams, sortRows, type SortState } from "@/lib/list-sort";
 import { firstParam } from "@/lib/search-params";
 
 export const STAFF_RECORDS_ROW_LIMIT = 10;
@@ -116,6 +117,17 @@ export function staffMonthPicker(totals: readonly MonthlyStatusTotals[]): StaffM
   }));
 }
 
+/** The columns of the records table that sort (#1458); the default is the table's own order (missing first, then name). */
+export const STAFF_RECORD_SORT_COLUMNS = ["club", "record", "points"] as const;
+export type StaffRecordSortColumn = typeof STAFF_RECORD_SORT_COLUMNS[number];
+export const STAFF_RECORD_DEFAULT_SORT: SortState<StaffRecordSortColumn> = { key: null, dir: "asc" };
+
+const staffRecordAccessors = {
+  club: (row: StaffRecordRow) => row.name,
+  record: (row: StaffRecordRow) => kindOrder.indexOf(row.kind),
+  points: (row: StaffRecordRow) => row.points,
+};
+
 export type StaffRecordsOptions = {
   clubs: readonly AreaClubSummary[];
   clubYear: string;
@@ -126,6 +138,9 @@ export type StaffRecordsOptions = {
   show?: string | string[];
   /** `all=1`: every row rather than the first ten. */
   all?: string | string[];
+  /** `sort` and `dir` of the records table, read through the whitelist. */
+  sort?: string | string[];
+  dir?: string | string[];
 };
 
 export function buildStaffMonthlyRecords(input: StaffRecordsOptions) {
@@ -138,7 +153,10 @@ export function buildStaffMonthlyRecords(input: StaffRecordsOptions) {
   const rows = buildStaffRecordRows(input.clubs, month);
   const attentionCount = rows.filter((row) => row.needsAttention).length;
   const searched = filterClubsByNameChurchOrCity(rows.map((row) => ({ ...row, sponsoringChurch: row.church })), query);
-  const matches = sortStaffRecordRows(searched.filter((row) => showAllClubs || row.needsAttention));
+  const order = parseSortParams({ sort: input.sort, dir: input.dir }, STAFF_RECORD_SORT_COLUMNS, STAFF_RECORD_DEFAULT_SORT);
+  const defaultOrder = sortStaffRecordRows(searched.filter((row) => showAllClubs || row.needsAttention));
+  // Sorted before the ten-row cut, so "Show all" and the first ten both follow the chosen column.
+  const matches = order.key ? sortRows(defaultOrder, order.key, order.dir, staffRecordAccessors) : defaultOrder;
   const visible = expanded ? matches : matches.slice(0, STAFF_RECORDS_ROW_LIMIT);
   const months = clubYearMonths(input.clubYear);
   const index = months.indexOf(month);
@@ -146,7 +164,7 @@ export function buildStaffMonthlyRecords(input: StaffRecordsOptions) {
     month, monthLabel: reportMonthLabel(month), query, showAllClubs, expanded, totals, monthTotals,
     tiles: staffRecordsTiles(monthTotals, input.clubYear, input.now), picker: staffMonthPicker(totals),
     previousMonth: index > 0 ? months[index - 1]! : null, nextMonth: index < months.length - 1 ? months[index + 1]! : null,
-    totalClubs: rows.length, attentionCount, matches: matches.length, rows: visible,
+    order, totalClubs: rows.length, attentionCount, matches: matches.length, rows: visible,
     hasMore: visible.length < matches.length,
   };
 }
@@ -158,6 +176,9 @@ export function staffRecordStatusLabel(row: Pick<StaffRecordRow, "kind" | "late"
 }
 
 /** An in-view address: keeps year, view=records, month and the search; `show` and `all` only when set. */
-export function staffRecordsHref(input: { clubYear: string; month: string; query?: string; showAll?: boolean; expanded?: boolean }) {
-  return `${clubSummaryHref({ clubYear: input.clubYear, view: "records", query: input.query, month: input.month, show: input.showAll ? "all" : undefined, all: input.expanded })}#monthly-records`;
+export function staffRecordsHref(input: { clubYear: string; month: string; query?: string; showAll?: boolean; expanded?: boolean; order?: SortState<StaffRecordSortColumn> }) {
+  const base = clubSummaryHref({ clubYear: input.clubYear, view: "records", query: input.query, month: input.month, show: input.showAll ? "all" : undefined, all: input.expanded });
+  // The chosen order rides along when the month, the filter or "Show all" changes (#1458).
+  const order = input.order?.key ? `&sort=${input.order.key}&dir=${input.order.dir}` : "";
+  return `${base}${order}#monthly-records`;
 }

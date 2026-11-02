@@ -21,7 +21,7 @@ const definition = {
 } as unknown as RegistrationFormDefinition;
 
 let mounted: Mounted | null = null;
-const textInputs = (container: HTMLElement) => [...container.querySelectorAll<HTMLInputElement>('input[type="text"], input[type="email"], input[type="tel"], input:not([type])')];
+const textInputs = (container: HTMLElement) => [...container.querySelectorAll<HTMLInputElement>('input[type="text"], input[type="email"], input[type="tel"], input:not([type])')].filter((input) => input.name !== "website"); // not the hidden honeypot (#1480)
 
 beforeEach(() => {
   window.localStorage.clear();

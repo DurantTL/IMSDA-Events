@@ -134,15 +134,16 @@ describe("columns per role (#1167)", () => {
     const out = html();
     expect(out).not.toContain(">Birth date<");
     expect(out).not.toContain("Sterling Volunteers");
-    expect(out).not.toContain("<th>Gender</th>");
-    expect(out).toContain("<th>Details</th>");
+    expect(out).not.toMatch(/>Gender<span class="sr-only">/);
+    // Every column but Actions has a sortable header (#1458): a button inside the header cell.
+    expect(out).toMatch(/>Details<span class="sr-only">, Members<\/span>/);
     expect(out).toContain("<th>Actions</th>");
   });
 
   it("shows screening for a role that is given it, and still no birth date until revealed", () => {
     const complianceStatuses: Record<string, RosterComplianceInfo> = { a: { state: "CLEAR", note: null }, b: { state: "NO_RECORD", note: null } };
     const out = html({ complianceStatuses });
-    expect(out).toContain("<th>Sterling Volunteers</th>");
+    expect(out).toMatch(/>Sterling Volunteers<span class="sr-only">, Members<\/span>/);
     expect(out).not.toContain(">Birth date<");
   });
 });

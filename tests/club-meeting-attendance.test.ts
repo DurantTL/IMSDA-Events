@@ -346,7 +346,7 @@ describe("attendance needs roster access (ADR 0005)", () => {
     const response = await EXPORT(request("?year=2026-27"), ctx);
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toContain("text/csv");
-    expect(response.headers.get("Content-Disposition")).toContain("meeting-attendance-2026-27.csv");
+    expect(response.headers.get("Content-Disposition")).toMatch(/club-1-meeting-attendance-2026-27-\d{4}-\d{2}-\d{2}\.csv/);
     const csv = await response.text();
     expect(csv).toContain('"Club","Test Pathfinders"');
     expect(csv).toContain('"Zed","Ana","Pathfinders","Present","1","1","100%"');
@@ -359,7 +359,7 @@ describe("attendance needs roster access (ADR 0005)", () => {
     role("DIRECTOR");
     const response = await EXPORT(request("?year=2026-27&from=2026-10-01&to=2026-10-31"), ctx);
     expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Disposition")).toContain('filename="meeting-attendance-2026-10.csv"');
+    expect(response.headers.get("Content-Disposition")).toMatch(/filename="club-1-meeting-attendance-2026-10-\d{4}-\d{2}-\d{2}\.csv"/);
     expect(mocks.noteFindMany.mock.calls[0][0].where.meetingDate).toEqual({ gte: "2026-10-01", lte: "2026-10-31" });
     expect(mocks.writeAuditLog.mock.calls[0][0].metadata).toMatchObject({ from: "2026-10-01", to: "2026-10-31" });
   });
@@ -367,7 +367,7 @@ describe("attendance needs roster access (ADR 0005)", () => {
   it("keeps the whole-year export unfiltered with the year file name", async () => {
     role("DIRECTOR");
     const response = await EXPORT(request("?year=2026-27"), ctx);
-    expect(response.headers.get("Content-Disposition")).toBe('attachment; filename="meeting-attendance-2026-27.csv"');
+    expect(response.headers.get("Content-Disposition")).toMatch(/^attachment; filename="club-1-meeting-attendance-2026-27-\d{4}-\d{2}-\d{2}\.csv"$/);
     expect(mocks.noteFindMany.mock.calls[0][0].where.meetingDate).toEqual({});
   });
 

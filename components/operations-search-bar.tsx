@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Search, X } from "lucide-react";
+import { ListPager } from "@/components/list-pager";
 import { SearchAsYouTypeForm, SearchDisclosure } from "@/components/search-as-you-type";
 import {
   activeFilterKeys,
@@ -192,18 +193,16 @@ export function OperationsSearchBar({
         </ul>
       ) : null}
       {summary && summary.issues.length === 0 ? (
-        <p aria-live="polite" className="muted" data-testid="operations-search-summary">
-          {summary.total} {summary.total === 1 ? "registration matches" : "registrations match"}
-          {summary.pageCount > 1 ? ` · page ${summary.page} of ${summary.pageCount}` : ""}
-          {summary.pageCount > 1 ? (
-            <>
-              {" "}
-              {summary.page > 1 ? <Link href={pageHref(summary.page - 1)}>Previous</Link> : null}
-              {summary.page > 1 && summary.page < summary.pageCount ? " · " : null}
-              {summary.page < summary.pageCount ? <Link href={pageHref(summary.page + 1)}>Next</Link> : null}
-            </>
-          ) : null}
-        </p>
+        <div data-testid="operations-search-summary">
+          <ListPager
+            hrefFor={pageHref}
+            label="Registration search pages"
+            noun="registrations"
+            nounOne="registration"
+            slice={{ from: summary.total === 0 ? 0 : (summary.page - 1) * query.pageSize + 1, to: Math.min(summary.total, summary.page * query.pageSize), page: summary.page, pageCount: summary.pageCount, total: summary.total }}
+          />
+          {summary.total === 0 && <p className="muted">0 registrations match.</p>}
+        </div>
       ) : null}
     </section>
   );

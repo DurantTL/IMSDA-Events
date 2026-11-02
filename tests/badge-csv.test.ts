@@ -37,12 +37,12 @@ vi.mock("@/modules/audit/audit-service", () => ({
 import { GET } from "@/app/api/events/[eventId]/exports/badge-labels-csv/route";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import {
-  badgeCsvFilename,
   badgePositionOptions,
   buildBadgeCsvRows,
 } from "@/modules/checkin/badge-csv";
 import { badgeTemplates } from "@/modules/checkin/badge-labels";
 import { buildBadgeLabels } from "@/modules/checkin/badge-labels";
+import { exportFileName } from "@/modules/reporting/export-response";
 import { toCsv } from "@/modules/reporting/csv";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 
@@ -227,10 +227,11 @@ describe("badge CSV rows", () => {
   });
 
   it("names the file safely from the event slug", () => {
-    expect(badgeCsvFilename("Womens-Retreat 2026")).toBe("womens-retreat-2026-avery-94237.csv");
-    expect(badgeCsvFilename("")).toBe("event-avery-94237.csv");
-    const hostile = badgeCsvFilename('bad"name\r\nX-Injected: 1');
-    expect(hostile).toBe("bad-name-x-injected-1-avery-94237.csv");
+    const date = new Date("2026-11-01T18:00:00Z");
+    expect(exportFileName({ scope: "Womens-Retreat 2026", kind: "avery-94237-badges", date })).toBe("womens-retreat-2026-avery-94237-badges-2026-11-01.csv");
+    expect(exportFileName({ scope: "", kind: "avery-94237-badges", date })).toBe("export-avery-94237-badges-2026-11-01.csv");
+    const hostile = exportFileName({ scope: 'bad"name\r\nX-Injected: 1', kind: "avery-94237-badges", date });
+    expect(hostile).toBe("bad-name-x-injected-1-avery-94237-badges-2026-11-01.csv");
     expect(hostile).toMatch(/^[a-z0-9.-]+$/);
   });
 });
@@ -295,11 +296,9 @@ describe("badge CSV route", () => {
     expect(dependencies.requirePermission).toHaveBeenCalledWith(
       expect.anything(), "event_1", "MANAGE_CHECK_IN", dependencies.findActiveMembership,
     );
-    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
-    expect(response.headers.get("Content-Disposition")).toBe(
-      'attachment; filename="womens-retreat-2026-avery-94237.csv"',
-    );
+    expect(response.headers.get("Content-Disposition")).toMatch(/^attachment; filename="womens-retreat-2026-avery-94237-badges-\d{4}-\d{2}-\d{2}\.csv"$/);
     const body = await response.text();
     expect(body.startsWith('"ID","Name","Position","Attendee type"\r\n')).toBe(true);
     expect(body).toContain('"REG-AAAA1111","Amy Adams","","Adult"');
@@ -384,9 +383,7 @@ describe("badge CSV route", () => {
   it("puts only a sanitised slug in Content-Disposition", async () => {
     dependencies.findEventSlug.mockResolvedValue('x"\r\nSet-Cookie: a=b');
     const response = await call();
-    expect(response.headers.get("Content-Disposition")).toBe(
-      'attachment; filename="x-set-cookie-a-b-avery-94237.csv"',
-    );
+    expect(response.headers.get("Content-Disposition")).toMatch(/^attachment; filename="x-set-cookie-a-b-avery-94237-badges-\d{4}-\d{2}-\d{2}\.csv"$/);
   });
 });
 

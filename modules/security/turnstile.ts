@@ -35,6 +35,10 @@ export const SECURITY_CHECK_FAILED_MESSAGE =
 export const SECURITY_CHECK_MISSING_MESSAGE =
   "Finish the security check above, then press Submit again. Your answers are still here.";
 
+/** Shown when an emailed code is wrong, expired, spent or was never issued (#1480). Says nothing about any account. */
+export const SECURITY_CHECK_CODE_FAILED_MESSAGE =
+  "That code didn't work. Check it, or press Email me a code instead to get a new one. Codes work once, for 10 minutes.";
+
 export type TurnstileConfiguration =
   | { mode: "enforce"; siteKey: string; secretKey: string; allowedHostnames: string[] }
   | { mode: "skip"; missing: ("TURNSTILE_SITE_KEY" | "TURNSTILE_SECRET_KEY")[]; production: boolean };
@@ -111,18 +115,38 @@ export async function checkTurnstile(
 }
 
 /**
+ * What a route lets through when the check could not produce a token at all (#1480). Never applies to a request that
+ * carries a token: an invalid token is always rejected.
+ * - `email-code`: sign-in, sign-up and password reset. The `x-security-check-code` header carries an emailed code for
+ *   this action and this email; a valid code is spent and satisfies the check for this one request.
+ * - `public-form`: every other public form. No token is allowed, through a much stricter rate limit than the form's
+ *   own (see `SECURITY_CHECK_FALLBACK_BUDGETS`), and the submission is flagged in the audit log. `email` is the
+ *   address in the route's own payload, when it has one. Routes must run their honeypot check BEFORE this call.
+ */
+export type SecurityCheckFallback =
+  | { kind: "email-code"; email: string }
+  | { kind: "public-form"; email?: string | null };
+
+/**
  * Call in a POST handler after the honeypot and rate limit and before any write or side effect. Returns null to
  * continue, or the JSON response to return. The token comes from the `x-turnstile-token` header.
  */
 export async function requireTurnstile(
   request: Request,
-  { action, token }: { action: TurnstileAction; token?: string | null },
+  { action, token, fallback }: { action: TurnstileAction; token?: string | null; fallback?: SecurityCheckFallback },
 ): Promise<Response | null> {
+  const submittedToken = token ?? request.headers.get(TURNSTILE_TOKEN_HEADER);
   let verdict: TurnstileVerdict;
   try {
+    if (fallback && !submittedToken?.trim() && getTurnstileConfiguration().mode === "enforce") {
+      // Imported here so the pure check above stays free of the database and the rate limiter.
+      const { applySecurityCheckFallback } = await import("@/modules/security/security-check-fallback");
+      const handled = await applySecurityCheckFallback(request, action, fallback);
+      if (handled) return handled.response;
+    }
     verdict = await checkTurnstile({
       action,
-      token: token ?? request.headers.get(TURNSTILE_TOKEN_HEADER),
+      token: submittedToken,
       remoteIp: trustedClientIpAddress(request),
     });
   } catch (error) {

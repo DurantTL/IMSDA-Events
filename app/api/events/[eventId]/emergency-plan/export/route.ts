@@ -3,6 +3,8 @@ import { requireEmergencyPlanAccess } from "@/modules/emergency-plans/access";
 import { emergencyPlanApiError } from "@/modules/emergency-plans/api-errors";
 import { getEmergencyPlanVersion } from "@/modules/emergency-plans/repository";
 import { buildEmergencyReferenceSheet, emergencyReferenceCsv } from "@/modules/reporting/emergency-reference";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 type RouteContext = { params: Promise<{ eventId: string }> };
 
@@ -21,15 +23,7 @@ async function getHandler(request: Request, context: RouteContext) {
       return Response.json({ error: "VERSION_NOT_FOUND", message: "There is no published emergency plan to export." }, { status: 404 });
     }
     const sheet = buildEmergencyReferenceSheet(version.snapshot, version);
-    const safeEventId = eventId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 100) || "event";
-    return new Response(emergencyReferenceCsv(sheet), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${safeEventId}-emergency-plan-v${version.versionNumber}.csv"`,
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return csvDownloadResponse(emergencyReferenceCsv(sheet), exportFileName({ scope: await eventFileScope(eventId), kind: `emergency-plan-v${version.versionNumber}` }));
   } catch (error) {
     return emergencyPlanApiError(error, "Exporting the emergency plan");
   }

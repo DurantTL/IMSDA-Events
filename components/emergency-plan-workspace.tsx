@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { PhoneInput } from "@/components/phone-input";
 import { useEffect, useId, useRef, useState } from "react";
 import { Download, Plus, Printer, Trash2 } from "lucide-react";
@@ -277,7 +278,7 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
                 <span><strong>Version {version.versionNumber}</strong>{version.versionNumber === latest?.versionNumber ? " (latest)" : ""}<br /><span className={styles.hint}>Published {version.publishedLabel}</span></span>
                 <span className={styles.actions}>
                   <a className="secondary-button" href={`/more/emergency-plan/print?${eventQuery}&version=${version.versionNumber}`}><Printer aria-hidden="true" size={15} /> Print version {version.versionNumber}</a>
-                  <a className="secondary-button" href={`${base}/export?version=${version.versionNumber}`}><Download aria-hidden="true" size={15} /> Download CSV for version {version.versionNumber}</a>
+                  <ExportLink className="secondary-button" href={`${base}/export?version=${version.versionNumber}`}><Download aria-hidden="true" size={15} /> Download CSV for version {version.versionNumber}</ExportLink>
                 </span>
               </li>
             ))}

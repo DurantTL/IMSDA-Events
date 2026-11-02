@@ -2,8 +2,9 @@ import { withRequestContext } from "@/lib/request-context";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { requireHonorsAccess } from "@/modules/honors/member-honor-access";
 import { memberHonorApiError } from "@/modules/honors/member-honor-api-errors";
-import { honorsExportCsv, exportFileName } from "@/modules/reporting/director-exports";
+import { honorsExportCsv } from "@/modules/reporting/director-exports";
 import { auditDirectorExport, isHonorCategory, loadHonorsExport } from "@/modules/reporting/director-exports-repository";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 type RouteContext = { params: Promise<{ organizationId: string }> };
 
@@ -32,14 +33,7 @@ async function getHandler(request: Request, context: RouteContext) {
       access.mode === "EDIT" ? access.actor : access.viewer,
       access.mode === "READ",
     );
-    return new Response(honorsExportCsv({ clubName, clubYear }, rows), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-        "Content-Disposition": `attachment; filename="${exportFileName("honors", clubYear)}"`,
-      },
-    });
+    return csvDownloadResponse(honorsExportCsv({ clubName, clubYear }, rows), exportFileName({ scope: organizationId, kind: `honors-${clubYear}` }));
   } catch (error) {
     return memberHonorApiError(error, "Exporting club honors");
   }

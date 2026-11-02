@@ -5,6 +5,8 @@ import { lodgingApiError } from "@/modules/lodging/api-errors";
 import { isLodgingReportKind, lodgingReportCsv } from "@/modules/lodging/assignment-export";
 import { getRoomingReports } from "@/modules/lodging/assignment-view";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 /**
  * The rooming list and the other lodging reports as CSV (`?report=assignments|occupancy|unassigned|conflicts|closeout|keys`).
@@ -22,15 +24,7 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
       return Response.json({ error: "INVALID_LODGING_INPUT", message: "Choose assignments, occupancy, unassigned, conflicts, closeout or keys." }, { status: 400, headers: { "Cache-Control": "no-store" } });
     }
     const reports = await getRoomingReports(eventId, { canSeeSensitive });
-    const safeEventId = eventId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 100) || "event";
-    return new Response(lodgingReportCsv(requested, reports), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${safeEventId}-lodging-${requested}.csv"`,
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return csvDownloadResponse(lodgingReportCsv(requested, reports), exportFileName({ scope: await eventFileScope(eventId), kind: `lodging-${requested}` }));
   } catch (error) {
     return lodgingApiError(error, "Exporting the lodging report");
   }

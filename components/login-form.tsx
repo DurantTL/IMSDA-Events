@@ -341,7 +341,7 @@ export function LoginForm({
       <label>Password<span className="password-field"><input id="sign-in-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required defaultValue={demoCredentials?.password} {...fieldErrorProps("sign-in-password_error", fieldErrors.password)} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></span><FieldError id="sign-in-password_error">{fieldErrors.password}</FieldError></label>
       <div className="auth-form-row"><label className="checkbox-label"><input type="checkbox" name="remember" /> Keep email on this device</label>{unified ? <Link href="/account/forgot-password">Forgot password?</Link> : <Link href="/forgot-password">Forgot password?</Link>}</div>
       {unified && <p className="field-help">Team member who cannot sign in? <Link href="/forgot-password">Reset a team password</Link>.</p>}
-      <SecurityCheck config={securityCheck} action="staff-sign-in" handleRef={check} />
+      <SecurityCheck config={securityCheck} action="staff-sign-in" handleRef={check} emailCode={{ getEmail: () => email }} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button full-button" type="submit" disabled={busy}><LogIn aria-hidden="true" size={17} /> {busy ? "Signing in…" : "Sign in"}</button>
       {unified && (

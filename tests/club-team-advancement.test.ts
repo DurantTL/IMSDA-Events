@@ -385,7 +385,7 @@ describe("the Conference list", () => {
     expect(body.teams.map((entry) => entry.teamName)).toEqual(["Aces", "Cubs"]);
 
     const csv = await getRoster(new Request("https://events.imsda.test/api/events/event-1/team-results/roster?format=csv&level=CONFERENCE"), eventCtx);
-    expect(csv.headers.get("content-disposition")).toContain("event-1-team-roster-conference.csv");
+    expect(csv.headers.get("content-disposition")).toMatch(/event-1-team-roster-conference-\d{4}-\d{2}-\d{2}\.csv/);
     const text = await csv.text();
     expect(text).toContain('"Aces","Aces Club","Test SDA Church","PBE-a","Iowa","Team member","Pat Test"');
     expect(text).toContain('"Cubs"');

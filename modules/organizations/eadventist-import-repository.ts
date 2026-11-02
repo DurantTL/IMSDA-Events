@@ -16,6 +16,8 @@ import {
 } from "@/modules/organizations/eadventist-import";
 import { clampPage } from "@/lib/pagination";
 import { organizationSearchWhere } from "@/modules/organizations/search";
+import type { SortState } from "@/lib/list-sort";
+import { directoryOrderBy, type DirectorySortColumn } from "@/modules/organizations/directory-sort";
 import { OrganizationOperationError } from "@/modules/organizations/repository";
 
 /**
@@ -227,7 +229,7 @@ export async function commitEadventistImport(csv: string, actorUserId: string, c
 }
 
 export type DirectoryStatusFilter = "ALL" | "ACTIVE" | "INACTIVE" | "REVIEW";
-export type DirectoryFilters = { kind: OrganizationType | null; status: DirectoryStatusFilter; query: string; page?: number };
+export type DirectoryFilters = { kind: OrganizationType | null; status: DirectoryStatusFilter; query: string; page?: number; sort?: SortState<DirectorySortColumn> };
 
 /** Rows per page in the organization directory (#723). */
 export const DIRECTORY_PAGE_SIZE = 50;
@@ -250,7 +252,7 @@ export async function listDirectoryOrganizations(filters: DirectoryFilters) {
   const page = clampPage(filters.page ?? 1, total, DIRECTORY_PAGE_SIZE);
   const rows = await getPrisma().organization.findMany({
     where,
-    orderBy: [{ name: "asc" }, { id: "asc" }],
+    orderBy: directoryOrderBy(filters.sort),
     skip: (page - 1) * DIRECTORY_PAGE_SIZE,
     take: DIRECTORY_PAGE_SIZE,
     select: {

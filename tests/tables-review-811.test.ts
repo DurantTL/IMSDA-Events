@@ -89,8 +89,8 @@ describe("sort controls state the order they set (#811)", () => {
   it("every file with a sortable header or sort link also shows a sort-order note", () => {
     const files = [...sourceFiles(path.join(root, "app")), ...sourceFiles(path.join(root, "components"))];
     const missing = files
-      .filter((file) => !file.endsWith("list-sort.tsx") && !file.endsWith("phone-hidden-sort-link.tsx"))
-      .filter((file) => /<SortableHeader|<PhoneHiddenSortLink/.test(readFileSync(file, "utf8")))
+      .filter((file) => !file.endsWith("list-sort.tsx") && !file.endsWith("column-header.tsx") && !file.endsWith("phone-hidden-sort-link.tsx"))
+      .filter((file) => /<SortableHeader|<ColumnHeader|<PhoneHiddenSortLink/.test(readFileSync(file, "utf8")))
       .filter((file) => !readFileSync(file, "utf8").includes("<SortOrderNote"))
       .map((file) => path.relative(root, file));
     expect(missing).toEqual([]);

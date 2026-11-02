@@ -1,5 +1,7 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
+import { ListPager } from "@/components/list-pager";
 import { ExactValue, Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { ActionsMenu } from "@/components/actions-menu";
@@ -856,12 +858,18 @@ export function PeopleWorkspace({
             {/* Personal staff, pastor and volunteer links (#804); the same permission. */}
             {canEdit && <li><a href={`/people/staff-invitations?event=${encodeURIComponent(eventId)}`}><MailPlus aria-hidden="true" size={16} /> Staff invitations</a></li>}
             <li><a href={`/people/responsible-adults?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Responsible adults</a></li>
-            <li><a href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Export CSV</a></li>
+            <li><ExportLink href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink></li>
             {canEmail && <li><button disabled={selectedIds.size === 0} onClick={() => setEmailingSelection(true)} title={selectedIds.size === 0 ? "Tick registrations in the list first" : undefined} type="button"><MailPlus aria-hidden="true" size={16} /> Email selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</button></li>}
           </ActionsMenu>
         </div>
       </div>
-      <p className="result-summary">Showing {visible.length} of {registrations.length} {matchingPersonFilter ? "registrations with a matching person" : "registrations"}{pageScoped ? " on this page of the search results" : ""}</p>
+      <ListPager
+        label="Registrations shown"
+        noun={`${matchingPersonFilter ? "registrations with a matching person" : "registrations"}${pageScoped ? " on this page of the search results" : ""}`}
+        nounOne={`${matchingPersonFilter ? "registration with a matching person" : "registration"}${pageScoped ? " on this page of the search results" : ""}`}
+        announce={false}
+        slice={{ from: visible.length === 0 ? 0 : 1, to: visible.length, total: visible.length, page: 1, pageCount: 1 }}
+      />
       <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} of ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"} shown.`} />
       {orderText && <SortOrderNote>{orderText}</SortOrderNote>}
       {/* Always shown, so "Select all" is findable before anything is ticked. */}

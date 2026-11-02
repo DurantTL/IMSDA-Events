@@ -4,8 +4,9 @@ import { useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import type { PermissionDecision, PermissionStatus } from "@/modules/club-teams/permission-domain";
 import type { TeamPermissionRow } from "@/modules/club-teams/permission-repository";
+import type { StatusWord } from "@/modules/registrations/status-words";
 
-const statusText: Record<PermissionStatus, string> = { PENDING: "Pending approval", GRANTED: "Approved", DECLINED: "Declined" };
+const statusText = { PENDING: "Pending approval", GRANTED: "Confirmed", DECLINED: "Cancelled" } as const satisfies Record<PermissionStatus, StatusWord>;
 
 /**
  * Team members who are 18 or older on the age date and need the Area Coordinator's permission (#809). Pending ones come

@@ -4,18 +4,12 @@ import { clubOrderApiError } from "@/modules/club-orders/api-errors";
 import { listHelperLines, listPickList, loadOrderExportHeader } from "@/modules/club-orders/repository";
 import { requireClubOrdersAccess } from "@/modules/club-supplies/access";
 import { syncHonorOrderNeeds } from "@/modules/honors/order-source";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 type RouteContext = { params: Promise<{ organizationId: string }> };
 
-function csvResponse(body: string, filename: string) {
-  return new Response(body, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "private, no-store, max-age=0",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+function csvResponse(body: string, organizationId: string, kind: string) {
+  return csvDownloadResponse(body, exportFileName({ scope: organizationId, kind }));
 }
 
 /**
@@ -37,13 +31,13 @@ async function getHandler(request: Request, context: RouteContext) {
     }
     if (access.mode === "EDIT") await syncHonorOrderNeeds(organizationId);
     if (view === "picklist") {
-      return csvResponse(pickListCsv(await listPickList(organizationId)), "pick-list.csv");
+      return csvResponse(pickListCsv(await listPickList(organizationId)), organizationId, "pick-list");
     }
     if (view === "all") {
-      return csvResponse(orderEverythingCsv(await listHelperLines(organizationId)), "order-everything.csv");
+      return csvResponse(orderEverythingCsv(await listHelperLines(organizationId)), organizationId, "order-everything");
     }
     const [header, lines] = await Promise.all([loadOrderExportHeader(organizationId), listHelperLines(organizationId)]);
-    return csvResponse(orderListCsv(header, lines), "order-list.csv");
+    return csvResponse(orderListCsv(header, lines), organizationId, "order-list");
   } catch (error) {
     return clubOrderApiError(error, "Exporting the order list");
   }

@@ -179,7 +179,7 @@ describe("export routes", () => {
     const response = await HONORS_GET(request("?year=2026-27&category=NATURE"), ctx);
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toContain("text/csv");
-    expect(response.headers.get("Content-Disposition")).toContain("club-honors-2026-27.csv");
+    expect(response.headers.get("Content-Disposition")).toMatch(/club-1-honors-2026-27-\d{4}-\d{2}-\d{2}\.csv/);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(await response.text()).toContain("No honors recorded for the chosen filters.");
@@ -204,7 +204,7 @@ describe("export routes", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
-    expect(response.headers.get("Content-Disposition")).toMatch(/club-class-tracking-\d{4}-\d{2}\.csv/);
+    expect(response.headers.get("Content-Disposition")).toMatch(/club-1-class-tracking-\d{4}-\d{2}-\d{4}-\d{2}-\d{2}\.csv/);
     expect(await response.text()).toContain("No active roster members for this club year.");
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ report: "class-tracking", readOnly: false }) }));
   });

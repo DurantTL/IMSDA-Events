@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   getRateLimitConfiguration,
+  mergeRateLimitOutcomes,
   hashRateLimitIdentifier,
   rateLimitClientIdentityHash,
   rateLimitSubjectHash,
@@ -832,6 +833,86 @@ export async function checkAttendeeSignInCodeVerifyRateLimit(
       identifierHashes: [account],
     },
   ], configuration);
+}
+
+/**
+ * Asking for the emailed Security check code (#1480), per source and per address, per hour. Charged the same for a
+ * known and an unknown address, so the limit itself says nothing about whether an account exists. Each send retires
+ * the previous code, so an unlimited budget would also keep a real owner's code perpetually stale, and a sign-up
+ * request sends to any address a stranger types, so the per-address ceiling is also what stops mail-bombing.
+ */
+export const SECURITY_CHECK_CODE_SEND_BUDGETS = { client: 10, email: 5, windowSeconds: oneHour } as const;
+
+/**
+ * An overall ceiling on sign-up codes, whatever the source or address, per hour. A sign-up code goes to any address a
+ * stranger types, so a botnet spreading its requests across sources and addresses stays under the two budgets above;
+ * this caps the mail it can cause in total. Ordinary sign-up is tiny next to it, and the cost of reaching it is that
+ * "Email me a code instead" on the sign-up form waits for the next hour while the contact line stays on screen.
+ */
+export const SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET = { limit: 200, windowSeconds: oneHour } as const;
+
+export async function checkSecurityCheckCodeSendRateLimit(request: Request, email: string, action?: string) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const address = hashRateLimitIdentifier("security-check-code-send", email.trim().toLowerCase(), configuration);
+  const perSourceAndAddress = await evaluate([
+    {
+      policy: "security-check.code-send.client",
+      limit: SECURITY_CHECK_CODE_SEND_BUDGETS.client,
+      windowSeconds: SECURITY_CHECK_CODE_SEND_BUDGETS.windowSeconds,
+      identifierHashes: [client],
+    },
+    {
+      policy: "security-check.code-send.email",
+      limit: SECURITY_CHECK_CODE_SEND_BUDGETS.email,
+      windowSeconds: SECURITY_CHECK_CODE_SEND_BUDGETS.windowSeconds,
+      identifierHashes: [address],
+    },
+  ], configuration);
+  // The total is charged only for a request the other two allowed: every bucket in one evaluation is incremented even
+  // when another refuses, so one source hammering the route must not be able to use up the total for everyone.
+  if (!perSourceAndAddress.allowed || action !== "attendee-sign-up") return perSourceAndAddress;
+  const total = await evaluate([{
+    policy: "security-check.code-send.sign-up-total",
+    limit: SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.limit,
+    windowSeconds: SECURITY_CHECK_SIGN_UP_CODE_TOTAL_BUDGET.windowSeconds,
+    identifierHashes: [hashRateLimitIdentifier("security-check-code-send-total", action, configuration)],
+  }], configuration);
+  return mergeRateLimitOutcomes(perSourceAndAddress, total);
+}
+
+/**
+ * A public form submitted with NO Security check token because a privacy browser blocked it (#1480). The submission
+ * is allowed, but only this many times, which is far below the ordinary form budgets because there is no check
+ * behind it, only the honeypot. Per hour:
+ * - 3 per source address: one family on a blocking browser can send a registration, a recovery email and an
+ *   information form, and a bot behind one address cannot do more than that.
+ * - 2 per email address typed in the form: a person fixes a typo once; a script cannot flood one registration contact.
+ * Both are charged before the submission runs and are not refunded on failure. Raise them only with Caleb's approval.
+ */
+export const SECURITY_CHECK_FALLBACK_BUDGETS = { client: 3, email: 2, windowSeconds: oneHour } as const;
+
+export async function checkSecurityCheckFallbackRateLimit(request: Request, email?: string | null) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const rules: RuleInput[] = [
+    {
+      policy: "security-check.fallback.client",
+      limit: SECURITY_CHECK_FALLBACK_BUDGETS.client,
+      windowSeconds: SECURITY_CHECK_FALLBACK_BUDGETS.windowSeconds,
+      identifierHashes: [client],
+    },
+  ];
+  const address = email?.trim().toLowerCase();
+  if (address) {
+    rules.push({
+      policy: "security-check.fallback.email",
+      limit: SECURITY_CHECK_FALLBACK_BUDGETS.email,
+      windowSeconds: SECURITY_CHECK_FALLBACK_BUDGETS.windowSeconds,
+      identifierHashes: [hashRateLimitIdentifier("security-check-fallback", address, configuration)],
+    });
+  }
+  return evaluate(rules, configuration);
 }
 
 const oneDay = 24 * 60 * 60;

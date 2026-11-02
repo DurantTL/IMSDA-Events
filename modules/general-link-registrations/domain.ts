@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { StatusWord } from "@/modules/registrations/status-words";
 import { REGISTRATION_MANAGE_API_SENTINEL, REGISTRATION_MANAGE_LINK_SENTINEL } from "@/modules/communications/manage-link";
 import { clubFormProblem, lockedClubDirectoryFieldKeys } from "@/modules/club-registrations/domain";
 import { DIRECTORY_NOT_LISTED_VALUE, notListedCompanionKey, type RegistrationFormDefinition } from "@/modules/forms/definition";
@@ -207,6 +208,6 @@ export function staffPendingDigestNotice(input: { eventName: string; waitingCoun
 export const GENERAL_LINK_STATUS_LABEL = {
   PENDING: "Pending approval",
   CONFIRMED: "Attached to a club",
-  REJECTED: "Rejected",
+  REJECTED: "Cancelled",
   EXPIRED: "Expired",
-} as const;
+} as const satisfies Record<"PENDING" | "CONFIRMED" | "REJECTED" | "EXPIRED", StatusWord | "Attached to a club" | "Expired">;

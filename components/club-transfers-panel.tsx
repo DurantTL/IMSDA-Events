@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeftRight, Send } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TransferDate, transferEventLabel } from "@/components/transfer-format";
+import { SENDING_CLUB_NEEDS_ANSWER_LINE } from "@/modules/club-transfers/domain";
 import type { ClubTransferRecord } from "@/modules/club-transfers/repository";
 
 /**
@@ -132,6 +133,7 @@ export function ClubTransferCard({ transfer, onAction }: { transfer: ClubTransfe
         <strong translate="no">{transfer.memberName}</strong>
         <span className={`status-chip ${tone}`}>{transfer.statusLabel}</span>
       </div>
+      {transfer.canAccept && transfer.statusLabel === "Pending approval" && <p className="quiet-copy">{SENDING_CLUB_NEEDS_ANSWER_LINE}</p>}
       <p>
         {incoming ? "From " : "To "}<span translate="no">{transfer.otherClubName}</span> · requested <TransferDate iso={transfer.initiatedAt} />
         {"acknowledgeDueAt" in transfer && transfer.status === "PENDING" && <> · answer by <TransferDate iso={transfer.acknowledgeDueAt} /></>}

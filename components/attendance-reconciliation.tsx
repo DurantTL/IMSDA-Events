@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import { formatCents } from "@/modules/payments/format-cents";
 import { ClipboardCheck, Download } from "lucide-react";
 import { AcknowledgeForm, ApproveControl, CorrectionForm, PrepareControl } from "@/components/attendance-reconciliation-controls";
@@ -83,9 +84,9 @@ export function AttendanceReconciliation({
           </p>
         </div>
         <div className="page-intro-actions">
-          <a className="secondary-button" href={`/api/events/${eventId}/exports/attendance-reconciliation${exportQuery ? `?${exportQuery}` : ""}`}>
-            <Download aria-hidden="true" size={17} /> Export CSV
-          </a>
+          <ExportLink className="secondary-button" href={`/api/events/${eventId}/exports/attendance-reconciliation${exportQuery ? `?${exportQuery}` : ""}`}>
+            <Download aria-hidden="true" size={17} /> Download CSV
+          </ExportLink>
           <a className="secondary-button" href={`/finance/billing-responsibility?event=${eventId}`}>Billing responsibility</a>
           <a className="secondary-button" href={`/finance/church-owed?event=${eventId}`}>Owed by churches</a>
           <a className="secondary-button" href={`/finance/invoices?event=${eventId}`}>Invoices</a>

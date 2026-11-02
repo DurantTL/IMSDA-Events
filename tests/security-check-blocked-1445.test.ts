@@ -57,10 +57,10 @@ describe("Security check when the script is blocked", () => {
     expect(ref.current?.headers()).toEqual({});
   });
 
-  it("pressing Submit while blocked keeps the blocked message and Try again (no dead end)", async () => {
+  it("pressing Submit on a sign-in form while blocked keeps the blocked message and Try again (no dead end; #1480: a public form goes on instead)", async () => {
     const { SecurityCheck, SECURITY_CHECK_BLOCKED_TEXT } = await loadComponent();
     const ref = createRef<SecurityCheckHandle>();
-    mounted = await mount(createElement(SecurityCheck, { config: { siteKey: "synthetic-site-key" }, action: "registration", handleRef: ref }));
+    mounted = await mount(createElement(SecurityCheck, { config: { siteKey: "synthetic-site-key" }, action: "staff-sign-in", handleRef: ref }));
     await blockScript();
     let allowed = true;
     await act(async () => { allowed = ref.current?.require("Submit") ?? true; });

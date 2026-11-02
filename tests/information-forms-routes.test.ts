@@ -198,7 +198,7 @@ describe("EVENT information form routes (MANAGE_FORMS on the event)", () => {
     mocks.getCurrentSession.mockResolvedValue(systemAdmin);
     const response = await EVENT_EXPORT(request(), eventParams());
     expect(response.headers.get("Content-Type")).toContain("text/csv");
-    expect(response.headers.get("Content-Disposition")).toContain("survey-responses.csv");
+    expect(response.headers.get("Content-Disposition")).toMatch(/information-forms-survey-responses-\d{4}-\d{2}-\d{2}\.csv/);
     expect(await response.text()).toBe("\"A\"\r\n");
   });
 });

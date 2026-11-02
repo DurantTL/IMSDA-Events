@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportLink } from "@/components/export-link";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   exceptionKindLabels,
@@ -234,12 +235,12 @@ export function PlanPanel({ view, base, run, busy, canExport }: { view: Assignme
     <section className="panel" aria-labelledby="la-export">
       <h3 id="la-export">Export</h3>
       {canExport ? <ul>
-        <li><a href={`/api/events/${view.eventId}/exports/lodging-assignments?report=assignments`}>Rooming list (CSV, the file the import reads)</a></li>
-        <li><a href={`/api/events/${view.eventId}/exports/lodging-assignments?report=occupancy`}>Occupancy by night (CSV)</a></li>
-        <li><a href={`/api/events/${view.eventId}/exports/lodging-assignments?report=unassigned`}>Not placed (CSV)</a></li>
-        <li><a href={`/api/events/${view.eventId}/exports/lodging-assignments?report=conflicts`}>Conflicts (CSV)</a></li>
-        <li><a href={`/api/events/${view.eventId}/exports/lodging-assignments?report=keys`}>Key hand-off inputs (CSV)</a></li>
-        <li><a href={`/api/events/${view.eventId}/exports/lodging-assignments?report=closeout`}>Closeout exceptions (CSV)</a></li>
+        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=assignments`}>Rooming list (CSV, the file the import reads)</ExportLink></li>
+        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=occupancy`}>Occupancy by night (CSV)</ExportLink></li>
+        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=unassigned`}>Not placed (CSV)</ExportLink></li>
+        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=conflicts`}>Conflicts (CSV)</ExportLink></li>
+        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=keys`}>Key hand-off inputs (CSV)</ExportLink></li>
+        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=closeout`}>Closeout exceptions (CSV)</ExportLink></li>
       </ul> : <p>Exports need the reports permission.</p>}
       <p className="field-hint">Names appear, as on any rooming list; contact details never do. {view.canSeeSensitive ? "The two accessibility columns are included for you." : "Accessibility columns are not included."}</p>
     </section>
