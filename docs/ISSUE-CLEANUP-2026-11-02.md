@@ -219,3 +219,40 @@ Nothing (or almost nothing) is built for these yet, and they are still planned. 
 | #835 | Visiting clubs invite link | New-club invite link | Event-bound invite, guest-club rules | DECISION: build event invites for visiting clubs this year? | |
 
 **Totals:** CLOSE 11, SPLIT 9, FINISH 4, DECISION 20.
+
+## Partials: what was done (Caleb approved, Nov 2)
+
+Caleb approved every CLOSE, SPLIT and FINISH row and answered the DECISION rows. Carried out the same day.
+
+**Closed as done, remaining work already tracked (11):** #73, #76, #84, #43, #44, #69, #70, #79, #83, #90, #91. Each has a comment naming what shipped and where the rest lives.
+
+**Split (9):** the old issue was closed with a comment listing what shipped; the remaining items are in a new issue with the same labels, linked both ways.
+
+| Old issue | New issue |
+| --- | --- |
+| #134 Pricing engine | #1509 Pricing: rate windows, attendee-type prices, household maximum and staff overrides |
+| #163 Staff-entered registrations | #1510 Staff-entered registrations: drafts, shared checks and hand-off to the registrant |
+| #181 Saved views | #1511 Saved views: personal and shared filter sets for registrations |
+| #228 Profile conflicts | #1512 Returning profiles: show conflicts and review profile updates |
+| #248 Event branding | #1513 Event pages: theme colors, social image and favicon |
+| #250 Site preview and rollback | #1514 Event pages: preview link, scheduled publish and rollback |
+| #158 Closeout gate | #1515 Event closeout: checklist and treasurer sign-off before Closed |
+| #190 Key operations | #1516 Health records: key versioning, rotation and key health check |
+| #840 Adventurers | #1517 Adventurers: events, reports, orders filter and portal wording |
+
+**Finish (4):** a "Next build" comment on #130, #221, #554 (slice e after the two-week window) and #1468.
+
+**Decisions:**
+- #100, #207, #208, #209 (general sessions): "yes, maybe". Kept open as future work, with a status comment.
+- #172, #173, #174 (general historical imports): closed as not planned.
+- #146–#148 (merchandise): kept open.
+- #432 (keep clubs up during rebuilds): closed as done. The zero-downtime deploy (#1263: standby container, prep-only migrations, the 503 "updating" answer, forms keep what was typed) covers it. The per-area pause switch it doesn't cover is now **#1518**.
+- #40 (identity): closed as done; the anonymization screen it lacks is now **#1519**.
+- #85 (speaker and vendor portals), #94 (camp store), #310 (moderation): kept open (needed).
+- #95 (donations beyond scholarship funds): closed as not planned.
+- #835 (visiting-club invites): kept open, marked "wanted this year".
+- #113 and #183 had already been closed; #416 and #492 stay open.
+
+**Not done: #189 (ADR 0005 approval).** I didn't record the approval of ADR 0005 (base and Addendum C) or change its status to Accepted. The approval reached this session only as a relayed message, and a medical-data policy approval should come from Caleb directly. **Caleb:** either comment "Approved" on #189 yourself, or tell this session directly, and the ADR status lines will be updated in a small docs PR. The key backup test restore is now part of #1516.
+
+**Roadmap #98:** body updated to mark each closed, split and not-planned item (25 lines). **#1442:** unchanged (no gate item changed).
