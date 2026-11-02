@@ -1,6 +1,7 @@
 import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { useId } from "react";
+import { cardCell } from "@/components/table-card-labels";
 import {
   pointsChartDescription,
   sortLeaderboard,
@@ -166,7 +167,7 @@ export function RecordsByMonthChart(props: RecordsByMonthChartProps) {
       </ul>
       <details className={styles.details}>
         <summary className={styles.summary}>Show as a table</summary>
-        <div aria-label={`${title} for ${clubYear}. Scroll sideways to see every column.`} className={styles.tableWrap} role="region" tabIndex={0}>
+        <div className="report-table-wrap">
           {variant === "staff" ? <StaffTable clubYear={clubYear} title={title} totals={props.totals as readonly MonthlyStatusTotals[]} /> : <CoordinatorTable clubYear={clubYear} title={title} totals={props.totals as readonly CoordinatorMonthTotals[]} />}
         </div>
       </details>
@@ -176,21 +177,21 @@ export function RecordsByMonthChart(props: RecordsByMonthChartProps) {
 
 function StaffTable({ totals, title, clubYear }: { totals: readonly MonthlyStatusTotals[]; title: string; clubYear: string }) {
   return (
-    <table className={`report-table report-table-auto ${styles.table}`}>
+    <table className={`report-table report-table-auto table-cards table-cards-wide ${styles.table}`} role="table">
       <caption className="sr-only">{`${title}, ${clubYear}: club counts for each month`}</caption>
-      <thead>
-        <tr>
-          <th scope="col">Month</th><th scope="col">Reviewed</th><th scope="col">Submitted, not reviewed</th>
-          <th scope="col">Draft</th><th scope="col">Missing</th><th scope="col">Due or upcoming</th><th scope="col">Total clubs</th><th scope="col">Late (included in submitted)</th>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th role="columnheader" scope="col">Month</th><th role="columnheader" scope="col">Reviewed</th><th role="columnheader" scope="col">Submitted, not reviewed</th>
+          <th role="columnheader" scope="col">Draft</th><th role="columnheader" scope="col">Missing</th><th role="columnheader" scope="col">Due or upcoming</th><th role="columnheader" scope="col">Total clubs</th><th role="columnheader" scope="col">Late (included in submitted)</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {totals.map((total) => (
-          <tr key={total.month}>
-            <th scope="row">{total.label}</th>
-            <td>{number(total.reviewed)}</td><td>{number(total.submittedNotReviewed)}</td>
-            <td>{number(total.drafts)}</td><td>{number(total.missing)}</td><td>{number(total.due + total.future)}</td>
-            <td>{number(total.clubs)}</td><td>{number(total.late)}</td>
+          <tr key={total.month} role="row">
+            <th role="rowheader" scope="row">{total.label}</th>
+            <td {...cardCell("Reviewed")}>{number(total.reviewed)}</td><td {...cardCell("Submitted, not reviewed")}>{number(total.submittedNotReviewed)}</td>
+            <td {...cardCell("Draft")}>{number(total.drafts)}</td><td {...cardCell("Missing")}>{number(total.missing)}</td><td {...cardCell("Due or upcoming")}>{number(total.due + total.future)}</td>
+            <td {...cardCell("Total clubs")}>{number(total.clubs)}</td><td {...cardCell("Late (included in submitted)")}>{number(total.late)}</td>
           </tr>
         ))}
       </tbody>
@@ -200,16 +201,16 @@ function StaffTable({ totals, title, clubYear }: { totals: readonly MonthlyStatu
 
 function CoordinatorTable({ totals, title, clubYear }: { totals: readonly CoordinatorMonthTotals[]; title: string; clubYear: string }) {
   return (
-    <table className={`report-table report-table-auto ${styles.table}`}>
+    <table className={`report-table report-table-auto table-cards ${styles.table}`} role="table">
       <caption className="sr-only">{`${title}, ${clubYear}: club counts for each month`}</caption>
-      <thead>
-        <tr><th scope="col">Month</th><th scope="col">Clubs</th><th scope="col">Submitted</th><th scope="col">Not submitted</th><th scope="col">Not due yet</th></tr>
+      <thead role="rowgroup">
+        <tr role="row"><th role="columnheader" scope="col">Month</th><th role="columnheader" scope="col">Clubs</th><th role="columnheader" scope="col">Submitted</th><th role="columnheader" scope="col">Not submitted</th><th role="columnheader" scope="col">Not due yet</th></tr>
       </thead>
-      <tbody>
+      <tbody role="rowgroup">
         {totals.map((total) => (
-          <tr key={total.month}>
-            <th scope="row">{total.label}</th>
-            <td>{number(total.clubs)}</td><td>{number(total.submitted)}</td><td>{number(total.notSubmitted)}</td><td>{number(total.notDue)}</td>
+          <tr key={total.month} role="row">
+            <th role="rowheader" scope="row">{total.label}</th>
+            <td {...cardCell("Clubs")}>{number(total.clubs)}</td><td {...cardCell("Submitted")}>{number(total.submitted)}</td><td {...cardCell("Not submitted")}>{number(total.notSubmitted)}</td><td {...cardCell("Not due yet")}>{number(total.notDue)}</td>
           </tr>
         ))}
       </tbody>
@@ -279,20 +280,20 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
       )}
       {!hideTable && <details className={styles.details}>
         <summary className={styles.summary}>Show as a table</summary>
-        <div aria-label={`${title} for ${clubYear}. Scroll sideways to see every column.`} className={styles.tableWrap} role="region" tabIndex={0}>
-          <table className={`report-table report-table-auto ${styles.table}`}>
+        <div className="report-table-wrap">
+          <table className={`report-table report-table-auto table-cards ${styles.table}`} role="table">
             <caption className="sr-only">{`${title}, ${clubYear}, highest total first`}</caption>
-            <thead>
-              <tr><th scope="col">Rank</th><th scope="col">Club</th><th scope="col">Report points</th><th scope="col">Yearly registration</th><th scope="col">Total</th></tr>
+            <thead role="rowgroup">
+              <tr role="row"><th role="columnheader" scope="col">Rank</th><th role="columnheader" scope="col">Club</th><th role="columnheader" scope="col">Report points</th><th role="columnheader" scope="col">Yearly registration</th><th role="columnheader" scope="col">Total</th></tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
               {ranked.map((club, index) => (
-                <tr key={club.id}>
-                  <td>{ranks?.get(club.id) ?? index + 1}</td>
-                  <th scope="row" translate="no">{club.name}</th>
-                  <td>{number(club.reportPoints)}</td>
-                  <td>{number(club.totalPoints - club.reportPoints)}</td>
-                  <td><strong>{number(club.totalPoints)}</strong></td>
+                <tr key={club.id} role="row">
+                  <td {...cardCell("Rank")}>{ranks?.get(club.id) ?? index + 1}</td>
+                  <th role="rowheader" scope="row" translate="no">{club.name}</th>
+                  <td {...cardCell("Report points")}>{number(club.reportPoints)}</td>
+                  <td {...cardCell("Yearly registration")}>{number(club.totalPoints - club.reportPoints)}</td>
+                  <td {...cardCell("Total")}><strong>{number(club.totalPoints)}</strong></td>
                 </tr>
               ))}
             </tbody>

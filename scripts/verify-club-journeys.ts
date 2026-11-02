@@ -60,50 +60,7 @@ import { AREA_ROLLUP_WORDS, Recorder, checkConfirmDialog, checkDialogBehavior, c
 loadEnvConfig(process.cwd());
 
 /** Failures that are the site's fault (found by these journeys). The label is what the failing check prints. */
-export const KNOWN_BUGS: KnownBug[] = [
-  {
-    id: "monthly-record-unsaved",
-    description: "Monthly Records: the Monthly Record form (components/club-report-form.tsx) never uses useUnsavedChangesGuard, so typing in it and then leaving the page (address bar, link, Back) gives no warning (B6).",
-    checks: [{ label: "Monthly Record form | B6 | monthly record: leaving with unsaved changes warns", detail: "without any warning" }],
-  },
-  {
-    id: "year-end-unsaved",
-    description: "Year-End Report: components/club-year-end-report-form.tsx never uses useUnsavedChangesGuard, so editing a number and clicking another page leaves with no warning (B6).",
-    checks: [{ label: "Year-End Report | B6 | year-end report: leaving with unsaved changes warns", detail: "without any warning" }],
-  },
-  {
-    id: "orders-remove-no-confirm",
-    description: "Orders: \"Remove from the list\" (components/club-order-workspace.tsx removeLine) removes the line at once, with no confirmation and no Undo (B9).",
-    checks: [{ label: "Orders (with a line) | B9 | remove an order line: asks for confirmation in the shared dialog", detail: "nothing asked before the action" }],
-  },
-  {
-    id: "club-events-registered-word",
-    description: "Club events: a submitted club registration shows the chip \"Registered · N going\" (components/club-event-list.tsx statusFor) and the confirmation card's status says \"Registered\", but \"Registered\" is only approved for the area coordinator roll-up; the registration's status word is \"Submitted\" (B12, #1479).",
-    checks: [
-      { label: "Club events (registered) | B12 | status chip words", detail: "Registered · 2 going" },
-      { label: "Club event: registered | B12 | the registration's status shows an approved word", detail: "\"Registered\"" },
-    ],
-  },
-  {
-    id: "records-chart-table-scrolls-sideways",
-    description: "Coordinator Monthly Records on a phone: the \"Records by month\" table (components/club-report-charts.tsx tableWrap) scrolls sideways (374px of content in a 330px box at 390px wide) instead of turning into cards (B3).",
-    checks: [{ label: "Coordinator: Monthly Records | B3 | tables do not scroll sideways", detail: "tableWrap" }],
-    only: "phone",
-  },
-  {
-    id: "club-profile-unsaved",
-    description: "Club settings: the club profile form (components/club-profile-form.tsx) never uses useUnsavedChangesGuard, so editing it and clicking another page leaves with no warning (B6).",
-    checks: [{ label: "Club settings | B6 | club profile form: leaving with unsaved changes warns", detail: "without any warning" }],
-  },
-  {
-    id: "club-form-native-required",
-    description: "Club forms: components/club-form-fill-in.tsx puts a native `required` on its fields and no noValidate, so submitting with an answer missing shows only the browser's own tooltip, never the shared summary at the top and a message by the field (B7).",
-    checks: [
-      { label: "Fill in a club form | B7 | required answers missing: error at the top", detail: "showed no error at all" },
-      { label: "Fill in a club form | B7 | required answers missing: error by the field", detail: "showed no error at all" },
-    ],
-  },
-];
+export const KNOWN_BUGS: KnownBug[] = [];
 
 type Viewport = { name: "desktop" | "phone"; width: number };
 const viewports: Viewport[] = [{ name: "desktop", width: 1280 }, { name: "phone", width: 390 }];

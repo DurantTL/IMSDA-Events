@@ -97,7 +97,7 @@ describe("staff points domain (#1314)", () => {
     const bravo = clubs.find((c) => c.id === "b")!;
     expect(bravo.reportPoints).toBe(200);
     expect(bravo.totalPoints - bravo.reportPoints).toBe(1500);
-    expect(html).toContain("<td>200</td><td>1,500</td><td><strong>1,700</strong></td>");
+    expect(html).toMatch(/<td role="cell" data-label="Report points">200<\/td><td role="cell" data-label="Yearly registration"[^>]*>1,500<\/td><td role="cell" data-label="Total"><strong>1,700<\/strong><\/td>/);
   });
 });
 
@@ -120,7 +120,7 @@ describe("staff points page (#1314)", () => {
     expect(html).toContain("Show all 24 clubs");
     expect(html).toContain("year=2026-27&amp;view=points&amp;all=1#points");
     expect(html).toContain("Show as a table");
-    expect(html.match(/<tr>/g)!.length).toBe(25);
+    expect(html.match(/<tr role="row"/g)!.length).toBe(25);
     expect(html).toContain('name="q"');
   });
 

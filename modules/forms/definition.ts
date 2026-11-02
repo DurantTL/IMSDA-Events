@@ -1645,6 +1645,11 @@ function hasValue(value: unknown) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+/** Whether an answer counts as given for a required field (the server's rule, so a form can check the same thing before sending). */
+export function answerIsGiven(value: unknown) {
+  return hasValue(value);
+}
+
 type FieldCondition = NonNullable<RegistrationFormField["conditional"]>;
 
 /** One field condition (field / operator / value) against a set of answers; shared with form notification routing (#1081). */

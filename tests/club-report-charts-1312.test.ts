@@ -116,7 +116,8 @@ describe("club report chart components (#1312)", () => {
     expect(html).toContain("Jan: 0 reviewed, 1 submitted, not reviewed, 2 not submitted, 0 due or upcoming");
     expect(html).toContain("Dec: 0 reviewed, 0 submitted, not reviewed, 3 not submitted, 0 due or upcoming");
     // The table row for August adds up: 0 + 0 + 0 + 0 + 3 = 3 clubs, and each row sums to its Total clubs cell.
-    expect(html).toMatch(/<th scope="row">August 2026<\/th><td>0<\/td><td>0<\/td><td>0<\/td><td>0<\/td><td>3<\/td><td>3<\/td>/);
+    const augustCells = [...html.matchAll(/<th role="rowheader" scope="row">August 2026<\/th>((?:<td [^>]*>[^<]*<\/td>)+)/g)][0]![1]!;
+    expect([...augustCells.matchAll(/<td [^>]*>([^<]*)<\/td>/g)].map((cell) => cell[1])).toEqual(["0", "0", "0", "0", "3", "3", "0"]);
     for (const t of staffTotals) {
       expect(t.reviewed + t.submittedNotReviewed + t.drafts + t.missing + t.due + t.future).toBe(t.clubs);
     }

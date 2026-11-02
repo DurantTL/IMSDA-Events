@@ -7,6 +7,7 @@ import {
   registrationMoneyStatus,
   registrationStatusWord,
   registrationStatusWords,
+  clubRegistrationWord,
   waitlistPositionDetail,
   waitlistStatusText,
 } from "@/modules/registrations/status-words";
@@ -203,8 +204,35 @@ const banned: Array<{ name: string; pattern: RegExp; only?: RegExp }> = [
   { name: "Not sent (status label)", pattern: /PENDING: "Not sent"/ },
   { name: "Paid as a standalone status label", pattern: /return "Paid";|label: "Paid"[,\s}]|<option value="PAID">Paid<\/option>/, only: /^(app\/\(workspace\)\/overview|components\/people-workspace|modules\/registrations|modules\/attendee-accounts|modules\/public-access)/ },
   { name: "registration status lowercased", pattern: /(?:registration|reg|selected)\.status\.toLowerCase\(\)|[rR]egistrationStatus\.toLowerCase\(\)|(?:row|line)\.status\.toLowerCase\(\)/, only: /^(components\/(finance-workspace|people-workspace|church-amounts-owed|billing-responsibility|church-code-invoices|cancellation-requests-workspace)|app\/\(public\)\/account|modules\/(cancellation|registrations|attendee-accounts))/ },
+  // "Registered" is approved only for the area coordinator roll-up (B12). A club's own registration says its stored status
+  // ("Submitted", "Confirmed"...), through clubRegistrationWord (#1501: the events list, the overview and the confirmation card said "Registered").
+  { name: "Registered as a club registration status", pattern: /`Registered ·|(?:label|word|status)\s*[:=]\s*"Registered[ ·"]|(?:eyebrow|status-chip[^"]*)">\s*Registered\s*</, only: /^(components\/club-|app\/\(public\)\/account\/\(portal\)\/clubs|modules\/club-)/ },
   { name: "old waitlist formats", pattern: /Waitlisted at \$\{|Waitlisted · position|"On the waitlist"|Waitlisted \(#/ },
 ];
+
+describe("club registration word (#1501, B12)", () => {
+  it("is the stored status\u2019s own word, never Registered and never Pending payment", () => {
+    for (const status of Object.values(RegistrationStatus)) {
+      expect(eight).toContain(clubRegistrationWord(status));
+      expect(clubRegistrationWord(status)).toBe(registrationStatusWords[status]);
+    }
+    expect(clubRegistrationWord("SUBMITTED")).toBe("Submitted");
+    expect(clubRegistrationWord("CONFIRMED")).toBe("Confirmed");
+  });
+
+  it("the rule above would have caught the old chip, overview line and card eyebrow", () => {
+    const rule = banned.find((entry) => entry.name === "Registered as a club registration status")!;
+    expect(rule.pattern.test("label: `Registered · ${event.registration.attendeeCount} going` }")).toBe(true);
+    expect(rule.pattern.test("`Registered · ${event.registration.attendeeCount} going · ${code}`")).toBe(true);
+    expect(rule.pattern.test('<p className="public-registration-eyebrow">Registered</p>')).toBe(true);
+    expect(rule.pattern.test('<p className="public-registration-eyebrow">{clubRegistrationWord(status)}</p>')).toBe(false);
+  });
+
+  it("the events list chip says the status word with the count", () => {
+    const source = readFileSync(join(root, "components/club-event-list.tsx"), "utf8");
+    expect(source).toContain("clubRegistrationWord(event.registration.status)");
+  });
+});
 
 describe("status word source scan (#1453)", () => {
   for (const rule of banned) {

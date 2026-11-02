@@ -100,6 +100,79 @@ describe("deletes always confirm (#1448, B9)", () => {
   });
 });
 
+/**
+ * The delete scan above only sees a DELETE request, so it missed an order line that is removed with a PUT of quantity 0
+ * (#1501, "Remove from the list" took the line off at once). This one looks at the handler by its name: a client function
+ * called remove* or delete* that sends something must itself ask first (askConfirm / confirm / ask), unless the asking
+ * happens in the component that calls it (listed here with where).
+ */
+const sendsAnything = /fetch\(|\bsend\(|\bpost\(|setQuantity\(|\bact\(|\bsubmitJson\(/;
+const asksFirst = /\b(?:askConfirm|confirm|ask|requestConfirm)\(/;
+
+/** The text of the function that starts at `start`: from its first `{` that opens the body to the matching `}` (by depth). */
+export function handlerBody(code: string, start: number) {
+  const open = code.indexOf("{", code.indexOf(")", start));
+  if (open === -1) return "";
+  let depth = 0;
+  for (let index = open; index < code.length; index += 1) {
+    if (code[index] === "{") depth += 1;
+    else if (code[index] === "}" && --depth === 0) return code.slice(start, index + 1);
+  }
+  return code.slice(start);
+}
+
+export function unconfirmedRemoveHandlers(rel: string, code: string) {
+  const found: string[] = [];
+  for (const match of code.matchAll(/(?:function|const)\s+((?:remove|delete)[A-Z]\w*)\s*(?:=|\()/g)) {
+    const body = handlerBody(code, match.index);
+    if (sendsAnything.test(body) && !asksFirst.test(body)) found.push(`${rel}:${match[1]}`);
+  }
+  return found;
+}
+
+/** "file:handler" -> where the question is asked instead. */
+const removeHandlerAllowlist: Record<string, string> = {
+  "components/club-order-workspace.tsx:removeUniforms": "The uniform section asks in the shared dialog before it calls onRemove (components/club-uniform-section.tsx).",
+  "components/registration-notes-tags-panel.tsx:removeTag": "Removes one tag chip; re-adding the tag restores it, no data is lost.",
+};
+
+describe("remove and delete handlers ask first (#1501, B9)", () => {
+  it("every client remove*/delete* handler that sends something asks, or is allow-listed with where", () => {
+    const offenders: string[] = [];
+    for (const file of files) {
+      if (!/^\s*["']use client["']/.test(file.text)) continue;
+      offenders.push(...unconfirmedRemoveHandlers(file.rel, withoutComments(file.text)));
+    }
+    expect(offenders.filter((entry) => !(entry in removeHandlerAllowlist))).toEqual([]);
+  });
+
+  it("allowlist entries are still real: the handler exists and still does not ask itself", () => {
+    const seen = new Set<string>();
+    for (const file of files) {
+      if (/^\s*["']use client["']/.test(file.text)) for (const entry of unconfirmedRemoveHandlers(file.rel, withoutComments(file.text))) seen.add(entry);
+    }
+    for (const entry of Object.keys(removeHandlerAllowlist)) expect(seen.has(entry), `${entry} no longer needs its allow-list entry`).toBe(true);
+  });
+
+  it("reads a long handler to its closing brace, not a fixed length", () => {
+    const filler = "    const x = 1;\n".repeat(80);
+    const long = `async function removeThing(id: string) {\n${filler}    if (!(await askConfirm({ title: "t" }))) return;\n    await send("/x", "PUT", {});\n  }\n`;
+    expect(unconfirmedRemoveHandlers("components/a.tsx", long)).toEqual([]);
+  });
+
+  it("would have caught the order line that was removed at once", () => {
+    const before = `function removeLine(line: HelperLine) {\n    return setQuantity(lineKey(line), line.computedNeeded > 0 ? 0 : null, \`Took off the list.\`);\n  }\n`;
+    expect(unconfirmedRemoveHandlers("components/club-order-workspace.tsx", before)).toEqual(["components/club-order-workspace.tsx:removeLine"]);
+  });
+
+  it("Orders: removing a line asks in the shared dialog and offers Undo through the existing quantity request", () => {
+    const code = files.find((file) => file.rel === "components/club-order-workspace.tsx")!.text;
+    expect(code).toContain("await askConfirm({");
+    expect(code).toMatch(/function undoRemoveLine\(\)[\s\S]*setQuantity\(key, quantity,/);
+    expect(code).toContain("undo={undoRemove ?");
+  });
+});
+
 describe("lifecycle dialog keeps its opener (#1448)", () => {
   it("the registration action row stays rendered while the lifecycle dialog is open, so focus can return to its button", () => {
     const people = files.find((file) => file.rel === "components/people-workspace.tsx")!.text;

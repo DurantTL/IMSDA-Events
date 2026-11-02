@@ -35,6 +35,9 @@ export function DateInput({
   required = false,
   locked = false,
   onChange,
+  fieldId,
+  invalid,
+  describedBy,
 }: {
   /** The visible label content; it labels the input only, so the button's name stays out of the input's. */
   label: ReactNode;
@@ -47,9 +50,15 @@ export function DateInput({
   required?: boolean;
   locked?: boolean;
   onChange: (value: string) => void;
+  /** The control's id, so an error summary can link to it. */
+  fieldId?: string;
+  /** Marks the control invalid, with `describedBy` pointing at its message. */
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const id = useId();
+  const generatedId = useId();
+  const id = fieldId ?? generatedId;
   const guidanceId = `${id}-guidance`;
   // A partly typed date (month and day only) leaves `value` empty but is not empty to the person typing:
   // keep its digits visible instead of hiding them under the hint (#733).
@@ -80,7 +89,8 @@ export function DateInput({
       <span className={`club-form-date${value || partial ? "" : " is-empty"}${locked ? " is-locked" : ""}`}>
         <input
           id={id}
-          aria-describedby={guidanceId}
+          aria-describedby={[guidanceId, describedBy].filter(Boolean).join(" ")}
+          aria-invalid={invalid ? true : undefined}
           max={bounds?.max}
           min={bounds?.min}
           onBlur={syncPartial}

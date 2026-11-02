@@ -5,6 +5,7 @@ import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
 import { ClubYearTiles } from "@/components/club-year-tiles";
 import { clubComplianceReminderCounts, clubRosterComplianceStatuses } from "@/modules/background-checks/repository";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
+import { clubRegistrationWord } from "@/modules/registrations/status-words";
 import { listClubEvents } from "@/modules/club-registrations/repository";
 import { monthlyReportProgress, reportMonthLabel, reportableMonths, yearToDate } from "@/modules/club-reports/domain";
 import { getClubReportYear } from "@/modules/club-reports/repository";
@@ -191,7 +192,7 @@ export async function ClubOverview({
                     {event.multipleTeams && event.teams.length > 0
                       ? `${event.teams.length} ${event.teams.length === 1 ? "team" : "teams"} registered · ${event.teams.reduce((sum, team) => sum + team.attendeeCount, 0)} going`
                       : event.registration
-                      ? `Registered · ${event.registration.attendeeCount} going · ${event.registration.confirmationCode}`
+                      ? `${clubRegistrationWord(event.registration.status)} · ${event.registration.attendeeCount} going · ${event.registration.confirmationCode}`
                       : event.draft
                         ? `Started, not submitted · ${event.draft.selectedCount} picked`
                         : `Not registered${event.registrationClosesOn ? ` · closes ${formatCalendarDate(event.registrationClosesOn)}` : ""}`}

@@ -15,6 +15,7 @@ import {
 } from "@/modules/club-reports/year-end-domain";
 import type { YearEndReportRecord } from "@/modules/club-reports/year-end-repository";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type Contact = {
   contactName: string;
@@ -112,6 +113,10 @@ export function ClubYearEndReportForm({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const locked = readOnly || current === "SUBMITTED";
+  // Dirty (B6, #1452) is any typed number or contact detail that differs from what was last saved.
+  const snapshot = JSON.stringify({ values, contact });
+  const [savedSnapshot, setSavedSnapshot] = useState(snapshot);
+  useUnsavedChangesGuard(!locked && snapshot !== savedSnapshot, "You have unsaved changes to this report. Leave this page and discard them?");
 
   const totals = useMemo(
     // A blank pre-filled field counts as its pre-filled number, exactly as the server resolves it.
@@ -162,6 +167,7 @@ export function ClubYearEndReportForm({
         contactCellPhone: result.report.contactCellPhone,
       };
       setContact((now) => ({ ...now, ...savedPhones }));
+      setSavedSnapshot(JSON.stringify({ values, contact: { ...contact, ...savedPhones } }));
       setSavedContact((now) => ({ ...now, ...savedPhones }));
       setResolved(result.report.resolved);
       setCurrent(result.report.status);

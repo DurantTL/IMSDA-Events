@@ -84,7 +84,6 @@ const allowList: Record<string, { tables: number; reason: string }> = {
   "components/club-form-submission-view.tsx": { tables: 1, reason: fits },
   "components/club-forms-lists.tsx": { tables: 2, reason: fits },
   "components/club-import-workspace.tsx": { tables: 2, reason: fits },
-  "components/club-report-charts.tsx": { tables: 3, reason: fits },
   "components/club-screen-tables.tsx": { tables: 2, reason: fits },
   "components/club-supply-catalog-workspace.tsx": { tables: 1, reason: fits },
   "components/communications-workspace.tsx": { tables: 2, reason: fits },
@@ -164,6 +163,33 @@ describe("every table is the shared card pattern or is allow-listed (rule B3, #1
     expect(/role="rowheader"|scope="row"/.test(table!.body)).toBe(false);
     const fixed = tablesIn(readFileSync(path.join(root, "components/tag-configuration-workspace.tsx"), "utf8"))[0]!;
     expect(/role="rowheader"[^>]*scope="row"|scope="row"[^>]*role="rowheader"/.test(fixed.body)).toBe(true);
+  });
+
+  // The "fits" reason is only true while nothing scrolls it. components/club-report-charts.tsx sat on the list with
+  // "fits" while its tables were wrapped in a "Scroll sideways" region and overflowed at 390px (#1501), so the count above was
+  // never the problem: the wrapper is. A table inside a sideways-scroll region is not "fits"; it is a bug unless printed.
+  it("no allow-listed table sits in a region that scrolls sideways", () => {
+    const offenders: string[] = [];
+    for (const file of Object.keys(allowList)) {
+      if (allowList[file]!.reason === printed) continue;
+      const source = readFileSync(path.join(root, file), "utf8");
+      if (/Scroll sideways|role="region"[^>]*tabIndex|tabIndex=\{0\}[^>]*role="region"/.test(source)) offenders.push(file);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("would have caught the Records by month table: a sideways region around a table that was allow-listed as fitting", () => {
+    const before = '<div aria-label={`${title} for ${clubYear}. Scroll sideways to see every column.`} className={styles.tableWrap} role="region" tabIndex={0}><table className={`report-table report-table-auto ${styles.table}`}>';
+    expect(cardsTable(tablesIn(before)[0]!.tag)).toBe(false);
+    expect(/Scroll sideways|role="region"[^>]*tabIndex/.test(before)).toBe(true);
+  });
+
+  it("the club report charts are table-cards in a table-box wrap, with no sideways region", () => {
+    const source = readFileSync(path.join(root, "components/club-report-charts.tsx"), "utf8");
+    expect(tablesIn(source)).toHaveLength(3);
+    for (const table of tablesIn(source)) expect(cardsTable(table.tag)).toBe(true);
+    expect(source).not.toMatch(/Scroll sideways|tableWrap/);
+    expect(source).toContain('<div className="report-table-wrap">');
   });
 
   it("never lets a table scroll with a scroll cue", () => {

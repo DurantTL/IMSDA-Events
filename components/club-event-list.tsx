@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ClubSetupHelp } from "@/components/role-setup-help";
 import { ArrowRight, CalendarDays } from "lucide-react";
 import type { ClubEventSummary } from "@/modules/club-registrations/repository";
+import { clubRegistrationWord } from "@/modules/registrations/status-words";
 
 function formatDate(value: string, timeZone: string) {
   return new Date(value).toLocaleDateString("en-US", { timeZone, month: "short", day: "numeric", year: "numeric" });
@@ -16,7 +17,7 @@ function statusFor(event: ClubEventSummary) {
   if (event.multipleTeams && event.drafts.length > 0 && event.phase === "OPEN") {
     return { tone: "purple", label: `${event.drafts.length === 1 ? "Draft saved" : `${event.drafts.length} drafts saved`}` };
   }
-  if (event.registration) return { tone: "green", label: `Registered · ${event.registration.attendeeCount} going` };
+  if (event.registration) return { tone: "green", label: `${clubRegistrationWord(event.registration.status)} · ${event.registration.attendeeCount} going` };
   if (!event.available) return { tone: "gold", label: "Not open for clubs yet" };
   if (event.phase === "UPCOMING") return { tone: "purple", label: "Registration opens soon" };
   if (event.phase === "CLOSED") return { tone: "coral", label: "Registration closed" };

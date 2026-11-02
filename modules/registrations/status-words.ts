@@ -50,6 +50,14 @@ export function registrationStatusWord(input: RegistrationStatusWordInput): Stat
   return registrationStatusWords[input.status];
 }
 
+/**
+ * The word for a club's event registration (#1453, B12): its stored status, never "Registered" (that word is only the
+ * area coordinator roll-up). A club is billed through its church, so it is never "Pending payment".
+ */
+export function clubRegistrationWord(status: string): string {
+  return registrationStatusWordOrRaw(status);
+}
+
 /** The word for a stored status string, or the raw text when it is not a registration status. */
 export function registrationStatusWordOrRaw(status: string): string {
   return status in registrationStatusWords ? registrationStatusWords[status as RegistrationStatus] : status;
