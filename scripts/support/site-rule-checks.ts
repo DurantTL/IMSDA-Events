@@ -34,8 +34,12 @@ import type { Page } from "./browser-journeys";
 
 export type Outcome = "pass" | "fail" | "n/a";
 export type RuleResult = { viewport: string; page: string; rule: string; what: string; outcome: Outcome; detail: string; known?: string };
-/** `checks`: each failing check the bug explains, by its exact label and a substring its failure detail must contain. */
-export type KnownBug = { id: string; description: string; checks: Array<{ label: string; detail: string }>; only?: string };
+/**
+ * `checks`: each failing check the bug explains, by its exact label and either a substring its failure detail must contain, or (for
+ * a check that can list several offenders) `offenders`: the failure matches only when EVERY offender it lists is one of these, so a
+ * new offender can never hide behind a known one.
+ */
+export type KnownBug = { id: string; description: string; checks: Array<{ label: string; detail?: string; offenders?: string[] }>; only?: string };
 
 export const APPROVED_STATUS_WORDS = ["Draft", "Submitted", "Pending payment", "Pending approval", "Confirmed", "Waitlisted", "Cancelled", "Refunded"];
 const OWN_MEANING_WORDS = ["Expired", "Used", "Attached to a club", "Declined", "Completed", "Queued", "Processing", "Captured", "Sent", "Failed", "Suppressed"];
@@ -66,12 +70,15 @@ export class Recorder {
     return `${page} | ${rule} | ${what}`;
   }
 
-  record(page: string, rule: string, what: string, outcome: Outcome, detail: string) {
+  record(page: string, rule: string, what: string, outcome: Outcome, detail: string, offenders?: string[]) {
     const label = Recorder.label(page, rule, what);
     const named = this.knownBugs.find((bug) => bug.checks.some((check) => check.label === label) && (!bug.only || bug.only === this.viewport));
     // A failure is the known one only when its detail also says what the entry expects; the same check failing for
     // another reason is a new, real failure.
-    const known = named && (outcome === "pass" || named.checks.some((check) => check.label === label && detail.includes(check.detail))) ? named : undefined;
+    const explains = (check: KnownBug["checks"][number]) => check.label === label && (check.offenders
+      ? Boolean(offenders && offenders.length > 0 && offenders.every((offender) => check.offenders!.includes(offender)))
+      : detail.includes(check.detail ?? "\u0000"));
+    const known = named && (outcome === "pass" || named.checks.some(explains)) ? named : undefined;
     const result: RuleResult = { viewport: this.viewport, page, rule, what, outcome, detail };
     if (known) {
       result.known = known.id;
@@ -667,7 +674,8 @@ async function checkOneSearchFieldLook(page: Page, rec: Recorder, name: string, 
   if (!shown) rec.record(name, "L1", "the clear button is 44px", "n/a", "this search field has no clear button after typing (the rule sizes the buttons that exist)");
   else {
     const box = await clear.boundingBox();
-    rec.record(name, "L1", "the clear button is 44px", box && box.width >= 43.5 && box.height >= 43.5 ? "pass" : "fail", `clear button is ${box ? `${Math.round(box.width)}x${Math.round(box.height)}` : "not measurable"}px`);
+    const size = box ? `${Math.round(box.width)}x${Math.round(box.height)}` : "not measurable";
+    rec.record(name, "L1", "the clear button is 44px", box && box.width >= 43.5 && box.height >= 43.5 ? "pass" : "fail", `clear button is ${size}px`, [size]);
   }
   await input.fill("");
 }
@@ -732,11 +740,11 @@ export async function checkChipsAndBadges(page: Page, rec: Recorder, name: strin
     return { own: [...new Set(own)], counted };
   });
   if (scan.own.length === 0) rec.record(name, "L4", "chips and badges use the shared classes", "n/a", "no chip, pill or badge on this page outside the shared ones");
-  else rec.record(name, "L4", "chips and badges use the shared classes", "fail", `own chip look instead of .status-chip / .count-badge: ${scan.own.slice(0, 8).join("; ")}`);
+  else rec.record(name, "L4", "chips and badges use the shared classes", "fail", `own chip look instead of .status-chip / .count-badge: ${scan.own.slice(0, 8).join("; ")}`, [...new Set(scan.own.map((entry: string) => entry.replace(/ ".*$/, "")))] as string[]);
   if (scan.counted.length === 0) rec.record(name, "L4", "filter counts use the count badge", "n/a", "no filter with counts on this page");
   else {
     const bad = scan.counted.filter((entry: { shared: boolean }) => !entry.shared);
-    rec.record(name, "L4", "filter counts use the count badge", bad.length === 0 ? "pass" : "fail", bad.length === 0 ? `${scan.counted.length} filter count(s) use .count-badge` : `the count in "${bad[0]!.label}" is a plain span (.${String(bad[0]!.cls).split(" ")[0] || "no class"}), not .count-badge`);
+    rec.record(name, "L4", "filter counts use the count badge", bad.length === 0 ? "pass" : "fail", bad.length === 0 ? `${scan.counted.length} filter count(s) use .count-badge` : `the count in "${bad[0]!.label}" is a plain span (.${String(bad[0]!.cls).split(" ")[0] || "no class"}), not .count-badge`, bad.map((entry: { cls: string }) => `.${String(entry.cls).split(" ")[0] || "no class"}`));
   }
 }
 
@@ -758,11 +766,13 @@ export async function checkButtons(page: Page, rec: Recorder, name: string) {
     return { count: buttons.length, ownLook: [...new Set(ownLook)], disabled };
   }, REVIEWED_OWN_LOOK.source);
   if (scan.count === 0) rec.record(name, "L5", "buttons use the shared classes", "n/a", "no button on this page");
-  else rec.record(name, "L5", "buttons use the shared classes", scan.ownLook.length === 0 ? "pass" : "fail", scan.ownLook.length === 0 ? `${scan.count} button(s), none styled by a module class alone` : `styled by a module class alone: ${scan.ownLook.slice(0, 3).join("; ")}`);
+  else rec.record(name, "L5", "buttons use the shared classes", scan.ownLook.length === 0 ? "pass" : "fail", scan.ownLook.length === 0 ? `${scan.count} button(s), none styled by a module class alone` : `styled by a module class alone: ${scan.ownLook.slice(0, 3).join("; ")}`,
+    // The module's build hash is dropped, so the same class is the same offender in every build.
+    [...new Set(scan.ownLook.map((entry: string) => `button.${entry.replace(/ ".*$/, "").replace(/__[A-Za-z0-9_-]{6}__/, "__")}`))] as string[]);
   if (scan.disabled.length === 0) rec.record(name, "L5", "a disabled button shows the not-allowed cursor", "n/a", "no disabled button on this page");
   else {
     const bad = scan.disabled.filter((entry: { cursor: string }) => entry.cursor !== "not-allowed");
-    rec.record(name, "L5", "a disabled button shows the not-allowed cursor", bad.length === 0 ? "pass" : "fail", bad.length === 0 ? `${scan.disabled.length} disabled button(s), all not-allowed` : `disabled "${bad[0]!.label}" has cursor ${bad[0]!.cursor}`);
+    rec.record(name, "L5", "a disabled button shows the not-allowed cursor", bad.length === 0 ? "pass" : "fail", bad.length === 0 ? `${scan.disabled.length} disabled button(s), all not-allowed` : `disabled ${bad.map((entry: { label: string; cursor: string }) => `"${entry.label}" has cursor ${entry.cursor}`).join("; ")}`, bad.map((entry: { label: string; cursor: string }) => `${entry.label}:${entry.cursor}`));
   }
   // Hover: a main or light button changes its look under the pointer.
   const target = page.locator("button.primary-button:visible:enabled, button.secondary-button:visible:enabled").first();

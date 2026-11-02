@@ -125,7 +125,7 @@ export async function seedEventWorld(prisma: PrismaClient, shard: string): Promi
     data: {
       id: world.eventId, slug: world.eventSlug, name: world.eventName, startsAt: new Date(now + 60 * day), endsAt: new Date(now + 62 * day),
       timezone: "America/Chicago", location: "Fictitious verification retreat center", isPublished: true, audience: "GENERAL", billingMode: "ATTENDEE_PAY",
-      registrationOpensOn: new Date(now - 10 * day).toISOString().slice(0, 10), registrationClosesOn: "2099-01-01", supportContact: "registration@imsda.org",
+      registrationOpensOn: new Date(now - 10 * day).toISOString().slice(0, 10), registrationClosesOn: "2099-01-01", supportContact: "registration@journey.example.test",
     },
   });
   const definition = registrationFormDefinitionSchema.parse(eventFormDefinition(world));
@@ -197,7 +197,7 @@ async function seedStaffWorld(prisma: PrismaClient, world: EventWorld, financeUs
   const open = (id: string, slug: string, name: string) => prisma.event.create({
     data: {
       id, slug, name, startsAt: new Date(now + 45 * day), endsAt: new Date(now + 47 * day), timezone: "America/Chicago", location: "Fictitious verification retreat center",
-      isPublished: true, audience: "GENERAL", billingMode: "ATTENDEE_PAY", registrationOpensOn: new Date(now - 10 * day).toISOString().slice(0, 10), registrationClosesOn: "2099-01-01", supportContact: "registration@imsda.org",
+      isPublished: true, audience: "GENERAL", billingMode: "ATTENDEE_PAY", registrationOpensOn: new Date(now - 10 * day).toISOString().slice(0, 10), registrationClosesOn: "2099-01-01", supportContact: "registration@journey.example.test",
     },
   });
   await open(world.list.eventId, world.list.slug, world.list.name);
@@ -219,14 +219,15 @@ export async function seedExistingAccount(prisma: PrismaClient, world: EventWorl
   const { hashPassword } = await import("../../modules/access/passwords");
   const id = `${world.prefix}_existing`;
   const email = emailFor(world, "existing");
+  const password = `Quartz-Meadow-${world.stamp}-existing-Lantern-47`;
   await prisma.attendeeAccount.create({
     data: {
       id, email, displayName: "Casey Existing", firstName: "Casey", lastName: `Journey${world.stamp}-Existing`, status: "ACTIVE", emailVerifiedAt: new Date(),
-      credential: { create: { passwordHash: await hashPassword(`Quartz-Meadow-${world.stamp}-existing-Lantern-47`) } },
+      credential: { create: { passwordHash: await hashPassword(password) } },
     },
   });
   world.accountIds.push(id);
-  return { id, email };
+  return { id, email, password };
 }
 
 /**

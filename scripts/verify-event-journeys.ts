@@ -9,7 +9,7 @@
  *     with the fictitious ids this run uses, so the card form or its fallback is what shows). Run again with the
  *     Google-Translate simulation and with the privacy-browser blocker lists, the second time with the page's own price preview
  *     failing: the amount on the card step and the recorded total are still the server's numbers (P1);
- *  3. manage the registration as that account (My registrations: find it, update the contact details, the filter tabs);
+ *  3. manage the registration as that account (My registrations: find it, update the contact details, the status filter links);
  *  4. ask to cancel it, a staff member approves and carries it out, and the attendee's list says Cancelled.
  * Phase B uses it like event staff would, each journey in a browser signed in as a stamped synthetic staff user:
  *  5. create an event from a template (/event-setup/from-template). THE ONE STEP RUN AS A SYSTEM ADMINISTRATOR: that page is theirs
@@ -95,7 +95,6 @@ loadEnvConfig(process.cwd());
 
 const turnstileBase = (process.env.JOURNEY_TURNSTILE_BASE_URL ?? "http://localhost:3002").replace(/\/$/, "");
 
-/** Failures that are the site's fault (found by these journeys). The label is what the failing check prints. */
 /** Every staff page the staff journeys visit: the staff shell (header, role switcher) is on each of them. */
 const staffPages = [
   "Start from template", "Overview (setting up an event)", "Attendee setup", "Event settings", "Registration builder", "Registration builder (preview and test)",
@@ -103,7 +102,10 @@ const staffPages = [
   "Check-in desk", "Scheduled emails", "Scheduled emails (new schedule)", "Scheduled emails (saved schedule)", "Scheduled emails (after sending)",
   "Cancellation requests (staff)", "Cancellation request (staff review)",
 ];
+/** What the staff pages draw as a chip or badge of their own: the shell's two, and each page's (the attendee list's meal totals, the builder's labels, the template page's count). */
+const STAFF_PILL_OFFENDERS = ["span.staff-pill", "a.admin-role-pill", "span.choice-chip", "span.fb-q-chip", "span.live-preview-badge", "span.fb-step-badge", "span.attention-badge", "button.fb-phone-step-pill"];
 const registrationsPages = ["My registrations", "My registrations (filters)", "My registrations (contact updated)", "My registrations (request cancellation)", "My registrations (cancelled)", "My registrations (after cancelling)"];
+/** Failures that are the site's fault (found by these journeys). The label is what the failing check prints. */
 export const KNOWN_BUGS: KnownBug[] = [
   {
     id: "sign-up-email-browser-only",
@@ -113,7 +115,7 @@ export const KNOWN_BUGS: KnownBug[] = [
   {
     id: "search-clear-button-42px",
     description: "Search fields on desktop: app/globals.css:1262 sizes .search-field-clear 44px wide but height: 42px (only the phone rule at app/globals.css:9451 makes it --touch-target tall), so the clear button is 44x42 (L1 \"clear buttons are 44px\", C2).",
-    checks: ["Events list", ...staffPages].map((page) => ({ label: `${page} | L1 | the clear button is 44px`, detail: "44x42" })),
+    checks: ["Events list", ...staffPages].map((page) => ({ label: `${page} | L1 | the clear button is 44px`, offenders: ["44x42"] })),
     only: "desktop",
   },
   {
@@ -124,31 +126,35 @@ export const KNOWN_BUGS: KnownBug[] = [
   {
     id: "forms-help-trigger-module-button",
     description: "Forms help: components/forms-help.tsx:25 gives its <button> only the module class styles.trigger (components/forms-help.module.css .trigger) unless a className is passed, so it is a button look of its own. tests/look-guard-1440.test.ts's reviewed list misses it because it reads `className={styles.x}` and this is `className ?? styles.trigger` (L5).",
-    checks: ["Registration form: About you", "Registration form: choices and payment"].map((page) => ({ label: `${page} | L5 | buttons use the shared classes`, detail: "forms-help-module" })),
+    checks: ["Registration form: About you", "Registration form: choices and payment"].map((page) => ({ label: `${page} | L5 | buttons use the shared classes`, offenders: ["button.forms-help-module__trigger"] })),
   },
   {
     id: "disabled-buttons-wait-cursor",
     description: "Disabled buttons use cursor: wait, not not-allowed (L5): app/globals.css:5514 .public-square-pay-button:disabled (the card step's Pay button, disabled until the card form is ready) and app/globals.css:5624 .public-manage-contact-actions > button:disabled, with the same wording at :4347, :5473 and :5536.",
-    checks: ["Card payment step", "My registrations (contact updated)"].map((page) => ({ label: `${page} | L5 | a disabled button shows the not-allowed cursor`, detail: "cursor wait" })),
+    checks: [
+      { label: "Card payment step | L5 | a disabled button shows the not-allowed cursor", offenders: ["Pay $79.10:wait"] },
+      // The Continue payment panel and the contact form are both open on this page.
+      { label: "My registrations (contact updated) | L5 | a disabled button shows the not-allowed cursor", offenders: ["Pay $79.10:wait", "Save with code:wait"] },
+    ],
   },
   {
     id: "attendee-status-pill-not-shared-chip",
     description: "My registrations: the status of each registration card (\"Pending payment\", \"Cancelled\") is a span.attendee-status-pill (components/account-registration-card.tsx:63, styled at app/globals.css:5083 with its own colors), not the shared .status-chip (L4).",
-    checks: registrationsPages.map((page) => ({ label: `${page} | L4 | chips and badges use the shared classes`, detail: "attendee-status-pill" })),
+    checks: registrationsPages.map((page) => ({ label: `${page} | L4 | chips and badges use the shared classes`, offenders: ["span.attendee-status-pill"] })),
   },
   {
     id: "attendee-filter-counts-plain-span",
-    description: "My registrations: the filter tabs write their counts as a plain span.attendee-reg-count \"(1)\" (app/(public)/account/(portal)/registrations/page.tsx:249), not the navy .count-badge (L4: filter counts use the count badge).",
-    checks: registrationsPages.map((page) => ({ label: `${page} | L4 | filter counts use the count badge`, detail: ".attendee-reg-count" })),
+    description: "My registrations: the status filter links write their counts as a plain span.attendee-reg-count \"(1)\" (app/(public)/account/(portal)/registrations/page.tsx:249), not the navy .count-badge (L4: filter counts use the count badge).",
+    checks: registrationsPages.map((page) => ({ label: `${page} | L4 | filter counts use the count badge`, offenders: [".attendee-reg-count"] })),
   },
   {
     id: "staff-shell-pills-not-shared-chip",
     description: "Every staff page: the header's \"Staff mode\" badge is a span.staff-pill (components/app-shell.tsx:665) and the role switcher's roles are a.admin-role-pill (components/admin-role-switcher.tsx:40), each with its own look, not the shared .status-chip / .count-badge (L4). Pages add their own: the attendee list's meal totals are span.choice-chip (app/(workspace)/people/attendees/page.tsx:94), the builder's step labels span.fb-step-badge.",
-    checks: staffPages.map((page) => ({ label: `${page} | L4 | chips and badges use the shared classes`, detail: "staff-pill" })),
+    checks: staffPages.map((page) => ({ label: `${page} | L4 | chips and badges use the shared classes`, offenders: STAFF_PILL_OFFENDERS })),
   },
   {
     id: "scheduled-email-status-words",
-    description: "Scheduled emails: a schedule waiting to be approved shows the chip \"Waiting for approval\" (modules/communications/scheduled-email-options.ts:30, drawn at components/scheduled-emails-workspace.tsx:448), but the approved word for that state is \"Pending approval\" (B12). \"Approved and scheduled\" has no approved word either.",
+    description: "Scheduled emails: a schedule waiting to be approved shows the chip \"Waiting for approval\" (modules/communications/scheduled-email-options.ts:30, drawn at components/scheduled-emails-workspace.tsx:448), but the approved word for that state is \"Pending approval\" (B12).",
     checks: [{ label: "Scheduled emails (saved schedule) | B12 | status chip words", detail: "Waiting for approval" }],
   },
   {
@@ -344,8 +350,6 @@ async function signUpJourney(ctx: Ctx, page: J.Page) {
   rec.record("Create account (Security check blocked)", "B10", "Create account says what it is doing while working", /…$/.test(working) ? "pass" : "fail", `while the request was in flight the button said "${working}"`);
   await held.stop();
   await page.getByText(/Check\s+\S+@\S+/).first().waitFor({ state: "visible", timeout: 25_000 });
-  // T3: the server took the emailed code in place of the Security check's token, so the person was never stuck.
-  rec.record("Create account (Security check blocked)", "T3", "an emailed code lets the person create the account", "pass", "with the Security check blocked, the code from the email was accepted and the account's verification code was sent");
   await visited(ctx, page, "Create account (check your email)");
 
   // The emailed verification code: lands signed in.
@@ -355,6 +359,10 @@ async function signUpJourney(ctx: Ctx, page: J.Page) {
   assert(row?.emailVerifiedAt, "the new account was not verified after the emailed code");
   attendee.accountId = row.id;
   ctx.world.accountIds.push(row.id);
+  // T3: with the Security check blocked, the emailed code stood in for its token, and the person really has an account (a verified
+  // row in the database) and is signed in (the account home greets them by name).
+  const greeted = await page.getByText(/Hello,/).first().isVisible().catch(() => false);
+  rec.record("Create account (Security check blocked)", "T3", "an emailed code lets the person create an account and sign in", greeted && Boolean(row.emailVerifiedAt) ? "pass" : "fail", greeted ? "the account row is verified and the account home greets the person" : "the account exists but the person is not shown as signed in");
 }
 
 /** T3 and T5 on the sign-in page: the emailed code for an address with an account and for one without get the same status and words. */
@@ -383,8 +391,29 @@ async function emailCodeSamenessJourney(ctx: Ctx, page: J.Page) {
   const same = known.status === unknown.status && known.message === unknown.message && known.shown === unknown.shown && known.status === 202 && known.shown.length > 0;
   rec.record("Sign-in (Security check blocked)", "T5", "the emailed-code answer is the same for an address with an account and one without", same ? "pass" : "fail", same ? `both answered ${known.status} "${known.shown}"` : `with an account: ${known.status} "${known.shown}"; without: ${unknown.status} "${unknown.shown}"`);
   // The only difference is the inbox: the address that has an account gets its code.
-  const code = await mail.waitForCodeWithSubject(existing.email, /security code/i, { since: known.at });
-  rec.record("Sign-in (Security check blocked)", "T3", "an emailed code satisfies the blocked check", /^\d{6}$/.test(code) ? "pass" : "fail", "a six-digit code arrived in the outbox for the address that has an account");
+  const first = await mail.waitForCodeWithSubject(existing.email, /security code/i, { since: known.at });
+  assert(/^\d{6}$/.test(first), "no six-digit code arrived for the address that has an account");
+  // Sign in with it, the Security check still blocked: password, then the emailed code. With no code typed, Sign in sends nothing
+  // and says what to do (never a dead end).
+  await emailField.fill(existing.email);
+  await label(page, "Password").first().fill(existing.password);
+  const signIn = page.locator("form").getByRole("button", { name: S.exactly("Sign in") });
+  await signIn.click();
+  await group.getByText(/Enter the code from your email first|Press Email me a code instead/).first().waitFor({ state: "visible", timeout: 10_000 });
+  // A new code, asked for now: only mail that arrives after this click counts (the first code's mail may have come a moment ago).
+  const since = Date.now();
+  await group.getByTestId("security-check-email-code-button").click();
+  const code = await mail.waitForCodeWithSubject(existing.email, /security code/i, { since });
+  assert(code !== first, "the second code asked for was the same message as the first");
+  await group.getByTestId("security-check-code-input").fill(code);
+  await signIn.click();
+  await page.waitForURL((url: URL) => !/\/sign-in/.test(url.pathname), { timeout: 25_000 }).catch(async (error: Error) => {
+    throw new Error(`${error.message.split("\n")[0]} at ${page.url()}; the page says: ${clean(await page.locator("main").innerText().catch(() => "?")).slice(-450)}`);
+  });
+  // Signed in: the account home greets the person by name.
+  await S.openPage(page, `${turnstileBase}/account`);
+  const greeted = await page.getByText(/Hello,/).first().waitFor({ state: "visible", timeout: 15_000 }).then(() => true, () => false);
+  rec.record("Sign-in (Security check blocked)", "T3", "an emailed code lets the person sign in", greeted ? "pass" : "fail", greeted ? "password plus the emailed code signed in an account that has no club role, and the account home greets them" : "the emailed code did not sign the person in");
 }
 
 /* ---------------------------------------------------------------- 2. find the event, register with a promo code, pay by card */
@@ -627,7 +656,7 @@ async function manageJourney(ctx: Ctx, page: J.Page) {
   assert((stored?.contactSnapshot as { phone?: string } | null)?.phone === newPhone, `the saved phone is "${(stored?.contactSnapshot as { phone?: string } | null)?.phone}", expected ${newPhone}`);
   await visited(ctx, page, "My registrations (contact updated)");
 
-  await filterTabs(ctx, page, { all: 1, upcoming: 1, past: 0, cancelled: 0 });
+  await statusFilters(ctx, page, { all: 1, upcoming: 1, past: 0, cancelled: 0 });
 
   // B14: a staff page opened as an attendee says the shared thing and who to ask.
   await S.openPage(page, "/finance/cancellation-requests");
@@ -636,17 +665,17 @@ async function manageJourney(ctx: Ctx, page: J.Page) {
   await visited(ctx, page, "Staff page opened as an attendee");
 }
 
-/** The four filter tabs: counts, the address (B2), and an empty tab that says why and what to do next (B4). */
-async function filterTabs(ctx: Ctx, page: J.Page, counts: { all: number; upcoming: number; past: number; cancelled: number }, options: { after?: boolean } = {}) {
+/** The status filter links (All, Upcoming, Past, Cancelled): counts, the address (B2), and an empty view that says why and what to do next (B4). */
+async function statusFilters(ctx: Ctx, page: J.Page, counts: { all: number; upcoming: number; past: number; cancelled: number }, options: { after?: boolean } = {}) {
   const { rec } = ctx;
   const name = options.after ? "My registrations (after cancelling)" : "My registrations (filters)";
   await S.openPage(page, "/account/registrations");
   await visited(ctx, page, name);
-  rec.record(name, "L6", "tabs use the shared tablist with arrow keys", "n/a", "the four filters are links to their own addresses (navigation with aria-current), not a tab panel");
+  rec.record(name, "L6", "tabs use the shared tablist with arrow keys", "n/a", "the status filters are links in a nav (each to its own address, aria-current on the chosen one), not a tablist");
   const nav = page.getByRole("navigation", { name: "Show registrations" });
   const labels = (await nav.locator("a").allInnerTexts()).map((text: string) => clean(text));
   const want = [`All (${counts.all})`, `Upcoming (${counts.upcoming})`, `Past (${counts.past})`, `Cancelled (${counts.cancelled})`];
-  assert(JSON.stringify(labels) === JSON.stringify(want), `the filter tabs read ${JSON.stringify(labels)}, expected ${JSON.stringify(want)}`);
+  assert(JSON.stringify(labels) === JSON.stringify(want), `the status filter links read ${JSON.stringify(labels)}, expected ${JSON.stringify(want)}`);
   // B2: choosing a tab puts it in the address; Back goes to the one before; a shared link opens on that tab.
   await nav.getByRole("link", { name: /^Past/ }).click();
   await page.waitForURL((url: URL) => url.searchParams.get("show") === "past", { timeout: 15_000 });
@@ -659,8 +688,8 @@ async function filterTabs(ctx: Ctx, page: J.Page, counts: { all: number; upcomin
   await S.openPage(page, "/account/registrations?show=cancelled");
   await settle(page);
   const sharedLink = /^Cancelled/.test(await current());
-  rec.record(name, "B2", "the filter tab is in the address (Back and shared links keep it)", onPast && backOnAll && sharedLink ? "pass" : "fail", `Past in the address: ${onPast}; Back returned to All: ${backOnAll}; ?show=cancelled opened on Cancelled: ${sharedLink}`);
-  rec.record(name, "B2", "a filtered list has a Clear filters button", "n/a", "the four filters are tabs of links and All is the way back; an empty tab links \"Show all my registrations\"");
+  rec.record(name, "B2", "the status filter is in the address (Back and shared links keep it)", onPast && backOnAll && sharedLink ? "pass" : "fail", `Past in the address: ${onPast}; Back returned to All: ${backOnAll}; ?show=cancelled opened on Cancelled: ${sharedLink}`);
+  rec.record(name, "B2", "a filtered list has a Clear filters button", "n/a", "a single status filter whose All link is the way back (an empty view also links \"Show all my registrations\")");
   if (counts.upcoming === 0) {
     await S.openPage(page, "/account/registrations?show=upcoming");
     await settle(page);
@@ -750,7 +779,7 @@ async function cancelJourney(ctx: Ctx, page: J.Page) {
   await checkCardStatus(ctx, page, "My registrations (cancelled)", "Cancelled");
   const row = await ctx.prisma.registration.findUnique({ where: { id: reg.id }, select: { status: true } });
   assert(row?.status === "CANCELLED", `the registration is ${row?.status}, expected CANCELLED`);
-  await filterTabs(ctx, page, { all: 1, upcoming: 0, past: 0, cancelled: 1 }, { after: true });
+  await statusFilters(ctx, page, { all: 1, upcoming: 0, past: 0, cancelled: 1 }, { after: true });
 }
 
 /** The staff side: open the request, start the review, approve it with a reason, carry it out. */
@@ -924,7 +953,7 @@ async function publishChecklistJourney(ctx: Ctx, page: J.Page) {
   // The support contact sits in a folded section: open it the way a person would.
   const contactSection = page.locator("details", { has: page.locator("#event-field-support-contact") }).first();
   if (await contactSection.count() && !(await contactSection.evaluate((node: HTMLDetailsElement) => node.open))) await contactSection.locator("summary").first().click();
-  await page.locator("#event-field-support-contact").fill("registration@imsda.org");
+  await page.locator("#event-field-support-contact").fill("registration@journey.example.test");
   const form = page.locator("form.event-settings-layout");
   const save = page.locator("#event-save-button");
   await checkSaveFlow(page, rec, "Event settings", "event settings", {
@@ -933,7 +962,7 @@ async function publishChecklistJourney(ctx: Ctx, page: J.Page) {
     done: () => pollPage<string>(page, async () => clean(await page.locator(".event-savebar-status").innerText()), (text) => /^(Saved|Not saved)/.test(text), 20_000),
   });
   const saved = await ctx.prisma.event.findUnique({ where: { id: created.id }, select: { location: true, supportContact: true } });
-  assert(saved?.location === `Journey Hall ${ctx.world.stamp}` && saved.supportContact === "registration@imsda.org", `the saved event has location "${saved?.location}" and support contact "${saved?.supportContact}"`);
+  assert(saved?.location === `Journey Hall ${ctx.world.stamp}` && saved.supportContact === "registration@journey.example.test", `the saved event has location "${saved?.location}" and support contact "${saved?.supportContact}"`);
 }
 
 /* ---- 7. the form builder: preview, test, publish the form */
@@ -1105,13 +1134,17 @@ async function attendeeListJourney(ctx: Ctx, page: J.Page) {
   // B11: Download CSV: named <event-slug>-attendees-<date in Central>.csv and holding the stamped rows.
   await S.openPage(page, base);
   await settle(page);
+  const centralDate = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const dateBefore = centralDate();
   const download = await Promise.all([
     page.waitForEvent("download", { timeout: 30_000 }),
     page.getByRole("link", { name: /Download CSV/ }).click(),
   ]).then(([file]) => file as { suggestedFilename(): string; path(): Promise<string | null> });
-  const central = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  // The date may turn over between the click and the check, so the date before and the date after are both accepted.
+  const dateAfter = centralDate();
   const fileName = download.suggestedFilename();
-  rec.record(name, "B11", "the CSV is named <event-slug>-attendees-<date>.csv", fileName === `${list.slug}-attendees-${central}.csv` ? "pass" : "fail", `file name: ${fileName} (expected ${list.slug}-attendees-${central}.csv)`);
+  const expectedNames = [...new Set([dateBefore, dateAfter])].map((date) => `${list.slug}-attendees-${date}.csv`);
+  rec.record(name, "B11", "the CSV is named <event-slug>-attendees-<date>.csv", expectedNames.includes(fileName) ? "pass" : "fail", `file name: ${fileName} (expected ${expectedNames.join(" or ")})`);
   const { readFile } = await import("node:fs/promises");
   const csv = await readFile((await download.path())!, "utf8");
   const stamped = csv.split("\n").filter((line) => line.includes(list.lastNameMarker)).length;
@@ -1209,19 +1242,10 @@ async function scheduledEmailJourney(ctx: Ctx, page: J.Page) {
   assert(batch && batch.status === "ACTIVE", `the approved schedule is ${batch?.status}`);
   assert((await ctx.prisma.scheduledEmailRecipient.count({ where: { batchId: batch.id } })) === 3, "the approved list is not the three stamped recipients");
 
-  // Make it due. The earliest the page lets a time be set is five minutes ahead, so instead of waiting, the approved time is moved
-  // into the past in the database: the rule (date and time in the event's zone) and the stored send time together, so the schedule
-  // still agrees with itself (moving only one makes the sender pause it as "changed after approval"). Two minutes late is well
-  // inside the six hours after which a late schedule is dropped.
-  const due = new Date(Math.floor((Date.now() - 2 * 60_000) / 60_000) * 60_000);
-  const local = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(due);
-  const part = (type: string) => local.find((entry) => entry.type === type)!.value;
-  await ctx.prisma.scheduledEmailBatch.update({ where: { id: batch.id }, data: { sendAt: due, localDate: `${part("year")}-${part("month")}-${part("day")}`, localTime: `${part("hour")}:${part("minute")}` } });
   // The sweep, exactly as the scheduler calls it.
   // The token is OUTBOX_SWEEP_TOKEN from the environment; the apps in CI (and the ones this suite is documented to run against) use
   // the CI value, and a local .env may carry another one, so the CI value is tried when the environment's is refused.
   const tokens = [...new Set([process.env.OUTBOX_SWEEP_TOKEN, "ci-only-outbox-sweep-token-000000000000"].filter((value): value is string => Boolean(value)))];
-  const since = Date.now() - 1_000;
   const sweep = async () => {
     let status = 0;
     for (const token of tokens) {
@@ -1230,6 +1254,20 @@ async function scheduledEmailJourney(ctx: Ctx, page: J.Page) {
     }
     return status;
   };
+  const announcement = new RegExp(`Journey news ${world.stamp}`);
+  const announcedTo = (address: string) => mail.messages.filter((message) => message.to.includes(address) && announcement.test(message.subject + message.text));
+  // Approved but not yet due (tomorrow): a sweep, as the scheduler would run it, must send nothing to anyone yet.
+  assert((await sweep()) === 200, "the outbox sweep did not answer 200 before the schedule was due");
+  assert(m.recipients.every((address) => announcedTo(address).length === 0), "a schedule that is not due yet was sent");
+  // Make it due. The earliest the page lets a time be set is five minutes ahead, so instead of waiting, the approved time is moved
+  // into the past in the database: the rule (date and time in the event's zone) and the stored send time together, so the schedule
+  // still agrees with itself (moving only one makes the sender pause it as "changed after approval"). Two minutes late is well
+  // inside the six hours after which a late schedule is dropped.
+  const due = new Date(Math.floor((Date.now() - 2 * 60_000) / 60_000) * 60_000);
+  const local = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(due);
+  const part = (type: string) => local.find((entry) => entry.type === type)!.value;
+  await ctx.prisma.scheduledEmailBatch.update({ where: { id: batch.id }, data: { sendAt: due, localDate: `${part("year")}-${part("month")}-${part("day")}`, localTime: `${part("hour")}:${part("minute")}` } });
+  const since = Date.now() - 1_000;
   assert((await sweep()) === 200, "the outbox sweep did not answer 200");
   for (const address of m.recipients) {
     await mail.waitForMessage(address, (message) => new RegExp(`Journey news ${world.stamp}`).test(message.subject + message.text), { since });
@@ -1245,6 +1283,9 @@ async function scheduledEmailJourney(ctx: Ctx, page: J.Page) {
     await page.reload({ waitUntil: "load" });
     return clean(await page.locator("li.scheduled-email-card").filter({ hasText: scheduleName }).innerText());
   }, (text) => /3 sent|3 captured/.test(text), 40_000);
+  // Exactly one message per stamped recipient: the sweeps above ran more than once and none of them sent it twice.
+  const counts = m.recipients.map((address) => announcedTo(address).length);
+  rec.record("Scheduled emails (after sending)", "Delivery", "exactly one message reached each stamped recipient", counts.every((count) => count === 1) ? "pass" : "fail", `messages per recipient: ${JSON.stringify(counts)}`);
   rec.record("Scheduled emails (after sending)", "B12", "the schedule shows it was sent", done.ok ? "pass" : "fail", `the card says: "${(done.value ?? "").slice(0, 200)}"`);
   await visited(ctx, page, "Scheduled emails (after sending)");
 }
@@ -1271,7 +1312,7 @@ async function runShard(ctx: Ctx) {
     if (signedUp && ["2", "3", "4"].some(wanted)) {
       registered = await journey(ctx, "2. Find the event, register with a promo code, pay by card", () => registerJourney(ctx, main.page, { email: ctx.attendee.email, rules: true, mode: "plain" }, true));
     }
-    if (registered && wanted("3")) await journey(ctx, "3. Manage the registration: contact details and the filter tabs", () => manageJourney(ctx, main.page));
+    if (registered && wanted("3")) await journey(ctx, "3. Manage the registration: contact details and the status filters", () => manageJourney(ctx, main.page));
     if (registered && wanted("4")) await journey(ctx, "4. Ask to cancel; staff approve; the list says Cancelled", () => cancelJourney(ctx, main.page));
   } finally {
     await main.context.close();
@@ -1298,10 +1339,21 @@ async function main() {
   await resetEventBudgets(prisma);
   const mail = new FakeMailServer();
   await mail.start();
+  try {
+    // Fail fast, before anything is seeded, unless the apps' email really lands in this suite's outbox.
+    await resetEventBudgets(prisma);
+    await mail.assertAppMailReachesOutbox(J.baseUrl);
+    await mail.assertAppMailReachesOutbox(turnstileBase);
+  } catch (error) {
+    await mail.stop();
+    await prisma.$disconnect();
+    throw error;
+  }
   // The platform's central email sender is a system administrator's one-time setup (System management > Email). A publish
   // needs it (readiness item "Central email sender saved") and so do scheduled emails; a fresh CI database has none, so it is
   // set for the run (to the CI sender address) and put back at the end.
   const platform = await prisma.platformSettings.findUnique({ where: { id: "platform" }, select: { defaultSenderEmail: true } });
+  const platformExisted = Boolean(platform);
   const senderWas = platform?.defaultSenderEmail ?? null;
   if (!senderWas?.trim()) await prisma.platformSettings.upsert({ where: { id: "platform" }, update: { defaultSenderEmail: "events@ci.example.test" }, create: { id: "platform", defaultSenderEmail: "events@ci.example.test" } });
   const summaries: string[] = [];
@@ -1332,7 +1384,9 @@ async function main() {
     await J.revokeSessions(tokens);
     await J.revokeStaffSessions(staffTokens);
     if (process.env.JOURNEY_KEEP_DATA !== "1") for (const world of worlds) await cleanupEventWorld(prisma, world);
-    await prisma.platformSettings.updateMany({ where: { id: "platform" }, data: { defaultSenderEmail: senderWas } });
+    // Put the sender back; a platform row that did not exist before the run (made by the setting above) is removed again.
+    if (platformExisted) await prisma.platformSettings.updateMany({ where: { id: "platform" }, data: { defaultSenderEmail: senderWas } });
+    else await prisma.platformSettings.deleteMany({ where: { id: "platform" } });
     await mail.stop();
     await prisma.$disconnect();
   }

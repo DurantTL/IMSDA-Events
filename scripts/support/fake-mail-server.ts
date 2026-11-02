@@ -146,4 +146,30 @@ export class FakeMailServer {
     if (!code) throw new Error(`The message "${message.subject}" has no six-digit code.`);
     return `${code[1]}${code[2]}`;
   }
+
+  /**
+   * Local-only proof that the app under test really sends its email here, so a suite never waits on mail that went nowhere (or, worse,
+   * to a real mailbox): asks the app for one emailed security code for a made-up address and requires it to arrive in this outbox.
+   */
+  async assertAppMailReachesOutbox(appUrl: string = this.appUrl) {
+    const address = `journeyevt.mailprobe.${Date.now().toString(36)}@example.test`;
+    const since = Date.now() - 1_000;
+    const fix = `Start the app under test with RESEND_API_KEY=ci-placeholder-never-sent RESEND_API_URL=http://127.0.0.1:${this.port} ACCOUNT_EMAIL_SENDER_ADDRESS=events@ci.example.test (and JOURNEY_MAIL_PORT=${this.port} here), as the header of the suite says.`;
+    let status = 0;
+    try {
+      const response = await fetch(`${appUrl}/api/security-check/email-code`, {
+        method: "POST", headers: { "content-type": "application/json", origin: appUrl },
+        body: JSON.stringify({ action: "attendee-sign-up", email: address, website: "" }), signal: AbortSignal.timeout(30_000),
+      });
+      status = response.status;
+    } catch (error) {
+      throw new Error(`The app at ${appUrl} did not answer the mail check (${(error as Error).message}). Is it running?`);
+    }
+    if (status !== 202) throw new Error(`The app at ${appUrl} refused the mail check with status ${status}. ${fix}`);
+    try {
+      await this.waitForMessage(address, /security code/i, { since, timeoutMs: 30_000 });
+    } catch {
+      throw new Error(`The app at ${appUrl} did not send its email to the dev outbox on port ${this.port}, so no sign-in or verification code could be read. ${fix}`);
+    }
+  }
 }
