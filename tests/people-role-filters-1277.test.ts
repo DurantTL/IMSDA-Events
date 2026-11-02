@@ -205,7 +205,7 @@ describe("Club leaders", () => {
     expect(buildLeadersWhere({ clubId: "org_1", role: "REPORTER" }, now)).toMatchObject({ role: "REPORTER", organization: { type: "CLUB", isActive: true, id: "org_1" } });
   });
 
-  it("sorts by club name, then Director, Deputy, Registrar, Reporter, then name", async () => {
+  it("asks the database for club name, then Director, Deputy, Registrar, Reporter, then name, and keeps its order", async () => {
     const grant = (id: string, club: string, role: string, name: string) => ({
       id, role, attendeeAccount: { id: `a-${id}`, displayName: name, email: `${id}@example.test` }, organization: { id: `o-${club}`, name: club },
     });
@@ -215,7 +215,8 @@ describe("Club leaders", () => {
     mocks.grantCount.mockResolvedValue(5);
     const { leaders, total } = await listClubLeaders({ clubId: null, role: null }, 1, now);
     expect(total).toBe(5);
-    expect(leaders.map((leader) => leader.key)).toEqual(["3", "5", "4", "2", "1"]);
+    // The database order is trusted: a page is not re-sorted in memory, so it agrees with the next page.
+    expect(leaders.map((leader) => leader.key)).toEqual(["1", "2", "3", "4", "5"]);
     expect(mocks.grantFindMany.mock.calls[0][0].where.organization).toEqual({ type: "CLUB", isActive: true });
     expect(sortClubLeaders([])).toEqual([]);
   });

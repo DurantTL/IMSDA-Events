@@ -8,7 +8,6 @@ import {
   CLUB_LEADERS_ORDER_BY,
   CLUB_LEADERS_PAGE_SIZE,
   leaderRoleLabel,
-  sortClubLeaders,
   type ClubLeader,
   type ClubLeaderFilters,
 } from "@/modules/system-admin/club-leaders-model";
@@ -33,7 +32,7 @@ export async function listClubLeaders(filters: ClubLeaderFilters, requestedPage 
     },
   });
   const twoStep = await accountIdsWithTwoStepOn(grants.map((grant) => grant.attendeeAccount.id));
-  const leaders = sortClubLeaders(grants.map((grant) => ({
+  const leaders = grants.map((grant) => ({
     key: grant.id,
     accountId: grant.attendeeAccount.id,
     name: grant.attendeeAccount.displayName,
@@ -43,6 +42,6 @@ export async function listClubLeaders(filters: ClubLeaderFilters, requestedPage 
     role: grant.role,
     roleLabel: leaderRoleLabel(grant.role),
     twoStepOn: twoStep.has(grant.attendeeAccount.id),
-  })));
+  }));
   return { leaders, total, page, pageSize: CLUB_LEADERS_PAGE_SIZE };
 }

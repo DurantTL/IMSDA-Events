@@ -144,7 +144,7 @@ function SeminarFields({ fields, sorting }: { fields: OperationalSeminarField[];
 export default async function OperationalReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string; countSort?: string; countDir?: string; seminarSort?: string; seminarDir?: string; rosterSort?: string; rosterDir?: string; typeSort?: string; typeDir?: string; volunteerSort?: string; volunteerDir?: string }>;
+  searchParams: Promise<{ event?: string; mealsSort?: string; mealsDir?: string; housingSort?: string; housingDir?: string; childcareSort?: string; childcareDir?: string; volunteerCountsSort?: string; volunteerCountsDir?: string; attendanceSort?: string; attendanceDir?: string; seminarSort?: string; seminarDir?: string; rosterSort?: string; rosterDir?: string; typeSort?: string; typeDir?: string; volunteerSort?: string; volunteerDir?: string }>;
 }) {
   const query = await searchParams;
   const requested = query.event;
@@ -167,7 +167,8 @@ export default async function OperationalReportsPage({
   ]);
   // Each kind of table sorts from its own column headers (its own address pair), from a fixed list of columns; the order stays as is until one is chosen (#1458).
   const path = "/more/reports";
-  const countSorting = serverSort(path, query, REPORT_COUNTS_SORT_COLUMNS, UNSORTED, { prefix: "count" });
+  // Each count section sorts on its own, so a click in one leaves the others alone.
+  const countSorts = Object.fromEntries(([["meals", "meal-counts"], ["housing", "housing-counts"], ["childcare", "childcare-counts"], ["volunteerCounts", "volunteer-counts"], ["attendance", "attendance-counts"]] as const).map(([prefix, anchor]) => [prefix, serverSort(path, query, REPORT_COUNTS_SORT_COLUMNS, UNSORTED, { prefix, hash: `#${anchor}` })])) as Record<"meals" | "housing" | "childcare" | "volunteerCounts" | "attendance", ReturnType<typeof serverSort<typeof REPORT_COUNTS_SORT_COLUMNS[number]>>>;
   const seminarSorting = serverSort(path, query, REPORT_SEMINAR_SORT_COLUMNS, UNSORTED, { prefix: "seminar", hash: "#seminar-ranking" });
   const rosterSorting = serverSort(path, query, REPORT_ROSTER_SORT_COLUMNS, UNSORTED, { prefix: "roster", hash: "#attendee-roster" });
   const typeSorting = serverSort(path, query, REPORT_TYPES_SORT_COLUMNS, UNSORTED, { prefix: "type", hash: "#attendee-types" });
@@ -384,7 +385,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "meals")}><Download aria-hidden="true" size={15} /> Download meal CSV</ExportLink>
           </div>
-          <CountFields fields={report.meals} emptyCopy="No structured meal or dietary-choice fields are configured on an active registration form yet." sorting={countSorting} />
+          <CountFields fields={report.meals} emptyCopy="No structured meal or dietary-choice fields are configured on an active registration form yet." sorting={countSorts.meals} />
         </section>
       )}
 
@@ -397,7 +398,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "housing")}><Download aria-hidden="true" size={15} /> Download housing CSV</ExportLink>
           </div>
-          <CountFields fields={report.housing} sorting={countSorting} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
+          <CountFields fields={report.housing} sorting={countSorts.housing} emptyCopy="No structured housing or lodging fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
         </section>
       )}
 
@@ -423,7 +424,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "childcare")}><Download aria-hidden="true" size={15} /> Download childcare CSV</ExportLink>
           </div>
-          <CountFields fields={report.childcare} sorting={countSorting} emptyCopy="No structured childcare fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
+          <CountFields fields={report.childcare} sorting={countSorts.childcare} emptyCopy="No structured childcare fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
         </section>
       )}
 
@@ -445,7 +446,7 @@ export default async function OperationalReportsPage({
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "volunteers")}><Download aria-hidden="true" size={15} /> Counts CSV</ExportLink>
           </span>
         </div>
-        {report.volunteers.length > 0 && <CountFields fields={report.volunteers} emptyCopy="" sorting={countSorting} />}
+        {report.volunteers.length > 0 && <CountFields fields={report.volunteers} emptyCopy="" sorting={countSorts.volunteerCounts} />}
         <article className="roster-report-group" id="volunteer-roster">
           <header>
             <div><h3>Who said yes</h3><p>Everyone who answered yes to a volunteer question, with a phone number to reach them. &ldquo;Email volunteers&rdquo; writes to each registration&rsquo;s contact after you preview it.</p></div>
@@ -489,7 +490,7 @@ export default async function OperationalReportsPage({
             </div>
             <ExportLink className="secondary-button report-download" href={reportDownloadHref(event.id, "attendance")}><Download aria-hidden="true" size={15} /> Download attendance CSV</ExportLink>
           </div>
-          <CountFields fields={report.attendance} sorting={countSorting} emptyCopy="No structured attendance fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
+          <CountFields fields={report.attendance} sorting={countSorts.attendance} emptyCopy="No structured attendance fields are configured on an active registration form yet." help={<EventSetupHelp eventId={event.id} context="this report section" id="reports-no-fields" />} />
         </section>
       )}
       {emptyCountSections.length > 0 && (
