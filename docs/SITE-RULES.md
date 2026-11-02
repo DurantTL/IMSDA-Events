@@ -31,7 +31,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | ID | Rule | Guard test | Browser test | Issue |
 | --- | --- | --- | --- | --- |
 | P1 | Every calculation that matters (prices, fees, discounts, deposits, balances, capacity, eligibility) is done on the server from one shared function. The browser only shows a preview from that same function; the server never trusts a total the browser sends, and if the browser's scripts fail or are blocked, the amount charged and recorded is still correct. | planned (#1445) | planned (#1445) | Caleb, Nov 1 (#1445) |
-| P2 | Live lists (the club roster above all, plus registrations, attendee lists, orders and monthly records) always show current data from the server, update right away after a change, are never cached by the browser, Cloudflare or the app, and still work with blockers and translation on. | planned (#1445) | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | Caleb, Nov 1 (#1445) |
+| P2 | Live lists (the club roster above all, plus registrations, attendee lists, orders and monthly records) always show current data from the server, update right away after a change, are never cached by the browser, Cloudflare or the app, and still work with blockers and translation on. | planned (#1445) | `npm run test:live-roster` (roster); `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)) | Caleb, Nov 1 (#1445) |
 
 ## Search
 
