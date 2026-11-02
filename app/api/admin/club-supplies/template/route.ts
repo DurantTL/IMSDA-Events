@@ -2,19 +2,13 @@ import { withRequestContext } from "@/lib/request-context";
 import { clubSupplyApiError } from "@/modules/club-supplies/api-errors";
 import { clubSupplyCsvTemplate } from "@/modules/club-supplies/catalog-csv";
 import { requireClubsAdministration } from "@/modules/organizations/access";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 /** The club supply catalog CSV template (#531). */
 async function getHandler() {
   try {
     await requireClubsAdministration();
-    return new Response(clubSupplyCsvTemplate(), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="club-supply-catalog-template.csv"',
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return csvDownloadResponse(clubSupplyCsvTemplate(), exportFileName({ scope: "club-supply-catalog", kind: "template" }));
   } catch (error) {
     return clubSupplyApiError(error, "Downloading the club supply template");
   }

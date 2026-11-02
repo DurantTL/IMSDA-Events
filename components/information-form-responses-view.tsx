@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
@@ -58,8 +59,8 @@ export function InformationFormResponsesView({ formName, total, rows, selected, 
         description={`${formName}: answers sent through the form's public link.`}
         primary={total > 0 ? (
           <>
-            <a className="secondary-button information-form-download" download href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV</a>
-            {membersExportHref && <a className="secondary-button information-form-download" download href={membersExportHref}><Download aria-hidden="true" size={16} /> Download members CSV</a>}
+            <ExportLink className="secondary-button information-form-download" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink>
+            {membersExportHref && <ExportLink className="secondary-button information-form-download" href={membersExportHref}><Download aria-hidden="true" size={16} /> Download members CSV</ExportLink>}
           </>
         ) : undefined}
       />

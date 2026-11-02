@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import { Download } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
 import { PrintReportButton } from "@/components/print-report-button";
@@ -17,7 +18,7 @@ export function KitchenReportView({ eventName, report, csvHref }: { eventName: s
           </p>
         </div>
         <div className="intro-actions kitchen-report-actions">
-          <a className="secondary-button" href={csvHref}><Download aria-hidden="true" size={16} /> Download CSV</a>
+          <ExportLink className="secondary-button" href={csvHref}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink>
           <PrintReportButton label="Print" />
         </div>
       </div>

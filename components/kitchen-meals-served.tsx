@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { Download, FileUp } from "lucide-react";
 import type { ServedFigures, ServedReport } from "@/modules/meals/served-report";
@@ -39,7 +40,7 @@ export function KitchenMealsServed({
         </div>
         <div className="intro-actions">
           {canImport && <Link className="secondary-button" href={importHref}><FileUp aria-hidden="true" size={16} /> Import scanner results</Link>}
-          <a className="secondary-button" href={csvHref}><Download aria-hidden="true" size={16} /> Download CSV</a>
+          <ExportLink className="secondary-button" href={csvHref}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink>
         </div>
       </div>
       {report.rows.length === 0 ? (

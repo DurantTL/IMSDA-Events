@@ -258,7 +258,7 @@ describe("club order routes (#487, #654): permissioned like club supplies (#531)
     mocks.listHelperLines.mockResolvedValue(lines);
     const response = await GET_CSV(new Request("https://events.imsda.test/x?view=all"), ctx());
     expect(response.status).toBe(200);
-    expect(response.headers.get("content-disposition")).toContain("order-everything.csv");
+    expect(response.headers.get("content-disposition")).toMatch(/club-1-order-everything-\d{4}-\d{2}-\d{2}\.csv/);
     const rows = parseCsvMatrix(await response.text());
     expect(rows[0]).toEqual(["Section", "Item name", "Item number", "Size", "Quantity", "Available", "To order"]);
     expect(rows.slice(1)).toEqual([

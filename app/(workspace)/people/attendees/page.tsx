@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
@@ -6,10 +7,11 @@ import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { AccessRestricted } from "@/components/access-restricted";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
-import { PhoneHiddenSortLink } from "@/components/phone-hidden-sort-link";
-import { SortOrderNote } from "@/components/list-sort";
+import { ListPager } from "@/components/list-pager";
+import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText } from "@/lib/list-sort";
+import { paginate, parsePageParam } from "@/lib/pagination";
 import { isClubAudienceEvent } from "@/modules/events/repository";
 import { listRegistrations } from "@/modules/registrations/repository";
 import {
@@ -34,6 +36,8 @@ import { registrationStatusWordOrRaw } from "@/modules/registrations/status-word
 
 export const metadata: Metadata = { title: staffPageTitles.attendeeList };
 
+const ATTENDEE_PAGE_SIZE = 50;
+
 export default async function AttendeeListingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const requestedEvent = firstParam(params.event);
@@ -48,6 +52,8 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
   const showDietaryDetails = canViewDietaryDetails({ permissions, clubEvent: await isClubAudienceEvent(event.id) });
   const rows = filterAttendeeListing(buildAttendeeListingRows(registrations, { showDietaryDetails }), query);
   const totals = mealTotals(rows);
+  // Paged after the filter and the sort, so a page is a slice of the whole sorted list, never the other way round (#1458).
+  const slice = paginate(rows, parsePageParam(firstParam(params.page)), ATTENDEE_PAGE_SIZE);
   // Every column is viewable by VIEW_SENSITIVE_DATA holders (dietary content is gated above, in the rows).
   const columns = visibleListingColumns(query.view);
   const activeView = LISTING_VIEWS.find((view) => view.id === query.view) ?? LISTING_VIEWS[0]!;
@@ -62,6 +68,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
     urlParams.set("event", event.id);
     return `/people/attendees?${urlParams.toString()}`;
   };
+  const pageHref = (page: number) => `${href({})}${page > 1 ? `&page=${page}` : ""}`;
   // The CSV always has every permitted column, so the view is not passed on.
   const exportParams = attendeeListingParams({ ...query, view: DEFAULT_LISTING_VIEW }).toString();
   const exportHref = `/api/events/${encodeURIComponent(event.id)}/exports/attendees${exportParams ? `?${exportParams}` : ""}`;
@@ -72,10 +79,10 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
         <div>
           <p className="eyebrow">{event.name}</p>
           <h2>{staffPageTitles.attendeeList}</h2>
-          <p>One row per attendee{query.view === DEFAULT_LISTING_VIEW ? ", with meal, dietary, childcare and volunteer answers" : ""}. {rows.length} {rows.length === 1 ? "attendee" : "attendees"} shown{query.view !== DEFAULT_LISTING_VIEW ? <> in the {activeView.label} view</> : null}.</p>
+          <p>One row per attendee{query.view === DEFAULT_LISTING_VIEW ? ", with meal, dietary, childcare and volunteer answers" : ""}.{query.view !== DEFAULT_LISTING_VIEW ? <> This is the {activeView.label} view.</> : null}</p>
         </div>
         <div className="intro-actions">
-          {canExport && <a className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV (all columns)</a>}
+          {canExport && <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV (all columns)</ExportLink>}
         </div>
       </div>
 
@@ -145,11 +152,8 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
               {columns.map((column) => {
                 const active = query.sort === column.key;
                 const nextDirection = active && query.direction === "asc" ? "desc" : "asc";
-                return (
-                  <th key={column.key} data-col={column.key} role="columnheader" scope="col" aria-sort={active ? (query.direction === "asc" ? "ascending" : "descending") : undefined}>
-                    <PhoneHiddenSortLink href={href({ sort: column.key, direction: nextDirection })}>{column.label}{active ? (query.direction === "asc" ? " ▲" : " ▼") : ""}</PhoneHiddenSortLink>
-                  </th>
-                );
+                // No page in the link: a new order starts at page 1.
+                return <SortableHeader key={column.key} active={active} dataCol={column.key} direction={query.direction} href={href({ sort: column.key, direction: nextDirection })} label={column.label} />;
               })}
             </tr>
           </thead>
@@ -159,7 +163,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
                 ? <NoMatchesState clear={{ href: clearHref }} className="empty-state" noun="attendees" query={query.search} />
                 : <EmptyState className="empty-state" title="No attendees yet">Attendees appear here once people register for this event.</EmptyState>}
             </td></tr>}
-            {rows.map((row) => (
+            {slice.items.map((row) => (
               <tr role="row" key={row.attendeeId}>
                 {columns.map((column) => {
                   const value = column.key === "confirmationCode"
@@ -175,6 +179,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
           </tbody>
         </table>
       </div>
+      <ListPager hrefFor={pageHref} label="Attendee list pages" noun="attendees" nounOne="attendee" slice={slice} />
     </section>
   );
 }

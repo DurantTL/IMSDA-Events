@@ -3,6 +3,7 @@ import { rosterApiError } from "@/modules/club-rosters/api-errors";
 import { buildClubSchedule, clubScheduleCsv } from "@/modules/honors/roster-domain";
 import { getHonorRosterData } from "@/modules/honors/roster-repository";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 type Context = { params: Promise<{ organizationId: string; eventId: string }> };
 
@@ -16,14 +17,7 @@ async function getHandler(_request: Request, { params }: Context) {
       return Response.json({ error: "NOT_REGISTERED", message: "Your club isn't registered for this event." }, { status: 404 });
     }
     const csv = clubScheduleCsv(buildClubSchedule(organizationId, data.sessions, data.offerings, data.enrollments, data.attendees, data.locations), data.hasLocations);
-    return new Response(csv, {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="club-class-schedule.csv"',
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return csvDownloadResponse(csv, exportFileName({ scope: organizationId, kind: "class-schedule" }));
   } catch (error) {
     return rosterApiError(error, "Downloading the club schedule");
   }

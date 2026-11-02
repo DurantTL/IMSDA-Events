@@ -9884,6 +9884,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .list-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 0; }
 .list-pager-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .list-pager-buttons .secondary-button { min-height: 44px; }
+.list-pager-buttons .secondary-button[aria-disabled="true"] { cursor: not-allowed; opacity: 0.58; }
 
 /* Public event page (#720): one container width and left edge for the hero,
    announcements, info cards ("steps", "Need help?"), resources, the

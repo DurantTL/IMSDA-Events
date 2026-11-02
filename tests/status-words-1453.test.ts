@@ -13,8 +13,18 @@ import {
 import { describePublicRegistrationStatus } from "@/modules/public-access/domain";
 import { registrationStateLabel } from "@/modules/attendee-accounts/registration-card";
 import { statusLabel as staffStatusLabel } from "@/components/people-workspace";
+import { newClubApplicationStatusLabels, NEW_CLUB_APPLICATION_STATUSES } from "@/modules/club-applications/domain";
+import { GENERAL_LINK_STATUS_LABEL } from "@/modules/general-link-registrations/domain";
+import { memberTransferStaffStatusLabels, receivingClubStatusLabel, sendingClubStatusLabel, SENDING_CLUB_NEEDS_ANSWER_LINE } from "@/modules/club-transfers/domain";
+import { merchandiseOrderStatusWords } from "@/modules/merchandise/domain";
+import { CLUB_ASSIGNMENT_EMAIL_NOT_SENT_WORD } from "@/modules/club-registrations/assignments";
+import { ClubTransferCard } from "@/components/club-transfers-panel";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 
+const root0 = join(__dirname, "..");
+const read = (path: string) => readFileSync(join(root0, path), "utf8");
 const eight = ["Draft", "Submitted", "Pending payment", "Pending approval", "Confirmed", "Waitlisted", "Cancelled", "Refunded"];
 
 describe("status words (#1453, B12)", () => {
@@ -72,6 +82,65 @@ describe("status words (#1453, B12)", () => {
     expect(registrationMoneyStatus({ ...base, deferredBilling: true, audience: "staff" })).toBe("Billed to church");
     expect(registrationMoneyStatus({ ...base, deferredBilling: true, audience: "attendee" })).toBe("Billed to your church");
     expect(registrationMoneyStatus({ ...base, deferredBilling: true, isGroup: true })).toBe("Billed to group contact");
+  });
+});
+
+describe("club status words (#1479)", () => {
+  /** Words that stay on purpose: a stored state with no matching shared word keeps its own wording. */
+  const kept = new Set(["Expired", "Used", "Sent", "Attached to a club", "Declined by the sending club", "Completed"]);
+  const shared = (word: string) => expect(eight.includes(word) || kept.has(word), word).toBe(true);
+
+  it("maps every club application status, and every general link status, to a shared or kept word", () => {
+    expect(Object.keys(newClubApplicationStatusLabels).sort()).toEqual([...NEW_CLUB_APPLICATION_STATUSES].sort());
+    expect(newClubApplicationStatusLabels).toEqual({ PENDING: "Pending approval", APPROVED: "Confirmed", DECLINED: "Cancelled" });
+    expect(Object.keys(GENERAL_LINK_STATUS_LABEL).sort()).toEqual(["CONFIRMED", "EXPIRED", "PENDING", "REJECTED"]);
+    expect(GENERAL_LINK_STATUS_LABEL).toEqual({ PENDING: "Pending approval", CONFIRMED: "Attached to a club", REJECTED: "Cancelled", EXPIRED: "Expired" });
+    for (const word of [...Object.values(newClubApplicationStatusLabels), ...Object.values(GENERAL_LINK_STATUS_LABEL)]) shared(word);
+  });
+
+  it("maps every transfer status to a shared or kept word, with no 'No match' wording", () => {
+    expect(Object.keys(memberTransferStaffStatusLabels).sort()).toEqual(["CANCELLED", "COMPLETED", "DECLINED", "PENDING", "UNMATCHED"]);
+    expect(memberTransferStaffStatusLabels.UNMATCHED).toBe("Pending approval");
+    for (const word of Object.values(memberTransferStaffStatusLabels)) shared(word);
+    expect(receivingClubStatusLabel("UNMATCHED")).toBe("Pending approval");
+    expect(sendingClubStatusLabel("UNMATCHED")).toBe("Pending approval");
+  });
+
+  it("shows the sending club 'Pending approval' with the line 'Your club needs to answer' under it", () => {
+    expect(SENDING_CLUB_NEEDS_ANSWER_LINE).toBe("Your club needs to answer");
+    const base = {
+      id: "t1", direction: "OUTGOING", memberName: "Ada Testperson", otherClubName: "Test Club", reason: "Moved", status: "PENDING",
+      statusLabel: "Pending approval", initiatedAt: "2026-10-01T12:00:00.000Z", acknowledgeDueAt: "2026-10-15T12:00:00.000Z", resolvedAt: null,
+      canAccept: true, canDecline: true, canCancel: true, events: [],
+    };
+    const sending = renderToStaticMarkup(createElement(ClubTransferCard, { transfer: base as never, onAction: () => {} }));
+    expect(sending).toMatch(/Pending approval<\/span><\/div><p[^>]*>Your club needs to answer<\/p>/);
+    const receiving = renderToStaticMarkup(createElement(ClubTransferCard, {
+      transfer: { ...base, direction: "INCOMING", canAccept: false, acknowledgeDueAt: undefined } as never, onAction: () => {},
+    }));
+    expect(receiving).not.toContain("Your club needs to answer");
+  });
+
+  it("maps every merchandise order status to a shared word, and refunded reads Refunded", () => {
+    expect(Object.keys(merchandiseOrderStatusWords).sort()).toEqual(["CANCELLED", "PAID", "PENDING", "REFUNDED"]);
+    expect(merchandiseOrderStatusWords).toEqual({ PENDING: "Pending payment", PAID: "Confirmed", CANCELLED: "Cancelled", REFUNDED: "Refunded" });
+    for (const word of Object.values(merchandiseOrderStatusWords)) expect(eight).toContain(word);
+  });
+
+  it("uses Draft for an assignment email that was never sent", () => {
+    expect(CLUB_ASSIGNMENT_EMAIL_NOT_SENT_WORD).toBe("Draft");
+    expect(read("components/club-assignments-workspace.tsx")).toContain("CLUB_ASSIGNMENT_EMAIL_NOT_SENT_WORD");
+  });
+
+  it("relabels the club form, health link, invite and team permission words, keeping stored keys", () => {
+    for (const path of ["components/club-forms-lists.tsx", "components/health-record-actions.tsx"]) {
+      const source = read(path);
+      expect(source).toContain('OPEN: "Draft", USED: "Submitted", REVOKED: "Cancelled", EXPIRED: "Expired"');
+      expect(source).toMatch(/satisfies Record<[^>]*, StatusWord \| "Expired">/);
+      expect(source).not.toMatch(/"Waiting"|"Withdrawn"/);
+    }
+    expect(read("components/club-invites-workspace.tsx")).toContain('PENDING: "Draft", SENT: "Sent", ACCEPTED: "Confirmed", CANCELLED: "Cancelled"');
+    expect(read("components/team-permission-panel.tsx")).toContain('PENDING: "Pending approval", GRANTED: "Confirmed", DECLINED: "Cancelled"');
   });
 });
 

@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { ColumnHeader } from "@/components/column-header";
 import { CoordinatorScrollRegion } from "@/components/coordinator-destinations";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
-import { filterClubsByName, sortLeaderboard, type AreaClubSummary, type LeaderboardSort } from "@/modules/club-reports/area-summary-domain";
+import { sortOrderText, sortRows, type ServerSort } from "@/lib/list-sort";
+import { filterClubsByName, sortLeaderboard, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
+import { rankingAccessors, type CoordinatorRankingSortColumn } from "@/modules/club-reports/area-table-sort";
 import { supportingRecordMonths } from "@/modules/club-reports/coordinator-destinations-domain";
-import { POINTS_CHART_LIMIT, pointsPageHref } from "@/modules/club-reports/coordinator-points-domain";
+import { POINTS_CHART_LIMIT } from "@/modules/club-reports/coordinator-points-domain";
 import styles from "./coordinator-points.module.css";
 
 const formatNumber = (value: number) => value.toLocaleString("en-US");
@@ -12,35 +16,32 @@ const formatNumber = (value: number) => value.toLocaleString("en-US");
  * The coordinator's ranking table (#1316), the chart's table alternative. Rank always comes from every club by total
  * points; a name search only narrows the rows. Supporting records is one "Records (n)" link per club.
  */
-export function CoordinatorPointsRanking({ allClubs, basePath, clubYear, query, sort }: {
+export function CoordinatorPointsRanking({ allClubs, clubYear, query, sorting, open }: {
   allClubs: readonly AreaClubSummary[];
-  basePath: string;
   clubYear: string;
   query: string;
-  sort: LeaderboardSort;
+  sorting: ServerSort<CoordinatorRankingSortColumn>;
+  /** Opened by a sort in the address, so a header click does not close the table it sorted. */
+  open?: boolean;
 }) {
   const rankOf = new Map(sortLeaderboard(allClubs, "points").map((club, index) => [club.id, index + 1]));
-  const rows = filterClubsByName(sortLeaderboard(allClubs, sort), query);
-  const sortHref = (value: LeaderboardSort) => pointsPageHref(basePath, { year: clubYear, sort: value, q: query });
+  const { key, dir } = sorting.order;
+  const rows = filterClubsByName(key ? sortRows(sortLeaderboard(allClubs, "points"), key, dir, rankingAccessors(rankOf)) : sortLeaderboard(allClubs, "points"), query);
+  const sortWords: Record<CoordinatorRankingSortColumn, string> = { rank: "rank", name: "club name", reportPoints: "report points", registration: "yearly registration", points: "total points" };
   return (
-    <details className={styles.details} open={sort === "name"}>
+    <details className={styles.details} open={open || undefined}>
       <summary className={styles.summary}>Show as a table (ranking and supporting records)</summary>
-      <p className={styles.sortNote}>
-        {sort === "name" ? "Sorted by club name, A to Z." : "Sorted by total points, highest first."}{" "}
-        Sort by {sort === "points" ? <strong>points</strong> : <Link href={sortHref("points")}>points</Link>}
-        {" · "}
-        {sort === "name" ? <strong>club name</strong> : <Link href={sortHref("name")}>club name</Link>}
-      </p>
+      {key && <SortOrderNote>{sortOrderText(sortWords[key], dir, key === "name" ? "text" : "number")}</SortOrderNote>}
       <CoordinatorScrollRegion label={`Points by club for ${clubYear}`}>
         <table className="report-table table-cards" role="table">
           <caption className="sr-only">Total points per club for {clubYear}, with each club&apos;s submitted records</caption>
           <thead role="rowgroup">
             <tr role="row">
-              <th role="columnheader" scope="col">Rank</th>
-              <th role="columnheader" scope="col">Club</th>
-              <th role="columnheader" scope="col">Report points</th>
-              <th role="columnheader" scope="col">Yearly registration</th>
-              <th role="columnheader" scope="col">Total points</th>
+              <ColumnHeader column="rank" label="Rank" sorting={sorting} />
+              <ColumnHeader column="name" label="Club" sorting={sorting} />
+              <ColumnHeader column="reportPoints" label="Report points" sorting={sorting} />
+              <ColumnHeader column="registration" label="Yearly registration" sorting={sorting} />
+              <ColumnHeader column="points" label="Total points" sorting={sorting} />
               <th role="columnheader" scope="col">Supporting records</th>
             </tr>
           </thead>

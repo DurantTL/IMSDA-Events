@@ -6,6 +6,8 @@ import { programAssignmentRosterCsv } from "@/modules/program-assignments/domain
 import { getAppliedAssignmentRoster } from "@/modules/program-assignments/repository";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
 async function getHandler(
   _request: Request,
@@ -28,15 +30,7 @@ async function getHandler(
         { status: 404 }
       );
     }
-    const safeRunId = runId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 100) || "run";
-    return new Response(programAssignmentRosterCsv(roster), {
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="program-assignments-${safeRunId}.csv"`,
-        "Cache-Control": "private, no-store, max-age=0",
-        "X-Content-Type-Options": "nosniff",
-      },
-    });
+    return csvDownloadResponse(programAssignmentRosterCsv(roster), exportFileName({ scope: await eventFileScope(eventId), kind: `program-assignments-${runId}` }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {
       return Response.json(

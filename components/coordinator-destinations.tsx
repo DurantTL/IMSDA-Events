@@ -1,7 +1,12 @@
+import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { ColumnHeader } from "@/components/column-header";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { Download } from "lucide-react";
+import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
+import { sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
+import { eventClubAccessors, type EventClubSortColumn } from "@/modules/club-reports/area-table-sort";
 import { filterClubsByName, eventHeadcount, eventStatusLabels, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
 import type { AreaClubEvent } from "@/modules/club-reports/area-summary-repository";
 import { COORDINATOR_SCOPE_TEXT, fullYearExportLabel } from "@/modules/club-reports/coordinator-overview-domain";
@@ -45,9 +50,9 @@ export function CoordinatorExportLink({ clubYear, kind }: { clubYear: string; ki
   return (
     <div className="coordinator-export">
       <div className="intro-actions">
-        <a className="secondary-button" href={`${EXPORT_PATH}?report=${kind}&year=${encodeURIComponent(clubYear)}`}>
+        <ExportLink className="secondary-button" href={`${EXPORT_PATH}?report=${kind}&year=${encodeURIComponent(clubYear)}`}>
           <Download aria-hidden="true" size={15} /> {fullYearExportLabel(clubYear, kind)}
-        </a>
+        </ExportLink>
       </div>
       <p className="field-help">The CSV covers the full club year for every available club. It does not change with the search below.</p>
     </div>
@@ -73,6 +78,9 @@ export function CoordinatorScrollRegion({ label, className = "", children }: { l
   );
 }
 
+export type RecordsGridColumn = "club" | "submitted" | "notSubmitted" | `month-${string}`;
+const stateRank = { NOT_SUBMITTED: 0, NOT_DUE: 1, SUBMITTED: 2 } as const;
+
 /**
  * Monthly Records: a club-by-month grid. Submitted opens that record read only,
  * Not submitted and Not due yet are plain text. No approve control.
@@ -84,6 +92,7 @@ export function CoordinatorMonthlyRecords({
   query,
   clearHref,
   now = new Date(),
+  sorting,
 }: {
   clubs: AreaClubSummary[];
   allClubsCount: number;
@@ -91,24 +100,37 @@ export function CoordinatorMonthlyRecords({
   query: string;
   clearHref: string;
   now?: Date;
+  /** `club`, `submitted`, `notSubmitted` and one `month-YYYY-MM` per month (sorted by that month's record state). */
+  sorting?: ServerSort<RecordsGridColumn>;
 }) {
   if (allClubsCount === 0) return <><p className="report-empty">No active clubs are available to this role yet.</p><CoordinatorSetupHelp context="the club list" id="no-clubs" /></>;
   if (clubs.length === 0) return <CoordinatorNoMatch clearHref={clearHref} query={query} />;
   const months = monthlyRecordCells(clubs[0]!, now).map(({ month, short }) => ({ month, short }));
+  const key = sorting?.order.key ?? null;
+  const accessor = (column: RecordsGridColumn) => (club: AreaClubSummary): SortValue => {
+    if (column === "club") return club.name;
+    if (column === "submitted") return monthlyRecordCounts(club, now).submitted;
+    if (column === "notSubmitted") return monthlyRecordCounts(club, now).notSubmitted;
+    const cell = monthlyRecordCells(club, now).find((entry) => `month-${entry.month}` === column);
+    return cell ? stateRank[cell.status.state] : null;
+  };
+  const rows = key ? sortRows(clubs, key, sorting!.order.dir, { [key]: accessor(key) } as Record<RecordsGridColumn, (club: AreaClubSummary) => SortValue>) : clubs;
+  const sortedLabel = key === null ? null : key.startsWith("month-") ? `${months.find((entry) => `month-${entry.month}` === key)?.short ?? "month"} record` : { club: "club name", submitted: "submitted", notSubmitted: "not submitted" }[key as "club"];
   return (
     <CoordinatorScrollRegion className="club-reports-grid" label={`Monthly Records by club and month, ${clubYear}`}>
+      {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : key?.startsWith("month-") ? "state" : "number")}</SortOrderNote>}
       <table className="report-table table-cards table-cards-xwide" role="table">
         <caption className="sr-only">Monthly Record status by club for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">
-            <th role="columnheader" scope="col">Club / church</th>
-            {months.map(({ month, short }) => <th key={month} role="columnheader" scope="col">{short}</th>)}
-            <th role="columnheader" scope="col">Submitted</th>
-            <th role="columnheader" scope="col">Not submitted</th>
+            <ColumnHeader column="club" label="Club / church" sorting={sorting} />
+            {months.map(({ month, short }) => <ColumnHeader column={`month-${month}`} key={month} label={short} hiddenLabel="record" sorting={sorting} />)}
+            <ColumnHeader column="submitted" label="Submitted" sorting={sorting} />
+            <ColumnHeader column="notSubmitted" label="Not submitted" sorting={sorting} />
           </tr>
         </thead>
         <tbody role="rowgroup">
-          {clubs.map((club) => {
+          {rows.map((club) => {
             const counts = monthlyRecordCounts(club, now);
             return (
               <tr key={club.id} role="row">
@@ -152,10 +174,12 @@ export function CoordinatorClubEvents({
   events,
   query,
   clearHref,
+  sorting,
 }: {
   events: AreaClubEvent[];
   query: string;
   clearHref: string;
+  sorting?: ServerSort<EventClubSortColumn>;
 }) {
   // A search narrows each event's club rows and hides events with no match; an event's own totals stay whole.
   const shownEvents = query ? events.filter((event) => filterClubsByName(event.clubs, query).length > 0) : events;
@@ -163,6 +187,7 @@ export function CoordinatorClubEvents({
   if (shownEvents.length === 0) return <CoordinatorNoMatch clearHref={clearHref} query={query} />;
   return (
     <>
+      {sorting?.order.key && <SortOrderNote>{sortOrderText({ club: "club name", status: "status", headcount: "headcount" }[sorting.order.key], sorting.order.dir, sorting.order.key === "headcount" ? "number" : "text")}</SortOrderNote>}
       {shownEvents.map((event) => (
         <section aria-labelledby={`coordinator-event-${event.id}`} className="coordinator-event" key={event.id}>
           <div className="coordinator-event-head">
@@ -182,14 +207,14 @@ export function CoordinatorClubEvents({
               <caption className="sr-only">Club registrations for {event.name}</caption>
               <thead role="rowgroup">
                 <tr role="row">
-                  <th role="columnheader" scope="col">Club</th>
-                  <th role="columnheader" scope="col">Status</th>
-                  <th role="columnheader" scope="col">Headcount</th>
+                  <ColumnHeader column="club" hiddenLabel={event.name} label="Club" sorting={sorting} />
+                  <ColumnHeader column="status" hiddenLabel={event.name} label="Status" sorting={sorting} />
+                  <ColumnHeader column="headcount" hiddenLabel={event.name} label="Headcount" sorting={sorting} />
                   <th role="columnheader" scope="col">Open club</th>
                 </tr>
               </thead>
               <tbody role="rowgroup">
-                {filterClubsByName(event.clubs, query).map((club) => (
+                {(sorting?.order.key ? sortRows(filterClubsByName(event.clubs, query), sorting.order.key, sorting.order.dir, eventClubAccessors) : filterClubsByName(event.clubs, query)).map((club) => (
                   <tr key={club.organizationId} role="row">
                     <th role="rowheader" scope="row" translate="no">{club.name}</th>
                     <td {...cardCell("Status")}>{eventStatusLabels[club.status]}</td>

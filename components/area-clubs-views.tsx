@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ColumnHeader } from "@/components/column-header";
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { Download } from "lucide-react";
 import { AreaClubSearchForm } from "@/components/area-club-search-form";
@@ -17,6 +18,15 @@ import { supportingRecordMonths } from "@/modules/club-reports/coordinator-desti
 import { reportMonthLabel } from "@/modules/club-reports/domain";
 import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote } from "@/components/list-sort";
+import { sortOrderText, sortRows, type ServerSort } from "@/lib/list-sort";
+import {
+  eventClubAccessors,
+  gridAccessors,
+  overviewAccessors,
+  type EventClubSortColumn,
+  type GridSortColumn,
+  type OverviewSortColumn,
+} from "@/modules/club-reports/area-table-sort";
 
 /**
  * Read-only cross-club report views shared by the Area Coordinator's Clubs
@@ -56,26 +66,30 @@ export function AreaClubSearch({ label = "Search clubs by name", ...props }: { b
   return <AreaClubSearchForm {...props} label={label} />;
 }
 
-export function AreaClubsOverview({ clubs, clubYear, links, query }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string }) {
+const overviewLabels: Record<OverviewSortColumn, string> = { club: "club", director: "director", church: "church", roster: "roster", reports: "reports submitted", points: "total points", lastReport: "last report", sterling: "Sterling Volunteers" };
+
+export function AreaClubsOverview({ clubs, clubYear, links, query, sorting }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string; sorting?: ServerSort<OverviewSortColumn> }) {
   if (clubs.length === 0) return <NoClubs query={query} />;
+  const rows = sorting?.order.key ? sortRows(clubs, sorting.order.key, sorting.order.dir, overviewAccessors) : clubs;
   return (
-    <div className="report-table-wrap card-box">
+    <div className="report-table-wrap card-box" id="club-overview">
+      {sorting?.order.key && <SortOrderNote>{sortOrderText(overviewLabels[sorting.order.key], sorting.order.dir, ["roster", "reports", "points", "sterling"].includes(sorting.order.key) ? "number" : sorting.order.key === "lastReport" ? "date" : "text")}</SortOrderNote>}
       <table role="table" className="report-table table-cards table-cards-tablet">
         <caption className="sr-only">Club overview for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">
-            <th role="columnheader" scope="col">Club</th>
-            <th role="columnheader" scope="col">Director</th>
-            <th role="columnheader" scope="col">Church</th>
-            <th role="columnheader" scope="col">Roster</th>
-            <th role="columnheader" scope="col">Reports submitted</th>
-            <th role="columnheader" scope="col">Total points</th>
-            <th role="columnheader" scope="col">Last report</th>
-            <th role="columnheader" scope="col">Sterling Volunteers</th>
+            <ColumnHeader column="club" label="Club" sorting={sorting} />
+            <ColumnHeader column="director" label="Director" sorting={sorting} />
+            <ColumnHeader column="church" label="Church" sorting={sorting} />
+            <ColumnHeader column="roster" label="Roster" sorting={sorting} />
+            <ColumnHeader column="reports" label="Reports submitted" sorting={sorting} />
+            <ColumnHeader column="points" label="Total points" sorting={sorting} />
+            <ColumnHeader column="lastReport" label="Last report" sorting={sorting} />
+            <ColumnHeader column="sterling" label="Sterling Volunteers" sorting={sorting} />
           </tr>
         </thead>
         <tbody role="rowgroup">
-          {clubs.map((club) => (
+          {rows.map((club) => (
             <tr role="row" key={club.id}>
               <th role="rowheader" scope="row" translate="no"><Link href={links.clubHref(club.id)}>{club.name}</Link></th>
               <td {...cardCell("Director")} translate="no">{club.directors.length > 0 ? club.directors.join(", ") : "—"}</td>
@@ -96,25 +110,29 @@ export function AreaClubsOverview({ clubs, clubYear, links, query }: { clubs: Ar
   );
 }
 
-export function AreaMonthlyReportsTable({ clubs, clubYear, links, query }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string }) {
+export function AreaMonthlyReportsTable({ clubs, clubYear, links, query, sorting }: { clubs: AreaClubSummary[]; clubYear: string; links: AreaLinks; query?: string; sorting?: ServerSort<GridSortColumn> }) {
   if (clubs.length === 0) return <NoClubs query={query} />;
   const months = clubs[0]!.months.map((cell) => cell.month);
+  const key = sorting?.order.key ?? null;
+  const rows = key ? sortRows(clubs, key, sorting!.order.dir, gridAccessors(clubYear)) : clubs;
+  const sortedLabel = key === null ? null : key.startsWith("month-") ? `${reportMonthLabel(key.slice(6))} points` : { club: "club", submitted: "submitted", drafts: "drafts", missing: "missing", points: "total points" }[key as "club"];
   return (
-    <div className="report-table-wrap club-reports-grid">
+    <div className="report-table-wrap club-reports-grid" id="monthly-grid">
+      {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : "number")}</SortOrderNote>}
       <table role="table" className="report-table table-cards table-cards-xwide">
         <caption className="sr-only">Monthly Record status and points by club for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">
-            <th role="columnheader" scope="col">Club</th>
-            {months.map((month) => <th key={month} role="columnheader" scope="col">{shortMonth(month)}</th>)}
-            <th role="columnheader" scope="col">Submitted</th>
-            <th role="columnheader" scope="col">Draft</th>
-            <th role="columnheader" scope="col">Missing</th>
-            <th role="columnheader" scope="col">Total points</th>
+            <ColumnHeader column="club" label="Club" sorting={sorting} />
+            {months.map((month) => <ColumnHeader column={`month-${month}`} key={month} label={shortMonth(month)} hiddenLabel="points" sorting={sorting} />)}
+            <ColumnHeader column="submitted" label="Submitted" sorting={sorting} />
+            <ColumnHeader column="drafts" label="Draft" sorting={sorting} />
+            <ColumnHeader column="missing" label="Missing" sorting={sorting} />
+            <ColumnHeader column="points" label="Total points" sorting={sorting} />
           </tr>
         </thead>
         <tbody role="rowgroup">
-          {clubs.map((club) => (
+          {rows.map((club) => (
             <tr role="row" key={club.id}>
               <th role="rowheader" scope="row" translate="no">{club.name}{club.church && <small>{club.church}</small>}</th>
               {club.months.map((cell) => {
@@ -231,12 +249,13 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
   );
 }
 
-export function AreaClubEvents({ events, clubHref, query }: { events: AreaClubEvent[]; clubHref: (organizationId: string) => string; query?: string }) {
+export function AreaClubEvents({ events, clubHref, query, sorting }: { events: AreaClubEvent[]; clubHref: (organizationId: string) => string; query?: string; sorting?: ServerSort<EventClubSortColumn> }) {
   // A search narrows each event's club rows and hides events with no match; the event's own totals stay whole (#791).
   const shownEvents = query ? events.filter((event) => filterClubsByName(event.clubs, query).length > 0) : events;
   if (shownEvents.length === 0) return <><p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>{query ? null : <EventSetupHelp context="club events" id="staff-club-events-none" />}</>;
   return (
     <>
+      {sorting?.order.key && <SortOrderNote>{sortOrderText({ club: "club", status: "status", headcount: "headcount" }[sorting.order.key], sorting.order.dir, sorting.order.key === "headcount" ? "number" : "text")}</SortOrderNote>}
       {shownEvents.map((event) => (
         <section className="panel report-panel" key={event.id}>
           <div className="section-heading">
@@ -253,10 +272,14 @@ export function AreaClubEvents({ events, clubHref, query }: { events: AreaClubEv
             <table role="table" className="report-table table-cards">
               <caption className="sr-only">Club registrations for {event.name}</caption>
               <thead role="rowgroup">
-                <tr role="row"><th role="columnheader" scope="col">Club</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Headcount</th></tr>
+                <tr role="row">
+                  <ColumnHeader column="club" label="Club" hiddenLabel={event.name} sorting={sorting} />
+                  <ColumnHeader column="status" label="Status" hiddenLabel={event.name} sorting={sorting} />
+                  <ColumnHeader column="headcount" label="Headcount" hiddenLabel={event.name} sorting={sorting} />
+                </tr>
               </thead>
               <tbody role="rowgroup">
-                {filterClubsByName(event.clubs, query).map((club) => (
+                {(sorting?.order.key ? sortRows(filterClubsByName(event.clubs, query), sorting.order.key, sorting.order.dir, eventClubAccessors) : filterClubsByName(event.clubs, query)).map((club) => (
                   <tr role="row" key={club.organizationId}>
                     <th role="rowheader" scope="row" translate="no"><Link href={clubHref(club.organizationId)}>{club.name}</Link></th>
                     <td {...cardCell("Status")}>{eventStatusLabels[club.status]}</td>

@@ -74,11 +74,13 @@ export function resolveRecordsMonth(clubYear: string, requested: string | undefi
 }
 
 /** An address on this page. `q` and `all` appear only when set. */
-export function coordinatorRecordsHref(input: { clubYear: string; month?: string; query?: string; all?: boolean }) {
+export function coordinatorRecordsHref(input: { clubYear: string; month?: string; query?: string; all?: boolean; sort?: { key: string | null; dir: string } }) {
   const params = new URLSearchParams({ year: input.clubYear });
   if (input.month) params.set("month", input.month);
   if (input.query) params.set("q", input.query);
   if (input.all) params.set("all", "1");
+  // The month table's order rides along "Show all" and "Show fewer" (#1458).
+  if (input.sort?.key) { params.set("sort", input.sort.key); params.set("dir", input.sort.dir); }
   return `${COORDINATOR_RECORDS_PATH}?${params}`;
 }
 

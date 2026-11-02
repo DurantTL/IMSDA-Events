@@ -132,14 +132,14 @@ describe("Registrations: search, then Start registration, then Actions", () => {
     expect(menu).toContain("Actions");
     expect(menu).toContain("Find duplicates");
     expect(menu).toContain("Directory review");
-    expect(menu).toContain("Export CSV");
+    expect(menu).toContain("Download CSV");
     expect(menu).toContain("Email selected");
     // Nothing is ticked, so bulk email is present but cannot be used.
     expect(menu).toMatch(/<button[^>]*disabled[^>]*>[\s\S]*Email selected/);
     // None of those sit outside the menu any more.
     const outside = html.replace(menu, "");
     expect(outside).not.toContain("Find duplicates");
-    expect(outside).not.toContain("Export CSV");
+    expect(outside).not.toContain("Download CSV");
     expect(outside).not.toContain("Directory review");
   });
 
@@ -148,7 +148,7 @@ describe("Registrations: search, then Start registration, then Actions", () => {
     expect(html).not.toContain("Start registration");
     expect(html).not.toContain("Directory review");
     expect(html).not.toContain("Email selected");
-    expect(html).toContain("Export CSV");
+    expect(html).toContain("Download CSV");
     expect(html).not.toContain("primary-button");
   });
 

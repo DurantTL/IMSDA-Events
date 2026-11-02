@@ -140,7 +140,7 @@ describe("filterClubHonorsRows and clubHonorsCsv", () => {
     const lines = clubHonorsCsv(rows).split(/\r?\n/);
     expect(lines[0]).toBe(CLUB_HONORS_CSV_HEADERS.map((header) => `"${header}"`).join(","));
     // The label the screen shows for the class column is the CSV's, and the class is named as the screen names it.
-    expect(read("components/club-honors-workspace.tsx")).toContain(">Current class</th>");
+    expect(read("components/club-honors-workspace.tsx")).toContain('label="Current class"');
     expect(lines[1]).toBe('"Lin","Ada","Basic Rescue","Completed","2026-09-01","Explorer"');
     // A member with no honors still has a line, with the honor columns empty.
     expect(lines.some((line) => line.includes("Diaz") && line.endsWith(',"Explorer"'))).toBe(true);

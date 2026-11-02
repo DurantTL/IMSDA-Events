@@ -174,7 +174,7 @@ describe("emergency plan input and export", () => {
     signInAs("READ_ONLY_STAFF");
     const response = await exportCsv();
     expect(response.headers.get("Content-Type")).toContain("text/csv");
-    expect(response.headers.get("Content-Disposition")).toContain("emergency-plan-v2.csv");
+    expect(response.headers.get("Content-Disposition")).toMatch(/event-1-emergency-plan-v2-\d{4}-\d{2}-\d{2}\.csv/);
     expect(mocks.getEmergencyPlanVersion).toHaveBeenLastCalledWith("event-1", undefined);
     expect(await response.text()).toContain("(515) 555-0100");
     await exportCsv("?version=2");

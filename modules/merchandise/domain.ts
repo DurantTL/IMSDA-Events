@@ -1,8 +1,18 @@
 import { createHash } from "node:crypto";
+import type { StatusWord } from "@/modules/registrations/status-words";
 
 export type MerchandiseInventoryPolicy = "UNLIMITED" | "TRACKED";
 export type MerchandiseTaxTreatment = "TAXABLE" | "TAX_EXEMPT";
 export type MerchandiseFeePolicy = "ABSORBED_BY_EVENT" | "PASSED_TO_BUYER";
+export type MerchandiseOrderStatusValue = "PENDING" | "PAID" | "CANCELLED" | "REFUNDED";
+
+/** The shared status word for a merchandise order (#1479, rule B12). Display only: the stored values do not change. */
+export const merchandiseOrderStatusWords = {
+  PENDING: "Pending payment",
+  PAID: "Confirmed",
+  CANCELLED: "Cancelled",
+  REFUNDED: "Refunded",
+} as const satisfies Record<MerchandiseOrderStatusValue, StatusWord>;
 
 export type MerchandiseCatalog = {
   eventId: string;

@@ -329,7 +329,7 @@ describe("7. the Team approvals tab explains itself (#918, #1015)", () => {
     expect(teamPermissionsIntro.ageRuleLead).toContain("maximum age");
     expect(teamPermissionsIntro.coaches).toContain("registered as coaches");
     expect(teamPermissionsIntro.coaches).toContain("don't need approval");
-    expect(teamPermissionsIntro.levels.map((level) => level.label)).toEqual(["Pending approval", "Approved", "Declined"]);
+    expect(teamPermissionsIntro.levels.map((level) => level.label)).toEqual(["Pending approval", "Confirmed", "Cancelled"]);
     for (const level of teamPermissionsIntro.levels) expect(level.detail.length).toBeGreaterThan(30);
     expect(teamPermissionsIntro.levels[0]!.detail).toContain("The team is registered while you decide");
     expect(teamPermissionsIntro.levels[2]!.detail).toContain("coach");

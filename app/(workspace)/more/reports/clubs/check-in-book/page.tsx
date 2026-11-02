@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
@@ -53,7 +54,7 @@ export default async function CheckInBookPage({
         </div>
         <div className="intro-actions report-actions">
           <Link className="secondary-button" href={`/more/reports/clubs?${eventQuery}`}>Back to club reports</Link>
-          <a className="secondary-button report-download" href={`/api/events/${encodeURIComponent(event.id)}/check-in-book?${downloadParams.toString()}`}><Download aria-hidden="true" size={15} /> Download CSV</a>
+          <ExportLink className="secondary-button report-download" href={`/api/events/${encodeURIComponent(event.id)}/check-in-book?${downloadParams.toString()}`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
           <PrintReportButton label="Print the book" />
         </div>
       </div>

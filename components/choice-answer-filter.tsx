@@ -1,3 +1,4 @@
+import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { Download, ListFilter, X } from "lucide-react";
 import { EmailRegistrationsButton } from "@/components/email-registrations-button";
@@ -143,7 +144,7 @@ export function ChoiceAnswerFilter({
             <div className="choice-filter-results">
               <div className="choice-filter-results-head">
                 <strong>{selected.label}: {selectedLabel} · {selected.matches.length} {resultNoun}</strong>
-                {exportHref && <a className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Export this list (CSV)</a>}
+                {exportHref && <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download this list (CSV)</ExportLink>}
                 {canEmail && emailRegistrationIds.length > 0 && (
                   <EmailRegistrationsButton
                     eventId={eventId}

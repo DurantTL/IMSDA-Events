@@ -42,7 +42,8 @@ describe("tables that became phone cards (#447)", () => {
     expect(attendeeListing).toContain('role="table" className="report-table table-cards table-cards-max attendee-listing-table"');
     expect(attendeeListing).toContain("{...cardCell(column.label)}");
     expect(attendeeListing).toMatch(/column\.key === "name"\s*\?\s*<th key=\{column\.key\} data-col=\{column\.key\} role="rowheader" scope="row">/);
-    expect(attendeeListing).toContain('role="columnheader"');
+    // The header cell comes from the shared SortableHeader, which sets role and scope (#1458).
+    expect(read("components/list-sort.tsx")).toContain('role="columnheader"');
   });
 
   it("the attendee listing gives a phone Sort and Direction, a sort note, and no stray Tab stops", () => {
@@ -50,7 +51,9 @@ describe("tables that became phone cards (#447)", () => {
     expect(attendeeListing).toContain('<select name="sort"');
     expect(attendeeListing).toContain('<select name="dir"');
     expect(attendeeListing).toContain("<SortOrderNote>");
-    expect(attendeeListing).toContain("<PhoneHiddenSortLink");
+    // The link-mode SortableHeader renders through PhoneHiddenSortLink (#1458).
+    expect(attendeeListing).toContain("<SortableHeader");
+    expect(read("components/list-sort.tsx")).toContain("<PhoneHiddenSortLink");
     expect(read("components/phone-hidden-sort-link.tsx")).toContain("tabIndex={onPhone ? -1 : undefined}");
     expect(enclosingMedia(css, ".attendee-sort-phone { display: contents; }")).toBe("@media screen and (max-width: 600px)");
   });

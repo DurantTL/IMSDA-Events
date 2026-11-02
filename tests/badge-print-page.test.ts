@@ -62,7 +62,7 @@ describe("printable name badge page layout options", () => {
   it("links to the Avery Design & Print CSV export", async () => {
     const markup = await render({});
     expect(markup).toContain("/api/events/event_1/exports/badge-labels-csv");
-    expect(markup).toContain("Export CSV for Avery Design &amp; Print");
+    expect(markup).toContain("Download CSV for Avery Design &amp; Print");
   });
 
   it("shows a screen-only print tip inside the intro that print CSS hides", async () => {

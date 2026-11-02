@@ -6,11 +6,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { Ban, Pencil, Send } from "lucide-react";
 import type { ClubInviteRecord } from "@/modules/club-imports/invites";
+import type { StatusWord } from "@/modules/registrations/status-words";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 
 type InvitesResponse = { invites?: ClubInviteRecord[]; sent?: number; message?: string; issues?: Array<{ message?: string }> };
 
-const statusLabels = { PENDING: "Draft", SENT: "Sent", ACCEPTED: "Accepted", CANCELLED: "Cancelled" } as const;
+const statusLabels = { PENDING: "Draft", SENT: "Sent", ACCEPTED: "Confirmed", CANCELLED: "Cancelled" } as const satisfies Record<ClubInviteRecord["status"], StatusWord | "Sent">;
 const statusTone = { PENDING: "gold", SENT: "purple", ACCEPTED: "green", CANCELLED: "coral" } as const;
 
 function formatDate(value: string | null) {

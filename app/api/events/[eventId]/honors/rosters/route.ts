@@ -13,16 +13,11 @@ import {
 import { getHonorRosterData } from "@/modules/honors/roster-repository";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
+import { eventFileScope } from "@/modules/reporting/export-scope";
 
-function csvResponse(body: string, filename: string) {
-  return new Response(body, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "private, no-store, max-age=0",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+async function csvResponse(body: string, eventId: string, kind: string) {
+  return csvDownloadResponse(body, exportFileName({ scope: await eventFileScope(eventId), kind }));
 }
 
 /** Honors Weekend rosters as CSV (#360): classes, the site roster, or one club's schedule. */
@@ -43,13 +38,12 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
     const includeAdminReasons = view === "classes" && access.user.globalRole === "SYSTEM_ADMIN";
     const data = await getHonorRosterData(eventId, { includeDietary, ...(includeAdminReasons ? { includeAdminPlacementReasons: true } : {}), ...(locationId ? { locationId } : {}) });
     if (!data) return Response.json({ error: "EVENT_NOT_FOUND" }, { status: 404 });
-    const safeEventId = eventId.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 100) || "event";
 
     if (view === "classes") {
-      return csvResponse(classRostersCsv(buildClassRosters(data.sessions, data.offerings, data.enrollments, data.attendees, data.locations), data.hasLocations, includeAdminReasons), `${safeEventId}-class-rosters.csv`);
+      return csvResponse(classRostersCsv(buildClassRosters(data.sessions, data.offerings, data.enrollments, data.attendees, data.locations), data.hasLocations, includeAdminReasons), eventId, "class-rosters");
     }
     if (view === "site") {
-      return csvResponse(siteRosterCsv(buildSiteRoster(data.attendees), includeDietary, data.hasLocations), `${safeEventId}-site-roster.csv`);
+      return csvResponse(siteRosterCsv(buildSiteRoster(data.attendees), includeDietary, data.hasLocations), eventId, "site-roster");
     }
     const clubId = url.searchParams.get("club") ?? "";
     if (!data.clubs.some((club) => club.id === clubId)) {
@@ -57,7 +51,8 @@ async function getHandler(request: Request, context: { params: Promise<{ eventId
     }
     return csvResponse(
       clubScheduleCsv(buildClubSchedule(clubId, data.sessions, data.offerings, data.enrollments, data.attendees, data.locations), data.hasLocations),
-      `${safeEventId}-club-schedule.csv`,
+      eventId,
+      "club-schedule",
     );
   } catch (error) {
     if (error instanceof AccessDeniedError) {

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { EmptyState, NoMatchesState } from "./empty-state";
+import { ListPager } from "@/components/list-pager";
 import type { ReactNode } from "react";
 import type { PeopleRow } from "@/modules/system-admin/people-directory";
 import {
   NO_PEOPLE_FILTERS,
+  PEOPLE_PAGE_SIZE,
   eventRolesNeedEvent,
   needsEventPick,
   peopleFilterChips,
@@ -173,12 +175,14 @@ export function PeopleDirectory({
           ))}
         </ul>
       )}
-      {pageCount > 1 ? (
-        <nav aria-label="Pages" className={styles.pager}>
-          {page > 1 ? <Link href={peopleHref({ query, page: page - 1, filters })} rel="prev">Previous</Link> : <span aria-disabled="true" className={styles.off}>Previous</span>}
-          <span className={styles.count}>Page {page} of {pageCount}</span>
-          {page < pageCount ? <Link href={peopleHref({ query, page: page + 1, filters })} rel="next">Next</Link> : <span aria-disabled="true" className={styles.off}>Next</span>}
-        </nav>
+      {!pickEvent && !pendingOnly && total > 0 ? (
+        <ListPager
+          hrefFor={(next) => peopleHref({ query, page: next, filters })}
+          label="Pages"
+          noun="people"
+          nounOne="person"
+          slice={{ from: (page - 1) * PEOPLE_PAGE_SIZE + 1, to: Math.min(total, page * PEOPLE_PAGE_SIZE), page, pageCount, total }}
+        />
       ) : null}
     </div>
   );

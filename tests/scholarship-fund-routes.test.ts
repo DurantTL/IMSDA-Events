@@ -122,7 +122,7 @@ describe("scholarship fund routes (#398)", () => {
     const response = await getExport(get("/api/events/event_a/exports/scholarship-fund"), eventParams);
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toContain("text/csv");
-    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store, max-age=0");
     const csv = await response.text();
     expect(csv).toContain(`"'=1+1"`);
     expect(csv).not.toMatch(/,"=1\+1"/);

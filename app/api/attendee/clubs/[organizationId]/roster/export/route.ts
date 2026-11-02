@@ -5,6 +5,7 @@ import { clubYearFor } from "@/modules/club-rosters/domain";
 import { runRosterExport } from "@/modules/club-rosters/export-repository";
 import { rosterExportRequestSchema } from "@/modules/club-rosters/export-schemas";
 import { withRequestContext } from "@/lib/request-context";
+import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
 /**
  * Builds a preview or downloads a CSV for the chosen columns (#490). POST,
@@ -29,15 +30,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
       access.capabilities.guardians,
     );
     if ("csv" in result) {
-      return new Response(result.csv, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": 'attachment; filename="roster-export.csv"',
-          "Cache-Control": "private, no-store, max-age=0",
-          "X-Content-Type-Options": "nosniff",
-        },
-      });
+      return csvDownloadResponse(result.csv, exportFileName({ scope: organizationId, kind: "roster" }));
     }
     return Response.json(
       { headers: result.headers, rows: result.rows, totalRows: result.totalRows },

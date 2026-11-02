@@ -60,8 +60,8 @@ export const teamPermissionsIntro = {
   coaches: "Adults who are coaching should be registered as coaches. Coaches don't need approval.",
   levels: [
     { label: "Pending approval", detail: "The club has asked. The team is registered while you decide, so nothing is held up." },
-    { label: "Approved", detail: "The person stays on the team as a team member. You can change your mind later and decline." },
-    { label: "Declined", detail: "The person cannot be a team member. The club's director is told to change them to a coach or take them off the team. Nobody is removed for them." },
+    { label: "Confirmed", detail: "The person stays on the team as a team member. You can change your mind later and decline." },
+    { label: "Cancelled", detail: "The person cannot be a team member. The club's director is told to change them to a coach or take them off the team. Nobody is removed for them." },
   ],
   footer: "Choose Approve or Decline beside a name. The club's director sees your answer on their team page.",
 } as const;

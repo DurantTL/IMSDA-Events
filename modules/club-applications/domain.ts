@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EMAIL_FIELD_MESSAGE, emailAddressSchema, newPhoneSchema } from "@/lib/field-validation";
+import type { StatusWord } from "@/modules/registrations/status-words";
 
 /**
  * New club applications (#817). Client-safe: the public form imports the
@@ -28,11 +29,11 @@ export const newClubTypeLabels: Record<NewClubTypeValue, string> = {
   ADVENTURER: "Adventurer club",
 };
 
-export const newClubApplicationStatusLabels: Record<NewClubApplicationStatusValue, string> = {
+export const newClubApplicationStatusLabels = {
   PENDING: "Pending approval",
-  APPROVED: "Approved",
-  DECLINED: "Declined",
-};
+  APPROVED: "Confirmed",
+  DECLINED: "Cancelled",
+} as const satisfies Record<NewClubApplicationStatusValue, StatusWord>;
 
 /** The text kept on the new club's organization (`sourceOrgType`), the only place its kind is modeled today. */
 export const newClubSourceOrgType: Record<NewClubTypeValue, string> = {

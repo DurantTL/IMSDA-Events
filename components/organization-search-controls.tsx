@@ -8,13 +8,16 @@ import { listSearchParams, ORGANIZATION_SEARCH_MAX_LENGTH } from "@/modules/orga
 
 type Option = { value: string; label: string };
 
-export type OrganizationListState = { q: string; kind: string; status: string };
+/** `sort` and `dir` are set only on a list that sorts (the directory, #1458); they ride along when the search or a filter changes. */
+export type OrganizationListState = { q: string; kind: string; status: string; sort?: string; dir?: string };
 
 // Kept here so existing importers keep working; the one implementation is components/search-as-you-type.tsx (#1431).
 export { SEARCH_DEBOUNCE_MS, syncFieldValue } from "@/components/search-as-you-type";
 
 export function organizationListHref(basePath: string, state: OrganizationListState, page = 1) {
-  const query = listSearchParams({ q: state.q, kind: state.kind, status: state.status, page }).toString();
+  const params = listSearchParams({ q: state.q, kind: state.kind, status: state.status, page });
+  if (state.sort) { params.set("sort", state.sort); params.set("dir", state.dir || "asc"); }
+  const query = params.toString();
   return query ? `${basePath}?${query}` : basePath;
 }
 
@@ -77,6 +80,7 @@ export function OrganizationSearchControls({
           {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </label>
+      {state.sort && <><input name="sort" type="hidden" value={state.sort} /><input name="dir" type="hidden" value={state.dir || "asc"} /></>}
       <button className="secondary-button org-filter-submit" type="submit">Filter</button>
       {/* Rule B2 (#1456): shown whenever a search or filter is set, and a search still waiting on its pause cannot put it back. */}
       {(state.q !== "" || state.kind !== "" || state.status !== "ALL") && (

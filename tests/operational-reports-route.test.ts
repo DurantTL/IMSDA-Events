@@ -187,7 +187,7 @@ describe("operational report export route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
     expect(response.headers.get("content-type")).toContain("text/csv");
-    expect(response.headers.get("content-disposition")).toContain("event_one-roster.csv");
+    expect(response.headers.get("content-disposition")).toMatch(/event-one-roster-\d{4}-\d{2}-\d{2}\.csv/);
     expect(dependencies.requirePermission).toHaveBeenCalledWith(
       expect.anything(),
       "event_one",

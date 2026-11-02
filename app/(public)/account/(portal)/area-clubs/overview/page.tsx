@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { serverSort } from "@/lib/list-sort";
+import { COORDINATOR_GLANCE_SORT_COLUMNS } from "@/modules/club-reports/area-table-sort";
 import { notFound } from "next/navigation";
 import { CoordinatorOverviewBody, CoordinatorOverviewHeading, type CoordinatorOverviewData } from "@/components/coordinator-overview";
 import { ClubNewYearStatus } from "@/components/club-new-year-status";
@@ -22,7 +24,7 @@ export const dynamic = "force-dynamic";
  * read must never become zero clubs or a Submitted record. The year, the month
  * and every total come from `getAreaClubsSummary` for the one queried year.
  */
-export default async function AreaOverviewPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string }> }) {
+export default async function AreaOverviewPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string; sort?: string; dir?: string }> }) {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
   if (!(await currentAreaCoordinatorViewerActive())) notFound();
   const params = await searchParams;
@@ -47,7 +49,7 @@ export default async function AreaOverviewPage({ searchParams }: { searchParams:
       <UpcomingDeadlines deadlines={deadlines} />
       <section className="public-manage-card page-stack area-overview-page coordinator-overview">
         <CoordinatorOverviewHeading clubYear={clubYear} />
-        <CoordinatorOverviewBody data={data} now={now} query={query} />
+        <CoordinatorOverviewBody data={data} now={now} query={query} sorting={serverSort("/account/area-clubs/overview", params, COORDINATOR_GLANCE_SORT_COLUMNS, { key: null, dir: "asc" })} />
         {clubs && <ClubNewYearStatus clubHref={(id) => `/account/area/${id}`} status={newYearStatus} />}
       </section>
     </>

@@ -25,8 +25,8 @@ describe("team approvals panel (#1015)", () => {
     expect(html).not.toMatch(/>Grant</);
   });
 
-  it("labels a decided person Approved, not Permission granted", () => {
-    expect(html).toContain("Approved");
+  it("labels a decided person Confirmed, not Permission granted", () => {
+    expect(html).toContain("Confirmed");
     expect(html).not.toContain("Permission granted");
   });
 });

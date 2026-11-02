@@ -63,6 +63,6 @@ describe("Sterling Volunteers wording (#443)", () => {
     const flags = readFileSync(path.join(root, "components/background-check-flags.tsx"), "utf8");
     expect(flags).toContain("Sterling Volunteers needed");
     const template = readFileSync(path.join(root, "app/api/admin/background-checks/template/route.ts"), "utf8");
-    expect(template).toContain("sterling-volunteers-");
+    expect(template).toContain('scope: "sterling-volunteers"');
   });
 });
