@@ -3,15 +3,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, HeartPulse, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
+import { ListPager } from "@/components/list-pager";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { paginate, parsePageParam } from "@/lib/pagination";
 import { getPrisma } from "@/lib/prisma";
+import { searchPageHref } from "@/lib/search-page-href";
 import { reconcileRegistrationLedger } from "@/modules/ledger/reconciliation";
 import { resolveEventContext } from "@/modules/events/selection";
 import styles from "../health/operational-health.module.css";
 
 export const metadata: Metadata = { title: staffPageTitles.ledgerCheck };
 
-const visibleRowLimit = 50;
+const PAGE_SIZE = 50;
 
 function words(value: string) {
   return value
@@ -27,9 +30,10 @@ function words(value: string) {
 export default async function LedgerCheckPage({
   searchParams,
 }: {
-  searchParams: Promise<{ event?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const requested = (await searchParams).event;
+  const params = await searchParams;
+  const requested = typeof params.event === "string" ? params.event : undefined;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
     return (
@@ -43,7 +47,8 @@ export default async function LedgerCheckPage({
 
   const { checked, failing } = await reconcileRegistrationLedger(getPrisma(), { eventId: event.id });
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
-  const shown = failing.slice(0, visibleRowLimit);
+  // Every registration that differs is listed, a page at a time (#1458).
+  const slice = paginate(failing, parsePageParam(typeof params.page === "string" ? params.page : undefined), PAGE_SIZE);
 
   return (
     <section className={`page-stack ${styles.workspace}`}>
@@ -99,7 +104,7 @@ export default async function LedgerCheckPage({
             <span className={styles.count}>{failing.length} {failing.length === 1 ? "item" : "items"}</span>
           </div>
           <ul className={styles.issueList}>
-            {shown.map((row) => (
+            {slice.items.map((row) => (
               <li className={styles.issue} key={row.registrationId}>
                 <div className={styles.issueMain}>
                   <div className={styles.issueTitle}>
@@ -119,9 +124,7 @@ export default async function LedgerCheckPage({
               </li>
             ))}
           </ul>
-          {failing.length > visibleRowLimit ? (
-            <p className={styles.moreNotice}>Showing the first {visibleRowLimit} of {failing.length}.</p>
-          ) : null}
+          <ListPager hrefFor={(page) => searchPageHref("/more/ledger-health", params, page)} label="Registrations that differ, pages" noun="registrations" nounOne="registration" slice={slice} />
         </section>
       )}
     </section>

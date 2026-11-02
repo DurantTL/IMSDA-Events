@@ -182,7 +182,7 @@ describe("the People list with filters", () => {
     expect(html).toContain('id="pending-section"');
     expect(html).toContain("2 pending invites.");
     expect(render({ filters: filtersFor("pending"), pending: section, pendingCount: 1 })).toContain("1 pending invite.");
-    expect(render({ filters: filtersFor("pending"), pending: section, pendingCount: 50, pendingCapped: true })).toContain("Showing the newest 50 pending invites");
+    expect(render({ filters: filtersFor("pending"), pending: section, pendingCount: 50, pendingCapped: true })).toContain("The newest 50 pending invites");
     const empty = render({ filters: filtersFor("pending"), pending: null, pendingCount: 0 });
     expect(empty).toContain("No pending invites.");
     expect(empty).not.toContain("No people found.");

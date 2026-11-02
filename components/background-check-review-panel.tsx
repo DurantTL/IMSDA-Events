@@ -5,6 +5,7 @@ import { RefreshCcw, Search, Undo2, UserCheck, UserX } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ListPager } from "@/components/list-pager";
 import { SearchResultStatus, useDebouncedCallback } from "@/components/search-as-you-type";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { paginate } from "@/lib/pagination";
 
 /** Unmatched list-wide rows shown per page (#702). */
@@ -56,6 +57,29 @@ export function MatchAnywayDialog({
   );
 }
 
+// The review tables sort from their headers (#1458), each with its own address prefix; the keys here are the whitelist. The
+// name-lookup results below are ranked by how close the name is, so they keep that order.
+const REVIEW_SORT: Record<"row" | "site" | "why", ColumnSpec<ReviewItem>> = {
+  row: { value: (review) => review.name, label: "row" },
+  site: { value: (review) => review.site, label: "site" },
+  why: { value: (review) => review.reason, label: "reason" },
+};
+const NAME_MATCH_SORT: Record<"row" | "rowSite" | "matched" | "theirSite", ColumnSpec<NameOnlyMatch>> = {
+  row: { value: (match) => match.entryName, label: "row" },
+  rowSite: { value: (match) => match.site, label: "the row's site" },
+  matched: { value: (match) => match.personName, label: "matched person" },
+  theirSite: { value: (match) => match.personSites.join(", "), label: "their club or church" },
+};
+const MANUAL_SORT: Record<"row" | "site" | "matched", ColumnSpec<ManualMatch>> = {
+  row: { value: (match) => match.entryName, label: "row" },
+  site: { value: (match) => match.site, label: "site" },
+  matched: { value: (match) => match.personName, label: "matched person" },
+};
+const UNMATCHED_SORT: Record<"name" | "site", ColumnSpec<UnmatchedEntry>> = {
+  name: { value: (entry) => entry.name, label: "name" },
+  site: { value: (entry) => entry.site, label: "site" },
+};
+
 /**
  * Staff review for the Sterling Volunteers list (#527): entries or people an
  * upload couldn't match with confidence, and entries that match no one yet.
@@ -78,6 +102,10 @@ export function BackgroundCheckReviewPanel() {
   // Dismissals made in this visit, so each can be undone until the page is left (#702).
   const [dismissals, setDismissals] = useState<Array<{ reviewId: string; name: string }>>([]);
   const [unmatchedPage, setUnmatchedPage] = useState(1);
+  const reviewSort = useTableSort(reviews ?? [], REVIEW_SORT, "review");
+  const nameSort = useTableSort(nameOnlyMatches ?? [], NAME_MATCH_SORT, "byName");
+  const manualSort = useTableSort(manualMatches ?? [], MANUAL_SORT, "byHand");
+  const unmatchedSort = useTableSort(unmatched ?? [], UNMATCHED_SORT, "unmatched", { onChange: () => setUnmatchedPage(1) });
   const lookupTicket = useRef(0);
   const lookupOpen = useRef<{ query: string; row: number; people: number } | null>(null);
 
@@ -294,7 +322,7 @@ export function BackgroundCheckReviewPanel() {
     );
   }
 
-  const unmatchedSlice = paginate(unmatched ?? [], unmatchedPage, UNMATCHED_PAGE_SIZE);
+  const unmatchedSlice = paginate(unmatchedSort.rows, unmatchedPage, UNMATCHED_PAGE_SIZE);
 
   return (
     <section className="panel">
@@ -327,11 +355,12 @@ export function BackgroundCheckReviewPanel() {
       {reviews && reviews.length === 0 && <p className="report-empty">Nothing waiting on a decision.</p>}
       {reviews && reviews.length > 0 && (
         <div className="report-table-wrap">
+          {reviewSort.note}
           <table className="report-table">
             <caption className="sr-only">Sterling Volunteers needing review</caption>
-            <thead><tr><th>Row</th><th>Site</th><th>Why</th><th>Candidates</th></tr></thead>
+            <thead><tr>{reviewSort.header("row", "Row")}{reviewSort.header("site", "Site")}{reviewSort.header("why", "Why")}<th>Candidates</th></tr></thead>
             <tbody>
-              {reviews.map((review) => (
+              {reviewSort.rows.map((review) => (
                 <tr key={review.id}>
                   <td translate="no">{review.name || "—"}</td>
                   <td>{review.site || "—"}</td>
@@ -369,11 +398,12 @@ export function BackgroundCheckReviewPanel() {
       {nameOnlyMatches && nameOnlyMatches.length === 0 && <p className="report-empty">No new matches by name since the last upload.</p>}
       {nameOnlyMatches && nameOnlyMatches.length > 0 && (
         <div className="report-table-wrap">
+          {nameSort.note}
           <table className="report-table">
             <caption className="sr-only">Sterling Volunteers rows matched on the name alone</caption>
-            <thead><tr><th>Row</th><th>Row&apos;s site</th><th>Matched to</th><th>Their club or church</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr>{nameSort.header("row", "Row")}{nameSort.header("rowSite", "Row's site")}{nameSort.header("matched", "Matched to")}{nameSort.header("theirSite", "Their club or church")}<th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
-              {nameOnlyMatches.map((match) => (
+              {nameSort.rows.map((match) => (
                 <tr key={match.id}>
                   <td translate="no">{match.entryName || "—"}</td>
                   <td>{match.site || "—"}</td>
@@ -395,11 +425,12 @@ export function BackgroundCheckReviewPanel() {
       {manualMatches && manualMatches.length === 0 && <p className="report-empty">No rows are matched by hand.</p>}
       {manualMatches && manualMatches.length > 0 && (
         <div className="report-table-wrap">
+          {manualSort.note}
           <table className="report-table">
             <caption className="sr-only">Sterling Volunteers rows matched to a person by hand</caption>
-            <thead><tr><th>Row</th><th>Site</th><th>Matched to</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr>{manualSort.header("row", "Row")}{manualSort.header("site", "Site")}{manualSort.header("matched", "Matched to")}<th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>
-              {manualMatches.map((match) => (
+              {manualSort.rows.map((match) => (
                 <tr key={match.id}>
                   <td translate="no">{match.entryName || "—"}</td>
                   <td>{match.site || "—"}</td>
@@ -520,9 +551,10 @@ export function BackgroundCheckReviewPanel() {
       {unmatched && unmatched.length === 0 && <p className="report-empty">Everyone on the list is matched to someone.</p>}
       {unmatched && unmatched.length > 0 && (
         <div className="report-table-wrap">
+          {unmatchedSort.note}
           <table className="report-table">
             <caption className="sr-only">Sterling Volunteers list entries not matched to anyone</caption>
-            <thead><tr><th>Name</th><th>Site</th></tr></thead>
+            <thead><tr>{unmatchedSort.header("name", "Name")}{unmatchedSort.header("site", "Site")}</tr></thead>
             <tbody>
               {unmatchedSlice.items.map((entry) => (
                 <tr key={entry.id}>

@@ -7,6 +7,7 @@ import { AssetReturnPanel } from "@/components/asset-return-panel";
 import { ListPager } from "@/components/list-pager";
 import type { PageSlice } from "@/lib/pagination";
 import { cardCell } from "@/components/table-card-labels";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import type { DeskMoney } from "@/modules/issued-assets/returns-view";
 import type { AssetLookup, AssigneeOptions, DeskLot, DeskPerson, DeskType, IssuanceRow } from "@/modules/issued-assets/view";
 
@@ -45,6 +46,20 @@ function writeQueue(scope: string, queue: SavedRequest[]) {
 }
 
 const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `k${Date.now()}${Math.random().toString(16).slice(2)}`);
+
+/** Both tables sort from their headers (#1458); each has its own prefix, and the keys here are the whitelist. */
+const PERSON_SORT: Record<"item" | "qty" | "issued" | "room", ColumnSpec<IssuanceRow>> = {
+  item: { value: (row) => row.identifier, label: "item" },
+  qty: { value: (row) => row.quantity, label: "quantity", kind: "number" },
+  issued: { value: (row) => row.issuedAt, label: "issue date", kind: "date" },
+  room: { value: (row) => row.roomName, label: "room" },
+};
+const OUT_NOW_SORT: Record<"item" | "qty" | "holder" | "room", ColumnSpec<IssuanceRow>> = {
+  item: { value: (row) => row.identifier, label: "item" },
+  qty: { value: (row) => row.quantity, label: "quantity", kind: "number" },
+  holder: { value: (row) => row.holderLabel, label: "holder" },
+  room: { value: (row) => row.roomName, label: "room" },
+};
 
 function lodgingNote(row: IssuanceRow) {
   if (!row.roomName) return null;
@@ -234,6 +249,8 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
 
   const openForPerson = person?.issuances.filter((row) => row.open) ?? [];
   const endedForPerson = person?.issuances.filter((row) => !row.open) ?? [];
+  const personSort = useTableSort(openForPerson, PERSON_SORT, "issued");
+  const outNowSort = useTableSort(outNow, OUT_NOW_SORT, "outNow");
   const kinds = [...new Set(types.flatMap((type) => type.assigneeKinds))];
 
   return <div className="settings-stack">
@@ -294,10 +311,10 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
 
     {person ? <section className="panel form-stack">
       <h3>Issued to {person.name}</h3>
-      {openForPerson.length === 0 ? <p>Nothing issued yet.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
+      {openForPerson.length === 0 ? <p>Nothing issued yet.</p> : <div className="table-wrap">{personSort.note}<table role="table" className="report-table table-cards">
         <caption className="sr-only">Open items issued to {person.name}</caption>
-        <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Qty</th><th role="columnheader" scope="col">Issued</th><th role="columnheader" scope="col">Room</th><th role="columnheader" scope="col">Change</th></tr></thead>
-        <tbody role="rowgroup">{openForPerson.map((row) => <tr role="row" key={row.id}>
+        <thead role="rowgroup"><tr role="row">{personSort.header("item", "Item")}{personSort.header("qty", "Qty")}{personSort.header("issued", "Issued")}{personSort.header("room", "Room")}<th role="columnheader" scope="col">Change</th></tr></thead>
+        <tbody role="rowgroup">{personSort.rows.map((row) => <tr role="row" key={row.id}>
           <th role="rowheader" scope="row">{row.identifier} <small>{row.typeName}</small></th>
           <td {...cardCell("Qty")}>{row.quantity}</td>
           <td {...cardCell("Issued")}>{new Date(row.issuedAt).toLocaleString()}{row.entryMethod === "OFFLINE" ? " (entered offline)" : ""}</td>
@@ -326,10 +343,10 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
 
     {!person ? <section className="panel form-stack">
       <h3>Out now</h3>
-      {outNow.length === 0 ? <p>Nothing is issued right now.</p> : <div className="table-wrap"><table role="table" className="report-table table-cards">
+      {outNow.length === 0 ? <p>Nothing is issued right now.</p> : <div className="table-wrap">{outNowSort.note}<table role="table" className="report-table table-cards">
         <caption className="sr-only">The most recent {outNow.length} open issues</caption>
-        <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Item</th><th role="columnheader" scope="col">Qty</th><th role="columnheader" scope="col">Holder</th><th role="columnheader" scope="col">Room</th></tr></thead>
-        <tbody role="rowgroup">{outNow.map((row) => <tr role="row" key={row.id}><th role="rowheader" scope="row">{row.identifier} <small>{row.typeName}</small></th><td {...cardCell("Qty")}>{row.quantity}</td><td {...cardCell("Holder")}>{row.holderLabel}</td><td {...cardCell("Room")}>{lodgingNote(row) ?? ""}</td></tr>)}</tbody>
+        <thead role="rowgroup"><tr role="row">{outNowSort.header("item", "Item")}{outNowSort.header("qty", "Qty")}{outNowSort.header("holder", "Holder")}{outNowSort.header("room", "Room")}</tr></thead>
+        <tbody role="rowgroup">{outNowSort.rows.map((row) => <tr role="row" key={row.id}><th role="rowheader" scope="row">{row.identifier} <small>{row.typeName}</small></th><td {...cardCell("Qty")}>{row.quantity}</td><td {...cardCell("Holder")}>{row.holderLabel}</td><td {...cardCell("Room")}>{lodgingNote(row) ?? ""}</td></tr>)}</tbody>
       </table></div>}
     </section> : null}
   </div>;

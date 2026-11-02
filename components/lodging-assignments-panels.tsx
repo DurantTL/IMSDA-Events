@@ -14,6 +14,7 @@ import type { PlanPreview } from "@/modules/lodging/assignment-service";
 import type { AssignmentWorkspaceView, RoomingReports } from "@/modules/lodging/assignment-view";
 import type { OfferPreviewRow } from "@/modules/lodging/waitlist-service";
 import { savedMessage } from "@/components/form-message";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 
 /**
  * The panels of the staff assignment workspace that are not the room board (#200): exceptions, the waitlist, the
@@ -71,6 +72,27 @@ export function ExceptionsPanel({ view, base, run, busy }: { view: AssignmentWor
 // Waitlist
 // ---------------------------------------------------------------------------
 
+// The waitlist and the key hand-off table sort from their headers (#1458); the keys here are the whitelist. The other tables
+// here are in a set order: the offer and plan previews list exactly what would happen, in the order it would happen, and
+// the nights are in date order.
+type WaitlistEntry = AssignmentWorkspaceView["waitlist"][number];
+const WAITLIST_SORT: Record<"registration" | "type" | "nights" | "people" | "rooms" | "status", ColumnSpec<WaitlistEntry>> = {
+  registration: { value: (entry) => entry.registrationCode, label: "registration" },
+  type: { value: (entry) => lodgingCategoryLabels[entry.category], label: "type" },
+  nights: { value: (entry) => entry.firstNight, label: "first night", kind: "date" },
+  people: { value: (entry) => entry.partySize, label: "people", kind: "number" },
+  rooms: { value: (entry) => entry.roomCount, label: "rooms", kind: "number" },
+  status: { value: (entry) => waitlistStatusLabels[entry.status], label: "status" },
+};
+type KeyHandoffRow = RoomingReports["keyHandoff"][number];
+const KEY_HANDOFF_SORT: Record<"place" | "people" | "arrives" | "leaves" | "holder", ColumnSpec<KeyHandoffRow>> = {
+  place: { value: (row) => `${row.building} ${row.place}`, label: "room or site" },
+  people: { value: (row) => row.people, label: "people", kind: "number" },
+  arrives: { value: (row) => row.arrival, label: "arrival", kind: "date" },
+  leaves: { value: (row) => row.departure, label: "departure", kind: "date" },
+  holder: { value: (row) => row.holder, label: "name on the registration" },
+};
+
 const openStatuses: WaitlistStatus[] = ["JOINED", "OFFERED", "ACCEPTED", "EXPIRED"];
 
 export function WaitlistPanel({ view, base, run, busy, canConfigure }: { view: AssignmentWorkspaceView; base: string; run: Run; busy: boolean; canConfigure: boolean }) {
@@ -78,6 +100,7 @@ export function WaitlistPanel({ view, base, run, busy, canConfigure }: { view: A
   const [hours, setHours] = useState(DEFAULT_OFFER_HOURS);
   const [preview, setPreview] = useState<OfferPreviewRow[] | null>(null);
   const [offerResult, setOfferResult] = useState("");
+  const waitlistSort = useTableSort(view.waitlist, WAITLIST_SORT, "waitlist");
   const registrations = [...new Map(view.people.filter((person) => person.kind === "ATTENDEE" && person.active && person.registrationId).map((person) => [person.registrationId!, person.registrationCode ?? ""])).entries()];
   const units = view.buildings.flatMap((building) => building.floors.flatMap((floor) => floor.units.map((unit) => ({ building: building.name, unit }))));
   const categories = Object.entries(lodgingCategoryLabels) as Array<[string, string]>;
@@ -88,13 +111,13 @@ export function WaitlistPanel({ view, base, run, busy, canConfigure }: { view: A
       <h3 id="la-waitlist">Lodging waitlist ({view.waitlist.length})</h3>
       <p className="field-hint">Offers are sent one email per entry, only when you confirm here. Nothing offers or promotes on its own. An offer reserves its places until it expires; placing the party in a room is a separate step after they accept. Nothing here changes a registration&apos;s charge.</p>
       {offerResult ? <p className="usage-note" role="status">{offerResult}</p> : null}
-      {view.waitlist.length === 0 ? <p>Nobody is on the lodging waitlist.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
+      {view.waitlist.length === 0 ? <p>Nobody is on the lodging waitlist.</p> : <div className="table-wrap">{waitlistSort.note}<table className="report-table report-table-auto">
         <caption className="sr-only">Lodging waitlist</caption>
         <thead><tr>
           {canConfigure ? <th scope="col"><span className="sr-only">Choose</span></th> : null}
-          <th scope="col">Registration</th><th scope="col">Type</th><th scope="col">Nights</th><th scope="col">People</th><th scope="col">Rooms</th><th scope="col">Status</th><th scope="col">Actions</th>
+          {waitlistSort.header("registration", "Registration")}{waitlistSort.header("type", "Type")}{waitlistSort.header("nights", "Nights")}{waitlistSort.header("people", "People")}{waitlistSort.header("rooms", "Rooms")}{waitlistSort.header("status", "Status")}<th scope="col">Actions</th>
         </tr></thead>
-        <tbody>{view.waitlist.map((entry) => {
+        <tbody>{waitlistSort.rows.map((entry) => {
           const open = openStatuses.includes(entry.status);
           return <tr key={entry.id}>
             {canConfigure ? <td><input type="checkbox" aria-label={`Choose ${entry.registrationCode} for an offer`} disabled={!open || entry.status === "ACCEPTED"} checked={selected.includes(entry.id)} onChange={(event) => { setPreview(null); setSelected(event.target.checked ? [...selected, entry.id] : selected.filter((id) => id !== entry.id)); }} /></td> : null}
@@ -255,6 +278,7 @@ export function ReportsPanel({ eventId }: { eventId: string }) {
   const [reports, setReports] = useState<RoomingReports | null>(null);
   const [error, setError] = useState("");
   const [night, setNight] = useState<string | null>(null);
+  const keySort = useTableSort(reports?.keyHandoff ?? [], KEY_HANDOFF_SORT, "keys");
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -302,9 +326,9 @@ export function ReportsPanel({ eventId }: { eventId: string }) {
     <section className="panel" aria-labelledby="la-keys">
       <h3 id="la-keys">Key hand-off inputs</h3>
       <p className="field-hint">What the person handing out keys needs. Key issuance itself is a separate feature.</p>
-      {reports.keyHandoff.length === 0 ? <p>No rooms are assigned.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
-        <thead><tr><th scope="col">Room or site</th><th scope="col">People</th><th scope="col">Arrives</th><th scope="col">Leaves</th><th scope="col">Name on the registration</th></tr></thead>
-        <tbody>{reports.keyHandoff.map((row) => <tr key={row.placeKey}><th scope="row">{row.building} {row.place}</th><td>{row.people}</td><td>{shortNight(row.arrival)}</td><td>{shortNight(row.departure)}</td><td>{row.holder}</td></tr>)}</tbody>
+      {reports.keyHandoff.length === 0 ? <p>No rooms are assigned.</p> : <div className="table-wrap">{keySort.note}<table className="report-table report-table-auto">
+        <thead><tr>{keySort.header("place", "Room or site")}{keySort.header("people", "People")}{keySort.header("arrives", "Arrives")}{keySort.header("leaves", "Leaves")}{keySort.header("holder", "Name on the registration")}</tr></thead>
+        <tbody>{keySort.rows.map((row) => <tr key={row.placeKey}><th scope="row">{row.building} {row.place}</th><td>{row.people}</td><td>{shortNight(row.arrival)}</td><td>{shortNight(row.departure)}</td><td>{row.holder}</td></tr>)}</tbody>
       </table></div>}
     </section>
     <section className="panel" aria-labelledby="la-unassigned">
