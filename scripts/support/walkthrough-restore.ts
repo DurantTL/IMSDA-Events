@@ -5,7 +5,7 @@
  * SIGTERM, a crash) is repaired by the next one, which restores from the marker first and then removes it.
  * The marker lives in the OS temp directory, never in the repository.
  */
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { PrismaClient } from "@prisma/client";
@@ -22,8 +22,9 @@ export type RestoreState = {
   passkeyRpId: string | null;
 };
 
+/** The marker's path: in the OS temp directory, named for the user who runs the script, so two users never share one. */
 export const restoreMarkerFile = (env: Record<string, string | undefined> = process.env) =>
-  env.HELP_SHOTS_RESTORE_FILE || path.join(os.tmpdir(), "imsda-help-walkthroughs-restore.json");
+  env.HELP_SHOTS_RESTORE_FILE || path.join(os.tmpdir(), `imsda-help-walkthroughs-restore-${os.userInfo().uid}.json`);
 
 /** The database name in a connection URL, or "" when it cannot be read. */
 export function databaseNameOf(url: string | undefined): string {
@@ -34,13 +35,33 @@ export function databaseNameOf(url: string | undefined): string {
   }
 }
 
+/**
+ * Writes the marker. `wx` refuses to write over anything that already exists (a file, or a symlink someone planted), and the
+ * file is private to the user.
+ */
 export function writeRestoreMarker(file: string, state: RestoreState) {
-  writeFileSync(file, JSON.stringify(state, null, 2), { mode: 0o600 });
+  try {
+    writeFileSync(file, JSON.stringify(state, null, 2), { mode: 0o600, flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new Error(`Refusing to write ${file}: something is already there that this run cannot use as its restore marker. Look at it, and delete it if it is yours.`);
+    throw error;
+  }
+}
+
+/** Whether `file` is a regular file (never a symlink) owned by this user. A marker that is not is ignored. */
+export function isOwnRegularFile(file: string): boolean {
+  try {
+    const stat = lstatSync(file);
+    if (!stat.isFile() || stat.isSymbolicLink()) return false;
+    return typeof process.getuid !== "function" || stat.uid === process.getuid();
+  } catch {
+    return false;
+  }
 }
 
 /** The saved state, or null when there is no marker or it is not a valid one. */
 export function readRestoreMarker(file: string): RestoreState | null {
-  if (!existsSync(file)) return null;
+  if (!isOwnRegularFile(file)) return null;
   try {
     const value = JSON.parse(readFileSync(file, "utf8")) as Partial<RestoreState>;
     const validTemplates = Array.isArray(value.templates) && value.templates.every((row) => row && typeof row.key === "string" && typeof row.enabled === "boolean" && typeof row.requirement === "string" && Array.isArray(row.requiredRoles));
@@ -55,8 +76,9 @@ export function readRestoreMarker(file: string): RestoreState | null {
   }
 }
 
+/** Removes the marker, but only when it is this user's own regular file. */
 export function removeRestoreMarker(file: string) {
-  rmSync(file, { force: true });
+  if (isOwnRegularFile(file)) rmSync(file, { force: true });
 }
 
 /** Applies a saved state. Each part runs on its own, so one failure does not stop the others; failures are returned. */

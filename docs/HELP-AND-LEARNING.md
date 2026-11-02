@@ -181,7 +181,9 @@ without `HELP_SHOTS_BROWSER`: the installed package's own Chromium, then a Chrom
 `/opt/pw-browsers`, then the other package. A run changes a few things outside its own fixtures (passkeys, some form templates, the
 published club events already in the database, and for coordinator walkthroughs the clubs already in the database). Their "before" state is written to a marker file in the OS
 temp directory (`imsda-help-walkthroughs-restore.json`, never in the repository) before anything changes; the end of the run,
-Ctrl-C and SIGTERM put it back, and the next run restores from a leftover marker first, so a killed run is repaired.
+Ctrl-C and SIGTERM put it back, and the next run restores from a leftover marker first, so a killed run is repaired. A signal only sets a stop flag: the run checks it before every write and its single `finally` does the one restore and the exit. The two
+commands run `node --import tsx` rather than the `tsx` command, because the `tsx` wrapper can end the script before it handles the signal. The
+marker is named for the user, is written with `wx`, and is ignored unless it is the user's own regular file (no symlinks).
 
 Both refuse `NODE_ENV=production`, a database or app URL that is not on this machine, and a database that is not a seeded dev
 or CI one. The first-sign-in and passkey walkthroughs sign in for real: the emailed code is the one the local app returns

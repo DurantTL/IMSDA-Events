@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo } from "react";
+import { useId, useMemo, useRef } from "react";
 import { useClientSearch } from "@/components/search-as-you-type";
-import { filterGuides } from "@/modules/help/visibility";
+import { filterGuides } from "@/modules/help/guide-filter";
 import type { PortalAudience } from "@/modules/help/types";
 import styles from "@/app/(workspace)/help/help.module.css";
 
@@ -24,6 +24,7 @@ const groups: readonly { audience: PortalAudience; title: string }[] = [
  */
 export function PortalHelpSearch({ guides }: { guides: readonly PortalHubGuide[] }) {
   const inputId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
   const countId = useId();
   const search = useClientSearch();
   const query = search.term;
@@ -40,6 +41,7 @@ export function PortalHelpSearch({ guides }: { guides: readonly PortalHubGuide[]
           autoComplete="off"
           className={styles.searchInput}
           id={inputId}
+          ref={inputRef}
           {...search.inputProps}
           placeholder="For example: passkey, roster, step by step"
           type="search"
@@ -49,7 +51,7 @@ export function PortalHelpSearch({ guides }: { guides: readonly PortalHubGuide[]
       {shown.length === 0 ? (
         <div className={styles.emptyState}>
           <p className={styles.empty}>No guide matches. Try a shorter or different word.</p>
-          <button className="secondary-button" onClick={() => search.setValue("")} type="button">Show all guides</button>
+          <button className="secondary-button" onClick={() => { search.setValue(""); inputRef.current?.focus(); }} type="button">Show all guides</button>
         </div>
       ) : groups.map((group) => {
         const inGroup = shown.filter((guide) => guide.audience === group.audience);

@@ -306,6 +306,40 @@ describe("the capture and check scripts", () => {
     expect(() => assertWalkthroughSafety("http://localhost:3000", { ...local, ACCOUNT_EMAIL_SENDER_ADDRESS: "", RESEND_API_KEY: " " })).not.toThrow();
   });
 
+  it("checks safety, then the seeded database, then writes the restore marker, then makes the first change", () => {
+    const harness = read("scripts/support/walkthrough-harness.ts");
+    const at = (text: string) => {
+      const index = harness.indexOf(text);
+      expect(index, text).toBeGreaterThan(-1);
+      return index;
+    };
+    const order = [
+      at("fixtures.assertWalkthroughSafety(baseUrl)"),
+      at("fixtures.assertSeededDatabase(prisma)"),
+      at("writeRestoreMarker(markerFile"),
+      at("fixtures.enablePasskeys(prisma)"),
+      at("fixtures.hideClubs(prisma"),
+      at("fixtures.setEventsPublished(prisma"),
+      at("fixtures.createWalkthroughFixtures(prisma)"),
+    ];
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    // A signal never restores or exits by itself: the single finally does.
+    expect(harness).not.toMatch(/const onSignal[\s\S]{0,400}process\.exit/);
+  });
+
+  it("keeps the portal Help search's browser bundle small: it imports only the tiny filter module", () => {
+    const search = read("app/(public)/account/(portal)/help/portal-help-search.tsx");
+    expect(search).toContain('from "@/modules/help/guide-filter"');
+    expect(search).not.toContain("modules/help/visibility");
+    expect(read("modules/help/guide-filter.ts")).not.toMatch(/^import /m);
+    expect(read("modules/help/visibility.ts")).toContain('export { filterGuides } from "@/modules/help/guide-filter"');
+  });
+
+  it("moves focus back to the search box after Show all guides (rule S5)", () => {
+    const search = read("app/(public)/account/(portal)/help/portal-help-search.tsx");
+    expect(search).toMatch(/onClick=\{\(\) => \{ search\.setValue\(""\); inputRef\.current\?\.focus\(\); \}\}[^>]*>Show all guides/);
+  });
+
   it("clears only the sign-in rate limits, and has no outbox fallback for the code", () => {
     expect(signInRateLimitPolicies).toEqual(["attendee.sign-in", "attendee.roster-unlock", "attendee.passkey"]);
     expect(read("scripts/support/walkthrough-harness.ts")).not.toContain("messageOutbox");

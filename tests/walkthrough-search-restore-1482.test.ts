@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createElement } from "react";
@@ -8,9 +8,12 @@ import { PortalHelpSearch, type PortalHubGuide } from "@/app/(public)/account/(p
 import { filterGuides } from "@/modules/help/visibility";
 import { visiblePortalGuides, type PortalHelpViewer } from "@/modules/help/portal-visibility";
 import type { PrismaClient } from "@prisma/client";
+import { pickOrphanedSamplePeople, restoreOtherClubs, setEventsPublished, walkthroughRosterPerson } from "@/scripts/support/help-walkthrough-fixtures";
+import { RunStopped, runSetupSteps, throwIfStopping } from "@/scripts/support/walkthrough-setup";
 import {
   applyRestoreState,
   databaseNameOf,
+  isOwnRegularFile,
   readRestoreMarker,
   recoverFromLeftoverMarker,
   restoreMarkerFile,
@@ -83,8 +86,23 @@ describe("restoring after a killed walkthrough run", () => {
   };
 
   it("keeps the marker out of the repository", () => {
-    expect(restoreMarkerFile({})).toBe(path.join(os.tmpdir(), "imsda-help-walkthroughs-restore.json"));
+    expect(restoreMarkerFile({})).toBe(path.join(os.tmpdir(), `imsda-help-walkthroughs-restore-${os.userInfo().uid}.json`));
     expect(path.resolve(restoreMarkerFile({})).startsWith(path.resolve(process.cwd()))).toBe(false);
+  });
+
+  it("never writes over what is already there, and ignores a symlink or a file that is not the user's own", () => {
+    const file = path.join(dir, "marker.json");
+    writeRestoreMarker(file, state);
+    expect(() => writeRestoreMarker(file, state)).toThrow(/Refusing to write/);
+    expect(isOwnRegularFile(file)).toBe(true);
+    rmSync(file);
+    const target = path.join(dir, "target.json");
+    writeFileSync(target, JSON.stringify(state));
+    symlinkSync(target, file);
+    expect(isOwnRegularFile(file)).toBe(false);
+    expect(readRestoreMarker(file)).toBeNull();
+    expect(() => writeRestoreMarker(file, state)).toThrow(/Refusing to write/);
+    rmSync(target);
   });
 
   it("round-trips a saved state and refuses a broken one", () => {
@@ -140,8 +158,64 @@ describe("restoring after a killed walkthrough run", () => {
     expect(readRestoreMarker(file)?.hiddenEvents).toEqual([]);
   });
 
+  it("only ever updates club organisations and club events when it restores", async () => {
+    const wheres: unknown[] = [];
+    const prisma = {
+      organization: { updateMany: async (args: { where: unknown }) => void wheres.push(args.where) },
+      event: { updateMany: async (args: { where: unknown }) => void wheres.push(args.where) },
+    } as unknown as PrismaClient;
+    await restoreOtherClubs(prisma, ["a"]);
+    await setEventsPublished(prisma, ["b"], true);
+    expect(wheres).toEqual([{ id: { in: ["a"] }, type: "CLUB" }, { id: { in: ["b"] }, audience: "CLUB" }]);
+  });
+
   it("reads the database name from the connection URL", () => {
     expect(databaseNameOf("postgresql://u:p@localhost:5432/imsda_events?schema=public")).toBe("imsda_events");
     expect(databaseNameOf(undefined)).toBe("");
+  });
+});
+
+describe("stopping a run", () => {
+  it("runs no setup write after the run was told to stop", async () => {
+    let stop = false;
+    const writes: string[] = [];
+    const step = (name: string, stopAfter = false) => ({ name, run: async () => { writes.push(name); if (stopAfter) stop = true; } });
+    await expect(runSetupSteps([step("passkeys"), step("clubs", true), step("events"), step("browser")], () => stop)).rejects.toBeInstanceOf(RunStopped);
+    // The signal arrived during "clubs": that write finished, and nothing after it ran.
+    expect(writes).toEqual(["passkeys", "clubs"]);
+  });
+
+  it("runs every step in order when nothing stops it, and checks before the very first write", async () => {
+    const ran: string[] = [];
+    expect(await runSetupSteps([{ name: "a", run: async () => void ran.push("a") }, { name: "b", run: async () => void ran.push("b") }], () => false)).toEqual(["a", "b"]);
+    await expect(runSetupSteps([{ name: "x", run: async () => void ran.push("x") }], () => true)).rejects.toThrow(/stopped/);
+    expect(ran).toEqual(["a", "b"]);
+    expect(() => throwIfStopping(() => false)).not.toThrow();
+    expect(() => throwIfStopping(() => true)).toThrow(RunStopped);
+  });
+});
+
+describe("removing the people a run created", () => {
+  const since = new Date("2026-11-02T12:00:00Z");
+  const row = (id: string, over: Partial<{ firstName: string; lastName: string; createdAt: Date; rosterCount: number }> = {}) => ({
+    id, firstName: walkthroughRosterPerson.firstName, lastName: walkthroughRosterPerson.lastName, createdAt: new Date("2026-11-02T12:05:00Z"), rosterCount: 0, ...over,
+  });
+
+  it("deletes the sample person this run created, and only that one", () => {
+    const picked = pickOrphanedSamplePeople(
+      [
+        row("made_by_the_run"),
+        row("same_name_made_by_hand_earlier", { createdAt: new Date("2026-10-01T09:00:00Z") }),
+        row("same_name_on_a_roster", { rosterCount: 1 }),
+        row("other_name", { firstName: "Someone" }),
+        row("other_last_name", { lastName: "Else" }),
+      ],
+      since,
+    );
+    expect(picked).toEqual(["made_by_the_run"]);
+  });
+
+  it("keeps a same-name person with no link to this run", () => {
+    expect(pickOrphanedSamplePeople([row("unlinked", { createdAt: new Date(since.getTime() - 1) })], since)).toEqual([]);
   });
 });

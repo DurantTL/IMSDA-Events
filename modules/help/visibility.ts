@@ -70,17 +70,7 @@ export function guideLinksForViewer(guide: HelpGuide, viewer: HelpViewer): { lin
   return { links, unavailable };
 }
 
-const norm = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-
-/** The hub's plain filter: every word typed must appear in the title, summary or keywords. */
-export function filterGuides<T extends Pick<HelpGuide, "title" | "summary" | "keywords">>(guides: readonly T[], query: string): T[] {
-  const words = norm(query).split(" ").filter(Boolean);
-  if (words.length === 0) return [...guides];
-  return guides.filter((guide) => {
-    const haystack = norm(`${guide.title} ${guide.summary} ${guide.keywords.join(" ")}`);
-    return words.every((word) => haystack.includes(word));
-  });
-}
+export { filterGuides } from "@/modules/help/guide-filter";
 
 /** The hub's workspace filter: every guide, or only System administration or Event workspace guides. */
 export type WorkspaceFilter = "all" | "System" | "Event";

@@ -167,15 +167,6 @@ export async function deleteWalkthroughFixtures(prisma: PrismaClient) {
     prisma.attendeePasskey.deleteMany({ where: { accountId: { in: fixtureAccountIds } } }),
     prisma.messageOutbox.deleteMany({ where: { OR: [{ accountAttendeeId: { in: fixtureAccountIds } }, { recipientEmail: { endsWith: "@example.test", startsWith: `${W}.` } }] } }),
   ]);
-  // The roster walkthrough's "Remove" erases the roster row but keeps the Person (their name stays on items already ordered).
-  // Delete that sample person, matched tightly: the sample name, and no roster row pointing at it.
-  const sample = await prisma.person.findMany({
-    where: { firstName: walkthroughRosterPerson.firstName, lastName: walkthroughRosterPerson.lastName, id: { not: { startsWith: `${W}_` } } },
-    select: { id: true },
-  });
-  for (const person of sample) {
-    if ((await prisma.clubRosterMember.count({ where: { personId: person.id } })) === 0) await prisma.person.delete({ where: { id: person.id } }).catch(() => undefined);
-  }
   // The club's event registrations and the event itself, then the account, profile and organizations.
   const registrations = await prisma.clubEventRegistration.findMany({ where: orgs, select: { id: true } }).catch(() => []);
   if (registrations.length > 0) await prisma.clubEventRegistration.deleteMany({ where: { id: { in: registrations.map((row) => row.id) } } });
@@ -380,15 +371,15 @@ export async function listOtherClubEventIds(prisma: PrismaClient): Promise<strin
 }
 
 export async function setEventsPublished(prisma: PrismaClient, ids: string[], isPublished: boolean) {
-  if (ids.length > 0) await prisma.event.updateMany({ where: { id: { in: ids } }, data: { isPublished } });
+  if (ids.length > 0) await prisma.event.updateMany({ where: { id: { in: ids }, audience: "CLUB" }, data: { isPublished } });
 }
 
 export async function hideClubs(prisma: PrismaClient, ids: string[]) {
-  if (ids.length > 0) await prisma.organization.updateMany({ where: { id: { in: ids } }, data: { isActive: false } });
+  if (ids.length > 0) await prisma.organization.updateMany({ where: { id: { in: ids }, type: "CLUB" }, data: { isActive: false } });
 }
 
 export async function restoreOtherClubs(prisma: PrismaClient, ids: string[]) {
-  if (ids.length > 0) await prisma.organization.updateMany({ where: { id: { in: ids } }, data: { isActive: true } });
+  if (ids.length > 0) await prisma.organization.updateMany({ where: { id: { in: ids }, type: "CLUB" }, data: { isActive: true } });
 }
 
 /**
@@ -428,4 +419,30 @@ export async function clearSignInRateLimits(prisma: PrismaClient) {
   await prisma.rateLimitBucket.deleteMany({
     where: { OR: signInRateLimitPolicies.map((prefix) => ({ policy: { startsWith: prefix } })) },
   });
+}
+
+/** A person row as the cleanup selector sees it. */
+export type SamplePersonRow = { id: string; firstName: string; lastName: string; createdAt: Date; rosterCount: number };
+
+/**
+ * The roster walkthrough's "Remove" erases the roster row but keeps the Person (their name stays on items already ordered). This
+ * picks exactly the people that run created: the sample name, created at or after the run's fixtures, with no roster membership.
+ * A person with the same name made by hand at another time is never picked.
+ */
+export function pickOrphanedSamplePeople(rows: readonly SamplePersonRow[], since: Date): string[] {
+  return rows
+    .filter((row) => row.firstName === walkthroughRosterPerson.firstName && row.lastName === walkthroughRosterPerson.lastName)
+    .filter((row) => row.createdAt.getTime() >= since.getTime() && row.rosterCount === 0)
+    .map((row) => row.id);
+}
+
+/** Deletes the sample people a run created since `since` (the moment its fixtures were made), and only those. */
+export async function deleteSamplePeopleCreatedSince(prisma: PrismaClient, since: Date) {
+  const candidates = await prisma.person.findMany({
+    where: { firstName: walkthroughRosterPerson.firstName, lastName: walkthroughRosterPerson.lastName, createdAt: { gte: since } },
+    select: { id: true, firstName: true, lastName: true, createdAt: true },
+  });
+  const rows: SamplePersonRow[] = [];
+  for (const person of candidates) rows.push({ ...person, rosterCount: await prisma.clubRosterMember.count({ where: { personId: person.id } }) });
+  for (const id of pickOrphanedSamplePeople(rows, since)) await prisma.person.delete({ where: { id } }).catch(() => undefined);
 }

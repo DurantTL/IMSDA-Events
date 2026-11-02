@@ -26,6 +26,7 @@ import { walkthroughs } from "../../modules/help/walkthroughs";
 import { runWalkthrough, type StepEvent } from "../../tests/browser/walkthroughs/steps";
 import type { WalkthroughContext, WalkthroughPage, WalkthroughStart } from "../../tests/browser/walkthroughs/types";
 import * as fixtures from "./help-walkthrough-fixtures";
+import { RunStopped, runSetupSteps, throwIfStopping } from "./walkthrough-setup";
 import { applyRestoreState, databaseNameOf, recoverFromLeftoverMarker, removeRestoreMarker, restoreMarkerFile, writeRestoreMarker, type RestoreState } from "./walkthrough-restore";
 
 loadEnvConfig(process.cwd());
@@ -116,6 +117,8 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
   const result: HarnessResult = [];
   const markerFile = restoreMarkerFile();
   let cleanupRun: Promise<void> | null = null;
+  /** When the latest run's fixtures were made: the sample people it created are removed by this time. */
+  let lastRunStartedAt: Date | null = null;
   // Puts everything back. Runs once, from the end of the run or from a SIGINT/SIGTERM, whichever comes first; the other caller
   // waits for the same run, so the process is never closed (or the database disconnected) before the restore is done.
   const restoreEverything = async () => {
@@ -125,6 +128,7 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
     const { revokeAttendeeSession } = await import("../../modules/attendee-accounts/session-store");
     for (const token of tokens) await revokeAttendeeSession(token).catch(() => undefined);
     await fixtures.deleteWalkthroughFixtures(prisma).catch((error: Error) => console.error(`Could not remove the walkthrough fixtures: ${error.message}`));
+    if (lastRunStartedAt) await fixtures.deleteSamplePeopleCreatedSince(prisma, lastRunStartedAt).catch((error: Error) => console.error(`Could not remove the sample people: ${error.message}`));
     if (restoreState) {
       const failures = await applyRestoreState(prisma, restoreState);
       for (const failure of failures) console.error(`Could not restore ${failure}`);
@@ -133,8 +137,15 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
     }
   };
   const cleanup = () => (cleanupRun ??= restoreEverything());
+  // A signal only sets a flag and closes the browser. The run checks the flag before every write, and the single `finally`
+  // below does the one restore and (after it) the exit, so nothing is written after the restore.
+  let stopping: NodeJS.Signals | null = null;
+  const shouldStop = () => stopping !== null;
   const onSignal = (signal: NodeJS.Signals) => {
-    void cleanup().finally(() => prisma.$disconnect().finally(() => process.exit(signal === "SIGINT" ? 130 : 143)));
+    if (stopping) return;
+    stopping = signal;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    void (browser as any)?.close().catch(() => undefined);
   };
   const onSigint = () => onSignal("SIGINT");
   const onSigterm = () => onSignal("SIGTERM");
@@ -150,18 +161,29 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
     restoreState = { database, hiddenClubs, hiddenEvents, templates: await fixtures.readTemplateStates(prisma), passkeyRpId: await fixtures.readPasskeyRpId(prisma) };
     // The marker is written BEFORE anything changes.
     writeRestoreMarker(markerFile, restoreState);
-    process.once("SIGINT", onSigint);
-    process.once("SIGTERM", onSigterm);
-    await fixtures.enablePasskeys(prisma);
-    await fixtures.hideClubs(prisma, hiddenClubs);
-    await fixtures.setEventsPublished(prisma, hiddenEvents, false);
-    browser = await launchBrowser();
+    // `on`, not `once`: npm and tsx relay the signal as well, and a second SIGTERM must not kill the process in the middle of the restore.
+    process.on("SIGINT", onSigint);
+    process.on("SIGTERM", onSigterm);
+    // Every write below is checked against the stop flag first.
+    await runSetupSteps(
+      [
+        { name: "passkeys", run: () => fixtures.enablePasskeys(prisma) },
+        { name: "clubs", run: () => fixtures.hideClubs(prisma, hiddenClubs) },
+        { name: "events", run: () => fixtures.setEventsPublished(prisma, hiddenEvents, false) },
+        { name: "browser", run: async () => { browser = await launchBrowser(); } },
+      ],
+      shouldStop,
+    );
     for (const walkthrough of selected) {
       for (const kind of options.kinds) {
+        throwIfStopping(shouldStop);
         // Every run starts from the same fixtures, so the pictures come out the same.
         await fixtures.deleteWalkthroughFixtures(prisma);
+        if (lastRunStartedAt) await fixtures.deleteSamplePeopleCreatedSince(prisma, lastRunStartedAt);
         await fixtures.clearSignInRateLimits(prisma);
+        throwIfStopping(shouldStop);
         const { authenticatorSecret } = await fixtures.createWalkthroughFixtures(prisma);
+        lastRunStartedAt = new Date();
         const viewport = walkthroughViewports[kind];
         const context = await browser.newContext({
           viewport,
@@ -230,12 +252,17 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
         }
       }
     }
+  } catch (error) {
+    // A stop closes the browser under the running step, so its error is the stop, not a failure.
+    if (!(error instanceof RunStopped) && !stopping) throw error;
   } finally {
+    // The handlers stay until everything is put back: a repeated signal while restoring is ignored.
+    await cleanup();
     process.off("SIGINT", onSigint);
     process.off("SIGTERM", onSigterm);
-    await cleanup();
     await prisma.$disconnect();
   }
+  if (stopping) process.exit(stopping === "SIGINT" ? 130 : 143);
   return result;
 }
 
