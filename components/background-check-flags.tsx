@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
 import { backgroundFlagLabels } from "@/modules/background-checks/display";
@@ -55,8 +56,8 @@ export function BackgroundCheckList({
         <tbody>
           {people.map((person) => (
             <tr key={person.attendeeId}>
-              <th scope="row" translate="no">
-                {person.lastName}, {person.firstName}
+              <th scope="row">
+                <ExactValue>{person.lastName}, {person.firstName}</ExactValue>
                 <small className="quiet-copy"> · {person.attendeeType}</small>
               </th>
               {showClub && <td translate="no">{person.clubName ?? "—"}</td>}
@@ -64,7 +65,7 @@ export function BackgroundCheckList({
               <td>
                 <BackgroundCheckBadge state={person.state} />
                 <small className="quiet-copy"> {person.state === "EXPIRED" ? `Expired ${person.expiresOn}` : backgroundFlagLabels[person.state]}</small>
-                {person.issuesNote && <><br /><small className="quiet-copy background-check-note" translate="no">Issues: {person.issuesNote}</small></>}
+                {person.issuesNote && <><br /><small className="quiet-copy background-check-note">Issues: <ExactValue>{person.issuesNote}</ExactValue></small></>}
                 {person.issueReasons.length > 0 && <><br /><small className="quiet-copy background-check-note">{person.issueReasons.join("; ")}</small></>}
               </td>
               <td>

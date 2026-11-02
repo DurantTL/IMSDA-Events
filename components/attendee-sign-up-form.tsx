@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -134,7 +135,7 @@ export function AttendeeSignUpForm({
     return (
       <form className="auth-form" onSubmit={submitCode}>
         <div className="auth-success">
-          <strong>Check {sentTo}</strong>
+          <strong>Check <ExactValue>{sentTo}</ExactValue></strong>
           <p>
             If an account can be created for that address, a six-digit code is on its way. Enter it
             here — it only works in this browser, and it expires in twenty minutes.
@@ -217,7 +218,7 @@ export function AttendeeSignUpForm({
       </label>
       <PasswordRequirementsChecklist password={password} owner={{ email, displayName }} />
       {retryNotice}
-      <SecurityCheck config={securityCheck} action="attendee-sign-up" handleRef={check} />
+      <SecurityCheck config={securityCheck} action="attendee-sign-up" handleRef={check} emailCode={{ getEmail: () => emailRef.current?.value ?? email }} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button
         className="primary-button full-button"

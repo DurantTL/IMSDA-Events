@@ -1,10 +1,12 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { SubmitButton } from "@/components/submit-button";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { flipDirection, nameSortLabel, sortByName, sortOrderText, type SortDirection } from "@/lib/list-sort";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { Download, ListPlus, Plus, Search, UsersRound, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { HonorCombobox } from "@/components/honor-combobox";
@@ -74,10 +76,12 @@ export function ClubHonorsWorkspace({
   const [honorFilter, setHonorFilter] = useState(initialHonorFilter);
   const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
   const [unitFilter, setUnitFilter] = useState("");
-  const [nameSearch, setNameSearch] = useState("");
+  const nameSearchBox = useClientSearch();
+  const nameSearch = nameSearchBox.term;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
-  const [memberSearch, setMemberSearch] = useState("");
+  const memberSearchBox = useClientSearch();
+  const memberSearch = memberSearchBox.term;
   const [singleHonorId, setSingleHonorId] = useState("");
   const [bulkHonorId, setBulkHonorId] = useState("");
   const [bulkStatus, setBulkStatus] = useState<"IN_PROGRESS" | "COMPLETED">("IN_PROGRESS");
@@ -179,7 +183,7 @@ export function ClubHonorsWorkspace({
       setBulkHonorId("");
       setBulkStatus("IN_PROGRESS");
       setBulkDate("");
-      setMemberSearch("");
+      memberSearchBox.setValue("");
       setConfirmingBulk(false);
       setBulkOpen(false);
     } catch (caught) {
@@ -195,7 +199,7 @@ export function ClubHonorsWorkspace({
     setHistory(null);
     setHistoryError("");
     try {
-      const response = await fetch(`${base}/roster/${encodeURIComponent(memberId)}/honors`);
+      const response = await fetch(`${base}/roster/${encodeURIComponent(memberId)}/honors`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as HistoryResponse;
       if (request !== historyRequest.current) return;
       if (!response.ok) {
@@ -244,7 +248,7 @@ export function ClubHonorsWorkspace({
         setHistory(result);
         setHistoryError("");
       }
-      const refreshed = await fetch(listUrl);
+      const refreshed = await fetch(listUrl, { cache: "no-store" });
       const refreshedBody = await refreshed.json().catch(() => ({})) as { rows?: ClubHonorsRow[] };
       if (refreshedBody.rows) setRows(refreshedBody.rows);
       formElement.reset();
@@ -285,7 +289,7 @@ export function ClubHonorsWorkspace({
         setHistory(result);
         setHistoryError("");
       }
-      const refreshed = await fetch(listUrl);
+      const refreshed = await fetch(listUrl, { cache: "no-store" });
       const refreshedBody = await refreshed.json().catch(() => ({})) as { rows?: ClubHonorsRow[] };
       if (refreshedBody.rows) setRows(refreshedBody.rows);
       setNotice("Entry voided. It is kept in the audit record.");
@@ -304,7 +308,7 @@ export function ClubHonorsWorkspace({
       <section className="public-manage-card" aria-labelledby="club-honors-heading">
         <div className="public-manage-card-heading club-roster-heading">
           <div>
-            <p className="public-registration-eyebrow">Club year {clubYear}</p>
+            <p className="public-registration-eyebrow">{`Club year ${clubYear}`}</p>
             <h2 id="club-honors-heading">Honors</h2>
           </div>
           {!staff && (
@@ -336,10 +340,9 @@ export function ClubHonorsWorkspace({
               <Search aria-hidden="true" size={14} />
               <input
                 autoComplete="off"
-                onChange={(event) => setNameSearch(event.target.value)}
+                {...nameSearchBox.inputProps}
                 placeholder="Search by name"
                 type="search"
-                value={nameSearch}
               />
             </span>
           </label>
@@ -364,8 +367,12 @@ export function ClubHonorsWorkspace({
           </label>
         </div>
 
+        <SearchResultStatus message={nameSearch.trim() === "" || visible.length === 0 ? "" : `${visible.length} of ${rows.length} ${rows.length === 1 ? "person" : "people"} shown.`} />
         {emptyState === "NO_MEMBERS" || emptyState === "NO_MATCH" ? (
-          <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
+          <>
+            <p className="public-manage-empty" role="status"><UsersRound size={17} aria-hidden="true" /> {clubHonorsEmptyCopy[emptyState]}</p>
+            {emptyState === "NO_MEMBERS" && !readOnly && !staff && <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="honors" id="honors-no-members" />}
+          </>
         ) : (
           <div className="report-table-wrap card-box">
             <SortOrderNote>{sortOrderText(nameSortLabel, nameDirection)}</SortOrderNote>
@@ -453,16 +460,16 @@ export function ClubHonorsWorkspace({
                       <Search aria-hidden="true" size={14} />
                       <input
                         autoComplete="off"
-                        onChange={(event) => setMemberSearch(event.target.value)}
+                        {...memberSearchBox.inputProps}
                         placeholder="Search members by name"
                         type="search"
-                        value={memberSearch}
                       />
                     </span>
                   </label>
                   <button className="text-button" disabled={bulkMembers.length === 0} onClick={selectAllListed} type="button">Select all</button>
                   <button className="text-button" disabled={selected.size === 0} onClick={() => setSelected(new Set())} type="button">Clear</button>
                 </div>
+                <SearchResultStatus message={memberSearch.trim() === "" ? "" : `${bulkMembers.length} ${bulkMembers.length === 1 ? "member" : "members"} listed.`} />
                 <ul className="honor-bulk-member-list">
                   {bulkMembers.map((row) => (
                     <li key={row.memberId}>

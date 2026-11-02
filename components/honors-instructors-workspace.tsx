@@ -1,8 +1,10 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { useConfirm } from "@/components/use-confirm";
 import { useState } from "react";
 import { Ban, Save, Send, UserPlus } from "lucide-react";
+import { savedMessage } from "@/components/form-message";
 import { INSTRUCTOR_EDIT_GRACE_DAYS } from "@/modules/honors/instructor-domain";
 import { classChangeEmailLabels } from "@/modules/honors/class-change-domain";
 
@@ -142,7 +144,7 @@ export function HonorsInstructorsWorkspace({
             return (
               <li key={instructor.id}>
                 <span>
-                  <strong translate="no">{instructor.name}{!instructor.sterlingCurrent && <span role="img" aria-label="Sterling Volunteers check not current" title="Sterling Volunteers check not current"> !</span>}</strong>
+                  <strong><ExactValue>{instructor.name}</ExactValue>{!instructor.sterlingCurrent && <span role="img" aria-label="Sterling Volunteers check not current" title="Sterling Volunteers check not current"> !</span>}</strong>
                   <small translate="no">{instructor.email}</small>
                 </span>
                 <span className={`status-chip ${statusTone[instructor.status]}`}>{statusLabels[instructor.status]}</span>
@@ -164,7 +166,7 @@ export function HonorsInstructorsWorkspace({
                   ))}
                 </fieldset>
                 <span className="club-invite-actions">
-                  <button className="secondary-button" disabled={busy || !changed || selected.length === 0} onClick={() => void call(`${base}/${encodeURIComponent(instructor.id)}`, "PATCH", { offeringIds: selected }, () => "Classes saved.")} type="button">
+                  <button className="secondary-button" disabled={busy || !changed || selected.length === 0} onClick={() => void call(`${base}/${encodeURIComponent(instructor.id)}`, "PATCH", { offeringIds: selected }, () => savedMessage())} type="button">
                     <Save aria-hidden="true" size={13} /> Save classes
                   </button>
                   {instructor.status === "INVITED" && (

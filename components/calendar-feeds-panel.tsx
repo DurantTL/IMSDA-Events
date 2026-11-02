@@ -8,6 +8,8 @@ import type { FeedPreview } from "@/modules/calendar/feed-plan";
 import type { CalendarAdminFeed } from "@/modules/calendar/feeds";
 import { describeRepeat, parseRepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry } from "@/modules/calendar/repository";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { savedMessage } from "@/components/form-message";
 
 type FeedResponse = {
   feeds?: CalendarAdminFeed[];
@@ -24,7 +26,7 @@ const fieldLabels: Record<string, string> = {
 };
 
 function when(value: string | null) {
-  return value ? new Date(value).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "Never";
+  return value ? formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" }) : "Never";
 }
 
 /**
@@ -97,7 +99,7 @@ export function CalendarFeedsPanel({
       ? await call(`/api/admin/calendar/feeds/${encodeURIComponent(editing.id)}`, "PATCH", body)
       : await call("/api/admin/calendar/feeds", "POST", body);
     if (result) {
-      setNotice(editing ? "Saved." : "Added. Preview it, then import.");
+      setNotice(editing ? savedMessage() : "Added. Preview it, then import.");
       setEditing(null);
       formElement.reset();
     }

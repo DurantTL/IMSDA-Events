@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useClientSearch } from "@/components/search-as-you-type";
 import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
+import { savedMessage } from "@/components/form-message";
 import { ClubSupplyStockWorkspace } from "@/components/club-supply-stock-workspace";
 import { ClubUniformSection, emptyUniformData, type ClubUniformData } from "@/components/club-uniform-section";
 import { ORDER_LIST_SECTIONS, activeHelperLines, formatSizeLabel, groupUnmatchedByHonor, hasStockTracking, needsDatedBefore, orderListSectionLabels, type HelperLine } from "@/modules/club-orders/domain";
@@ -197,9 +199,17 @@ export function ClubOrderWorkspace({
   const [beforeDate, setBeforeDate] = useState("");
   // Remembered per club on this device. The server snapshot is "not dismissed", so the first render matches the server.
   const promptDismissed = useSyncExternalStore(subscribeDismissed, () => readDismissed(organizationId), () => false);
-  const [pickerQuery, setPickerQuery] = useState("");
+  const pickerSearch = useClientSearch();
+  const pickerQuery = pickerSearch.term;
   const [pickerPage, setPickerPage] = useState(1);
   const [pickerItem, setPickerItem] = useState("");
+  // A new search starts on page 1 with nothing chosen, once the list has changed (not on every keystroke).
+  const [pickerTermSeen, setPickerTermSeen] = useState(pickerQuery);
+  if (pickerTermSeen !== pickerQuery) {
+    setPickerTermSeen(pickerQuery);
+    setPickerPage(1);
+    setPickerItem("");
+  }
   const [pickerQuantity, setPickerQuantity] = useState("1");
   const [busy, setBusy] = useState(false);
   const focusHonorId = useRef<string | null>(null);
@@ -323,7 +333,7 @@ export function ClubOrderWorkspace({
       setError("Enter a whole number, 0 or more.");
       return;
     }
-    return setQuantity(lineKey(line), Number(draft), "Quantity saved.");
+    return setQuantity(lineKey(line), Number(draft), savedMessage());
   }
 
   /** "Honors to order separately": adds the honor with the number of members who completed it (#1330). */
@@ -346,7 +356,7 @@ export function ClubOrderWorkspace({
     }
     if (await setQuantity(chosenItem, quantity, "Added to the list.")) {
       setPickerItem("");
-      setPickerQuery(""); setPickerPage(1);
+      pickerSearch.setValue(""); setPickerPage(1);
       setPickerQuantity("1");
     }
   }
@@ -467,9 +477,9 @@ export function ClubOrderWorkspace({
           <p className={styles.promptCopy}>Mark the ones already handed out so they come off the list. Nothing is marked for you, and stock isn&apos;t changed.</p>
           {/* Closed until opened: a long list of completed honors would push the real order list off the screen (#1004). */}
           <details className={styles.earlierDetails}>
-            <summary>Show the {earlier.length} {earlier.length === 1 ? "honor" : "honors"}</summary>
+            <summary>{`Show the ${earlier.length} ${earlier.length === 1 ? "honor" : "honors"}`}</summary>
             <div className={styles.actions}>
-              <button className="secondary-button" disabled={busy} onClick={() => toggleIn(setHandedOut, earlierIds, true)} type="button">Select all ({earlierIds.length})</button>
+              <button className="secondary-button" disabled={busy} onClick={() => toggleIn(setHandedOut, earlierIds, true)} type="button">{`Select all (${earlierIds.length})`}</button>
               <span className={styles.dateSelect}>
                 <label htmlFor="club-order-before-date">Completed before</label>
                 <input className={styles.date} id="club-order-before-date" onChange={(event) => setBeforeDate(event.target.value)} type="date" value={beforeDate} />
@@ -512,7 +522,7 @@ export function ClubOrderWorkspace({
           <div className={styles.flag} id="club-order-unmatched">
             <Info aria-hidden="true" size={14} />
             <div className={styles.unmatched}>
-              <p role="status">{unmatchedCount} completed {unmatchedCount === 1 ? "honor has" : "honors have"} no matching catalog item, so {unmatchedCount === 1 ? "it isn't" : "they aren't"} on this list. Conference staff can link the honor in the supply catalog.</p>
+              <p role="status">{`${unmatchedCount} completed ${unmatchedCount === 1 ? "honor has" : "honors have"} no matching catalog item, so ${unmatchedCount === 1 ? "it isn't" : "they aren't"} on this list. Conference staff can link the honor in the supply catalog.`}</p>
               <details className={styles.earlierDetails}>
                 <summary>{`${unmatchedHonors.length === 1 ? "Honor" : "Honors"} to order separately (${unmatchedHonors.length})`}</summary>
                 <ul className={styles.unmatchedList}>
@@ -575,7 +585,7 @@ export function ClubOrderWorkspace({
                             <dd>
                               {readOnly ? line.needed : (
                                 <>
-                                  <label className="sr-only" htmlFor={inputId}>Quantity: {line.name}{line.size ? `, ${line.size}` : ""}</label>
+                                  <label className="sr-only" htmlFor={inputId}>{`Quantity: ${line.name}${line.size ? `, ${line.size}` : ""}`}</label>
                                   <input
                                     className={styles.number}
                                     id={inputId}
@@ -637,7 +647,7 @@ export function ClubOrderWorkspace({
           })
         )}
         {onList.length > 0 && (
-          <p className={`field-help ${styles.helpText}`}>To order is the quantity less what is available, never below zero. Available = in stock minus items set aside for someone. {totalToOrder} to order in all.</p>
+          <p className={`field-help ${styles.helpText}`}>{`To order is the quantity less what is available, never below zero. Available = in stock minus items set aside for someone. ${totalToOrder} to order in all.`}</p>
         )}
 
         {takenOff.length > 0 && (
@@ -662,7 +672,7 @@ export function ClubOrderWorkspace({
             <div className={styles.pickerRow}>
               <label className={styles.pickerField} htmlFor="club-order-picker-search">
                 Search honors and items
-                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" onChange={(event) => { setPickerQuery(event.target.value); setPickerPage(1); setPickerItem(""); }} placeholder="Honor or item name, or item number" type="search" value={pickerQuery} />
+                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" {...pickerSearch.inputProps} placeholder="Honor or item name, or item number" type="search" />
               </label>
               <label className={styles.pickerField} htmlFor="club-order-picker-item">
                 Item
@@ -728,7 +738,7 @@ export function ClubOrderWorkspace({
               <li className={styles.row} key={batch.id}>
                 <span className={styles.text}>
                   <strong>{formatDate(batch.createdAt)}</strong>
-                  <small>{batch.itemCount} {batch.itemCount === 1 ? "item" : "items"} · {batch.totalQuantity} ordered</small>
+                  <small>{`${batch.itemCount} ${batch.itemCount === 1 ? "item" : "items"} · ${batch.totalQuantity} ordered`}</small>
                 </span>
                 {!readOnly && (
                   <button

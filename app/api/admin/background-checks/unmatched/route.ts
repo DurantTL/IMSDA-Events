@@ -2,6 +2,7 @@ import { requireClubsAdministration } from "@/modules/organizations/access";
 import { backgroundCheckApiError } from "@/modules/background-checks/api-errors";
 import { listUnmatchedBackgroundCheckEntries } from "@/modules/background-checks/repository";
 import { withRequestContext } from "@/lib/request-context";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * List entries with no one matched to them yet (#527): still on the current
@@ -15,7 +16,7 @@ async function getHandler() {
     return Response.json({
       entries: entries.map((entry) => ({
         id: entry.id,
-        name: `${entry.firstName} ${entry.lastName}`.trim(),
+        name: formatPersonName(entry),
         site: entry.site,
         complianceStatus: entry.complianceStatus,
         checkedOn: entry.checkedOn,

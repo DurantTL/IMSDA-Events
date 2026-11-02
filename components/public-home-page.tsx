@@ -1,3 +1,4 @@
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
@@ -82,7 +83,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
             <li key={announcement.id}>
               <h3>{announcement.title}</h3>
               <p>{announcement.body}</p>
-              {announcement.linkHref && <p><HubLink className={styles.homeAnnouncementLink} href={announcement.linkHref}>{linkText(announcement)}<span className="sr-only"> about {announcement.title}</span></HubLink></p>}
+              {announcement.linkHref && <p><HubLink className={styles.homeAnnouncementLink} href={announcement.linkHref}>{linkText(announcement)}<span className="sr-only">{` about ${announcement.title}`}</span></HubLink></p>}
             </li>
           ))}
         </ul>
@@ -144,7 +145,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
                 <span className="home-place-text">
                   <strong>{tile.name}</strong>
                   {tile.description && <span className="home-place-desc">{tile.description}</span>}
-                  {tile.next && <span className="home-place-next">Next: {tile.next.title}, {tile.next.dateLabel}</span>}
+                  {tile.next && <span className="home-place-next">{`Next: ${tile.next.title}, ${tile.next.dateLabel}`}</span>}
                   {tile.closing && <span className="home-place-flag">{tile.closing.line}</span>}
                 </span>
                 <ChevronRight size={20} aria-hidden="true" />
@@ -184,7 +185,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
             <p className="season-closing-line">{closing.line}</p>
             {closing.item.href && (
               <Link className="season-closing-register" href={closing.item.href}>
-                Register<span className="sr-only"> for {closing.item.eventTitle ?? closing.item.title}</span>
+                Register<span className="sr-only">{` for ${closing.item.eventTitle ?? closing.item.title}`}</span>
               </Link>
             )}
           </aside>
@@ -236,7 +237,7 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
               <Link href="/account">
                 <span>
                   <strong>My registrations</strong>
-                  {signedInName && <small>Signed in as {signedInName}</small>}
+                  {signedInName && <small>Signed in as <ExactValue>{signedInName}</ExactValue></small>}
                 </span>
                 <ChevronRight size={18} aria-hidden="true" />
               </Link>

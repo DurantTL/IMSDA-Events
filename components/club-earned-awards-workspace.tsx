@@ -1,7 +1,9 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useClientSearch } from "@/components/search-as-you-type";
 import { AlertTriangle, Award, CheckCircle2, Download, Eye, GraduationCap, Plus, Search, Sparkles, Trash2, Trophy, UsersRound, X } from "lucide-react";
 import { HonorCombobox } from "@/components/honor-combobox";
 import styles from "@/components/club-orders.module.css";
@@ -147,14 +149,22 @@ export function ClubEarnedAwardsWorkspace({
   const [unticked, setUnticked] = useState<Set<string>>(new Set());
   // One member selection, shared by Mark completed and Add by hand: the members table is listed once.
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [memberQuery, setMemberQuery] = useState("");
+  const memberSearch = useClientSearch();
+  const memberQuery = memberSearch.term;
   const [statusFilter, setStatusFilter] = useState<ClassStatusFilter>("");
   const [nameDirection, setNameDirection] = useState<SortDirection>("asc");
   const [classLevel, setClassLevel] = useState<ClubClassLevel>("FRIEND");
   const [completedOn, setCompletedOn] = useState(today);
   // Add by hand.
   const [itemId, setItemId] = useState("");
-  const [itemQuery, setItemQuery] = useState("");
+  const itemSearch = useClientSearch();
+  const itemQuery = itemSearch.term;
+  // A new item search clears the chosen item once the list has changed (not on every keystroke).
+  const [itemTermSeen, setItemTermSeen] = useState(itemQuery);
+  if (itemTermSeen !== itemQuery) {
+    setItemTermSeen(itemQuery);
+    setItemId("");
+  }
   const [chosen, setChosen] = useState<Array<{ itemId: string; label: string }>>([]);
   const [alreadyHasIt, setAlreadyHasIt] = useState(false);
   // Open items.
@@ -262,7 +272,7 @@ export function ClubEarnedAwardsWorkspace({
     if (!group || chosen.some((entry) => entry.itemId === group.itemId)) return;
     setChosen((current) => [...current, { itemId: group.itemId, label: group.name }]);
     setItemId("");
-    setItemQuery("");
+    itemSearch.setValue("");
   }
 
   async function record() {
@@ -348,7 +358,7 @@ export function ClubEarnedAwardsWorkspace({
           <h2 id="class-tracking-heading">Class tracking</h2>
         </div>
         <div className="club-roster-heading-actions">
-          <span className="count-badge">{data.needs.length} open</span>
+          <span className="count-badge">{`${data.needs.length} open`}</span>
           {(exportCsvHref || exportPrintHref) && (
             <div className="report-actions" role="group" aria-label="Export class tracking">
               {exportCsvHref && <a className="secondary-button" href={exportCsvHref}><Download aria-hidden="true" size={14} /> Export CSV</a>}
@@ -369,7 +379,10 @@ export function ClubEarnedAwardsWorkspace({
         <section aria-labelledby="earned-members" className={styles.block}>
           <h3 id="earned-members"><UsersRound aria-hidden="true" size={14} /> Members ({data.members.length})</h3>
           {data.members.length === 0 ? (
-            <p className="public-manage-empty" role="status"><UsersRound aria-hidden="true" size={17} /> No active members are on this year&apos;s roster yet.</p>
+            <>
+              <p className="public-manage-empty" role="status"><UsersRound aria-hidden="true" size={17} /> No active members are on this year&apos;s roster yet.</p>
+              <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="class tracking" id="awards-no-members" />
+            </>
           ) : (
             <>
               <div className="club-roster-tools">
@@ -380,10 +393,9 @@ export function ClubEarnedAwardsWorkspace({
                     <input
                       autoComplete="off"
                       id="earned-search"
-                      onChange={(event) => setMemberQuery(event.target.value)}
+                      {...memberSearch.inputProps}
                       placeholder="Search by name or class"
                       type="search"
-                      value={memberQuery}
                     />
                   </span>
                 </label>
@@ -456,7 +468,7 @@ export function ClubEarnedAwardsWorkspace({
                             <td {...cardCell(null)}>
                               {classHistoryBase && (
                                 <Link className="secondary-button class-history-button" href={`${classHistoryBase}/${encodeURIComponent(member.personId)}`}>
-                                  Class history<span className="sr-only"> for {member.firstName} {member.lastName}</span>
+                                  Class history<span className="sr-only">{` for ${member.firstName} ${member.lastName}`}</span>
                                 </Link>
                               )}
                             </td>
@@ -501,7 +513,7 @@ export function ClubEarnedAwardsWorkspace({
                 {data.catalog.length > 8 && (
                   <span className={styles.pickerField}>
                     <label htmlFor="earned-item-search">Find an item</label>
-                    <input autoComplete="off" className={styles.select} aria-describedby="earned-item-results" id="earned-item-search" onChange={(event) => { setItemQuery(event.target.value); setItemId(""); }} placeholder="Item name" type="search" value={itemQuery} />
+                    <input autoComplete="off" className={styles.select} aria-describedby="earned-item-results" id="earned-item-search" {...itemSearch.inputProps} placeholder="Item name" type="search" />
                   </span>
                 )}
                 <span className={styles.pickerField}>
@@ -568,7 +580,7 @@ export function ClubEarnedAwardsWorkspace({
               <div className={styles.group} key={entry.completionId}>
                 <div className={styles.groupHead}>
                   <strong><span translate="no">{entry.firstName} {entry.lastName}</span> · {entry.classLabel} insignia</strong>
-                  <small className={styles.muted}>Completed {entry.completedOn}</small>
+                  <small className={styles.muted}>{`Completed ${entry.completedOn}`}</small>
                 </div>
                 <ul className={styles.people}>
                   {entry.items.map((item) => (
@@ -641,7 +653,7 @@ export function ClubEarnedAwardsWorkspace({
 
       <section aria-labelledby="earned-open" className={styles.block}>
         <h3 id="earned-open"><Award aria-hidden="true" size={14} /> Open earned items ({data.needs.length})</h3>
-        {data.awardedCount > 0 && <small className={styles.muted}>{data.awardedCount} awarded so far</small>}
+        {data.awardedCount > 0 && <small className={styles.muted}>{`${data.awardedCount} awarded so far`}</small>}
         {data.needs.length === 0 ? (
           <p className="quiet-copy">No open earned items.</p>
         ) : (
@@ -666,7 +678,7 @@ export function ClubEarnedAwardsWorkspace({
                   )}
                   {classHistoryBase && firstForPerson && !need.classHistoryHidden && (
                     <Link className="text-button" href={`${classHistoryBase}/${encodeURIComponent(need.personId)}`}>
-                      Class history<span className="sr-only"> for {need.firstName} {need.lastName}</span>
+                      Class history<span className="sr-only">{` for ${need.firstName} ${need.lastName}`}</span>
                     </Link>
                   )}
                 </li>
@@ -697,14 +709,14 @@ export function ClubEarnedAwardsWorkspace({
               <div className={styles.group} key={rule.ruleId}>
                 <div className={styles.groupHead}>
                   <strong translate="no">{rule.name}</strong>
-                  <small className={styles.muted}>Needs {rule.requirement}</small>
+                  <small className={styles.muted}>{`Needs ${rule.requirement}`}</small>
                 </div>
                 {rule.missingItem && (
                   <p className={styles.flag} role="status">
                     <AlertTriangle aria-hidden="true" size={14} /> Not linked to a catalog item yet, so it can&apos;t be added to an order.
                   </p>
                 )}
-                <strong className={styles.muted}>Eligible, not yet awarded ({rule.eligible.length})</strong>
+                <strong className={styles.muted}>{`Eligible, not yet awarded (${rule.eligible.length})`}</strong>
                 {rule.eligible.length === 0 ? <p className="quiet-copy">No one right now.</p> : (
                   <ul className={styles.people}>
                     {rule.eligible.map((person) => (
@@ -731,12 +743,12 @@ export function ClubEarnedAwardsWorkspace({
                   </div>
                 )}
                 {rule.onOrder.length > 0 && (
-                  <small className={styles.muted}>On the order list: {rule.onOrder.map((person) => `${person.firstName} ${person.lastName}`).join(", ")}</small>
+                  <small className={styles.muted}>{`On the order list: ${rule.onOrder.map((person) => `${person.firstName} ${person.lastName}`).join(", ")}`}</small>
                 )}
                 {rule.givenElsewhere.length > 0 && (
-                  <small className={styles.muted}>Already given (another club): {rule.givenElsewhere.map((person) => `${person.firstName} ${person.lastName}`).join(", ")}</small>
+                  <small className={styles.muted}>{`Already given (another club): ${rule.givenElsewhere.map((person) => `${person.firstName} ${person.lastName}`).join(", ")}`}</small>
                 )}
-                {rule.awardedCount > 0 && <small className={styles.muted}>{rule.awardedCount} awarded</small>}
+                {rule.awardedCount > 0 && <small className={styles.muted}>{`${rule.awardedCount} awarded`}</small>}
                 {rule.closest.length > 0 && (
                   <>
                     <strong className={styles.muted}>Closest</strong>

@@ -33,6 +33,7 @@ import {
 import { getRegistrationById, type RegistrationRecord } from "@/modules/registrations/repository";
 import type { RestoredClassSeats } from "@/modules/honors/restore-seats";
 import { recordRegistrationClassChanges, withClassChangeKick } from "@/modules/honors/class-change-log";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 export type RegistrationLifecycleErrorCode =
   | "REGISTRATION_NOT_FOUND"
@@ -160,7 +161,7 @@ function requireStatus(
   if (allowed.includes(registration.status)) return;
   throw new RegistrationLifecycleError(
     "INVALID_REGISTRATION_TRANSITION",
-    `${action} is not allowed while registration ${registration.confirmationCode} is ${registration.status.toLowerCase()}.`,
+    `${action} is not allowed while registration ${registration.confirmationCode} is ${registrationStatusWordOrRaw(registration.status).toLowerCase()}.`,
     { currentStatus: registration.status, allowedStatuses: allowed },
   );
 }

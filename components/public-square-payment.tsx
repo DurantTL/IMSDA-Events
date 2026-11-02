@@ -25,6 +25,19 @@ import {
 } from "@/modules/payments/hosted-return-presentation";
 import { squareTestModeNotice } from "@/modules/payments/square-sandbox-notice";
 
+const SQUARE_LOAD_TIMEOUT_MS = 20_000;
+
+/** A card form that never finishes attaching (a blocker holding a frame open) is a failure, not a wait. */
+function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("Square took too long to load.")), milliseconds);
+    promise.then(
+      (value) => { window.clearTimeout(timer); resolve(value); },
+      (error: unknown) => { window.clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
 type SquareCheckout = {
   state:
     | "READY"
@@ -267,6 +280,9 @@ export function PublicSquarePayment({
   const [checkout, setCheckout] = useState<SquareCheckout | null>(null);
   const [loading, setLoading] = useState(true);
   const [sdkReady, setSdkReady] = useState(false);
+  // Square's script or card form could not load (a blocker, a privacy setting or the network, #1445). Try again reloads it.
+  const [sdkFailed, setSdkFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [cardReady, setCardReady] = useState(false);
   const [applePayReady, setApplePayReady] = useState(false);
   const [googlePayReady, setGooglePayReady] = useState(false);
@@ -370,12 +386,23 @@ export function PublicSquarePayment({
         const [cardResult, applePayResult, googlePayResult] =
           await Promise.allSettled([
             payments.card().then(async (nextCard) => {
-              await nextCard.attach(`#${cardContainerId}`);
+              try {
+                await withTimeout(nextCard.attach(`#${cardContainerId}`), SQUARE_LOAD_TIMEOUT_MS);
+              } catch (error) {
+                // A slow attach must not finish later and leave a second card form after Try again.
+                destroyPaymentMethod(nextCard);
+                throw error;
+              }
               return nextCard;
             }),
             payments.applePay(request),
             payments.googlePay(request).then(async (nextGooglePay) => {
-              await nextGooglePay.attach(`#${googlePayContainerId}`);
+              try {
+                await withTimeout(nextGooglePay.attach(`#${googlePayContainerId}`), SQUARE_LOAD_TIMEOUT_MS);
+              } catch (error) {
+                destroyPaymentMethod(nextGooglePay);
+                throw error;
+              }
               return nextGooglePay;
             }),
           ]);
@@ -400,10 +427,7 @@ export function PublicSquarePayment({
         setApplePayReady(Boolean(applePay));
         setGooglePayReady(Boolean(googlePay));
         if (!card && !applePay && !googlePay) {
-          setNotice({
-            tone: "error",
-            message: "No secure Square payment method is available in this browser. Try another browser or contact the event team.",
-          });
+          setSdkFailed(true);
         } else if (!card) {
           setNotice({
             tone: "pending",
@@ -414,10 +438,7 @@ export function PublicSquarePayment({
         destroyPaymentMethod(card);
         destroyPaymentMethod(applePay);
         destroyPaymentMethod(googlePay);
-        setNotice({
-          tone: "error",
-          message: "The secure Square payment options could not be loaded. Try again or contact the event team.",
-        });
+        if (active) setSdkFailed(true);
       }
     })();
     return () => {
@@ -435,7 +456,23 @@ export function PublicSquarePayment({
       destroyPaymentMethod(applePay);
       destroyPaymentMethod(googlePay);
     };
-  }, [cardContainerId, checkout, googlePayContainerId, sdkReady]);
+  }, [cardContainerId, checkout, googlePayContainerId, sdkReady, loadAttempt]);
+
+  // A blocker can hold Square's script request open without refusing it: after a while, say so instead of waiting forever.
+  const squareWaiting = checkout?.state === "READY" && Boolean(checkout.square) && !sdkReady && !sdkFailed;
+  useEffect(() => {
+    if (!squareWaiting) return;
+    const timer = window.setTimeout(() => setSdkFailed(true), SQUARE_LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [squareWaiting, loadAttempt]);
+
+  function retrySquareLoad() {
+    setSdkFailed(false);
+    setNotice(null);
+    // A script that already loaded only needs its card form built again; one that failed is requested again.
+    setSdkReady(typeof window !== "undefined" && Boolean(window.Square));
+    setLoadAttempt((attempt) => attempt + 1);
+  }
 
   function clearPaymentAttempt() {
     idempotencyKeyRef.current = null;
@@ -903,16 +940,37 @@ export function PublicSquarePayment({
       {paymentChoicePanel}
       <div className="public-square-checkout">
       <Script
-        id={`square-web-payments-${checkout.square.environment}`}
-        src={checkout.square.scriptUrl}
+        key={loadAttempt}
+        id={`square-web-payments-${checkout.square.environment}-${loadAttempt}`}
+        // A fragment makes a retry a new script to the loader (it remembers addresses it has tried); the request is the same.
+        src={loadAttempt > 0 ? `${checkout.square.scriptUrl}#retry-${loadAttempt}` : checkout.square.scriptUrl}
         nonce={nonce}
         strategy="afterInteractive"
-        onReady={() => setSdkReady(true)}
-        onError={() => setNotice({
-          tone: "error",
-          message: "The secure Square payment service could not be loaded.",
-        })}
+        onReady={() => {
+          // A load that finishes after the give-up timer still counts.
+          setSdkFailed(false);
+          setSdkReady(true);
+        }}
+        onError={() => setSdkFailed(true)}
       />
+      {sdkFailed && (
+        <div className="public-square-notice is-error" data-testid="square-load-failed" role="alert">
+          <TriangleAlert size={18} aria-hidden="true" />
+          <div>
+            <span>
+              The secure card form could not load. A browser privacy setting, an ad blocker or the network may be blocking
+              Square. Your registration is saved.
+            </span>
+            <p>
+              {payLaterChoice && paymentChoice?.available && !paymentChoice.locked
+                ? "You can choose Pay later in the options above."
+                : "You can still pay another way: contact the event team."}
+              {checkout.hostedLink && " If this keeps failing, Pay on Square below opens Square's own page, which a blocker may stop too."}
+            </p>
+            <button className="secondary-button" onClick={retrySquareLoad} type="button">Try again</button>
+          </div>
+        </div>
+      )}
       {checkout.deposit && (
         <div className="public-square-deposit-choice" role="group" aria-label="What to pay now">
           <button

@@ -57,7 +57,7 @@ export function ClubReportReview({
       >
         {!reviewed && <CheckCircle2 aria-hidden="true" size={15} />}
         {reviewed ? "Undo reviewed" : "Mark reviewed"}
-        <span className="sr-only"> for {clubName}</span>
+        <span className="sr-only">{` for ${clubName}`}</span>
       </button>
       {error && <small className="club-report-problem" role="alert">{error}</small>}
     </div>

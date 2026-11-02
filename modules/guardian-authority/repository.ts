@@ -19,6 +19,7 @@ import {
   type ReviewKind,
   type RosterPerson,
 } from "@/modules/guardian-authority/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Declared guardian authority (#131, narrow slice). Authority is one append-only record per declaration,
@@ -118,7 +119,7 @@ function personDisplayName(attendee: { profileSnapshot: unknown; person: { first
   const profile = record(attendee.profileSnapshot);
   const first = typeof profile.firstName === "string" ? profile.firstName : attendee.person.firstName;
   const last = typeof profile.lastName === "string" ? profile.lastName : attendee.person.lastName;
-  return `${first} ${last}`.trim() || "Attendee";
+  return formatPersonName({ firstName: first, lastName: last }) || "Attendee";
 }
 
 /**

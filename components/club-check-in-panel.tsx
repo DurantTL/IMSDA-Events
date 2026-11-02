@@ -12,6 +12,7 @@ import {
 import { useMemo, useState } from "react";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { SterlingCheckInOverride } from "@/components/sterling-check-in-override";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Q1 (#412): checking in a whole club at once. Shared between the arrival
@@ -229,7 +230,7 @@ export function ClubCheckInPanel({
                   type="checkbox"
                 />
                 <span>
-                  <strong translate="no">{attendee.firstName} {attendee.lastName}</strong>
+                  <strong translate="no">{formatPersonName(attendee)}</strong>
                   <small>{attendee.attendeeType.toLowerCase()}</small>
                   {attendee.backgroundFlagged && <BackgroundCheckBadge />}
                 </span>
@@ -292,7 +293,7 @@ export function ClubCheckInPanel({
           <div className="club-check-in-scanned">
             <div>
               <p className="eyebrow">Scanned pass</p>
-              <strong translate="no">{scanned.firstName} {scanned.lastName}</strong>
+              <strong translate="no">{formatPersonName(scanned)}</strong>
               <small>{scanned.attendeeType.toLowerCase()}</small>
               {scanned.backgroundFlagged && <BackgroundCheckBadge />}
             </div>
@@ -305,7 +306,7 @@ export function ClubCheckInPanel({
                 canOverride={canCheckIn && Boolean(onOverrideScanned)}
                 disabled={busy || savedQueueUnreadable}
                 onOverride={(reason) => onOverrideScanned!(scanned.id, reason)}
-                personLabel={`${scanned.firstName} ${scanned.lastName}`}
+                personLabel={formatPersonName(scanned)}
               />
             ) : scanned.savedState === "QUEUED" && scanned.lastResult !== "CONFLICT" ? (
               <span className="club-check-in-status">Queued — not confirmed</span>
@@ -320,8 +321,8 @@ export function ClubCheckInPanel({
                 {busy && !progress
                   ? "Checking in…"
                   : clubAttendeeStatusLabel(scanned) === "Needs review"
-                    ? <>Retry check-in for <span translate="no">{scanned.firstName} {scanned.lastName}</span></>
-                    : <>Check in <span translate="no">{scanned.firstName} {scanned.lastName}</span></>}
+                    ? <>Retry check-in for <span translate="no">{formatPersonName(scanned)}</span></>
+                    : <>Check in <span translate="no">{formatPersonName(scanned)}</span></>}
               </button>
             )}
           </div>

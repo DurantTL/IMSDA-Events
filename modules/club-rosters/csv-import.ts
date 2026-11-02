@@ -9,6 +9,7 @@ import {
 } from "@/modules/club-rosters/domain";
 import { parseCsvMatrix } from "@/modules/imports/csv-parser";
 import { toCsv } from "@/modules/reporting/csv";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Club roster CSV (#384): a template to fill in, and an upload that adds new
@@ -121,7 +122,7 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
 }
 
 function nameKey(firstName: string, lastName: string) {
-  return `${firstName} ${lastName}`.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+  return formatPersonName({ firstName, lastName }).replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 }
 
 const csvFieldOrder = ["birthDate", "attendeeType", "classLevel", "role", "gender"] as const;
@@ -182,7 +183,7 @@ export function planRosterImport(rows: readonly RosterCsvRow[], existing: Readon
   }
   const seen = new Set<string>();
   return rows.map((row): RosterImportStep => {
-    const name = `${row.firstName} ${row.lastName}`.trim();
+    const name = formatPersonName(row);
     const key = nameKey(row.firstName, row.lastName);
     const skip = (message: string): RosterImportStep => ({ line: row.line, name, action: "SKIP", memberId: null, message, row });
     if (row.problems.length > 0) return skip(row.problems.join(" "));

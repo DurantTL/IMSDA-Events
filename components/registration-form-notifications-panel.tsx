@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useState } from "react";
 import { Plus, Save, Trash2 } from "lucide-react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import {
   CLUB_CONDITION_KEY,
@@ -48,8 +49,6 @@ type Draft = {
   warnings: string[];
   /** The stored club is gone from the directory: shown as "(club removed)". */
   clubRemoved: boolean;
-  /** What the staff member typed to find a club. Never saved. */
-  clubSearch: string;
 };
 
 let localCounter = 0;
@@ -72,12 +71,45 @@ function toDraft(row: PanelData["notifications"][number]): Draft {
     sectionIds: row.sectionIds,
     warnings: row.warnings,
     clubRemoved: row.clubRemoved,
-    clubSearch: "",
   };
 }
 
 function blankDraft(): Draft {
-  return { localKey: nextKey(), name: "", recipientsText: "", savedRecipients: [], conditionFieldKey: "", conditionOperator: "EQUALS", conditionValue: "", onlyTheseSections: false, sectionIds: [], warnings: [], clubRemoved: false, clubSearch: "" };
+  return { localKey: nextKey(), name: "", recipientsText: "", savedRecipients: [], conditionFieldKey: "", conditionOperator: "EQUALS", conditionValue: "", onlyTheseSections: false, sectionIds: [], warnings: [], clubRemoved: false };
+}
+
+/** The club search box and the club list it narrows. It owns the typed words, which are never saved. */
+function ClubPicker({ clubRemoved, clubs, label, onChoose, value }: {
+  clubRemoved: boolean;
+  clubs: Array<{ id: string; name: string }>;
+  label: string;
+  onChoose: (clubId: string) => void;
+  value: string;
+}) {
+  const search = useClientSearch();
+  const needle = search.term.trim().toLowerCase();
+  const shown = clubs.filter((club) => club.id === value || club.name.toLowerCase().includes(needle));
+  return (
+    <>
+      <label>
+        <span>Value</span>
+        <input
+          aria-label={label}
+          autoComplete="off"
+          {...search.inputProps}
+          placeholder="Search clubs by name"
+          type="search"
+        />
+        <select onChange={(event) => onChoose(event.target.value)} value={value}>
+          <option value="">Choose a club</option>
+          {clubRemoved && value && <option value={value}>(club removed)</option>}
+          {shown.map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
+        </select>
+      </label>
+      {/* Outside the label, so it is not part of the field's name. */}
+      <SearchResultStatus message={needle === "" ? "" : `${shown.length} ${shown.length === 1 ? "club" : "clubs"} listed.`} />
+    </>
+  );
 }
 
 export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventId: string; formId: string }) {
@@ -97,7 +129,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
 
   useEffect(() => {
     let cancelled = false;
-    fetch(base, { headers: { Accept: "application/json" } })
+    fetch(base, { headers: { Accept: "application/json" }, cache: "no-store" })
       .then(async (response) => {
         const result = await response.json().catch(() => null) as (PanelData & { message?: string }) | null;
         if (cancelled) return;
@@ -181,7 +213,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
             const prefix = `${headingId}-${draft.localKey}`;
             return (
               <fieldset className="panel form-stack form-notification-item" key={draft.localKey}>
-                <legend>Notification {index + 1}</legend>
+                <legend>{`Notification ${index + 1}`}</legend>
                 {draft.warnings.map((warning) => <div className="inline-notice error" key={warning} role="alert">{warning}</div>)}
                 <label>
                   <span>Name</span>
@@ -199,12 +231,12 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                     value={draft.recipientsText}
                   />
                 </label>
-                <p className="field-help" id={`${prefix}-addresses`}>One address per line, up to {FORM_NOTIFICATION_MAX_RECIPIENTS}.</p>
+                <p className="field-help" id={`${prefix}-addresses`}>{`One address per line, up to ${FORM_NOTIFICATION_MAX_RECIPIENTS}.`}</p>
 
                 <label>
                   <span>Send</span>
                   <select
-                    onChange={(event) => update(draft.localKey, { conditionFieldKey: event.target.value, conditionValue: "", conditionOperator: "EQUALS", clubRemoved: false, clubSearch: "" })}
+                    onChange={(event) => update(draft.localKey, { conditionFieldKey: event.target.value, conditionValue: "", conditionOperator: "EQUALS", clubRemoved: false })}
                     value={draft.conditionFieldKey}
                   >
                     <option value="">Every time</option>
@@ -222,6 +254,15 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                         <option value="NOT_EQUALS">is not</option>
                       </select>
                     </label>
+                    {draft.conditionFieldKey === CLUB_CONDITION_KEY ? (
+                      <ClubPicker
+                        clubRemoved={draft.clubRemoved}
+                        clubs={data.clubs}
+                        label={`Search clubs for notification ${index + 1}`}
+                        onChoose={(value) => update(draft.localKey, { conditionValue: value, clubRemoved: false })}
+                        value={draft.conditionValue}
+                      />
+                    ) : (
                     <label>
                       <span>Value</span>
                       {draft.conditionFieldKey === LOCATION_CONDITION_KEY ? (
@@ -229,24 +270,6 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                           <option value="">Choose a location</option>
                           {data.locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
                         </select>
-                      ) : draft.conditionFieldKey === CLUB_CONDITION_KEY ? (
-                        <>
-                          <input
-                            aria-label={`Search clubs for notification ${index + 1}`}
-                            autoComplete="off"
-                            onChange={(event) => update(draft.localKey, { clubSearch: event.target.value })}
-                            placeholder="Search clubs by name"
-                            type="search"
-                            value={draft.clubSearch}
-                          />
-                          <select onChange={(event) => update(draft.localKey, { conditionValue: event.target.value, clubRemoved: false })} value={draft.conditionValue}>
-                            <option value="">Choose a club</option>
-                            {draft.clubRemoved && draft.conditionValue && <option value={draft.conditionValue}>(club removed)</option>}
-                            {data.clubs
-                              .filter((club) => club.id === draft.conditionValue || club.name.toLowerCase().includes(draft.clubSearch.trim().toLowerCase()))
-                              .map((club) => <option key={club.id} value={club.id}>{club.name}</option>)}
-                          </select>
-                        </>
                       ) : field && field.options.length > 0 ? (
                         <select onChange={(event) => update(draft.localKey, { conditionValue: event.target.value })} value={draft.conditionValue}>
                           <option value="">Choose an answer</option>
@@ -256,6 +279,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
                         <input autoComplete="off" maxLength={120} onChange={(event) => update(draft.localKey, { conditionValue: event.target.value })} value={draft.conditionValue} />
                       )}
                     </label>
+                    )}
                   </div>
                 )}
 
@@ -305,7 +329,7 @@ export function RegistrationFormNotificationsPanel({ eventId, formId }: { eventI
               <Save aria-hidden="true" size={14} /> {saving ? "Saving…" : "Save notifications"}
             </button>
           </div>
-          <p className="field-help">Up to {FORM_NOTIFICATIONS_MAX_PER_FORM} notifications per form. Event administrators and system administrators can change them.</p>
+          <p className="field-help">{`Up to ${FORM_NOTIFICATIONS_MAX_PER_FORM} notifications per form. Event administrators and system administrators can change them.`}</p>
         </form>
       )}
     </section>

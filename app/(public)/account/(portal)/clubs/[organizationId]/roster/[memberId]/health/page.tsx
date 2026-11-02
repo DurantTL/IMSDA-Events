@@ -1,4 +1,6 @@
+import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { HealthRecordActions } from "@/components/health-record-actions";
@@ -11,6 +13,7 @@ import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-gla
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { listHealthRecordLinks, viewHealthEntryStatus, viewHealthRecord } from "@/modules/health-records/repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Health record", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -28,14 +31,14 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
   if (!healthRecordsEnabled()) notFound();
   const { organizationId, memberId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const viewer = await requireHealthViewerForClub(organizationId).catch((error: unknown) => {
     if (error instanceof HealthRecordError && error.code === "FORBIDDEN") return null;
     if (error instanceof HealthRecordError || error instanceof RosterAccessError) notFound();
     throw error;
   });
   if (!viewer) {
-    return <p className="public-manage-empty">Health records are kept by the club&apos;s director and deputy.</p>;
+    return <><p className="public-manage-empty">Health records are kept by the club&apos;s director and deputy.</p><ClubSetupHelp base={`/account/clubs/${organizationId}`} context="health records" id="health-role" /></>;
   }
   const needsAck = (error: unknown) => error instanceof HealthRecordError && error.code === "ACKNOWLEDGMENT_REQUIRED";
   const rosterHref = `/account/clubs/${organizationId}/roster`;
@@ -52,7 +55,7 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
       <section className="page-stack club-form-page">
         <BackLink href={rosterHref}>Back to roster</BackLink>
         <header>
-          <h2 translate="no">Health record entry: {entryName}</h2>
+          <h2>Health record entry: <ExactValue>{entryName}</ExactValue></h2>
           <p><HealthStatusChip status={entry.status} /></p>
           {entry.exists ? (
             <p className="quiet-copy">A health record is on file; the director or a deputy can update it.</p>
@@ -97,7 +100,7 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
     <section className="page-stack club-form-page">
       <BackLink href={rosterHref}>Back to roster</BackLink>
       <header>
-        <h2 translate="no">Health record: {memberName}</h2>
+        <h2>Health record: <ExactValue>{memberName}</ExactValue></h2>
         <p><HealthStatusChip status={health.status} /></p>
         <p className="quiet-copy">Opening this page is recorded. Health details are never emailed, exported, or printed in the check-in book.</p>
       </header>

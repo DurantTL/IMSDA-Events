@@ -11,6 +11,7 @@ export function PasswordResetRequestForm({ securityCheck = null }: { securityChe
   const [resetUrl, setResetUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,5 +40,5 @@ export function PasswordResetRequestForm({ securityCheck = null }: { securityChe
     }
   }
 
-  return <form className="auth-form" onSubmit={submit}><label>Email address<input name="email" type="email" autoComplete="email" required /></label><SecurityCheck config={securityCheck} action="forgot-password" handleRef={check} />{error && <p className="form-error" role="alert">{error}</p>}{message && <div className="auth-success" role="status"><strong>Request received</strong><p>{message}</p>{resetUrl && <Link className="primary-button" href={resetUrl}><KeyRound size={16} /> Open local reset link</Link>}</div>}<button className="primary-button full-button" type="submit" disabled={busy}><KeyRound size={17} /> {busy ? "Preparing…" : "Prepare reset instructions"}</button><Link className="auth-back-link" href="/login"><ArrowLeft size={15} /> Back to sign in</Link></form>;
+  return <form className="auth-form" onSubmit={submit}><label>Email address<input name="email" type="email" autoComplete="email" required ref={emailRef} /></label><SecurityCheck config={securityCheck} action="forgot-password" handleRef={check} emailCode={{ getEmail: () => emailRef.current?.value ?? "" }} />{error && <p className="form-error" role="alert">{error}</p>}{message && <div className="auth-success" role="status"><strong>Request received</strong><p>{message}</p>{resetUrl && <Link className="primary-button" href={resetUrl}><KeyRound size={16} /> Open local reset link</Link>}</div>}<button className="primary-button full-button" type="submit" disabled={busy}><KeyRound size={17} /> {busy ? "Preparing…" : "Prepare reset instructions"}</button><Link className="auth-back-link" href="/login"><ArrowLeft size={15} /> Back to sign in</Link></form>;
 }

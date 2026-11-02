@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Check, CheckCheck, Eraser } from "lucide-react";
 import type { InstructorRosterRow } from "@/modules/honors/instructor-domain";
+import { formatPersonName } from "@/lib/person-name";
+import { savedMessage } from "@/components/form-message";
 
 type MarkResponse = { people?: InstructorRosterRow[]; locked?: number; writeBack?: { skipped: number } | null; message?: string };
 
@@ -45,7 +47,7 @@ export function InstructorRoster({
         result.locked ? `${result.locked} already in the honor record were left as they are; ask the conference office to void one if it was a mistake.` : "",
         result.writeBack?.skipped ? `${result.writeBack.skipped} marked completed here have no club roster record to update.` : "",
       ].filter(Boolean);
-      setNotice(["Saved.", ...notes].join(" "));
+      setNotice([savedMessage(), ...notes].join(" "));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The marks could not be saved.");
     } finally {
@@ -84,11 +86,11 @@ export function InstructorRoster({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.enrollmentId}>
-                  <th scope="row" translate="no">{row.lastName}, {row.firstName}</th>
+                  <th scope="row" translate="no">{formatPersonName(row, "sorted")}</th>
                   <td translate="no">{row.clubName}</td>
                   <td>
                     <input
-                      aria-label={`Attended: ${row.firstName} ${row.lastName}`}
+                      aria-label={`Attended: ${formatPersonName(row)}`}
                       checked={row.attended}
                       disabled={busy || !editable || row.completed}
                       onChange={(event) => void send({ action: "SET", enrollmentId: row.enrollmentId, attended: event.target.checked })}
@@ -97,7 +99,7 @@ export function InstructorRoster({
                   </td>
                   <td>
                     <input
-                      aria-label={`Completed: ${row.firstName} ${row.lastName}`}
+                      aria-label={`Completed: ${formatPersonName(row)}`}
                       checked={row.completed}
                       disabled={busy || !editable || row.recorded}
                       onChange={(event) => void send({ action: "SET", enrollmentId: row.enrollmentId, completed: event.target.checked })}

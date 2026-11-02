@@ -7,8 +7,8 @@ export type SettingsSaveState = "saving" | "conflict" | "failed" | "saved" | "un
 
 export const settingsSaveStateLabels: Record<SettingsSaveState, string> = {
   saving: "Saving…",
-  conflict: "Conflict: not saved",
-  failed: "Failed: not saved",
+  conflict: "Not saved: changed by someone else",
+  failed: "Not saved",
   saved: "Saved",
   unsaved: "Unsaved changes",
   clean: "",

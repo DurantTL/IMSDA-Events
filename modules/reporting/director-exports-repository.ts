@@ -8,6 +8,7 @@ import { loadMasterAwardProgress } from "@/modules/earned-awards/order-source";
 import { honorCategoryLabels } from "@/modules/honors/domain";
 import { memberHonorStatusLabels } from "@/modules/honors/member-honor-domain";
 import type { ClassTrackingMemberRow, HonorsExportRow } from "@/modules/reporting/director-exports";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Reads for the director exports (#655). Names, class, honors and earned items
@@ -48,7 +49,7 @@ async function rosterMembers(organizationId: string, clubYear: string, memberId?
 export async function listExportMemberOptions(organizationId: string, clubYear: string) {
   return (await rosterMembers(organizationId, clubYear))
     .sort(byName)
-    .map((member) => ({ memberId: member.memberId, label: `${member.lastName}, ${member.firstName}` }));
+    .map((member) => ({ memberId: member.memberId, label: formatPersonName(member, "sorted") }));
 }
 
 /**

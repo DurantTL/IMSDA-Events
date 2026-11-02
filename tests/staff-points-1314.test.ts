@@ -129,12 +129,12 @@ describe("staff points page (#1314)", () => {
     expect(html).toContain("Showing 12 of 24 clubs matching");
     expect(html).toContain('name="all" value="1"');
     expect(html).toContain('value="pine"');
-    expect(html).toContain("Clear search");
+    expect(html).toContain("Clear filters");
     expect(html).toContain("All clubs by total points");
     expect(html).toContain("Points at a glance, all 24 clubs");
     const none = await render({ q: "zzzz" });
     expect(none).toContain("No clubs match this search");
-    expect(none).toContain("Clear search");
+    expect(none).toContain("Clear filters");
     const limited = await render({ q: "synthetic" });
     expect(limited).toContain("q=synthetic&amp;all=1");
   });
@@ -149,7 +149,7 @@ describe("staff points page (#1314)", () => {
   it("announces whole-year ranks on the bars while searching", async () => {
     const html = await render({ q: "cedar" });
     // Cedar clubs are 00-11; Club 10 is 7th in the whole year, not 1st of the results.
-    expect(html).toContain("Rank 7, </span>Synthetic Club 10");
+    expect(html).toContain("Rank 7, </span><span translate=\"no\">Synthetic Club 10</span>");
     expect(html).not.toContain("Rank 1, </span>");
   });
 

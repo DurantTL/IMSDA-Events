@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCents } from "@/modules/payments/format-cents";
+import { Money } from "@/components/exact-value";
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, MailCheck, Send, TriangleAlert, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
@@ -257,7 +257,7 @@ export function SelectedAudienceDialog({
                   <span><small>Will receive</small><strong>{preview.includedCount}</strong></span>
                   <span><small>Skipped</small><strong>{preview.skippedCount}</strong></span>
                   {templateKey === "BALANCE_REMINDER" && (
-                    <span><small>Balance covered</small><strong>{formatCents(preview.totalBalanceCents)}</strong></span>
+                    <span><small>Balance covered</small><strong><Money cents={preview.totalBalanceCents} /></strong></span>
                   )}
                 </div>
                 <div className="inline-notice">
@@ -305,7 +305,7 @@ export function SelectedAudienceDialog({
                           <small>{recipient.resolvedTemplateLabel}{recipient.templateVersionNumber ? ` · version ${recipient.templateVersionNumber}` : ""}</small>
                         )}
                         {(templateKey === "BALANCE_REMINDER" || recipient.resolvedTemplateKey === "REGISTRATION_CONFIRMATION_UNPAID") && (
-                          <small>Balance due: {formatCents(recipient.balanceCents)}</small>
+                          <small>Balance due: <Money cents={recipient.balanceCents} /></small>
                         )}
                       </li>
                     ))}

@@ -90,13 +90,14 @@ const feedTimeFormat = conferenceDateFormat({
   hour: "numeric",
   minute: "2-digit",
   hour12: true,
+  timeZoneName: "short",
 });
 
 /**
- * "Nov 30, 2026, 6:05 AM CT", built from parts so the server and the browser produce the same characters (ICU versions
+ * "Nov 30, 2026, 6:05 AM CST", built from parts so the server and the browser produce the same characters (ICU versions
  * differ in the space before AM/PM), which keeps hydration quiet.
  */
 export function formatFeedTime(iso: string) {
   const parts = Object.fromEntries(feedTimeFormat.formatToParts(new Date(iso)).map((part) => [part.type, part.value]));
-  return `${parts.month} ${parts.day}, ${parts.year}, ${parts.hour}:${parts.minute} ${String(parts.dayPeriod).toUpperCase()} CT`;
+  return `${parts.month} ${parts.day}, ${parts.year}, ${parts.hour}:${parts.minute} ${String(parts.dayPeriod).toUpperCase()} ${parts.timeZoneName}`;
 }

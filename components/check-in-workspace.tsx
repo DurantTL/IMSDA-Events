@@ -1,5 +1,6 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText } from "@/lib/list-sort";
@@ -26,6 +27,7 @@ import {
   useState,
 } from "react";
 import { formatCents } from "@/modules/payments/format-cents";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { SterlingCheckInOverride } from "@/components/sterling-check-in-override";
@@ -95,17 +97,20 @@ export function CheckInWorkspace({
       }]),
   ), [initialArrivals]);
   const owingCount = Object.keys(paymentDueByConfirmationCode).length;
-  const [query, setQueryText] = useState("");
+  const search = useClientSearch();
+  const query = search.term;
   const [rosterPage, setRosterPageState] = useState(1);
   const rosterHeadingRef = useRef<HTMLHeadingElement>(null);
   const setRosterPage = useCallback((page: number) => {
     setRosterPageState(page);
     rosterHeadingRef.current?.scrollIntoView?.({ block: "start" });
   }, []);
-  const setQuery = useCallback((next: string) => {
-    setQueryText(next);
+  // A new search shows the first page, once the list has changed (not on every keystroke).
+  const [queryPageSeen, setQueryPageSeen] = useState(query);
+  if (queryPageSeen !== query) {
+    setQueryPageSeen(query);
     setRosterPageState(1);
-  }, []);
+  }
   const [undoPendingId, setUndoPendingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   // Review before discarding saved offline data (#471): both are local,
@@ -456,12 +461,12 @@ export function CheckInWorkspace({
           <Search aria-hidden="true" size={18} />
           <span className="sr-only">Search arrivals</span>
           <input
-            onChange={(event) => setQuery(event.target.value)}
+            {...search.inputProps}
             placeholder="Search name, club, or confirmation code"
-            value={query}
           />
         </label>
       </div>
+      <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} of ${arrivals.length} ${arrivals.length === 1 ? "arrival" : "arrivals"} shown.`} />
 
       {/* Results and messages sit right under the search that produced them. */}
       {message && (
@@ -837,6 +842,7 @@ export function CheckInWorkspace({
             <p>{arrivals.length === 0
               ? "Nobody is registered for this event, so there is no one to check in. Registrations appear here once people submit the public form."
               : "Check the name or confirmation code and try again."}</p>
+            {arrivals.length === 0 && <EventSetupHelp context="check-in" id="check-in-no-arrivals" />}
           </div>
         )}
       </section>

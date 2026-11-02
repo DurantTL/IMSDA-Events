@@ -1,4 +1,4 @@
-import { formatCents } from "@/modules/payments/format-cents";
+import { ExactValue, Money } from "@/components/exact-value";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, HeartPulse, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
@@ -35,7 +35,8 @@ export default async function LedgerCheckPage({
     return (
       <AccessRestricted
         title="Ledger check is restricted"
-        detail="Only event administrators and finance managers can compare registration totals with the ledger. Ask an event administrator if you need finance access."
+        detail="Only event administrators and finance managers can compare registration totals with the ledger."
+        whoToAsk="your event administrator"
       />
     );
   }
@@ -102,13 +103,13 @@ export default async function LedgerCheckPage({
               <li className={styles.issue} key={row.registrationId}>
                 <div className={styles.issueMain}>
                   <div className={styles.issueTitle}>
-                    <strong>{row.confirmationCode} · {words(row.status)}</strong>
+                    <strong><ExactValue>{row.confirmationCode}</ExactValue> · {words(row.status)}</strong>
                     <span className={`${styles.badge} ${row.hasNoEntries ? "" : styles.badgeUrgent}`}>
                       {row.hasNoEntries ? "No ledger entries" : `${row.entryCount} ${row.entryCount === 1 ? "entry" : "entries"}`}
                     </span>
                   </div>
                   <p>
-                    Current total {formatCents(row.expectedCents)} · Ledger {formatCents(row.ledgerCents)} · Difference {formatCents(row.differenceCents)}
+                    Current total <Money cents={row.expectedCents} /> · Ledger <Money cents={row.ledgerCents} /> · Difference <Money cents={row.differenceCents} />
                   </p>
                 </div>
                 <Link className={styles.resolveLink} href={`/finance?${eventQuery}&registration=${encodeURIComponent(row.registrationId)}`}>

@@ -1,4 +1,4 @@
-import { formatCents } from "@/modules/payments/format-cents";
+import { Money } from "@/components/exact-value";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { systemRoleText } from "@/modules/access/role-descriptions";
@@ -172,7 +172,7 @@ export default async function SystemAdminPage({
       <AdminSectionHeaderFor path="/admin" section="system" />
       {unavailable && (
         <div className="inline-notice error" role="status">
-          <span>That event isn&rsquo;t available. It may not exist, or this account may not have access to it. Choose an event below to continue.</span>
+          <span>You can&rsquo;t open that event with this account. Ask a system administrator if you need access, or choose an event below to continue.</span>
         </div>
       )}
       <section className={styles.hero} aria-labelledby="system-home-heading">
@@ -322,7 +322,7 @@ export default async function SystemAdminPage({
                   <span><strong>{event.waitingCount}</strong><small>Waitlisted</small></span>
                   <span>
                     <Link href={`/finance?${query}`} title="Money still owed on active registrations">
-                      <strong>{formatCents(event.ledgerBalanceCents, { wholeDollars: true })}</strong><small>Outstanding balance</small>
+                      <strong><Money cents={event.ledgerBalanceCents} options={{ wholeDollars: true }} /></strong><small>Outstanding balance</small>
                     </Link>
                   </span>
                 </div>

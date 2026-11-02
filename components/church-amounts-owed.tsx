@@ -1,4 +1,4 @@
-import { formatCents } from "@/modules/payments/format-cents";
+import { ExactValue, Money } from "@/components/exact-value";
 import Link from "next/link";
 import { Building2, Download } from "lucide-react";
 import {
@@ -12,6 +12,7 @@ import {
   summarizeSponsoredLines,
   type ChurchSponsoredPromoLine,
 } from "@/modules/promo-codes/church-sponsored";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 /**
  * What each church owes for this event (#409): an estimate from the pricing
@@ -103,7 +104,7 @@ export function ChurchAmountsOwed({
         <article className="finance-stat warning">
           <span><Building2 aria-hidden="true" size={18} /></span>
           <small>Estimated amount owed</small>
-          <strong>{formatCents(summary.totalOwedCents + groupSummary.totalOwedCents + sponsored.totalCents)}</strong>
+          <strong><Money cents={summary.totalOwedCents + groupSummary.totalOwedCents + sponsored.totalCents} /></strong>
         </article>
       </section>
       {summary.churches.length > 0 && (
@@ -114,7 +115,7 @@ export function ChurchAmountsOwed({
               <span><strong>{church.churchName}</strong></span>
               <span>{church.clubCount} {church.clubCount === 1 ? unit : `${unit}s`}</span>
               <span />
-              <span>{formatCents(church.amountOwedCents)}</span>
+              <span><Money cents={church.amountOwedCents} /></span>
             </div>
           ))}
         </section>
@@ -123,10 +124,10 @@ export function ChurchAmountsOwed({
         <div className="finance-row finance-head"><span>{hasIndividuals ? "Registrant or club / church or organization" : "Club / church"}</span><span>Confirmation</span><span>Attendees</span><span>Estimated amount owed</span></div>
         {billed.map((row) => (
           <div className="finance-row" key={`${row.organizationId}-${row.confirmationCode}`}>
-            <span><strong>{row.organizationName}</strong><small>{row.teamName ? `Team ${row.teamName} · ` : ""}{row.churchName ?? NO_CHURCH_ON_FILE} · {row.status.toLowerCase()}{row.locationName ? ` · ${row.locationName}` : ""}</small></span>
+            <span><strong>{row.organizationName}</strong><small>{row.teamName ? `Team ${row.teamName} · ` : ""}{row.churchName ?? NO_CHURCH_ON_FILE} · {registrationStatusWordOrRaw(row.status)}{row.locationName ? ` · ${row.locationName}` : ""}</small></span>
             <span>{row.confirmationCode}</span>
             <span>{row.attendeeCount} {row.attendeeCount === 1 ? "person" : "people"}</span>
-            <span>{formatCents(row.amountOwedCents)}</span>
+            <span><Money cents={row.amountOwedCents} /></span>
           </div>
         ))}
         {billed.length === 0 && (
@@ -147,14 +148,14 @@ export function ChurchAmountsOwed({
               <span>
                 <strong>{row.billingContact?.name ?? row.organizationName}</strong>
                 <small>
-                  Group · billed to the contact after the event · {row.isBilled ? row.status.toLowerCase() : notBilledLabel(row.status)}
+                  Group · billed to the contact after the event · {row.isBilled ? registrationStatusWordOrRaw(row.status) : notBilledLabel(row.status)}
                   {row.billingContact?.email ? ` · ${row.billingContact.email}` : ""}
                   {row.locationName ? ` · ${row.locationName}` : ""}
                 </small>
               </span>
               <span>{row.confirmationCode}</span>
               <span>{row.attendeeCount} {row.attendeeCount === 1 ? "person" : "people"}</span>
-              <span>{formatCents(row.amountOwedCents)}</span>
+              <span><Money cents={row.amountOwedCents} /></span>
             </div>
           ))}
         </section>
@@ -168,14 +169,14 @@ export function ChurchAmountsOwed({
                 <span><strong>{church.churchName}</strong><small>{church.lineCount} {church.lineCount === 1 ? "registration" : "registrations"} used a code this church sponsors</small></span>
                 <span />
                 <span />
-                <span><strong>{formatCents(church.amountCents)}</strong></span>
+                <span><strong><Money cents={church.amountCents} /></strong></span>
               </div>
               {church.lines.map((line) => (
                 <div className="finance-row" key={line.lineId}>
-                  <span><small>Promo code {line.promoCode}</small></span>
+                  <span><small>Promo code <ExactValue>{line.promoCode}</ExactValue></small></span>
                   <span>{line.confirmationCode}</span>
-                  <span>{line.status.toLowerCase()}</span>
-                  <span>{formatCents(line.amountCents)}</span>
+                  <span>{registrationStatusWordOrRaw(line.status)}</span>
+                  <span><Money cents={line.amountCents} /></span>
                 </div>
               ))}
             </div>
@@ -190,7 +191,7 @@ export function ChurchAmountsOwed({
               <span><strong>{row.organizationName}</strong><small>{row.teamName ? `Team ${row.teamName} · ` : ""}{row.churchName ?? NO_CHURCH_ON_FILE} · {notBilledLabel(row.status)}{row.locationName ? ` · ${row.locationName}` : ""}</small></span>
               <span>{row.confirmationCode}</span>
               <span>{row.attendeeCount} {row.attendeeCount === 1 ? "person" : "people"}</span>
-              <span>{formatCents(0)}</span>
+              <span><Money cents={0} /></span>
             </div>
           ))}
         </section>

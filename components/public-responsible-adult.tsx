@@ -7,6 +7,7 @@ import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { RESPONSIBLE_ADULT_NONE } from "@/modules/guardian-authority/domain";
 import type { RegistrationResponsibleAdultView } from "@/modules/guardian-authority/repository";
+import { savedMessage } from "@/components/form-message";
 
 type PublicResponsibleAdultProps = {
   token: string;
@@ -58,8 +59,8 @@ export function PublicResponsibleAdult({ token, view: initialView, readOnly = fa
       setState({
         kind: "saved",
         message: payload?.outcome && payload.outcome.sentToReview > 0
-          ? "Saved. One choice differs from what is already recorded, so the event team will review it."
-          : "Saved.",
+          ? savedMessage("One choice differs from what is already recorded, so the event team will review it.")
+          : savedMessage(),
       });
     } catch (error) {
       setState({ kind: "error", message: error instanceof Error ? error.message : "The responsible adult could not be saved. Try again." });

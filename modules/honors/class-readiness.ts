@@ -10,6 +10,7 @@
  */
 import { unavailableReason } from "@/modules/honors/class-picker-view";
 import { consumesClassSeat } from "@/modules/honors/enrollment-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /** Any offering the class pickers show: the club view with seat counts, or the public view with only availability. */
 type ReadinessOffering = Parameters<typeof unavailableReason>[0] & {
@@ -80,7 +81,7 @@ export function classChoiceReadiness(input: {
     });
     const savedIds = new Set(input.saved?.[attendee.id] ?? []);
     const open = (offering: ReadinessOffering) => unavailableReason(offering, savedIds.has(offering.id), attendee) === null;
-    const name = `${attendee.firstName} ${attendee.lastName}`.trim();
+    const name = formatPersonName(attendee);
     const required = requiresClassChoice(attendee);
     const hasPicks = chosen.length > 0;
     const base = { attendeeId: attendee.id, name, required, hasPicks };

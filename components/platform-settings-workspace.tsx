@@ -6,7 +6,10 @@ import { useEffect, useRef, useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useConfirm } from "@/components/use-confirm";
 import { Building2, CalendarPlus, FileText, KeyRound, Mail, Megaphone, Save, Wrench } from "lucide-react";
+import { PhoneInput } from "@/components/phone-input";
 import { inlinePhoneProblem } from "@/lib/field-validation";
+import { EmailHeaderPreview } from "@/components/email-header-preview";
+import { checkEmailHeaderName, checkEmailHelpEmail } from "@/modules/communications/email-layout-domain";
 import {
   displayPlatformSettingValue,
   normalizePlatformSettingValue,
@@ -40,6 +43,10 @@ function draftFrom(settings: PlatformSettingsRecord): Draft {
     invoiceHeaderPhone: settings.invoiceHeaderPhone ?? "",
     publicHelpPhone: settings.publicHelpPhone ?? "",
     publicHelpEmail: settings.publicHelpEmail ?? "",
+    emailHeaderName: settings.emailHeaderName,
+    emailClubHeaderName: settings.emailClubHeaderName,
+    emailHelpEmail: settings.emailHelpEmail ?? "",
+    emailHelpPhone: settings.emailHelpPhone ?? "",
   };
 }
 
@@ -85,7 +92,7 @@ export function PlatformSettingsWorkspace({
       // Fresh counts, so the warning is not stale if someone linked people since the page loaded.
       let counts = signIn.linkCheck;
       try {
-        const fresh = await fetch("/api/admin/platform-settings/unified-sign-in");
+        const fresh = await fetch("/api/admin/platform-settings/unified-sign-in", { cache: "no-store" });
         const data = await fresh.json().catch(() => ({}));
         if (fresh.ok && data.linkCheck) {
           counts = data.linkCheck;
@@ -164,6 +171,17 @@ export function PlatformSettingsWorkspace({
   const phoneProblem = inlinePhoneProblem("Phone", draft.invoiceHeaderPhone, settings.invoiceHeaderPhone, phoneTouched);
   const [helpPhoneTouched, setHelpPhoneTouched] = useState(false);
   const helpPhoneProblem = inlinePhoneProblem("Phone", draft.publicHelpPhone, settings.publicHelpPhone, helpPhoneTouched);
+  // The email footer phone (#1443), judged like the other phones; the stored one is flagged but never blocks.
+  const [emailPhoneTouched, setEmailPhoneTouched] = useState(false);
+  const emailPhoneProblem = inlinePhoneProblem("Phone", draft.emailHelpPhone, settings.emailHelpPhone, emailPhoneTouched);
+  const [emailLayoutTouched, setEmailLayoutTouched] = useState(false);
+  const nameCheck = checkEmailHeaderName(draft.emailHeaderName);
+  const clubNameCheck = checkEmailHeaderName(draft.emailClubHeaderName);
+  const emailCheck = checkEmailHelpEmail(draft.emailHelpEmail);
+  const nameProblem = emailLayoutTouched && !nameCheck.ok ? nameCheck.message : undefined;
+  const clubNameProblem = emailLayoutTouched && !clubNameCheck.ok ? clubNameCheck.message : undefined;
+  const emailProblem = emailLayoutTouched && !emailCheck.ok ? emailCheck.message : undefined;
+  const emailLayoutBlocking = !nameCheck.ok || !clubNameCheck.ok || !emailCheck.ok;
   const changes = platformSettingsChanges(draftFrom(settings), draft);
   const dirty = changes.length > 0;
   const shownOutcome = outcome?.kind === "conflict" && !dirty ? null : outcome;
@@ -220,17 +238,25 @@ export function PlatformSettingsWorkspace({
     setFieldErrors({});
     setPhoneTouched(false);
     setHelpPhoneTouched(false);
+    setEmailPhoneTouched(false);
+    setEmailLayoutTouched(false);
   }
 
   async function save(submitEvent: React.FormEvent<HTMLFormElement>) {
     submitEvent.preventDefault();
     setPhoneTouched(true);
     setHelpPhoneTouched(true);
-    if (phoneProblem.blocking || helpPhoneProblem.blocking) {
+    setEmailPhoneTouched(true);
+    setEmailLayoutTouched(true);
+    if (phoneProblem.blocking || helpPhoneProblem.blocking || emailPhoneProblem.blocking || emailLayoutBlocking) {
       setOutcome({ kind: "failed", message: "Check the highlighted answers and try again." });
       focusFirstInvalid([
         ...(phoneProblem.blocking ? ["invoiceHeaderPhone" as const] : []),
         ...(helpPhoneProblem.blocking ? ["publicHelpPhone" as const] : []),
+        ...(!nameCheck.ok ? ["emailHeaderName" as const] : []),
+        ...(!clubNameCheck.ok ? ["emailClubHeaderName" as const] : []),
+        ...(!emailCheck.ok ? ["emailHelpEmail" as const] : []),
+        ...(emailPhoneProblem.blocking ? ["emailHelpPhone" as const] : []),
       ]);
       return;
     }
@@ -315,9 +341,11 @@ export function PlatformSettingsWorkspace({
           }
         }
       }
-      const codeField = result.error === "INVALID_SETTING" && typeof result.message === "string" && result.message.startsWith("Help phone")
-        ? "publicHelpPhone"
-        : serverCodeFields[result.error as string];
+      const codeField = result.error === "INVALID_SETTING" && typeof result.message === "string" && result.message.startsWith("Email help phone")
+        ? "emailHelpPhone"
+        : result.error === "INVALID_SETTING" && typeof result.message === "string" && result.message.startsWith("Help phone")
+          ? "publicHelpPhone"
+          : serverCodeFields[result.error as string];
       if (codeField && !invalid[codeField]) invalid[codeField] = result.message ?? "Check this answer.";
       setFieldErrors(invalid);
       setOutcome({ kind: "failed", message: result.message ?? "The platform settings could not be saved." });
@@ -456,14 +484,49 @@ export function PlatformSettingsWorkspace({
             blank no help line shows. This is separate from the alert addresses, which are internal.
           </p>
           <label>Help phone
-            <input {...invalidProps("publicHelpPhone", helpPhoneProblem.message ?? undefined)} autoComplete="off" inputMode="tel" maxLength={40} onBlur={() => setHelpPhoneTouched(true)} type="tel" {...field("publicHelpPhone")} />
+            <PhoneInput {...invalidProps("publicHelpPhone")} autoComplete="off" id={fieldId("publicHelpPhone")} label="Help phone" onBlur={() => setHelpPhoneTouched(true)} onValueChange={(value) => edit("publicHelpPhone", value)} showNow={helpPhoneTouched} stored={settings.publicHelpPhone} value={draft.publicHelpPhone} />
             <small>A phone number the public can call, like (515) 555-0100.</small>
-            {fieldError("publicHelpPhone", helpPhoneProblem.message ?? undefined)}
+            {fieldError("publicHelpPhone")}
           </label>
           <label>Help email
             <input autoComplete="off" maxLength={200} type="email" {...field("publicHelpEmail")} {...invalidProps("publicHelpEmail")} />
             <small>An address the public can write to. Shown as typed, saved in lower case.</small>
             {fieldError("publicHelpEmail")}
+          </label>
+        </section>
+
+        <section className="panel" aria-labelledby="platform-email-layout-heading">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Email</p>
+              <h2 id="platform-email-layout-heading">Email header and footer</h2>
+            </div>
+          </div>
+          <p className="settings-ownership"><strong>Central value.</strong> Every email sent after you save uses these.</p>
+          <p className="field-help platform-note">
+            Every email has the same header and a footer that says who sent it, why the person got it and how to get help.
+            Registration and event emails keep using each event&apos;s own contact for help.
+          </p>
+          <EmailHeaderPreview eventName={draft.emailHeaderName} clubName={draft.emailClubHeaderName} />
+          <label>Header name for event and general emails
+            <input {...invalidProps("emailHeaderName", nameProblem)} autoComplete="off" maxLength={40} onBlur={() => setEmailLayoutTouched(true)} type="text" {...field("emailHeaderName")} />
+            <small>Up to 40 characters. Shown in the header bar and in &ldquo;Sent by&rdquo;. Default: IMSDA Events.</small>
+            {fieldError("emailHeaderName", nameProblem)}
+          </label>
+          <label>Header name for club emails
+            <input {...invalidProps("emailClubHeaderName", clubNameProblem)} autoComplete="off" maxLength={40} onBlur={() => setEmailLayoutTouched(true)} type="text" {...field("emailClubHeaderName")} />
+            <small>Used for club roles and invites, the club director sign-in code, club forms and club registrations. Up to 40 characters.</small>
+            {fieldError("emailClubHeaderName", clubNameProblem)}
+          </label>
+          <label>Footer help email
+            <input {...invalidProps("emailHelpEmail", emailProblem)} autoComplete="off" maxLength={200} onBlur={() => setEmailLayoutTouched(true)} type="email" {...field("emailHelpEmail")} />
+            <small>Shown as &ldquo;Need help?&rdquo; in system and club emails. Leave both help fields blank and the footer says &ldquo;Reply to this email for help&rdquo; only when replies reach an inbox someone reads; otherwise it leaves the line out.</small>
+            {fieldError("emailHelpEmail", emailProblem)}
+          </label>
+          <label>Footer help phone (optional)
+            <PhoneInput {...invalidProps("emailHelpPhone")} autoComplete="off" id={fieldId("emailHelpPhone")} label="Phone" onBlur={() => setEmailPhoneTouched(true)} onValueChange={(value) => edit("emailHelpPhone", value)} showNow={emailPhoneTouched} stored={settings.emailHelpPhone} value={draft.emailHelpPhone} />
+            <small>A phone number, like (515) 555-0100.</small>
+            {fieldError("emailHelpPhone")}
           </label>
         </section>
 
@@ -507,9 +570,9 @@ export function PlatformSettingsWorkspace({
             {fieldError("invoiceHeaderAddress")}
           </label>
           <label>Phone
-            <input {...invalidProps("invoiceHeaderPhone", phoneProblem.message ?? undefined)} autoComplete="off" inputMode="tel" maxLength={40} onBlur={() => setPhoneTouched(true)} type="tel" {...field("invoiceHeaderPhone")} />
+            <PhoneInput {...invalidProps("invoiceHeaderPhone")} autoComplete="off" id={fieldId("invoiceHeaderPhone")} label="Phone" onBlur={() => setPhoneTouched(true)} onValueChange={(value) => edit("invoiceHeaderPhone", value)} showNow={phoneTouched} stored={settings.invoiceHeaderPhone} value={draft.invoiceHeaderPhone} />
             <small>Printed under the address, like (515) 555-0100.</small>
-            {fieldError("invoiceHeaderPhone", phoneProblem.message ?? undefined)}
+            {fieldError("invoiceHeaderPhone")}
           </label>
         </section>
 

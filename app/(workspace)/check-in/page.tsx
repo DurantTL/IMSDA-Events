@@ -43,7 +43,7 @@ export default async function CheckInPage({ searchParams }: { searchParams: Prom
   }
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_CHECK_IN")) {
-    return <AccessRestricted title="Staff access required" detail="Check-in is for event administrators and check-in staff. Your account doesn't have check-in access for this event. If you're helping at arrival, ask the event administrator to add check-in access to your account." />;
+    return <AccessRestricted title="Staff access required" detail="Check-in is for event administrators and check-in staff. Your account doesn't have check-in access for this event." whoToAsk="your event administrator" />;
   }
   // A check-in desk can work one location, or all of them at once (#413).
   const { locations, locationId, selected } = await resolveLocationFilter(event.id, requestedLocation);

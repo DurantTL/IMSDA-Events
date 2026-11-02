@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EMAIL_FIELD_MESSAGE, emailAddressSchema, newPhoneSchema } from "@/lib/field-validation";
 
 /**
  * New club applications (#817). Client-safe: the public form imports the
@@ -28,7 +29,7 @@ export const newClubTypeLabels: Record<NewClubTypeValue, string> = {
 };
 
 export const newClubApplicationStatusLabels: Record<NewClubApplicationStatusValue, string> = {
-  PENDING: "Waiting for a decision",
+  PENDING: "Pending approval",
   APPROVED: "Approved",
   DECLINED: "Declined",
 };
@@ -53,6 +54,12 @@ const optionalText = (max: number) =>
     (value) => (typeof value === "string" ? value.trim() : value),
     z.string().max(max, `Keep this to ${max} characters or fewer.`),
   ).nullish().transform((value) => (value ? value : null));
+
+/** The shared email check (#1451), lower-cased as before; a blank address is not an address. */
+const requiredEmail = emailAddressSchema.refine((value) => value !== "", EMAIL_FIELD_MESSAGE);
+
+/** The shared phone check (#1451): blank is "not given" (null), anything else must be a real number and is stored normalised. */
+const optionalPhone = newPhoneSchema.nullish().transform((value) => (value ? value : null));
 
 /** The least time a person plausibly needs to fill in the whole form. Anything faster is treated as a bot. */
 export const MIN_FILL_SECONDS = 4;
@@ -84,9 +91,9 @@ export const newClubApplicationInputSchema = z.strictObject({
   pastorName: requiredText("The pastor's name", 120),
   directorName: requiredText("The director's name", 120),
   directorAddress: requiredText("The director's mailing address", 300, 5),
-  directorEmail: z.string().trim().toLowerCase().pipe(z.email("Enter the director's email address.").max(160)),
-  directorHomePhone: optionalText(40),
-  directorWorkPhone: optionalText(40),
+  directorEmail: requiredEmail,
+  directorHomePhone: optionalPhone,
+  directorWorkPhone: optionalPhone,
   philosophyAgreed: z.literal(true, { error: "Tick the box to confirm the church agrees." }),
   pastorSignature: requiredText("The pastor's signature", 120),
   headElderSignature: requiredText("The head elder's signature", 120),
@@ -112,7 +119,7 @@ export const newClubApplicationInputSchema = z.strictObject({
 export type NewClubApplicationInput = z.infer<typeof newClubApplicationInputSchema>;
 
 export const newClubInviteInputSchema = z.strictObject({
-  email: z.string().trim().toLowerCase().pipe(z.email("Enter a valid email address.").max(160)),
+  email: requiredEmail,
   name: z.string().trim().max(120).optional().default(""),
 });
 

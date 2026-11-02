@@ -1,5 +1,6 @@
 "use client";
 
+import { Money } from "@/components/exact-value";
 import { CheckCircle2, CreditCard, ShieldAlert, Square } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
@@ -400,7 +401,7 @@ function PaymentPanel({
       {payment.state === "PAID" && <p className={styles.cisOk}><CheckCircle2 aria-hidden="true" size={18} /> Paid</p>}
       {payment.state === "DUE" && (
         <>
-          <p className={styles.cisDue}><CreditCard aria-hidden="true" size={18} /> <strong>Balance due {formatCents(payment.balanceCents)}</strong></p>
+          <p className={styles.cisDue}><CreditCard aria-hidden="true" size={18} /> <strong>Balance due <Money cents={payment.balanceCents} /></strong></p>
           {payment.squareAppNote && (
             <p className={styles.cisHelp}>Card payment noted - finance will match it from Square. The balance stays until they do.</p>
           )}

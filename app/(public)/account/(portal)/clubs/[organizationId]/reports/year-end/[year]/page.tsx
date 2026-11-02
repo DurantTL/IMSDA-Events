@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { ClubYearEndReportForm } from "@/components/club-year-end-report-form";
@@ -10,6 +11,7 @@ import {
   reportYearSpanLabel,
 } from "@/modules/club-reports/year-end-domain";
 import { getYearEndView } from "@/modules/club-reports/year-end-repository";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Year-End Report" };
 export const dynamic = "force-dynamic";
@@ -17,13 +19,14 @@ export const dynamic = "force-dynamic";
 export default async function ClubYearEndReportPage({ params }: { params: Promise<{ organizationId: string; year: string }> }) {
   const { organizationId, year } = await params;
   const access = await getClubRoleAccessForPage(organizationId);
-  if (access.state !== "OK") return null;
+  if (access.state !== "OK") return clubAccessClosed(access);
   const backHref = `/account/clubs/${organizationId}/records`;
   if (!access.capabilities.submitReports) {
     return (
       <>
         <BackLink href={backHref}>Back to Monthly Records</BackLink>
         <p className="public-manage-empty">The Year-End Report is filed by the club&apos;s director, deputy, or reporter.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the Year-End Report" id="year-end-role" />
       </>
     );
   }

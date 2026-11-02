@@ -31,6 +31,7 @@ import {
 } from "@/modules/forms/definition";
 import { eventStartDate, minorStatusAt, personAgeFromAnswers, type MinorStatus } from "@/modules/guardian-authority/domain";
 import { findActiveDeclaredAuthority } from "@/modules/guardian-authority/repository";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Acknowledgment evidence (#150). One append-only row per acknowledgment: who it is about, who gave it, exactly what
@@ -654,7 +655,7 @@ export async function listRegistrationAcknowledgments(
       ? [{ subject: { kind: "REGISTRATION" as const }, attendeeId: null as string | null, answers: shared }]
       : registration.attendees.map((attendee) => {
           const profile = record(attendee.profileSnapshot);
-          const name = `${typeof profile.firstName === "string" ? profile.firstName : ""} ${typeof profile.lastName === "string" ? profile.lastName : ""}`.trim() || "Attendee";
+          const name = formatPersonName({ firstName: typeof profile.firstName === "string" ? profile.firstName : "", lastName: typeof profile.lastName === "string" ? profile.lastName : "" }) || "Attendee";
           return {
             subject: { kind: "ATTENDEE" as const, attendeeId: attendee.id, personId: attendee.personId, name },
             attendeeId: attendee.id as string | null,

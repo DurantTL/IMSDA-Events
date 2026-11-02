@@ -1,5 +1,7 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/event-setup-help";
+import type { EventSetupId } from "@/modules/setup-help/event-setup-steps";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
@@ -30,7 +32,7 @@ import {
   type EventSettingsSectionId,
 } from "@/modules/events/settings-sections";
 import { getEventPublishReadiness, getEventPublishWarnings, type EventReadinessItem, type EventReadinessRecommendedItem, type EventReadinessSource } from "@/modules/events/readiness";
-import { draftFromEvent, eventSettingsRequestBody } from "@/modules/events/settings-draft";
+import { draftFromEvent, eventSettingsBadInputProblems, eventSettingsClientProblems, eventSettingsRequestBody } from "@/modules/events/settings-draft";
 import { CreationFeaturesStep } from "@/components/creation-features-step";
 import type { EventModuleKey } from "@/modules/event-modules/catalog";
 import {
@@ -73,7 +75,8 @@ import { SubmitButton } from "@/components/submit-button";
 import { UnpublishEventDialog } from "@/components/unpublish-event-dialog";
 import { DraftCreatedGuideBanner } from "@/components/draft-created-guide-banner";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
-import { FormErrorSummary } from "@/components/form-error-summary";
+import { FormErrorSummary, summaryMessage } from "@/components/form-error-summary";
+import { notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
 import { SettingsBlock } from "@/components/settings-block";
 import {
   blockForControlId,
@@ -144,6 +147,19 @@ function readinessInputsFrom(event: EventSettingsRecord | null | undefined): Pic
 /** The platform email settings (System management > Email), where the central sender is saved. */
 const CENTRAL_SENDER_SETTINGS_HREF = "/admin/email";
 
+/** The setup help for a readiness row that has no fix link of its own. The registration form has the button below the list. */
+function readinessHelpId(itemId: string, canOpenPlatformSettings: boolean): EventSetupId | null {
+  switch (itemId) {
+    case "basics": return "readiness-basics";
+    case "location": return "readiness-location";
+    case "support": return "readiness-support";
+    case "club-billing": return "readiness-club-billing";
+    case "public-info": return "readiness-public-info";
+    case "central-sender": return canOpenPlatformSettings ? null : "readiness-central-sender";
+    default: return null;
+  }
+}
+
 /** One group of the readiness panel. Each row keeps its status as text for screen readers (the icon is decorative). */
 function ReadinessList({ items, canOpenPlatformSettings, ...rest }: { items: ReadonlyArray<EventReadinessItem | EventReadinessRecommendedItem>; canOpenPlatformSettings: boolean; "aria-labelledby": string }) {
   return (
@@ -156,6 +172,8 @@ function ReadinessList({ items, canOpenPlatformSettings, ...rest }: { items: Rea
             <small>{item.detail}</small>
             {!item.complete && item.href && item.actionLabel && <small><Link className={readinessStyles.action} href={item.href}>{item.actionLabel}</Link></small>}
             {!item.complete && item.id === "central-sender" && canOpenPlatformSettings && <small><Link className={readinessStyles.action} href={CENTRAL_SENDER_SETTINGS_HREF}>Open email settings</Link></small>}
+            {/* Items that already link to their fix keep that link; the rest say where or how, or who to ask (#1435). */}
+            {!item.complete && !item.href && readinessHelpId(item.id, canOpenPlatformSettings) && <EventSetupHelp context={item.label} id={readinessHelpId(item.id, canOpenPlatformSettings)!} />}
           </span>
         </li>
       ))}
@@ -206,6 +224,23 @@ function startingDraft(event: EventSettingsRecord | null, prefill: CalendarPrefi
     location: prefill.location || null,
   };
 }
+
+/** How the summary names the fields people most often get wrong; any other field shows its message alone. */
+const SUMMARY_LABELS: Record<string, string> = {
+  name: "Event name",
+  slug: "Short web address",
+  startsOn: "Starts on",
+  endsOn: "Ends on",
+  startTime: "Start time",
+  endTime: "End time",
+  capacity: "Capacity",
+  registrationOpensOn: "Registration opens",
+  registrationClosesOn: "Registration closes",
+  paymentDueOn: "Payment due by",
+  publicInfoUrl: "Public information link",
+  helpEmail: "Help email",
+  hotelBookingUrl: "Hotel booking link",
+};
 
 export function EventSettingsWorkspace({
   mode,
@@ -390,6 +425,20 @@ export function EventSettingsWorkspace({
     event?.preventDefault();
     if (saving) return;
     setSiteUpdating(false);
+    // The browser's own checks are off (noValidate), so the same problems are found here and shown in the summary.
+    // A half-typed number or date reaches the draft as blank, so look at what the browser holds (validity.badInput).
+    const form = event?.currentTarget ?? document.querySelector<HTMLFormElement>("form.event-settings-layout");
+    const problems = {
+      ...eventSettingsClientProblems(draft, mode),
+      ...eventSettingsBadInputProblems(form ? [...form.querySelectorAll<HTMLInputElement>("input[type=number], input[type=date], input[type=time]")] : []),
+    };
+    if (Object.keys(problems).length > 0) {
+      setSaveMessage(null);
+      setError("");
+      setNotice("");
+      showFieldErrors(problems);
+      return;
+    }
     setSaving(true);
     setSaveMessage(null);
     setFieldErrors({});
@@ -430,7 +479,7 @@ export function EventSettingsWorkspace({
           const errors = fieldErrorsFromIssues(result.issues);
           if (Object.keys(errors).length > 0) showFieldErrors(errors);
         }
-        setSaveMessage({ kind: failure.kind === "conflict" ? "conflict" : "error", text: failure.message });
+        setSaveMessage({ kind: failure.kind === "conflict" ? "conflict" : "error", text: notSavedMessage(failure.message) });
         return;
       }
       if (mode === "create") {
@@ -458,11 +507,12 @@ export function EventSettingsWorkspace({
         : nextReadiness.items.find((item) => !item.complete)
           ? `Next: ${nextReadiness.items.find((item) => !item.complete)!.label.toLowerCase()} before you publish.`
           : "Next: publish the event when you are ready.";
-      setSaveMessage({ kind: "success", text: `Event settings saved. ${nextStep}` });
+      setSaveMessage({ kind: "success", text: savedMessage(nextStep) });
     } catch (caught) {
-      setSaveMessage({ kind: "error", text: caught instanceof Error ? caught.message : "The event could not be saved." });
+      setSaveMessage({ kind: "error", text: notSavedMessage(caught instanceof Error ? caught.message : "The event could not be saved.") });
     } finally {
       setSaving(false);
+      restoreFocusAfterSave("event-save-button");
     }
   }
 
@@ -540,13 +590,12 @@ export function EventSettingsWorkspace({
     block.querySelector<HTMLElement>("summary")?.focus({ preventScroll: true });
   }
 
-  // After a failed save the first invalid field takes focus, once. goToControl
-  // opens every closed <details> around it, "More settings" included. Later
-  // changes to the errors (one clearing as someone types) never move focus.
+  // After a failed save the summary takes focus, once (rule 7, #1450): it lists every problem, and a link opens
+  // the closed block holding the field (onFollow below). Later changes to the errors (one clearing as someone
+  // types) never move focus.
   useEffect(() => {
     const targetId = takePendingFocus(pendingFocusRef);
-    if (targetId) goToControl(targetId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (targetId) errorSummaryRef.current?.focus();
   }, [fieldErrors]);
 
   function openPublishDialog() {
@@ -843,24 +892,7 @@ export function EventSettingsWorkspace({
   const errorItems = Object.entries(fieldErrors)
     .filter(([key]) => key in settingsFieldBlock)
     .sort(([left], [right]) => settingsBlockIds.indexOf(settingsFieldBlock[left]) - settingsBlockIds.indexOf(settingsFieldBlock[right]))
-    .map(([key, message]) => ({ targetId: settingsFieldDomId(key), message }));
-
-  // A field inside a closed block can fail native validation (a bad URL, say).
-  // The browser cannot show a message on a hidden field, so Save would do
-  // nothing; open the block and focus the field instead.
-  function openBlockForInvalidField(event: React.FormEvent<HTMLFormElement>) {
-    const target = event.target as HTMLElement;
-    let opened = false;
-    for (let node = target.closest("details"); node; node = node.parentElement?.closest("details") ?? null) {
-      if (!node.open) {
-        node.open = true;
-        opened = true;
-      }
-      const id = node.dataset.settingsBlock as SettingsBlockId | undefined;
-      if (id) setBlockOpen(id, true);
-    }
-    if (opened) target.focus();
-  }
+    .map(([key, message]) => ({ targetId: settingsFieldDomId(key), message: key in SUMMARY_LABELS ? summaryMessage(SUMMARY_LABELS[key], message) : message }));
 
   return (
     <section className="page-stack event-settings-workspace">
@@ -903,7 +935,7 @@ export function EventSettingsWorkspace({
       {notice && <div className="inline-notice success" role="status"><CheckCircle2 size={17} aria-hidden="true" /> {notice}</div>}
 
       <nav aria-label="Jump to a settings section" className="settings-jump-bar">
-        <span aria-live="polite" className={`settings-save-status ${saveStatusNeedsAttention ? "is-dirty" : "is-clean"}`} data-save-state={saveState.state} role="status">
+        <span className={`settings-save-status ${saveStatusNeedsAttention ? "is-dirty" : "is-clean"}`} data-save-state={saveState.state}>
           {saveStatusNeedsAttention ? <AlertTriangle aria-hidden="true" size={14} /> : <CheckCircle2 aria-hidden="true" size={14} />}
           <strong>{saveStatus}</strong>
         </span>
@@ -914,7 +946,7 @@ export function EventSettingsWorkspace({
         </ul>
       </nav>
 
-      <form className="event-settings-layout" onSubmit={save} onInvalidCapture={openBlockForInvalidField}>
+      <form className="event-settings-layout" noValidate onSubmit={save}>
         <div className="event-settings-main">
           {errorItems.length > 0 && (
             <FormErrorSummary
@@ -1397,7 +1429,7 @@ export function EventSettingsWorkspace({
         <div className={`event-savebar${savebarPinned ? " is-pinned" : ""}`} role="region" aria-label="Save event settings">
           <p className="event-savebar-status" aria-live={saveMessage && saveMessage.kind !== "success" ? "assertive" : "polite"}>
             {saveMessage
-              ? <span className={saveMessage.kind === "success" ? "event-savebar-ok" : "event-savebar-error"} >{saveMessage.kind === "conflict" ? "Conflict: not saved. " : saveMessage.kind === "error" ? "Failed: not saved. " : ""}{saveMessage.text}</span>
+              ? <span className={saveMessage.kind === "success" ? "event-savebar-ok" : "event-savebar-error"} >{saveMessage.text}</span>
               : saving
                 ? "Saving…"
                 : dirty

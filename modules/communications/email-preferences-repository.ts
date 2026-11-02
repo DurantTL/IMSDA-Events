@@ -16,6 +16,7 @@ import {
   type AnnouncementOptOutRow,
   type AnnouncementOptOutScope,
 } from "@/modules/communications/email-preferences";
+import { formatPersonName } from "@/lib/person-name";
 
 type OptOutClient = Pick<PrismaClient, "emailAnnouncementOptOut"> | Prisma.TransactionClient;
 
@@ -206,7 +207,7 @@ export async function listEventAnnouncementOptOuts(eventId: string): Promise<Eve
     return {
       registration,
       email: announcementRecipientEmail(registration.contactSnapshot, registration.accountHolderPerson?.normalizedEmail ?? null),
-      name: `${first} ${last}`.trim(),
+      name: formatPersonName({ firstName: first, lastName: last }),
     };
   }).filter((entry) => entry.email);
   const optOuts = await prisma.emailAnnouncementOptOut.findMany({

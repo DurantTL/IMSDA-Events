@@ -12,6 +12,7 @@ import {
   type ImportPreview,
   type StaffInvitationGroupValue,
 } from "@/modules/staff-invitations/domain";
+import { formatPersonName } from "@/lib/person-name";
 
 type Props = { eventId: string };
 
@@ -140,7 +141,7 @@ export function StaffInvitationImport({ eventId }: Props) {
                   <tr key={row.line}>
                     <td>{row.line}</td>
                     <td>{row.email || "(blank)"}</td>
-                    <td>{`${row.firstName} ${row.lastName}`.trim() || "—"}</td>
+                    <td>{formatPersonName(row) || "—"}</td>
                     <td>{row.group ? STAFF_INVITATION_GROUP_LABEL[row.group] : "—"}</td>
                     <td><span className={`status-chip ${row.status === "NEW" ? "green" : row.status === "ALREADY_INVITED" || row.status === "ALREADY_REGISTERED" || row.status === "DUPLICATE_IN_FILE" ? "gold" : "coral"}`}>{IMPORT_ROW_STATUS_LABEL[row.status]}</span></td>
                   </tr>

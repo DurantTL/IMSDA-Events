@@ -78,6 +78,8 @@ export type MessageOutboxRecord = {
   id: string;
   templateKey: MessageTemplateKeyValue;
   recipientKind: "REGISTRANT" | "INTERNAL" | "TEST";
+  /** A club registration, or an invoice to a club director: the message gets the club email header (#1443). */
+  clubLinked: boolean;
   recipientEmail: string;
   recipientName: string | null;
   senderName: string;

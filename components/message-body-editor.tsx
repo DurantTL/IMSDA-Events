@@ -1,16 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import {
   $applyNodeReplacement,
   $createParagraphNode,
   $createTextNode,
   $getSelection,
   $isRangeSelection,
+  $setSelection,
   FORMAT_TEXT_COMMAND,
   REDO_COMMAND,
   TextNode,
   UNDO_COMMAND,
+  type BaseSelection,
   type EditorConfig,
   type LexicalNode,
   type NodeKey,
@@ -472,6 +475,7 @@ const BUTTON_LINK_SUGGESTIONS = ["{{portal_url}}", "{{checkin_qr_url}}"];
 
 function EditorToolbar({ tokens, tokenLabels, imageLibrary, markChanged }: EditorToolbarProps) {
   const [editor] = useLexicalComposerContext();
+  const { ask, confirmDialog } = useConfirm();
   const [token, setToken] = useState(tokens[0] ?? "");
   const [panel, setPanel] = useState<"image" | "button" | null>(null);
   const [buttonText, setButtonText] = useState("");
@@ -581,11 +585,24 @@ function EditorToolbar({ tokens, tokenLabels, imageLibrary, markChanged }: Edito
     });
   }
 
-  function editLink() {
-    const url = window.prompt("Link URL (http, https, mailto, or tel). Leave blank to remove the link.");
+  async function editLink() {
+    // The dialog's field takes focus, so remember the selected text and put it back before applying the link.
+    let saved: BaseSelection | null = null;
+    editor.getEditorState().read(() => {
+      saved = $getSelection()?.clone() ?? null;
+    });
+    const url = await ask({
+      title: "Add or remove a link?",
+      body: <p>Applies to the selected text. Leave the address blank to remove the link.</p>,
+      confirmLabel: "Apply link",
+      input: { label: "Link URL (http, https, mailto, or tel)", type: "url" },
+    });
     if (url === null) return;
     markChanged();
-    editor.dispatchCommand(TOGGLE_LINK_COMMAND, url.trim() || null);
+    editor.update(() => {
+      if (saved) $setSelection(saved);
+    });
+    editor.dispatchCommand(TOGGLE_LINK_COMMAND, url || null);
   }
 
   const button = (
@@ -606,6 +623,7 @@ function EditorToolbar({ tokens, tokenLabels, imageLibrary, markChanged }: Edito
 
   return (
     <>
+    {confirmDialog}
     <div className="message-editor-toolbar" role="toolbar" aria-label="Message formatting">
       <div>
         {button("Paragraph", <Pilcrow size={16} />, () => setBlock("p"))}
@@ -875,7 +893,7 @@ export function MessageBodyEditor({
       ) : null}
       <div className="message-editor-footer">
         <span>Visual formatting is converted to the Markdown stored by existing template versions.</span>
-        <span>{value.length.toLocaleString()} / {maxLength.toLocaleString()}</span>
+        <span>{value.length.toLocaleString("en-US")} / {maxLength.toLocaleString("en-US")}</span>
       </div>
     </div>
   );

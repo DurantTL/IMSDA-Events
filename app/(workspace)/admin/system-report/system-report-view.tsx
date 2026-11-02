@@ -10,6 +10,9 @@ import {
   type SystemReport,
 } from "@/modules/system-admin/system-report/model";
 import type { OwnConnection } from "@/modules/system-admin/system-report/own-connection";
+import { SetupHelpPanel } from "@/components/setup-help";
+import { createSetupHelpRegistry, type SetupHelpRegistry } from "@/modules/setup-help/registry";
+import { systemSetupIdOf } from "@/modules/setup-help/system-setup-steps";
 import styles from "./page.module.css";
 import { SystemReportTesters } from "./system-report-testers";
 import { CloudflarePurgeRow } from "./cloudflare-purge-row";
@@ -32,7 +35,24 @@ function StateChip({ state, label }: { state: SignalState; label?: string }) {
 
 const verdictIcon = { attention: ShieldAlert, unavailable: CircleHelp, watch: TriangleAlert, ok: ShieldCheck, info: ShieldCheck } as const;
 
-function SignalRow({ signal, now }: { signal: Signal; now: Date }) {
+/** The next step for a row whose reading says it is not set up (#1434). Never shown on a healthy row or one that only could not be read. */
+function SignalSetup({ signal, registry }: { signal: Signal; registry: SetupHelpRegistry }) {
+  if (signal.serviceSetup && signal.serviceSetup.length > 0) {
+    return (
+      <ul className={styles.serviceSetup} aria-label={`${signal.name}: how to set up what is missing`}>
+        {signal.serviceSetup.map((service) => (
+          <li key={service.id}>
+            <strong>{service.label}</strong>
+            <SetupHelpPanel setup={service.setup} context={service.label} registry={registry} setupKey={systemSetupIdOf(service.setup) ?? undefined} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return signal.setup ? <SetupHelpPanel setup={signal.setup} context={signal.name} registry={registry} setupKey={systemSetupIdOf(signal.setup) ?? undefined} /> : null;
+}
+
+function SignalRow({ signal, now, registry }: { signal: Signal; now: Date; registry: SetupHelpRegistry }) {
   return (
     <li className={`${styles.row} ${rowClass[signal.state] ?? ""}`} data-signal={signal.key} data-state={signal.state}>
       <div className={styles.rowName}>
@@ -44,13 +64,14 @@ function SignalRow({ signal, now }: { signal: Signal; now: Date }) {
         {signal.checkedAt ? reportTimeLabel(signal.checkedAt, now) : signal.noTimeLabel ?? reportTimeLabel(null, now)}
       </div>
       <div className={styles.rowResult}>
-        <StateChip state={signal.state} />
+        <StateChip state={signal.state} label={signal.chipLabel} />
         <span>{signal.resultText}</span>
         {signal.items && signal.items.length > 0 && (
-          <ul className={styles.items} aria-label={`${signal.name}: open items`}>
+          <ul className={styles.items} aria-label={`${signal.name}: ${signal.itemsLabel ?? "open items"}`}>
             {signal.items.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
           </ul>
         )}
+        {signal.needsSetup && <SignalSetup signal={signal} registry={registry} />}
       </div>
       <div className={styles.rowFix}>
         {signal.fixHref ? (
@@ -83,7 +104,7 @@ function OwnConnectionCard({ connection }: { connection: OwnConnection }) {
   );
 }
 
-function Section({ section, now, ownConnection, cloudflarePurgeConfigured }: { section: ReportSection; now: Date; ownConnection?: OwnConnection; cloudflarePurgeConfigured: boolean }) {
+function Section({ section, now, ownConnection, cloudflarePurgeConfigured, registry }: { section: ReportSection; now: Date; ownConnection?: OwnConnection; cloudflarePurgeConfigured: boolean; registry: SetupHelpRegistry }) {
   const headingId = `h-${section.key}`;
   return (
     <section className={styles.section} id={`s-${section.key}`} aria-labelledby={headingId} data-section={section.key} data-state={section.state}>
@@ -95,7 +116,7 @@ function Section({ section, now, ownConnection, cloudflarePurgeConfigured }: { s
         {section.fixHref && <Link className={styles.fix} href={section.fixHref}>{section.fixLabel ?? "Open"}<ArrowRight aria-hidden="true" size={14} /></Link>}
       </div>
       <ul className={styles.rows}>
-        {section.signals.map((signal) => <SignalRow key={signal.key} signal={signal} now={now} />)}
+        {section.signals.map((signal) => <SignalRow key={signal.key} signal={signal} now={now} registry={registry} />)}
       </ul>
       {section.key === "setup" && <CloudflarePurgeRow configured={cloudflarePurgeConfigured} />}
       {section.key === "setup" && ownConnection && <OwnConnectionCard connection={ownConnection} />}
@@ -105,8 +126,10 @@ function Section({ section, now, ownConnection, cloudflarePurgeConfigured }: { s
 }
 
 /** Draws a built report and nothing else: it measures, sorts and tallies nothing. */
-export function SystemReportView({ report, testerDefaultEmail = "", ownConnection, cloudflarePurgeConfigured = false }: { report: SystemReport; testerDefaultEmail?: string; ownConnection?: OwnConnection; cloudflarePurgeConfigured?: boolean }) {
+export function SystemReportView({ report, testerDefaultEmail = "", ownConnection, cloudflarePurgeConfigured = false, emailBackupConfigured = false }: { report: SystemReport; testerDefaultEmail?: string; ownConnection?: OwnConnection; cloudflarePurgeConfigured?: boolean; emailBackupConfigured?: boolean }) {
   const now = new Date(report.generatedAt);
+  // One per render: each setup's full steps show once, in the order the page draws them.
+  const registry = createSetupHelpRegistry();
   const { overall } = report;
   const Icon = verdictIcon[overall.state];
   const tally = overall.tally;
@@ -151,9 +174,9 @@ export function SystemReportView({ report, testerDefaultEmail = "", ownConnectio
         </ul>
       </section>
 
-      <SystemReportTesters defaultEmail={testerDefaultEmail} />
+      <SystemReportTesters defaultEmail={testerDefaultEmail} emailBackupConfigured={emailBackupConfigured} />
 
-      {report.sections.map((section) => <Section key={section.key} section={section} now={now} ownConnection={ownConnection} cloudflarePurgeConfigured={cloudflarePurgeConfigured} />)}
+      {report.sections.map((section) => <Section key={section.key} section={section} now={now} ownConnection={ownConnection} cloudflarePurgeConfigured={cloudflarePurgeConfigured} registry={registry} />)}
 
       <p className={styles.footerLine}>
         Counts and states only: no settings values, names or attendee details. The one exception is your own connection card above, which shows only your own address.{" "}

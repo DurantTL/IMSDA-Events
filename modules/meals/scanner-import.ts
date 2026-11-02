@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { CsvImportError, parseCsvMatrix } from "@/modules/imports/csv-parser";
 import { mealTicketId, scannerMealTypes, type MealAgeGroupValue, type MealPayerValue, type MealTypeValue } from "@/modules/meals/domain";
 import { MealError } from "@/modules/meals/errors";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 /**
  * Café scanner results (#1028): the pure rules for reading what the scanner gives back and planning what to record. No
@@ -160,7 +161,7 @@ export function eventLocalDate(date: Date, timeZone: string) {
 
 /** A time for people, in the event's time zone (never the viewer's or the server's). */
 export function eventLocalDateTime(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", { timeZone, dateStyle: "medium", timeStyle: "short" }).format(date);
+  return formatInTimeZone(date, timeZone, { dateStyle: "medium", timeStyle: "short" });
 }
 
 const isoInstant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;

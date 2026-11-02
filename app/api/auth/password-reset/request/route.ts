@@ -43,7 +43,10 @@ async function postHandler(request: Request) {
       }), rateLimit);
     }
 
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.forgotPassword });
+    const securityCheckFailure = await requireTurnstile(request, {
+      action: TURNSTILE_ACTIONS.forgotPassword,
+      fallback: { kind: "email-code", email: email },
+    });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     // With email configured the link is emailed and never returned — the

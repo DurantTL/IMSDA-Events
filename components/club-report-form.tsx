@@ -17,6 +17,7 @@ import {
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { ClubReportRecord } from "@/modules/club-reports/repository";
 import { clubClassLevelLabels, type ClubClassLevel } from "@/modules/club-rosters/domain";
+import { savedMessage } from "@/components/form-message";
 
 type Prefill = {
   meetingPlace: string;
@@ -169,7 +170,7 @@ export function ClubReportForm({
       if (!response.ok || !result.report) throw new Error(result.message ?? result.issues?.[0]?.message ?? "The report could not be saved.");
       setReport(result.report);
       setCountsRefresh(null);
-      setNotice(status === "DRAFT" ? "Draft saved." : `Submitted. ${result.report.totalPoints} points for ${monthLabel}.`);
+      setNotice(status === "DRAFT" ? savedMessage("Submit it when you are ready.") : `Submitted. ${result.report.totalPoints} points for ${monthLabel}.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The report could not be saved.");
     } finally {
@@ -205,7 +206,7 @@ export function ClubReportForm({
     if (!notesPrefill) return;
     if (!(await askConfirm({
       title: "Replace attendance and honors with meeting-note averages",
-      body: <p>The attendance counts and honors below are replaced with the averages from {monthLabel} meeting notes. Anything else you typed stays.</p>,
+      body: <p>{`The attendance counts and honors below are replaced with the averages from ${monthLabel} meeting notes. Anything else you typed stays.`}</p>,
       confirmLabel: "Replace with meeting-note averages",
     }))) return;
     setCountsRefresh({
@@ -231,7 +232,7 @@ export function ClubReportForm({
     <div className={`${card} club-report-total${inDialog ? " club-report-total-dialog" : ""}`} aria-live={asDialog && !inDialog ? undefined : "polite"}>
         <div>
           <p className={eyebrow}>{monthLabel}</p>
-          <h2>{total} points</h2>
+          <h2>{`${total} points`}</h2>
           <p className="field-help">
             {onTime > 0 ? `Includes ${onTime} for submitting by ${dueLabel}.` : `Submitted after ${dueLabel}, so no on-time points.`}
             {unanswered > 0 && !readOnly ? ` ${unanswered} item${unanswered === 1 ? "" : "s"} not answered yet (counted as 0).` : ""}
@@ -243,7 +244,7 @@ export function ClubReportForm({
           </span>
         )}
         {report && !isDraft && report.reviewedAt && (
-          <span className="status-chip green" data-report-reviewed="">Reviewed ({formatShortDate(report.reviewedAt)})</span>
+          <span className="status-chip green" data-report-reviewed="">{`Reviewed (${formatShortDate(report.reviewedAt)})`}</span>
         )}
         {asDialog && !inDialog && (
           <button className="primary-button" data-monthly-report-open="" onClick={() => setOpen(true)} type="button">
@@ -265,7 +266,7 @@ export function ClubReportForm({
         {readOnlyNote ?? (
           <>
             This report closed on {dueLabel}. You can&apos;t submit changes now — email{" "}
-            <a href={`mailto:${REPORT_CHANGE_REQUEST_EMAIL}`}>{REPORT_CHANGE_REQUEST_EMAIL}</a> to request a change.
+            <a href={`mailto:${REPORT_CHANGE_REQUEST_EMAIL}`} translate="no">{REPORT_CHANGE_REQUEST_EMAIL}</a> to request a change.
           </>
         )}
       </div>
@@ -284,7 +285,7 @@ export function ClubReportForm({
       <section className={`${card} club-report-readonly`} data-report-readonly="" aria-labelledby="club-report-readonly-points">
         <h3 className={eyebrow} id="club-report-readonly-points">Points</h3>
         <dl>
-          <div><dt>Report submitted by {dueLabel}</dt><dd>{onTime}</dd></div>
+          <div><dt>{`Report submitted by ${dueLabel}`}</dt><dd>{onTime}</dd></div>
           {pointItems.map((item) => (
             <div key={item.key}><dt>{item.label}</dt><dd>{answerText(points[item.key])}</dd></div>
           ))}
@@ -341,7 +342,7 @@ export function ClubReportForm({
       <fieldset className={`${card} form-stack`} disabled={saving}>
         <legend className={eyebrow}>Points</legend>
         <div className="club-report-item club-report-auto">
-          <span><strong>Report submitted by {dueLabel}</strong><small>Worked out from when you first submit.</small></span>
+          <span><strong>{`Report submitted by ${dueLabel}`}</strong><small>Worked out from when you first submit.</small></span>
           <strong>{onTime}</strong>
         </div>
         {pointItems.map((item) => {
@@ -387,7 +388,7 @@ export function ClubReportForm({
         </div>
 
         <div className="club-report-sub">
-          <strong>Honors worked on (up to {MAX_HONORS})</strong>
+          <strong>{`Honors worked on (up to ${MAX_HONORS})`}</strong>
           {problemFor("honorsList") && <small className="club-report-problem">{problemFor("honorsList")}</small>}
           {honors.map((honor, index) => (
             <div className="form-grid two-column club-report-honor" key={index}>

@@ -21,7 +21,7 @@ const definition = {
 } as unknown as RegistrationFormDefinition;
 
 let mounted: Mounted | null = null;
-const textInputs = (container: HTMLElement) => [...container.querySelectorAll<HTMLInputElement>('input[type="text"], input[type="email"], input[type="tel"], input:not([type])')];
+const textInputs = (container: HTMLElement) => [...container.querySelectorAll<HTMLInputElement>('input[type="text"], input[type="email"], input[type="tel"], input:not([type])')].filter((input) => input.name !== "website"); // not the hidden honeypot (#1480)
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -120,7 +120,7 @@ describe("registration contact edit (#1263)", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body)).firstName).toBe("Avery Jo");
-    expect(container.textContent).toContain("Contact details saved.");
+    expect(container.textContent).toContain("Saved.");
     expect(container.querySelector(".submit-retry-notice")).toBeNull();
   });
 });

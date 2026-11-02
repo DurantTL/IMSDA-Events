@@ -171,7 +171,7 @@ describe("preview, then confirm", () => {
     expect(events.at(-1)).toMatchObject({ kind: "UNREDEEMED" });
 
     const preview = await previewScannerImport("evt", "c.csv", first, true);
-    expect(preview.conflicts).toEqual([expect.objectContaining({ kind: "REREDEEM", ticketId: "MT-00001", servedAtLabel: "Oct 15, 2026, 12:05 PM" })]);
+    expect(preview.conflicts).toEqual([expect.objectContaining({ kind: "REREDEEM", ticketId: "MT-00001", servedAtLabel: "Oct 15, 2026, 12:05 PM CDT" })]);
     const result = await confirmScannerImport(confirmInput(preview.digest, first, { acceptUnredeem: [1] }));
     expect(result).toMatchObject({ redeemed: 1, reredeemed: 1, unredeemed: 0 });
     expect(events.at(-1)).toMatchObject({ kind: "REDEEMED", ticketId: "t1", redeemedByText: "Alex Example" });

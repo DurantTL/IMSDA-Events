@@ -47,7 +47,7 @@ function DeleteEventDialogBody({
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/events/${eventId}/deletion`)
+    fetch(`/api/events/${eventId}/deletion`, { cache: "no-store" })
       .then(async (response) => {
         const body = await response.json().catch(() => ({})) as { preview?: DeletionPreview; message?: string };
         if (!response.ok || !body.preview) throw new Error(body.message ?? "The deletion summary could not be loaded.");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/use-confirm";
 import { AlertTriangle, Link2, Unlink } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
 import { clubSupplySectionLabels, type ClubSupplySection } from "@/modules/club-supplies/domain";
@@ -19,6 +20,7 @@ export function EventPatchesWorkspace({ eventId, eventName, initial }: { eventId
   const [data, setData] = useState(initial);
   const [itemId, setItemId] = useState("");
   const [busy, setBusy] = useState(false);
+  const { confirm, confirmDialog } = useConfirm();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const base = `/api/events/${encodeURIComponent(eventId)}/award-items`;
@@ -48,6 +50,7 @@ export function EventPatchesWorkspace({ eventId, eventName, initial }: { eventId
 
   return (
     <section className="page-stack">
+      {confirmDialog}
       <div className="page-intro">
         <div>
           <p className="eyebrow">Club ministries</p>
@@ -112,7 +115,15 @@ export function EventPatchesWorkspace({ eventId, eventName, initial }: { eventId
                   </small>
                 </span>
                 <span className={styles.itemControls}>
-                  <button className="secondary-button" disabled={busy} onClick={() => call(`${base}/${encodeURIComponent(item.itemId)}`, "DELETE", null, "Unlinked. Items clubs already added stay on their order lists.")} type="button">
+                  <button className="secondary-button" disabled={busy} onClick={async () => {
+                    if (!(await confirm({
+                      title: `Unlink ${item.name}?`,
+                      body: <p>It is no longer suggested for this event. Items clubs already added stay on their order lists.</p>,
+                      confirmLabel: `Unlink ${item.name}`,
+                      destructive: true,
+                    }))) return;
+                    void call(`${base}/${encodeURIComponent(item.itemId)}`, "DELETE", null, "Unlinked. Items clubs already added stay on their order lists.");
+                  }} type="button">
                     <Unlink aria-hidden="true" size={14} /> Unlink
                   </button>
                 </span>

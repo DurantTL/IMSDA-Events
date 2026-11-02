@@ -3,6 +3,7 @@
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { cardCell } from "@/components/table-card-labels";
 import { useState } from "react";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { Award, Pencil, Plus, Save, X } from "lucide-react";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import type { HonorRecord } from "@/modules/honors/repository";
@@ -15,9 +16,9 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [filter, setFilter] = useState("");
+  const search = useClientSearch();
 
-  const query = filter.trim().toLowerCase();
+  const query = search.term.trim().toLowerCase();
   const visible = query
     ? honors.filter((honor) => `${honor.code} ${honor.name}`.toLowerCase().includes(query))
     : honors;
@@ -143,12 +144,12 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
             <label className="form-stack">
               <span className="sr-only">Filter honors</span>
               <input
-                onChange={(event) => setFilter(event.target.value)}
+                {...search.inputProps}
                 placeholder="Filter by code or name"
                 type="search"
-                value={filter}
               />
             </label>
+            <SearchResultStatus message={`${visible.length} of ${honors.length} ${honors.length === 1 ? "honor" : "honors"} shown.`} />
             <div className="report-table-wrap card-box">
               <table className="report-table table-cards table-cards-corner table-cards-compact" role="table">
                 <thead role="rowgroup">

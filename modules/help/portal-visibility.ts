@@ -1,5 +1,6 @@
 import { findPortalGuide, portalDestinations, portalGuides } from "@/modules/help/portal-guides";
 import type { PortalAudience, PortalDestination, PortalGuide } from "@/modules/help/types";
+import { isClubFormsRole } from "@/modules/club-forms/domain";
 import { clubCapabilities, type ClubRole } from "@/modules/organizations/director-grants-domain";
 
 /**
@@ -65,7 +66,8 @@ function clubChoice(viewer: PortalHelpViewer): ClubChoice {
 
 function resolveClubLink(destination: PortalDestination, viewer: PortalHelpViewer): { href: string; label: string } | null {
   const choice = clubChoice(viewer);
-  const allowed = (role: ClubRole) => !destination.capability || clubCapabilities(role)[destination.capability];
+  const allowed = (role: ClubRole) =>
+    (!destination.capability || clubCapabilities(role)[destination.capability]) && (!destination.formsRole || isClubFormsRole(role));
   if (choice.kind === "one") {
     return allowed(choice.role) ? { href: destination.path.replace("[organizationId]", encodeURIComponent(choice.organizationId)), label: destination.label } : null;
   }

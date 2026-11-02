@@ -1,6 +1,7 @@
 import { partnerClubName } from "@/modules/club-registrations/domain";
 import type { ClubAssignmentFields } from "@/modules/club-registrations/assignments";
 import { toCsv } from "@/modules/reporting/csv";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Camporee reports (Q1, #411): camping coordinator summary, duties and
@@ -435,7 +436,7 @@ export function buildSpecialRolesReport(clubs: ClubEventRecord[]): SpecialRoleRe
   const rows: SpecialRoleReportRow[] = [];
   for (const club of clubs) {
     for (const attendee of club.attendees) {
-      const name = `${attendee.lastName}, ${attendee.firstName}`;
+      const name = formatPersonName(attendee, "sorted");
       if (attendee.medicalPersonnel) {
         rows.push({
           role: "Medical personnel",

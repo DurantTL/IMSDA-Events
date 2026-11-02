@@ -1,5 +1,6 @@
 "use client";
 
+import { Money } from "@/components/exact-value";
 import { useState } from "react";
 import { formatCents } from "@/modules/payments/format-cents";
 import { mealAgeGroupLabels, mealTypeLabels, type MealAgeGroupValue, type MealTypeValue } from "@/modules/meals/domain";
@@ -19,7 +20,7 @@ export function RegistrationMealsHistory({ eventId, registrationId }: { eventId:
   async function load() {
     setBusy(true); setError("");
     try {
-      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/meals/registrations/${encodeURIComponent(registrationId)}`);
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/meals/registrations/${encodeURIComponent(registrationId)}`, { cache: "no-store" });
       const json = await response.json();
       if (!response.ok) throw new Error(json.message ?? "The meal history could not be loaded.");
       setSelections(json.selections);
@@ -42,7 +43,7 @@ export function RegistrationMealsHistory({ eventId, registrationId }: { eventId:
         <small>{selection.planName} · {selection.source.toLowerCase().replace("_", " ")}</small>
         <ul>
           {selection.changes.map((change) => <li key={change.id}><small>{new Date(change.createdAt).toLocaleString()} · {change.type.toLowerCase().replaceAll("_", " ")} · {change.actorName}{change.reason ? ` · ${change.reason}` : ""}</small></li>)}
-          {selection.ledger.map((entry) => <li key={entry.id}><small>{entry.kind === "CREDIT" ? "Credit" : "Charge"} {formatCents(Math.abs(entry.amountCents))} ({entry.quantity} × {formatCents(entry.unitPriceCents)}) · {entry.settlement.toLowerCase().replaceAll("_", " ")}</small></li>)}
+          {selection.ledger.map((entry) => <li key={entry.id}><small>{entry.kind === "CREDIT" ? "Credit" : "Charge"} <Money cents={Math.abs(entry.amountCents)} /> ({entry.quantity} × <Money cents={entry.unitPriceCents} />) · {entry.settlement.toLowerCase().replaceAll("_", " ")}</small></li>)}
         </ul>
       </span>
     </div>)}

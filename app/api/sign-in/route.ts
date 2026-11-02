@@ -93,7 +93,10 @@ async function postHandler(request: Request) {
       return applyRateLimitHeaders(Response.json(RATE_LIMITED_BODY, { status: 429 }), rateLimit);
     }
 
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.staffSignIn });
+    const securityCheckFailure = await requireTurnstile(request, {
+      action: TURNSTILE_ACTIONS.staffSignIn,
+      fallback: { kind: "email-code", email: input.email },
+    });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     const userAgent = request.headers.get("user-agent");

@@ -27,6 +27,7 @@ import { appliedCardSurchargeCents } from "@/modules/payments/applied-surcharge"
 import { depositConfigurationFromValue, netPaidCents } from "@/modules/payments/deposit-domain";
 import { adjustmentCharges, mealFieldKeySet } from "@/modules/cancellation-policy/adjustment-charge";
 import { forfeitableDeposit } from "@/modules/cancellation-policy/deposit-facts";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Storage and fact-gathering for cancellation policy (#169).
@@ -235,7 +236,7 @@ function personName(attendee: { profileSnapshot: unknown; person: { firstName: s
   const profile = record(attendee.profileSnapshot);
   const first = typeof profile.firstName === "string" ? profile.firstName : attendee.person.firstName;
   const last = typeof profile.lastName === "string" ? profile.lastName : attendee.person.lastName;
-  return `${first} ${last}`.trim();
+  return formatPersonName({ firstName: first, lastName: last });
 }
 
 

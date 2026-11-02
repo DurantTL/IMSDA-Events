@@ -1,0 +1,25 @@
+/* Who's missing what (#1435): the chips are the shared .status-chip; this only lays them out in a row. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Headers keep the staff 14px floor, and the next step gets room on wide screens (#1435). */
+/* Two classes beat the shared `.report-table thead th` so the 14px floor really applies. */
+.table:global(.report-table) thead th {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+@media (min-width: 861px) {
+  .table th:first-child {
+    width: 22%;
+  }
+
+  .next {
+    min-width: 18rem;
+  }
+}

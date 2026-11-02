@@ -37,6 +37,7 @@ import {
   type ScheduledEmailTemplateKey,
   type ScheduledEmailTrigger,
 } from "@/modules/communications/scheduled-email-options";
+import { formatInTimeZone } from "@/modules/calendar/conference-format";
 
 export {
   SCHEDULED_EMAIL_STATUSES,
@@ -221,16 +222,7 @@ export type ScheduleProjection = {
 };
 
 export function formatInstantInZone(instant: Date, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(instant);
+  return formatInTimeZone(instant, timeZone, { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function dstNoteFor(behavior: DstBehavior, requested: { date: string; time: string }, actual: Date, timeZone: string) {

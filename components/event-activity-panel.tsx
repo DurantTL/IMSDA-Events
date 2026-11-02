@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Activity } from "lucide-react";
 import type { ActivitySelection, EventKind } from "@/modules/events/settings-sections";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export type ActivityPanelEntry = {
   id: string;
@@ -34,7 +35,7 @@ export function EventActivityPanel({
         {entries.map((entry) => (
           <article className="activity-row" key={entry.id}>
             <span className="activity-icon"><Activity aria-hidden="true" size={16} /></span>
-            <span><strong>{entry.summary}</strong><small>{entry.actorName} · {new Date(entry.createdAt).toLocaleString()}</small></span>
+            <span><strong>{entry.summary}</strong><small>{entry.actorName} · {formatInConferenceTime(entry.createdAt, { dateStyle: "medium", timeStyle: "short" })}</small></span>
             <code>{entry.action}</code>
           </article>
         ))}

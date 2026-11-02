@@ -166,7 +166,7 @@ export function parseImportCsv(text: string, maxRows = 2_000): { headers: string
   if (duplicates.length > 0) throw new CsvImportError("INVALID_CSV", `Duplicate CSV column: ${duplicates[0]}.`);
   const missing = requiredColumns.filter((column) => !headers.includes(column));
   if (missing.length > 0) throw new CsvImportError("MISSING_COLUMNS", `Missing required columns: ${missing.join(", ")}.`);
-  if (matrix.length - 1 > maxRows) throw new CsvImportError("TOO_MANY_ROWS", `This file contains more than ${maxRows.toLocaleString()} data rows.`);
+  if (matrix.length - 1 > maxRows) throw new CsvImportError("TOO_MANY_ROWS", `This file contains more than ${maxRows.toLocaleString("en-US")} data rows.`);
 
   const sourceIds = new Set<string>();
   const confirmationCodes = new Set<string>();

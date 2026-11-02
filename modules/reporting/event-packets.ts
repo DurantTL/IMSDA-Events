@@ -8,6 +8,7 @@ import {
   defaultEventPacketConfig,
   type EventPacketConfig,
 } from "@/modules/reporting/event-packet-config";
+import { formatPersonName } from "@/lib/person-name";
 
 export type EventPacketAssignment = {
   fieldLabel: string;
@@ -91,7 +92,7 @@ export function buildEventPacketGroups(
         .map((registration) => ({
           id: registration.id,
           confirmationCode: registration.confirmationCode,
-          accountHolderName: `${registration.accountHolder.firstName} ${registration.accountHolder.lastName}`.trim(),
+          accountHolderName: formatPersonName(registration.accountHolder),
           email: registration.accountHolder.email,
           phone: registration.accountHolder.phone,
           attendeeCount: registration.attendeeCount,

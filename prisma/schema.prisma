@@ -599,6 +599,8 @@ enum MessageTemplateKey {
   ATTENDEE_EDIT_VERIFICATION
   /// The emailed sign-in code for a club-role account that has not set up two-step sign-in (#1410).
   ATTENDEE_SIGN_IN_CODE
+  /// The emailed code that stands in for the Security check when a privacy browser blocks it (#1480). No account needed.
+  SECURITY_CHECK_CODE
   REGISTRATION_CONFIRMATION_ORGANIZATION_BILLED
   CLUB_INVITE
   CLUB_ASSIGNMENTS
@@ -1377,6 +1379,32 @@ model AttendeeStepUpCode {
 }
 
 /**
+ * The emailed code that stands in for the Security check (Turnstile) when a privacy browser blocks it (#1480), on
+ * sign-in, sign-up and password reset. Not bound to an account: a sign-up has none, and a staff sign-in has not
+ * proved a password yet. Bound to one (action, address) instead; the address is kept only as a keyed hash of its
+ * lowercase form, never as text. `sealedCode` exists only so a delivery retry resends the SAME code, as #1410's does.
+ * A valid code is spent on use and satisfies the check for one request.
+ */
+model SecurityCheckCode {
+  id                String    @id @default(cuid())
+  /// One of TURNSTILE_ACTIONS: staff-sign-in, attendee-sign-in, attendee-sign-up or forgot-password.
+  action            String
+  emailHash         String
+  codeHash          String?   @unique
+  deliveryMessageId String?   @unique
+  sealedCode        String?
+  codeExpiresAt     DateTime?
+  expiresAt         DateTime
+  attempts          Int       @default(0)
+  consumedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([action, emailHash, consumedAt])
+  @@index([expiresAt])
+  @@index([codeExpiresAt])
+}
+
+/**
  * One row per alert condition, so a condition that persists pages once an hour
  * rather than every time the monitor runs. Without this, a backed-up queue
  * would send an alert every five minutes and be muted by whoever receives it.
@@ -1602,6 +1630,12 @@ model PlatformSettings {
   /// Not `supportContact`, which is the internal alert inbox.
   publicHelpPhone           String?
   publicHelpEmail           String?
+  /// The header name in every email (#1443): one for event and general email, one for club email. Never blank.
+  emailHeaderName           String             @default("IMSDA Events")
+  emailClubHeaderName       String             @default("IMSDA Events")
+  /// The footer help contact of system and club email (#1443). Defaults are the conference office; cleared (null) leaves the help part out.
+  emailHelpEmail            String?            @default("support@imsda.org")
+  emailHelpPhone            String?            @default("(515) 223-1197")
   /// Where "a new club applied" notices go (#817), e.g. the youth department administrative assistant. Blank means no notice is sent; applications still wait in the queue.
   newClubApplicationEmail   String?
   /// The one-sign-in switch (#554, ADR 0013). OFF by default; nothing reads it yet.

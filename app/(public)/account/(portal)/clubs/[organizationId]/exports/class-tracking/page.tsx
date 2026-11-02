@@ -6,6 +6,8 @@ import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { CLASS_TRACKING_EXPORT_HEADERS } from "@/modules/reporting/director-exports";
 import { loadClassTrackingExport } from "@/modules/reporting/director-exports-repository";
+import { formatPersonName } from "@/lib/person-name";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Class tracking report" };
 export const dynamic = "force-dynamic";
@@ -22,7 +24,7 @@ export default async function ClubClassTrackingReportPage({
 }) {
   const [{ organizationId }, query] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const { clubYear, choices } = rosterYearView(query.year);
   const { rows } = await loadClassTrackingExport(organizationId, clubYear);
   return (
@@ -57,7 +59,7 @@ export default async function ClubClassTrackingReportPage({
               <tbody role="rowgroup">
                 {rows.map((row) => (
                   <tr key={row.personId} role="row">
-                    <th role="rowheader" scope="row">{row.lastName}, {row.firstName}</th>
+                    <th role="rowheader" scope="row">{formatPersonName(row, "sorted")}</th>
                     {[row.className, cell(row.insignia), cell(row.eventPatches), cell(row.conductAndTlt), cell(row.masterAwards)].map((value, index) => (
                       <td key={CLASS_TRACKING_EXPORT_HEADERS[index + 2]} {...cardCell(CLASS_TRACKING_EXPORT_HEADERS[index + 2])}>{value}</td>
                     ))}

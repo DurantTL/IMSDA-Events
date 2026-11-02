@@ -33,3 +33,87 @@
   color: #8f3a30;
   font-weight: 600;
 }
+
+.retry {
+  justify-self: start;
+  margin-top: 8px;
+}
+
+.contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  margin: 8px 0 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+}
+
+/* Underlined, so they are not told apart from the text by color alone; the 44px target comes from min-height. */
+.contact a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.codeBlock {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin-top: 8px;
+}
+
+.emailCodeButton {
+  min-height: 44px;
+}
+
+/* The same look as the shared disabled secondary button (`.secondary-button:disabled`). */
+.emailCodeButton[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+/* The shared hover rule only skips real `:disabled`; keep the resting look while sending. */
+.emailCodeButton.emailCodeButton[aria-disabled="true"]:hover {
+  background: #f9fbfb;
+  border-color: var(--line);
+}
+
+.codeStatus,
+.codeError {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+}
+
+.codeStatus:not(:empty) {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f1f7f2;
+  color: #1f5a33;
+  font-weight: 600;
+}
+
+.codeError:not(:empty) {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fdf4f2;
+  color: #8f3a30;
+  font-weight: 600;
+}
+
+.codeField {
+  display: grid;
+  gap: 4px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 600;
+}
+
+.codeField input {
+  min-height: 44px;
+  width: 12em;
+  max-width: 100%;
+  letter-spacing: 0.15em;
+}

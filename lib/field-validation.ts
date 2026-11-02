@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * One shared set of value types and validators (#855): phone, email, number,
@@ -155,6 +156,25 @@ export function isUnchangedFromStored(submitted: unknown, stored: unknown) {
 export const PHONE_FIELD_MESSAGE = "Enter a 10-digit US number, like (515) 555-0134, or an international number starting with +.";
 export const EMAIL_FIELD_MESSAGE = "Enter a valid email address.";
 
+/**
+ * The message for a failed check of one value type (#1451): phone and email have one wording everywhere
+ * ({@link PHONE_FIELD_MESSAGE}, {@link EMAIL_FIELD_MESSAGE}); every other type reads after its label.
+ */
+export function typedProblemMessage(type: FieldValueType, label: string, problem: string) {
+  if (type === "phone") return PHONE_FIELD_MESSAGE;
+  if (type === "email") return EMAIL_FIELD_MESSAGE;
+  return problemMessage(label, problem);
+}
+
+/**
+ * A message for a list (an error summary) where the field is not beside it (#1451): the one shared phone or email
+ * message is prefixed with the field's label, "Cell phone: Enter a 10-digit US number...". Any other message already
+ * names what it is about and is returned as it is.
+ */
+export function labelledFieldMessage(label: string, message: string) {
+  return (message === PHONE_FIELD_MESSAGE || message === EMAIL_FIELD_MESSAGE) && label.trim() ? `${label.trim()}: ${message}` : message;
+}
+
 /** A phone with its formatting taken away, for comparing an old unusable value with its re-typed self. */
 function phoneSkeleton(value: string) {
   return value.trim().toLowerCase().replace(/[\s().\-–—/]+/g, "");
@@ -234,7 +254,7 @@ export function inlinePhoneProblem(
   if (value.trim() === "") return { message: "", blocking: false };
   const check = validatePhone(value);
   if (check.ok) return { message: "", blocking: false };
-  const text = problemMessage(label, check.problem);
+  const text = PHONE_FIELD_MESSAGE;
   if (isUnchangedPhone(value, stored)) return { message: `${text} This saved number needs correcting.`, blocking: false };
   return { message: shown ? text : "", blocking: true };
 }
@@ -287,7 +307,8 @@ export function inlineFieldProblem(
   if (value === undefined || value === null || value === "") return { message: "", blocking: false };
   const check = validateByType(type, String(value), rules);
   if (check.ok) return { message: "", blocking: false };
-  const text = problemMessage(label, check.problem);
+  // One wording for phone and email everywhere (#1451); the other types read after their label.
+  const text = typedProblemMessage(type, label, check.problem);
   if (isUnchangedFromStored(value, stored)) return { message: `${text} This saved answer needs correcting.`, blocking: false };
   return { message: shown ? text : "", blocking: true };
 }
@@ -314,7 +335,7 @@ export function inputAttributesFor(type: FieldValueType, options: { integer?: bo
 type ContactLike = { firstName?: unknown; lastName?: unknown; phone?: unknown };
 
 const contactName = (contact: ContactLike) =>
-  `${String(contact.firstName ?? "").trim()} ${String(contact.lastName ?? "").trim()}`.toLowerCase();
+  formatPersonName({ firstName: String(contact.firstName ?? "").trim(), lastName: String(contact.lastName ?? "").trim() }).toLowerCase();
 
 /**
  * The stored phone an emergency contact's phone is compared against (#855): the

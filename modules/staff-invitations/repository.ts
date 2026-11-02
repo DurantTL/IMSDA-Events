@@ -47,6 +47,7 @@ import {
 import { invitationIdFromToken, invitationToken, invitationTokenMatches } from "@/modules/staff-invitations/link";
 import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { isLooseEmail } from "@/lib/field-validation";
+import { formatPersonName } from "@/lib/person-name";
 
 type Tx = Prisma.TransactionClient;
 
@@ -545,7 +546,7 @@ export async function sendInvitations(eventId: string, actorUserId: string, inpu
           templateKey: "CUSTOM_MESSAGE",
           recipientKind: "REGISTRANT",
           recipientEmail: invitation.email,
-          recipientName: `${invitation.firstName} ${invitation.lastName}`.trim() || null,
+          recipientName: formatPersonName(invitation) || null,
           senderNameSnapshot: settings?.senderName ?? "IMSDA Events",
           senderEmailSnapshot: settings?.senderEmail ?? null,
           replyToEmailSnapshot: settings?.replyToEmail ?? null,
@@ -872,7 +873,7 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
           kind: "RECEIVED",
           recipientKind: "REGISTRANT",
           email: invitation.email,
-          name: `${input.firstName} ${input.lastName}`.trim(),
+          name: formatPersonName(input),
           idempotencyKey: `staff-invitation:received:${invitation.id}`,
           ...receivedEmail({ eventName: event.name, firstName: input.firstName, confirmationCode }),
         },
@@ -970,7 +971,7 @@ export async function listApprovals(eventId: string) {
       group: row.group,
       approval: row.approval,
       email: row.email,
-      name: `${String(contact.firstName ?? "")} ${String(contact.lastName ?? "")}`.trim(),
+      name: formatPersonName({ firstName: String(contact.firstName ?? ""), lastName: String(contact.lastName ?? "") }),
       registeredAt: row.registeredAt.toISOString(),
       needsHousing: row.needsHousing,
       housingNote: row.housingNote,
@@ -978,7 +979,7 @@ export async function listApprovals(eventId: string) {
       party: row.registration.attendees.map((attendee) => {
         const snapshot = snapshotRecord(attendee.profileSnapshot);
         return {
-          name: `${String(snapshot.firstName ?? "")} ${String(snapshot.lastName ?? "")}`.trim(),
+          name: formatPersonName({ firstName: String(snapshot.firstName ?? ""), lastName: String(snapshot.lastName ?? "") }),
           role: String(snapshot.partyRole ?? "PRIMARY"),
           age: typeof snapshot.ageOnEventDate === "number" ? snapshot.ageOnEventDate : null,
         };
@@ -1090,7 +1091,7 @@ export async function approveRegistrations(
             kind: "APPROVED",
             recipientKind: "REGISTRANT",
             email: invitation.email,
-            name: `${String(contact.firstName ?? "")} ${String(contact.lastName ?? "")}`.trim() || null,
+            name: formatPersonName({ firstName: String(contact.firstName ?? ""), lastName: String(contact.lastName ?? "") }) || null,
             idempotencyKey: `staff-invitation:approved:${invitation.id}`,
             ...approvedEmail({ eventName: event.name, firstName: String(contact.firstName ?? ""), confirmationCode: registration.confirmationCode }),
           }],
@@ -1153,7 +1154,7 @@ async function entitleMeals(eventId: string, actorUserId: string, registrationId
   }
   const named = (attendee: (typeof attendees)[number]) => {
     const snapshot = snapshotRecord(attendee.profileSnapshot);
-    return { registrationId: attendee.registrationId, attendeeId: attendee.id, name: `${String(snapshot.firstName ?? "")} ${String(snapshot.lastName ?? "")}`.trim() };
+    return { registrationId: attendee.registrationId, attendeeId: attendee.id, name: formatPersonName({ firstName: String(snapshot.firstName ?? ""), lastName: String(snapshot.lastName ?? "") }) };
   };
   if (!planId) return { planFound: false, entitledPeople: 0, failedPeople: attendees.length, failed: attendees.map(named) };
   const failed: MealCoverageResult["failed"] = [];

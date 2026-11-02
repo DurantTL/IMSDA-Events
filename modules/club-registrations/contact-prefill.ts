@@ -1,4 +1,5 @@
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Pre-filling a club registration's contact fields from the signed-in
@@ -67,7 +68,7 @@ function sourceFor(field: RegistrationFormField): Source | null {
 
 function valueFor(source: Source, contact: DirectorContact) {
   switch (source) {
-    case "fullName": return `${contact.firstName} ${contact.lastName}`.trim();
+    case "fullName": return formatPersonName(contact);
     case "firstName": return contact.firstName;
     case "lastName": return contact.lastName;
     case "email": return contact.email;

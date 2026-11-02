@@ -6,6 +6,7 @@ import "@fontsource/noto-sans/700.css";
 import "./globals.css";
 import { PublicWebVitals } from "@/components/public-metrics-beacon";
 import { sidebarCollapseInitScript } from "@/components/sidebar-collapse";
+import { UnsavedChangesDialogHost } from "@/components/unsaved-changes-dialog-host";
 import { getRequestNonce } from "@/modules/security/request-nonce";
 import { zodJitlessInitScript } from "@/modules/security/zod-jitless";
 
@@ -27,7 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" suppressHydrationWarning>
       <head><script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: zodJitlessInitScript + sidebarCollapseInitScript }} /></head>
-      <body>{children}<PublicWebVitals /></body>
+      <body>{children}<PublicWebVitals /><UnsavedChangesDialogHost /></body>
     </html>
   );
 }

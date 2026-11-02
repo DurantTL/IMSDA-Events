@@ -23,7 +23,7 @@ export default async function StaffLevelTeamFormsPage({ searchParams }: { search
   const { event: requested, level: requestedLevel } = await searchParams;
   const { event, allowed } = await resolveClubReportsAccess(requested);
   if (!allowed) {
-    return <AccessRestricted title="Team forms are restricted" detail="Ask an event administrator for report access to this club event." />;
+    return <AccessRestricted title="Team forms are restricted" detail="Team results and forms for this club event need report access." whoToAsk="your event administrator" />;
   }
   const level = levelFromParam(typeof requestedLevel === "string" ? requestedLevel : undefined);
   const [rows, settings] = await Promise.all([listTeamResults(event.id), getTeamSettings(event.id)]);

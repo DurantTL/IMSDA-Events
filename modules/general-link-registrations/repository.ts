@@ -72,6 +72,7 @@ import {
 import { readTypedInTeam, requestHash, rosterOverMaximumMessage, typedInPersonId, withoutRetiredAnswers } from "@/modules/general-link-registrations/typed-team";
 import { normalizeOrganizationName } from "@/modules/organizations/domain";
 import { isLooseEmail } from "@/lib/field-validation";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * The general registration link (#931): a club director with no account registers a team through the event's one public link,
@@ -160,7 +161,7 @@ export function typedInAttendeePreparer(options: {
       throwIfOnOtherTeams((await peopleOnOtherTeams(tx, {
         eventId: event.id,
         organizationId: options.organizationId,
-        people: team.people.map((person) => ({ personId: null, name: `${person.firstName} ${person.lastName}`.trim(), onRoster: false })),
+        people: team.people.map((person) => ({ personId: null, name: formatPersonName(person), onRoster: false })),
       })).conflicts);
     }
     const resolved: Awaited<ReturnType<ClubSubmissionContext["prepareAttendees"]>>["attendees"] = new Map();
@@ -595,7 +596,7 @@ async function validateGeneralLinkRequest(
       throwIfOnOtherTeams((await peopleOnOtherTeams(db, {
         eventId: input.event.id,
         organizationId: input.pickedOrganizationId,
-        people: input.people.map((person) => ({ personId: null, name: `${person.firstName} ${person.lastName}`.trim(), onRoster: false })),
+        people: input.people.map((person) => ({ personId: null, name: formatPersonName(person), onRoster: false })),
       })).conflicts);
     }
   }
@@ -698,8 +699,8 @@ export async function submitGeneralLinkRegistration(
     definition, formSlug: form.slug, submission: input,
   });
   const matches = picked ? await emailIsDirectorOrDeputyOf(prisma, picked.id, directorEmail, now) : false;
-  const directorName = `${prepared.identity.firstName} ${prepared.identity.lastName}`.trim();
-  const attendeeNames = typed.people.map((person) => `${person.firstName} ${person.lastName}`.trim());
+  const directorName = formatPersonName(prepared.identity);
+  const attendeeNames = typed.people.map((person) => formatPersonName(person));
   if (picked && matches) {
     return submitMatched({
       event, form, input, organizationId: picked.id, clubName: picked.name, team: teamIdentity, locationId, hash, now,
@@ -722,7 +723,7 @@ export async function submitGeneralLinkRegistration(
 /** The names of the people typed into a request, for the confirmation shown to the person who typed them. */
 function typedNames(definition: RegistrationFormDefinition, input: PublicRegistrationInput, settings: Parameters<typeof readTypedInTeam>[2], event: ClubEvent) {
   return readTypedInTeam(definition, input.attendees ?? [], settings, calendarDateInEventTimeZone(event.startsAt, event.timezone))
-    .people.map((person) => `${person.firstName} ${person.lastName}`.trim());
+    .people.map((person) => formatPersonName(person));
 }
 
 async function submitMatched(input: {

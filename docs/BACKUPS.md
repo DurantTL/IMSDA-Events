@@ -33,38 +33,17 @@ only a label such as "Database dump (.sql.gz)". Until the settings below are
 added, both rows say "Backups are managed outside the app; connect read-only R2
 to check them." That is a neutral note, not a warning.
 
-### Create the read-only key (Caleb, in Cloudflare)
+### Create the read-only key and give it to the app (Caleb)
 
-1. Sign in to the Cloudflare dashboard and open **R2 Object Storage**.
-2. On the R2 overview, copy the **Account ID** (shown on the right). Keep it.
-3. Click **Manage API tokens** (also labelled **API** or **Manage R2 API
-   Tokens**), then **Create API token** (an Account API token or a User API
-   token both work).
-4. Name it, for example `imsda-events-backup-read`.
-5. Permissions: choose **Object Read only**. Do not choose any option with
-   Write.
-6. Specify bucket(s): choose **Apply to specific buckets only** and pick only the
-   backup bucket.
-7. TTL: **Forever** (or set an end date and put a reminder in the calendar to
-   replace the key before then; when it expires the System report says "R2
-   refused the read-only key").
-8. Click **Create API token**.
-9. Copy the **Access Key ID** and the **Secret Access Key** now. Cloudflare
-   shows the secret only once. (You do not need the "Token value" or the
-   endpoint URL.)
+The click-by-click steps (the read-only R2 token in Cloudflare, then the four
+settings in xCloud) live in one place: the `r2-backup-read` entry in
+`modules/setup-help/system-setup-steps.ts`. The same steps show in the app, on
+**System report** → Background jobs, under the **Newest database backup** row's
+**How to set this up** panel, so they are not repeated here.
 
-### Give the key to the app (Caleb, in xCloud)
-
-Add these lines in the xCloud site's **environment panel** (the same place as
-the other settings; xCloud writes them to `/home/u_events/239298/.env`, see
-`DEPLOY-DOCKER.md`, "xCloud site setup"). The values are placeholders:
-
-```
-BACKUP_R2_READ_ACCOUNT_ID=<the 32-character Account ID>
-BACKUP_R2_READ_ACCESS_KEY_ID=<Access Key ID>
-BACKUP_R2_READ_SECRET_ACCESS_KEY=<Secret Access Key>
-BACKUP_R2_READ_BUCKET=<the backup bucket's name>
-```
+The four required settings are `BACKUP_R2_READ_ACCOUNT_ID`,
+`BACKUP_R2_READ_ACCESS_KEY_ID`, `BACKUP_R2_READ_SECRET_ACCESS_KEY` and
+`BACKUP_R2_READ_BUCKET`.
 
 Optional:
 

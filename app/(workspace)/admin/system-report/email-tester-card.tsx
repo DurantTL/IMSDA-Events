@@ -78,6 +78,7 @@ function Result({ status }: { status: EmailTestStatus }) {
       return (
         <div className={`${styles.result} ${styles.resultOk}`}>
           <strong>Email works end to end.</strong>
+          {status.provider && <p>Sent through {status.provider}.</p>}
           <p>{took === null ? "" : `Took ${took} ${took === 1 ? "second" : "seconds"} from queue to delivery. `}Check the inbox for “IMSDA Events test email”.</p>
           {ref}
         </div>
@@ -154,8 +155,9 @@ function Result({ status }: { status: EmailTestStatus }) {
  * The email tester card (#1383). It posts to the guarded route, then polls that one test's status until it is final.
  * Everything it shows comes from fixed states and sentences in the route's answer.
  */
-export function EmailTesterCard({ defaultEmail }: { defaultEmail: string }) {
+export function EmailTesterCard({ defaultEmail, backupConfigured = false }: { defaultEmail: string; backupConfigured?: boolean }) {
   const [to, setTo] = useState(defaultEmail);
+  const [viaBackup, setViaBackup] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [status, setStatus] = useState<EmailTestStatus | null>(null);
   const [message, setMessage] = useState<{ tone: "bad" | "warn"; title: string; text?: string } | null>(null);
@@ -195,7 +197,7 @@ export function EmailTesterCard({ defaultEmail }: { defaultEmail: string }) {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to }),
+        body: JSON.stringify(backupConfigured && viaBackup ? { to, backup: true } : { to }),
       });
       const body = await response.json().catch(() => ({})) as { status?: EmailTestStatus; error?: string; message?: string; nextAllowedAt?: string };
       if (response.status === 429 && body.nextAllowedAt) {
@@ -248,6 +250,23 @@ export function EmailTesterCard({ defaultEmail }: { defaultEmail: string }) {
           </div>
           <p className={styles.help} id="email-tester-help">Starts as your own address. One address per test, up to 3 tests an hour.</p>
         </div>
+        {backupConfigured && (
+          <label className={styles.checkRow} htmlFor="email-tester-backup">
+            <input
+              id="email-tester-backup"
+              className={styles.checkbox}
+              type="checkbox"
+              aria-describedby="email-tester-backup-help"
+              checked={viaBackup}
+              onChange={(event) => setViaBackup(event.target.checked)}
+              disabled={sending}
+            />
+            <span>Send through the backup (Resend)</span>
+          </label>
+        )}
+        {backupConfigured && (
+          <p className={styles.help} id="email-tester-backup-help">This test skips Amazon SES and goes straight to Resend.</p>
+        )}
         <div aria-live="polite">
           {message && (
             <div className={`${styles.result} ${message.tone === "bad" ? styles.resultBad : styles.resultWarn}`} role="status">

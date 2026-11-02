@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { BackLink } from "@/components/back-link";
 import { ClubRosterCarryForward } from "@/components/club-roster-carry-forward";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { getCarryForwardOffer } from "@/modules/club-rosters/carry-forward";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Start next year's roster" };
 export const dynamic = "force-dynamic";
@@ -15,13 +17,14 @@ export const dynamic = "force-dynamic";
 export default async function ClubRosterNextYearPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { organizationId } = await params;
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const rosterHref = `/account/clubs/${organizationId}/roster`;
   if (!access.capabilities.manageTeam) {
     return (
       <>
         <BackLink href={rosterHref}>Back to roster</BackLink>
         <p className="inline-notice" role="status">Your club role doesn&apos;t include starting a new year. Ask your club director.</p>
+        <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="starting a new year" id="next-year-role" />
       </>
     );
   }

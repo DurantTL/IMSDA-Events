@@ -103,8 +103,8 @@ export function DuplicateMatchReviewWorkspace({
   /** Reloads both lists so the screen shows what is actually stored. */
   async function refreshLists() {
     const [candidateResult, mergeResult] = await Promise.all([
-      fetch("/api/people/matches").then(readResponse),
-      fetch("/api/people/merges").then(readResponse),
+      fetch("/api/people/matches", { cache: "no-store" }).then(readResponse),
+      fetch("/api/people/merges", { cache: "no-store" }).then(readResponse),
     ]);
     setCandidates(candidateResult.candidates ?? []);
     setMerges(mergeResult.merges ?? []);

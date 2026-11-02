@@ -141,7 +141,7 @@ describe("inlinePhoneProblem: the browser message", () => {
     expect(hidden).toEqual({ message: "", blocking: true });
     const shown = inlinePhoneProblem("Phone", "idk 911", OLD_BAD, true);
     expect(shown.blocking).toBe(true);
-    expect(shown.message).toMatch(/^Phone must be a 10-digit US number/);
+    expect(shown.message).toMatch(/^Enter a 10-digit US number/);
     expect(shown.message).not.toContain("911");
   });
 
@@ -283,7 +283,7 @@ describe("a legacy profile phone prefilled into a NEW registration is a new valu
     expect(prefill.phone).toBe(OLD_BAD);
     // A new registration has nothing stored, so the prefill is not grandfathered.
     const problem = typedAnswerProblem(phoneField, prefill.phone);
-    expect(problem).toMatch(/^Mobile phone must be a 10-digit US number/);
+    expect(problem).toMatch(/^Enter a 10-digit US number/);
     expect(problem).not.toContain(OLD_BAD);
   });
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { computeRequiredForms, isRequirement, type ClubRequiredForms, type RequiredTemplate } from "@/modules/club-forms/required-domain";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Where each active club stands on the forms staff marked required (#1246), for one club year. Reads only: it
@@ -49,7 +50,7 @@ export async function getRequiredFormsStatus(clubYear: string, organizationIds?:
       id: member.id,
       organizationId: member.organizationId,
       attendeeType: member.attendeeType,
-      name: member.person ? `${member.person.firstName} ${member.person.lastName}`.trim() : "Unnamed member",
+      name: member.person ? formatPersonName(member.person) : "Unnamed member",
     })),
     submissions: submissionRows.flatMap((row) => (row.organizationId ? [{ templateKey: row.template.key, organizationId: row.organizationId, rosterMemberId: row.rosterMemberId }] : [])),
   });

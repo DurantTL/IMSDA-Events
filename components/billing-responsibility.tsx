@@ -1,3 +1,4 @@
+import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { Building2, Download } from "lucide-react";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/modules/billing-responsibility/domain";
 import type { BillingResponsibilityView } from "@/modules/billing-responsibility/repository";
 import { notBilledLabel } from "@/modules/club-registrations/church-owed";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 function date(value: string) {
   return new Date(value).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
@@ -98,7 +100,7 @@ export function BillingResponsibility({
                 <div className="billing-line" key={line.registrationId}>
                   <span>
                     <strong>{lineLabel(line)}</strong>
-                    <small>{line.confirmationCode} · {line.status.toLowerCase()} · {unresolvedReasonLabel(line.source)}{line.locationName ? ` · ${line.locationName}` : ""}</small>
+                    <small>{line.confirmationCode} · {registrationStatusWordOrRaw(line.status)} · {unresolvedReasonLabel(line.source)}{line.locationName ? ` · ${line.locationName}` : ""}</small>
                   </span>
                   <span>{line.isBilled ? formatCents(line.owedCents) : notBilledLabel(line.status)}</span>
                   <span><LinkOrganizationForm eventId={eventId} hint={line.hint} needsReason={false} registrationId={line.registrationId} /></span>
@@ -166,7 +168,7 @@ function GroupPanel({
         <div className="finance-row" key={line.registrationId}>
           <span>
             <strong>{lineLabel(line)}</strong>
-            <small>{line.status.toLowerCase()}{line.locationName ? ` · ${line.locationName}` : ""}{!line.recorded ? " · not recorded yet" : line.outdated ? " · recorded answer is out of date" : ""}</small>
+            <small>{registrationStatusWordOrRaw(line.status)}{line.locationName ? ` · ${line.locationName}` : ""}{!line.recorded ? " · not recorded yet" : line.outdated ? " · recorded answer is out of date" : ""}</small>
             {line.reason && <small>Reason: {line.reason}</small>}
           </span>
           <span>{line.confirmationCode}</span>
@@ -196,7 +198,7 @@ function GroupPanel({
         </div>
       ))}
       <div className="finance-row">
-        <span><strong>Group total (estimated, registered)</strong></span><span /><span>{group.billedCount} billed</span><span><strong>{formatCents(group.owedCents)}</strong></span>
+        <span><strong>Group total (estimated, registered)</strong></span><span /><span>{group.billedCount} billed</span><span><strong><Money cents={group.owedCents} /></strong></span>
       </div>
     </section>
   );

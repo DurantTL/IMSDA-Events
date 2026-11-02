@@ -1,9 +1,12 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { ageInputAttributes } from "@/modules/attendee-types/age-limits";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { notSavedMessage } from "@/components/form-message";
+import { settingsSaveStateLabels } from "@/components/settings-save-state";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
 import { ArrowLeft, ArrowRight, Trash2, UserPlus, UsersRound } from "lucide-react";
 import {
@@ -489,7 +492,7 @@ export function ClubRegistrationWorkspace({
 
   const saveLabel = conflict
     ? DRAFT_CONFLICT_MESSAGE
-    : saveState === "saving" ? "Saving draft…" : saveState === "saved" ? "Draft saved" : saveState === "error" ? "Draft not saved. Check your connection." : "";
+    : saveState === "saving" ? settingsSaveStateLabels.saving : saveState === "saved" ? settingsSaveStateLabels.saved : saveState === "error" ? notSavedMessage("check your connection. Your answers are still here.") : "";
   const saveAction = conflict
     ? <button className="text-button" onClick={() => window.location.reload()} type="button">Reload</button>
     : saveState === "error"
@@ -527,7 +530,7 @@ export function ClubRegistrationWorkspace({
           <p className="public-registration-eyebrow">Step 1 of {totalSteps} · Who&apos;s going</p>
           <h2>Who&apos;s going?</h2>
         </div>
-        <span className="count-badge">{goingCount} chosen</span>
+        <span className="count-badge">{`${goingCount} chosen`}</span>
       </div>
       {locationNote && <p className="field-help" role="status">{locationNote}</p>}
       {multipleTeams && (
@@ -551,7 +554,7 @@ export function ClubRegistrationWorkspace({
       </p>
       {teamRules && (
         <div className={`inline-notice${sizeProblem ? " error" : ""}`} role="status">
-          <strong>{teamMemberCount} team {teamMemberCount === 1 ? "member" : "members"}</strong>
+          <strong>{`${teamMemberCount} team ${teamMemberCount === 1 ? "member" : "members"}`}</strong>
           {sizeLimits ? <> (a team has {sizeLimits}{teamRules.maxAlternates > 0 ? `, including ${teamRules.maxAlternates === 1 ? "the alternate" : `up to ${teamRules.maxAlternates} alternates`}` : ""})</> : null}
           {" · "}{coachCount} {coachCount === 1 ? "coach" : "coaches"}. Coaches are adults who come with the team; they don&apos;t count toward the team.
           {teamRules.maxMemberAge !== null && <> A team member can be at most {teamRules.maxMemberAge} on {ageDateText}.</>}
@@ -564,9 +567,12 @@ export function ClubRegistrationWorkspace({
         </ul>
       )}
       {workspace.roster.length === 0 ? (
-        <p className="public-manage-empty">
-          <UsersRound size={17} aria-hidden="true" /> Your roster is empty. Add regular members using Add to roster on the roster page, or import a CSV. You can add event-only guests when registering.
-        </p>
+        <>
+          <p className="public-manage-empty">
+            <UsersRound size={17} aria-hidden="true" /> Your roster is empty. Add regular members using Add to roster on the roster page, or import a CSV. You can add event-only guests when registering.
+          </p>
+          <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the registration" id="event-roster-empty" />
+        </>
       ) : (
         <>
           <div className="club-roster-tools">

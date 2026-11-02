@@ -1,11 +1,13 @@
 "use client";
 
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { useMemo, useState } from "react";
 import { Eye, Package, Save } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
 import { type ClubSupplySection, clubSupplySectionLabels, clubSupplySections } from "@/modules/club-supplies/domain";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { makeSearchMatcher } from "@/lib/search-match";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 
 type SaveResponse = { stock?: { itemId: string; quantityOnHand: number }; error?: string; message?: string; issues?: Array<{ message?: string }> };
 
@@ -42,18 +44,18 @@ export function ClubSupplyStockWorkspace({
   const [saved, setSaved] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [section, setSection] = useState<ClubSupplySection | "">("");
-  const [query, setQuery] = useState("");
+  const search = useClientSearch();
   const [onlyInStock, setOnlyInStock] = useState(false);
 
   const groups = useMemo(() => {
-    const matches = makeSearchMatcher(query);
+    const matches = makeSearchMatcher(search.term);
     const visible = stock.filter((row) => (!section || row.section === section)
       && (!onlyInStock || row.quantityOnHand > 0)
       && matches([row.name, row.catalogNumber, row.sizeLabel]));
     return clubSupplySections
       .map((value) => ({ section: value, rows: visible.filter((row) => row.section === value) }))
       .filter((group) => group.rows.length > 0);
-  }, [stock, section, query, onlyInStock]);
+  }, [stock, section, search.term, onlyInStock]);
 
   async function save(row: ClubStockRow) {
     const draft = drafts[row.itemId];
@@ -98,7 +100,7 @@ export function ClubSupplyStockWorkspace({
           {!embedded && <p className="public-registration-eyebrow">Club supplies</p>}
           {embedded ? <h3>Inventory: supplies on hand</h3> : <h2>Supplies on hand</h2>}
         </div>
-        <span className="count-badge">{stock.filter((row) => row.quantityOnHand > 0).length} in stock</span>
+        <span className="count-badge">{`${stock.filter((row) => row.quantityOnHand > 0).length} in stock`}</span>
       </div>
       {readOnly ? (
         <p className="inline-notice" role="status"><Eye aria-hidden="true" size={14} /> View only. The club director or deputy records stock.</p>
@@ -110,6 +112,7 @@ export function ClubSupplyStockWorkspace({
           <Package aria-hidden="true" size={27} />
           <h3>No catalog items yet</h3>
           <p>Conference staff haven&apos;t loaded the supply catalog yet. Check back later, or ask the conference office.</p>
+          <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the supply catalog" id="supplies-no-catalog" />
         </div>
       ) : (
         <>
@@ -123,12 +126,13 @@ export function ClubSupplyStockWorkspace({
             </label>
             <label>
               Search
-              <input onChange={(event) => setQuery(event.target.value)} placeholder="Name or catalog number" type="search" value={query} />
+              <input {...search.inputProps} placeholder="Name or catalog number" type="search" />
             </label>
           </div>
           <label className="checkbox-label">
             <input checked={onlyInStock} onChange={(event) => setOnlyInStock(event.target.checked)} type="checkbox" /> Only items in stock
           </label>
+          <SearchResultStatus message={groups.length === 0 ? "No items match." : `${groups.reduce((total, group) => total + group.rows.length, 0)} items shown.`} />
           {groups.length === 0 && <p className="quiet-copy">Nothing matches.</p>}
           {groups.map((group) => (
             <section className={styles.sectionBlock} key={group.section}>
@@ -154,7 +158,7 @@ export function ClubSupplyStockWorkspace({
                           className={styles.itemControls}
                           onSubmit={(event) => { event.preventDefault(); void save(row); }}
                         >
-                          <label className="sr-only" htmlFor={inputId}>Quantity on hand: {row.name}</label>
+                          <label className="sr-only" htmlFor={inputId}>{`Quantity on hand: ${row.name}`}</label>
                           <input
                             className={styles.quantity}
                             id={inputId}

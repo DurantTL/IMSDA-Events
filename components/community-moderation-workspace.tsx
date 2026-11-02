@@ -1,7 +1,9 @@
 "use client";
 
+import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
 import { Eye, Flag, MessageSquareWarning, Save, ShieldCheck, UsersRound } from "lucide-react";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type StaffCommunity = {
   eventId: string;
@@ -61,7 +63,7 @@ type StaffCommunity = {
 };
 
 function when(value: string) {
-  return new Date(value).toLocaleString();
+  return formatInConferenceTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export function CommunityModerationWorkspace({ community }: { community: StaffCommunity }) {
@@ -186,7 +188,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
               <option value="365">1 year after</option>
             </select>
           </label>
-          <button className="primary-button" disabled={busy} type="submit"><Save size={16} aria-hidden="true" /> Save controls</button>
+          <SubmitButton icon={<Save size={16} aria-hidden="true" />} iconSize={16} label="Save controls" submitting={busy} submittingLabel="Saving…" />
         </form>
       </section>
 

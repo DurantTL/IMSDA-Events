@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/use-confirm";
 import { SubmitButton } from "@/components/submit-button";
 import { cardCell } from "@/components/table-card-labels";
 import Link from "next/link";
@@ -57,6 +58,7 @@ export function ClubDirectorsWorkspace({
 }) {
   const [grants, setGrants] = useState(initialGrants);
   const [saving, setSaving] = useState(false);
+  const { ask, confirmDialog } = useConfirm();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [given, setGiven] = useState<NonNullable<GrantResponse["granted"]> | null>(null);
@@ -105,7 +107,13 @@ export function ClubDirectorsWorkspace({
   }
 
   async function revoke(grant: DirectorGrantRecord) {
-    const reason = window.prompt(`Why is ${grant.account.displayName} losing access to ${club.name}?`);
+    const reason = await ask({
+      title: `Revoke ${grant.account.displayName}'s access to ${club.name}?`,
+      body: <p>{`${grant.account.displayName} will lose this club access. The reason is recorded in the audit log.`}</p>,
+      confirmLabel: `Revoke access for ${grant.account.displayName}`,
+      destructive: true,
+      input: { label: `Why is ${grant.account.displayName} losing access to ${club.name}?`, required: true, minLength: 3, maxLength: 500, hint: "At least 3 characters." },
+    });
     if (reason === null) return;
     setSaving(true);
     setError("");
@@ -128,6 +136,7 @@ export function ClubDirectorsWorkspace({
 
   return (
     <section className="page-stack">
+      {confirmDialog}
       <div className="page-intro">
         <div>
           <p className="eyebrow">Club admins</p>
@@ -213,7 +222,7 @@ export function ClubDirectorsWorkspace({
             <p className="eyebrow">Access history</p>
             <h2>Grants</h2>
           </div>
-          <span className="count-badge">{grants.length} total</span>
+          <span className="count-badge">{`${grants.length} total`}</span>
         </div>
         {grants.length === 0 ? (
           <div className="empty-state">
@@ -268,7 +277,7 @@ export function ClubDirectorsWorkspace({
                     {grant.revokeReason && (
                       <>
                         <br />
-                        <small>Revoked: {grant.revokeReason}</small>
+                        <small>{`Revoked: ${grant.revokeReason}`}</small>
                       </>
                     )}
                   </td>

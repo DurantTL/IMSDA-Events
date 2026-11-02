@@ -83,7 +83,7 @@ describe("every health page checks access itself on the server (#658)", () => {
     expect(mocks.listHealthEvents).not.toHaveBeenCalled();
   });
 
-  it("club page: no open roster access renders nothing; a registrar or reporter is told it is for directors", async () => {
+  it("club page: a club with no tie to the viewer renders nothing (the layout answers with its 404); a registrar or reporter is told it is for directors", async () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "NOT_FOUND" });
     expect(await ClubHealthPage({ params: Promise.resolve({ organizationId: "club-b" }), searchParams: Promise.resolve({ event: "e1" }) })).toBeNull();
     mocks.getRosterAccessStateForPage.mockResolvedValue({ state: "OPEN", club: { role: "REGISTRAR" } });

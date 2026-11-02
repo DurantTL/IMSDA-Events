@@ -1,5 +1,6 @@
 "use client";
 
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { useConfirm } from "@/components/use-confirm";
 import Link from "next/link";
 import { useState } from "react";
@@ -9,7 +10,7 @@ import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-
 
 type InvitesResponse = { invites?: ClubInviteRecord[]; sent?: number; message?: string; issues?: Array<{ message?: string }> };
 
-const statusLabels = { PENDING: "Not sent", SENT: "Sent", ACCEPTED: "Accepted", CANCELLED: "Cancelled" } as const;
+const statusLabels = { PENDING: "Draft", SENT: "Sent", ACCEPTED: "Accepted", CANCELLED: "Cancelled" } as const;
 const statusTone = { PENDING: "gold", SENT: "purple", ACCEPTED: "green", CANCELLED: "coral" } as const;
 
 function formatDate(value: string | null) {
@@ -54,8 +55,13 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
     void call("/api/admin/club-invites/send", "POST", selection, sentMessage);
   }
 
-  function changeEmail(invite: ClubInviteRecord) {
-    const email = window.prompt(`New email for ${invite.name || "this invite"} (${invite.club.name}):`, invite.email);
+  async function changeEmail(invite: ClubInviteRecord) {
+    const email = await ask({
+      title: `Change email for ${invite.name || "this invite"}?`,
+      body: <p>{`The invite to ${invite.club.name} will be sent to the new address instead.`}</p>,
+      confirmLabel: "Change email",
+      input: { label: `New email for ${invite.name || "this invite"} (${invite.club.name})`, defaultValue: invite.email, type: "email", required: true },
+    });
     if (!email || email.trim().toLowerCase() === invite.email) return;
     void call(`/api/admin/club-invites/${encodeURIComponent(invite.id)}`, "PATCH", { email }, () => "Email changed. The invite is waiting to be sent.");
   }
@@ -73,7 +79,7 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
   const pending = invites.filter((invite) => invite.status === "PENDING");
   const clubs = [...new Map(invites.map((invite) => [invite.club.id, invite.club])).values()];
 
-  const { confirm: askConfirm, confirmDialog } = useConfirm();
+  const { confirm: askConfirm, ask, confirmDialog } = useConfirm();
   return (
     <section className="page-stack">
       {confirmDialog}
@@ -102,11 +108,14 @@ export function ClubInvitesWorkspace({ initialInvites, emailConfigured }: { init
       {!emailConfigured && (
         <div className="inline-notice error" role="status">Account email isn&apos;t set up on this server, so invites can&apos;t be sent yet.</div>
       )}
+      {!emailConfigured && (
+        <EventSetupHelp context="club invites" id="club-invites-email" />
+      )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
       {clubs.length === 0 && (
-        <div className="panel"><p className="report-empty">No invites yet. <a href="/admin/clubs/import">Import clubs</a> to create them.</p></div>
+        <div className="panel"><p className="report-empty">No invites yet. Invites are created when clubs are imported.</p><EventSetupHelp context="club invites" id="club-invites-none" /></div>
       )}
 
       {clubs.map((club) => {

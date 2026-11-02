@@ -9,6 +9,7 @@ import { rosterYearView } from "@/modules/club-rosters/domain";
 import { clubHonorCounts, memberCompletedHonors } from "@/modules/reporting/director-exports";
 import { listExportMemberOptions, loadHonorsExport } from "@/modules/reporting/director-exports-repository";
 import { firstParam } from "@/lib/search-params";
+import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Honors report" };
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default async function ClubHonorsReportPage({
 }) {
   const [{ organizationId }, query] = await Promise.all([params, searchParams]);
   const access = await getRosterAccessStateForPage(organizationId);
-  if (access.state !== "OPEN") return null;
+  if (access.state !== "OPEN") return clubAccessClosed(access);
   const { clubYear, choices } = rosterYearView(one(query.year));
   const person = one(query.view) === "person";
   const memberId = one(query.member);

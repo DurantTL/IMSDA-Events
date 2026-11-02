@@ -1,5 +1,6 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -22,6 +23,7 @@ import { OneTimeCodeInput } from "@/components/one-time-code-input";
  */
 export function AttendeePasswordResetForm({ securityCheck = null }: { securityCheck?: SecurityCheckConfig }) {
   const check = useRef<SecurityCheckHandle>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -85,7 +87,7 @@ export function AttendeePasswordResetForm({ securityCheck = null }: { securityCh
     return (
       <form className="auth-form" onSubmit={completeReset}>
         <div className="auth-success">
-          <strong>Check {sentTo}</strong>
+          <strong>Check <ExactValue>{sentTo}</ExactValue></strong>
           <p>
             If that address has an account with a password, a six-digit code is on its way. Enter
             it here with your new password — the code only works in this browser, and it expires in
@@ -143,9 +145,9 @@ export function AttendeePasswordResetForm({ securityCheck = null }: { securityCh
     <form className="auth-form" onSubmit={requestCode}>
       <label>
         Email address
-        <input name="email" type="email" autoComplete="username" required maxLength={254} />
+        <input name="email" type="email" autoComplete="username" required maxLength={254} ref={emailRef} />
       </label>
-      <SecurityCheck config={securityCheck} action="forgot-password" handleRef={check} />
+      <SecurityCheck config={securityCheck} action="forgot-password" handleRef={check} emailCode={{ getEmail: () => emailRef.current?.value ?? "" }} />
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button full-button" type="submit" disabled={busy}>
         <MailCheck aria-hidden="true" size={17} /> {busy ? "Sending…" : "Send me a code"}

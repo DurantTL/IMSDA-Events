@@ -2,6 +2,7 @@
 
 import { SubmitButton } from "@/components/submit-button";
 import { useMemo, useRef, useState } from "react";
+import { HoneypotField } from "@/components/honeypot-field";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { DraftRestoredNotice } from "@/components/draft-restored-notice";
@@ -15,6 +16,7 @@ import { ClubFormSectionTitle } from "@/components/club-form-section-title";
 import { DateInput } from "@/components/club-form-date-input";
 import { inputAttributesFor } from "@/lib/field-validation";
 import { addressComponentKeys, addressComponentLabels } from "@/modules/forms/address";
+import { savedMessage } from "@/components/form-message";
 import {
   dateFieldBounds,
   fieldRuns,
@@ -88,6 +90,7 @@ export function ClubFormFillIn(props: Props) {
   const [rosterMemberId, setRosterMemberId] = useState(props.mode === "club" ? props.initialRosterMemberId ?? "" : "");
   const [subjectName, setSubjectName] = useState(props.mode === "club" ? props.initialSubjectName ?? "" : "");
   const [saving, setSaving] = useState(false);
+  const [website, setWebsite] = useState("");
   const [error, setError] = useState("");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [notice, setNotice] = useState("");
@@ -188,6 +191,7 @@ export function ClubFormFillIn(props: Props) {
             unlistedClubName: clubChoice === "NOT_LISTED" ? unlistedClubName.trim() : undefined,
             idempotencyKey,
             answers,
+            website,
           }, { idempotent: true, init: { headers: check.current?.headers() } })
           : await submitJson(`/api/public/club-forms/${encodeURIComponent(props.token)}`, { answers });
       if (response.unavailable) {
@@ -224,7 +228,7 @@ export function ClubFormFillIn(props: Props) {
         return;
       }
       setSavedId(result.submission?.id);
-      setNotice("Draft saved.");
+      setNotice(savedMessage("Submit it when you are ready."));
     } catch {
       if (props.mode === "open") check.current?.settle();
       setError("The form could not be saved. Check your connection and try again.");
@@ -345,6 +349,7 @@ export function ClubFormFillIn(props: Props) {
       )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {siteUpdating && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => void send(lastSubmitRef.current)} />}
+      {props.mode === "open" && <HoneypotField onChange={setWebsite} value={website} />}
       {props.mode === "open" && <SecurityCheck config={props.securityCheck ?? null} action="club-application" handleRef={check} />}
       {error && (
         <div className="inline-notice error" role="alert">

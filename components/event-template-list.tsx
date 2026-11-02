@@ -39,7 +39,7 @@ export function EventTemplateList({ initialTemplates }: EventTemplateListProps) 
       const body = await response.json();
       if (!response.ok) throw new Error(body.message ?? "The starter templates could not be added.");
       setStarterResult(body as StarterTemplatesResult);
-      const listResponse = await fetch("/api/event-templates");
+      const listResponse = await fetch("/api/event-templates", { cache: "no-store" });
       const listBody = await listResponse.json();
       if (listResponse.ok) setTemplates(listBody.templates);
     } catch (startersError) {

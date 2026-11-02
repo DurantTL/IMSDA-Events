@@ -3,6 +3,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { accountSignOutMode } from "@/modules/access/workspace-contexts";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { accountNeedsSecondStep } from "@/modules/attendee-accounts/sign-in-gate";
+import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import type { ClubRole } from "@/modules/organizations/director-grants-domain";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
@@ -28,5 +29,5 @@ export async function ClubPortalMasthead({ role, actingAs }: { role: ClubRole; a
     clubCount: clubs.length,
     signOut: accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: isActing }),
   });
-  return <ClubPortalMastheadView model={model} role={role} />;
+  return <ClubPortalMastheadView model={model} role={role} formsHelpContact={await getFormsHelpContact()} />;
 }

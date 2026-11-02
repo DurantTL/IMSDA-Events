@@ -88,7 +88,7 @@ registrations that come back wait for the office to approve them in one batch. T
 
 **Where the group shows**
 
-- People: a Staff / Pastor / Volunteer chip on the registration card and in the detail, a "Waiting for office approval" status and
+- People: a Staff / Pastor / Volunteer chip on the registration card and in the detail, a "Pending approval" status and
   filter.
 - Attendee listing: a Group column (also in the CSV).
 - Kitchen report: a count per group of people whose meals the conference covers, no names.

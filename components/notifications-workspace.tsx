@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Mail, Save } from "lucide-react";
+import { savedMessage } from "@/components/form-message";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { cardCell } from "@/components/table-card-labels";
@@ -117,7 +118,7 @@ export function NotificationsWorkspace({
       if (!response.ok || !result.addresses) throw new Error(message);
       setAddresses(result.addresses);
       setDraft(draftFrom(result.addresses));
-      setNotice("Alert addresses saved.");
+      setNotice(savedMessage());
     } catch (caught) {
       setAddressError(caught instanceof Error ? caught.message : failedMessage);
     } finally {

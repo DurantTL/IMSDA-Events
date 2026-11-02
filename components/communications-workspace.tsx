@@ -1,8 +1,10 @@
 "use client";
 
-import { formatCents } from "@/modules/payments/format-cents";
+import { Money } from "@/components/exact-value";
+import { EventSetupHelp } from "@/components/event-setup-help";
 import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
+import { savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
@@ -53,6 +55,8 @@ import {
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { messageRetryRequestPayload } from "@/modules/communications/message-retry-client";
 import { PREHEADER_MAX_LENGTH, renderEmailHtmlDocument } from "@/modules/communications/email-html";
+import { emailPreviewLayout, plainTextToEmailBodyHtml } from "@/modules/communications/email-layout";
+import { DEFAULT_EMAIL_LAYOUT_SETTINGS, type EmailLayoutSettings } from "@/modules/communications/email-layout-domain";
 import { SendCheckPanel, jumpToSendCheckField } from "@/components/send-check-panel";
 import {
   ANNOUNCEMENT_CHECK_ANCHORS,
@@ -107,6 +111,8 @@ type CommunicationsWorkspaceProps = {
   announcementOptOuts?: EventAnnouncementOptOutRow[];
   initialView: CommunicationsView;
   openNew?: boolean;
+  /** The header names and help contact from Platform settings, so a preview shows what delivery sends (#1443). */
+  emailLayoutSettings?: EmailLayoutSettings;
 };
 
 type ApiResult = {
@@ -179,6 +185,8 @@ const templateTokenLabels: Readonly<Record<string, string>> = Object.fromEntries
  * note in that position renders as broken markup rather than a button.
  */
 const PREVIEW_MANAGE_URL = "https://events.imsda.org/manage/preview-link-not-live";
+/** The origin the preview treats as the site's own, so text-only previews show the same buttons delivery sends. */
+const PREVIEW_ORIGINS = [new URL(PREVIEW_MANAGE_URL).origin];
 const PREVIEW_MANAGE_API_URL = "https://events.imsda.org/api/public/manage/preview-link-not-live";
 
 function withPreviewLinks(value: string) {
@@ -252,8 +260,22 @@ function messageTypeLabel(message: Pick<MessageOutboxRecord, "templateKey" | "re
   return templateLabels[message.templateKey] ?? message.templateKey.toLowerCase().replaceAll("_", " ");
 }
 
+/** Delivery and message states in capitalized words (#1453). These are not registration status words, so they keep their own names. */
+const deliveryStatusLabels: Record<string, string> = {
+  PENDING: "Queued",
+  PROCESSING: "Processing",
+  CAPTURED: "Captured",
+  SENT: "Sent",
+  FAILED: "Failed",
+  SUPPRESSED: "Suppressed",
+  CANCELLED: "Cancelled",
+};
+
 function friendlyStatus(status: string) {
-  return status.toLowerCase().replaceAll("_", " ");
+  const known = deliveryStatusLabels[status];
+  if (known) return known;
+  const words = status.toLowerCase().replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function localDate(value: string | null) {
@@ -289,6 +311,7 @@ export function CommunicationsWorkspace({
   announcementOptOuts = [],
   initialView,
   openNew = false,
+  emailLayoutSettings = DEFAULT_EMAIL_LAYOUT_SETTINGS,
 }: CommunicationsWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -445,7 +468,7 @@ export function CommunicationsWorkspace({
     let cancelled = false;
     void Promise.all(missing.map(async (id) => {
       try {
-        const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/message-files/${encodeURIComponent(id)}?disposition=inline`);
+        const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/message-files/${encodeURIComponent(id)}?disposition=inline`, { cache: "no-store" });
         if (!response.ok) return [id, ""] as const;
         const blob = await response.blob();
         const url = await new Promise<string>((resolve) => {
@@ -1051,7 +1074,7 @@ export function CommunicationsWorkspace({
           internalNotificationEmails: recipients,
         }),
       },
-      "Message settings saved.",
+      savedMessage(),
     );
     if (updated) setSettingsDraft(settingsDraftFromMessaging(updated));
   }
@@ -1231,7 +1254,7 @@ export function CommunicationsWorkspace({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(`/api/events/${eventId}/balance-reminders`);
+      const response = await fetch(`/api/events/${eventId}/balance-reminders`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as ApiResult;
       if (!response.ok || !result.reminderPreview) {
         throw new Error(result.message ?? "The reminder preview could not be refreshed.");
@@ -1254,7 +1277,7 @@ export function CommunicationsWorkspace({
     setError("");
     setNotice("");
     try {
-      const response = await fetch(`/api/events/${eventId}/shirt-size-requests`);
+      const response = await fetch(`/api/events/${eventId}/shirt-size-requests`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as ApiResult;
       if (!response.ok || !result.shirtSizePreview) {
         throw new Error(result.message ?? "The shirt-size preview could not be refreshed.");
@@ -1578,7 +1601,7 @@ export function CommunicationsWorkspace({
               </article>
             ))}
             {announcements.length === 0 && (
-              <div className="empty-state panel"><Megaphone aria-hidden="true" size={24} /><h3>No announcements yet</h3><p>Create a draft when attendees need an event-feed update.</p></div>
+              <div className="empty-state panel"><Megaphone aria-hidden="true" size={24} /><h3>No announcements yet</h3><p>Create a draft when attendees need an event-feed update.</p><EventSetupHelp context="announcements" id="announcements-none" /></div>
             )}
           </section>
           <aside className="panel audience-panel">
@@ -1636,7 +1659,7 @@ export function CommunicationsWorkspace({
               <article>
                 <span className="message-stat-icon gold"><WalletCards size={18} aria-hidden="true" /></span>
                 <small>Total balance</small>
-                <strong>{formatCents(messaging.reminderPreview.totalBalanceCents)}</strong>
+                <strong><Money cents={messaging.reminderPreview.totalBalanceCents} /></strong>
               </article>
               <article>
                 <span className="message-stat-icon purple"><AlertTriangle size={18} aria-hidden="true" /></span>
@@ -1681,7 +1704,7 @@ export function CommunicationsWorkspace({
                       <td>{recipient.recipientName}</td>
                       <td>{recipient.confirmationCode}</td>
                       <td>{recipient.recipientEmail}</td>
-                      <td>{formatCents(recipient.balanceCents)}</td>
+                      <td><Money cents={recipient.balanceCents} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -1728,7 +1751,7 @@ export function CommunicationsWorkspace({
                 onChange={(event) => setReminderConfirmed(event.target.checked)}
               />
               <span>
-                <strong>I reviewed all {messaging.reminderPreview.includedCount} recipient{messaging.reminderPreview.includedCount === 1 ? "" : "s"} and the total balance of {formatCents(messaging.reminderPreview.totalBalanceCents)}.</strong>
+                <strong>I reviewed all {messaging.reminderPreview.includedCount} recipient{messaging.reminderPreview.includedCount === 1 ? "" : "s"} and the total balance of <Money cents={messaging.reminderPreview.totalBalanceCents} />.</strong>
                 <small>
                   I understand this action uses the exact preview above. If a registration, payment, refund, email, template, or sender setting changes, IMSDA Events will stop and require a new review.
                 </small>
@@ -2013,7 +2036,7 @@ export function CommunicationsWorkspace({
                     title: preview.subject || "Template preview",
                     preheader: preview.preheader,
                     bodyHtml: withPreviewImages(preview.bodyHtml),
-                    footer: messaging.settings.senderName,
+                    ...emailPreviewLayout(emailLayoutSettings, selectedTemplate.key, messaging.settings.replyToEmail, "recipient@example.org"),
                   })}
                 />
                 <div className="message-preview-attachments">
@@ -2259,13 +2282,23 @@ export function CommunicationsWorkspace({
                           // the text here would re-parse registrant values as Markdown
                           // long after the safe render already decided they were not.
                           bodyHtml: withPreviewImages(withPreviewLinks(selectedMessage.bodyHtml)),
-                          footer: selectedMessage.senderName,
+                          ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
                         })}
                       />
                     ) : (
-                      <p className="message-body-note">
-                        This message was captured before formatted bodies existed, so it has a plain-text body only.
-                      </p>
+                      <iframe
+                        className="message-body-html"
+                        title="Captured message"
+                        sandbox=""
+                        // Written from the text as plain paragraphs, as delivery does. The preview's stand-in manage link counts
+                        // as the site's own address, so the same lines become buttons here as in the sent email.
+                        srcDoc={renderEmailHtmlDocument({
+                          title: selectedMessage.subject,
+                          preheader: selectedMessage.preheader ? withPreviewLinks(selectedMessage.preheader) : null,
+                          bodyHtml: plainTextToEmailBodyHtml(withPreviewLinks(selectedMessage.bodyText), { buttonOrigins: PREVIEW_ORIGINS }),
+                          ...emailPreviewLayout(emailLayoutSettings, selectedMessage.templateKey, selectedMessage.replyToEmail ?? null, selectedMessage.recipientEmail, selectedMessage.clubLinked),
+                        })}
+                      />
                     )}
                     <details className="message-body-plain">
                       <summary>Plain-text fallback</summary>
@@ -2421,6 +2454,7 @@ export function CommunicationsWorkspace({
             <h2>{messaging.settings.providerConfigured ? "Email provider is configured" : "Real email is locked"}</h2>
             <p>{messaging.settings.providerConfigured ? "Real delivery is on for every event unless a system administrator pauses it. Local template tests remain previews." : "Local preview exercises rendering, outbox idempotency, attempts, and staff review without transmitting attendee data."}</p>
             <ul><li>Provider API: {messaging.settings.providerConfigured ? "configured" : "not configured"}</li><li>Delivery webhook: {messaging.settings.webhookConfigured ? "configured" : "not configured"}</li><li>Registration commits before processing</li><li>Retries preserve the original message snapshot</li></ul>
+            {!messaging.settings.providerConfigured ? <EventSetupHelp context="email delivery" id="email-provider-locked" /> : !messaging.settings.webhookConfigured ? <EventSetupHelp context="the email delivery webhook" id="email-webhook-missing" /> : null}
           </aside>
         </div>
         </ViewPanel>

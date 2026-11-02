@@ -56,10 +56,10 @@ describe("one announcement per search (#1013 review)", () => {
     expect(page).not.toMatch(/public-manage-empty" role="status">\{query \?/);
   });
 
-  it("clears a pending search when Clear is clicked", async () => {
+  it("clears a pending search when Clear filters is clicked", async () => {
     const { readFileSync } = await import("node:fs");
     const form = readFileSync("components/area-club-search-form.tsx", "utf8");
-    expect(form).toMatch(/>Clear<\/Link>/);
-    expect(form).toMatch(/onClick=\{cancel\}>Clear<\/Link>/);
+    expect(form).toMatch(/>Clear filters<\/Link>/);
+    expect(form).toMatch(/onClick=\{cancel\}>Clear filters<\/Link>/);
   });
 });

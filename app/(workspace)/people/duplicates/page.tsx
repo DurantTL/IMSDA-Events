@@ -1,3 +1,4 @@
+import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -17,6 +18,7 @@ import {
   type DuplicateMatchConfidence,
 } from "@/modules/registrations/duplicate-detection";
 import { listRegistrations } from "@/modules/registrations/repository";
+import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 export const metadata: Metadata = { title: "Duplicate finder" };
 
@@ -44,6 +46,7 @@ export default async function DuplicateFinderPage({
       <AccessRestricted
         title="The duplicate finder is restricted"
         detail="Reviewing possible duplicates means reading attendee names and contact details, which your event role does not include."
+        whoToAsk="your event administrator"
       />
     );
   }
@@ -127,7 +130,7 @@ export default async function DuplicateFinderPage({
                     <span>
                       <strong>{member.name}</strong>
                       <small>
-                        {member.confirmationCode} · {member.registrationStatus.toLowerCase()} · {member.attendeeType.toLowerCase()}
+                        {member.confirmationCode} · {registrationStatusWordOrRaw(member.registrationStatus)} · {member.attendeeType.toLowerCase()}
                         {member.checkedIn ? " · checked in" : ""}
                         {member.balanceCents > 0 ? ` · ${formatCents(member.balanceCents)} due` : ""}
                       </small>
@@ -175,7 +178,7 @@ export default async function DuplicateFinderPage({
                     <span>
                       <strong>{member.confirmationCode}</strong>
                       <small>
-                        {member.status.toLowerCase()} · {member.attendeeCount} {member.attendeeCount === 1 ? "person" : "people"} · {formatCents(member.totalAmountCents)} total · {formatCents(member.balanceCents)} due
+                        {registrationStatusWordOrRaw(member.status)} · {member.attendeeCount} {member.attendeeCount === 1 ? "person" : "people"} · <Money cents={member.totalAmountCents} /> total · <Money cents={member.balanceCents} /> due
                       </small>
                       <small className="duplicate-contact">
                         {member.email && <span><Mail aria-hidden="true" size={12} /> {member.email}</span>}

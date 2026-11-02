@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, UsersRound } from "lucide-react";
 import type { TeamSettings } from "@/modules/club-teams/domain";
+import { savedMessage } from "@/components/form-message";
 
 type Draft = {
   allowMultipleTeams: boolean;
@@ -83,7 +84,7 @@ export function EventTeamSettingsPanel({ eventId, initialSettings }: { eventId: 
         return;
       }
       setDraft(draftFrom(result.teamSettings ?? null));
-      setNotice("Team rules saved.");
+      setNotice(savedMessage());
     } catch {
       setError("We couldn't reach the server. Nothing was changed.");
     } finally {

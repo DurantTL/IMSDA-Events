@@ -149,7 +149,7 @@ describe("attendee listing CSV", () => {
     const lines = csv.slice(1).trim().split("\r\n");
     expect(lines[0]).toBe('"Confirmation code","Status","Attendee","Type","Group","Church","Meal preference","Dietary needs","Childcare needed","Volunteer","Phone","Account holder","Account holder email"');
     expect(lines).toHaveLength(1 + shown.length);
-    expect(lines[1]).toBe('"WR26-A1","CONFIRMED","Ada Synthetic","Adult","","Test Church","Vegetarian","synthetic: no peanuts","Yes","No","555-0101","Holder A1","A1@example.test"');
+    expect(lines[1]).toBe('"WR26-A1","Confirmed","Ada Synthetic","Adult","","Test Church","Vegetarian","synthetic: no peanuts","Yes","No","555-0101","Holder A1","A1@example.test"');
   });
 
   it("escapes formula-like cells", () => {

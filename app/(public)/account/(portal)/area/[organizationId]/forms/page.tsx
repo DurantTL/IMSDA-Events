@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FileText } from "lucide-react";
@@ -64,6 +65,7 @@ export default async function AreaClubFormsPage({ params }: { params: Promise<{ 
       <p className="field-help">
         Health, conduct, physician, emergency-contact and birth-date answers show as Restricted. Forms the conference has since switched off stay listed.
       </p>
+      {submissions.length === 0 && <CoordinatorSetupHelp context="club forms" id="club-no-forms" />}
       {submissions.length === 0 ? (
         <EmptyState className="empty-state panel" headingLevel={2} icon={<FileText aria-hidden="true" size={26} />} title="No submitted forms">This club has not submitted any forms yet.</EmptyState>
       ) : (
@@ -75,7 +77,7 @@ export default async function AreaClubFormsPage({ params }: { params: Promise<{ 
               {submissions.map((row) => (
                 <tr key={row.id}>
                   <th scope="row">{row.templateName}</th>
-                  <td translate="no">{row.subjectName || "Not named"}</td>
+                  <td translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
                   <td>{formatDate(row.submittedAt)}</td>
                   <td><Link className="secondary-button" href={`/account/area/${organizationId}/forms/${row.id}`}>View</Link></td>
                 </tr>

@@ -3,6 +3,7 @@
 // the draft save (PATCH), so the server's validation, price sync, policy checks
 // and expectedUpdatedAt rule all apply unchanged.
 import type { FormVersionView } from "./builder-types";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type VersionLike = Pick<FormVersionView, "status" | "versionNumber" | "updatedAt" | "publishedAt" | "createdBy">;
 
@@ -18,7 +19,7 @@ export function versionStateLabel(version: VersionLike, versions: Pick<VersionLi
 export function formatVersionDate(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return `${new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(date)} UTC`;
+  return formatInConferenceTime(date, { dateStyle: "medium", timeStyle: "short" });
 }
 
 /** Published versions say when they went live; others say when they were last saved. `createdBy` is whoever last saved it. */

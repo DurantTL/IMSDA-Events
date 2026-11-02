@@ -1,9 +1,11 @@
 "use client";
 
+import { ExactValue } from "@/components/exact-value";
 import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Download, Mail, Printer, RefreshCw, Trophy } from "lucide-react";
 import { TEAM_LEVELS, teamLabel, teamLevelLabels, type TeamLevel, type TeamLevelInfo } from "@/modules/club-teams/domain";
+import { savedMessage } from "@/components/form-message";
 import {
   levelInfoFor,
   levelWhenWhere,
@@ -80,7 +82,7 @@ function LevelEditor({
       }
       onSaved(result.result ?? null);
       setDraft(draftOf(result.result ?? null));
-      setMessage({ kind: "ok", text: result.result ? "Saved." : "Cleared." });
+      setMessage({ kind: "ok", text: result.result ? savedMessage() : "Cleared." });
     } catch {
       setMessage({ kind: "error", text: "We couldn't reach the server. Nothing was changed." });
     } finally {
@@ -192,7 +194,7 @@ function SendNotices({ eventId, toLevel }: { eventId: string; toLevel: TeamLevel
     setBusy(true);
     setMessage(null);
     try {
-      const response = await fetch(`${endpoint}?level=${toLevel}`);
+      const response = await fetch(`${endpoint}?level=${toLevel}`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as NoticePreview & { message?: string };
       if (!response.ok) setMessage({ kind: "error", text: result.message ?? "We couldn't check who is waiting." });
       else setPreview(result);
@@ -334,8 +336,8 @@ export function TeamResultsWorkspace({
             <p className="field-help" translate="no">{row.teamName ? `${row.clubName} · ` : ""}{row.church ?? "No church on file"} · {row.confirmationCode}{row.locationName ? ` · Area: ${row.locationName}` : ""}</p>
             {row.permissionsPending > 0 && <p className="inline-notice warning" role="status"><strong>{row.permissionsPending} team {row.permissionsPending === 1 ? "member is" : "members are"} waiting for the Area Coordinator&apos;s approval.</strong></p>}
             {people && level !== "AREA" && (
-              <p className="field-help" translate="no">
-                Members: {people.members.join(", ") || "none"}{people.alternate ? ` · Alternate: ${people.alternate}` : ""} · Coaches: {people.coaches.join(", ") || "none"}
+              <p className="field-help">
+                Members: {people.members.length > 0 ? <ExactValue>{people.members.join(", ")}</ExactValue> : "none"}{people.alternate ? <> · Alternate: <ExactValue>{people.alternate}</ExactValue></> : ""} · Coaches: {people.coaches.length > 0 ? <ExactValue>{people.coaches.join(", ")}</ExactValue> : "none"}
               </p>
             )}
             <p><Link className="text-button" href={`/more/reports/clubs/team-form/${encodeURIComponent(row.clubEventRegistrationId)}?${eventQuery}`}>Print this team&apos;s form</Link></p>

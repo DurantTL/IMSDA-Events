@@ -66,7 +66,7 @@ export function clubFormSubmittedContent(input: { formName: string; clubName: st
       `Form: ${formName}`,
       `Club: ${clubName}`,
       `Submitted by: ${input.submitterName ? neutralizePlaceholders(input.submitterName) : input.openApplication ? "an applicant using the public application link" : "someone with the club's private link"}`,
-      `When: ${when} (Central Time)`,
+      `When: ${when}`,
       "",
       "Open it (sign-in required):",
       staffLink(input.submissionId),

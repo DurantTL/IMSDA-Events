@@ -17,6 +17,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import { logError } from "@/lib/logger";
 import { countPublicMetric } from "@/modules/public-metrics/record";
 import { withRequestContext } from "@/lib/request-context";
+import { emailFromRegistrationResponses } from "@/modules/security/fallback-email";
 import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 
 const maximumBodyBytes = 512 * 1024;
@@ -124,7 +125,10 @@ async function postHandler(request: Request, context: { params: Promise<{ eventS
         ), rateLimit);
       }
     }
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.registration });
+    const securityCheckFailure = await requireTurnstile(request, {
+      action: TURNSTILE_ACTIONS.registration,
+      fallback: { kind: "public-form", email: emailFromRegistrationResponses(input.responses) },
+    });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
     let confirmation;
     try {
