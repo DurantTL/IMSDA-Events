@@ -631,12 +631,114 @@ jobs:
         if: failure()
         run: cat app.log || true
 
+  # The attendee and event staff journeys (#1439 round 2) in a real browser (Chromium). Attendee: create an account with the
+  # Security check blocked, register with a promo code and pay by card, manage the registration, ask to cancel and have staff
+  # approve it. Event staff (stamped synthetic staff users with minted sessions): create an event from a template, the publish
+  # checklist, the form builder test, the attendee list and its CSV, check-in, a scheduled email, the no-access state. System
+  # administrator journeys are round 3. One leg
+  # per width (1280 and 390 px) so each stays well under the time limit; each leg builds the app and starts it against its own
+  # migrated and seeded database. Two copies of the built app run on that one database: port 3000 without the Security
+  # check, and port 3002 with Cloudflare's published always-pass test keys (the journey blocks challenges.cloudflare.com in the
+  # browser, so the Security check cannot load and "Email me a code instead" is what gets the person through). Both send email
+  # to the suite's dev outbox on port 3999 and carry the fictitious Square values (the card step then shows Square's form or its
+  # fallback; nothing is charged). Failures that are the site's fault are listed in KNOWN_BUGS in the suite and do not fail it
+  # until they are fixed (then it fails until the entry is removed). See scripts/verify-event-journeys.ts.
+  event-journeys:
+    name: Event journeys (real browser, ${{ matrix.shard }})
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [desktop, phone]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: imsda_events
+          POSTGRES_USER: imsda
+          POSTGRES_PASSWORD: imsda_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U imsda -d imsda_events"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
+      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run db:seed
+      - run: npm run club-forms:sync
+      # The lodging property templates are code data synced after migrations (#198).
+      - run: npm run lodging:sync
+      # The form templates are synced after migrations; a template edited in the app is never overwritten (#153, #1064).
+      - run: npm run form-templates:sync
+      # The seeded event content (Camp Meeting meal and cancellation presets) is synced after migrations (#919).
+      - run: npm run event-content:sync
+      - run: npm run build
+      # Playwright is deliberately not a dependency; `--no-save` keeps the lockfile untouched.
+      - run: npm i --no-save playwright@1.63.0
+      - run: npx playwright install --with-deps chromium
+      # Fictitious CI-only values for production mode: the same block as the "club-journeys" job (keep them in step), plus the
+      # fictitious Square values from browser-privacy.yml. The second app has the Security check on with Cloudflare's published
+      # test keys (the same ones browser-privacy.yml uses).
+      - name: Start the built apps
+        env:
+          MANAGE_LINK_DERIVATION_SECRET: ci-only-manage-link-derivation-secret-0000000
+          ATTENDEE_PASS_SIGNING_SECRET: ci-only-attendee-pass-signing-secret-000000
+          RATE_LIMIT_HASH_SECRET: ci-only-rate-limit-hash-secret-0000000000
+          OUTBOX_SWEEP_TOKEN: ci-only-outbox-sweep-token-000000000000
+          SECRET_ENCRYPTION_KEY: ci-only-secret-encryption-key-00000000000
+          ACCOUNT_EMAIL_SENDER_ADDRESS: events@ci.example.test
+          RESEND_API_KEY: ci-placeholder-never-sent
+          RESEND_API_URL: http://127.0.0.1:3999
+          SQUARE_ENVIRONMENT: sandbox
+          SQUARE_APPLICATION_ID: sandbox-sq0idb-synthetic
+          SQUARE_LOCATION_ID: LSYNTHETIC
+          SQUARE_ACCESS_TOKEN: synthetic-token-never-used
+          SQUARE_WEBHOOK_SIGNATURE_KEY: synthetic-signature-key-0000
+          SQUARE_WEBHOOK_NOTIFICATION_URL: https://events.example.test/api/webhooks/square
+        run: |
+          nohup npm run start -- -p 3000 > app.log 2>&1 &
+          # Cloudflare's published test keys: the widget loads and answers with a dummy token (the journey blocks it on purpose).
+          APP_BASE_URL=http://localhost:3002 TURNSTILE_SITE_KEY=1x00000000000000000000AA TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA TURNSTILE_ALLOWED_HOSTNAMES=localhost nohup npm run start -- -p 3002 > app-turnstile.log 2>&1 &
+          for port in 3000 3002; do
+            for attempt in $(seq 1 60); do
+              if curl -fsS -o /dev/null http://localhost:$port/; then break; fi
+              sleep 2
+              if [ "$attempt" = "60" ]; then echo "The app on port $port did not start:" && cat app.log app-turnstile.log && exit 1; fi
+            done
+          done
+      - name: Event journeys at ${{ matrix.shard == 'desktop' && '1280' || '390' }} px wide
+        env:
+          JOURNEY_SHARD: ${{ matrix.shard }}
+          JOURNEY_BASE_URL: http://localhost:3000
+          JOURNEY_TURNSTILE_BASE_URL: http://localhost:3002
+        run: npm run test:event-journeys
+      - name: Show the app logs when a check failed
+        if: failure()
+        run: |
+          cat app.log || true
+          cat app-turnstile.log || true
+
   # The required check (branch protection and the Claude tooling look for this
   # name): green only when `npm run verify` and every shard passed. The shards
   # may be skipped only when the scope job decided this change does not need them.
   verify:
     if: ${{ !cancelled() && github.event_name != 'push' }}
-    needs: [scope, verify-app, db-scripts-1, db-scripts-2, http-scripts, club-journeys]
+    needs: [scope, verify-app, db-scripts-1, db-scripts-2, http-scripts, club-journeys, event-journeys]
     runs-on: ubuntu-latest
     steps:
       - name: Check every job passed

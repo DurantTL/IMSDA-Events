@@ -690,6 +690,14 @@ async function main() {
   await resetSignInBudgets(prisma);
   const mail = new FakeMailServer();
   await mail.start();
+  try {
+    // Fail fast unless the app's email really lands in this suite's outbox (scripts/support/fake-mail-server.ts).
+    await mail.assertAppMailReachesOutbox(J.baseUrl);
+  } catch (error) {
+    await mail.stop();
+    await prisma.$disconnect();
+    throw error;
+  }
   const settings = await prisma.platformSettings.findUnique({ where: { id: "platform" }, select: { passkeyRpId: true } });
   await prisma.platformSettings.upsert({ where: { id: "platform" }, update: { passkeyRpId: "localhost" }, create: { id: "platform", passkeyRpId: "localhost" } });
   const summaries: string[] = [];

@@ -47,3 +47,21 @@ export const STRICT_STORAGE_INIT_SCRIPT = `
   try { Object.defineProperty(window, "indexedDB", { configurable: true, get: deny }); } catch (e) {}
 })();
 `;
+
+/**
+ * Makes the shared price function throw in the page, the way a broken or blocked script would (P1): the page must say the
+ * total is calculated when it is submitted, and the amount recorded and charged is still the server's. Used by
+ * `scripts/verify-privacy-browsers.ts` and the event journeys.
+ */
+export const PREVIEW_FAILS_INIT_SCRIPT = `
+(() => {
+  const original = Array.prototype.reduce;
+  Array.prototype.reduce = function (callback, ...rest) {
+    if (typeof callback === "function" && /Math\\.max\\([^)]*amountCents/.test(Function.prototype.toString.call(callback))) {
+      window.__previewThrew = true;
+      throw new Error("The price preview failed (injected by the privacy-browser check).");
+    }
+    return original.call(this, callback, ...rest);
+  };
+})();
+`;

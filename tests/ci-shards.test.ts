@@ -28,7 +28,7 @@ const NOT_IN_CI = new Set([
   "test:custom-message", // not in ci.yml before the shards (#1233)
 ]);
 
-const SHARD_JOB = /^(db-scripts-\d+|http-scripts|club-journeys)$/;
+const SHARD_JOB = /^(db-scripts-\d+|http-scripts|club-journeys|event-journeys)$/;
 
 type Job = { id: string; lines: string[] };
 
@@ -75,7 +75,7 @@ describe("CI database-script shards (#1233)", () => {
       .filter((name) => !NOT_IN_CI.has(name))
       .sort();
     expect([...placements.keys()].sort()).toEqual(expected);
-    expect(expected).toHaveLength(98);
+    expect(expected).toHaveLength(99);
   });
 
   it("keeps the scripts that need the app in the shard that starts it", () => {

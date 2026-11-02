@@ -37,6 +37,7 @@ export class FakeMailServer {
   readonly messages: CapturedMessage[] = [];
   private server: Server | null = null;
   private sequence = 0;
+  private readonly runId = `${process.pid.toString(36)}${Date.now().toString(36)}`;
   private sweepNudged = new Set<string>();
 
   constructor(port = Number(process.env.JOURNEY_MAIL_PORT ?? 3999), private readonly appUrl = (process.env.JOURNEY_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "")) {
@@ -56,7 +57,8 @@ export class FakeMailServer {
         }
         let parsed: { from?: string; to?: string[] | string; subject?: string; text?: string; html?: string } = {};
         try { parsed = JSON.parse(body || "{}"); } catch { /* an empty message is still recorded */ }
-        const id = `journey-mail-${++this.sequence}`;
+        // Unique per run: the app stores this as the message's provider id, which must not repeat across runs on one database.
+        const id = `journey-mail-${this.runId}-${++this.sequence}`;
         this.messages.push({
           id, from: parsed.from ?? "", to: (Array.isArray(parsed.to) ? parsed.to : [parsed.to ?? ""]).map((address) => address.toLowerCase()),
           subject: parsed.subject ?? "", text: parsed.text ?? "", html: parsed.html ?? "", receivedAt: Date.now(),
@@ -89,14 +91,16 @@ export class FakeMailServer {
   private async nudgeSweep(key: string) {
     if (this.sweepNudged.has(key)) return;
     this.sweepNudged.add(key);
-    try {
-      await fetch(`${this.appUrl}/api/internal/outbox/sweep`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${process.env.OUTBOX_SWEEP_TOKEN ?? defaultSweepToken}` },
-        signal: AbortSignal.timeout(60_000),
-      });
-    } catch {
-      // No token, or the sweep is busy: the wait below simply continues.
+    // OUTBOX_SWEEP_TOKEN from the environment, then the CI value: a local .env can carry a different token than the apps under test.
+    const tokens = [...new Set([process.env.OUTBOX_SWEEP_TOKEN, defaultSweepToken].filter((value): value is string => Boolean(value)))];
+    for (const token of tokens) {
+      try {
+        const response = await fetch(`${this.appUrl}/api/internal/outbox/sweep`, { method: "POST", headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60_000) });
+        if (response.status !== 401 && response.status !== 403) return;
+      } catch {
+        // The sweep is busy: the wait continues.
+        return;
+      }
     }
   }
 
@@ -132,5 +136,40 @@ export class FakeMailServer {
     const code = pattern.exec(message.text);
     if (!code) throw new Error(`The message "${message.subject}" has no six-digit code.`);
     return `${code[1]}${code[2]}`;
+  }
+
+  /** Like `waitForCode`, for the message whose subject matches (sign-up verification, security code, edit code). */
+  async waitForCodeWithSubject(to: string, subject: RegExp, options: { since: number; timeoutMs?: number }): Promise<string> {
+    const pattern = /\b(\d{3}) ?(\d{3})\b/;
+    const message = await this.waitForMessage(to, (candidate) => subject.test(candidate.subject) && pattern.test(candidate.text), options);
+    const code = pattern.exec(message.text);
+    if (!code) throw new Error(`The message "${message.subject}" has no six-digit code.`);
+    return `${code[1]}${code[2]}`;
+  }
+
+  /**
+   * Local-only proof that the app under test really sends its email here, so a suite never waits on mail that went nowhere (or, worse,
+   * to a real mailbox): asks the app for one emailed security code for a made-up address and requires it to arrive in this outbox.
+   */
+  async assertAppMailReachesOutbox(appUrl: string = this.appUrl) {
+    const address = `journeyevt.mailprobe.${Date.now().toString(36)}@example.test`;
+    const since = Date.now() - 1_000;
+    const fix = `Start the app under test with RESEND_API_KEY=ci-placeholder-never-sent RESEND_API_URL=http://127.0.0.1:${this.port} ACCOUNT_EMAIL_SENDER_ADDRESS=events@ci.example.test (and JOURNEY_MAIL_PORT=${this.port} here), as the header of the suite says.`;
+    let status = 0;
+    try {
+      const response = await fetch(`${appUrl}/api/security-check/email-code`, {
+        method: "POST", headers: { "content-type": "application/json", origin: appUrl },
+        body: JSON.stringify({ action: "attendee-sign-up", email: address, website: "" }), signal: AbortSignal.timeout(30_000),
+      });
+      status = response.status;
+    } catch (error) {
+      throw new Error(`The app at ${appUrl} did not answer the mail check (${(error as Error).message}). Is it running?`);
+    }
+    if (status !== 202) throw new Error(`The app at ${appUrl} refused the mail check with status ${status}. ${fix}`);
+    try {
+      await this.waitForMessage(address, /security code/i, { since, timeoutMs: 30_000 });
+    } catch {
+      throw new Error(`The app at ${appUrl} did not send its email to the dev outbox on port ${this.port}, so no sign-in or verification code could be read. ${fix}`);
+    }
   }
 }

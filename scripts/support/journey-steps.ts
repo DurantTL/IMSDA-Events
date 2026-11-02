@@ -44,13 +44,31 @@ export async function submitPassword(page: Page, input: { email: string; passwor
   return sentAfter;
 }
 
-/** Reads the emailed code from the outbox and enters it on the "Check your email" page. */
+/**
+ * Reads the emailed code from the outbox and enters it on the "Check your email" page.
+ *
+ * Reusable: the emailed sign-in code steps (`submitPassword`, `enterEmailedCode`, `signInWithEmailedCode`) are for any account
+ * that has club or staff roles and no two-step yet (rule A2). A plain attendee account keeps the password-only sign-in, so the
+ * event journeys (scripts/verify-event-journeys.ts) use `enterSignUpVerificationCode` below for the code a new account is sent.
+ */
 export async function enterEmailedCode(page: Page, mail: FakeMailServer, input: { email: string; since: number }) {
   await expectHeading(page, /Check your email/);
   const code = await mail.waitForCode(input.email, { since: input.since });
   await page.getByLabel("Sign-in code").fill(code);
   await page.getByRole("button", { name: exactly("Sign in") }).click();
   await page.waitForURL((url: URL) => !/\/account\/sign-in\/code/.test(url.pathname), { timeout: SLOW });
+  return code;
+}
+
+/**
+ * The verification code an account is emailed when it is created ("Six-digit code", "Verify and continue"): reads it from the
+ * outbox (subject "verification code"), enters it, and waits until the person is signed in. Reusable by any suite that creates an account.
+ */
+export async function enterSignUpVerificationCode(page: Page, mail: FakeMailServer, input: { email: string; since: number }) {
+  const code = await mail.waitForCodeWithSubject(input.email, /verification code/i, { since: input.since });
+  await page.getByLabel(/^(\[es\] )?Six-digit code/).fill(code);
+  await page.getByRole("button", { name: /Verify and continue/ }).click();
+  await page.waitForURL((url: URL) => url.pathname === "/account", { timeout: SLOW });
   return code;
 }
 
