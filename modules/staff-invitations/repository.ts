@@ -48,6 +48,19 @@ import { invitationIdFromToken, invitationToken, invitationTokenMatches } from "
 import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { isLooseEmail } from "@/lib/field-validation";
 import { formatPersonName } from "@/lib/person-name";
+import { clampPage } from "@/lib/pagination";
+import { segmentWindows } from "@/lib/segment-window";
+import {
+  buildInvitationWhere,
+  INVITATION_BULK_LIMIT,
+  INVITATION_DEFAULT_SORT,
+  INVITATION_PAGE_SIZE,
+  invitationOrderBy,
+  invitationStatusSortOrder,
+  invitationStatusWhere,
+  type InvitationListFilters,
+  type InvitationListQuery,
+} from "@/modules/staff-invitations/list-query";
 
 type Tx = Prisma.TransactionClient;
 
@@ -280,37 +293,86 @@ export type InvitationListRow = {
 };
 
 const LIST_LIMIT = 2000;
+const DEFAULT_INVITATION_QUERY: InvitationListQuery = { filters: { status: "ALL", group: "ALL", search: "" }, sort: INVITATION_DEFAULT_SORT, page: 1 };
 
-export async function listInvitations(eventId: string) {
+function serializeInvitationRow(row: Prisma.StaffInvitationGetPayload<{ select: typeof listSelect }>): InvitationListRow {
+  const status = invitationStatus({ revokedAt: row.revokedAt, registeredAt: row.registeredAt, approval: row.approval, sentAt: row.sentAt, message: row.lastMessage });
+  return {
+    id: row.id,
+    email: row.email,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    group: row.group,
+    status,
+    sentAt: row.sentAt?.toISOString() ?? null,
+    sendCount: row.sendCount,
+    registeredAt: row.registeredAt?.toISOString() ?? null,
+    confirmationCode: row.registration?.confirmationCode ?? null,
+    usable: invitationUsable(row),
+    reissuable: !row.registeredAt,
+    reinvitable: invitationReinvitable(row),
+    deliveryNote: status === "DELIVERY_FAILED" ? (row.lastMessage?.lastError?.slice(0, 200) ?? "The email did not reach this address.") : null,
+  };
+}
+
+/**
+ * One page of the event's invitations, searched, filtered and ordered in the database (#1492). `counts` are the whole event's
+ * invitations by status (the filter's own options); `total` is how many match the filters, across every page.
+ */
+export async function listInvitations(eventId: string, query: InvitationListQuery = DEFAULT_INVITATION_QUERY) {
   await requireEvent(getPrisma(), eventId);
-  const rows = await getPrisma().staffInvitation.findMany({
-    // A person who was re-invited is listed once, by the new invitation; the old one stays in the approval list as history.
-    where: { eventId, supersededAt: null },
-    orderBy: [{ group: "asc" }, { lastName: "asc" }, { firstName: "asc" }, { email: "asc" }],
-    take: LIST_LIMIT,
-    select: listSelect,
-  });
-  const list: InvitationListRow[] = rows.map((row) => {
-    const status = invitationStatus({ revokedAt: row.revokedAt, registeredAt: row.registeredAt, approval: row.approval, sentAt: row.sentAt, message: row.lastMessage });
-    return {
-      id: row.id,
-      email: row.email,
-      firstName: row.firstName,
-      lastName: row.lastName,
-      group: row.group,
-      status,
-      sentAt: row.sentAt?.toISOString() ?? null,
-      sendCount: row.sendCount,
-      registeredAt: row.registeredAt?.toISOString() ?? null,
-      confirmationCode: row.registration?.confirmationCode ?? null,
-      usable: invitationUsable(row),
-      reissuable: !row.registeredAt,
-      reinvitable: invitationReinvitable(row),
-      deliveryNote: status === "DELIVERY_FAILED" ? (row.lastMessage?.lastError?.slice(0, 200) ?? "The email did not reach this address.") : null,
-    };
-  });
-  const counts = Object.fromEntries(INVITATION_STATUSES.map((status) => [status, list.filter((row) => row.status === status).length])) as Record<InvitationStatus, number>;
-  return { rows: list, counts, truncated: rows.length >= LIST_LIMIT };
+  const prisma = getPrisma();
+  const where = buildInvitationWhere(eventId, query.filters) as Prisma.StaffInvitationWhereInput;
+  const eventWhere = { eventId, supersededAt: null };
+  const [total, ...statusCounts] = await Promise.all([
+    prisma.staffInvitation.count({ where }),
+    ...INVITATION_STATUSES.map((status) => prisma.staffInvitation.count({ where: { ...eventWhere, ...invitationStatusWhere(status) } as Prisma.StaffInvitationWhereInput })),
+  ]);
+  const counts = Object.fromEntries(INVITATION_STATUSES.map((status, index) => [status, statusCounts[index] ?? 0])) as Record<InvitationStatus, number>;
+  const page = clampPage(query.page, total, INVITATION_PAGE_SIZE);
+  const skip = (page - 1) * INVITATION_PAGE_SIZE;
+  let rows;
+  if (query.sort.key === "status") {
+    // A status is worked out from several columns, so the status order is a window over one query per status (#1492).
+    const statuses = invitationStatusSortOrder(query.sort.dir).filter((status) => query.filters.status === "ALL" || status === query.filters.status);
+    const runs = statuses.map((status) => buildInvitationWhere(eventId, { ...query.filters, status }) as Prisma.StaffInvitationWhereInput);
+    const runCounts = await Promise.all(runs.map((runWhere) => prisma.staffInvitation.count({ where: runWhere })));
+    const orderBy = invitationOrderBy(query.sort).map((order) => ({ ...order })) as Prisma.StaffInvitationOrderByWithRelationInput[];
+    const parts = await Promise.all(segmentWindows(runCounts, skip, INVITATION_PAGE_SIZE).map((window) => prisma.staffInvitation.findMany({
+      where: runs[window.segment]!, orderBy, skip: window.skip, take: window.take, select: listSelect,
+    })));
+    rows = parts.flat();
+  } else {
+    rows = await prisma.staffInvitation.findMany({
+      where,
+      orderBy: invitationOrderBy(query.sort).map((order) => ({ ...order })) as Prisma.StaffInvitationOrderByWithRelationInput[],
+      skip,
+      take: INVITATION_PAGE_SIZE,
+      select: listSelect,
+    });
+  }
+  return {
+    rows: rows.map(serializeInvitationRow),
+    counts,
+    total,
+    page,
+    pageSize: INVITATION_PAGE_SIZE,
+    totalAll: statusCounts.reduce((sum, count) => sum + count, 0),
+  };
+}
+
+/**
+ * The ids behind "Select all N matching": every invitation of this event the filters match, across all pages, up to the
+ * most one Send or Revoke takes. The event is part of the clause, so another event's invitations can never be returned.
+ * Past the limit only the count comes back.
+ */
+export async function listMatchingInvitationIds(eventId: string, filters: InvitationListFilters) {
+  await requireEvent(getPrisma(), eventId);
+  const where = buildInvitationWhere(eventId, filters) as Prisma.StaffInvitationWhereInput;
+  const total = await getPrisma().staffInvitation.count({ where });
+  if (total > INVITATION_BULK_LIMIT) return { ids: [] as string[], total, limit: INVITATION_BULK_LIMIT };
+  const rows = await getPrisma().staffInvitation.findMany({ where, select: { id: true }, orderBy: invitationOrderBy(INVITATION_DEFAULT_SORT).map((order) => ({ ...order })) as Prisma.StaffInvitationOrderByWithRelationInput[] });
+  return { ids: rows.map((row) => row.id), total, limit: INVITATION_BULK_LIMIT };
 }
 
 async function invitationsById(tx: Tx | ReturnType<typeof getPrisma>, eventId: string, ids: readonly string[]) {

@@ -10,7 +10,11 @@
  *   feed and published, and a bulk hide survives the sync;
  * - the 500-entry cap: 500 are changed in one request, 501 are refused;
  * - a refresh keeps a bulk-set category, with no `locallyEditedFields` mark;
- * - one summary audit row lists the changed ids.
+ * - one summary audit row lists the changed ids;
+ * - the Entries list is paged, searched and ordered in the database (#1492): every row is on exactly one page, a page
+ *   past the end is clamped, "Select all N matching" finds every matching id across pages (and only the count past the
+ *   bulk limit), the category order puts no-category rows last across a page boundary, and a repeating entry that began
+ *   in the past stays "Upcoming" while a series that ended is "Past".
  *
  *   npm run test:calendar-bulk
  */
@@ -180,6 +184,51 @@ async function main() {
   assert(big.result.changed === 500, `500 entries were changed in one request (got ${big.result.changed})`);
   const live = await prisma.calendarEntry.count({ where: { id: { in: manyIds.slice(0, 500) }, isPublished: true } });
   assert(live === 500 && !(await prisma.calendarEntry.findUniqueOrThrow({ where: { id: manyIds[500] } })).isPublished, "exactly the 500 asked for were published");
+
+  // 8. The list is paged in the database (#1492).
+  const { listCalendarEntryPage, listMatchingCalendarEntryIds } = await import("@/modules/calendar/repository");
+  const { defaultEntryFilters, maxBulkEntries } = await import("@/modules/calendar/admin-list");
+  const { serializeRepeatRule } = await import("@/modules/calendar/recurrence");
+  const asOf = new Date("2026-11-02T18:00:00Z");
+  const query = (patch: Partial<typeof defaultEntryFilters>, sort: "date" | "title" | "category" = "title", page = 1) => ({ filters: { ...defaultEntryFilters, time: "all" as const, ...patch }, sort, page });
+  const first = await listCalendarEntryPage(query({ search: "Bulk " }), asOf);
+  assert(first.total === 501 && first.entries.length === 50 && first.pageSize === 50, `page 1 of 501 matching entries holds 50 (got total ${first.total}, ${first.entries.length} rows)`);
+  const seen = new Set<string>();
+  for (let page = 1; page <= 11; page += 1) {
+    const result = await listCalendarEntryPage(query({ search: "Bulk " }, "title", page), asOf);
+    assert(result.entries.length === (page === 11 ? 1 : 50), `page ${page} holds ${page === 11 ? 1 : 50} rows (got ${result.entries.length})`);
+    for (const entry of result.entries) seen.add(entry.id);
+  }
+  assert(seen.size === 501, `every matching entry is on exactly one page (saw ${seen.size})`);
+  const beyond = await listCalendarEntryPage(query({ search: "Bulk " }, "title", 99), asOf);
+  assert(beyond.page === 11 && beyond.entries.length === 1, "a page past the end is clamped to the last page");
+  const over = await listMatchingCalendarEntryIds(query({ search: "Bulk " }).filters, asOf);
+  assert(over.total === 501 && over.ids.length === 0 && over.limit === maxBulkEntries, "past the bulk limit only the count comes back");
+  const narrow = await listMatchingCalendarEntryIds(query({ search: "Bulk 1" }).filters, asOf);
+  assert(narrow.total === 111 && narrow.ids.length === 111 && new Set(narrow.ids).size === 111, "Select all N matching returns every matching id, across pages");
+  const narrowPage = await listCalendarEntryPage(query({ search: "Bulk 1" }), asOf);
+  assert(narrowPage.total === 111 && narrowPage.entries.every((entry) => narrow.ids.includes(entry.id)), "the list and the selection use the same filter");
+
+  // The category order puts no-category rows last, even when a page spans both runs.
+  await bulk(manyIds.slice(0, 60), { action: "setCategory", category: "Zed" });
+  const withCategory = await listCalendarEntryPage(query({ search: "Bulk " }, "category", 2), asOf);
+  assert(withCategory.entries.slice(0, 10).every((entry) => entry.category === "Zed") && withCategory.entries.slice(10).every((entry) => entry.category === ""), "page 2 of the category order is ten Zed rows, then rows with no category");
+  const categorySeen = new Set<string>();
+  for (let page = 1; page <= 11; page += 1) for (const entry of (await listCalendarEntryPage(query({ search: "Bulk " }, "category", page), asOf)).entries) categorySeen.add(entry.id);
+  assert(categorySeen.size === 501, "the category order also puts every entry on exactly one page");
+  assert((await listCalendarEntryPage(query({ search: "Bulk ", category: "Zed" }), asOf)).total === 60, "the category filter counts in the database");
+
+  // A repeating entry that began in the past is still upcoming; a series that has ended is past.
+  const weekly = { frequency: "WEEKLY" as const, interval: 1, weekdays: [], weekStart: 0 as const, until: null, count: null };
+  await prisma.calendarEntry.createMany({ data: [
+    { id: `${P}_series_open`, title: "Cbulk Series open", startsOn: "2026-01-05", endsOn: "2026-01-05", repeatRule: serializeRepeatRule(weekly), createdByUserId: userId, updatedByUserId: userId },
+    { id: `${P}_series_ended`, title: "Cbulk Series ended", startsOn: "2026-01-05", endsOn: "2026-01-05", repeatRule: serializeRepeatRule({ ...weekly, until: "2026-02-01" }), createdByUserId: userId, updatedByUserId: userId },
+    { id: `${P}_one_past`, title: "Cbulk Series single past", startsOn: "2026-01-05", endsOn: "2026-01-05", createdByUserId: userId, updatedByUserId: userId },
+  ] });
+  const upcoming = (await listCalendarEntryPage(query({ search: "Cbulk Series", time: "upcoming" }), asOf)).entries.map((entry) => entry.id);
+  const past = (await listCalendarEntryPage(query({ search: "Cbulk Series", time: "past" }), asOf)).entries.map((entry) => entry.id);
+  assert(upcoming.length === 1 && upcoming[0] === `${P}_series_open`, `only the open-ended series is upcoming (got ${upcoming.join(", ")})`);
+  assert(past.length === 2 && past.includes(`${P}_series_ended`) && past.includes(`${P}_one_past`), `the ended series and the single past entry are past (got ${past.join(", ")})`);
 
   console.log("calendar bulk: all checks passed");
 }

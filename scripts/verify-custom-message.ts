@@ -502,6 +502,53 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
   console.log(`scale: ${SCALE_COUNT} recipients with 1 attachment queued in ${scaleMs} ms (transaction timeout 120000 ms)`);
   assert(scaleMs < 60_000, `the 250-recipient send stays well inside the transaction timeout, took ${scaleMs} ms`);
 
+  // Rows that carry an event id but are not event messages (an invoice email, an account email) are not counted or listed.
+  const strangers = [
+    { key: "INVOICE_DELIVERY", kind: "BILLING_CONTACT" },
+    { key: "INFORMATION_FORM_SUBMITTED", kind: "INTERNAL" },
+    { key: "CUSTOM_MESSAGE", kind: "ACCOUNT" },
+  ] as const;
+  const logBefore = await getMessagingWorkspace(ids.scale);
+  for (const [index, stranger] of strangers.entries()) {
+    await prisma.messageOutbox.create({
+      data: {
+        eventId: ids.scale, templateKey: stranger.key as never, recipientKind: stranger.kind as never, recipientEmail: `${P}-stranger${index}@example.test`,
+        senderNameSnapshot: "IMSDA Events", subjectSnapshot: "Not an event message", bodyTextSnapshot: "x", idempotencyKey: `${P}-stranger-${index}`, correlationId: `${P}-stranger-${index}`,
+        status: "FAILED", createdAt: new Date(Date.now() + 60_000 + index),
+      },
+    });
+  }
+  const logAfter = await getMessagingWorkspace(ids.scale);
+  assert(logAfter.messageLog.total === logBefore.messageLog.total, "rows that are not event messages are not counted in the log total");
+  assert(logAfter.counts.FAILED === logBefore.counts.FAILED, "nor in the status counts");
+  assert(logAfter.messages.every((message) => !message.subject.includes("Not an event message")), "nor listed, and they leave no gap on the page");
+  assert(logAfter.messages.length === 50, "the first page is still full");
+
+  // The delivery log is paged in the database (#1492): 250 messages are all reachable, newest first, from this event only.
+  const logPage = (status: "ALL" | "PENDING" | "CAPTURED" | "SENT" | "FAILED" | "SUPPRESSED" | "CANCELLED", page: number) => getMessagingWorkspace(ids.scale, { status, page });
+  const { buildDeliveryWhere } = await import("../modules/communications/delivery-log-model");
+  const logTotal = await prisma.messageOutbox.count({ where: buildDeliveryWhere(ids.scale) as never });
+  const firstLog = await logPage("ALL", 1);
+  assert(logTotal >= SCALE_COUNT && firstLog.messageLog.total === logTotal && firstLog.messages.length === 50 && firstLog.messageLog.pageSize === 50, "the first log page holds 50 of every message in the event");
+  const seenMessages = new Set<string>();
+  let newest = Infinity;
+  for (let page = 1; page <= Math.ceil(logTotal / 50); page += 1) {
+    for (const message of (await logPage("ALL", page)).messages) {
+      assert(!seenMessages.has(message.id), "no message is on two log pages");
+      seenMessages.add(message.id);
+      const at = new Date(message.createdAt).getTime();
+      assert(at <= newest, "the log runs newest first across page boundaries");
+      newest = at;
+    }
+  }
+  assert(seenMessages.size === logTotal, `every message is on exactly one log page (saw ${seenMessages.size} of ${logTotal})`);
+  assert((await logPage("ALL", 9999)).messageLog.page === Math.ceil(logTotal / 50), "a log page past the end is clamped");
+  for (const status of ["PENDING", "CAPTURED", "SENT", "FAILED", "SUPPRESSED", "CANCELLED"] as const) {
+    const filtered = await logPage(status, 1);
+    assert(filtered.messageLog.total === (await prisma.messageOutbox.count({ where: buildDeliveryWhere(ids.scale, status) as never })) && filtered.messages.every((message) => message.status === status), `the ${status} filter counts and lists in the database`);
+  }
+  assert((await prisma.messageOutbox.count({ where: { id: { in: [...seenMessages] }, eventId: ids.scale } })) === seenMessages.size, "the log lists this event's messages only");
+
   console.log("custom message verification passed");
 }
 

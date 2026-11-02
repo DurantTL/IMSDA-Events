@@ -145,6 +145,7 @@ function baseTransaction(settings = settingsWith()) {
         id: "message-test-1",
         status: "PENDING",
       }),
+      count: vi.fn().mockResolvedValue(0),
       groupBy: vi.fn().mockResolvedValue([]),
     },
     messageDeliveryAttempt: { create: vi.fn().mockResolvedValue({}) },

@@ -115,7 +115,8 @@ async function cleanup() {
 
 async function main() {
   const { createCalendarFeed, deleteCalendarFeed, syncCalendarFeed } = await import("../modules/calendar/feeds");
-  const { listCalendarEntries, listCalendarEvents, listPublicCalendarItems } = await import("../modules/calendar/repository");
+  const { listCalendarEntryPage, listCalendarEvents, listPublicCalendarItems } = await import("../modules/calendar/repository");
+  const { defaultEntryFilters } = await import("../modules/calendar/admin-list");
   const links = await import("../modules/calendar/event-links");
   const { createEvent, getEventSettings, updateEventSettings } = await import("../modules/events/repository");
   const { deleteEvent } = await import("../modules/events/deletion-repository");
@@ -130,7 +131,8 @@ async function main() {
     collectsShirtSizes: false, capacity: null, registrationOpensOn: null, registrationClosesOn: null, waitlistEnabled: false, autoPromoteWaitlist: false,
   });
   const entryRow = (id: string) => prisma.calendarEntry.findUniqueOrThrow({ where: { id } });
-  const listed = async (id: string) => (await listCalendarEntries(now)).find((entry) => entry.id === id);
+  // The admin list is paged in the database (#1492): this check's items all start "Evlink", so one search page holds them.
+  const listed = async (id: string) => (await listCalendarEntryPage({ filters: { ...defaultEntryFilters, search: "Evlink", time: "all" }, sort: "title", page: 1 }, now)).entries.find((entry) => entry.id === id);
   const publicKeys = async (from: string, to: string) => (await listPublicCalendarItems(from, to, now)).map((item) => item.key).sort();
 
   // A feed with imported items: the retreat (looks like an event staff will make), a conference, and an unrelated one.

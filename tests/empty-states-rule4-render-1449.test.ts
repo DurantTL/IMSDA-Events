@@ -22,7 +22,7 @@ import { SEARCH_DEBOUNCE_MS } from "@/components/search-as-you-type";
 import { attendeeFiltersSet, parseAttendeeListingQuery } from "@/modules/registrations/attendee-listing";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
 import type { InvitationListRow } from "@/modules/staff-invitations/repository";
-import { buttonByText, mount, typeInto, type Mounted } from "./helpers/dom-render";
+import { mount, typeInto, type Mounted } from "./helpers/dom-render";
 
 describe("attendeeFiltersSet", () => {
   it("is false for the defaults and true for any narrowing", () => {
@@ -75,35 +75,48 @@ function registration(index: number): RegistrationRecord {
 let mounted: Mounted;
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(async () => { await mounted?.unmount(); vi.useRealTimers(); });
-const searchBox = () => mounted.container.querySelector<HTMLInputElement>('input[type="search"], input[placeholder]')!;
 const pause = () => act(async () => { vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS + 1); });
 
 describe("staff invitation list: nothing matches", () => {
-  const list = (truncated: boolean) => createElement(StaffInvitationList, { eventId: "e1", rows: [invite(1), invite(2)], counts, truncated, canSend: true });
+  const filters = (search: string) => ({ status: "ALL" as const, group: "ALL" as const, search });
+  const list = (search: string) => createElement(StaffInvitationList, {
+    eventId: "e1", rows: [], counts, canSend: true, total: 0, totalAll: 2, page: 1, pageSize: 50,
+    query: { filters: filters(search), sort: { key: null, dir: "asc" as const }, page: 1 },
+  });
 
-  it("states the total and clears the search", async () => {
-    mounted = await mount(list(false));
-    await typeInto(searchBox(), "zzzz");
-    await pause();
+  it("states the total and links Clear filters to the bare list (the server did the search, #1492)", async () => {
+    mounted = await mount(list("zzzz"));
     const text = mounted.container.textContent ?? "";
     expect(text).toContain('No invitations match "zzzz"');
     expect(text).toContain("This list has 2 invitations.");
     expect(text).not.toContain("Nobody is invited yet");
-    await act(async () => { buttonByText(mounted.container, "Clear filters").click(); });
-    await pause();
-    expect(mounted.container.textContent).not.toContain("No invitations match");
+    const clear = [...mounted.container.querySelectorAll("a")].filter((link) => link.textContent === "Clear filters");
+    expect(clear.length).toBeGreaterThan(0);
+    for (const link of clear) expect(link.getAttribute("href")).toBe("/people/staff-invitations?event=e1");
   });
 
-  it("leaves the total out when the list is truncated", async () => {
-    mounted = await mount(list(true));
-    await typeInto(searchBox(), "zzzz");
-    await pause();
-    expect(mounted.container.textContent).toContain('No invitations match "zzzz"');
-    expect(mounted.container.textContent).not.toContain("This list has");
+  it("a page of a longer list links its headers and pager through the address, keeping the filters (#1492)", async () => {
+    mounted = await mount(createElement(StaffInvitationList, {
+      eventId: "e1", rows: [invite(1), invite(2)], counts, canSend: true, total: 120, totalAll: 120, page: 1, pageSize: 2,
+      query: { filters: { status: "SENT" as const, group: "ALL" as const, search: "ada" }, sort: { key: null, dir: "asc" as const }, page: 1 },
+    }));
+    const hrefs = [...mounted.container.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "");
+    const person = hrefs.find((href) => href.includes("sort=person"))!;
+    expect(person).toContain("status=SENT");
+    expect(person).toContain("q=ada");
+    expect(person).toContain("dir=asc");
+    expect(person).not.toContain("page=");
+    expect(hrefs.find((href) => href.includes("page=2"))).toContain("status=SENT");
+    expect(mounted.container.textContent).toContain("Showing 1–2 of 120 invitations");
+    expect(mounted.container.textContent).toContain("Select all 120 matching");
+    expect(mounted.container.textContent).not.toContain("cut off");
   });
 
   it("nothing yet links to the import section", async () => {
-    mounted = await mount(createElement(StaffInvitationList, { eventId: "e1", rows: [], counts, truncated: false, canSend: true }));
+    mounted = await mount(createElement(StaffInvitationList, {
+      eventId: "e1", rows: [], counts, canSend: true, total: 0, totalAll: 0, page: 1, pageSize: 50,
+      query: { filters: filters(""), sort: { key: null, dir: "asc" as const }, page: 1 },
+    }));
     expect(mounted.container.querySelector('a[href="#staff-invite-import-title"]')?.textContent).toBe("Import a CSV");
   });
 });

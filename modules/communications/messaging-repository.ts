@@ -27,6 +27,14 @@ import {
 } from "@/integrations/email/provider";
 import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
+import { clampPage } from "@/lib/pagination";
+import {
+  buildDeliveryWhere,
+  DEFAULT_DELIVERY_QUERY,
+  DELIVERY_ORDER_BY,
+  DELIVERY_PAGE_SIZE,
+  type DeliveryLogQuery,
+} from "@/modules/communications/delivery-log-model";
 import { logError } from "@/lib/logger";
 import {
   ExternalEmailDeliveryError,
@@ -869,9 +877,13 @@ export async function getShirtSizeRequestPreview(
   return (await loadShirtSizeRequestState(eventId, getPrisma())).preview;
 }
 
-export async function getMessagingWorkspace(eventId: string): Promise<MessagingWorkspaceData> {
+export async function getMessagingWorkspace(eventId: string, logQuery: DeliveryLogQuery = DEFAULT_DELIVERY_QUERY): Promise<MessagingWorkspaceData> {
   await ensureEventMessagingDefaults(eventId);
   const prisma = getPrisma();
+  // The delivery log is paged in the database: the filtered total first, then the page clamped to it (#1492).
+  const logWhere = buildDeliveryWhere(eventId, logQuery.status) as never;
+  const logTotal = await prisma.messageOutbox.count({ where: logWhere });
+  const logPage = clampPage(logQuery.page, logTotal, DELIVERY_PAGE_SIZE);
   const [
     settings,
     templates,
@@ -891,9 +903,10 @@ export async function getMessagingWorkspace(eventId: string): Promise<MessagingW
       },
     }),
     prisma.messageOutbox.findMany({
-      where: { eventId },
-      orderBy: { createdAt: "desc" },
-      take: 150,
+      where: logWhere,
+      orderBy: DELIVERY_ORDER_BY.map((order) => ({ ...order })),
+      skip: (logPage - 1) * DELIVERY_PAGE_SIZE,
+      take: DELIVERY_PAGE_SIZE,
       include: {
         registration: { select: { id: true, confirmationCode: true, clubRegistration: { select: { id: true } } } },
         templateVersion: { select: { id: true, versionNumber: true } },
@@ -906,7 +919,7 @@ export async function getMessagingWorkspace(eventId: string): Promise<MessagingW
     }),
     prisma.messageOutbox.groupBy({
       by: ["status"],
-      where: { eventId },
+      where: buildDeliveryWhere(eventId) as never,
       _count: { _all: true },
     }),
     loadBalanceReminderState(eventId, prisma),
@@ -927,9 +940,11 @@ export async function getMessagingWorkspace(eventId: string): Promise<MessagingW
       .filter(isEventTemplateRow)
       .map((template) => serializeTemplate(template, filesByVersion))
       .sort((left, right) => (keyOrder.get(left.key) ?? 99) - (keyOrder.get(right.key) ?? 99)),
+    // The where already holds only event messages (buildDeliveryWhere), so no row is dropped after the page is read.
     messages: messages
       .filter(isEventScopedMessage)
       .map((message) => serializeMessage(message, settings.deliveryMode)),
+    messageLog: { total: logTotal, page: logPage, pageSize: DELIVERY_PAGE_SIZE, status: logQuery.status },
     inlineImages,
     counts,
     reminderPreview: reminderState.preview,
