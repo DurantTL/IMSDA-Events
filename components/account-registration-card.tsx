@@ -10,6 +10,9 @@ function peopleLabel(people: number, waitlisted: boolean) {
   return people === 1 ? "1 person registered" : `${people} people registered`;
 }
 
+/** The shared `.status-chip` color for each status tone of a registration card. */
+const REGISTRATION_STATUS_CHIP_TONE = { neutral: "neutral", positive: "green", waiting: "purple", cancelled: "coral" } as const;
+
 export type AccountRegistrationCardData = Pick<
   AttendeeRegistrationSummary,
   | "id" | "confirmationCode" | "lifecycle" | "status" | "event" | "attendeeNames" | "balanceCents" | "totalCents"
@@ -60,7 +63,7 @@ export function AccountRegistrationCard({
           </div>
           <div className="attendee-ov-card-title">
             <Heading id={headingId} translate="no">{registration.event.name}</Heading>
-            <span className={`attendee-status-pill attendee-status-pill-${registration.status.tone}`}>
+            <span className={`status-chip ${REGISTRATION_STATUS_CHIP_TONE[registration.status.tone]}`}>
               {registrationStateLabel(registration)}
             </span>
           </div>

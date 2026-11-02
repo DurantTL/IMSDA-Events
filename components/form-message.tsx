@@ -35,15 +35,21 @@ export type FormMessageProps = {
   /** Only where the reverse action already exists in the same component. */
   undo?: FormMessageUndo;
   className?: string;
+  /**
+   * Keep one polite live region mounted while there is no message, so the result is announced when it arrives. The
+   * same element (same role, same aria-live) receives the text, so an error is announced politely here too.
+   */
+  alwaysMounted?: boolean;
 };
 
-export function FormMessage({ tone, message, undo, className }: FormMessageProps) {
-  if (!message) return null;
-  const classes = ["inline-notice", tone === "error" ? "error" : "success", styles.message, className].filter(Boolean).join(" ");
+export function FormMessage({ tone, message, undo, className, alwaysMounted }: FormMessageProps) {
+  if (!message && !alwaysMounted) return null;
+  const classes = message ? ["inline-notice", tone === "error" ? "error" : "success", styles.message, className].filter(Boolean).join(" ") : "sr-only";
+  const live = alwaysMounted ? { "aria-live": "polite" as const, role: "status" } : { role: tone === "error" ? "alert" : "status" };
   return (
-    <div className={classes} role={tone === "error" ? "alert" : "status"}>
+    <div className={classes} {...live}>
       {message}
-      {undo && (
+      {message && undo && (
         <>
           {" "}
           <button

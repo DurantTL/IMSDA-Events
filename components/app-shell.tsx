@@ -659,7 +659,7 @@ export function AppShell({
                   <span>Attendee experience</span>
                 </GuardedLink>
               )}
-            <span className="staff-pill">Staff mode</span>
+            <span className="count-badge staff-pill">Staff mode</span>
             {isSystemAdmin && <AdminAttentionBell />}
             <StaffAccountMenu
               attendeePreviewHref={attendeePreviewHref}

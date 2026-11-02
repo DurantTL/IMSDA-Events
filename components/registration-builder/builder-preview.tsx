@@ -214,7 +214,7 @@ export function BuilderPreview() {
   const previewAllowedFieldKeys = new Set(previewStep?.fieldKeys ?? []);
   return (
 <aside className="panel builder-preview" data-testid="live-form-preview" id="live-form-preview" ref={previewRef} tabIndex={-1}>
-          <div className="section-heading"><div><p className="eyebrow">Live preview</p><h2>{information ? "Preview" : "Preview & test"}</h2></div><span className="live-preview-badge"><span /> Live</span></div>
+          <div className="section-heading"><div><p className="eyebrow">Live preview</p><h2>{information ? "Preview" : "Preview & test"}</h2></div><span className="count-badge live-preview-badge"><span /> Live</span></div>
           <div className="preview-device">
             <div className="preview-browser-bar"><span /><span /><span /></div>
             <div className="preview-form">

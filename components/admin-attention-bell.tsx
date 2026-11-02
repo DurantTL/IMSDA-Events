@@ -210,7 +210,7 @@ export function AdminAttentionBell({
         type="button"
       >
         <Bell aria-hidden="true" size={19} />
-        {badgeCount > 0 && <span aria-hidden="true" className="attention-badge">{attentionBadgeText(badgeCount)}</span>}
+        {badgeCount > 0 && <span aria-hidden="true" className="count-badge attention-badge">{attentionBadgeText(badgeCount)}</span>}
       </button>
       {open && (
         <div aria-label="Notifications" className="header-popover attention-popover" id={panelId} role="group">

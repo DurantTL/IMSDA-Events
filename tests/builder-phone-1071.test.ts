@@ -276,7 +276,7 @@ describe("the phone builder wiring (#1071)", () => {
     const block = css.slice(css.indexOf("/* Registration form builder on a phone (#1071)"));
     expect(block).toContain("min-height: var(--touch-target, 44px)");
     expect(block).toMatch(/\.fb-phone-card-actions \.fb-btn \{[^}]*min-height: 48px/);
-    expect(block).toMatch(/\.fb-phone-step-pill \{[^}]*min-height: var\(--touch-target, 44px\)/);
+    expect(block).toMatch(/\.fb-phone-step-button \{[^}]*min-height: var\(--touch-target, 44px\)/);
     expect(block).toMatch(/\.fb-phone-step-option \{[^}]*min-height: var\(--touch-target, 44px\)/);
     expect(block).toMatch(/\.fb-phone-sheet \.fb-btn \{ min-height: 48px; \}/);
     // No literal font size under 0.875rem anywhere in the new block.

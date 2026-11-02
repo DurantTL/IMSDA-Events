@@ -3,6 +3,7 @@
 import { formatCents } from "@/modules/payments/format-cents";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Undo2 } from "lucide-react";
+import { useConfirm } from "@/components/use-confirm";
 import type { RegistrantProposal } from "@/modules/cancellation-requests/domain";
 import type { RegistrantRequestSummary, RegistrantRequestView } from "@/modules/cancellation-requests/views";
 
@@ -50,7 +51,7 @@ export function CancellationRequestPanel({
   const [replaceConfirmed, setReplaceConfirmed] = useState(false);
   const [busy, setBusy] = useState<"preview" | "submit" | "withdraw" | null>(null);
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
-  const [confirmingWithdraw, setConfirmingWithdraw] = useState<string | null>(null);
+  const { confirm, confirmDialog } = useConfirm();
   const idempotencyKey = useRef(newKey());
   const messageRef = useRef<HTMLDivElement>(null);
   const Heading = `h${headingLevel}` as const;
@@ -166,11 +167,25 @@ export function CancellationRequestPanel({
       }
       setView(payload.view as RegistrantRequestView);
       setMessage({ kind: "ok", text: "Your request was withdrawn. Your registration was not changed." });
+      // The withdraw button is gone now, so focus goes to the message instead of falling to the page.
+      window.requestAnimationFrame(() => messageRef.current?.focus());
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : "The request could not be withdrawn. Try again." });
     } finally {
       setBusy(null);
     }
+  }
+
+  /** Asks in the shared confirm dialog first; the withdraw itself is unchanged. */
+  async function confirmWithdraw(request: RegistrantRequestSummary) {
+    const ok = await confirm({
+      title: `Withdraw the request from ${when(request.createdAt)}`,
+      body: <p>Withdraw this request? Your registration will not be changed.</p>,
+      confirmLabel: "Yes, withdraw it",
+      cancelLabel: "Keep it",
+      destructive: true,
+    });
+    if (ok) await withdraw(request);
   }
 
   function toggle(list: string[], id: string, set: (next: string[]) => void) {
@@ -180,6 +195,7 @@ export function CancellationRequestPanel({
 
   return (
     <section className="public-manage-card cancel-request-panel" aria-labelledby={`${uid}-title`}>
+      {confirmDialog}
       <div className="public-manage-card-heading">
         <p className="public-registration-eyebrow">Cancellation</p>
         <Heading id={`${uid}-title`}>Ask to cancel</Heading>
@@ -219,25 +235,16 @@ export function CancellationRequestPanel({
                   <li key={`${step.status}-${index}`}>{step.label}, {when(step.at)}</li>
                 ))}
               </ol>
-              {request.canWithdraw && confirmingWithdraw !== request.id && (
+              {request.canWithdraw && (
                 <button
                   aria-label={`Withdraw the ${request.statusLabel.toLowerCase()} request from ${when(request.createdAt)}`}
                   className="secondary-button"
                   disabled={busy !== null}
-                  onClick={() => setConfirmingWithdraw(request.id)}
+                  onClick={() => void confirmWithdraw(request)}
                   type="button"
                 >
-                  <Undo2 size={16} aria-hidden="true" /> Withdraw this request
+                  <Undo2 size={16} aria-hidden="true" /> {busy === "withdraw" ? "Withdrawing…" : "Withdraw this request"}
                 </button>
-              )}
-              {request.canWithdraw && confirmingWithdraw === request.id && (
-                <div className="cancel-request-confirm" role="group" aria-label={`Confirm withdrawing the request from ${when(request.createdAt)}`}>
-                  <p>Withdraw this request? Your registration will not be changed.</p>
-                  <button className="primary-button" disabled={busy !== null} onClick={async () => { await withdraw(request); setConfirmingWithdraw(null); }} type="button">
-                    {busy === "withdraw" ? "Withdrawing…" : "Yes, withdraw it"}
-                  </button>
-                  <button className="secondary-button" disabled={busy !== null} onClick={() => setConfirmingWithdraw(null)} type="button">Keep it</button>
-                </div>
               )}
             </li>
           ))}

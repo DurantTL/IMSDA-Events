@@ -125,6 +125,16 @@ describe("L5: buttons use the shared button classes", () => {
     expect(globalsCss).toMatch(/\.primary-button:disabled,\s*\.secondary-button:disabled \{[^}]*cursor: not-allowed/);
   });
 
+  it("never shows a wait or progress cursor on a disabled or busy button (one --cursor-busy token, #1506)", () => {
+    expect(rootBlock).toMatch(/--cursor-busy:\s*not-allowed\s*;/);
+    const offenders = [{ file: "app/globals.css", rules: cssRules(globalsCss) }, ...modules]
+      .flatMap(({ file, rules }) => rules
+        .filter((rule) => /:disabled|\[disabled\]|aria-busy|aria-disabled/.test(rule.selector))
+        .filter((rule) => /cursor:\s*(wait|progress)\b/.test(rule.body))
+        .map((rule) => `${file}:${rule.line} ${rule.selector}`));
+    expect(offenders).toEqual([]);
+  });
+
   /**
    * A `<button>` styled only by a CSS module class is a new button look. These are the reviewed ones, each with what
    * it is; a new one should use `primary-button`, `secondary-button`, `text-button` or `icon-button` instead.
@@ -140,15 +150,48 @@ describe("L5: buttons use the shared button classes", () => {
     "components/club-uniform-section.tsx:styles.chipRemove": "tiny remove (x) inside a chip",
     "components/club-earned-awards-workspace.tsx:styles.chipRemove": "tiny remove (x) inside a chip",
   };
-  const moduleOnlyButtons = tsxFiles.flatMap((file) => {
-    const source = read(file);
-    return [...source.matchAll(/<button\b[^>]*?className=\{(?:`([^`]*)`|(\w+\.\w+))\}/g)].flatMap((match) => {
-      const text = (match[1] ?? match[2] ?? "").trim();
-      const tokens = text.split(/\s+/).filter(Boolean);
-      const onlyModule = tokens.length > 0 && tokens.every((token) => /^\$\{\w+\.\w+\}$|^\w+\.\w+$/.test(token));
-      return onlyModule ? [`${file}:${text.replace(/^\$\{|\}$/g, "")}`] : [];
-    });
-  });
+  /**
+   * The className expression of every `<button ...>` in a file, read with brace matching so `className={x ?? styles.y}`
+   * and `className={open ? styles.a : styles.b}` are seen as well as `className={styles.y}` and template strings.
+   */
+  function buttonClassExpressions(source: string) {
+    const found: string[] = [];
+    for (const open of source.matchAll(/<button\b/g)) {
+      let depth = 0;
+      let index = open.index! + open[0].length;
+      for (; index < source.length; index += 1) {
+        const char = source[index];
+        if (char === "{") depth += 1;
+        else if (char === "}") depth -= 1;
+        else if (char === ">" && depth === 0 && source[index - 1] !== "=") break;
+        else if (depth === 0 && source.startsWith("className={", index)) {
+          let end = index + "className={".length;
+          let inner = 1;
+          for (; end < source.length && inner > 0; end += 1) {
+            if (source[end] === "{") inner += 1;
+            else if (source[end] === "}") inner -= 1;
+          }
+          found.push(source.slice(index + "className={".length, end - 1));
+          index = end - 1;
+        }
+      }
+    }
+    return found;
+  }
+
+  /** The module classes an expression names when it carries no class text of its own (no shared class beside them). */
+  function moduleOnlyRefs(expression: string) {
+    const refs = [...expression.matchAll(/\b(styles|\w+Styles)\.\w+/g)].map((match) => match[0]);
+    if (refs.length === 0) return [];
+    // Anything written inside quotes or backticks, outside `${...}`, is class text of its own.
+    const literals = [...expression.replace(/\$\{[^}]*\}/g, " ").matchAll(/"([^"]*)"|'([^']*)'|`([^`]*)`/g)].map((match) => (match[1] ?? match[2] ?? match[3] ?? "").trim());
+    return literals.some(Boolean) ? [] : [...new Set(refs)];
+  }
+
+  const moduleOnlyButtons = tsxFiles.flatMap((file) => buttonClassExpressions(read(file)).flatMap((expression) => {
+    const refs = moduleOnlyRefs(expression);
+    return refs.length > 0 ? [`${file}:${refs.join(" ")}`] : [];
+  }));
 
   it("has no <button> styled only by a module class outside the reviewed list", () => {
     expect(moduleOnlyButtons.filter((entry) => !(entry in ownLook))).toEqual([]);
@@ -183,9 +226,15 @@ describe("L5: buttons use the shared button classes", () => {
   });
 
   it("finds a module-only button (the scanner itself)", () => {
-    const sample = "<button className={styles.fancy} onClick={go}>Go</button>";
-    const match = /<button\b[^>]*?className=\{(?:`([^`]*)`|(\w+\.\w+))\}/.exec(sample);
-    expect(match?.[2]).toBe("styles.fancy");
+    const refsOf = (sample: string) => buttonClassExpressions(sample).flatMap(moduleOnlyRefs);
+    expect(refsOf("<button className={styles.fancy} onClick={go}>Go</button>")).toEqual(["styles.fancy"]);
+    // The shapes the first scanner missed: a prop with a module fallback, and a choice between module classes (#1506).
+    expect(refsOf("<button aria-haspopup=\"dialog\" className={className ?? styles.trigger} onClick={() => setOpen(true)}>Help</button>")).toEqual(["styles.trigger"]);
+    expect(refsOf("<button className={open ? styles.a : styles.b} type=\"button\">Go</button>")).toEqual(["styles.a", "styles.b"]);
+    // A shared class beside the module class, or a pass-through className, is fine.
+    expect(refsOf("<button className={className ?? `text-button ${styles.trigger}`} type=\"button\">Help</button>")).toEqual([]);
+    expect(refsOf("<button className={`primary-button ${styles.large}`} type=\"button\">Go</button>")).toEqual([]);
+    expect(refsOf("<button className={className} type=\"button\">Go</button>")).toEqual([]);
   });
 });
 

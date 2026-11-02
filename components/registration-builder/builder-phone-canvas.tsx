@@ -77,7 +77,7 @@ export function BuilderPhoneCanvas({ activeStepIndex, onStepChange, onEdit, onMo
             key={candidate.id}
             ref={index === sectionIndex ? activeButton : undefined}
             type="button"
-            className="fb-phone-step-pill"
+            className="fb-phone-step-button"
             aria-current={index === sectionIndex ? "step" : undefined}
             onClick={() => { setStepSettingsOpen(false); onStepChange(index); }}
           >{index + 1} · {candidate.title || "Untitled step"}</button>
@@ -85,7 +85,7 @@ export function BuilderPhoneCanvas({ activeStepIndex, onStepChange, onEdit, onMo
       </nav>
       <div className="fb-step fb-phone-step" data-testid={`builder-section-${sectionIndex}`}>
         <div className="fb-step-head">
-          <span className="fb-step-badge">Step {sectionIndex + 1} of {definition.sections.length}</span>
+          <span className="count-badge fb-step-badge">Step {sectionIndex + 1} of {definition.sections.length}</span>
           <h3 id={`fb-step-title-${section.id}`}>{section.title || "Untitled step"}</h3>
           {review && <span className="fb-step-tag">Final review</span>}
           <button type="button" className="fb-link-button" aria-expanded={stepSettingsOpen} aria-controls={`fb-step-settings-${section.id}`} onClick={() => setStepSettingsOpen((open) => !open)}>
