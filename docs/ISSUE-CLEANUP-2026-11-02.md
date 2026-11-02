@@ -4,7 +4,7 @@ Caleb asked to "go through the issues and remove ones that are done and change t
 
 **Method.** All 210 open issues (not PRs) were listed and checked against the 698 merged PRs, the 573 closed issues, each issue's comments and, where unsure, the current `main` code. Each issue was sorted as done, partly done, changed, still open as written, or duplicate. The roadmap #98, the launch gate #1442 and every issue labelled `needs-decision` or `needs-human` were never closed.
 
-**Result.** 8 closed as done, 46 got a status comment and stay open, #98 and #1442 bodies updated, about 150 left untouched (still open as written). 19 need Caleb (list below).
+**Result (first pass).** 8 closed as done, 46 got a status comment and stay open, #98 and #1442 bodies updated, about 150 left untouched (still open as written). 19 need Caleb (list below).
 
 Status comments were posted as comments only. Issue bodies were not changed except #98 and #1442.
 
@@ -84,6 +84,80 @@ The original body is saved in the session scratchpad (`issue1442-body-before-202
 18. **#492** — Club director spreadsheet survey: honor and uniform orders are built; the survey remains.
 19. **#1495** — Overlaps #1363 (money helpers). Kept as the lodging and WR26 part; merge them if you prefer one issue.
 
-## Left untouched
+## Second pass (same day): code check of the remaining 154
 
-About 150 issues are still open as written. Most are Phase 2–5 planning slices with nothing built yet (wallet, installments, API, mobile app, incidents, personnel, volunteers, transport, sessions, site builder, surveys). The newest launch work also stays open as written: #1441, #1468, #1483, #1492, #1494, #1496, #1501.
+Caleb thought most of the remaining issues had been replaced by other work and never checked off. Five explorer agents checked each one against the **code on main** (database models, modules, pages, decisions), not just PR links. I spot-checked the key claims myself (for example `HonorEnrollmentMark`, `ClubRegistrationDraft`, `SiteContentRevision`, `AcknowledgmentEvidence` and the lifecycle states all exist).
+
+**Finding:** few were fully replaced. Many were *partly* built under other names (mostly Honors Weekend, club, and WR26-specific versions of a general feature), but the general feature each issue asks for is still missing.
+
+### Closed (1)
+
+| Issue | Why |
+| --- | --- |
+| #195 CMMS capability matrix and coexistence plan | Closed as not planned. Caleb decided Oct 27 (on #68) that CMMS is reference only ("never used in reality, just a mock-up system"), so there's nothing to coexist with. |
+
+### Partly built: status comment added, left open (24)
+
+Each comment names what exists (file paths, PRs) and what's left as a checklist. These went on as comments, not body edits: the only tool allowed to edit issues here replaces the whole body, and retyping each full body risks changing Caleb's original text.
+
+| Issue | Exists under another name |
+| --- | --- |
+| #73 Save/resume and staff entry | Club-leader saved drafts (`ClubRegistrationDraft`); browser drafts |
+| #76 Historical imports and exports | CSV, WR26 bundle and Google Sheets imports with checksums |
+| #84 No-code event site builder | Event page content sections, Open Graph metadata |
+| #100 Session scheduling | Honors sessions, waitlists, attendance; program assignment runs |
+| #113 NCS Risk import profile | Fixed-format Sterling background-check import |
+| #130 Consent evidence | Acknowledgment evidence tied to policy versions |
+| #134 Pricing engine | Form prices, one late-pricing date, meal prices by attendee type |
+| #146 Merchandise quotes (on hold) | Server-side order drafts with replay |
+| #163 Staff-entered registrations | Staff can create a single-attendee registration |
+| #172 Import batches | WR26-specific import runs and preview |
+| #173 Registration import profiles | WR26 bundle import |
+| #174 Financial history import | One ledger charge per WR26 registration |
+| #181 Saved views | Filters in the page address, task presets |
+| #183 Ministry units and seasons | Club-year rosters, carry-forward, transfers |
+| #207 Session schedule | Honors sessions, rooms, offerings, instructors |
+| #208 Session conflicts and waitlists | Honors waitlist offers and placement overrides |
+| #209 Session attendance | Honors attendance marks and printed rosters |
+| #221 Passkey recovery | Recent-2FA rule, emailed codes, forgot-password |
+| #228 Profile conflicts | One-way prefill; duplicate-person review and merge |
+| #248 Event branding | Hero/gallery/custom HTML, tagline, page metadata |
+| #250 Site preview and rollback | Homepage content revisions with restore |
+| #432 Keep clubs up during rebuilds | Standby container and prep-only migrations |
+| #554 One account per person | Mostly built; slice (e) cleanup and Caleb's rollout remain |
+| #1468 Unsaved-changes guard | Guard used in 24 files; 75 forms left |
+
+### Caleb: yes/no to close
+
+Answer yes (close) or no (keep) for each row.
+
+| Issue | Title | What replaced it | Confidence | Close? |
+| --- | --- | --- | --- | --- |
+| #183 | Ministry units, seasons, roster history | Club-year rosters (`ClubRosterMember`), carry-forward (PR #937), transfers (PR #534) | medium | |
+| #113 | NCS Risk CSV import profile | Sterling background-check CSV import (PRs #440, #535, #578) | medium | |
+| #204, #205, #206 | Transportation routes, riders, manifests | Nothing built; the driver feature was removed in #544 (driver clearance now comes from the background-check list). Still wanted? | medium | |
+| #252–#256 | Staff recruiting, onboarding, deployment, offboarding | Nothing built; you chose Oct 27 to leave staff-record policy for a later phase. Keep for later or close? | medium | |
+| #257–#261 | Incident cases, missing person, escalation | Emergency plans (#114, PR #1339) this season; you chose Oct 27 to leave incident policy for later. Keep for later or close? | medium | |
+| #311, #312, #314 | Community profiles, directory, photos | Your Oct 27 decision on #495: none in 2026–27. Keep for later or close? | high (decision) | |
+| #495 | Community scope and native push | Scope decided Oct 27 (event-scoped only); native push still undecided | high (decision) | |
+| #894 | Single name labels at check-in | Your Oct 27 decision: no name labels at check-in for now (on hold) | high (decision) | |
+| #389 | Health records options report | Report delivered (PR #407); decisions recorded; what's left is in #416 | medium | |
+| #844 | Comparison index and gaps (Oct 2026) | A register; every open row has its own issue (#485, #494, #835, #837, #840–#843, #893, #1212, #779) | medium | |
+
+Labelled `needs-decision` or `needs-human` (so never closed by automation): #252, #257, #311, #312, #314, #389, #894.
+
+### Partly built but labelled needs-decision or needs-human (report only)
+
+#40 identity, #43 consents, #44 health records, #69 eAdventist, #70 Sterling, #79 incidents (emergency plans built), #83 community, #85 speaker portals (speakers content block only), #90 surveys (information forms), #91 returning profiles, #94 camp store (merchandise catalog), #95 donations (scholarship funds), #158 closeout gate (lifecycle states), #189 and #190 protected records, #218 Sterling sign-off, #306 WR26 sign-off, #310 moderation (reports and pause exist), #416 go-live checklist, #492 director survey, #835 visiting clubs (new-club invite link), #840 Adventurers.
+
+## Still needed, by phase (87)
+
+Nothing (or almost nothing) is built for these yet, and they are still planned. They stay open so the roadmap stays honest.
+
+- **Launch and recent (no phase, 9):** #1501, #1496, #1494, #1492, #1495, #1483, #1441, #683, #779.
+- **Phase 0 (2):** #147, #148 (merchandise, on hold).
+- **Phase 1 (11):** ledger #118, #119, #121, #122, #123; consent #132; drafts #162, #164; registration theme #283; reactions #309; event map #1212.
+- **Phase 2 (21):** participation and readiness #42, #186, #187, #188, #115; volunteers #65, #201, #202, #203; grouping #89; minor release #96, #215, #216, #217; uploads #151; presentation #284; parent registration #485; announcement sections #837; Adventurers #841, #842, #843.
+- **Phase 3 (37):** wallet #53, #222–#225, #267; installments #92, #229–#232, #268; mobile app #82, #262–#266; API #103, #124, #237–#241, #269; surveys and certificates #234, #235, #236; eAdventist #244, #245, #246; site builder #249, #270; personnel #93; e-learning #493; seminar "Not attending" #893.
+- **Phase 4 (4):** #87 networking, #88 budgeting, #313 community groups, #494 unit scoring.
+- **Phase 5 (3):** #71 UltraCamp, #86 virtual events, #97 personalization.
