@@ -110,6 +110,9 @@ type Client = Prisma.TransactionClient | PrismaClient;
 const IN_SCOPE_STATUSES = ["SUBMITTED", "CONFIRMED", "WAITLISTED"] as const;
 /** Browser and clock allowance for an "acknowledged at" that is a little ahead of the server. */
 const FUTURE_TOLERANCE_MS = 5 * 60_000;
+/** Action writes queue on a per-subject advisory lock while holding a connection, so a burst of double submissions can
+ *  wait longer than Prisma's 2-second default for a free connection. */
+const ACTION_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 15_000 } as const;
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -201,14 +204,22 @@ function summarize(row: SummaryRow): EvidenceSummary {
  * version is looked up by its id for this event and must be published and of the acknowledgment kind. A version of
  * another event's policy, a draft, or a policy of another kind is not found.
  */
-export async function resolveShownContent(eventId: string, field: RegistrationFormField): Promise<ShownContent> {
+/**
+ * Pass the transaction as `client` when calling inside one: a second pooled connection taken while the transaction holds
+ * one can starve the pool when several submissions for the same person wait on the subject lock at once.
+ */
+export async function resolveShownContent(
+  eventId: string,
+  field: RegistrationFormField,
+  client?: Pick<Prisma.TransactionClient, "consentPolicyVersion">,
+): Promise<ShownContent> {
   const config = field.acknowledgment;
   if (field.type !== "ACKNOWLEDGMENT" || !config) {
     throw new AcknowledgmentError("FIELD_NOT_FOUND", "That field is not an acknowledgment.");
   }
   if (config.source === "TEXT") return textContent(config.text);
   try {
-    const version = await getPolicyVersionForEvidence(eventId, config.policyVersionId, "ACKNOWLEDGMENT");
+    const version = await getPolicyVersionForEvidence(eventId, config.policyVersionId, "ACKNOWLEDGMENT", client);
     return policyContent(version);
   } catch (error) {
     if (error instanceof ConsentPolicyError || error instanceof PolicyKindMismatchError) {
@@ -367,7 +378,7 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
   if (action === "DECLINE" && request.channel === "ONLINE") {
     throw new AcknowledgmentError("ACKNOWLEDGMENT_REFUSED", "A decline is recorded by staff, never from the online form.");
   }
-  const content = await resolveShownContent(request.eventId, request.field);
+  const content = await resolveShownContent(request.eventId, request.field, tx);
   const identity = {
     eventId: request.eventId,
     registrationId: request.registrationId,
@@ -688,7 +699,7 @@ export async function recordStaffAcknowledgment(input: StaffAcknowledgmentInput,
       idempotencyKey: staffEvidenceKey(input.clientRequestId),
       requestMetadata: { ...input.requestMetadata, formVersionId: submission.formVersionId },
     });
-  });
+  }, ACTION_TRANSACTION_OPTIONS);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -911,7 +922,7 @@ export async function voidAcknowledgmentEvidence(input: {
       }, tx);
     }
     return { void: { id: row.id, evidenceId: row.evidenceId, voidedAt: row.voidedAt.toISOString() }, created: inserted.count === 1 };
-  });
+  }, ACTION_TRANSACTION_OPTIONS);
 }
 
 export type WithdrawalOutcome = {
@@ -1084,7 +1095,7 @@ export async function withdrawAcknowledgmentEvidence(input: {
       },
     }, tx);
     return { withdrawal: summarizeWithdrawal(row), created: true, replayed: false };
-  });
+  }, ACTION_TRANSACTION_OPTIONS);
 }
 
 function summarizeWithdrawal(row: { id: string; evidenceId: string; withdrawnAt: Date; channel: AcknowledgmentChannel }) {

@@ -387,8 +387,13 @@ export async function getPolicyVersionEffectiveAt(eventId: string, policyId: str
  * Drafts are never valid evidence targets, and a version of another event's
  * policy is not found. Pass `expectedKind` to refuse a policy of another kind.
  */
-export async function getPolicyVersionForEvidence(eventId: string, versionId: string, expectedKind?: PolicyKind) {
-  const version = await getPrisma().consentPolicyVersion.findFirst({
+export async function getPolicyVersionForEvidence(
+  eventId: string,
+  versionId: string,
+  expectedKind?: PolicyKind,
+  client: Pick<Prisma.TransactionClient, "consentPolicyVersion"> = getPrisma(),
+) {
+  const version = await client.consentPolicyVersion.findFirst({
     where: { id: versionId, status: ConsentPolicyVersionStatus.PUBLISHED, policy: reachableFromEvent(eventId) },
     select: { ...versionSummarySelect, policy: { select: { id: true, kind: true, scope: true, eventId: true } } },
   });

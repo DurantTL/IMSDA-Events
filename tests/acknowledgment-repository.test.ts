@@ -310,7 +310,7 @@ describe("recording evidence (#150)", () => {
     const outcome = await run((tx) => recordAcknowledgmentEvidence(asTx(tx), request({
       field: field("att_ack"), attendee: { attendeeId: "att-dan", personId: "p-dan", status: "ADULT" },
     })));
-    expect(consent.getPolicyVersionForEvidence).toHaveBeenCalledWith("event-1", "version-1", "ACKNOWLEDGMENT");
+    expect(consent.getPolicyVersionForEvidence).toHaveBeenCalledWith("event-1", "version-1", "ACKNOWLEDGMENT", expect.anything());
     expect(state.evidence[0]).toMatchObject({ source: "POLICY_VERSION", policyVersionId: "version-1", shownText: null, contentHash: "hash-version-1", contentRef: "policy:version-1" });
     expect(outcome.evidence.policyVersionId).toBe("version-1");
   });
