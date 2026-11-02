@@ -77,26 +77,12 @@ export const KNOWN_BUGS: KnownBug[] = [
     checks: [{ label: "Orders (with a line) | B9 | remove an order line: asks for confirmation in the shared dialog", detail: "nothing asked before the action" }],
   },
   {
-    id: "help-no-search",
-    description: "Help: the account Help page (app/(public)/account/(portal)/help/page.tsx) lists the director and coordinator guides but has no search box (only the staff Help has one), so nobody can search for a guide (H5, S4).",
-    checks: [
-      { label: "Help | H5 | Help search finds the director guide", detail: "no search box" },
-      { label: "Coordinator: Help | H5 | Help search finds the coordinator guide", detail: "no search box" },
-    ],
-  },
-  {
     id: "club-events-registered-word",
     description: "Club events: a submitted club registration shows the chip \"Registered · N going\" (components/club-event-list.tsx statusFor) and the confirmation card's status says \"Registered\", but \"Registered\" is only approved for the area coordinator roll-up; the registration's status word is \"Submitted\" (B12, #1479).",
     checks: [
       { label: "Club events (registered) | B12 | status chip words", detail: "Registered · 2 going" },
       { label: "Club event: registered | B12 | the registration's status shows an approved word", detail: "\"Registered\"" },
     ],
-  },
-  {
-    id: "records-grid-scrolls-sideways",
-    description: "Coordinator Monthly Records: the \"Monthly Record status by club\" grid (CoordinatorMonthlyRecords) is a 14-column table that scrolls sideways inside its wrapper (scrollWidth 1600 in a 1132px box at 1280px wide) (B3).",
-    checks: [{ label: "Coordinator: Monthly Records | B3 | tables do not scroll sideways", detail: "div.report-table-wrap" }],
-    only: "desktop",
   },
   {
     id: "records-chart-table-scrolls-sideways",
@@ -512,9 +498,13 @@ async function helpJourney(ctx: Ctx, page: J.Page) {
   const search = page.locator('input[type="search"], [role="searchbox"]');
   if ((await search.count()) === 0) rec.record("Help", "H5", "Help search finds the director guide", "fail", "the account Help page has no search box to type in");
   else {
+    // The list filters a short pause after typing: wait until it has narrowed (fewer guide links) with the guide still
+    // listed, so the click below does not land while the list is still re-rendering.
+    const allGuides = page.locator('main a[href^="/account/help/"]');
+    const before = await allGuides.count();
     await search.first().fill("getting started");
-    const found = await pollPage<number>(page, () => guide.count(), (count) => count > 0, 4_000);
-    rec.record("Help", "H5", "Help search finds the director guide", found.ok ? "pass" : "fail", found.ok ? "searching \"getting started\" lists the guide" : "the guide is not found by searching");
+    const found = await pollPage<number>(page, async () => ((await guide.count()) > 0 ? await allGuides.count() : before), (count) => count < before, 4_000);
+    rec.record("Help", "H5", "Help search finds the director guide", found.ok ? "pass" : "fail", found.ok ? `searching "getting started" narrows ${before} guides to ${found.value} and lists the guide` : "searching did not narrow the list to the guide");
   }
   await guide.first().click();
   await page.waitForURL(/\/account\/help\/director-getting-started/, { timeout: 20_000 });
@@ -634,9 +624,11 @@ async function coordinatorHelpJourney(ctx: Ctx, page: J.Page) {
   const search = page.locator('input[type="search"], [role="searchbox"]');
   if ((await search.count()) === 0) rec.record("Coordinator: Help", "H5", "Help search finds the coordinator guide", "fail", "the account Help page has no search box to type in");
   else {
+    const allGuides = page.locator('main a[href^="/account/help/"]');
+    const before = await allGuides.count();
     await search.first().fill("getting started");
-    const found = await pollPage<number>(page, () => guide.count(), (count) => count > 0, 4_000);
-    rec.record("Coordinator: Help", "H5", "Help search finds the coordinator guide", found.ok ? "pass" : "fail", found.ok ? "searching lists the guide" : "the guide is not found by searching");
+    const found = await pollPage<number>(page, async () => ((await guide.count()) > 0 ? await allGuides.count() : before), (count) => count < before, 4_000);
+    rec.record("Coordinator: Help", "H5", "Help search finds the coordinator guide", found.ok ? "pass" : "fail", found.ok ? `searching "getting started" narrows ${before} guides to ${found.value} and lists the guide` : "searching did not narrow the list to the guide");
   }
   await guide.first().click();
   await page.waitForURL(/\/account\/help\/coordinator-getting-started/, { timeout: 20_000 });
