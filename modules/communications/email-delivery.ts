@@ -49,6 +49,7 @@ import {
   prepareAccountEmailBodyForDelivery,
 } from "@/modules/communications/account-email";
 import { prepareAttendeeEmailBodyForDelivery } from "@/modules/attendee-accounts/attendee-email";
+import { prepareSecurityCheckCodeForDelivery } from "@/modules/security/security-check-code-email";
 import {
   CLUB_FORM_LINK_TEMPLATE_KEY,
   prepareClubFormLinkBodyForDelivery,
@@ -1651,6 +1652,14 @@ async function prepareAccountEmailBody(
   // Module request email (#741) carries free text and no sentinel: never replace anything in it.
   if (input.templateKey?.startsWith("MODULE_REQUEST_")) {
     return { bodyText: input.bodyText };
+  }
+  // The code that stands in for the Security check (#1480): no account, the code is minted here, at delivery.
+  if (input.templateKey === "SECURITY_CHECK_CODE") {
+    return prepareSecurityCheckCodeForDelivery({
+      messageId: input.messageId,
+      bodyText: input.bodyText,
+      now: input.now,
+    });
   }
   if (input.templateKey?.startsWith("ATTENDEE_")) {
     return prepareAttendeeEmailBodyForDelivery({

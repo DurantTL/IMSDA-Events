@@ -58,7 +58,10 @@ async function postHandler(request: Request) {
       }, { status: 429 }), rateLimit);
     }
 
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.attendeeSignUp });
+    const securityCheckFailure = await requireTurnstile(request, {
+      action: TURNSTILE_ACTIONS.attendeeSignUp,
+      fallback: { kind: "email-code", email: input.email },
+    });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     // The password rules are the platform's, and they are stated plainly: this

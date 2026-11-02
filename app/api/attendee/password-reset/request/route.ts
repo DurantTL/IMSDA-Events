@@ -52,7 +52,10 @@ async function postHandler(request: Request) {
       }, { status: 429 }), rateLimit);
     }
 
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.forgotPassword });
+    const securityCheckFailure = await requireTurnstile(request, {
+      action: TURNSTILE_ACTIONS.forgotPassword,
+      fallback: { kind: "email-code", email: input.email },
+    });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
     const reset = await beginAttendeePasswordReset({ email: input.email });

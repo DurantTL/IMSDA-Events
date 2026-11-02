@@ -484,6 +484,8 @@ async function securityCheckBlocked(path: string, { browser, mode, tracker, brow
     await retry.waitFor();
     const text = await group.innerText();
     assert(/could not load/i.test(text) && /Try again/.test(text), `The Security check message was unclear: ${text}`);
+    // #1480: the office contact and, on sign-in and reset, the emailed-code fallback are offered beside the message.
+    assert(/Need help\?/.test(text) && /Email me a code instead/.test(text), `The Security check fallback was not offered: ${text}`);
     // Try again asks for the script again; blocked again, the message comes back. Nothing is skipped.
     await retry.click();
     await retry.waitFor();

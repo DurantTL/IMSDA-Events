@@ -7,6 +7,7 @@ import { getGeneralLinkExperience, submitGeneralLinkRegistration } from "@/modul
 import { applyRateLimitHeaders, trustedClientIpAddress, type RateLimitOutcome } from "@/modules/rate-limit/domain";
 import { checkPublicRegistrationRateLimit } from "@/modules/rate-limit/service";
 import { withRequestContext } from "@/lib/request-context";
+import { emailFromRegistrationResponses } from "@/modules/security/fallback-email";
 import { requireTurnstile, TURNSTILE_ACTIONS } from "@/modules/security/turnstile";
 
 const maximumBodyBytes = 512 * 1024;
@@ -52,7 +53,10 @@ async function postHandler(request: Request, context: Context) {
     // The site and the team name travel beside the form answers, never inside them.
     const { locationId, teamName, ...answers } = generalLinkExtrasSchema.loose().parse(JSON.parse(body)) as Record<string, unknown> & { locationId?: string | null; teamName?: string | null };
     const input = publicRegistrationInputSchema.parse(answers);
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.registration });
+    const securityCheckFailure = await requireTurnstile(request, {
+      action: TURNSTILE_ACTIONS.registration,
+      fallback: { kind: "public-form", email: emailFromRegistrationResponses(input.responses) },
+    });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
     const confirmation = await submitGeneralLinkRegistration(eventSlug, input, { locationId: locationId ?? null, teamName: teamName ?? null, requestContext: { userAgent: request.headers.get("user-agent"), ipAddress: trustedClientIpAddress(request) } });
     // Counted per public event only, with no registration or person attached (#111).

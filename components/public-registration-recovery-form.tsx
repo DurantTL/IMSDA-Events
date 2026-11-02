@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { LockKeyhole, MailCheck } from "lucide-react";
+import { HoneypotField } from "@/components/honeypot-field";
 import { SecurityCheck, type SecurityCheckConfig, type SecurityCheckHandle } from "@/components/security-check/security-check";
 
 export function PublicRegistrationRecoveryForm({
@@ -15,6 +16,7 @@ export function PublicRegistrationRecoveryForm({
   // One box per form: each form has its own Submit, and a token is single-use.
   const accessCheck = useRef<SecurityCheckHandle>(null);
   const emailCheck = useRef<SecurityCheckHandle>(null);
+  const [website, setWebsite] = useState("");
   const [busy, setBusy] = useState<"access" | "email" | null>(null);
   const [error, setError] = useState("");
   const [requested, setRequested] = useState(false);
@@ -57,6 +59,7 @@ export function PublicRegistrationRecoveryForm({
             ? { confirmationCode, ...(returnTo ? { returnTo } : {}) }
             : {}),
           email,
+          website,
         }),
       });
       const result = await response.json();
@@ -127,6 +130,7 @@ export function PublicRegistrationRecoveryForm({
             type="email"
           />
         </label>
+        <HoneypotField onChange={setWebsite} value={website} />
         <SecurityCheck config={securityCheck} action="registration-recovery" handleRef={accessCheck} />
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-button full-button" disabled={busy !== null} type="submit">

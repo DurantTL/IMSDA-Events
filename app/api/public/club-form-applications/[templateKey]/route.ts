@@ -72,7 +72,7 @@ async function postHandler(request: Request, context: RouteContext) {
       return json({ error: "INVALID_JSON_BODY", message: "Send a JSON request body." }, { status: 400 }, rateLimit);
     }
     const input = openApplicationSubmitSchema.parse(parsed);
-    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.clubApplication });
+    const securityCheckFailure = await requireTurnstile(request, { action: TURNSTILE_ACTIONS.clubApplication, fallback: { kind: "public-form" } });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
     const result = await submitOpenApplication(templateKey, input);
     // The submission id stays inside; the applicant only needs to know it worked.
