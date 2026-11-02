@@ -548,12 +548,94 @@ jobs:
         if: failure()
         run: cat app.log || true
 
+  # The club director and area coordinator journeys (#1439) in a real browser (Chromium), at 1280 and 390 px wide. They
+  # use the built app like a person would, so this shard builds it and starts it against its own migrated and seeded
+  # database. The app sends its email to the suite's own stand-in for Resend on port 3999 (the dev outbox), which is how
+  # the journeys read an emailed sign-in code in production mode; nothing leaves the job. The two widths run one after
+  # the other against the one app: each seeds its own rows (the run stamp carries the width) and the outbox port is only
+  # held while a width runs. Failures that are the site's fault are listed in KNOWN_BUGS in the suite and do not fail it
+  # until they are fixed (then it fails until the entry is removed). See scripts/verify-club-journeys.ts.
+  club-journeys:
+    name: Club journeys (real browser)
+    needs: scope
+    if: needs.scope.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: imsda_events
+          POSTGRES_USER: imsda
+          POSTGRES_PASSWORD: imsda_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U imsda -d imsda_events"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://imsda:imsda_ci@localhost:5432/imsda_events?schema=public
+      # `next build` type-checks the whole app and needs more than Node's default ~4 GB heap (#214).
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:deploy
+      - run: npm run db:seed
+      - run: npm run club-forms:sync
+      # The lodging property templates are code data synced after migrations (#198).
+      - run: npm run lodging:sync
+      # The form templates are synced after migrations; a template edited in the app is never overwritten (#153, #1064).
+      - run: npm run form-templates:sync
+      # The seeded event content (Camp Meeting meal and cancellation presets) is synced after migrations (#919).
+      - run: npm run event-content:sync
+      - run: npm run build
+      # Playwright is deliberately not a dependency; `--no-save` keeps the lockfile untouched.
+      - run: npm i --no-save playwright@1.63.0
+      - run: npx playwright install --with-deps chromium
+      # Fictitious CI-only values for production mode. Keep this block identical to the one in the
+      # "http-scripts" job, plus RESEND_API_URL, which points the app's email at the suite's dev outbox.
+      - name: Start the built app
+        env:
+          MANAGE_LINK_DERIVATION_SECRET: ci-only-manage-link-derivation-secret-0000000
+          ATTENDEE_PASS_SIGNING_SECRET: ci-only-attendee-pass-signing-secret-000000
+          RATE_LIMIT_HASH_SECRET: ci-only-rate-limit-hash-secret-0000000000
+          OUTBOX_SWEEP_TOKEN: ci-only-outbox-sweep-token-000000000000
+          SECRET_ENCRYPTION_KEY: ci-only-secret-encryption-key-00000000000
+          ACCOUNT_EMAIL_SENDER_ADDRESS: events@ci.example.test
+          RESEND_API_KEY: ci-placeholder-never-sent
+          RESEND_API_URL: http://127.0.0.1:3999
+        run: |
+          nohup npm run start > app.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost:3000/; then exit 0; fi
+            sleep 2
+          done
+          echo "The app did not start:" && cat app.log && exit 1
+      - name: Club journeys at 1280 px wide
+        env:
+          JOURNEY_SHARD: desktop
+        run: npm run test:club-journeys
+      - name: Club journeys at 390 px wide
+        env:
+          JOURNEY_SHARD: phone
+        run: npm run test:club-journeys
+      - name: Show the app log when a check failed
+        if: failure()
+        run: cat app.log || true
+
   # The required check (branch protection and the Claude tooling look for this
   # name): green only when `npm run verify` and every shard passed. The shards
   # may be skipped only when the scope job decided this change does not need them.
   verify:
     if: ${{ !cancelled() && github.event_name != 'push' }}
-    needs: [scope, verify-app, db-scripts-1, db-scripts-2, http-scripts]
+    needs: [scope, verify-app, db-scripts-1, db-scripts-2, http-scripts, club-journeys]
     runs-on: ubuntu-latest
     steps:
       - name: Check every job passed

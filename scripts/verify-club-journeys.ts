@@ -34,8 +34,19 @@
  * Sign-in budgets: the account sign-in code send limit (20 per hour per address) would stop repeated local runs, so the
  * suite clears the "attendee." rate-limit buckets on the local database before it starts.
  *
- * KNOWN_BUGS: failures that are the site's fault. Each is reported as an "expected failure" and the suite fails if one
- * unexpectedly passes, so the entry is removed when the site is fixed.
+ * RUN LOCALLY, step by step
+ *   1. Seeded database: npm run db:deploy && npm run db:seed, then club-forms:sync, lodging:sync, form-templates:sync,
+ *      event-content:sync.
+ *   2. npm run build, then start the app (npm run start) with the environment above (the dev outbox variables).
+ *   3. npm run test:club-journeys (both widths, one after the other), or JOURNEY_SHARD=desktop / phone for one.
+ *   JOURNEY_ONLY=3,5,C2 runs only those journeys (1 always runs: it signs in); JOURNEY_DEBUG=1 prints the page when
+ *   a step fails. CI runs it as the required check "Club journeys (real browser)" (.github/workflows/ci.yml).
+ *
+ * KNOWN_BUGS POLICY. A failing rule check that is the SITE's fault (checked in the source, not a test mistake) is never
+ * weakened or skipped. It is added to KNOWN_BUGS with an id, a one-line description naming the file, and the exact
+ * check label(s) (`page | rule | what`). It then shows as an "expected failure" and does not fail the run, and the run
+ * FAILS if that check unexpectedly passes, so the entry is deleted in the same change that fixes the site. A new,
+ * unlisted failure always fails the run.
  */
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";

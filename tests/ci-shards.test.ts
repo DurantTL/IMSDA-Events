@@ -23,12 +23,11 @@ const NOT_IN_CI = new Set([
   "test:translation-sim", // browser-translation.yml (#1445)
   "test:live-roster", // browser-translation.yml (#1445)
   "test:privacy-browsers", // browser-privacy.yml (#1445)
-  "test:club-journeys", // role journeys workflow (#1439, added with the CI job in part C)
   "test:club-form-roster-add", // not in ci.yml before the shards (#1233)
   "test:custom-message", // not in ci.yml before the shards (#1233)
 ]);
 
-const SHARD_JOB = /^(db-scripts-\d+|http-scripts)$/;
+const SHARD_JOB = /^(db-scripts-\d+|http-scripts|club-journeys)$/;
 
 type Job = { id: string; lines: string[] };
 
@@ -66,14 +65,15 @@ describe("CI database-script shards (#1233)", () => {
       }
     }
     for (const [script, ids] of placements) {
-      expect(ids, script).toHaveLength(1);
+      // One job runs a script once, except the club journeys job, which runs it once per width (JOURNEY_SHARD).
+      expect(new Set(ids), script).toHaveProperty("size", 1);
       expect(ids[0], script).toMatch(SHARD_JOB);
     }
     const expected = packageScripts
       .filter((name) => !NOT_IN_CI.has(name))
       .sort();
     expect([...placements.keys()].sort()).toEqual(expected);
-    expect(expected).toHaveLength(97);
+    expect(expected).toHaveLength(98);
   });
 
   it("keeps the scripts that need the app in the shard that starts it", () => {
