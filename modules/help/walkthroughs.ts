@@ -51,7 +51,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
       "app/(public)/account/sign-in/code/page.tsx",
       "components/attendee-sign-in-form.tsx",
       "components/sign-in-code-form.tsx",
-    ],
+      "app/(public)/account/(portal)/page.tsx", "components/account-section-nav.tsx", "components/one-time-code-input.tsx", "components/passkey-sign-in-button.tsx", "components/sign-in-code-form.module.css"],
     steps: [
       { id: "open-sign-in", text: "Open the account sign-in page.", alt: "The Account sign in page with an Email address box and a Password box." },
       { id: "enter-details", text: "Type your email address and your password. Then choose Sign in.", alt: "The sign-in form filled in, with the Sign in button marked." },
@@ -77,7 +77,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
       "components/two-step-setup.tsx",
       "components/passkey-manager.tsx",
       "components/sign-in-code-form.tsx",
-    ],
+      "components/one-time-code-input.tsx", "components/passkey-unlock-button.tsx", "components/two-step-setup.module.css", "components/sign-in-code-form.module.css"],
     steps: [
       { id: "code-page", text: "Sign in and type your emailed code. Then choose Enter your code, then set up two-step sign-in.", alt: "The Check your email page with the code typed in and the link Enter your code, then set up two-step sign-in marked." },
       { id: "start", text: "Choose Set up two-step sign-in.", alt: "The Turn on two-step sign-in page with the Set up two-step sign-in button marked." },
@@ -97,12 +97,12 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Add the people in your club to the roster.",
     destinationIds: ["club-settings"],
     keywords: ["leader", "leaders", "invite", "send an invite", "registrar", "reporter", "club admin", "club admins", "add someone", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${CLUB}/club-info/page.tsx`, "components/club-team-workspace.tsx", ...SHELL],
+    sourceFiles: [`${CLUB}/club-info/page.tsx`, "components/club-team-workspace.tsx", ...SHELL, "components/club-profile-form.tsx", "components/confirm-dialog.tsx", "components/role-details.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
       { id: "open-settings", text: "Open Club settings. Under Club admins, choose Add club admin.", alt: "The Club settings page, with the Add club admin button under Club admins marked." },
       { id: "fill-invite", text: "Type their email. Pick Registrar or Reporter.", alt: "The Give a role window with the Their email box marked." },
-      { id: "send", text: "Choose Add club admin. Someone with an account gets the role right away; anyone else gets an email invite.", alt: "The Give a role window filled in, with the Add club admin button marked." },
-      { id: "see-invite", text: "The person now shows under Club admins with their role. An invite shows here until they accept it.", alt: "The Club admins list showing the new person and their role." },
+      { id: "send", text: "Check the email and the role, then confirm in the window. Someone with an account gets the role right away; anyone else gets an email invite.", alt: "The Give a role window filled in, with the Add club admin button marked." },
+      { id: "see-invite", text: "The person now shows under Club admins with their role. An invite shows here until they accept it.", alt: "The Club admins list showing the new person's name, email and role, with the role marked." },
     ],
   },
   {
@@ -116,7 +116,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Fill in the club forms for the new year.",
     destinationIds: ["club-roster"],
     keywords: ["roster", "add member", "edit member", "remove member", "add person", "add to roster", "pathfinder", "staff", "actions", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${CLUB}/roster/page.tsx`, "components/club-roster-workspace.tsx", "components/club-roster-sections.module.css", ...SHELL],
+    sourceFiles: [`${CLUB}/roster/page.tsx`, "components/club-roster-workspace.tsx", "components/club-roster-sections.module.css", ...SHELL, "components/actions-menu.tsx", "components/birth-date-field.tsx", "components/roster-guardian-fields.tsx", "components/roster-type-definitions.tsx", "components/confirm-dialog.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
       { id: "open-roster", text: "Open Roster. Choose Add to roster.", alt: "The Roster page, with the Add to roster button marked." },
       { id: "add-details", text: "Type the first name, last name and birth date. Pick the type, the current class and the gender.", alt: "The Add to the roster window with the name, birth date, class and gender filled in, with the first name box marked." },
@@ -138,7 +138,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Register your club for an event.",
     destinationIds: ["club-forms"],
     keywords: ["forms", "club forms", "yearly forms", "required forms", "fill in", "send link", "private link", "missing", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${CLUB}/forms/page.tsx`, `${CLUB}/forms/[templateKey]/new/page.tsx`, "components/club-forms-lists.tsx", "components/club-form-fill-in.tsx", ...SHELL],
+    sourceFiles: [`${CLUB}/forms/page.tsx`, `${CLUB}/forms/[templateKey]/new/page.tsx`, "components/club-forms-lists.tsx", "components/club-form-fill-in.tsx", ...SHELL, "components/club-forms-actions.tsx", "components/club-forms-lists.module.css", "components/club-form-date-input.tsx", "components/club-form-section-title.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
       { id: "open-forms", text: "Open Forms. Required forms are at the top, and Missing means not filled in yet.", alt: "The Forms page, with the Required forms list and a Missing label marked." },
       { id: "fill-in", text: "Choose Fill in beside a required form.", alt: "The Forms page with the Fill in button beside a required form marked." },
@@ -157,7 +157,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Build your order list.",
     destinationIds: ["club-events"],
     keywords: ["event", "events", "register", "registration", "club event", "who's going", "roster", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${CLUB}/events/page.tsx`, `${CLUB}/events/[eventId]/page.tsx`, "components/club-event-list.tsx", "components/club-registration-workspace.tsx", ...SHELL],
+    sourceFiles: [`${CLUB}/events/page.tsx`, `${CLUB}/events/[eventId]/page.tsx`, "components/club-event-list.tsx", "components/club-registration-workspace.tsx", ...SHELL, "components/club-roster-age-field.tsx", "components/missing-age-summary.tsx", "components/public-registration-form.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
       { id: "open-events", text: "Open Club events. Choose Register beside an open event.", alt: "The Club events page, with the Register button beside an open event marked." },
       { id: "whos-going", text: "Tap each person who is going, or choose Select everyone.", alt: "The Who's going page with the Select everyone button marked." },
@@ -177,7 +177,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Keep your Monthly Records up to date.",
     destinationIds: ["club-orders"],
     keywords: ["orders", "order list", "supplies", "stock", "on hand", "add an item", "catalog", "adventsource", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${CLUB}/orders/page.tsx`, "components/club-order-workspace.tsx", "components/club-orders.module.css", ...SHELL],
+    sourceFiles: [`${CLUB}/orders/page.tsx`, "components/club-order-workspace.tsx", "components/club-orders.module.css", ...SHELL, "components/club-supply-stock-workspace.tsx", "components/club-uniform-section.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
       { id: "open-orders", text: "Open Orders. Under Add an item, pick an item.", alt: "The Orders page with the Item choice under Add an item marked." },
       { id: "add-item", text: "Choose Add to list.", alt: "The Add an item form with an item picked and the Add to list button marked." },
@@ -196,7 +196,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "File the Year-End Report in spring.",
     destinationIds: ["club-records"],
     keywords: ["monthly records", "monthly record", "report", "reports", "due the 10th", "submit report", "points", "attendance", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${CLUB}/records/page.tsx`, "components/club-report-form.tsx", ...SHELL],
+    sourceFiles: [`${CLUB}/records/page.tsx`, "components/club-report-form.tsx", ...SHELL, "components/club-meeting-notes.tsx", "components/club-year-tiles.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
       { id: "open-records", text: "Open Monthly Records. Choose Open beside the month that has no record.", alt: "The Monthly Records page, with the Open button beside a month marked." },
       { id: "fill-record", text: "Choose Open Monthly Record. Then fill in the meeting details and head counts.", alt: "A Monthly Record open for filling in, with the attendance box marked." },
@@ -214,7 +214,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Nothing else is needed until next year.",
     destinationIds: ["club-records"],
     keywords: ["year-end", "year end", "year-end report", "yearly report", "april 1", "report", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${CLUB}/records/page.tsx`, `${CLUB}/reports/year-end/[year]/page.tsx`, "components/club-year-end-report-form.tsx", ...SHELL],
+    sourceFiles: [`${CLUB}/records/page.tsx`, `${CLUB}/reports/year-end/[year]/page.tsx`, "components/club-year-end-report-form.tsx", ...SHELL, "components/club-year-end-conference.tsx", "components/email-input.tsx", "components/phone-input.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
       { id: "open-report", text: "Open Monthly Records. Under Year-End Report, choose Open report.", alt: "The Year-End Report list on Monthly Records, with an Open report button marked." },
       { id: "who-reporting", text: "Type your name and contact details under Who is reporting.", alt: "The Year-End Report with the Who is reporting boxes marked." },
@@ -233,7 +233,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Search the Help guides in your account for the task you are doing.",
     destinationIds: ["club-home"],
     keywords: ["help", "support", "contact", "forms help", "email support", "phone", "need help", "translation", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: ["components/forms-help.tsx", "components/forms-help.module.css", ...SHELL],
+    sourceFiles: ["components/forms-help.tsx", "components/club-portal-masthead-view.tsx", "components/forms-help.module.css", "modules/system-admin/forms-help-contact.ts", "app/(public)/account/(portal)/clubs/[organizationId]/page.tsx", "components/club-overview.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
       { id: "open-help", text: "On any club page, choose Forms help at the top.", alt: "A club page with the Forms help button at the top marked." },
       { id: "help-choices", text: "Pick the choice that fits, such as Having form issues? or Need translation?.", alt: "The Forms help window listing Having form issues, Need translation and Need more help, with the first marked." },
@@ -263,7 +263,7 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
       "app/(public)/account/two-step/page.tsx",
       "components/attendee-sign-in-form.tsx",
       "components/roster-unlock-form.tsx",
-    ],
+      "components/passkey-unlock-button.tsx", "components/one-time-code-input.tsx", "components/account-section-nav.tsx", "components/area-coordinator-card.tsx", "app/(public)/account/(portal)/page.tsx"],
     steps: [
       { id: "enter-details", text: "Open the account sign-in page. Type your email address and password, then choose Sign in.", alt: "The Account sign in page filled in, with the Sign in button marked." },
       { id: "confirm", text: "The Confirm it's you page opens. Use your passkey, or find the six-digit code in your authenticator app.", alt: "The Confirm it's you page, with the Authenticator code box marked." },
@@ -282,7 +282,7 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Follow up with a club that is behind.",
     destinationIds: ["coordinator-overview", "coordinator-clubs"],
     keywords: ["clubs", "all clubs", "find a club", "open club", "who's missing what", "whos missing", "overview", "search", "view only", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${AREA}/overview/page.tsx`, "app/(public)/account/(portal)/clubs/page.tsx", "app/(public)/account/(portal)/area/[organizationId]/page.tsx", "components/coordinator-overview.tsx", "components/coordinator-whos-missing.tsx", "components/area-clubs-views.tsx", ...COORDINATOR_SHELL],
+    sourceFiles: [`${AREA}/overview/page.tsx`, "app/(public)/account/(portal)/clubs/page.tsx", "app/(public)/account/(portal)/area/[organizationId]/page.tsx", "components/coordinator-overview.tsx", "components/coordinator-whos-missing.tsx", "components/area-clubs-views.tsx", ...COORDINATOR_SHELL, "components/area-club-search-form.tsx", "components/club-overview.tsx", "components/club-year-tiles.tsx", "components/coordinator-whos-missing.module.css", "components/setup-checklist-panel.tsx", "components/table-card-labels.tsx"],
     steps: [
       { id: "open-clubs", text: "On Club coordination, choose All clubs.", alt: "The Club overview page with the All clubs tab marked." },
       { id: "search", text: "Every active club is listed. Type a club, church or city to find one.", alt: "The All clubs page with the search box marked." },
@@ -301,7 +301,7 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Follow up with a club that is behind.",
     destinationIds: ["coordinator-records"],
     keywords: ["monthly records", "records", "filed", "submitted", "not submitted", "month", "review", "due the 10th", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${AREA}/reports/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/reports/[month]/page.tsx", "components/coordinator-monthly-records.tsx", ...COORDINATOR_SHELL],
+    sourceFiles: [`${AREA}/reports/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/reports/[month]/page.tsx", "components/coordinator-monthly-records.tsx", ...COORDINATOR_SHELL, "components/club-report-charts.tsx", "components/coordinator-monthly-records.module.css", "components/table-card-labels.tsx"],
     steps: [
       { id: "open-records", text: "On Club coordination, choose Monthly Records.", alt: "The Club overview with the Monthly Records tab marked." },
       { id: "pick-month", text: "Pick a month. Each month shows how many clubs filed.", alt: "The Monthly Records page with the month buttons marked." },
@@ -320,7 +320,7 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Follow up with a club that is behind.",
     destinationIds: ["coordinator-points"],
     keywords: ["points", "ranking", "leader", "score", "total points", "report points", "chart", "table", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${AREA}/points/page.tsx`, "components/coordinator-points.tsx", ...COORDINATOR_SHELL],
+    sourceFiles: [`${AREA}/points/page.tsx`, "components/coordinator-points.tsx", ...COORDINATOR_SHELL, "components/coordinator-destinations.tsx", "components/coordinator-points.module.css", "components/table-card-labels.tsx"],
     steps: [
       { id: "open-points", text: "On Club coordination, choose Points.", alt: "The Club overview with the Points tab marked." },
       { id: "chart", text: "The chart ranks the clubs by total points. The leader is shown at the top.", alt: "The Points page with the Points leader card marked." },
@@ -339,7 +339,7 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Check Monthly Records for the whole year.",
     destinationIds: ["coordinator-overview", "coordinator-records"],
     keywords: ["follow up", "behind", "late", "missing", "overdue", "contact the director", "who's missing what", "next step", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${AREA}/overview/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/page.tsx", "components/coordinator-overview.tsx", "components/coordinator-whos-missing.tsx", ...COORDINATOR_SHELL],
+    sourceFiles: [`${AREA}/overview/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/page.tsx", "components/coordinator-overview.tsx", "components/coordinator-whos-missing.tsx", ...COORDINATOR_SHELL, "components/club-overview.tsx", "components/coordinator-whos-missing.module.css", "components/setup-checklist-panel.tsx", "components/table-card-labels.tsx"],
     steps: [
       { id: "find-club", text: "On Overview, find the club in Who's missing what. Missing or Missing 1 earlier month says what is not filed.", alt: "The Who's missing what list with a club's Missing marks marked." },
       { id: "next-step", text: "Read the next step. The app sends nothing for you.", alt: "The Who's missing what list with the club's next step marked." },
@@ -359,12 +359,12 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
     next: "Ask the conference office to add a director.",
     destinationIds: ["coordinator-overview"],
     keywords: ["no director", "missing director", "club without a director", "add a director", "conference office", "who's missing what", "step by step", "walkthrough", "screenshots"],
-    sourceFiles: [`${AREA}/overview/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/page.tsx", "components/coordinator-overview.tsx", "components/coordinator-whos-missing.tsx", "modules/setup-help/coordinator-checklist.ts", ...COORDINATOR_SHELL],
+    sourceFiles: [`${AREA}/overview/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/page.tsx", "components/coordinator-overview.tsx", "components/coordinator-whos-missing.tsx", "modules/setup-help/coordinator-checklist.ts", ...COORDINATOR_SHELL, "components/club-overview.tsx", "components/coordinator-whos-missing.module.css", "components/role-setup-help.tsx", "components/setup-checklist-panel.tsx", "components/table-card-labels.tsx"],
     steps: [
       { id: "getting-started", text: "On Overview, Getting started says how many clubs have no director.", alt: "The Getting started list on Overview with A director for every club marked." },
       { id: "no-director", text: "In Who's missing what, a club with No director has a red mark.", alt: "The Who's missing what list with the No director mark marked." },
       { id: "ask-office", text: "Its next step says to ask the conference office to add a director. Only they can.", alt: "The Who's missing what list with the next step for a club with no director marked." },
-      { id: "club-admins", text: "Choose Open club. Club admins says no director is assigned yet.", alt: "The club's page with the Club admins message that no director is assigned marked." },
+      { id: "club-admins", text: "Choose Open club. Club admins says no director is assigned yet.", alt: "The club's page with the whole Club admins section marked, which says no director is assigned yet." },
     ],
   },
 ];

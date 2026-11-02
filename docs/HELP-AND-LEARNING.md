@@ -91,6 +91,18 @@ page, and a staff viewer never gets a portal guide in staff search.
   `reservedPortalGuideIds`). Static routes win over `[guideId]`, and the check reports a collision.
 - Add a guide the same way as a staff guide (see above), using `portalDestinations` and the audience.
 
+### Searching portal Help
+
+The portal Help hub (`/account/help`) has a "Search the guides" box (`app/(public)/account/(portal)/help/portal-help-search.tsx`),
+built from the same pieces as the staff hub: `useClientSearch` (`components/search-as-you-type`), the generic `filterGuides`
+(`modules/help/visibility.ts`) and the same `help.module.css` classes. The server still decides which guides this viewer may see
+and passes the browser only each guide's id, title, summary, audience and keywords, never viewer data. The box filters as you
+type (title, summary and keywords; every word typed must match), keeps focus, announces the count (`role="status"`), shows the
+full list when it is empty, and offers "Show all guides" when nothing matches. With JavaScript off the full list still renders.
+Give a new guide good `keywords` so the search finds it (walkthroughs carry "step by step"). A viewer never sees, or finds by
+search, a guide for a role they do not hold: the coordinator walkthroughs never appear for a director-only account.
+`tests/walkthrough-search-restore-1482.test.ts` checks the search.
+
 ## Permitted next steps
 
 The shared staff states "Permission required" (`AccessRestricted`) and "Not available for this event"
@@ -163,6 +175,14 @@ run and only the script knows it, so the coordinator sign-in walkthrough types a
 one up to date, one behind, one with no director, and the director's own club. A coordinator sees every active club, so the
 script hides the clubs already in the local database while it runs and shows them again afterwards.
 
+A run also refuses to start when `ACCOUNT_EMAIL_SENDER_ADDRESS`, `RESEND_API_KEY` or an SES region is set in its environment (the
+app only returns the sign-in code when it has no email to send it with, and no run may send real email). The browser is found
+without `HELP_SHOTS_BROWSER`: the installed package's own Chromium, then a Chromium found under `PLAYWRIGHT_BROWSERS_PATH` or
+`/opt/pw-browsers`, then the other package. A run changes a few things outside its own fixtures (passkeys, some form templates, the
+published club events already in the database, and for coordinator walkthroughs the clubs already in the database). Their "before" state is written to a marker file in the OS
+temp directory (`imsda-help-walkthroughs-restore.json`, never in the repository) before anything changes; the end of the run,
+Ctrl-C and SIGTERM put it back, and the next run restores from a leftover marker first, so a killed run is repaired.
+
 Both refuse `NODE_ENV=production`, a database or app URL that is not on this machine, and a database that is not a seeded dev
 or CI one. The first-sign-in and passkey walkthroughs sign in for real: the emailed code is the one the local app returns
 instead of sending mail (it is never real email), and a software passkey (Chromium's virtual authenticator) stands in for a
@@ -174,6 +194,11 @@ help:check` prints a WARNING (not an error, exit code unchanged) when a walkthro
 manifest entry, with the command that fixes it, and the workflow turns each into a `::warning::` annotation. A picture file that
 is missing is an error. The guide page also shows "This picture may be out of date; the steps above are current." when the
 guide's `lastReviewed` is later than the capture date.
+
+The hash covers only the files listed in a walkthrough's `sourceFiles`: its pages, the main components they render and their CSS
+modules. A change to something not listed (a shared hook, a helper, global CSS, a deeper child component) does not trigger the
+warning, so when you change shared look or behavior, re-run `npm run test:walkthroughs` (it fails on a missing control) and
+refresh the pictures by hand. Add a file to `sourceFiles` when a walkthrough's pictures start to depend on it.
 
 **Size budget.** Pictures are WebP (quality 70): phone 390 x 844, desktop 1280 x 800 resized to 960 wide. Target at most 60 KB
 (phone) and 90 KB (desktop); over 150 KB fails the test, and all walkthroughs together should stay under about 6 MB.

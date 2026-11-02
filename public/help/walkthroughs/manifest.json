@@ -1,66 +1,66 @@
 {
   "walkthrough-coordinator-clubs": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "fa4ce2fc5665d28273a50152666d8de8320ae43c7bd0594998f616b93ee68313"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "4c799fecc0c300b283ce592e1aef9d3469955e164748913834a98dd17f752476"
   },
   "walkthrough-coordinator-follow-up": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "5d3d683d68bfa137dba0478479222beb52aca29d8e01b78c4ab9e722073d9eab"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "5e757861eeb0df0614d47df532782d0cb41deb355c0eff1ab5817fe4ba10abab"
   },
   "walkthrough-coordinator-no-director": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "e2eb20777e5ede9977a1531bee4e6731837018f236ad1c7720e166a003c78a82"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "92a7e4840475069f82f2cb79891f9409ea4ad22b75f0b11410e590d7a51c108e"
   },
   "walkthrough-coordinator-points": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "f28b40c1efa7a64dc867e71c109bf339ed43c724b595894422035d5ab7f72520"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "8a5f809fd07acd5ca6ba17e8da2006d2b0ecc118fec0ab2519d74da8c3a44cf5"
   },
   "walkthrough-coordinator-records": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "fda833ba0ba0b717b32983982ce100a4e65ab4e15b6e99eb968f544b6178165f"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "619692f99da6924e999da88ced4afb12f707201ecabb3098f5944a276199062e"
   },
   "walkthrough-coordinator-sign-in": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "bb183b8de30f4c80d11f79a25ccf8d5c828e654af2335a918f1f49797c103909"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "e4ae2e9b3b495059245a8997958d0ea13dba05916212ee6af9944c222c7f7ae9"
   },
   "walkthrough-director-club-forms": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "fb9786efb234e2bcaaa9e22c3c79978646dcaeb811bcce1263ca0f4689774066"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "20dc0d1089992a4476133c32318c57773bf7a3d17a9990b90c22de5242e5df7b"
   },
   "walkthrough-director-first-sign-in": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "401374990a355cc88e83cc20a1e541f82ea2c69dc28a95fe4ad60892e1736309"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "e79617a483781941d2c2e7a2ff365258ef2668af177eb4fc196cc384323ff330"
   },
   "walkthrough-director-get-help": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "5f46869e201f7079a0dec2ab4e38b1f61134aeed0d0e4de8ec6d3a0e939a1f58"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "25a336ea3486dfcd794767a2d5d5f75f070a22279bf5b6e08c13566234a74307"
   },
   "walkthrough-director-leaders": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "cbad354f95b8d3885f7192d43da13971baedee51e15567ac64a9ed9625894925"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "227ff5339640980cc2a98b027f245ade19c94b64799f547286bbc0a1c0982e93"
   },
   "walkthrough-director-monthly-records": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "af33cd405a2e703bb6ffa02aa402e45c6f9def08256f90df6ad28c0d5a875b63"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "d2a2f34e8c2ba07fe542df67ee359e3662375a4b8975f36e22365e770daef8d7"
   },
   "walkthrough-director-orders": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "529f5e2f152f379877fcc314afddb30465818ae74f99b8ef079c55bbc356d5fc"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "bcc07e88da69abd27779dd616857b0ea6fb9e4d858c1f19d7218e37c8d2b1bf6"
   },
   "walkthrough-director-register-event": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "1f93f616f178cbdd75add8fe8c95033e83650c12aca8ed53ff4ec1d2983c579b"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "8870d254ef4167114c1ffdd65eaab6f4060973f014f3556bdbb6f793ff7f777f"
   },
   "walkthrough-director-roster": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "633d44335f72cb0a918dd8f5a5c1af43c4a3e1b0a2f209905719715a80aadd5f"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "bcd33cdae3d2166f87db7dc1c8c3ffd1f3d9a610cd08234089e8faa344cd1988"
   },
   "walkthrough-director-two-step": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "7a18a88ab0661dc155ffead1580e7a6f8e3dabb8090dcf38b5edfe502a57cdcc"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "84ceda2dd13ed9d8886a7addd0c75a35a305f38592c898bf6845ebc4666ab9ed"
   },
   "walkthrough-director-year-end": {
-    "capturedFor": "2026-11-01",
-    "sourceHash": "b0936a09a832c75f8e5dff89044dd539c900d9d5b5309d2a320e406e7b882e5b"
+    "capturedFor": "2026-11-02",
+    "sourceHash": "0b1ce5d9c98cc41a0b32b9a7e6489c4bef7b943cd48822d288f6c6581052b519"
   }
 }

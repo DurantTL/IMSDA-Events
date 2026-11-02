@@ -12,6 +12,7 @@ import { checkWalkthroughManifest, walkthroughCapturedFor } from "@/modules/help
 import { readWalkthroughManifest, walkthroughSourceHash } from "@/modules/help/walkthrough-files";
 import { walkthroughDesktopMinWidth, walkthroughImage, walkthroughImageBudgets, walkthroughImageSizes, type WalkthroughImageKind } from "@/modules/help/walkthrough-images";
 import { coordinatorWalkthroughs, directorWalkthroughs, walkthroughGuides, walkthroughs, walkthroughsForGuide } from "@/modules/help/walkthroughs";
+import { assertWalkthroughSafety, signInRateLimitPolicies } from "@/scripts/support/help-walkthrough-fixtures";
 import { buildClubChecklist, type ClubChecklistFacts } from "@/modules/setup-help/club-checklist";
 import { buildCoordinatorChecklist } from "@/modules/setup-help/coordinator-checklist";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
@@ -61,9 +62,19 @@ describe("walkthrough data and browser actions", () => {
     }
   });
 
+  it("lists each source file once", () => {
+    for (const walkthrough of walkthroughs) expect(new Set(walkthrough.sourceFiles).size, walkthrough.id).toBe(walkthrough.sourceFiles.length);
+  });
+
+  it("lists the Forms help popup's own files for the get-help walkthrough", () => {
+    const help = walkthroughs.find((walkthrough) => walkthrough.id === "walkthrough-director-get-help")!;
+    expect(help.sourceFiles).toEqual(expect.arrayContaining(["components/forms-help.tsx", "components/forms-help.module.css", "modules/system-admin/forms-help-contact.ts"]));
+  });
+
   it("lists source files that exist, for the stale-picture check", () => {
     for (const walkthrough of walkthroughs) {
       expect(walkthrough.sourceFiles.length, walkthrough.id).toBeGreaterThan(0);
+      for (let index = 0; index < walkthrough.sourceFiles.length; index += 1) expect(typeof walkthrough.sourceFiles[index], `${walkthrough.id} source ${index}`).toBe("string");
       expect(walkthroughSourceHash(walkthrough, root), `${walkthrough.id} lists a missing source file`).toMatch(/^[0-9a-f]{64}$/);
     }
   });
@@ -282,14 +293,23 @@ describe("the guide page's steps", () => {
 describe("the capture and check scripts", () => {
   const read = (file: string) => readFileSync(join(root, file), "utf8");
 
-  it("refuse a non-local database or app URL, and production, before writing anything", () => {
-    const harness = read("scripts/support/walkthrough-harness.ts");
-    expect(harness.indexOf("assertWalkthroughSafety(baseUrl)")).toBeGreaterThan(-1);
-    expect(harness.indexOf("assertWalkthroughSafety(baseUrl)")).toBeLessThan(harness.indexOf("assertSeededDatabase(prisma)"));
-    expect(harness.indexOf("assertSeededDatabase(prisma)")).toBeLessThan(harness.indexOf("createWalkthroughFixtures(prisma)"));
-    const fixtures = read("scripts/support/help-walkthrough-fixtures.ts");
-    expect(fixtures).toContain("assertLocalDatabase(");
-    expect(fixtures).toContain("assertLocalUrl(");
+  it("refuse a non-local app URL, a non-local database, production and an environment with account email set, and accept the local setup", () => {
+    const local = { DATABASE_URL: "postgresql://imsda:pw@localhost:5432/imsda_events?schema=public" };
+    expect(() => assertWalkthroughSafety("http://localhost:3000", local)).not.toThrow();
+    expect(() => assertWalkthroughSafety("https://events.example.org", local)).toThrow(/outside localhost/);
+    expect(() => assertWalkthroughSafety("http://localhost:3000", { DATABASE_URL: "postgresql://imsda:pw@db.example.org:5432/imsda_events" })).toThrow(/outside a local database/);
+    expect(() => assertWalkthroughSafety("http://localhost:3000", { ...local, NODE_ENV: "production" })).toThrow(/NODE_ENV=production/);
+    expect(() => assertWalkthroughSafety("http://localhost:3000", {})).toThrow(/DATABASE_URL is required/);
+    expect(() => assertWalkthroughSafety("http://localhost:3000", { ...local, ACCOUNT_EMAIL_SENDER_ADDRESS: "events@example.test" })).toThrow(/ACCOUNT_EMAIL_SENDER_ADDRESS/);
+    expect(() => assertWalkthroughSafety("http://localhost:3000", { ...local, RESEND_API_KEY: "placeholder" })).toThrow(/RESEND_API_KEY/);
+    // A blank value is the same as not set (that is how .env.example ships them).
+    expect(() => assertWalkthroughSafety("http://localhost:3000", { ...local, ACCOUNT_EMAIL_SENDER_ADDRESS: "", RESEND_API_KEY: " " })).not.toThrow();
+  });
+
+  it("clears only the sign-in rate limits, and has no outbox fallback for the code", () => {
+    expect(signInRateLimitPolicies).toEqual(["attendee.sign-in", "attendee.roster-unlock", "attendee.passkey"]);
+    expect(read("scripts/support/walkthrough-harness.ts")).not.toContain("messageOutbox");
+    expect(read("scripts/support/help-walkthrough-fixtures.ts")).not.toMatch(/rateLimitBucket\.deleteMany\(\{\}\)/);
   });
 
   it("use only synthetic fixtures: a walkthrough id prefix, example.test emails and valid sample phones", () => {
