@@ -9,6 +9,7 @@ import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-
 import { Award, Pencil, Plus, Save, X } from "lucide-react";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import type { HonorRecord } from "@/modules/honors/repository";
+import { EmptyState } from "@/components/empty-state";
 
 /** Sorts from the headers, in the address (#1458); the catalog stays in the order the server gave until a column is chosen. */
 const HONOR_CATALOG_SORT = {
@@ -145,11 +146,7 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
           <span className="count-badge">{honors.length} honors</span>
         </div>
         {honors.length === 0 ? (
-          <div className="empty-state">
-            <Award aria-hidden="true" size={27} />
-            <h3>No honors yet</h3>
-            <p>Add the honors from last year&apos;s class list to get started.</p>
-          </div>
+          <EmptyState hint="Use the form above to add the honors from last year's class list." icon={<Award aria-hidden="true" size={27} />} title="No honors yet">The honor catalog is empty.</EmptyState>
         ) : (
           <>
             <label className="form-stack">

@@ -20,6 +20,7 @@ import {
 import type { BillingResponsibilityView } from "@/modules/billing-responsibility/repository";
 import { notBilledLabel } from "@/modules/club-registrations/church-owed";
 import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
+import { EmptyState } from "@/components/empty-state";
 
 function date(value: string) {
   return new Date(value).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
@@ -67,11 +68,7 @@ export function BillingResponsibility({
         </div>
       </div>
       {!view.isDeferred ? (
-        <div className="panel empty-state">
-          <Building2 aria-hidden="true" size={24} />
-          <h3>This event is not billed to organizations</h3>
-          <p>Billing responsibility applies to events where churches and groups are invoiced after the event.</p>
-        </div>
+        <EmptyState className="panel empty-state" headingLevel={3} hint="Nothing to do here. Pick an event that invoices churches and groups after the event." icon={<Building2 aria-hidden="true" size={24} />} title="This event is not billed to organizations">Billing responsibility applies to events where churches and groups are invoiced after the event.</EmptyState>
       ) : (
         <>
           <p className="billing-estimate-note">Amounts are estimates based on registration. Invoices use the people checked in at the event.</p>
@@ -113,11 +110,7 @@ export function BillingResponsibility({
             <GroupPanel eventId={eventId} group={group} isSystemAdministrator={isSystemAdministrator} key={group.key} lineHistory={lineHistory} />
           ))}
           {groups.length === 0 && (
-            <div className="panel empty-state">
-              <Building2 aria-hidden="true" size={24} />
-              <h3>No registrations to bill yet</h3>
-              <p>Submitted, confirmed, waitlisted and cancelled registrations appear here.</p>
-            </div>
+            <EmptyState className="panel empty-state" headingLevel={3} hint="Registrations appear here once people submit, confirm, waitlist or cancel." icon={<Building2 aria-hidden="true" size={24} />} title="No registrations to bill yet">There are no registrations to group into invoices.</EmptyState>
           )}
         </>
       )}

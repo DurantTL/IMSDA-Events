@@ -8,6 +8,7 @@ import { type ClubSupplySection, clubSupplySectionLabels, clubSupplySections } f
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
 import { makeSearchMatcher } from "@/lib/search-match";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
+import { EmptyState } from "@/components/empty-state";
 
 type SaveResponse = { stock?: { itemId: string; quantityOnHand: number }; error?: string; message?: string; issues?: Array<{ message?: string }> };
 
@@ -108,12 +109,10 @@ export function ClubSupplyStockWorkspace({
         <p className="field-help">Record how many of each item the club has on hand. Each row saves on its own.</p>
       )}
       {stock.length === 0 ? (
-        <div className="empty-state">
-          <Package aria-hidden="true" size={27} />
-          <h3>No catalog items yet</h3>
-          <p>Conference staff haven&apos;t loaded the supply catalog yet. Check back later, or ask the conference office.</p>
+        <>
+          <EmptyState hint="Check back later, or ask the conference office." icon={<Package aria-hidden="true" size={27} />} title="No catalog items yet">Conference staff haven&apos;t loaded the supply catalog yet.</EmptyState>
           <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="the supply catalog" id="supplies-no-catalog" />
-        </div>
+        </>
       ) : (
         <>
           <div className={styles.filters}>

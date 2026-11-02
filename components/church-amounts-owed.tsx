@@ -14,6 +14,7 @@ import {
   type ChurchSponsoredPromoLine,
 } from "@/modules/promo-codes/church-sponsored";
 import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
+import { EmptyState } from "@/components/empty-state";
 
 /**
  * What each church owes for this event (#409): an estimate from the pricing
@@ -132,13 +133,9 @@ export function ChurchAmountsOwed({
           </div>
         ))}
         {billed.length === 0 && (
-          <div className="empty-state">
-            <Building2 aria-hidden="true" size={24} />
-            <h3>{sponsored.lineCount > 0 ? "No church-billed club registrations" : "No church-billed registrations"}</h3>
-            <p>{sponsored.lineCount > 0
-              ? "No club is billed for this event. Church-sponsored promo codes are listed below."
-              : "No club has a submitted registration for this event yet, or this event does not bill churches."}</p>
-          </div>
+          <EmptyState hint={sponsored.lineCount > 0 ? "Church-sponsored promo codes are listed below." : "Amounts appear here once a club submits a registration for an event that bills churches."} icon={<Building2 aria-hidden="true" size={24} />} title={sponsored.lineCount > 0 ? "No church-billed club registrations" : "No church-billed registrations"}>{sponsored.lineCount > 0
+            ? "No club is billed for this event."
+            : "No club has a submitted registration for this event yet, or this event does not bill churches."}</EmptyState>
         )}
       </section>
       {groupRows.length > 0 && (

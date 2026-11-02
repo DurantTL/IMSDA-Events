@@ -39,13 +39,16 @@ export function EmptyState({
   className?: string;
   /** The title's heading level; pass the one that follows the heading above it. Defaults to 3. */
   headingLevel?: 2 | 3 | 4;
-  /** False when the empty state is just the visible result of a search or filter: no live region, so typing never re-announces it. */
-  announce?: boolean;
+  /**
+   * True (default): a polite status. False when the empty state is just the visible result of a search or filter, or is
+   * present at first render: no live region, so typing never re-announces it. "alert" for a failure the viewer must hear now.
+   */
+  announce?: boolean | "alert";
 }) {
   const Heading = `h${headingLevel}` as const;
   const offered = emptyStateAction(canCreate, action);
   return (
-    <div className={className} role={announce ? "status" : undefined}>
+    <div className={className} role={announce === "alert" ? "alert" : announce ? "status" : undefined}>
       {icon}
       <Heading>{title}</Heading>
       {children && <p>{children}</p>}

@@ -12,6 +12,7 @@ import type { RegistrationRecord } from "@/modules/registrations/repository";
 import type { SquareReconciliationFinding } from "@/modules/payments/square-reconciliation";
 import { registrationMatchesSearch } from "@/modules/registrations/search";
 import { cappedNotice } from "@/lib/pagination";
+import { EmptyState } from "@/components/empty-state";
 
 /** How many registrations the match dialog lists: a short default, a wider cap once searching. */
 export const SQUARE_CANDIDATES_DEFAULT = 8;
@@ -290,33 +291,29 @@ export function SquarePaymentMatching({
           </button>
         ))}
         {outstanding.length === 0 && unavailable && (
-          <div className="empty-state">
-            <CreditCard aria-hidden="true" size={24} />
-            <h3>Square payments were not checked</h3>
-            <p>
+          <>
+            <EmptyState hint="Reload the page to check again once Square can be reached." icon={<CreditCard aria-hidden="true" size={24} />} title="Square payments were not checked">
               This is not an all-clear. Any card payments taken outside IMSDA
               Events, including in the Square app at check-in, are still
               unknown until Square can be reached.
-            </p>
+            </EmptyState>
             <EventSetupHelp context="Square payments" id={/not configured/i.test(unavailable ?? "") ? "square-not-configured" : "square-unavailable"} />
-          </div>
+          </>
         )}
         {outstanding.length === 0 && !unavailable && (
-          <div className="empty-state">
-            <CreditCard aria-hidden="true" size={24} />
-            <h3>
-              {squareUnreachable
-                ? "Nothing found so far"
-                : "Nothing is waiting to be matched"}
-            </h3>
-            <p>
-              {squareUnreachable
-                ? `The ${examined} Square payments read before Square stopped responding are recorded. Reload to check the rest.`
-                : examined > 0
-                ? `All ${examined} completed Square payments in the last ${windowDays} days are recorded.`
-                : "No completed Square payments were found in this window."}
-            </p>
-          </div>
+          <EmptyState
+            hint={squareUnreachable ? "Reload the page to check the rest." : "Nothing to do here. New Square payments are listed when they need matching."}
+            icon={<CreditCard aria-hidden="true" size={24} />}
+            title={squareUnreachable
+              ? "Nothing found so far"
+              : "Nothing is waiting to be matched"}
+          >
+            {squareUnreachable
+              ? `The ${examined} Square payments read before Square stopped responding are recorded.`
+              : examined > 0
+              ? `All ${examined} completed Square payments in the last ${windowDays} days are recorded.`
+              : "No completed Square payments were found in this window."}
+          </EmptyState>
         )}
       </section>
 

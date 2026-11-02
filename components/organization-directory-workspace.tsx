@@ -15,6 +15,7 @@ import {
 } from "@/modules/organizations/domain";
 import type { OrganizationDeletionCheck, OrganizationRecord } from "@/modules/organizations/repository";
 import styles from "./organization-directory-workspace.module.css";
+import { EmptyState, NoMatchesState } from "@/components/empty-state";
 
 type OrganizationEditor =
   | { kind: "create" }
@@ -316,20 +317,9 @@ export function OrganizationDirectoryWorkspace({
         />
 
         {total === 0 && searching ? (
-          <div className="empty-state" role="status">
-            <Building2 aria-hidden="true" size={27} />
-            <h3>No churches or clubs match</h3>
-            <p>Nothing matches your search and filters. Try fewer words, or clear the filters.</p>
-          </div>
+          <NoMatchesState clear={{ href: "/admin/organizations" }} icon={<Building2 aria-hidden="true" size={27} />} noun="churches or clubs" query={filters.q} />
         ) : total === 0 ? (
-          <div className="empty-state">
-            <Building2 aria-hidden="true" size={27} />
-            <h3>No churches or clubs yet</h3>
-            <p>Add the first church, then place its clubs beneath it.</p>
-            <button className="primary-button" type="button" onClick={beginCreate}>
-              Add first organization
-            </button>
-          </div>
+          <EmptyState action={{ label: "Add first organization", onClick: beginCreate }} canCreate icon={<Building2 aria-hidden="true" size={27} />} title="No churches or clubs yet">Add the first church, then place its clubs beneath it.</EmptyState>
         ) : (
           <div className={styles.directory}>
             {organizations.map((organization) => (

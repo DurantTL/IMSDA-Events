@@ -9,6 +9,7 @@ import styles from "@/components/club-supplies.module.css";
 import type { ClubSupplyImportSummary, MergedNumberConflict, RepeatedCatalogNumber } from "@/modules/club-supplies/catalog-csv";
 import { type ClubSupplySection, clubSupplySectionLabels, clubSupplySections } from "@/modules/club-supplies/domain";
 import type { ClubSupplyItemRecord } from "@/modules/club-supplies/repository";
+import { EmptyState } from "@/components/empty-state";
 
 type PreviewStep = {
   line: number;
@@ -258,11 +259,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
           <span className="count-badge">{`${items.length} items`}</span>
         </div>
         {items.length === 0 ? (
-          <div className="empty-state">
-            <Package aria-hidden="true" size={27} />
-            <h3>No items yet</h3>
-            <p>Import the reference file to start the catalog.</p>
-          </div>
+          <EmptyState hint="Import the reference file above to start the catalog." icon={<Package aria-hidden="true" size={27} />} title="No items yet">The supply catalog has no items.</EmptyState>
         ) : (
           <>
             <div className={styles.filters}>
