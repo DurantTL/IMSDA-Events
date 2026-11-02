@@ -4,6 +4,7 @@ import { ExportLink } from "@/components/export-link";
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { useState } from "react";
 import { useConfirm } from "@/components/use-confirm";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatCents } from "@/modules/payments/format-cents";
 import {
@@ -20,6 +21,16 @@ import type { MealView } from "@/modules/meals/view-repository";
 
 type Plan = MealView["plans"][number];
 type Service = MealView["services"][number];
+
+// The meals ordered table sorts from its headers (#1458); the keys here are the whitelist. The other tables are in a set order:
+// meal services by when they are served, the recent orders as an activity log (newest first), and the price grid by meal.
+type MealTotal = MealView["totals"][number];
+const TOTAL_SORT: Record<"meal" | "age" | "payer" | "quantity", ColumnSpec<MealTotal>> = {
+  meal: { get: (row) => mealTypeLabels[row.mealType as MealTypeValue], label: "meal" },
+  age: { get: (row) => mealAgeGroupLabels[row.ageGroup as MealAgeGroupValue], label: "age group" },
+  payer: { get: (row) => (row.payer === "CONFERENCE" ? "Conference" : "Attendee"), label: "payer" },
+  quantity: { get: (row) => row.quantity, label: "quantity", kind: "number" },
+};
 
 async function call(url: string, method: string, body: unknown): Promise<{ meals: MealView }> {
   const response = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -41,6 +52,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const totalSort = useTableSort(view.totals, TOTAL_SORT, "ordered");
   const base = `/api/events/${eventId}/meals`;
 
   async function run(action: () => Promise<{ meals: MealView }>, success: string) {
@@ -80,10 +92,10 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
 
     <section className="panel">
       <h3>Meals ordered</h3>
-      {view.totals.length === 0 ? <p>No meals have been ordered yet.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
+      {view.totals.length === 0 ? <p>No meals have been ordered yet.</p> : <div className="table-wrap">{totalSort.note}<table className="report-table report-table-auto">
         <caption>Active selections of submitted and confirmed registrations, and walk-up orders</caption>
-        <thead><tr><th scope="col">Meal</th><th scope="col">Age group</th><th scope="col">Payer</th><th scope="col">Quantity</th></tr></thead>
-        <tbody>{view.totals.map((row) => <tr key={`${row.mealType}${row.ageGroup}${row.payer}`}>
+        <thead><tr>{totalSort.header("meal", "Meal")}{totalSort.header("age", "Age group")}{totalSort.header("payer", "Payer")}{totalSort.header("quantity", "Quantity")}</tr></thead>
+        <tbody>{totalSort.rows.map((row) => <tr key={`${row.mealType}${row.ageGroup}${row.payer}`}>
           <th scope="row">{mealTypeLabels[row.mealType as MealTypeValue]}</th><td>{mealAgeGroupLabels[row.ageGroup as MealAgeGroupValue]}</td>
           <td>{row.payer === "CONFERENCE" ? "Conference" : "Attendee"}</td><td>{row.quantity}</td>
         </tr>)}</tbody>

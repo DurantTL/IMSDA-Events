@@ -4,6 +4,7 @@ import { ExportLink } from "@/components/export-link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Download } from "lucide-react";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { reviewKindLabels, type ReviewKind } from "@/modules/guardian-authority/domain";
 import type { GuardianReview, GuardianReviewItem } from "@/modules/guardian-authority/repository";
 
@@ -24,6 +25,22 @@ async function postAction(eventId: string, body: Record<string, unknown>) {
 }
 
 const kindOrder: ReviewKind[] = ["CONFLICT", "NO_ADULT_ON_REGISTRATION", "NONE_OF_US", "ADULT_LEFT_REGISTRATION", "UNKNOWN_AGE", "NOT_DECLARED"];
+
+// Both tables sort from their headers (#1458); the keys here are the whitelist. Only what a column already shows is sortable.
+type Minor = GuardianReview["minors"][number];
+const adultName = (person: { responsibleAdult: { name: string } | null; noneOfUs: boolean }) => (person.responsibleAdult ? person.responsibleAdult.name : person.noneOfUs ? "None of us" : "Not recorded");
+const NEEDS_SORT: Record<"minor" | "registration" | "why" | "adult", ColumnSpec<GuardianReviewItem>> = {
+  minor: { get: (item) => item.name, label: "minor" },
+  registration: { get: (item) => item.confirmationCode, label: "registration" },
+  why: { get: (item) => Math.min(...item.kinds.map((kind) => kindOrder.indexOf(kind))), label: "how urgent the reason is", kind: "state" },
+  adult: { get: (item) => adultName(item), label: "responsible adult" },
+};
+const MINOR_SORT: Record<"minor" | "registration" | "adult" | "setBy", ColumnSpec<Minor>> = {
+  minor: { get: (minor) => minor.name, label: "minor" },
+  registration: { get: (minor) => minor.confirmationCode, label: "registration" },
+  adult: { get: (minor) => (minor.status === "UNKNOWN" ? "Age unknown" : adultName(minor)), label: "responsible adult" },
+  setBy: { get: (minor) => (minor.responsibleAdult ? (minor.responsibleAdult.source === "STAFF" ? "Staff" : "Registration form") : ""), label: "who set it" },
+};
 
 function ItemActions({ eventId, item, adults, canEdit }: { eventId: string; item: GuardianReviewItem; adults: GuardianReview["adults"]; canEdit: boolean }) {
   const router = useRouter();
@@ -93,6 +110,8 @@ export function ResponsibleAdultReview({ eventId, review, canEdit, canExport }: 
   const needing = [...review.items].sort((left, right) => (
     Math.min(...left.kinds.map((kind) => kindOrder.indexOf(kind))) - Math.min(...right.kinds.map((kind) => kindOrder.indexOf(kind)))
   ));
+  const needingSort = useTableSort(needing, NEEDS_SORT, "needs");
+  const minorSort = useTableSort(review.minors, MINOR_SORT, "minors");
   return (
     <section className="page-stack">
       <div className="page-intro">
@@ -118,10 +137,12 @@ export function ResponsibleAdultReview({ eventId, review, canEdit, canExport }: 
           {kindOrder.map((kind) => <li key={kind}>{reviewKindLabels[kind]}: {review.counts[kind]}</li>)}
         </ul>
         {needing.length === 0 ? <p>Every minor has a responsible adult on record.</p> : (
+          <>
+          {needingSort.note}
           <table className="guardian-review-table">
-            <thead><tr><th>Minor</th><th>Registration</th><th>Why</th><th>Responsible adult</th>{canEdit && <th>Change</th>}</tr></thead>
+            <thead><tr>{needingSort.header("minor", "Minor")}{needingSort.header("registration", "Registration")}{needingSort.header("why", "Why")}{needingSort.header("adult", "Responsible adult")}{canEdit && <th>Change</th>}</tr></thead>
             <tbody>
-              {needing.map((item) => (
+              {needingSort.rows.map((item) => (
                 <tr key={item.attendeeId}>
                   <td><span translate="no">{item.name}</span>{item.age !== null && <small> · age {item.age}</small>}</td>
                   <td><a href={`/people?event=${encodeURIComponent(eventId)}&registration=${encodeURIComponent(item.registrationId)}`}>{item.confirmationCode}</a></td>
@@ -139,16 +160,19 @@ export function ResponsibleAdultReview({ eventId, review, canEdit, canExport }: 
               ))}
             </tbody>
           </table>
+          </>
         )}
       </section>
 
       <section className="panel" aria-labelledby="guardian_all_minors">
         <h3 id="guardian_all_minors">All minors ({review.minors.length})</h3>
         {review.minors.length === 0 ? <p>No minors are registered for this event.</p> : (
+          <>
+          {minorSort.note}
           <table className="guardian-review-table">
-            <thead><tr><th>Minor</th><th>Registration</th><th>Responsible adult</th><th>Set by</th></tr></thead>
+            <thead><tr>{minorSort.header("minor", "Minor")}{minorSort.header("registration", "Registration")}{minorSort.header("adult", "Responsible adult")}{minorSort.header("setBy", "Set by")}</tr></thead>
             <tbody>
-              {review.minors.map((minor) => (
+              {minorSort.rows.map((minor) => (
                 <tr key={minor.attendeeId}>
                   <td><span translate="no">{minor.name}</span>{minor.age !== null && <small> · age {minor.age}</small>}</td>
                   <td>{minor.confirmationCode}</td>
@@ -158,6 +182,7 @@ export function ResponsibleAdultReview({ eventId, review, canEdit, canExport }: 
               ))}
             </tbody>
           </table>
+          </>
         )}
       </section>
     </section>

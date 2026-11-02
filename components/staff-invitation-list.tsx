@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
+import { ListPager } from "@/components/list-pager";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
+import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { Ban, Copy, MailPlus, RefreshCw, UserPlus } from "lucide-react";
 import {
   INVITATION_STATUSES,
@@ -14,6 +16,7 @@ import {
   type StaffInvitationGroupValue,
 } from "@/modules/staff-invitations/domain";
 import type { InvitationListRow } from "@/modules/staff-invitations/repository";
+import { paginate } from "@/lib/pagination";
 import { formatPersonName } from "@/lib/person-name";
 
 type SendPreview = {
@@ -33,6 +36,16 @@ type Props = {
   truncated: boolean;
   /** MANAGE_COMMUNICATIONS: sending is a bulk communication and needs it. */
   canSend: boolean;
+};
+
+/** Invitations shown per page. */
+const PAGE_SIZE = 50;
+
+// Sorts from its headers (#1458); the keys here are the whitelist. Only what a column already shows is sortable.
+const INVITATION_SORT: Record<"person" | "group" | "status", ColumnSpec<InvitationListRow>> = {
+  person: { get: (row) => formatPersonName(row) || row.email, label: "person" },
+  group: { get: (row) => STAFF_INVITATION_GROUP_LABEL[row.group], label: "group" },
+  status: { get: (row) => INVITATION_STATUS_LABEL[row.status], label: "status" },
 };
 
 function tone(status: InvitationStatus) {
@@ -78,6 +91,11 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
       && (!needle || `${row.email} ${formatPersonName(row)}`.toLowerCase().includes(needle))
     ));
   }, [rows, status, group, query]);
+  // The page goes back to 1 when the filters or the sort change: the stored page only counts for the filters it was chosen under.
+  const filterKey = `${status}|${group}|${query}`;
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
+  const sorted = useTableSort(visible, INVITATION_SORT, undefined, () => setPageState({ key: filterKey, page: 1 }));
+  const slice = paginate(sorted.rows, pageState.key === filterKey ? pageState.page : 1, PAGE_SIZE);
   const visibleSelected = visible.filter((row) => selected.has(row.id));
   const selectedIds = [...selected];
 
@@ -201,7 +219,7 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
         </span>
         <div className="selection-bar-actions">
           {visibleSelected.length < visible.length && (
-            <button className="text-button" onClick={() => changeSelection((current) => new Set([...current, ...visible.map((row) => row.id)]))} type="button">Select all {visible.length} shown</button>
+            <button className="text-button" onClick={() => changeSelection((current) => new Set([...current, ...visible.map((row) => row.id)]))} type="button">Select all {visible.length} matching</button>
           )}
           {selected.size > 0 && (
             <>
@@ -295,18 +313,19 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
           )
       ) : (
         <div className="report-table-wrap card-box">
+          {sorted.note}
           <table className="report-table staff-invite-table">
             <thead>
               <tr>
                 <th scope="col"><span className="sr-only">Select</span></th>
-                <th scope="col">Person</th>
-                <th scope="col">Group</th>
-                <th scope="col">Status</th>
+                {sorted.header("person", "Person")}
+                {sorted.header("group", "Group")}
+                {sorted.header("status", "Status")}
                 <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {visible.map((row) => (
+              {slice.items.map((row) => (
                 <tr key={row.id}>
                   <td><label className="staff-invite-select"><input aria-label={`Select ${row.email}`} checked={selected.has(row.id)} onChange={() => toggle(row.id)} type="checkbox" /></label></td>
                   <td data-label="Person">
@@ -341,7 +360,8 @@ export function StaffInvitationList({ eventId, rows, counts, truncated, canSend 
           </table>
         </div>
       )}
-      {truncated && <p className="field-help">Showing the first 2,000 people.</p>}
+      <ListPager label="Invitation pages" noun="invitations" nounOne="invitation" onPage={(page) => setPageState({ key: filterKey, page })} slice={slice} />
+      {truncated && <p className="field-help">This list is cut off at 2,000 people. Filter it, or ask for the rest to be exported.</p>}
     </section>
   );
 }
