@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { assigneeKindLabels, type AssigneeKind } from "@/modules/issued-assets/domain";
 import { AssetReturnPanel } from "@/components/asset-return-panel";
 import { ListPager } from "@/components/list-pager";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { PageSlice } from "@/lib/pagination";
 import { cardCell } from "@/components/table-card-labels";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
@@ -107,6 +108,9 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
   const [lookup, setLookup] = useState<AssetLookup | null | "none">(null);
   const codeInput = useRef<HTMLInputElement>(null);
   const searchTicket = useRef(0);
+  // Unsaved work: codes collected for the issue sheet, or a changed purpose, room or expected-back time, until the sheet is issued.
+  // Scanning, typing a code and the attendee search are not (#1468).
+  useUnsavedChangesGuard(items.length > 0 || assignmentId !== "" || expectedReturn !== "" || purpose !== "Issued at check-in");
 
   // Saved requests from an earlier visit (read after mount, so the server and first client render agree).
   useEffect(() => {
@@ -187,7 +191,10 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
           : []));
       writeQueue(scope, remaining); setQueue(remaining);
       setResult(response);
-      setItems(response.items.filter((item) => item.status === "REJECTED").map((item) => ({ code: item.code, quantity: request.items[item.index]?.quantity ?? 1 })));
+      const refusedItems = response.items.filter((item) => item.status === "REJECTED").map((item) => ({ code: item.code, quantity: request.items[item.index]?.quantity ?? 1 }));
+      setItems(refusedItems);
+      // Everything went through: the sheet is done, so its purpose, room and expected-back time go back to their defaults.
+      if (refusedItems.length === 0) { setPurpose("Issued at check-in"); setAssignmentId(""); setExpectedReturn(""); }
       router.refresh();
     } catch (cause) {
       const failure = cause as Error & { server?: boolean; details?: { items?: ItemResult[] } };
@@ -355,6 +362,8 @@ export function AssetIssueDesk({ eventId, userId, types, lots, options, person, 
 function IssuanceActions({ row, busy, change }: { row: IssuanceRow; busy: boolean; change: (id: string, body: unknown, done: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
+  // Unsaved work: a typed withdrawal reason while the form is open, until withdrawn or closed (#1468).
+  useUnsavedChangesGuard(open && reason.trim() !== "");
   // Replacing or swapping a key is part of Check out (the original's return, loss or damage is recorded with it).
   return <div>
     <button className="secondary-button" type="button" disabled={busy} onClick={() => setOpen(!open)}>Entered in error</button>

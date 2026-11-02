@@ -13,6 +13,7 @@ import type { FacilityIssueRow } from "@/modules/issued-assets/returns-view";
 import { lodgingHoldKinds } from "@/modules/lodging/domain";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 /**
  * The issued-asset closeout (#214): what is still out, lost, damaged, charged, waived and held, the facility issues that
@@ -54,7 +55,8 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
       delete actionKeys.current[signature];
       setNotice(done);
       router.refresh();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "That could not be saved."); }
+      return true;
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "That could not be saved."); return false; }
     finally { setBusy(false); }
   }
 
@@ -116,7 +118,7 @@ type TableContext = {
   download: (section: string) => React.ReactNode;
   canManageMoney: boolean;
   busy: boolean;
-  post: (path: string, body: unknown, done: string) => Promise<void>;
+  post: (path: string, body: unknown, done: string) => Promise<boolean>;
 };
 
 // Every table here sorts from its headers (#1458). Each has its own address prefix, and the keys on these objects are the whitelist.
@@ -236,10 +238,12 @@ function DepositsTable({ ctx, rows }: { ctx: TableContext; rows: DepositRow[] })
  * found later is Lost corrected to Returned. Nothing is refunded, charged or settled by it; the closeout lists anything
  * that needs a decision afterwards.
  */
-function OutcomeForm({ busy, current, onSubmit }: { busy: boolean; current: "LOST" | "DAMAGED" | "REPLACED"; onSubmit: (body: { action: "correct"; fate: string; reason: string } | { action: "write_off"; reason: string }) => Promise<void> }) {
+function OutcomeForm({ busy, current, onSubmit }: { busy: boolean; current: "LOST" | "DAMAGED" | "REPLACED"; onSubmit: (body: { action: "correct"; fate: string; reason: string } | { action: "write_off"; reason: string }) => Promise<boolean> }) {
   const [choice, setChoice] = useState(current === "REPLACED" ? "RETURNED" : "WRITE_OFF");
   const [reason, setReason] = useState("");
-  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onSubmit(choice === "WRITE_OFF" ? { action: "write_off", reason: reason.trim() } : { action: "correct", fate: choice, reason: reason.trim() }); }}>
+  // Unsaved work: a typed reason or a changed outcome, until saved (the row leaves the list once it is) (#1468).
+  useUnsavedChangesGuard(reason.trim() !== "" || choice !== (current === "REPLACED" ? "RETURNED" : "WRITE_OFF"));
+  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onSubmit(choice === "WRITE_OFF" ? { action: "write_off", reason: reason.trim() } : { action: "correct", fate: choice, reason: reason.trim() }).then((ok) => { if (ok) setReason(""); }); }}>
     <label>What happened <select value={choice} onChange={(event) => setChoice(event.target.value)}>
       <option value="RETURNED">{current === "LOST" ? "Found: it came back" : "It came back"}</option>
       <option value="LOST">Lost</option>
@@ -255,14 +259,17 @@ function OutcomeForm({ busy, current, onSubmit }: { busy: boolean; current: "LOS
  * An exception that needs a person's eyes: mark it reviewed with a reason, or (for a kept deposit whose key was found) record
  * the cash handed back at the desk. Finance and administrators only. Recording cash is a record, never a provider refund.
  */
-function ReviewForm({ busy, depositId, onReview, onRefund }: { busy: boolean; depositId: string | null; onReview: (reason: string) => Promise<void>; onRefund: (depositEntryId: string, amountCents: number, reason: string) => Promise<void> }) {
+function ReviewForm({ busy, depositId, onReview, onRefund }: { busy: boolean; depositId: string | null; onReview: (reason: string) => Promise<boolean>; onRefund: (depositEntryId: string, amountCents: number, reason: string) => Promise<boolean> }) {
   const [choice, setChoice] = useState("REVIEWED");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  // Unsaved work: a typed reason or refund amount, until saved (the exception leaves the list once it is) (#1468).
+  useUnsavedChangesGuard(reason.trim() !== "" || amount.trim() !== "");
   return <form className="form-stack" onSubmit={(event) => {
     event.preventDefault();
     if (reason.trim().length < 3) return;
-    if (choice === "REFUND" && depositId) { const cents = Math.round(Number(amount) * 100); if (cents >= 1) void onRefund(depositId, cents, reason.trim()); } else void onReview(reason.trim());
+    const cleared = (ok: boolean) => { if (ok) { setReason(""); setAmount(""); } };
+    if (choice === "REFUND" && depositId) { const cents = Math.round(Number(amount) * 100); if (cents >= 1) void onRefund(depositId, cents, reason.trim()).then(cleared); } else void onReview(reason.trim()).then(cleared);
   }}>
     <label>What was done <select value={choice} onChange={(event) => setChoice(event.target.value)}>
       <option value="REVIEWED">Reviewed, nothing more to do</option>
@@ -274,9 +281,11 @@ function ReviewForm({ busy, depositId, onReview, onRefund }: { busy: boolean; de
   </form>;
 }
 
-function WaiveForm({ busy, onWaive }: { busy: boolean; onWaive: (reason: string) => Promise<void> }) {
+function WaiveForm({ busy, onWaive }: { busy: boolean; onWaive: (reason: string) => Promise<boolean> }) {
   const [reason, setReason] = useState("");
-  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onWaive(reason.trim()); }}>
+  // Unsaved work: a typed waiver reason, until the charge is waived (#1468).
+  useUnsavedChangesGuard(reason.trim() !== "");
+  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); if (reason.trim().length >= 3) void onWaive(reason.trim()).then((ok) => { if (ok) setReason(""); }); }}>
     <label>Reason to waive <input value={reason} minLength={3} maxLength={500} required onChange={(event) => setReason(event.target.value)} /></label>
     <button className="secondary-button" type="submit" disabled={busy}>Waive</button>
   </form>;
@@ -284,7 +293,7 @@ function WaiveForm({ busy, onWaive }: { busy: boolean; onWaive: (reason: string)
 
 function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
   issue: FacilityIssueRow; staff: Array<{ userId: string; name: string }>; canUpdate: boolean; canConfigure: boolean; busy: boolean;
-  post: (path: string, body: unknown, done: string) => Promise<void>;
+  post: (path: string, body: unknown, done: string) => Promise<boolean>;
 }) {
   const [status, setStatus] = useState(issue.status);
   const [severity, setSeverity] = useState(issue.severity);
@@ -296,6 +305,11 @@ function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
   const [lastNight, setLastNight] = useState("");
   const finishing = status === "RESOLVED" || status === "DISMISSED";
   const blocked = issue.block?.active ?? false;
+  // Unsaved work: a changed status, severity or assignee, a typed note or resolution, or block dates, until saved (#1468).
+  useUnsavedChangesGuard(
+    status !== issue.status || severity !== issue.severity || assignee !== (issue.assigneeUserId ?? "")
+    || note.trim() !== "" || resolution.trim() !== "" || firstNight !== "" || lastNight !== "",
+  );
   return <article className="panel form-stack">
     <h4>{issue.targetLabel}: {issue.title}</h4>
     <p>{issue.severity.toLowerCase()} severity, {issue.status === "OPEN" ? "open" : "in progress"}; reported {when(issue.reportedAt)}{issue.reportedByName ? ` by ${issue.reportedByName}` : ""}{issue.source === "CHECKOUT_INSPECTION" ? " at check-out" : ""}. {issue.assigneeName ? `Assigned to ${issue.assigneeName}.` : "Not assigned."}{issue.description ? ` ${issue.description}` : ""}</p>
@@ -306,7 +320,7 @@ function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
       void post("facility", {
         action: "update", issueId: issue.id, ...(status !== issue.status ? { status } : {}), ...(severity !== issue.severity ? { severity } : {}),
         ...(assignee !== (issue.assigneeUserId ?? "") ? { assigneeUserId: assignee } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(finishing ? { resolution: resolution.trim() } : {}),
-      }, savedMessage());
+      }, savedMessage()).then((saved) => { if (saved) { setNote(""); setResolution(""); } });
     }}>
       <label>Status <select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>{facilityStatuses.map((value) => <option key={value} value={value}>{value.toLowerCase().replace("_", " ")}</option>)}</select></label>
       <label>Severity <select value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>{facilitySeverities.map((value) => <option key={value} value={value}>{value.toLowerCase()}</option>)}</select></label>
@@ -317,7 +331,7 @@ function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
     </form> : null}
     {canConfigure && issue.targetKind === "UNIT" && !blocked ? <form className="form-stack" onSubmit={(event) => {
       event.preventDefault();
-      void post("facility", { action: "block", issueId: issue.id, block: { kind, reason: issue.title, firstNight, lastNight } }, "The room is blocked for those nights. Nobody already placed was moved.");
+      void post("facility", { action: "block", issueId: issue.id, block: { kind, reason: issue.title, firstNight, lastNight } }, "The room is blocked for those nights. Nobody already placed was moved.").then((ok) => { if (ok) { setFirstNight(""); setLastNight(""); } });
     }}>
       <label>Block the room <select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>{lodgingHoldKinds.map((value) => <option key={value} value={value}>{holdKindLabels[value]}</option>)}</select></label>
       <label>First night <input type="date" value={firstNight} required onChange={(event) => setFirstNight(event.target.value)} /></label>

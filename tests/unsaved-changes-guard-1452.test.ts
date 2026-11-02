@@ -22,10 +22,6 @@ const allowlist: Record<string, string> = {
   "app/(workspace)/more/reports/clubs/check-in-book/page.tsx": "search or filter",
   "components/app-shell.tsx": "action button only, no typed fields",
   "components/area-club-search-form.tsx": "search or filter",
-  "components/asset-closeout-workspace.tsx": "needs guard: follow-up #1468",
-  "components/asset-issue-desk.tsx": "needs guard: follow-up #1468",
-  "components/asset-return-panel.tsx": "needs guard: follow-up #1468",
-  "components/attendance-reconciliation-controls.tsx": "needs guard: follow-up #1468",
   "components/attendee-pass-grid.tsx": "action button only, no typed fields",
   "components/attendee-password-reset-form.tsx": "sign-in",
   "components/attendee-sign-in-form.tsx": "sign-in",
@@ -38,7 +34,6 @@ const allowlist: Record<string, string> = {
   "components/cancellation-request-panel.tsx": "needs guard: follow-up #1468",
   "components/cancellation-requests-workspace.tsx": "action button only, no typed fields",
   "components/check-in-scanner.tsx": "action button only, no typed fields",
-  "components/check-in-station.tsx": "needs guard: follow-up #1468",
   "components/check-in-stations-panel.tsx": "action button only, no typed fields",
   "components/choice-answer-filter.tsx": "search or filter",
   "components/church-sponsor-flags.tsx": "action button only, no typed fields",
@@ -57,23 +52,19 @@ const allowlist: Record<string, string> = {
   "components/honors-instructors-workspace.tsx": "needs guard: follow-up #1468",
   "components/honors-schedule-board.tsx": "needs guard: follow-up #1468",
   "components/honors-setup-workspace.tsx": "needs guard: follow-up #1468",
-  "components/import-workspace.tsx": "needs guard: follow-up #1468",
+  "components/import-workspace.tsx": "one field",
   "components/information-form-fill-in.tsx": "saves instantly / autosave",
   "components/invoice-controls.tsx": "needs guard: follow-up #1468",
   "components/invoice-ledger-controls.tsx": "needs guard: follow-up #1468",
-  "components/issued-assets-workspace.tsx": "needs guard: follow-up #1468",
-  "components/kitchen-counts-entry.tsx": "needs guard: follow-up #1468",
   "components/lodging-assignments-panels.tsx": "needs guard: follow-up #1468",
   "components/lodging-assignments-workspace.tsx": "needs guard: follow-up #1468",
   "components/lodging-requests-workspace.tsx": "needs guard: follow-up #1468",
   "components/lodging-workspace.tsx": "needs guard: follow-up #1468",
   "components/login-form.tsx": "sign-in",
   "components/meal-closeout-review-form.tsx": "action button only, no typed fields",
-  "components/meals-workspace.tsx": "needs guard: follow-up #1468",
   "components/mfa-manager.tsx": "sign-in",
   "components/module-request-form.tsx": "one field",
   "components/module-request-queue.tsx": "action button only, no typed fields",
-  "components/notifications-workspace.tsx": "needs guard: follow-up #1468",
   "components/organization-search-controls.tsx": "search or filter",
   "components/password-reset-form.tsx": "sign-in",
   "components/password-reset-request-form.tsx": "sign-in",
@@ -186,7 +177,7 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
   it("lists the forms that still need a guard", () => {
     const pending = Object.entries(allowlist).filter(([, reason]) => reason === followUp).map(([path]) => path);
     // Not a limit to raise: it only goes down as the follow-up mounts the hook.
-    expect(pending.length).toBeLessThanOrEqual(35);
+    expect(pending.length).toBeLessThanOrEqual(23);
   });
 });
 

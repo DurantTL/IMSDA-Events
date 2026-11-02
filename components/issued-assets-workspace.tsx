@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import {
   assetAvailabilities,
   assetConditions,
@@ -10,7 +10,9 @@ import {
   type AssetCondition,
   type AssigneeKind,
 } from "@/modules/issued-assets/domain";
+import { formHasEdits } from "@/components/form-has-edits";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { depositShortfalls, depositShortfallLabels } from "@/modules/issued-assets/returns-domain";
 import type { CatalogAsset, CatalogType, CatalogView } from "@/modules/issued-assets/view";
@@ -24,6 +26,14 @@ async function call(url: string, body: unknown): Promise<{ result: Result; catal
   return json;
 }
 
+/** Tracks one uncontrolled form for the unsaved-changes guard: `track` goes on its onChange, `clear` runs after a save or reset. */
+function useEditedForm() {
+  const [edited, setEdited] = useState(false);
+  // Unsaved work: any field of this form changed from its starting value, until it is saved or reset (#1468).
+  useUnsavedChangesGuard(edited);
+  return { track: (event: FormEvent<HTMLFormElement>) => setEdited(formHasEdits(event.currentTarget)), clear: () => setEdited(false) };
+}
+
 const label = (value: string) => value.charAt(0) + value.slice(1).toLowerCase();
 
 export function IssuedAssetsWorkspace({ eventId, eventName, initialCatalog }: { eventId: string; eventName: string; initialCatalog: CatalogView }) {
@@ -32,6 +42,7 @@ export function IssuedAssetsWorkspace({ eventId, eventName, initialCatalog }: { 
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const base = `/api/events/${encodeURIComponent(eventId)}/assets`;
+  const addType = useEditedForm();
 
   async function run(url: string, body: unknown, success: (result: Result) => string) {
     setBusy(true); setError(""); setNotice("");
@@ -65,8 +76,8 @@ export function IssuedAssetsWorkspace({ eventId, eventName, initialCatalog }: { 
           action: "create", name: data.get("name"), mode: data.get("mode"), assigneeKinds: data.getAll("kinds"), roomLinked: data.get("roomLinked") === "on",
           depositPolicyRef: data.get("depositPolicyRef"), replacementPolicyRef: data.get("replacementPolicyRef"),
           depositCents: dollarsToCents(data.get("depositDollars")), depositShortfall: data.get("depositShortfall"), replacementFeeCents: dollarsToCents(data.get("replacementDollars")),
-        }, () => "Kind of item added.").then((ok) => { if (ok) form.reset(); });
-      }}>
+        }, () => "Kind of item added.").then((ok) => { if (ok) { form.reset(); addType.clear(); } });
+      }} onChange={addType.track}>
         <label>Name <input name="name" required maxLength={80} placeholder="Dorm room key" /></label>
         <label>Behaviour <select name="mode" defaultValue="SERIALIZED">
           <option value="SERIALIZED">Numbered (one holder at a time)</option>
@@ -123,6 +134,9 @@ type Run = (url: string, body: unknown, success: (result: Result) => string) => 
 function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; assets: CatalogAsset[]; base: string; busy: boolean; run: Run }) {
   const serialized = type.mode === "SERIALIZED";
   const sorted = useTableSort(assets, ASSET_SORT);
+  const policy = useEditedForm();
+  const addItem = useEditedForm();
+  const addRange = useEditedForm();
   const setKinds = (kind: AssigneeKind, on: boolean) => {
     const next = on ? [...new Set([...type.assigneeKinds, kind])] : type.assigneeKinds.filter((existing) => existing !== kind);
     if (next.length === 0) return;
@@ -144,8 +158,8 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
       void run(`${base}/types`, {
         action: "update", typeId: type.id, depositPolicyRef: data.get("depositPolicyRef"), replacementPolicyRef: data.get("replacementPolicyRef"),
         depositCents: dollarsToCents(data.get("depositDollars")), depositShortfall: data.get("depositShortfall"), replacementFeeCents: dollarsToCents(data.get("replacementDollars")),
-      }, () => `${type.name} updated.`);
-    }}>
+      }, () => `${type.name} updated.`).then((ok) => { if (ok) policy.clear(); });
+    }} onChange={policy.track}>
       <label>Deposit policy reference <input name="depositPolicyRef" maxLength={120} defaultValue={type.depositPolicyRef ?? ""} /></label>
       <label>Replacement policy reference <input name="replacementPolicyRef" maxLength={120} defaultValue={type.replacementPolicyRef ?? ""} /></label>
       <MoneyFields type={type} />
@@ -160,8 +174,8 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
       void run(`${base}/items`, {
         action: "create", typeId: type.id, identifier: data.get("identifier"), ...(scan ? { scanCode: scan } : {}),
         quantityTotal: serialized ? 1 : Number(data.get("quantityTotal") || 1), condition: data.get("condition"), location: data.get("location"),
-      }, () => "Item added.").then((ok) => { if (ok) form.reset(); });
-    }}>
+      }, () => "Item added.").then((ok) => { if (ok) { form.reset(); addItem.clear(); } });
+    }} onChange={addItem.track}>
       <h4>{serialized ? "Add one item" : "Add a lot"}</h4>
       <label>{serialized ? "Number or identifier" : "Lot name"} <input name="identifier" required maxLength={64} placeholder={serialized ? "K-214" : "WELCOME-PACKETS"} /></label>
       <label>Barcode or QR value (defaults to the identifier) <input name="scanCode" maxLength={64} /></label>
@@ -177,8 +191,8 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
       void run(`${base}/items`, {
         action: "bulk", typeId: type.id, prefix: data.get("prefix"), from: Number(data.get("from")), to: Number(data.get("to")), width: Number(data.get("width") || 0),
         condition: data.get("condition"), location: data.get("location"),
-      }, (result) => `Added ${result.created ?? 0} item${result.created === 1 ? "" : "s"}${result.skipped ? `; ${result.skipped} already existed and were left alone` : ""}.`);
-    }}>
+      }, (result) => `Added ${result.created ?? 0} item${result.created === 1 ? "" : "s"}${result.skipped ? `; ${result.skipped} already existed and were left alone` : ""}.`).then((ok) => { if (ok) addRange.clear(); });
+    }} onChange={addRange.track}>
       <h4>Add a numbered range</h4>
       <p>For example prefix K-, from 201 to 260 adds K-201 through K-260. Numbers that already exist are skipped, so it is safe to run twice.</p>
       <label>Prefix <input name="prefix" maxLength={32} placeholder="K-" /></label>
@@ -202,14 +216,20 @@ function TypePanel({ type, assets, base, busy, run }: { type: CatalogType; asset
           <td>{asset.outQuantity}</td>
           <td><label className="sr-only" htmlFor={`cond-${asset.id}`}>Condition of {asset.identifier}</label>
             <select id={`cond-${asset.id}`} value={asset.condition} disabled={busy} onChange={(event) => void run(`${base}/items`, { action: "update", assetId: asset.id, condition: event.target.value as AssetCondition }, () => `${asset.identifier} updated.`)}>{assetConditions.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></td>
-          <td><form className="form-stack" onSubmit={(event) => {
-            event.preventDefault();
-            void run(`${base}/items`, { action: "update", assetId: asset.id, location: new FormData(event.currentTarget).get("location") ?? "" }, () => `${asset.identifier} updated.`);
-          }}><label className="sr-only" htmlFor={`loc-${asset.id}`}>Location of {asset.identifier}</label><input id={`loc-${asset.id}`} name="location" maxLength={120} defaultValue={asset.location ?? ""} /><button className="secondary-button" type="submit" disabled={busy}>Save</button></form></td>
+          <td><LocationForm asset={asset} base={base} busy={busy} run={run} /></td>
           <td><label className="sr-only" htmlFor={`avail-${asset.id}`}>Status of {asset.identifier}</label>
             <select id={`avail-${asset.id}`} value={asset.availability} disabled={busy} onChange={(event) => void run(`${base}/items`, { action: "update", assetId: asset.id, availability: event.target.value as AssetAvailability }, () => `${asset.identifier} updated.`)}>{assetAvailabilities.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></td>
         </tr>)}</tbody>
       </table></div>
     </details>}
   </section>;
+}
+
+/** One item's location box. Typed but unsaved text is unsaved work until Save (#1468). */
+function LocationForm({ asset, base, busy, run }: { asset: CatalogAsset; base: string; busy: boolean; run: Run }) {
+  const edit = useEditedForm();
+  return <form className="form-stack" onChange={edit.track} onSubmit={(event) => {
+    event.preventDefault();
+    void run(`${base}/items`, { action: "update", assetId: asset.id, location: new FormData(event.currentTarget).get("location") ?? "" }, () => `${asset.identifier} updated.`).then((ok) => { if (ok) edit.clear(); });
+  }}><label className="sr-only" htmlFor={`loc-${asset.id}`}>Location of {asset.identifier}</label><input id={`loc-${asset.id}`} name="location" maxLength={120} defaultValue={asset.location ?? ""} /><button className="secondary-button" type="submit" disabled={busy}>Save</button></form>;
 }

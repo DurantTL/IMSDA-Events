@@ -2,8 +2,10 @@
 
 import { ExportLink } from "@/components/export-link";
 import { EventSetupHelp } from "@/components/event-setup-help";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { formHasEdits } from "@/components/form-has-edits";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { formatCents } from "@/modules/payments/format-cents";
@@ -43,6 +45,14 @@ function serviceLabel(service: Service) {
   return `${service.serviceDate} ${service.startTime}${service.endTime ? `–${service.endTime}` : ""}`;
 }
 
+/** Tracks one uncontrolled form for the unsaved-changes guard: `track` goes on its onChange, `clear` runs after a save or reset. */
+function useEditedForm() {
+  const [edited, setEdited] = useState(false);
+  // Unsaved work: any field of this form changed from its starting value, until it is saved or reset (#1468).
+  useUnsavedChangesGuard(edited);
+  return { track: (event: FormEvent<HTMLFormElement>) => setEdited(formHasEdits(event.currentTarget)), clear: () => setEdited(false) };
+}
+
 const reasonHint = "Do not enter allergy, medical or other personal details.";
 
 export function MealsWorkspace({ eventId, eventName, initialView, presets = [], canConfigure, canManageFinance, canExport }: {
@@ -54,6 +64,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
   const [busy, setBusy] = useState(false);
   const totalSort = useTableSort(view.totals, TOTAL_SORT, "ordered");
   const base = `/api/events/${eventId}/meals`;
+  const addPlan = useEditedForm();
 
   async function run(action: () => Promise<{ meals: MealView }>, success: string) {
     setBusy(true); setError(""); setNotice("");
@@ -61,8 +72,10 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
       const result = await action();
       setView(result.meals);
       setNotice(success);
+      return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "That could not be saved.");
+      return false;
     } finally { setBusy(false); }
   }
 
@@ -124,8 +137,8 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
           isDefaultTicketPlan: form.get("isDefaultTicketPlan") === "on" && payer === "ATTENDEE", includesAllServices: form.get("includesAllServices") === "on",
           defaultEntitlement: payer === "CONFERENCE" ? "INCLUDED" : "PAID", isActive: true,
         };
-        void run(() => call(`${base}/plans`, "POST", body), "Meal plan added.");
-      }}>
+        void run(() => call(`${base}/plans`, "POST", body), "Meal plan added.").then((ok) => { if (ok) addPlan.clear(); });
+      }} onChange={addPlan.track}>
         <label>Code <input name="code" required maxLength={40} placeholder="meal-tickets" /></label>
         <label>Name <input name="name" required maxLength={80} /></label>
         <label>Description <input name="description" maxLength={500} /></label>
@@ -165,7 +178,7 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
 
 function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }: {
   service: Service; base: string; busy: boolean; canManageFinance: boolean; canConfigure: boolean;
-  run: (action: () => Promise<{ meals: MealView }>, success: string) => Promise<void>;
+  run: (action: () => Promise<{ meals: MealView }>, success: string) => Promise<boolean>;
 }) {
   const [editing, setEditing] = useState(false);
   const { ask, confirmDialog } = useConfirm();
@@ -208,16 +221,17 @@ function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }
 }
 
 function ServiceForm({ title, submitLabel, busy, initial, onSubmit }: {
-  title: string; submitLabel: string; busy: boolean; initial?: Service; onSubmit: (input: unknown) => Promise<void>;
+  title: string; submitLabel: string; busy: boolean; initial?: Service; onSubmit: (input: unknown) => Promise<boolean>;
 }) {
-  return <form onSubmit={(event) => {
+  const edit = useEditedForm();
+  return <form onChange={edit.track} onSubmit={(event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const text = (key: string) => String(form.get(key) ?? "").trim();
     void onSubmit({
       name: text("name"), mealType: text("mealType"), serviceDate: text("serviceDate"), startTime: text("startTime"), endTime: text("endTime") || null,
       location: text("location") || null, ticketing: text("ticketing"), capacity: text("capacity") === "" ? null : Number(text("capacity")),
-    });
+    }).then((ok) => { if (ok) edit.clear(); });
   }}>
     <h4>{title}</h4>
     <label>Name <input name="name" required maxLength={80} defaultValue={initial?.name ?? ""} /></label>
@@ -234,10 +248,13 @@ function ServiceForm({ title, submitLabel, busy, initial, onSubmit }: {
 
 function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: {
   plan: Plan; view: MealView; base: string; busy: boolean; canManageFinance: boolean; services: Service[];
-  run: (action: () => Promise<{ meals: MealView }>, success: string) => Promise<void>;
+  run: (action: () => Promise<{ meals: MealView }>, success: string) => Promise<boolean>;
 }) {
   const priceOf = (mealType: MealTypeValue, ageGroup: MealAgeGroupValue) => plan.prices.find((price) => price.mealType === mealType && price.ageGroup === ageGroup);
   const typePrices = plan.prices.filter((price) => price.attendeeTypeId);
+  const editPlan = useEditedForm();
+  const typePrice = useEditedForm();
+  const planServices = useEditedForm();
   return <section className="panel">
     <h3>{plan.name} <small>({mealPayerLabels[plan.payer]}{plan.isDefaultTicketPlan ? ", sells form tickets" : ""}{plan.isActive ? "" : ", off"})</small></h3>
     {plan.description ? <p>{plan.description}</p> : null}
@@ -249,8 +266,8 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
         code: plan.code, name: String(form.get("name")), description: String(form.get("description") ?? ""), payer: plan.payer,
         isDefaultTicketPlan: plan.payer === "ATTENDEE" && isActive && form.get("isDefaultTicketPlan") === "on",
         includesAllServices: plan.includesAllServices, defaultEntitlement: plan.defaultEntitlement, isActive,
-      }), "Plan saved.");
-    }}>
+      }), "Plan saved.").then((ok) => { if (ok) editPlan.clear(); });
+    }} onChange={editPlan.track}>
       <h4>Edit this plan</h4>
       <label>Name <input name="name" required maxLength={80} defaultValue={plan.name} /></label>
       <label>Description <input name="description" maxLength={500} defaultValue={plan.description} /></label>
@@ -266,17 +283,9 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
         <th scope="row">{mealTypeLabels[mealType]}</th>
         {mealAgeGroups.map((group) => {
           const price = priceOf(mealType, group);
-          return <td key={group}>{canManageFinance ? <form onSubmit={(event) => {
-            event.preventDefault();
-            const raw = String(new FormData(event.currentTarget).get("amount") ?? "").trim();
-            const cents = Math.round(Number(raw) * 100);
-            if (!Number.isFinite(cents) || cents < 0 || raw === "") { void run(async () => { throw new Error("Enter a price in dollars, such as 7 or 7.50."); }, ""); return; }
-            void run(() => call(`${base}/plans/${plan.id}/prices`, "PUT", { mealType, ageGroup: group, attendeeTypeId: null, amountCents: cents }), "Price saved.");
-          }}>
-            <label className="sr-only" htmlFor={`price-${plan.id}-${mealType}-${group}`}>{plan.name} {mealTypeLabels[mealType]} {mealAgeGroupLabels[group]} price in dollars</label>
-            <input id={`price-${plan.id}-${mealType}-${group}`} name="amount" inputMode="decimal" defaultValue={price ? (price.amountCents / 100).toFixed(2) : ""} placeholder="not set" />
-            <button type="submit" disabled={busy}>Save</button>
-          </form> : price ? formatCents(price.amountCents) : "Not set"}</td>;
+          return <td key={group}>{canManageFinance
+            ? <PriceForm plan={plan} mealType={mealType} group={group} amountCents={price?.amountCents ?? null} base={base} busy={busy} run={run} />
+            : price ? formatCents(price.amountCents) : "Not set"}</td>;
         })}
       </tr>)}</tbody>
     </table></div>
@@ -288,8 +297,8 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const cents = Math.round(Number(form.get("amount")) * 100);
-      void run(() => call(`${base}/plans/${plan.id}/prices`, "PUT", { mealType: String(form.get("mealType")), ageGroup: null, attendeeTypeId: String(form.get("attendeeTypeId")), amountCents: cents }), "Price saved.");
-    }}>
+      void run(() => call(`${base}/plans/${plan.id}/prices`, "PUT", { mealType: String(form.get("mealType")), ageGroup: null, attendeeTypeId: String(form.get("attendeeTypeId")), amountCents: cents }), "Price saved.").then((ok) => { if (ok) typePrice.clear(); });
+    }} onChange={typePrice.track}>
       <label>Attendee type <select name="attendeeTypeId">{view.attendeeTypes.map((type) => <option key={type.id} value={type.id}>{type.label}</option>)}</select></label>
       <label>Meal <select name="mealType">{mealTypes.map((type) => <option key={type} value={type}>{mealTypeLabels[type]}</option>)}</select></label>
       <label>Price in dollars <input name="amount" inputMode="decimal" required /></label>
@@ -299,8 +308,8 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const listed = services.filter((service) => form.get(`service-${service.id}`) === "on").map((service) => ({ serviceId: service.id, entitlement: plan.payer === "CONFERENCE" ? "INCLUDED" : String(form.get(`entitlement-${service.id}`)) }));
-      void run(() => call(`${base}/plans/${plan.id}/services`, "PUT", listed), "Plan services saved.");
-    }}>
+      void run(() => call(`${base}/plans/${plan.id}/services`, "PUT", listed), "Plan services saved.").then((ok) => { if (ok) planServices.clear(); });
+    }} onChange={planServices.track}>
       <fieldset><legend>Services this plan lists</legend>
         {services.map((service) => {
           const row = plan.services.find((candidate) => candidate.serviceId === service.id);
@@ -317,8 +326,9 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
 
 function WalkUpForm({ services, plans, base, busy, run }: {
   services: Service[]; plans: Plan[]; base: string; busy: boolean;
-  run: (action: () => Promise<{ meals: MealView }>, success: string) => Promise<void>;
+  run: (action: () => Promise<{ meals: MealView }>, success: string) => Promise<boolean>;
 }) {
+  const order = useEditedForm();
   if (services.length === 0 || plans.length === 0) return <p>Add a ticketed meal service and an attendee-paid plan to take walk-up orders.</p>;
   return <form onSubmit={(event) => {
     event.preventDefault();
@@ -329,13 +339,32 @@ function WalkUpForm({ services, plans, base, busy, run }: {
       registrationId: null, registrationAttendeeId: null, planId: String(form.get("planId")), mealType: service.mealType, serviceId: service.id,
       ageGroup: String(form.get("ageGroup")), quantity: Number(form.get("quantity")), orderLabel: String(form.get("orderLabel") ?? "").trim() || null,
       dietaryCategories: [], clientRequestId: crypto.randomUUID(),
-    }), "Walk-up order recorded.");
-  }}>
+    }), "Walk-up order recorded.").then((ok) => { if (ok) order.clear(); });
+  }} onChange={order.track}>
     <label>Meal <select name="serviceId">{services.map((service) => <option key={service.id} value={service.id}>{service.name} ({serviceLabel(service)})</option>)}</select></label>
     <label>Plan <select name="planId">{plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select></label>
     <label>Age group <select name="ageGroup">{mealAgeGroups.map((group) => <option key={group} value={group}>{mealAgeGroupLabels[group]}</option>)}</select></label>
     <label>Quantity <input name="quantity" type="number" min={1} max={1000} defaultValue={1} required /></label>
     <label>Label (optional). No allergy or medical details. <input name="orderLabel" maxLength={60} /></label>
     <button className="primary-button" type="submit" disabled={busy}>Record walk-up order</button>
+  </form>;
+}
+
+/** One cell of the price grid. A typed price that differs from the saved one is unsaved work until Save (#1468). */
+function PriceForm({ plan, mealType, group, amountCents, base, busy, run }: {
+  plan: Plan; mealType: MealTypeValue; group: MealAgeGroupValue; amountCents: number | null; base: string; busy: boolean;
+  run: (action: () => Promise<{ meals: MealView }>, success: string) => Promise<boolean>;
+}) {
+  const edit = useEditedForm();
+  return <form onChange={edit.track} onSubmit={(event) => {
+    event.preventDefault();
+    const raw = String(new FormData(event.currentTarget).get("amount") ?? "").trim();
+    const cents = Math.round(Number(raw) * 100);
+    if (!Number.isFinite(cents) || cents < 0 || raw === "") { void run(async () => { throw new Error("Enter a price in dollars, such as 7 or 7.50."); }, ""); return; }
+    void run(() => call(`${base}/plans/${plan.id}/prices`, "PUT", { mealType, ageGroup: group, attendeeTypeId: null, amountCents: cents }), "Price saved.").then((ok) => { if (ok) edit.clear(); });
+  }}>
+    <label className="sr-only" htmlFor={`price-${plan.id}-${mealType}-${group}`}>{plan.name} {mealTypeLabels[mealType]} {mealAgeGroupLabels[group]} price in dollars</label>
+    <input id={`price-${plan.id}-${mealType}-${group}`} name="amount" inputMode="decimal" defaultValue={amountCents !== null ? (amountCents / 100).toFixed(2) : ""} placeholder="not set" />
+    <button type="submit" disabled={busy}>Save</button>
   </form>;
 }
