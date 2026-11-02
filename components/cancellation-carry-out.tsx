@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { postJson } from "@/lib/post-json";
 import { formatCentsPlain } from "@/modules/payments/format-cents";
 import { refundMethodLabels, type RefundMethod } from "@/modules/cancellation-execution/domain";
@@ -55,6 +56,8 @@ export function CancellationCarryOut({
   const [message, setMessage] = useState<{ kind: "error" | "ok"; text: string } | null>(null);
   const [note, setNote] = useState("");
   const [resolveConfirmed, setResolveConfirmed] = useState(false);
+  // Only the typed settlement note is work to lose; the refund choice and tick boxes are not, and a recorded note clears it (#1468).
+  useUnsavedChangesGuard(note.trim() !== "");
   const messageRef = useRef<HTMLDivElement>(null);
   // A failed attempt moves focus to what went wrong, so a keyboard or screen reader user lands on it.
   useEffect(() => {

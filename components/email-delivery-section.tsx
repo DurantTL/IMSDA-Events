@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Mail, Pause, Play, Save } from "lucide-react";
 import { savedMessage } from "@/components/form-message";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { cardCell } from "@/components/table-card-labels";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import type { EventEmailState } from "@/modules/communications/event-email-pause";
@@ -73,6 +74,8 @@ export function EmailDeliverySection({
   const senderMissing = canSend && senderBlank;
   const platformConfigured = canSend && !senderBlank;
   const dirty = JSON.stringify(draft) !== JSON.stringify(sender);
+  // The sender form is the only typed work here; a save resets `sender`, so the guard clears (#1468).
+  useUnsavedChangesGuard(dirty);
   const paused = events.filter((event) => event.paused);
   const pausable = events.filter((event) => !event.paused && !event.archived);
   const pausedSort = useTableSort(paused, PAUSED_SORT);

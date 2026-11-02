@@ -3,6 +3,7 @@
 import { Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   ArrowDown,
   ArrowUp,
@@ -381,14 +382,19 @@ export function RegistrationAmendmentEditor({
     return () => { live = false; };
   }, [eventId, registration.id, hasAcknowledgments]);
   const [reason, setReason] = useState("");
+  // Staff only (#809): attendees confirmed as a different person from someone with the same name on another team of the club.
+  const [differentPeople, setDifferentPeople] = useState<ReadonlySet<string>>(new Set());
+  // Dirty while the edited answers, roster, reason or confirmed-different people differ from what the editor opened with.
+  // Cancel and a saved amendment unmount the editor (the parent closes it), so the guard clears with it (#1468).
+  const editState = () => JSON.stringify({ responses, attendees, reason, differentPeople: [...differentPeople].sort() });
+  const [openedState] = useState(editState);
+  useUnsavedChangesGuard(editState() !== openedState);
   const [clientRequestId] = useState(() => crypto.randomUUID());
   // The site was restarting (#1263): the edits stay; Try again re-sends with the same request id, so it applies once.
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
   const [preview, setPreview] = useState<AmendmentPreview | null>(null);
   const [issues, setIssues] = useState<Array<{ path?: string; message?: string }>>([]);
   const [error, setError] = useState("");
-  // Staff only (#809): attendees confirmed as a different person from someone with the same name on another team of the club.
-  const [differentPeople, setDifferentPeople] = useState<ReadonlySet<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [attempted, setAttempted] = useState(false);
   const [addedNotice, setAddedNotice] = useState("");

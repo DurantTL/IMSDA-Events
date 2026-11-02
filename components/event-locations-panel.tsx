@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, MapPin, Pencil, Plus, 
 import type { ActiveAreaCoordinator, EventLocationRecord } from "@/modules/event-locations/repository";
 import { getLocationDateWarnings } from "@/modules/events/readiness";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type Draft = {
   name: string;
@@ -129,6 +130,10 @@ export function EventLocationsPanel({
   const formOpen = adding || editingId !== null;
   // The location being edited has a stored coordinator who is no longer an active Area Coordinator.
   const editedLocation = editingId ? locations.find((row) => row.id === editingId) : undefined;
+  // Dirty only while the add/edit form is open with values that differ from what it opened with; Cancel and a
+  // successful save close it and reset the draft, so a reopen starts clean (#1468).
+  const formBaseline = editedLocation ? draftFrom(editedLocation) : emptyDraft;
+  useUnsavedChangesGuard(formOpen && JSON.stringify(draft) !== JSON.stringify(formBaseline));
   const inactiveCoordinator = editedLocation?.coordinator && !editedLocation.coordinatorActive ? editedLocation.coordinator : null;
 
   const { confirm: askConfirm, confirmDialog } = useConfirm();

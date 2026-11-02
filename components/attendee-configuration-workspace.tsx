@@ -8,6 +8,7 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { Info } from "lucide-react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type AttendeeTypeRow = {
   id: string; code: string; label: string; description: string; sortOrder: number;
@@ -17,6 +18,11 @@ type ClassificationRow = {
   id: string; kind: "CATEGORY" | "TRACK" | "DEPARTMENT"; code: string; label: string;
   description: string; sortOrder: number; isActive: boolean;
 };
+
+/** True when an uncontrolled add form holds anything other than its starting values. */
+export function addFormHasInput(form: HTMLFormElement, defaults: Record<string, string> = {}): boolean {
+  return Array.from(new FormData(form).entries()).some(([key, value]) => String(value) !== (defaults[key] ?? ""));
+}
 
 async function responseJson(response: Response) {
   const body = await response.json();
@@ -42,9 +48,19 @@ export function AttendeeConfigurationWorkspace({
   const [classifications, setClassifications] = useState(initialClassifications);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  // What each table last saved, so an edited cell counts as unsaved until its row's Save succeeds (#1468).
+  const [savedTypes, setSavedTypes] = useState(initialTypes);
+  const [savedClassifications, setSavedClassifications] = useState(initialClassifications);
+  const [addTypeOpen, setAddTypeOpen] = useState(false);
+  const [addGroupingOpen, setAddGroupingOpen] = useState(false);
+  useUnsavedChangesGuard(
+    JSON.stringify(types) !== JSON.stringify(savedTypes)
+    || JSON.stringify(classifications) !== JSON.stringify(savedClassifications)
+    || addTypeOpen || addGroupingOpen,
+  );
 
   async function addType(form: FormData) {
-    setSaving(true); setError("");
+    setSaving(true); setError(""); setAddTypeOpen(false);
     try {
       const body = await responseJson(await fetch(`/api/events/${eventId}/attendee-types`, {
         method: "POST", headers: { "content-type": "application/json" },
@@ -55,7 +71,9 @@ export function AttendeeConfigurationWorkspace({
           maximumAge: form.get("maximumAge") === "" ? null : Number(form.get("maximumAge")),
         }),
       }));
-      setTypes((current) => [...current, body.attendeeType].sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label)));
+      const byOrder = (a: AttendeeTypeRow, b: AttendeeTypeRow) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label);
+      setTypes((current) => [...current, body.attendeeType].sort(byOrder));
+      setSavedTypes((current) => [...current, body.attendeeType].sort(byOrder));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The attendee type could not be saved."); }
     finally { setSaving(false); }
   }
@@ -68,18 +86,20 @@ export function AttendeeConfigurationWorkspace({
         body: JSON.stringify({ ...row, ...patch }),
       }));
       setTypes((current) => current.map((candidate) => candidate.id === row.id ? body.attendeeType : candidate));
+      setSavedTypes((current) => current.map((candidate) => candidate.id === row.id ? body.attendeeType : candidate));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The attendee type could not be updated."); }
     finally { setSaving(false); }
   }
 
   async function addClassification(form: FormData) {
-    setSaving(true); setError("");
+    setSaving(true); setError(""); setAddGroupingOpen(false);
     try {
       const body = await responseJson(await fetch(`/api/events/${eventId}/attendee-classifications`, {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ kind: form.get("kind"), code: form.get("code"), label: form.get("label"), description: "", sortOrder: 0, isActive: true }),
       }));
       setClassifications((current) => [...current, body.classification]);
+      setSavedClassifications((current) => [...current, body.classification]);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The classification could not be saved."); }
     finally { setSaving(false); }
   }
@@ -92,6 +112,7 @@ export function AttendeeConfigurationWorkspace({
         body: JSON.stringify({ ...row, ...patch }),
       }));
       setClassifications((current) => current.map((candidate) => candidate.id === row.id ? body.classification : candidate));
+      setSavedClassifications((current) => current.map((candidate) => candidate.id === row.id ? body.classification : candidate));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The classification could not be updated."); }
     finally { setSaving(false); }
   }
@@ -122,7 +143,7 @@ export function AttendeeConfigurationWorkspace({
         <td {...cardCell("Status")}>{row.isActive ? "Active" : "Inactive"}</td>
         <td {...cardCell(null)}><span className="form-actions"><button className="secondary-button" disabled={saving} type="button" onClick={() => updateType(row, {})}>Save</button><button className="secondary-button" disabled={saving} type="button" onClick={() => updateType(row, { isActive: !row.isActive })}>{row.isActive ? "Deactivate" : "Activate"}</button></span></td>
       </tr>)}</tbody></table></div>}
-      {canCreate && <form className="form-stack inset-form" action={addType}><div className="form-grid two-column"><label>Permanent code<input id="attendee-type-code-input" name="code" required placeholder="ADULT" /></label><label>Display label<input name="label" required placeholder="Adult" /></label></div><label>Description<input name="description" /></label><div className="form-grid three-column"><label>Minimum age<input name="minimumAge" {...ageBandInputAttributes} type="number" /></label><label>Maximum age<input name="maximumAge" {...ageBandInputAttributes} type="number" /></label><label>Sort order<input name="sortOrder" defaultValue="0" type="number" /></label></div><button className="primary-button" disabled={saving} type="submit">Add attendee type</button></form>}
+      {canCreate && <form className="form-stack inset-form" action={addType} onChange={(event) => setAddTypeOpen(addFormHasInput(event.currentTarget, { sortOrder: "0" }))}><div className="form-grid two-column"><label>Permanent code<input id="attendee-type-code-input" name="code" required placeholder="ADULT" /></label><label>Display label<input name="label" required placeholder="Adult" /></label></div><label>Description<input name="description" /></label><div className="form-grid three-column"><label>Minimum age<input name="minimumAge" {...ageBandInputAttributes} type="number" /></label><label>Maximum age<input name="maximumAge" {...ageBandInputAttributes} type="number" /></label><label>Sort order<input name="sortOrder" defaultValue="0" type="number" /></label></div><button className="primary-button" disabled={saving} type="submit">Add attendee type</button></form>}
     </section>
     <section className="panel"><div className="section-heading"><div><h2>Categories, tracks, and departments</h2><p>Categories, tracks, and departments are independent of attendee type, and an attendee can have several of each. Codes and dimension are permanent once created.</p></div></div>
       <div className="table-wrap"><table className="editable-settings-table table-cards table-cards-xwide" role="table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Dimension</th><th role="columnheader" scope="col">Code</th><th role="columnheader" scope="col">Label</th><th role="columnheader" scope="col">Description</th><th role="columnheader" scope="col">Sort order</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Actions</th></tr></thead><tbody role="rowgroup">{classifications.map((row) => <tr key={row.id} role="row">
@@ -134,7 +155,7 @@ export function AttendeeConfigurationWorkspace({
         <td {...cardCell("Status")}>{row.isActive ? "Active" : "Inactive"}</td>
         <td {...cardCell(null)}><span className="form-actions"><button className="secondary-button" disabled={saving} type="button" onClick={() => updateClassification(row, {})}>Save</button><button className="secondary-button" disabled={saving} type="button" onClick={() => toggleClassification(row)}>{row.isActive ? "Deactivate" : "Activate"}</button></span></td>
       </tr>)}</tbody></table></div>
-      <form className="form-stack inset-form" action={addClassification}><div className="form-grid three-column"><label>Dimension<select name="kind"><option value="CATEGORY">Category</option><option value="TRACK">Track</option><option value="DEPARTMENT">Department</option></select></label><label>Permanent code<input name="code" required placeholder="WORSHIP" /></label><label>Display label<input name="label" required placeholder="Worship" /></label></div><button className="primary-button" disabled={saving} type="submit">Add grouping</button></form>
+      <form className="form-stack inset-form" action={addClassification} onChange={(event) => setAddGroupingOpen(addFormHasInput(event.currentTarget, { kind: "CATEGORY" }))}><div className="form-grid three-column"><label>Dimension<select name="kind"><option value="CATEGORY">Category</option><option value="TRACK">Track</option><option value="DEPARTMENT">Department</option></select></label><label>Permanent code<input name="code" required placeholder="WORSHIP" /></label><label>Display label<input name="label" required placeholder="Worship" /></label></div><button className="primary-button" disabled={saving} type="submit">Add grouping</button></form>
     </section>
   </div>;
 }
