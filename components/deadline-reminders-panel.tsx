@@ -82,7 +82,7 @@ export function DeadlineRemindersPanel({ initial, onCountChange }: { initial: Pe
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       {state.batches.length === 0 ? (
-        <EmptyState hint="Nothing to do here. Reminders are listed as deadlines get close." title="Nothing waiting">No reminders are waiting to be sent.</EmptyState>
+        <EmptyState announce={false} hint="Nothing to do here. Reminders are listed as deadlines get close." title="Nothing waiting">Every reminder that is due has been sent.</EmptyState>
       ) : (
         <ul className="calendar-admin-list">
           {state.batches.map((batch) => {

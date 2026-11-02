@@ -431,7 +431,7 @@ export function ScheduledEmailsWorkspace({
 
       {schedules.length === 0 && !form ? (
         <>
-          <EmptyState action={{ label: "Schedule an email", onClick: () => void openNew() }} canCreate={!busy} icon={<CalendarClock aria-hidden="true" size={22} />} title="No emails are scheduled">No emails are scheduled for this event.</EmptyState>
+          <EmptyState action={{ label: "Schedule an email", onClick: () => void openNew() }} canCreate={!busy} icon={<CalendarClock aria-hidden="true" size={22} />} title="No emails are scheduled">Scheduled emails go out to attendees at a set time, such as before a deadline.</EmptyState>
           <EventSetupHelp context="scheduled emails" id="scheduled-emails-none" />
         </>
       ) : (

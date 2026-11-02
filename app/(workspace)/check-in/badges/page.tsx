@@ -240,7 +240,7 @@ export default async function PrintableNameBadgesPage({
 
       {labels.length === 0 ? (
         <>
-          <EmptyState className="empty-state panel" headingLevel={3} hint="Badges appear here automatically once someone registers." icon={<ContactRound aria-hidden="true" size={26} />} title="No badges to print yet">Active submitted or confirmed attendees get a badge, and there are none yet.</EmptyState>
+          <EmptyState className="empty-state panel" headingLevel={3} hint="Badges appear here automatically once someone registers." icon={<ContactRound aria-hidden="true" size={26} />} title="No badges to print yet">Each registered attendee gets a badge. None have registered for this event yet.</EmptyState>
           <EventSetupHelp eventId={event.id} context="badges" id="badges-none" />
         </>
       ) : (

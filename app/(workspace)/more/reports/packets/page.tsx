@@ -151,7 +151,7 @@ export default async function EventPacketsPage({
         </article>
       ))}
 
-      {selectedGroups.length === 0 && (query.group
+      {selectedGroups.length === 0 && (query.group && packets.groups.length > 0
         ? <NoMatchesState clear={{ href: `/more/reports/packets?${eventQuery}` }} headingLevel={3} icon={<PackageOpen size={26} aria-hidden="true" />} known={`This event has ${packets.groups.length} ${packets.groups.length === 1 ? "packet" : "packets"}.`} noun="packets" />
         : <EmptyState className="empty-state panel" headingLevel={3} hint="Packets appear here once active attendees register." icon={<PackageOpen size={26} aria-hidden="true" />} title="No packets yet">There are no active attendees to build a packet for.</EmptyState>)}
     </section>

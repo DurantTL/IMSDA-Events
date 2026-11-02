@@ -366,7 +366,7 @@ export function CalendarAdminWorkspace({
               </div>
             </div>
             {entries.length === 0 ? (
-              <EmptyState hint="Use the form above to add dates for events that aren't registered here, such as rallies or camporees." icon={<CalendarDays aria-hidden="true" size={27} />} title="No entries yet">The calendar has no entries of its own.</EmptyState>
+              <EmptyState announce={false} hint="Use the form above to add dates for events that aren't registered here, such as rallies or camporees." icon={<CalendarDays aria-hidden="true" size={27} />} title="No entries yet">The calendar has no entries of its own.</EmptyState>
             ) : (
               <>
               <EntryFiltersBar
@@ -536,7 +536,7 @@ export function CalendarAdminWorkspace({
             </div>
           </div>
           {events.length === 0 ? (
-            <EmptyState hint="Create an event first; published events then appear here." icon={<CalendarDays aria-hidden="true" size={27} />} title="No upcoming events">There are no upcoming events to show on the calendar.</EmptyState>
+            <EmptyState announce={false} hint="Create an event first; published events then appear here." icon={<CalendarDays aria-hidden="true" size={27} />} title="No upcoming events">There are no upcoming events to show on the calendar.</EmptyState>
           ) : (
             <ul className="calendar-admin-list">
               {events.map((event) => {

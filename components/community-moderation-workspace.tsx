@@ -205,7 +205,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
           <ShieldCheck size={21} aria-hidden="true" />
         </div>
         {community.reports.length === 0 ? (
-          <EmptyState hint="Nothing to do here. Reports from attendees will appear in this queue." title="No open reports">There are no open community reports.</EmptyState>
+          <EmptyState hint="Nothing to do here. Reports from attendees will appear in this queue." title="No open reports">Attendees have not reported any posts, or every report has been handled.</EmptyState>
         ) : community.reports.map((report) => (
           <article className="community-report-card" key={report.id}>
             <header><strong>{report.reason.toLowerCase()}</strong><time>{when(report.createdAt)}</time></header>
@@ -235,7 +235,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
           </a>
         </div>
         {posts.length === 0 ? (
-          <EmptyState hint="Posts and replies from attendees will appear here for review." title="No conversations yet">No attendee conversations have been posted.</EmptyState>
+          <EmptyState hint="Posts and replies from attendees will appear here for review." title="No conversations yet">Attendees have not started any discussions for this event.</EmptyState>
         ) : posts.map((post) => (
           <article className="community-staff-post" key={post.id}>
             <header>

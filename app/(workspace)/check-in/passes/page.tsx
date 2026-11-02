@@ -159,7 +159,7 @@ export default async function PrintableAttendeePassesPage({
 
       {passesAvailable && passes.length === 0 && (
         <>
-          <EmptyState className="empty-state panel" headingLevel={3} hint="Passes appear here automatically once someone registers." icon={<QrCode aria-hidden="true" size={26} />} title="No passes to print yet">Active submitted or confirmed attendees get a pass, and there are none yet.</EmptyState>
+          <EmptyState className="empty-state panel" headingLevel={3} hint="Passes appear here automatically once someone registers." icon={<QrCode aria-hidden="true" size={26} />} title="No passes to print yet">Each registered attendee gets a pass. None have registered for this event yet.</EmptyState>
           <EventSetupHelp eventId={event.id} context="passes" id="passes-none" />
         </>
       )}

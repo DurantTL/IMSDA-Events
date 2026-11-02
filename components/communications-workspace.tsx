@@ -2409,7 +2409,7 @@ export function CommunicationsWorkspace({
                       </button>
                     )}
                   </>
-                ) : <EmptyState headingLevel={3} hint="Choose a message in the list to see its subject, body, and attempts." icon={<Mail size={24} />} title="No message selected">Nothing is open for inspection.</EmptyState>}
+                ) : <EmptyState announce={false} headingLevel={3} hint="Choose a row to inspect the immutable subject, body, and attempts." icon={<Mail size={24} />} title="Select a message">Nothing is open yet.</EmptyState>}
               </aside>
             </div>
           </section>

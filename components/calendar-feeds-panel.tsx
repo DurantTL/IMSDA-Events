@@ -209,7 +209,7 @@ export function CalendarFeedsPanel({
           </div>
         </div>
         {feeds.length === 0 ? (
-          <EmptyState hint="Add a Google Calendar above to bring its events onto the public calendar." icon={<Download aria-hidden="true" size={27} />} title="No imported calendars">No outside calendars are being imported.</EmptyState>
+          <EmptyState announce={false} hint="Add a Google Calendar above to bring its events onto the public calendar." icon={<Download aria-hidden="true" size={27} />} title="No imported calendars">No outside calendars are being imported.</EmptyState>
         ) : (
           <ul className="calendar-admin-list">
             {feeds.map((feed) => (
