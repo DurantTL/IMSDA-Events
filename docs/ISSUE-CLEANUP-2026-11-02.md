@@ -161,3 +161,61 @@ Nothing (or almost nothing) is built for these yet, and they are still planned. 
 - **Phase 3 (37):** wallet #53, #222–#225, #267; installments #92, #229–#232, #268; mobile app #82, #262–#266; API #103, #124, #237–#241, #269; surveys and certificates #234, #235, #236; eAdventist #244, #245, #246; site builder #249, #270; personnel #93; e-learning #493; seminar "Not attending" #893.
 - **Phase 4 (4):** #87 networking, #88 budgeting, #313 community groups, #494 unit scoring.
 - **Phase 5 (3):** #71 UltraCamp, #86 virtual events, #97 personalization.
+
+## Partials: proposed actions (waiting for Caleb's approval)
+
+44 partly-built issues: the 24 above plus 20 labelled needs-decision or needs-human. "What's left" comes from today's code check on main. **Nothing has been done yet**; one "approved" reply carries out the whole table.
+
+- **CLOSE:** what's left is already tracked by its own open issues, so the old umbrella issue goes.
+- **SPLIT:** close the old issue as partly delivered (comment with what shipped) and open one small issue with only the real remaining items, same labels, linked both ways.
+- **FINISH:** one focused build finishes it.
+- **DECISION:** only your yes/no is left. The question is in the row.
+
+| Issue | Title | What shipped | What's left | Proposed action | New issue title (SPLIT) |
+| --- | --- | --- | --- | --- | --- |
+| #73 | Save/resume and staff-entered registrations (epic) | Club saved drafts; browser drafts | All tracked in #161–#164 | CLOSE (covered by #161–#164) | |
+| #76 | Historical imports and exports (epic) | CSV, WR26 and Google Sheets imports | All tracked in #172–#175 | CLOSE (covered by #172–#175) | |
+| #84 | No-code event site builder (epic) | Event page content sections, page metadata | All tracked in #247–#251, #270 | CLOSE (covered by #247–#251, #270) | |
+| #43 | Consents, waivers and approvals (epic) | Policy versions #129, acknowledgments #150, guardian authority #131 | All tracked in #130, #132 | CLOSE (covered by #130, #132) | |
+| #44 | Protected medical records (epic) | Encrypted health records, coordinator view, break-glass | All tracked in #189–#192, #151 | CLOSE (covered by #189–#192, #151) | |
+| #69 | eAdventist integration (epic) | Organization CSV import, geocoding | All tracked in #242–#246 | CLOSE (covered by #242–#246) | |
+| #70 | Sterling Volunteers readiness (epic) | CSV import, compliance review, check-in hold | All tracked in #113, #115, #218 | CLOSE (covered by #113, #115, #218) | |
+| #79 | Incident management (epic) | Emergency plans #114 (PR #1339) | All tracked in #257–#261 | CLOSE (covered by #257–#261) | |
+| #83 | Event community (epic) | Feed, pinning, revisions, reports | All tracked in #308–#315 | CLOSE (covered by #308–#315) | |
+| #90 | Surveys, certificates and outcomes (epic) | Information forms (PRs #1153–#1156) | All tracked in #233–#236 | CLOSE (covered by #233–#236) | |
+| #91 | Returning attendee profiles (epic) | Profile prefill (PR #756) | All tracked in #226–#228 | CLOSE (covered by #226–#228) | |
+| #134 | Pricing engine | Form prices, one late-pricing date, meal prices by type | Rate windows; per-type prices; household max; staff overrides | SPLIT | Pricing: rate windows, attendee-type prices, household maximum and staff overrides |
+| #163 | Staff-entered registrations | Staff can create one-attendee registration | Staff drafts with provenance; shared pricing and capacity; hand-off to registrant | SPLIT | Staff-entered registrations: drafts, shared checks and hand-off to the registrant |
+| #181 | Saved views and drilldowns | Filters in the address, task presets | Personal and shared saved views; count drilldowns | SPLIT | Saved views: personal and shared filter sets for registrations |
+| #228 | Profile conflicts and corrections | One-way prefill; duplicate review and merge | Conflict display; reviewed profile updates; staff corrections | SPLIT | Returning profiles: show conflicts and review profile updates |
+| #248 | Event branding, SEO and domains | Hero/gallery/HTML blocks, tagline, page metadata | Theme colors with contrast check; social image; favicon (custom domains to #270) | SPLIT | Event pages: theme colors, social image and favicon |
+| #250 | Site preview, scheduling and rollback | Homepage revisions with restore | Event-page preview link; scheduled publish; rollback | SPLIT | Event pages: preview link, scheduled publish and rollback |
+| #158 | Event closeout gate | Lifecycle states to Financial reconciliation and Closed | Closeout checklist; treasurer sign-off (decided Oct 27); snapshot | SPLIT | Event closeout: checklist and treasurer sign-off before Closed |
+| #190 | Encrypted persistence and key operations | AES-GCM sealed fields, file-based key loading | Key version and rotation; key health check; human test restore | SPLIT | Health records: key versioning, rotation and key health check |
+| #840 | Adventurers on IMSDA Events (epic) | Adventurer forms, carry-forward, coordinator workspace | #841–#843 plus events, reports, orders filter, portal wording | SPLIT | Adventurers: events, reports, orders filter and portal wording |
+| #130 | Consent presentation and withdrawal evidence | Acknowledgment evidence tied to policy versions | Decline and withdraw actions; re-consent on material change | FINISH: one build adding decline, withdraw and re-consent to acknowledgments | |
+| #221 | Passkey recovery and session revocation | Recent-2FA rule, sign-in codes, `signOutEverywhere` (no screen) | Lost-device recovery; "sign out everywhere" screen | FINISH: one build for attendee lost-device recovery and the sign-out-everywhere screen | |
+| #554 | One account and one sign-in per person | Switch, hand-link, combined passkey sign-in (8 PRs) | Slice (e) remove old paths after the window; your rollout | FINISH: slice (e) PR after your two-week window (rollout stays yours) | |
+| #1468 | Unsaved-changes guard on remaining forms | Shared guard in 24 files | 75 allow-listed forms | FINISH: in rounds of about ten (club forms first, with #1501); already launch-gate work | |
+| #100 | Session scheduling (epic) | Honors sessions, waitlists, attendance | General sessions #207–#209 | DECISION: do non-Honors events need a general session schedule? No closes #100 and #207–#209 | |
+| #207 | Session schedule and capacity | Honors sessions, rooms, offerings | General sessions and fees | DECISION: same question as #100 | |
+| #208 | Session conflicts and waitlists | Honors waitlist offers and overrides | Non-Honors conflicts and waitlists | DECISION: same question as #100 | |
+| #209 | Session attendance | Honors attendance marks, printed rosters | Per-occurrence attendance, QR, summaries | DECISION: same question as #100 | |
+| #172 | Multi-file import batches | WR26 import runs and preview | Generic framework, XLSX, modes | DECISION: need general historical imports beyond WR26? No closes #172–#175 | |
+| #173 | Registration import profiles | WR26 bundle import | Other profiles and history | DECISION: same question as #172 | |
+| #174 | Financial history import | One ledger charge per WR26 registration | Payments, refunds, credits import | DECISION: same question as #172 | |
+| #113 | NCS Risk import profile | Sterling Volunteers CSV import | Versioned NCS mapping profile | DECISION: is the Sterling Volunteers import enough? Yes closes it | |
+| #146 | Merchandise quotes and reservations | Server-side order drafts | Quotes, reservations, payment (#147, #148) | DECISION: close merchandise #146–#148 until a 2027 event needs it? | |
+| #183 | Ministry units and seasons | Club-year rosters, carry-forward, transfers | Unit table, seasons, dated membership | DECISION: does the club-year roster replace this? Yes closes it | |
+| #432 | Keep clubs up while events side rebuilds | Standby container, prep-only migrations | Pause switch, stale pages, two surfaces | DECISION: still wanted? No closes it | |
+| #40 | Durable Person and Household identity (epic) | Slices #125–#128 (PRs #320, #326, #1345, #1358) | Identity ADR approval; anonymization screen | DECISION: accept identity as built and close? | |
+| #85 | Speaker, sponsor and vendor portals | Speakers content block only | Portals and sponsor records | DECISION: needed at all? No closes it | |
+| #94 | Camp store and cashless accounts | Merchandise catalog | Cashless accounts, POS | DECISION: needed at all? No closes it | |
+| #95 | Donations and fundraising | Scholarship funds (PR #941) | Donations, campaigns, designated funds | DECISION: needed beyond scholarship funds? No closes it | |
+| #189 | Protected-records policy gate | ADR 0005 Addenda A and B accepted | Base ADR and Addendum C approval; key backup test restore | DECISION: approve ADR 0005 base and Addendum C? | |
+| #310 | Community moderation | Reports, hide/remove, pause | Block/mute, suspension, escalation | DECISION: needed for an event-only feed? No closes it | |
+| #416 | 2026–27 setup and go-live checklist | Code prerequisites done | Your server, migration, MFA, invite and event-setup items | DECISION: keep open as your personal go-live checklist? | |
+| #492 | Survey club directors about spreadsheets | Honor tracking, honor orders, uniform orders | The survey itself | DECISION: still planning the survey? No closes it | |
+| #835 | Visiting clubs invite link | New-club invite link | Event-bound invite, guest-club rules | DECISION: build event invites for visiting clubs this year? | |
+
+**Totals:** CLOSE 11, SPLIT 9, FINISH 4, DECISION 20.
