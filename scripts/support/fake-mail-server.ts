@@ -37,6 +37,7 @@ export class FakeMailServer {
   readonly messages: CapturedMessage[] = [];
   private server: Server | null = null;
   private sequence = 0;
+  private readonly runId = `${process.pid.toString(36)}${Date.now().toString(36)}`;
   private sweepNudged = new Set<string>();
 
   constructor(port = Number(process.env.JOURNEY_MAIL_PORT ?? 3999), private readonly appUrl = (process.env.JOURNEY_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "")) {
@@ -56,7 +57,8 @@ export class FakeMailServer {
         }
         let parsed: { from?: string; to?: string[] | string; subject?: string; text?: string; html?: string } = {};
         try { parsed = JSON.parse(body || "{}"); } catch { /* an empty message is still recorded */ }
-        const id = `journey-mail-${++this.sequence}`;
+        // Unique per run: the app stores this as the message's provider id, which must not repeat across runs on one database.
+        const id = `journey-mail-${this.runId}-${++this.sequence}`;
         this.messages.push({
           id, from: parsed.from ?? "", to: (Array.isArray(parsed.to) ? parsed.to : [parsed.to ?? ""]).map((address) => address.toLowerCase()),
           subject: parsed.subject ?? "", text: parsed.text ?? "", html: parsed.html ?? "", receivedAt: Date.now(),
@@ -89,14 +91,16 @@ export class FakeMailServer {
   private async nudgeSweep(key: string) {
     if (this.sweepNudged.has(key)) return;
     this.sweepNudged.add(key);
-    try {
-      await fetch(`${this.appUrl}/api/internal/outbox/sweep`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${process.env.OUTBOX_SWEEP_TOKEN ?? defaultSweepToken}` },
-        signal: AbortSignal.timeout(60_000),
-      });
-    } catch {
-      // No token, or the sweep is busy: the wait below simply continues.
+    // OUTBOX_SWEEP_TOKEN from the environment, then the CI value: a local .env can carry a different token than the apps under test.
+    const tokens = [...new Set([process.env.OUTBOX_SWEEP_TOKEN, defaultSweepToken].filter((value): value is string => Boolean(value)))];
+    for (const token of tokens) {
+      try {
+        const response = await fetch(`${this.appUrl}/api/internal/outbox/sweep`, { method: "POST", headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60_000) });
+        if (response.status !== 401 && response.status !== 403) return;
+      } catch {
+        // The sweep is busy: the wait continues.
+        return;
+      }
     }
   }
 

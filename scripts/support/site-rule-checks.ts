@@ -268,6 +268,12 @@ export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) 
     const box = boxes.nth(index);
     const id = (await box.getAttribute("id")) ?? (await box.getAttribute("placeholder")) ?? `box ${index + 1}`;
     const what = `search box "${id}"`;
+    // A combobox (the header's "Find a page or task") opens a list of choices when it is focused: that list is the full list, so it
+    // is read as options, not as a change to the page.
+    if ((await box.getAttribute("role")) === "combobox") {
+      await checkComboboxSearch(page, rec, name, what, box);
+      continue;
+    }
     const baseline = await read();
     // S2: no minimum and no "type to search" empty state.
     const gate = /type (at least )?\d+ (characters|letters)|type to search|type more to narrow|enter at least/i.exec(baseline);
@@ -275,7 +281,8 @@ export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) 
     // S1: focusing does not hide anything.
     await box.click();
     const afterFocus = await read();
-    rec.record(name, "S1", `${what} (focus shows full list)`, afterFocus === baseline ? "pass" : "fail", afterFocus === baseline ? "list unchanged on focus" : "the page changed when the box was focused");
+    const focusDiff = afterFocus === baseline ? "" : (() => { const was = new Set(baseline.split("\n")); const now = new Set(afterFocus.split("\n")); const gone = baseline.split("\n").find((line: string) => !now.has(line)); const added = afterFocus.split("\n").find((line: string) => !was.has(line)); return ` (${gone ? `gone: "${gone.slice(0, 60)}"` : ""}${added ? ` new: "${added.slice(0, 60)}"` : ""})`; })();
+    rec.record(name, "S1", `${what} (focus shows full list)`, afterFocus === baseline ? "pass" : "fail", afterFocus === baseline ? "list unchanged on focus" : `the page changed when the box was focused${focusDiff}`);
     // S4: typing narrows with no Enter.
     await box.pressSequentially("zzqx-no-match-zz", { delay: 15 });
     // Narrowing means fewer lines of results than before, or a no-match message that was not there before; a different
@@ -290,8 +297,29 @@ export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) 
     // more, for example a table that stays open after a search).
     const baselineLines = baseline.split("\n");
     const restored = await pollPage<string>(page, read, (text) => { const now = new Set(text.split("\n")); return baselineLines.every((line: string) => now.has(line)); }, 5_000);
-    rec.record(name, "S1", `${what} (empty shows full list)`, restored.ok ? "pass" : "fail", restored.ok ? "emptying the box restored the full list" : "emptying the box did not bring back the full list");
+    const missingLine = restored.ok ? "" : (() => { const now = new Set((restored.value ?? "").split("\n")); const gone = baselineLines.find((line: string) => !now.has(line)); return gone ? ` (missing: "${gone.slice(0, 70)}")` : ""; })();
+    rec.record(name, "S1", `${what} (empty shows full list)`, restored.ok ? "pass" : "fail", restored.ok ? "emptying the box restored the full list" : `emptying the box did not bring back the full list${missingLine}`);
+    // Leave the box as a person would, so a list or popup it opened is not still there for the next box.
+    await page.keyboard.press("Escape");
+    await box.blur().catch(() => undefined);
   }
+}
+
+/** S1, S2, S4 for a combobox search: focus lists every choice, typing narrows them (or says none match), emptying lists them all again. */
+async function checkComboboxSearch(page: Page, rec: Recorder, name: string, what: string, box: ReturnType<Page["locator"]>) {
+  const options = page.locator('[role="listbox"] [role="option"]:visible');
+  await box.click();
+  const all = await pollPage<number>(page, () => options.count(), (count) => count > 0, 3_000);
+  rec.record(name, "S1", `${what} (focus shows full list)`, all.ok ? "pass" : "fail", all.ok ? `${all.value} choice(s) listed on focus` : "focusing the box listed no choices");
+  rec.record(name, "S2", what, "pass", "a combobox: no minimum-character or type-to-search message");
+  await box.pressSequentially("zzqx-no-match-zz", { delay: 15 });
+  const none = await pollPage<{ count: number; message: boolean }>(page, async () => ({ count: await options.count(), message: /\bno [\w ]*(match|results?|found)/i.test(await page.locator("body").innerText()) }), (value) => value.count < (all.value ?? 0) || value.message, 3_000);
+  rec.record(name, "S4", `${what} (typing narrows, no Enter)`, none.ok ? "pass" : "fail", none.ok ? "fewer choices (or a no-match message) while typing" : "typing a string that matches nothing did not narrow the choices");
+  await box.fill("");
+  const back = await pollPage<number>(page, () => options.count(), (count) => count >= (all.value ?? 1), 3_000);
+  rec.record(name, "S1", `${what} (empty shows full list)`, back.ok ? "pass" : "fail", back.ok ? "emptying the box listed every choice again" : "emptying the box did not bring the choices back");
+  await page.keyboard.press("Escape");
+  await box.blur().catch(() => undefined);
 }
 
 /* -------------------------------------------------------------- active */
@@ -489,7 +517,7 @@ export async function checkSaveFlow(page: Page, rec: Recorder, name: string, wha
     await held.stop();
   }
   await input.done();
-  const messages = await input.form.locator('[role="status"], [role="alert"], .inline-notice').evaluateAll((nodes: HTMLElement[]) => nodes.filter((node) => node.getBoundingClientRect().width > 0 && (node.textContent ?? "").trim().length > 0).map((node) => (node.textContent ?? "").replace(/\s+/g, " ").trim()));
+  const messages = await input.form.locator('[role="status"], [role="alert"], .inline-notice, [aria-live="polite"], [aria-live="assertive"]').evaluateAll((nodes: HTMLElement[]) => nodes.filter((node) => node.getBoundingClientRect().width > 0 && (node.textContent ?? "").trim().length > 0).map((node) => (node.textContent ?? "").replace(/\s+/g, " ").trim()));
   const text = messages[0] ?? "";
   rec.record(name, "B5", `${what}: one "Saved." message after saving`, messages.length === 1 && /^Saved\./.test(text) ? "pass" : "fail", `messages shown after saving: ${JSON.stringify(messages)}`);
 }
@@ -537,6 +565,22 @@ export async function checkNoAccess(page: Page, rec: Recorder, name: string, ema
   rec.record(name, "B14", "the page has its own heading", heading > 0 ? "pass" : "fail", `${heading} level-1 heading(s)`);
 }
 
+/**
+ * B14 for a staff member whose role lacks the permission for a page: the shared "Permission required" state (components/access-restricted.tsx)
+ * with the page's own title and the line "Ask <who> if you need access.", a heading, and a way on (Help & learning).
+ */
+export async function checkRestricted(page: Page, rec: Recorder, name: string, expected: { title: string; whoToAsk: string }) {
+  const state = page.locator(".forbidden-state");
+  const shown = await state.first().waitFor({ state: "visible", timeout: 5_000 }).then(() => true, () => false);
+  if (!shown) { rec.record(name, "B14", "shows the shared no-access state", "fail", `no "Permission required" state: the page says "${clean((await page.locator("main").innerText().catch(() => "")).slice(0, 120))}"`); return; }
+  const text = clean(await state.first().innerText());
+  rec.record(name, "B14", "shows the shared no-access state", /permission required/i.test(text) && text.includes(expected.title) ? "pass" : "fail", `"${text.slice(0, 140)}"`);
+  const ask = `Ask ${expected.whoToAsk} if you need access.`;
+  rec.record(name, "B14", "explains who to ask", text.includes(ask) ? "pass" : "fail", text.includes(ask) ? `"${ask}"` : `the page says: "${text.slice(0, 140)}"`);
+  const next = await state.first().locator("a[href]").count();
+  rec.record(name, "B14", "offers a permitted next step", next > 0 ? "pass" : "fail", `${next} link(s) in the no-access state`);
+}
+
 /* --------------------------------------------------------------- S5 */
 
 /**
@@ -576,8 +620,14 @@ export async function checkSearchWithoutScript(browser: { newContext(options: Re
 
 /** L1: the `.search-field` wrapper draws the border (10px radius), the input draws nothing, the native clear "x" is hidden, clear buttons are 44px. */
 export async function checkSearchFieldLook(page: Page, rec: Recorder, name: string) {
-  const wrapper = page.locator(".search-field:visible").first();
-  if (!(await wrapper.count())) { rec.record(name, "L1", "search field look", "n/a", "no search field on this page"); return; }
+  const wrappers = page.locator(".search-field:visible");
+  const total = await wrappers.count();
+  if (total === 0) { rec.record(name, "L1", "search field look", "n/a", "no search field on this page"); return; }
+  // Every search field on the page (the staff header has one too), each read the same way.
+  for (let index = 0; index < total; index += 1) await checkOneSearchFieldLook(page, rec, name, wrappers.nth(index));
+}
+
+async function checkOneSearchFieldLook(page: Page, rec: Recorder, name: string, wrapper: ReturnType<Page["locator"]>) {
   const look = await wrapper.evaluate((node: HTMLElement) => {
     const style = getComputedStyle(node);
     const input = node.querySelector("input");
@@ -614,7 +664,7 @@ export async function checkSearchFieldLook(page: Page, rec: Recorder, name: stri
   await input.fill("x");
   const clear = wrapper.locator("button:visible").first();
   const shown = await clear.waitFor({ state: "visible", timeout: 2_000 }).then(() => true, () => false);
-  if (!shown) rec.record(name, "L1", "the clear button is 44px", "fail", "no clear button appeared after typing in the search field");
+  if (!shown) rec.record(name, "L1", "the clear button is 44px", "n/a", "this search field has no clear button after typing (the rule sizes the buttons that exist)");
   else {
     const box = await clear.boundingBox();
     rec.record(name, "L1", "the clear button is 44px", box && box.width >= 43.5 && box.height >= 43.5 ? "pass" : "fail", `clear button is ${box ? `${Math.round(box.width)}x${Math.round(box.height)}` : "not measurable"}px`);
@@ -682,7 +732,7 @@ export async function checkChipsAndBadges(page: Page, rec: Recorder, name: strin
     return { own: [...new Set(own)], counted };
   });
   if (scan.own.length === 0) rec.record(name, "L4", "chips and badges use the shared classes", "n/a", "no chip, pill or badge on this page outside the shared ones");
-  else rec.record(name, "L4", "chips and badges use the shared classes", "fail", `own chip look instead of .status-chip / .count-badge: ${scan.own.slice(0, 3).join("; ")}`);
+  else rec.record(name, "L4", "chips and badges use the shared classes", "fail", `own chip look instead of .status-chip / .count-badge: ${scan.own.slice(0, 8).join("; ")}`);
   if (scan.counted.length === 0) rec.record(name, "L4", "filter counts use the count badge", "n/a", "no filter with counts on this page");
   else {
     const bad = scan.counted.filter((entry: { shared: boolean }) => !entry.shared);

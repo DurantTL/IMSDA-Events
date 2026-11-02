@@ -1,7 +1,7 @@
 /**
- * Event attendee journeys in a real browser (#1439, round 2 phase A).
+ * Event journeys in a real browser (#1439, round 2: phase A attendees, phase B event staff).
  *
- * Uses the built site like an attendee would, on a seeded database, at 1280 and 390 px wide (Chromium only):
+ * Phase A uses the built site like an attendee would, on a seeded database, at 1280 and 390 px wide (Chromium only):
  *  1. create an account while the Cloudflare Security check is blocked (the "Email me a code instead" way in, the office
  *     contact beside the blocked message, the same words for an address that has an account and one that has not), then the
  *     emailed verification code;
@@ -11,6 +11,19 @@
  *     failing: the amount on the card step and the recorded total are still the server's numbers (P1);
  *  3. manage the registration as that account (My registrations: find it, update the contact details, the filter tabs);
  *  4. ask to cancel it, a staff member approves and carries it out, and the attendee's list says Cancelled.
+ * Phase B uses it like event staff would, each journey in a browser signed in as a stamped synthetic staff user:
+ *  5. create an event from a template (/event-setup/from-template). THE ONE STEP RUN AS A SYSTEM ADMINISTRATOR: that page is theirs
+ *     only, so a stamped synthetic SYSTEM_ADMIN user's session is minted for it and for nothing else;
+ *  6. the publish checklist, as that event's EVENT_ADMIN (a stamped staff user granted the role on the new event): "Set up this
+ *     event" on the Overview, an attendee type, the event settings (one Save), then Publish event in the shared confirm dialog;
+ *  7. the form builder (between the settings and Publish event): leave-with-unsaved-changes, Preview & test with Continue and Back,
+ *     Run test submission (recorded as a test, no registration), publish the form version;
+ *  8. the attendee list of an event with 55 stamped attendees (sort both ways, the pager, a filter that survives Back, Clear filters,
+ *     an empty filter, search, Download CSV with its file name);
+ *  9. check-in as CHECK_IN_STAFF: search, Check in, Undo (the /check-in-station screen is not covered yet);
+ * 10. a scheduled email as the COMMUNICATIONS_MANAGER: New schedule, Review, Save, Approve, then the sweep as the scheduler calls it,
+ *     the email in the dev outbox for the three stamped recipients only, and the page saying it was sent;
+ * 14. staff without the permission (CHECK_IN_STAFF) opening finance and scheduled emails see the shared no-access state.
  * Every page a journey visits is checked against docs/SITE-RULES.md (scripts/support/site-rule-checks.ts).
  *
  * LOCAL USE ONLY (see scripts/support/browser-journeys.ts): synthetic rows only, sessions minted for the staff context, and it
@@ -47,11 +60,14 @@
  *      (the same two start lines are what .github/workflows/ci.yml does for "Event journeys (real browser)").
  *   4. npm run test:event-journeys (both widths, one after the other), or JOURNEY_SHARD=desktop / phone for one.
  *   JOURNEY_ONLY=1,3,T runs only those journeys (1 creates the account that 3 and 4 use, 2 makes the registration they use, so
- *   JOURNEY_ONLY=3 runs 1 and 2 as well); JOURNEY_DEBUG=1 prints the page when a step fails; JOURNEY_KEEP_DATA=1 keeps the seeded
+ *   JOURNEY_ONLY=3 runs 1 and 2 as well; 6 and 7 run 5 first; the ids are 1 2 3 4 5 6 7 8 9 10 14 T B P); JOURNEY_DEBUG=1 prints the page when a step fails; JOURNEY_KEEP_DATA=1 keeps the seeded
  *   rows. Each shard seeds its own data (the run stamp includes the shard).
  *
  * Environment: JOURNEY_BASE_URL, JOURNEY_TURNSTILE_BASE_URL, JOURNEY_SHARD (desktop = 1280 wide, phone = 390 wide, unset = both),
  * JOURNEY_MAIL_PORT, JOURNEY_KEEP_DATA, JOURNEY_ONLY, JOURNEY_DEBUG, JOURNEY_BROWSERS (default chromium).
+ *
+ * The platform's central email sender is set for the run when the database has none (a publish and scheduled email need it) and put
+ * back at the end. The sweep (journey 10) uses OUTBOX_SWEEP_TOKEN from the environment, then the CI value.
  *
  * Budgets: the sign-in, sign-up, Security check, public registration and payment send limits would stop repeated local runs, so the
  * suite clears those buckets on the local database before it starts.
@@ -65,14 +81,14 @@
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 import * as J from "./support/browser-journeys";
-import { FINANCE_EMAIL, cleanupEventWorld, eventFormDefinition, emailFor, resetEventBudgets, seedEventWorld, seedExistingAccount, type EventWorld } from "./support/event-journey-data";
+import { FINANCE_EMAIL, cleanupEventWorld, eventFormDefinition, emailFor, resetEventBudgets, seedEventWorld, seedExistingAccount, type EventWorld, type StaffRole } from "./support/event-journey-data";
 import { FakeMailServer } from "./support/fake-mail-server";
 import * as S from "./support/journey-steps";
 import { assertLocalUrl } from "./support/local-only-guard";
 import { PREVIEW_FAILS_INIT_SCRIPT, blockedBy } from "./support/privacy-block-lists";
 import {
-  APPROVED_STATUS_WORDS, Recorder, checkBrowserOnlyEmail, checkEmptyState, checkErrorSummary, checkErroredFocus, checkFocusRing, checkInFlightLabel, checkNoAccess,
-  checkPage, checkSaveFlow, checkSearchLive, checkSearchWithoutScript, checkTypedFields, clean, holdRequest, pollPage, type KnownBug,
+  APPROVED_STATUS_WORDS, Recorder, checkBrowserOnlyEmail, checkEmptyState, checkErrorSummary, checkErroredFocus, checkFocusRing, checkInFlightLabel, checkNoAccess, checkRestricted,
+  checkPage, checkConfirmDialog, checkDialogBehavior, checkLeaveWarning, checkSaveFlow, checkSearchLive, checkSearchWithoutScript, checkTypedFields, clean, holdRequest, pollPage, type KnownBug,
 } from "./support/site-rule-checks";
 
 loadEnvConfig(process.cwd());
@@ -80,6 +96,13 @@ loadEnvConfig(process.cwd());
 const turnstileBase = (process.env.JOURNEY_TURNSTILE_BASE_URL ?? "http://localhost:3002").replace(/\/$/, "");
 
 /** Failures that are the site's fault (found by these journeys). The label is what the failing check prints. */
+/** Every staff page the staff journeys visit: the staff shell (header, role switcher) is on each of them. */
+const staffPages = [
+  "Start from template", "Overview (setting up an event)", "Attendee setup", "Event settings", "Registration builder", "Registration builder (preview and test)",
+  "Event settings (ready to publish)", "Overview (event published)", "Attendee list", "Cancellation requests (check-in staff)", "Scheduled emails (check-in staff)",
+  "Check-in desk", "Scheduled emails", "Scheduled emails (new schedule)", "Scheduled emails (saved schedule)", "Scheduled emails (after sending)",
+  "Cancellation requests (staff)", "Cancellation request (staff review)",
+];
 const registrationsPages = ["My registrations", "My registrations (filters)", "My registrations (contact updated)", "My registrations (request cancellation)", "My registrations (cancelled)", "My registrations (after cancelling)"];
 export const KNOWN_BUGS: KnownBug[] = [
   {
@@ -90,7 +113,7 @@ export const KNOWN_BUGS: KnownBug[] = [
   {
     id: "search-clear-button-42px",
     description: "Search fields on desktop: app/globals.css:1262 sizes .search-field-clear 44px wide but height: 42px (only the phone rule at app/globals.css:9451 makes it --touch-target tall), so the clear button is 44x42 (L1 \"clear buttons are 44px\", C2).",
-    checks: [{ label: "Events list | L1 | the clear button is 44px", detail: "44x42" }],
+    checks: ["Events list", ...staffPages].map((page) => ({ label: `${page} | L1 | the clear button is 44px`, detail: "44x42" })),
     only: "desktop",
   },
   {
@@ -117,6 +140,21 @@ export const KNOWN_BUGS: KnownBug[] = [
     id: "attendee-filter-counts-plain-span",
     description: "My registrations: the filter tabs write their counts as a plain span.attendee-reg-count \"(1)\" (app/(public)/account/(portal)/registrations/page.tsx:249), not the navy .count-badge (L4: filter counts use the count badge).",
     checks: registrationsPages.map((page) => ({ label: `${page} | L4 | filter counts use the count badge`, detail: ".attendee-reg-count" })),
+  },
+  {
+    id: "staff-shell-pills-not-shared-chip",
+    description: "Every staff page: the header's \"Staff mode\" badge is a span.staff-pill (components/app-shell.tsx:665) and the role switcher's roles are a.admin-role-pill (components/admin-role-switcher.tsx:40), each with its own look, not the shared .status-chip / .count-badge (L4). Pages add their own: the attendee list's meal totals are span.choice-chip (app/(workspace)/people/attendees/page.tsx:94), the builder's step labels span.fb-step-badge.",
+    checks: staffPages.map((page) => ({ label: `${page} | L4 | chips and badges use the shared classes`, detail: "staff-pill" })),
+  },
+  {
+    id: "scheduled-email-status-words",
+    description: "Scheduled emails: a schedule waiting to be approved shows the chip \"Waiting for approval\" (modules/communications/scheduled-email-options.ts:30, drawn at components/scheduled-emails-workspace.tsx:448), but the approved word for that state is \"Pending approval\" (B12). \"Approved and scheduled\" has no approved word either.",
+    checks: [{ label: "Scheduled emails (saved schedule) | B12 | status chip words", detail: "Waiting for approval" }],
+  },
+  {
+    id: "cancellation-queue-times-without-ct",
+    description: "Cancellation requests (staff): components/cancellation-requests-workspace.tsx:33 formats every time (the queue rows, the request's timeline) in the event's zone but without a zone label, so \"Nov 2, 2026, 1:40 AM\" never says CT (B13).",
+    checks: ["Cancellation requests (staff)", "Cancellation request (staff review)"].map((page) => ({ label: `${page} | B13 | times show CT`, detail: "time without" })),
   },
   {
     id: "contact-form-saved-words",
@@ -147,6 +185,8 @@ type Ctx = {
   attendee: Attendee;
   /** What the journeys learn on the way: the registration made in journey 2. */
   registration?: { id: string; confirmationCode: string; cardChargeCents: number; subtotalCents: number };
+  /** Journey 5 makes this event from a template; journeys 6 and 7 work on it. */
+  created?: { id: string; slug: string; name: string };
 };
 
 const problems: string[] = [];
@@ -288,10 +328,12 @@ async function signUpJourney(ctx: Ctx, page: J.Page) {
   await group.getByTestId("security-check-code-input").waitFor({ state: "visible", timeout: 20_000 });
   assert(/we sent a code/i.test(await group.innerText()), "the Security check did not say a code was sent");
   const securityCode = await mail.waitForCodeWithSubject(attendee.email, /security code/i, { since: sentAfter });
+  if (process.env.JOURNEY_DEBUG) console.error(`    security code ${securityCode}: ${JSON.stringify(mail.to(attendee.email).map((m) => [m.subject, m.text.slice(0, 200)]))}`);
   await group.getByTestId("security-check-code-input").fill(securityCode);
 
   // The password, then Create account. B10: the button says what it is doing while the request is in flight.
   await label(page, "Password").first().fill(attendee.password);
+  if (process.env.JOURNEY_DEBUG) page.on("response", async (response: { url(): string; status(): number; text(): Promise<string> }) => { if (/\/api\/attendee\/sign-up/.test(response.url())) console.error(`    sign-up ${response.status()} ${(await response.text().catch(() => "")).slice(0, 300)}`); });
   const create = page.getByRole("button", { name: /^Create account$/ });
   await create.waitFor({ state: "visible" });
   const held = await holdRequest(page, (url, method) => method === "POST" && url.endsWith("/api/attendee/sign-up"));
@@ -718,7 +760,8 @@ async function staffCancellation(ctx: Ctx, page: J.Page, requestId: string) {
   await settle(page);
   const row = page.locator(`a[href*="request=${requestId}"]`).first();
   await row.waitFor({ state: "visible", timeout: 20_000 });
-  await visited(ctx, page, name, { rules: false });
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+  await visited(ctx, page, name);
   await row.click();
   await page.waitForURL((url: URL) => url.searchParams.get("request") === requestId, { timeout: 20_000 });
   await settle(page);
@@ -732,7 +775,7 @@ async function staffCancellation(ctx: Ctx, page: J.Page, requestId: string) {
   await page.getByRole("button", { name: /^Start review$/ }).waitFor({ state: "detached", timeout: 20_000 });
   await page.getByRole("button", { name: /^Approve/ }).waitFor({ state: "visible", timeout: 20_000 });
   await page.locator(".count-badge", { hasText: "Under review" }).waitFor({ state: "visible", timeout: 20_000 });
-  await visited(ctx, page, "Cancellation request (staff review)", { rules: false });
+  await visited(ctx, page, "Cancellation request (staff review)");
   // The page reloads its data after the review starts and can clear a note typed in that moment: type until Approve turns on.
   const approve = page.getByRole("button", { name: /^Approve/ });
   const typed = await pollPage<boolean>(page, async () => {
@@ -748,6 +791,462 @@ async function staffCancellation(ctx: Ctx, page: J.Page, requestId: string) {
   await act(/^Carry out$/);
   await pollPage<string>(page, async () => clean(await page.locator("body").innerText()), (text) => /Cancel the registration:\s*Done/.test(text), 25_000)
     .then((result) => assert(result.ok, "carrying out did not report the registration as cancelled"));
+}
+
+/* ---------------------------------------------------------------- staff journeys (phase B) */
+
+/** A browser signed in as one of the stamped synthetic staff users (a minted session: staff sign-in needs a second factor). */
+async function staffContext(ctx: Ctx, role: StaffRole) {
+  const cookie = await J.mintStaffSessionFor(ctx.staffTokens, ctx.world.staff[role]);
+  const context = await J.newContext(ctx.browser, { translate: false, cookie, width: ctx.viewport.width });
+  context.setDefaultTimeout(20_000);
+  const page = await context.newPage();
+  watch(page);
+  lastPage = page;
+  return { context, page };
+}
+
+/** Runs a staff journey in its own signed-in browser; on a failure with JOURNEY_DEBUG it shows what was on the page before the browser closes. */
+async function asStaff(ctx: Ctx, role: StaffRole, run: (page: J.Page) => Promise<void>) {
+  const { context, page } = await staffContext(ctx, role);
+  try {
+    await run(page);
+  } catch (error) {
+    if (process.env.JOURNEY_DEBUG) console.error(`    page ${page.url()}:\n${(await J.bodyText(page).catch(() => "")).split("\n").filter(Boolean).slice(0, 90).join("\n")}`);
+    throw error;
+  } finally {
+    await context.close();
+  }
+}
+
+/** The staff page loaded, it is usable, and the page checks. */
+async function staffVisit(ctx: Ctx, page: J.Page, name: string, path: string) {
+  await S.openPage(page, path);
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+  await visited(ctx, page, name);
+}
+
+const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
+/* ---- 5. create an event from a template (the one step run as a system administrator: /event-setup/from-template is theirs only) */
+
+async function templateJourney(ctx: Ctx) {
+  const { rec, world } = ctx;
+  await asStaff(ctx, "sysadmin", async (page) => {
+    const name = `Journey Template Event ${world.stamp}`;
+    if (process.env.JOURNEY_DEBUG) page.on("response", async (response: { url(): string; status(): number; text(): Promise<string> }) => { if (/event-templates/.test(response.url())) console.error(`    ${response.status()} ${response.url()} ${(await response.text().catch(() => "")).slice(0, 300)}`); });
+    await staffVisit(ctx, page, "Start from template", "/event-setup/from-template");
+    // B7: an empty form shows the shared summary and a message by each field.
+    const create = page.getByRole("button", { name: /^(Create draft event|Creating…)$/ });
+    await checkErrorSummary(page, rec, "Start from template", "required answers missing", () => create.click());
+    // "Blank event": a small starter form, so the whole publish path can be walked in one journey.
+    const option = page.getByLabel("Template").locator("option", { hasText: "Blank event (General)" }).first();
+    await page.getByLabel("Template").selectOption({ label: ((await option.textContent()) ?? "").trim() });
+    await page.getByLabel("Event name").fill(name);
+    await page.getByLabel("Starts on").fill(inDays(120));
+    await page.getByLabel("Start time").fill("09:00");
+    await page.getByLabel("Ends on").fill(inDays(122));
+    await page.getByLabel("End time").fill("17:00");
+    await checkInFlightLabel(page, rec, "Start from template", "Create draft event", { button: create, click: () => create.click(), match: (url, method) => method === "POST" && /\/api\/event-templates\/[^/]+\/apply$/.test(url), expect: /Creating…/ });
+    await page.waitForURL((url: URL) => url.pathname === "/more/event-settings" && url.searchParams.has("event"), { timeout: 10_000 }).catch(async (error: Error) => {
+      throw new Error(`${error.message.split("\n")[0]} The page says: ${clean(await page.locator("main").innerText().catch(() => "?")).slice(0, 500)}`);
+    });
+    const eventId = new URL(page.url()).searchParams.get("event")!;
+    world.extraEventIds.push(eventId);
+    // The draft exists with what the template carries.
+    const event = await ctx.prisma.event.findUnique({ where: { id: eventId }, select: { id: true, slug: true, name: true, isPublished: true, audience: true } });
+    assert(event && event.name === name, "the draft event was not created with the typed name");
+    assert(!event.isPublished, "a new event from a template must be a draft");
+    const application = await ctx.prisma.eventTemplateApplication.findUnique({ where: { eventId }, select: { payloadSnapshot: true } });
+    assert(application, "no template application was recorded for the new event");
+    const payload = application.payloadSnapshot as { formTemplateKeys?: string[]; audience?: string };
+    const forms = await ctx.prisma.registrationForm.count({ where: { eventId } });
+    assert((payload.formTemplateKeys?.length ?? 0) > 0 && forms === payload.formTemplateKeys!.length, `the draft has ${forms} form(s); the template carries ${payload.formTemplateKeys?.length ?? 0}`);
+    assert(event.audience === (payload.audience ?? "GENERAL"), `the draft's audience is ${event.audience}, the template's is ${payload.audience}`);
+    ctx.created = { id: event.id, slug: event.slug, name };
+    await settle(page);
+  });
+}
+
+/* ---- 6. the publish checklist, as the event's administrator (6a: the checklist and the event settings; 7 follows; 6b: Publish event) */
+
+const SETUP_STEPS = ["Event basics", "Attendee types", "Registration forms and prices", "Test form", "Publish form", "Publish event", "View public page"];
+
+async function grantEventAdmin(ctx: Ctx) {
+  const created = ctx.created;
+  assert(created, "the staff journeys 6 and 7 need the event journey 5 makes");
+  // A stamped synthetic staff member becomes this event's administrator, as an administrator would be assigned.
+  await ctx.prisma.eventMembership.upsert({
+    where: { eventId_userId: { eventId: created.id, userId: ctx.world.staff.eventadmin.id } },
+    update: { role: "EVENT_ADMIN", status: "ACTIVE", permissions: [] },
+    create: { eventId: created.id, userId: ctx.world.staff.eventadmin.id, role: "EVENT_ADMIN", status: "ACTIVE", permissions: [] },
+  });
+  return created;
+}
+
+/** The checklist items a viewer sees on the Overview, with whether each is done. */
+async function setupChecklist(page: J.Page) {
+  const panel = page.locator("section, aside").filter({ has: page.getByRole("heading", { name: "Set up this event" }) }).last();
+  await panel.waitFor({ state: "visible", timeout: 15_000 });
+  return { panel, text: clean(await panel.innerText()) };
+}
+
+async function publishChecklistJourney(ctx: Ctx, page: J.Page) {
+  const { rec } = ctx;
+  const created = await grantEventAdmin(ctx);
+  const eventQuery = `?event=${encodeURIComponent(created.id)}`;
+  await staffVisit(ctx, page, "Overview (setting up an event)", `/overview${eventQuery}`);
+  const before = await setupChecklist(page);
+  // "Set up this event" lists every step this administrator can act on, in order, with what is done so far.
+  const positions = SETUP_STEPS.map((label) => before.text.indexOf(label));
+  assert(positions.every((position) => position >= 0) && positions.every((position, index) => index === 0 || position > positions[index - 1]!), `"Set up this event" does not list ${SETUP_STEPS.join(", ")} in order: ${before.text.slice(0, 300)}`);
+  const doneBefore = Number(/(\d) of 7 done/.exec(before.text)?.[1] ?? -1);
+  assert(doneBefore >= 1 && doneBefore < 7 && /Event basics Done/.test(before.text), `the checklist does not say how many of the 7 steps are done: ${before.text.slice(0, 200)}`);
+  const hrefs = await before.panel.locator("a[href]").evaluateAll((links: HTMLAnchorElement[]) => links.map((link) => link.getAttribute("href") ?? ""));
+  assert(hrefs.some((href: string) => href.startsWith("/more/event-settings")) && hrefs.some((href: string) => href.startsWith("/registration-builder")), `the checklist links are ${JSON.stringify(hrefs)}`);
+
+  // The checklist's own link opens attendee setup; one adult type is what the readiness list needs.
+  await before.panel.getByRole("link", { name: /Open attendee setup/ }).click();
+  await page.waitForURL((url: URL) => url.pathname === "/more/attendee-configuration", { timeout: 20_000 });
+  await visited(ctx, page, "Attendee setup");
+  await page.locator("#attendee-type-code-input").fill("ADULT");
+  await page.locator('form:has(#attendee-type-code-input) input[name="label"]').fill("Adult");
+  await page.locator('form:has(#attendee-type-code-input) input[name="minimumAge"]').fill("18");
+  await page.locator('form:has(#attendee-type-code-input)').getByRole("button", { name: "Add attendee type" }).click();
+  const typed = await pollPage<number>(page, () => ctx.prisma.eventAttendeeType.count({ where: { eventId: created.id, isActive: true } }), (count) => count >= 1, 15_000);
+  assert(typed.ok, "the attendee type was not saved");
+
+  // Event settings: the location and the support contact the readiness list asks for, saved with one Save.
+  await staffVisit(ctx, page, "Event settings", `/more/event-settings${eventQuery}`);
+  const readiness = clean(await page.locator("#event-readiness-panel").innerText());
+  assert(/Not done: Event location/.test(readiness) && /Not done: Support contact/.test(readiness), `the readiness list does not ask for the location and the support contact: ${readiness.slice(0, 300)}`);
+  await page.locator("#event-field-location").fill(`Journey Hall ${ctx.world.stamp}`);
+  // The support contact sits in a folded section: open it the way a person would.
+  const contactSection = page.locator("details", { has: page.locator("#event-field-support-contact") }).first();
+  if (await contactSection.count() && !(await contactSection.evaluate((node: HTMLDetailsElement) => node.open))) await contactSection.locator("summary").first().click();
+  await page.locator("#event-field-support-contact").fill("registration@imsda.org");
+  const form = page.locator("form.event-settings-layout");
+  const save = page.locator("#event-save-button");
+  await checkSaveFlow(page, rec, "Event settings", "event settings", {
+    form, button: save, click: () => save.click(),
+    match: (url, method) => method !== "GET" && url.includes(`/api/events/${created.id}`),
+    done: () => pollPage<string>(page, async () => clean(await page.locator(".event-savebar-status").innerText()), (text) => /^(Saved|Not saved)/.test(text), 20_000),
+  });
+  const saved = await ctx.prisma.event.findUnique({ where: { id: created.id }, select: { location: true, supportContact: true } });
+  assert(saved?.location === `Journey Hall ${ctx.world.stamp}` && saved.supportContact === "registration@imsda.org", `the saved event has location "${saved?.location}" and support contact "${saved?.supportContact}"`);
+}
+
+/* ---- 7. the form builder: preview, test, publish the form */
+
+async function builderJourney(ctx: Ctx, page: J.Page) {
+  const { rec } = ctx;
+  const created = await grantEventAdmin(ctx);
+  const url = `/registration-builder?event=${encodeURIComponent(created.id)}`;
+  await staffVisit(ctx, page, "Registration builder", url);
+  // L6 (the sidebar tabs) is read by the page checks above; B6: typing in the form and leaving warns.
+  const title = page.getByLabel("Form title");
+  await checkLeaveWarning(page, rec, "Registration builder", "form title", async () => { await title.fill(`Journey retitled ${ctx.world.stamp}`); },
+    () => page.goto(`${J.baseUrl}/overview?event=${encodeURIComponent(created.id)}`));
+  await S.openPage(page, url);
+  await settle(page);
+  // "Preview & test": through the steps with Continue and Back, then the test submission.
+  const preview = page.locator("#live-form-preview");
+  await page.getByRole("button", { name: /^Preview & test$/ }).first().click();
+  await preview.waitFor({ state: "visible", timeout: 10_000 });
+  await visited(ctx, page, "Registration builder (preview and test)");
+  const stepLabel = async () => clean((await preview.locator(".preview-step-progress > span").first().innerText()));
+  assert(/step 1 of 2/i.test(await stepLabel()), `the preview starts on "${await stepLabel()}"`);
+  // Continue with the required answers empty stays on the step and says so.
+  await preview.getByRole("button", { name: "Continue" }).click();
+  await preview.locator(".preview-test-alert").waitFor({ state: "visible", timeout: 5_000 });
+  assert(/step 1 of 2/i.test(await stepLabel()), "Continue moved on although required answers were empty");
+  await preview.getByLabel(/^First name/).fill("Riley");
+  await preview.getByLabel(/^Last name/).fill("Journey");
+  await preview.getByLabel(/^Email address/).fill(emailFor(ctx.world, "builder"));
+  await preview.getByRole("button", { name: "Continue" }).click();
+  await pollPage<string>(page, stepLabel, (text) => /step 2 of 2/i.test(text), 5_000).then((result) => assert(result.ok, "Continue did not move the preview to step 2"));
+  await preview.getByRole("button", { name: "Back" }).click();
+  await pollPage<string>(page, stepLabel, (text) => /step 1 of 2/i.test(text), 5_000).then((result) => assert(result.ok, "Back did not return the preview to step 1"));
+  await preview.getByRole("button", { name: "Continue" }).click();
+  const run = preview.getByRole("button", { name: /Run test submission|Testing…/ });
+  await run.waitFor({ state: "visible", timeout: 10_000 });
+  await checkInFlightLabel(page, rec, "Registration builder (preview and test)", "Run test submission", { button: run, click: () => run.click(), match: (urlText, method) => method === "POST" && /test/i.test(urlText), expect: /Testing…/ });
+  const tested = await pollPage<number>(page, () => ctx.prisma.formTestSubmission.count({ where: { eventId: created.id, isValid: true } }), (count) => count >= 1, 20_000);
+  assert(tested.ok, "no valid test submission was recorded for the event");
+  const registrations = await ctx.prisma.registration.count({ where: { eventId: created.id } });
+  assert(registrations === 0, "a test submission created a registration");
+  await preview.getByText(/1 test submission/).waitFor({ state: "visible", timeout: 10_000 });
+
+  // Publish the form's version: the checklist asks for a published form.
+  const publish = page.getByRole("button", { name: /Publish version/ });
+  await publish.click();
+  const dialog = page.locator('[role="dialog"]').filter({ hasText: /Publish registration form/ });
+  await dialog.waitFor({ state: "visible", timeout: 10_000 });
+  await checkDialogBehavior(page, rec, "Registration builder", "publish form dialog", dialog, publish);
+  await publish.click();
+  await dialog.getByRole("button", { name: /^Publish form$/ }).click();
+  const published = await pollPage<number>(page, () => ctx.prisma.registrationFormVersion.count({ where: { form: { eventId: created.id }, status: "PUBLISHED" } }), (count) => count >= 1, 20_000);
+  assert(published.ok, "the form version was not published");
+}
+
+async function publishEventJourney(ctx: Ctx, page: J.Page) {
+  const { rec } = ctx;
+  const created = await grantEventAdmin(ctx);
+  const eventQuery = `?event=${encodeURIComponent(created.id)}`;
+  await staffVisit(ctx, page, "Event settings (ready to publish)", `/more/event-settings${eventQuery}`);
+  const readiness = clean(await page.locator("#event-readiness-panel").innerText());
+  assert(/Ready to publish/.test(readiness), `the event is not ready to publish: ${readiness.slice(0, 400)}`);
+  // Publish event asks first, in the shared dialog (L7, B9); cancelling leaves it a draft.
+  const publish = page.locator(".event-publish-button");
+  await checkConfirmDialog(page, rec, "Event settings (ready to publish)", "publish the event", () => publish.click(), publish);
+  assert(!(await ctx.prisma.event.findUnique({ where: { id: created.id }, select: { isPublished: true } }))?.isPublished, "cancelling the publish dialog published the event anyway");
+  await publish.click();
+  const confirm = page.locator(".confirm-dialog").getByRole("button", { name: new RegExp(`^Publish ${esc(created.name)}$`) });
+  await checkInFlightLabel(page, rec, "Event settings (ready to publish)", "Publish (dialog)", { button: page.locator(".confirm-dialog button.primary-button"), click: () => confirm.click(), match: (url, method) => method !== "GET" && url.includes(`/api/events/${created.id}`), expect: /Publishing…/ });
+  const live = await pollPage<boolean>(page, async () => Boolean((await ctx.prisma.event.findUnique({ where: { id: created.id }, select: { isPublished: true } }))?.isPublished), Boolean, 20_000);
+  assert(live.ok, "the event is not published in the database");
+  // The checklist now shows Publish event done.
+  await staffVisit(ctx, page, "Overview (event published)", `/overview${eventQuery}`);
+  // Every step is now done, so the page hides "Set up this event" (it disappears once nothing is left); if it is still there, Publish event must read Done.
+  const panels = page.locator("section, aside").filter({ has: page.getByRole("heading", { name: "Set up this event" }) });
+  await pollPage<number>(page, () => panels.count(), (count) => count === 0, 8_000);
+  if (await panels.count()) {
+    const row = panels.last().locator("li").filter({ hasText: /Publish event/ }).first();
+    assert(/Done/.test(clean(await row.innerText())), `the checklist row for Publish event says: ${clean(await row.innerText())}`);
+    rec.record("Overview (event published)", "Setup", "the checklist shows Publish event done", "pass", "the row reads Done");
+  } else rec.record("Overview (event published)", "Setup", "the checklist shows Publish event done", "pass", "every step is done, so the checklist is hidden as the page says it will be");
+}
+
+async function staffEventJourneys(ctx: Ctx) {
+  await asStaff(ctx, "eventadmin", async (page) => {
+    await publishChecklistJourney(ctx, page);
+    await builderJourney(ctx, page);
+    await publishEventJourney(ctx, page);
+  });
+}
+
+/* ---- 8. the attendee list, as the event's administrator */
+
+/** The names in the first column of the attendee table, in the order shown (each row's attendee). */
+const attendeeNames = (page: J.Page) => page.locator('tbody [data-col="name"]').allInnerTexts().then((texts: string[]) => texts.map((text) => clean(text)));
+
+/** Sorts the list by a column: the header's own link on a wide screen, the "Sort by" and "Direction" choices where the table is cards. */
+async function sortAttendees(page: J.Page, column: string, label: string, direction: "asc" | "desc") {
+  const header = page.locator(`th[data-col="${column}"] a`).first();
+  if (await header.isVisible().catch(() => false)) {
+    // A first press sorts ascending, a second flips it.
+    await header.click();
+    await page.waitForURL((url: URL) => url.searchParams.get("sort") === column, { timeout: 15_000 });
+    if (direction === "desc") {
+      await page.locator(`th[data-col="${column}"] a`).first().click();
+      await page.waitForURL((url: URL) => url.searchParams.get("dir") === "desc", { timeout: 15_000 });
+    }
+  } else {
+    await page.getByLabel("Sort by").selectOption({ label });
+    await page.getByLabel("Direction").selectOption(direction);
+    await page.waitForURL((url: URL) => url.searchParams.get("sort") === column && (url.searchParams.get("dir") ?? "asc") === direction, { timeout: 15_000 });
+  }
+  await settle(page);
+}
+
+async function attendeeListJourney(ctx: Ctx, page: J.Page) {
+  const { rec, world } = ctx;
+  const list = world.list;
+  const name = "Attendee list";
+  const base = `/people/attendees?event=${encodeURIComponent(list.eventId)}`;
+  await staffVisit(ctx, page, name, base);
+  // B1: the shared count line and pager (50 to a page, so 55 attendees make two pages).
+  const count = page.locator(".list-pager").first();
+  assert(/Showing 1.50 of 55 attendees/.test(clean(await count.innerText())), `the count line says "${clean(await count.innerText())}", expected "Showing 1–50 of 55 attendees"`);
+  assert((await attendeeNames(page)).length === 50, "the first page does not hold 50 attendees");
+
+  // B1: a header (or, on a phone, the Sort by choice) puts the whole list in order, both ways, across the pages.
+  await sortAttendees(page, "name", "Attendee", "asc");
+  const ascending = await attendeeNames(page);
+  await sortAttendees(page, "name", "Attendee", "desc");
+  const descending = await attendeeNames(page);
+  const sorted = (names: string[], factor: 1 | -1) => names.every((entry, index) => index === 0 || factor * names[index - 1]!.localeCompare(entry, "en", { sensitivity: "base" }) <= 0);
+  rec.record(name, "B1", "a header sorts the list ascending and descending", sorted(ascending, 1) && sorted(descending, -1) && ascending[0] !== descending[0] && /PatA0/.test(ascending[0]!) && /PatZ1/.test(descending[0]!) ? "pass" : "fail", `first rows: ascending "${ascending[0]}", descending "${descending[0]}"`);
+  // The second page keeps the order and says which rows it shows.
+  await page.locator(".list-pager").getByRole("link", { name: "Next" }).click();
+  await page.waitForURL((url: URL) => url.searchParams.get("page") === "2", { timeout: 15_000 });
+  await settle(page);
+  const second = await attendeeNames(page);
+  const pagerText = clean(await page.locator(".list-pager").first().innerText());
+  rec.record(name, "B1", "the pager moves to page 2 with the sort kept", second.length === 5 && /Showing 51.55 of 55 attendees/.test(pagerText) && new URL(page.url()).searchParams.get("sort") === "name" && sorted(second, -1) && descending.at(-1)!.localeCompare(second[0]!, "en", { sensitivity: "base" }) >= 0 ? "pass" : "fail", `page 2 shows ${second.length} row(s); "${pagerText}"`);
+
+  // B2: a filter lives in the address; open a row, go Back, and it is kept; Clear filters resets it.
+  await S.openPage(page, `${base}&q=PatB`);
+  await settle(page);
+  const narrowed = await attendeeNames(page);
+  assert(narrowed.length > 0 && narrowed.length < 55 && narrowed.every((entry: string) => /PatB/.test(entry)), `the filter q=PatB left ${narrowed.length} rows: ${narrowed.slice(0, 3).join(", ")}`);
+  await page.locator('tbody [data-col="confirmationCode"] a').first().click();
+  await page.waitForURL((url: URL) => url.pathname === "/people" && url.searchParams.has("registration"), { timeout: 20_000 });
+  await page.goBack({ waitUntil: "load" });
+  await settle(page);
+  const kept = new URL(page.url()).searchParams.get("q") === "PatB" && (await page.locator('input[type="search"][name="q"]').inputValue()) === "PatB" && (await attendeeNames(page)).length === narrowed.length;
+  rec.record(name, "B2", "the filter is kept after opening a row and going Back", kept ? "pass" : "fail", kept ? "q=PatB stayed in the address, in the search box and in the list" : `after Back the address is ${page.url()}`);
+  await page.getByRole("link", { name: "Clear filters" }).click();
+  await page.waitForURL((url: URL) => !url.searchParams.has("q"), { timeout: 15_000 });
+  await settle(page);
+  rec.record(name, "B2", "Clear filters resets the list", (await page.locator(".list-pager").first().innerText()).includes("of 55 attendees") ? "pass" : "fail", `count line: "${clean(await page.locator(".list-pager").first().innerText())}"`);
+
+  // B4: a filter nothing matches says why and what to do next.
+  await S.openPage(page, `${base}&q=zzqx-nobody-has-this`);
+  await settle(page);
+  await checkEmptyState(page, rec, name, "a filter with no match", page.locator("tbody .empty-state"));
+
+  // S4 and S5 in the search box: results narrow as typed, focus stays, the new count is announced.
+  await S.openPage(page, base);
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+  await checkSearchLive(page, rec, name, { box: page.locator('input[type="search"][name="q"]'), query: "PatC" });
+  await page.locator('input[type="search"][name="q"]').fill("");
+
+  // B11: Download CSV: named <event-slug>-attendees-<date in Central>.csv and holding the stamped rows.
+  await S.openPage(page, base);
+  await settle(page);
+  const download = await Promise.all([
+    page.waitForEvent("download", { timeout: 30_000 }),
+    page.getByRole("link", { name: /Download CSV/ }).click(),
+  ]).then(([file]) => file as { suggestedFilename(): string; path(): Promise<string | null> });
+  const central = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  const fileName = download.suggestedFilename();
+  rec.record(name, "B11", "the CSV is named <event-slug>-attendees-<date>.csv", fileName === `${list.slug}-attendees-${central}.csv` ? "pass" : "fail", `file name: ${fileName} (expected ${list.slug}-attendees-${central}.csv)`);
+  const { readFile } = await import("node:fs/promises");
+  const csv = await readFile((await download.path())!, "utf8");
+  const stamped = csv.split("\n").filter((line) => line.includes(list.lastNameMarker)).length;
+  rec.record(name, "B11", "the CSV holds the stamped attendees", stamped === 55 ? "pass" : "fail", `${stamped} row(s) with ${list.lastNameMarker} (expected 55)`);
+}
+
+/* ---- B14 for a staff role without the permission */
+
+async function noPermissionJourney(ctx: Ctx) {
+  const { rec, world } = ctx;
+  // Check-in staff can run the check-in desk and nothing else of this event: the attendee list and scheduled emails are not theirs.
+  await asStaff(ctx, "checkin", async (page) => {
+    await S.openPage(page, `/finance/cancellation-requests?event=${encodeURIComponent(world.list.eventId)}`);
+    await visited(ctx, page, "Cancellation requests (check-in staff)");
+    await checkRestricted(page, rec, "Cancellation requests (check-in staff)", { title: "Finance is restricted", whoToAsk: "your event administrator" });
+    await S.openPage(page, `/communications/scheduled?event=${encodeURIComponent(world.list.eventId)}`);
+    await visited(ctx, page, "Scheduled emails (check-in staff)");
+    await checkRestricted(page, rec, "Scheduled emails (check-in staff)", { title: "Scheduled emails are restricted", whoToAsk: "your event administrator" });
+  });
+}
+
+/* ---- 9. check-in, as check-in staff */
+
+async function checkInJourney(ctx: Ctx, page: J.Page) {
+  const { rec, world } = ctx;
+  const list = world.list;
+  const name = "Check-in desk";
+  await staffVisit(ctx, page, name, `/check-in?event=${encodeURIComponent(list.eventId)}`);
+  const search = page.getByPlaceholder("Search name, club, or confirmation code");
+  // S4 and S5: results narrow as typed, focus stays in the box, and the count is announced.
+  await checkSearchLive(page, rec, name, { box: search, query: "PatC" });
+  await search.fill("PatD0");
+  await page.getByText(/1 of 55 arrivals shown\./).waitFor({ state: "visible", timeout: 10_000 });
+  const attendee = await ctx.prisma.registrationAttendee.findFirst({ where: { eventId: list.eventId, person: { firstName: "PatD0", lastName: list.lastNameMarker } }, select: { id: true } });
+  assert(attendee, "the stamped attendee PatD0 is not in the database");
+  const activeCheckIn = () => ctx.prisma.checkIn.count({ where: { registrationAttendeeId: attendee.id, undoneAt: null } });
+  assert((await activeCheckIn()) === 0, "the attendee was already checked in");
+  const toggle = page.getByRole("button", { name: /^(Check in|Confirming…|Undo|Saving…)$/ }).first();
+  await checkInFlightLabel(page, rec, name, "Check in", { button: toggle, click: () => toggle.click(), match: (url, method) => method === "POST" && /\/check-in/.test(url) && !/_rsc/.test(url), expect: /…$/ });
+  const arrived = await pollPage<number>(page, activeCheckIn, (count) => count === 1, 15_000);
+  assert(arrived.ok, "the arrival was not recorded in the database");
+  await page.getByRole("button", { name: "Undo" }).first().waitFor({ state: "visible", timeout: 15_000 });
+  // Undo takes it back, and says "Saving…" while it does.
+  const undo = page.getByRole("button", { name: /^(Undo|Saving…)$/ }).first();
+  await checkInFlightLabel(page, rec, name, "Undo", { button: undo, click: () => undo.click(), match: (url, method) => method !== "GET" && /\/check-in/.test(url) && !/_rsc/.test(url), expect: /Saving…/ });
+  const undone = await pollPage<number>(page, activeCheckIn, (count) => count === 0, 15_000);
+  assert(undone.ok, "Undo did not take the arrival back in the database");
+  const history = await ctx.prisma.checkIn.findFirst({ where: { registrationAttendeeId: attendee.id }, select: { undoneAt: true } });
+  assert(history?.undoneAt, "the undone check-in kept no history");
+  await page.getByRole("button", { name: "Check in" }).first().waitFor({ state: "visible", timeout: 15_000 });
+}
+
+/* ---- 10. a scheduled email, as the event's communications manager */
+
+async function scheduledEmailJourney(ctx: Ctx, page: J.Page) {
+  const { rec, world, mail } = ctx;
+  const m = world.mail;
+  const name = "Scheduled emails";
+  const base = `/communications/scheduled?event=${encodeURIComponent(m.eventId)}`;
+  await staffVisit(ctx, page, name, base);
+  // B4: nothing is scheduled yet, and the page says so and where to get help.
+  await checkEmptyState(page, rec, name, "no schedules yet", page.locator(".empty-state").filter({ hasText: /No emails are scheduled/ }));
+  const scheduleName = `Journey reminder ${world.stamp}`;
+  await page.getByRole("button", { name: /New schedule/ }).click();
+  const editor = page.locator('section[aria-label="New schedule"]');
+  await editor.waitFor({ state: "visible", timeout: 10_000 });
+  await visited(ctx, page, "Scheduled emails (new schedule)");
+  await editor.getByLabel("Name", { exact: true }).fill(scheduleName);
+  await editor.getByLabel(/^Message/).selectOption({ label: "Event announcement" });
+  await editor.getByLabel("Announcement title").fill(`Journey news ${world.stamp}`);
+  await editor.getByLabel("Announcement message").fill("A synthetic announcement for the browser journey check.");
+  await editor.getByLabel("Date", { exact: true }).fill(inDays(1));
+  await editor.getByLabel("Time of day").fill("09:00");
+  // "Registration contact" is ticked already: the three stamped registrations are the whole audience of this event.
+  await editor.getByRole("button", { name: /Review schedule/ }).click();
+  await editor.getByRole("button", { name: /Save schedule/ }).waitFor({ state: "visible", timeout: 20_000 });
+  const reviewText = clean(await editor.innerText());
+  assert(/\b3 (people|recipients|addresses|will)/i.test(reviewText) || /3 approved/i.test(reviewText), `the review does not show the three recipients: ${reviewText.slice(-700)}`);
+  await editor.getByRole("button", { name: /Save schedule/ }).click();
+  const card = page.locator("li.scheduled-email-card").filter({ hasText: scheduleName });
+  await card.waitFor({ state: "visible", timeout: 20_000 });
+  assert(/Waiting for approval/.test(clean(await card.innerText())), "a saved schedule is not waiting for approval");
+  // B13: the time it will be sent is in Central and labelled.
+  const sends = clean(await card.locator("dd").filter({ hasText: /\d{1,2}:\d{2}/ }).first().innerText().catch(() => ""));
+  rec.record("Scheduled emails (saved schedule)", "B13", "the schedule's time is shown in Central, labelled", /\b(CT|CDT|CST|Central)\b/.test(sends) ? "pass" : "fail", `the card says it sends: "${sends}"`);
+  await visited(ctx, page, "Scheduled emails (saved schedule)");
+
+  // Approve: the list's Approve opens the review; "Approve and schedule" is the one act that lets it send.
+  await card.getByRole("button", { name: "Review and approve" }).click();
+  const approvePanel = page.locator(`section[aria-label="Approve ${scheduleName}"]`);
+  await approvePanel.waitFor({ state: "visible", timeout: 20_000 });
+  await approvePanel.getByRole("button", { name: "Approve and schedule" }).click();
+  await page.getByText(/is approved\. It will be sent at/).waitFor({ state: "visible", timeout: 20_000 });
+  const batch = await ctx.prisma.scheduledEmailBatch.findFirst({ where: { eventId: m.eventId, name: scheduleName }, select: { id: true, status: true } });
+  assert(batch && batch.status === "ACTIVE", `the approved schedule is ${batch?.status}`);
+  assert((await ctx.prisma.scheduledEmailRecipient.count({ where: { batchId: batch.id } })) === 3, "the approved list is not the three stamped recipients");
+
+  // Make it due. The earliest the page lets a time be set is five minutes ahead, so instead of waiting, the approved time is moved
+  // into the past in the database: the rule (date and time in the event's zone) and the stored send time together, so the schedule
+  // still agrees with itself (moving only one makes the sender pause it as "changed after approval"). Two minutes late is well
+  // inside the six hours after which a late schedule is dropped.
+  const due = new Date(Math.floor((Date.now() - 2 * 60_000) / 60_000) * 60_000);
+  const local = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(due);
+  const part = (type: string) => local.find((entry) => entry.type === type)!.value;
+  await ctx.prisma.scheduledEmailBatch.update({ where: { id: batch.id }, data: { sendAt: due, localDate: `${part("year")}-${part("month")}-${part("day")}`, localTime: `${part("hour")}:${part("minute")}` } });
+  // The sweep, exactly as the scheduler calls it.
+  // The token is OUTBOX_SWEEP_TOKEN from the environment; the apps in CI (and the ones this suite is documented to run against) use
+  // the CI value, and a local .env may carry another one, so the CI value is tried when the environment's is refused.
+  const tokens = [...new Set([process.env.OUTBOX_SWEEP_TOKEN, "ci-only-outbox-sweep-token-000000000000"].filter((value): value is string => Boolean(value)))];
+  const since = Date.now() - 1_000;
+  const sweep = async () => {
+    let status = 0;
+    for (const token of tokens) {
+      status = (await fetch(`${J.baseUrl}/api/internal/outbox/sweep`, { method: "POST", headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60_000) })).status;
+      if (status !== 401 && status !== 403) break;
+    }
+    return status;
+  };
+  assert((await sweep()) === 200, "the outbox sweep did not answer 200");
+  for (const address of m.recipients) {
+    await mail.waitForMessage(address, (message) => new RegExp(`Journey news ${world.stamp}`).test(message.subject + message.text), { since });
+  }
+  // Only the stamped recipients got it: nobody else's address was sent this announcement.
+  const strangers = mail.messages.filter((message) => message.receivedAt >= since && new RegExp(`Journey news ${world.stamp}`).test(message.subject + message.text) && !message.to.every((address) => m.recipients.includes(address)));
+  assert(strangers.length === 0, `the announcement also went to ${strangers.map((message) => message.to.join(",")).join("; ")} (recipients: ${JSON.stringify(m.recipients)})`);
+  // The page shows it as sent.
+  await S.openPage(page, base);
+  await settle(page);
+  const done = await pollPage<string>(page, async () => {
+    await sweep().catch(() => 0);
+    await page.reload({ waitUntil: "load" });
+    return clean(await page.locator("li.scheduled-email-card").filter({ hasText: scheduleName }).innerText());
+  }, (text) => /3 sent|3 captured/.test(text), 40_000);
+  rec.record("Scheduled emails (after sending)", "B12", "the schedule shows it was sent", done.ok ? "pass" : "fail", `the card says: "${(done.value ?? "").slice(0, 200)}"`);
+  await visited(ctx, page, "Scheduled emails (after sending)");
 }
 
 /* ---------------------------------------------------------------- run */
@@ -777,6 +1276,12 @@ async function runShard(ctx: Ctx) {
   } finally {
     await main.context.close();
   }
+  if (wanted("5") || wanted("6") || wanted("7")) await journey(ctx, "5. Create an event from a template (as a system administrator)", () => templateJourney(ctx));
+  if (wanted("6") || wanted("7")) await journey(ctx, "6 and 7. The publish checklist, the form builder test, Publish event (as the event's administrator)", () => staffEventJourneys(ctx));
+  if (wanted("8")) await journey(ctx, "8. The attendee list: sort, page, filter, search, download (as the event's administrator)", () => asStaff(ctx, "eventadmin", (page) => attendeeListJourney(ctx, page)));
+  if (wanted("9")) await journey(ctx, "9. Check in an attendee and undo it (as check-in staff)", () => asStaff(ctx, "checkin", (page) => checkInJourney(ctx, page)));
+  if (wanted("10")) await journey(ctx, "10. A scheduled email, approved, swept and delivered (as the communications manager)", () => asStaff(ctx, "comms", (page) => scheduledEmailJourney(ctx, page)));
+  if (wanted("14")) await journey(ctx, "14. Staff without the permission see the shared no-access state (as check-in staff)", () => noPermissionJourney(ctx));
   if (wanted("T")) await journey(ctx, "2 again with the translation simulation", () => registerVariant(ctx, "translate"));
   if (wanted("B")) await journey(ctx, "2 again with the privacy-browser blocker lists", () => registerVariant(ctx, "lists"));
   if (wanted("P")) await journey(ctx, "2 again with the blocker lists and the price preview failing", () => registerVariant(ctx, "preview"));
@@ -793,6 +1298,12 @@ async function main() {
   await resetEventBudgets(prisma);
   const mail = new FakeMailServer();
   await mail.start();
+  // The platform's central email sender is a system administrator's one-time setup (System management > Email). A publish
+  // needs it (readiness item "Central email sender saved") and so do scheduled emails; a fresh CI database has none, so it is
+  // set for the run (to the CI sender address) and put back at the end.
+  const platform = await prisma.platformSettings.findUnique({ where: { id: "platform" }, select: { defaultSenderEmail: true } });
+  const senderWas = platform?.defaultSenderEmail ?? null;
+  if (!senderWas?.trim()) await prisma.platformSettings.upsert({ where: { id: "platform" }, update: { defaultSenderEmail: "events@ci.example.test" }, create: { id: "platform", defaultSenderEmail: "events@ci.example.test" } });
   const summaries: string[] = [];
   const worlds: EventWorld[] = [];
   const tokens: string[] = [];
@@ -821,6 +1332,7 @@ async function main() {
     await J.revokeSessions(tokens);
     await J.revokeStaffSessions(staffTokens);
     if (process.env.JOURNEY_KEEP_DATA !== "1") for (const world of worlds) await cleanupEventWorld(prisma, world);
+    await prisma.platformSettings.updateMany({ where: { id: "platform" }, data: { defaultSenderEmail: senderWas } });
     await mail.stop();
     await prisma.$disconnect();
   }

@@ -379,6 +379,16 @@ export async function mintStaffSession(tokens: string[], email = "admin@imsda-ev
   return { name: staffSessionCookie.legacyName, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
 }
 
+/** A staff session for one of the stamped synthetic staff users a suite seeded (its email must carry the suite's stamp prefix). */
+export async function mintStaffSessionFor(tokens: string[], user: { id: string; email: string }) {
+  if (!/^journeyevt\./.test(user.email)) throw new Error(`Refusing to mint a session for ${user.email}: only the stamped synthetic staff users of a journey run are allowed.`);
+  const { createDatabaseSession } = await import("../../modules/access/session-store");
+  const { staffSessionCookie } = await import("../../modules/security/session-cookies");
+  const session = await createDatabaseSession(user.id, null);
+  tokens.push(session.token);
+  return { name: staffSessionCookie.legacyName, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
+}
+
 /** Ends the staff sessions `mintStaffSession` made. */
 export async function revokeStaffSessions(tokens: string[]) {
   const { revokeDatabaseSession } = await import("../../modules/access/session-store");
