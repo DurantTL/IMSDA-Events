@@ -162,6 +162,9 @@ export const clubDirectorWalkthroughActions: Record<string, WalkthroughActions> 
       },
       "edit-fields": async (ctx) => {
         await ctx.page.getByRole("button", { name: `Edit ${rosterRowName(ctx)}` }).click();
+        // The Edit window loads the person's emergency contacts after it opens, and Save refuses while they load (the
+        // window then stays open). Wait for the roster's loaded state: the contact boxes stop being read-only (#1507).
+        await ctx.page.getByRole("dialog").locator('input[name="g1Name"][readonly]').waitFor({ state: "detached", ...slow });
         const role = ctx.page.getByRole("dialog").getByLabel("Role (optional)");
         await role.fill(ctx.rosterPerson.editedRole);
         return role;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CalendarItem } from "@/modules/calendar/domain";
+import { calendarDateIn, type CalendarItem } from "@/modules/calendar/domain";
 import {
   closingSoonFor,
   helpContactLinks,
@@ -137,6 +137,33 @@ describe("the six-month ribbon (#1251)", () => {
     const full = seasonMonthMarks(seasonWindow("2026-10-01"));
     expect(full[0]).toEqual({ label: "October", leftPct: 0, showLabel: true });
     expect(full).toHaveLength(6);
+  });
+
+  it("drops a last label that would run past the right edge, keeping its grid line (#1507)", () => {
+    vi.setSystemTime(new Date("2026-11-02T15:00:00Z")); // Nov 2, 09:00 in Chicago: May 1 is the ribbon's last day
+    const nov2 = seasonMonthMarks(seasonWindow(calendarDateIn(new Date())));
+    expect(nov2.at(-1)).toMatchObject({ label: "May 2027", showLabel: false });
+    expect(nov2.at(-1)!.leftPct).toBeGreaterThan(99);
+    expect(nov2.filter((mark) => mark.showLabel).map((mark) => mark.label)).toEqual(["November", "December", "January 2027", "February 2027", "March 2027", "April 2027"]);
+    expect(nov2.filter((mark) => mark.leftPct > 0)).toHaveLength(6);
+
+    vi.setSystemTime(new Date("2026-10-31T15:00:00Z")); // a whole April left: its label fits
+    const oct31 = seasonMonthMarks(seasonWindow(calendarDateIn(new Date())));
+    expect(oct31.at(-1)).toMatchObject({ label: "April 2027", showLabel: true });
+  });
+
+  it("keeps every shown month label inside the ribbon on any day of the year (#1507)", () => {
+    // Measured at 861px, the narrowest ribbon: the track is about 635px and a label about 7.3px a character.
+    const measuredPctPerChar = (7.3 / 635) * 100;
+    for (let day = 0; day < 366 * 2; day += 1) {
+      vi.setSystemTime(new Date(Date.UTC(2026, 0, 1 + day, 15)));
+      const marks = seasonMonthMarks(seasonWindow(calendarDateIn(new Date())));
+      const shown = marks.filter((mark) => mark.showLabel);
+      for (const mark of shown) expect(mark.leftPct + mark.label.length * measuredPctPerChar).toBeLessThanOrEqual(100);
+      // Left edge: the first label never sits on the next one.
+      if (shown[0]?.leftPct === 0 && shown[1]) expect(shown[1].leftPct).toBeGreaterThanOrEqual(8);
+      expect(marks.filter((mark) => mark.leftPct > 0).length).toBeGreaterThanOrEqual(5);
+    }
   });
 
   it("places a one-day item as a dot and a multi-day item as a bar by date", () => {
