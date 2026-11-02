@@ -68,9 +68,7 @@ function tokenLiterals(file: string, source: string) {
 
 describe("L8: identical radius and color values use the tokens", () => {
   /** Files another open PR edits; their remaining literals are fixed once it merges. */
-  const waitingForOtherPr: Record<string, string> = {
-    "components/club-roster-sections.module.css": "PR #1485 (issue #1457) edits this file; its `background: #fff` becomes var(--card) once that merges",
-  };
+  const waitingForOtherPr: Record<string, string> = {};
 
   it("reads the tokens from :root", () => {
     expect(colorTokens.get("#582c83")).toBe("--imsda-purple");

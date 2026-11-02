@@ -180,7 +180,7 @@
   align-items: center;
   gap: 6px 18px;
   padding: 12px 20px;
-  border-top: 1px solid #eaf0f2;
+  border-top: 1px solid var(--table-row-line);
 }
 
 .row:first-child {
@@ -281,7 +281,7 @@
 .noteLine {
   margin: 0;
   padding: 10px 20px 14px;
-  border-top: 1px solid #eaf0f2;
+  border-top: 1px solid var(--table-row-line);
   color: var(--muted);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
@@ -352,7 +352,7 @@
   display: grid;
   gap: 8px;
   padding: 12px 20px 14px;
-  border-top: 1px solid #eaf0f2;
+  border-top: 1px solid var(--table-row-line);
 }
 
 .ownConnection h3 {

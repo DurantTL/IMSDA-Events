@@ -62,7 +62,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | --- | --- | --- | --- | --- |
 | B1 | Every list can be sorted by clicking a column header, and uses the same paging control and "Showing 1–25 of 140" line. Every staff and admin table is sortable except short fixed or set-order lists, which go on an allowlist. | `tests/sorting-pager-rule1-1458.test.ts`, `tests/list-sort-pager-1458.test.ts`, `tests/sorting-round-a-1458.test.ts` | planned (#1439) | #1433; Caleb, Nov 1 |
 | B2 | Filters live in the web address (Back and shared links keep them), and every filtered list has a "Clear filters" button. | `tests/filters-in-address-rule2-1456.test.ts`, `tests/search-as-you-type-dom-1431.test.ts` | planned (#1439) | #1433 |
-| B3 | On a phone, every table turns into cards the same way. | planned (#1457, PR #1485) | planned (#1439) | #1433 |
+| B3 | On a phone, every table turns into cards the same way. | `tests/table-cards-guard-1457.test.ts` | planned (#1439) | #1433 |
 | B4 | Every empty list says why it's empty and offers the next step. | `tests/empty-states-rule4-1449.test.ts`, `tests/empty-states-rule4-render-1449.test.ts`, `tests/empty-states-guard-1440.test.ts` | planned (#1439) | #1433 |
 
 ## Behavior: forms and saving

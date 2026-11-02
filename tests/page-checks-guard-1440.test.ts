@@ -36,9 +36,7 @@ describe("C1: staff headings and labels are at least 14px", () => {
   });
 
   /** Known small sizes, each with its reason. A new one must be fixed with the floor form, not added here. */
-  const allowed: Record<string, string> = {
-    "app/globals.css: .fb-rule-row label": "KNOWN VIOLATION (13px staff builder label): app/globals.css is being edited by PR #1485, so the fix waits for it; use max(var(--type-staff-floor, 0px), 0.875rem)",
-  };
+  const allowed: Record<string, string> = {};
 
   it("has no bare font-size under 14px on a heading or label rule, outside the reviewed list", () => {
     const unexpected = undersized.filter((entry) => !Object.keys(allowed).some((key) => entry.startsWith(`${key} {`)));

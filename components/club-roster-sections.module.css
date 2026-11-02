@@ -18,7 +18,7 @@
 .rosterSearchPanel, .rosterSearchField { grid-template-columns: minmax(0, 1fr); }
 .rosterSearchRow, .rosterSearchInput { min-width: 0; }
 /* --- Roster search, Details needed, labelled Edit and Actions (#1167) --- */
-.rosterSearchPanel { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: #fff; }
+.rosterSearchPanel { display: grid; gap: 8px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); }
 .rosterSearchRow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
 .rosterSearchField { display: grid; flex: 1 1 18rem; min-width: 0; gap: 4px; color: var(--ink); font-weight: 700; }
 /* The box is the shared .search-field wrapper (one border, one ring); the input inside draws nothing. */
