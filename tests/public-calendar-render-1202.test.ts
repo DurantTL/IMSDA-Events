@@ -43,10 +43,13 @@ describe("public calendar month render (#1202)", () => {
     const markup = await render({ month: "2026-03" });
     expect(markup).toContain('aria-label="Explore"');
     expect(markup).not.toContain("Unexpected category");
+    expect(markup).toContain('href="/">Home</a>');
+    expect(markup).not.toContain('aria-current="page" href="/">Home</a>');
     expect(markup).toContain('href="/events">Events</a>');
     expect(markup).toContain('aria-current="page" href="/calendar">Calendar</a>');
     expect(markup).toContain('href="/clubs">Club ministry</a>');
-    expect(markup).toContain('aria-label="IMAdventist calendar"');
+    expect(markup).toContain('aria-label="IMAdventist home"');
+    expect(markup).toMatch(/<a [^>]*href="\/"[^>]*aria-label="IMAdventist home"|<a [^>]*aria-label="IMAdventist home"[^>]*href="\/"/);
     expect(markup).toContain('class="home-footer"');
     expect(markup).toContain('aria-label="Calendar view"');
   });

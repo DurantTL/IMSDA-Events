@@ -11,6 +11,7 @@ import {
   Paperclip,
 } from "lucide-react";
 import { BrandLink } from "@/components/brand-link";
+import { PublicExploreNav } from "@/components/public-explore-nav";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { HubLink, SiteNoticesView } from "@/components/site-notices-view";
@@ -273,8 +274,8 @@ export default async function PublicEventPage({
     <main className={`public-registration-page public-event-page ${homeStyles.page} ${styles.eventPage}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" wordmark />
-          <nav aria-label="Explore" className={homeStyles.primaryNav}><Link href="/events">Events</Link><Link href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
+          <BrandLink className="public-registration-brand public-event-brand-link" destination="home" wordmark />
+          <PublicExploreNav />
           <div className="public-header-links">
             <PublicHeaderSessionLinks navLinks={[]} />
           </div>

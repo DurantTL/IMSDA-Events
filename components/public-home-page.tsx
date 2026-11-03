@@ -2,6 +2,7 @@ import { ExactValue } from "@/components/exact-value";
 import Link from "next/link";
 import { CalendarDays, ChevronRight } from "lucide-react";
 import { BrandLink } from "@/components/brand-link";
+import { PublicExploreNav } from "@/components/public-explore-nav";
 import { HomepageMinistryIconView } from "@/components/homepage-ministry-icon";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
@@ -161,8 +162,8 @@ export async function PublicHomePage({ content, preview = false }: { content: Hu
     <Wrapper className={`public-registration-page public-calendar-page public-home-page ${styles.page}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" wordmark />
-          <nav aria-label="Explore" className={styles.primaryNav}><Link href="/events">Events</Link><Link href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
+          <BrandLink className="public-registration-brand public-event-brand-link" destination="home" wordmark />
+          <PublicExploreNav current="home" />
           <div className="public-header-links"><PublicHeaderSessionLinks navLinks={[]} /></div>
         </div>
       </header>

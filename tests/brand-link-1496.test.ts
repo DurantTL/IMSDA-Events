@@ -38,11 +38,29 @@ describe("every IMAdventist logo links to the calendar (#1496, #1549)", () => {
     const source = read("components/brand-link.tsx");
     expect(source).toContain('BRAND_LINK_HREF = "/calendar"');
     expect(source).toContain("BRAND_LINK_LABEL = BRAND_CALENDAR_LABEL");
-    expect(source).toContain("label = BRAND_LINK_LABEL");
+    expect(source).toContain("BRAND_LINK_LABEL");
     expect(source).toContain("GuardedLink");
     expect(source).toContain("BRAND_SYMBOL_PATH");
-    expect(source).toMatch(/aria-label=\{label\}/);
+    expect(source).toMatch(/aria-label=\{label \?\? /);
     expect(read("components/brand-link.module.css")).toContain("min-height: 44px");
+  });
+
+  it("lets only the public discovery pages send the logo Home (#1561)", () => {
+    const source = read("components/brand-link.tsx");
+    expect(source).toContain('BRAND_HOME_HREF = "/"');
+    expect(source).toContain('destination = "calendar"');
+    const homePages = [
+      "components/public-home-page.tsx",
+      "app/(public)/calendar/page.tsx",
+      "app/(public)/clubs/page.tsx",
+      "app/(public)/clubs/forms/page.tsx",
+      "app/(public)/events/page.tsx",
+      "app/(public)/events/[eventSlug]/page.tsx",
+      "app/(public)/events/[eventSlug]/loading.tsx",
+    ];
+    const found = sourceFiles.filter((file) => /destination="home"/.test(read(file))).sort();
+    expect(found).toEqual([...homePages].sort());
+    for (const file of homePages) expect(read(file), file).toContain('destination="home"');
   });
 
   it("opens the calendar in the top window from the embedded registration pages", () => {

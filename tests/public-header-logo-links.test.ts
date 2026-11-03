@@ -66,6 +66,8 @@ describe("public header logo links (#470)", () => {
         // The shared BrandLink (#1496) always links to /calendar and takes no href of its own.
         if (tag.startsWith("<BrandLink")) {
           expect(hrefOf(tag), `BrandLink in ${file} must not set an href`).toBeUndefined();
+          // Public discovery pages send the logo Home (#1561); the destination prop is the only other option.
+          if (tag.includes("destination")) expect(tag).toContain('destination="home"');
           continue;
         }
         const href = hrefOf(tag);

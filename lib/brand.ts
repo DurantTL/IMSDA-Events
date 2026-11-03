@@ -10,3 +10,5 @@ export const BRAND_SYMBOL_PATH = "/brand/imadventist-symbol.png";
 export const BRAND_EMAIL_SYMBOL_PATH = "/brand/imadventist-symbol-email.png";
 export const BRAND_APPLE_TOUCH_PATH = "/brand/imadventist-apple-touch.png";
 export const BRAND_CALENDAR_LABEL = `${PRODUCT_NAME} calendar`;
+/** The public discovery pages' logo goes to the Home page instead (#1561). */
+export const BRAND_HOME_LABEL = `${PRODUCT_NAME} home`;

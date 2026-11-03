@@ -10,7 +10,7 @@ export default function PublicEventLoading() {
     <main className={`public-registration-page public-event-page ${homeStyles.page} ${styles.eventPage}`} aria-busy="true">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand" label="IMAdventist calendar" wordmark />
+          <BrandLink className="public-registration-brand" destination="home" wordmark />
         </div>
       </header>
       <EventLoadingTransition>
