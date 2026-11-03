@@ -4,6 +4,7 @@ import { formatCents } from "@/modules/payments/format-cents";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Undo2 } from "lucide-react";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { RegistrantProposal } from "@/modules/cancellation-requests/domain";
 import type { RegistrantRequestSummary, RegistrantRequestView } from "@/modules/cancellation-requests/views";
 
@@ -26,6 +27,29 @@ const when = (iso: string) => dateFormatter.format(new Date(iso));
 
 type OpenConflict = { id: string; status: string; scope: string };
 
+/**
+ * True when a request that has not been sent has anything picked or typed (#1468): a changed choice, ticked attendees
+ * or items for the chosen scope, and, once the outcome is shown, a reason, a contact method or the replace box.
+ * Viewing an existing request, and fields that are not on screen, do not count.
+ */
+export function cancellationRequestEdited(state: {
+  available: boolean;
+  scope: Scope;
+  baselineScope: Scope;
+  attendeeCount: number;
+  chargeCount: number;
+  outcomeShown: boolean;
+  reason: string;
+  contactMethod: "EMAIL" | "PHONE";
+  replaceConfirmed: boolean;
+}): boolean {
+  if (!state.available) return false;
+  if (state.scope !== state.baselineScope) return true;
+  if (state.scope === "ATTENDEE" && state.attendeeCount > 0) return true;
+  if (state.scope === "COMPONENT" && state.chargeCount > 0) return true;
+  return state.outcomeShown && (state.reason.trim() !== "" || state.contactMethod !== "EMAIL" || state.replaceConfirmed);
+}
+
 function newKey() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `k${Date.now()}${Math.random().toString(36).slice(2)}`;
 }
@@ -42,6 +66,8 @@ export function CancellationRequestPanel({
   const uid = useId();
   const [view, setView] = useState(initialView);
   const [scope, setScope] = useState<Scope>(initialView.allowedScopes[0] ?? "FULL_REGISTRATION");
+  // The choice the form opened with, and after a sent request the one left on screen (#1468).
+  const [baselineScope, setBaselineScope] = useState<Scope>(initialView.allowedScopes[0] ?? "FULL_REGISTRATION");
   const [attendeeIds, setAttendeeIds] = useState<string[]>([]);
   const [chargeIds, setChargeIds] = useState<string[]>([]);
   const [proposal, setProposal] = useState<RegistrantProposal | null>(null);
@@ -67,6 +93,19 @@ export function CancellationRequestPanel({
       ? "Tick the box above to replace your open request, or withdraw it first."
       : null;
   const selectionReady = scope === "FULL_REGISTRATION" || (scope === "ATTENDEE" && attendeeIds.length > 0) || (scope === "COMPONENT" && chargeIds.length > 0);
+
+  // A choice, reason or contact method for a request not yet sent counts; sending it clears them (#1468).
+  useUnsavedChangesGuard(cancellationRequestEdited({
+    available: view.available,
+    scope,
+    baselineScope,
+    attendeeCount: attendeeIds.length,
+    chargeCount: chargeIds.length,
+    outcomeShown: proposal?.status === "CALCULATED",
+    reason,
+    contactMethod,
+    replaceConfirmed: replace !== null && replace.length > 0 && replaceConfirmed,
+  }));
 
   // An error is announced, and focus moves to it, because the send button it belongs to can be far below the top of the panel.
   useEffect(() => {
@@ -142,6 +181,8 @@ export function CancellationRequestPanel({
         throw new Error(typeof payload?.message === "string" ? payload.message : "Your request could not be sent. Try again.");
       }
       setView(payload.view as RegistrantRequestView);
+      setBaselineScope(scope);
+      setContactMethod("EMAIL");
       setProposal(null);
       setReason("");
       setAttendeeIds([]);

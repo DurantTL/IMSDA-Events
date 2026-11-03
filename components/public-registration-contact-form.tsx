@@ -4,8 +4,10 @@ import { useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, Save } from "lucide-react";
 import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { savedMessage } from "@/components/form-message";
+import { samePhoneNumber } from "@/components/form-has-edits";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 
 type Contact = {
@@ -26,6 +28,14 @@ type SaveState =
   | { kind: "saved"; message: string }
   | { kind: "error"; message: string };
 
+/** True when the typed contact differs from the saved one; the phone ignores formatting (#1468). */
+export function contactEdited(contact: Contact, saved: Contact): boolean {
+  return contact.firstName.trim() !== saved.firstName.trim()
+    || contact.lastName.trim() !== saved.lastName.trim()
+    || contact.email.trim() !== saved.email.trim()
+    || !samePhoneNumber(contact.phone, saved.phone);
+}
+
 export function PublicRegistrationContactForm({
   token,
   initialContact,
@@ -34,6 +44,7 @@ export function PublicRegistrationContactForm({
   // The saved phone (#871): the same number is an old one left alone and never blocks the save.
   const [savedPhone, setSavedPhone] = useState(initialContact.phone);
   const [savedEmail, setSavedEmail] = useState(initialContact.email);
+  const [savedContact, setSavedContact] = useState(initialContact);
   const [attempted, setAttempted] = useState(false);
   // The site was restarting (#1263): the fields keep their values and Try again saves them as typed.
   const [siteUpdating, setSiteUpdating] = useState<string | false>(false);
@@ -41,6 +52,9 @@ export function PublicRegistrationContactForm({
     kind: "idle",
     message: "",
   });
+
+  // Typed contact details that differ from the saved ones count; a save makes what is shown the new baseline (#1468).
+  useUnsavedChangesGuard(contactEdited(contact, savedContact));
 
   function updateField(field: keyof Contact, value: string) {
     setContact((current) => ({ ...current, [field]: value }));
@@ -93,8 +107,11 @@ export function PublicRegistrationContactForm({
       }
       if (payload?.registration?.contact) {
         setContact(payload.registration.contact);
+        setSavedContact(payload.registration.contact);
         setSavedPhone(payload.registration.contact.phone);
         setSavedEmail(payload.registration.contact.email);
+      } else {
+        setSavedContact(contact);
       }
       setSaveState({ kind: "saved", message: savedMessage() });
     } catch (error) {
