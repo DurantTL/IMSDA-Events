@@ -12,7 +12,7 @@ import { getAccountEmailSender } from "@/modules/communications/account-email";
  * minted into it and no attendee data can reach it. Staff-written free text never appears: the body is fixed here.
  */
 export const SYSTEM_TEST_EMAIL_TRIGGER = "SYSTEM_REPORT_TEST";
-export const SYSTEM_TEST_EMAIL_SUBJECT = "IMSDA Events test email";
+export const SYSTEM_TEST_EMAIL_SUBJECT = "IMAdventist test email";
 
 const refAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -24,14 +24,14 @@ export function newSystemTestRef() {
 
 export function systemTestEmailBody(ref: string) {
   return [
-    "This is a test email from the IMSDA Events System report.",
+    "This is a test email from the IMAdventist System report.",
     "",
     "A system administrator sent it to check that email delivery is working. It was sent to this one address only.",
     "It contains no registration or attendee information and nothing is needed from you.",
     "",
     `Test reference: ${ref}`,
     "",
-    "IMSDA Events",
+    "IMAdventist",
   ].join("\n");
 }
 

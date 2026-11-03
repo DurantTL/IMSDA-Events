@@ -94,7 +94,7 @@ function row(overrides: Partial<Row> & { id: string }): Row {
   };
 }
 
-const normalSettings = { deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON", senderName: "IMSDA Events", senderEmail: "events@example.test", replyToEmail: null };
+const normalSettings = { deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON", senderName: "IMAdventist", senderEmail: "events@example.test", replyToEmail: null };
 const pausedSettings = { ...normalSettings, deliveryMode: "LOCAL_CAPTURE", deliveryReason: "PAUSED" };
 
 beforeEach(() => {

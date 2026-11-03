@@ -167,8 +167,8 @@ export async function renderInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arr
   doc.setTitle(`Invoice ${input.number}`);
   doc.setSubject(`Invoice for ${input.organizationName}`);
   doc.setAuthor(input.header.organizationName);
-  doc.setCreator("IMSDA Events");
-  doc.setProducer("IMSDA Events");
+  doc.setCreator("IMAdventist");
+  doc.setProducer("IMAdventist");
   doc.setCreationDate(input.issuedAt);
   doc.setModificationDate(input.issuedAt);
   const regular = await doc.embedFont(StandardFonts.Helvetica);

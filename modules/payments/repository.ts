@@ -31,7 +31,7 @@ export class PaymentOperationError extends Error {
         : code === "REFUND_IDEMPOTENCY_KEY_REUSED"
         ? "This refund key was already used for a different amount or reason. Review the refund again to start a new one."
         : code === "CARD_REFUND_REQUIRES_SQUARE"
-        ? "Card refunds must be issued in Square. IMSDA Events will update automatically after Square confirms the refund."
+        ? "Card refunds must be issued in Square. IMAdventist will update automatically after Square confirms the refund."
         : code === "REFUND_EXCEEDS_AVAILABLE"
         ? "The refund exceeds the remaining refundable amount."
         : code === "REGISTRATION_NOT_PAYABLE"

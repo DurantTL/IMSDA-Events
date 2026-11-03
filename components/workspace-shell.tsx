@@ -92,7 +92,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
   const acting = await currentStaffActingContext();
 
   return (
-    <Suspense fallback={<div className="shell-loading">Loading IMSDA Events…</div>}>
+    <Suspense fallback={<div className="shell-loading">Loading IMAdventist…</div>}>
       <ActAsBanner acting={acting} inShell />
       <AppShell
         attendeeAccountAvailable={attendeeAccountAvailable}

@@ -28,7 +28,7 @@ const event = { id: "event-1", name: "Spring Camporee", supportContact: "help@ex
 
 const settings = {
   deliveryMode: "EXTERNAL_EMAIL" as const,
-  senderName: "IMSDA Events",
+  senderName: "IMAdventist",
   senderEmail: "registration@example.test",
   replyToEmail: "help@example.test",
   internalNotificationEmails: [],

@@ -95,7 +95,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: async (entry: {
 vi.mock("@/modules/calendar/subscribe", () => ({ siteBaseUrl: () => "https://events.example.test" }));
 vi.mock("@/modules/communications/account-email", () => ({
   isAccountEmailConfigured: () => state.emailConfigured,
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }),
+  getAccountEmailSender: () => ({ name: "IMAdventist", address: "events@example.test", replyTo: null }),
 }));
 
 import { expansionDiagnostics } from "@/modules/calendar/recurrence";

@@ -100,7 +100,7 @@ export function AnnouncementBroadcastReviewFacts({
             <dt>Skipped (opted out)</dt>
             <dd>
               {preview.skippedOptedOutCount} contact{preview.skippedOptedOutCount === 1 ? " has" : "s have"} opted out of announcements:
-              {" "}{preview.skippedOptedOutEventCount} for this event, {preview.skippedOptedOutAllCount} for all IMSDA Events announcements.
+              {" "}{preview.skippedOptedOutEventCount} for this event, {preview.skippedOptedOutAllCount} for all IMAdventist announcements.
               Mark the announcement essential (communications or event managers) to reach them.
             </dd>
           </div>
@@ -126,7 +126,7 @@ export function AnnouncementBroadcastReviewFacts({
         </div>
         <div>
           <dt>Preview line</dt>
-          <dd>{preview.preheader ?? "None. Inboxes will show “IMSDA Events” under the subject."}</dd>
+          <dd>{preview.preheader ?? "None. Inboxes will show “IMAdventist” under the subject."}</dd>
         </div>
         <div>
           <dt>Attachments</dt>

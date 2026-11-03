@@ -214,7 +214,7 @@ async function main() {
   await prisma.messageOutbox.create({
     data: {
       templateKey: "MEMBER_TRANSFER_COMPLETED", recipientKind: "ACCOUNT", recipientEmail: "director-a@xfer.example.test", accountAttendeeId: accounts.a,
-      senderNameSnapshot: "IMSDA Events", senderEmailSnapshot: "events@xfer.example.test", subjectSnapshot: "pre-existing", bodyTextSnapshot: "pre-existing",
+      senderNameSnapshot: "IMAdventist", senderEmailSnapshot: "events@xfer.example.test", subjectSnapshot: "pre-existing", bodyTextSnapshot: "pre-existing",
       idempotencyKey: completedKey, correlationId: matched.transferId, status: "PENDING",
     },
   });

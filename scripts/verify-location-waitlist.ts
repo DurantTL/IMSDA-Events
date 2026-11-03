@@ -479,7 +479,7 @@ async function main() {
 
   // 10b. The director's own emails: a delivery failure after the commit never blocks or undoes the registration change.
   await setSyntheticCentralSender(prisma);
-  await prisma.eventMessageSettings.create({ data: { eventId, deliveryPaused: false, senderName: "IMSDA Events" } });
+  await prisma.eventMessageSettings.create({ data: { eventId, deliveryPaused: false, senderName: "IMAdventist" } });
   const cancelledWithOutage = await cancel("a2", "Synthetic cancellation during an outage.");
   assert(cancelledWithOutage.autoPromotedRegistration !== null && cancelledWithOutage.pendingMessageIds.length >= 2, "the cancel promoted the waiting club and queued both emails");
   const outage = await processQueuedMessageIdsAfterCommit(cancelledWithOutage.pendingMessageIds, { sendEmail: failing as never, configuration });

@@ -56,7 +56,7 @@ export const SYSTEM_SETUP_STEPS: Record<SystemSetupId, SetupHelp> = {
   turnstile: {
     steps: [
       "In the Cloudflare dashboard, open Turnstile and click Add widget.",
-      "Name it IMSDA Events. For the hostname enter the site's address without https:// (the host of APP_BASE_URL). Add another hostname only if the app is also served from one.",
+      "Name it IMAdventist. For the hostname enter the site's address without https:// (the host of APP_BASE_URL). Add another hostname only if the app is also served from one.",
       "Set the widget mode to Managed and leave pre-clearance off. Create it.",
       "Copy the Site key and the Secret key. " + NEVER_SHARE,
       `${ADD_IN_XCLOUD} the first two settings listed below. Add TURNSTILE_ALLOWED_HOSTNAMES only if the app is served from more than one host (comma-separated).`,

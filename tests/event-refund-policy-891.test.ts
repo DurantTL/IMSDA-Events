@@ -169,7 +169,7 @@ const definition = registrationFormDefinitionSchema.parse({
 function enqueueFixture(refundPolicy: string | null) {
   const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: `message-${create.mock.calls.length}`, ...data }));
   const tx = {
-    eventMessageSettings: { findUnique: vi.fn().mockResolvedValue({ deliveryMode: "LOCAL_CAPTURE", senderName: "IMSDA Events", senderEmail: "events@example.test", replyToEmail: "office@example.test", internalNotificationEmails: [] }) },
+    eventMessageSettings: { findUnique: vi.fn().mockResolvedValue({ deliveryMode: "LOCAL_CAPTURE", senderName: "IMAdventist", senderEmail: "events@example.test", replyToEmail: "office@example.test", internalNotificationEmails: [] }) },
     eventMessageTemplate: { findMany: vi.fn().mockResolvedValue([]) },
     event: { findUnique: vi.fn().mockResolvedValue({ supportContact: "office@example.test", refundPolicy, paymentInstructionVersions: [] }) },
     registrationAttendee: { findMany: vi.fn().mockResolvedValue([{ id: "attendee-1" }]) },

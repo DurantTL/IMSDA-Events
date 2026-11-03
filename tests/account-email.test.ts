@@ -32,7 +32,7 @@ import {
 
 const configuredEnv = {
   APP_BASE_URL: "https://events.imsda.org",
-  ACCOUNT_EMAIL_SENDER_NAME: "IMSDA Events",
+  ACCOUNT_EMAIL_SENDER_NAME: "IMAdventist",
   ACCOUNT_EMAIL_SENDER_ADDRESS: "no-reply@imsda.org",
   ACCOUNT_EMAIL_REPLY_TO: "help@imsda.org",
 };
@@ -127,7 +127,7 @@ describe("queueing an account email", () => {
         templateKey: "ACCOUNT_ACTIVATION",
         recipientKind: "ACCOUNT",
         recipientEmail: "alex@imsda.org",
-        senderNameSnapshot: "IMSDA Events",
+        senderNameSnapshot: "IMAdventist",
         senderEmailSnapshot: "no-reply@imsda.org",
         replyToEmailSnapshot: "help@imsda.org",
         idempotencyKey: "account:ACCOUNT_ACTIVATION:invite-1",

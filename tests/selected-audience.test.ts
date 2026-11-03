@@ -15,7 +15,7 @@ function context(
     eventId: "event-1",
     templateKey: "BALANCE_REMINDER",
     deliveryMode: "LOCAL_CAPTURE",
-    senderName: "IMSDA Events",
+    senderName: "IMAdventist",
     senderEmail: "events@imsda.test",
     replyToEmail: "events@imsda.test",
     templateEnabled: true,

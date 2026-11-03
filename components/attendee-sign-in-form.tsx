@@ -104,7 +104,7 @@ export function AttendeeSignInForm({ next, securityCheck = null }: { next?: stri
         <LogIn aria-hidden="true" size={17} /> {busy ? "Signing in…" : "Sign in"}
       </button>
       <div className="auth-alternate">
-        <strong>New to IMSDA Events?</strong>
+        <strong>New to IMAdventist?</strong>
         <span>Want one place to manage future registrations? Create an optional account — registration itself never requires one.</span>
         <AccountComingSoonNotice />
         <Link className="secondary-button full-button" href="/account/sign-up">

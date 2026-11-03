@@ -198,7 +198,7 @@ export function buildDeadlineReminderEmail(input: {
   const lines = [
     `Hello ${name},`,
     "",
-    `Just a friendly reminder from IMSDA Events: "${title}" ${when}.`,
+    `Just a friendly reminder from IMAdventist: "${title}" ${when}.`,
     "",
   ];
   // Only an https link goes in the email, the same as the portal list.
@@ -211,7 +211,7 @@ export function buildDeadlineReminderEmail(input: {
       ? "Thank you for walking alongside the clubs in your area."
       : "Thank you for everything you do for your club.",
     "",
-    "IMSDA Events",
+    "IMAdventist",
   );
   return {
     subject: `Deadline reminder: ${title} (${formatDateRange(input.dueOn, input.dueOn)})`,

@@ -231,7 +231,7 @@ export function runSendCheck(input: SendCheckInput): SendCheckResult {
 
   // Suggestions.
   if (!preheader.trim()) {
-    add("suggestion", "PREHEADER_MISSING", "preheader", "Add an inbox preview line. Without one, inboxes show “IMSDA Events” under the subject.");
+    add("suggestion", "PREHEADER_MISSING", "preheader", "Add an inbox preview line. Without one, inboxes show “IMAdventist” under the subject.");
   }
   if (body.trim() && visibleBodyLength(body) < BODY_SHORT_LENGTH) {
     add("suggestion", "BODY_SHORT", "body", "The message body is very short. Check that nothing is missing.");

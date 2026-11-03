@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@/lib/brand";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
 import { BrandLink } from "@/components/brand-link";
@@ -54,7 +55,7 @@ export function CoordinatorMastheadView({ model }: { model: CoordinatorMastheadM
   return (
     <header className="club-masthead coordinator-masthead">
       <div className="club-masthead-inner">
-        <BrandLink label="IMSDA Events Club coordination, calendar" className="club-masthead-brand" wordmark={<span><small>IMSDA Events</small><strong>Club coordination</strong></span>} />
+        <BrandLink label="IMAdventist Club coordination, calendar" className="club-masthead-brand" wordmark={<span><small>{PRODUCT_NAME}</small><strong>Club coordination</strong></span>} />
         <div className="club-masthead-account">
           {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
           {model.identity && (

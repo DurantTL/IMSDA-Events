@@ -36,7 +36,7 @@ export default async function EmbeddedRegistrationPage({
     return (
       <main className="public-registration-embed-state">
         <BrandLink target="_top" />
-        <p className="public-registration-eyebrow">IMSDA Events</p>
+        <p className="public-registration-eyebrow">IMAdventist</p>
         <h1>Online registration is not available here</h1>
         <p>Open the event page for current dates, availability, waitlist information, and help.</p>
         <Link

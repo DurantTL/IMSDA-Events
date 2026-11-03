@@ -93,10 +93,10 @@ describe("email layout settings validation (#1443)", () => {
   });
 
   it("saves a valid phone and the names in their stored form, and audits both sides", async () => {
-    const tx = database({ emailHeaderName: "IMSDA Events", emailClubHeaderName: "IMSDA Events", emailHelpPhone: "(515) 223-1197" });
+    const tx = database({ emailHeaderName: "IMAdventist", emailClubHeaderName: "IMAdventist", emailHelpPhone: "(515) 223-1197" });
     await updatePlatformSettings(platformSettingsInputSchema.parse({
       ...base,
-      emailHeaderName: "IMSDA Events",
+      emailHeaderName: "IMAdventist",
       emailClubHeaderName: "IMSDA Club Ministry",
       emailHelpEmail: "help@example.org",
       emailHelpPhone: "515-555-0100",
@@ -107,7 +107,7 @@ describe("email layout settings validation (#1443)", () => {
       emailHelpPhone: "(515) 555-0100",
     });
     const audit = tx.auditLog.create.mock.calls[0][0].data.metadata;
-    expect(audit.before).toMatchObject({ emailClubHeaderName: "IMSDA Events", emailHelpPhone: "(515) 223-1197" });
+    expect(audit.before).toMatchObject({ emailClubHeaderName: "IMAdventist", emailHelpPhone: "(515) 223-1197" });
     expect(audit.after).toMatchObject({ emailClubHeaderName: "IMSDA Club Ministry", emailHelpPhone: "(515) 555-0100" });
   });
 
@@ -157,7 +157,7 @@ describe("PATCH /api/admin/platform-settings with the email layout fields (#1443
     };
     mocks.getPrisma.mockReturnValue({
       $transaction: vi.fn(async (run: (client: typeof tx) => Promise<unknown>) => run(tx)),
-      platformSettings: { upsert: vi.fn().mockResolvedValue({ organizationName: "IMSDA", updatedAt: new Date("2026-11-01T00:00:00Z"), updatedBy: null, emailHeaderName: "IMSDA Events", emailClubHeaderName: "IMSDA Club Ministry", emailHelpEmail: "help@example.org", emailHelpPhone: "(515) 555-0100" }) },
+      platformSettings: { upsert: vi.fn().mockResolvedValue({ organizationName: "IMSDA", updatedAt: new Date("2026-11-01T00:00:00Z"), updatedBy: null, emailHeaderName: "IMAdventist", emailClubHeaderName: "IMSDA Club Ministry", emailHelpEmail: "help@example.org", emailHelpPhone: "(515) 555-0100" }) },
     });
     const response = await call({ ...base, emailClubHeaderName: "IMSDA Club Ministry", emailHelpEmail: "help@example.org", emailHelpPhone: "(515) 555-0100" });
     expect(response.status).toBe(200);

@@ -108,7 +108,7 @@ vi.mock("next/headers", () => ({ cookies: async () => ({ get: vi.fn(), set: vi.f
 vi.mock("@/integrations/turnstile/siteverify", () => ({ verifyTurnstileToken: mocks.verify }));
 vi.mock("@/modules/communications/account-email", () => ({
   isAccountEmailConfigured: () => state.configured,
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@imsda.test", replyTo: null }),
+  getAccountEmailSender: () => ({ name: "IMAdventist", address: "events@imsda.test", replyTo: null }),
 }));
 vi.mock("@/modules/communications/email-delivery", () => ({ processAccountEmailQueue: vi.fn(async () => ({ sentIds: [], rescheduledIds: [] })) }));
 vi.mock("@/modules/attendee-accounts/attendee-email", () => ({

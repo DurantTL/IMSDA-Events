@@ -96,7 +96,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   dependencies.getServerEnv.mockReturnValue({
     APP_BASE_URL: SITE,
-    ACCOUNT_EMAIL_SENDER_NAME: "IMSDA Events",
+    ACCOUNT_EMAIL_SENDER_NAME: "IMAdventist",
     ACCOUNT_EMAIL_SENDER_ADDRESS: "no-reply@example.org",
     ACCOUNT_EMAIL_REPLY_TO: "help@example.org",
   });

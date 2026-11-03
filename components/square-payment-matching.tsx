@@ -225,7 +225,7 @@ export function SquarePaymentMatching({
           <p>
             Completed Square payments this system never recorded. Money taken
             through an invoice, a payment link, or another registration site
-            carries nothing IMSDA Events can match on, so it is attached here by
+            carries nothing IMAdventist can match on, so it is attached here by
             hand. Nothing is recorded until you choose the registration.
           </p>
         </div>

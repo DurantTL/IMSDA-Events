@@ -144,7 +144,7 @@ export function buildTeamForm(input: TeamFormInput): TeamFormModel {
     mailLine: "Please mail or email this form in as soon as possible!",
     contactLines: [
       "YOUTH DEPARTMENT, PO Box 65665, West Des Moines, IA 50265  Email: youth@imsda.org",
-      "Or register online from your club's page in IMSDA Events.",
+      "Or register online from your club's page in IMAdventist.",
       "Go to https://nadpbe.org/pbe-resources/ to assist you in your PBE preparation.",
     ],
     filled,

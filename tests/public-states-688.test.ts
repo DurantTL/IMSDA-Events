@@ -57,7 +57,8 @@ describe("group registration not-available state", () => {
     const markup = renderToStaticMarkup(await GroupRegistrationPage({ params: Promise.resolve({ eventSlug: "synthetic-weekend" }) }));
     expect(markup).toContain("public-registration-header");
     expect(markup).toContain("public-group-state");
-    expect(markup).not.toContain("style=");
+    // next/image adds style="color:transparent" to the IMAdventist symbol (#1549); nothing else may be inline.
+    expect(markup.replaceAll('style="color:transparent"', "")).not.toContain("style=");
     expect(markup).toContain("Group registration isn&#x27;t available yet");
     expect(markup).toContain("/events/synthetic-weekend");
   });

@@ -223,7 +223,7 @@ async function main() {
   await setInstructorClassChangeEmails(account.id, daily.id, "DAILY", new Date(morning4.getTime() + HOUR));
   assert((await prisma.honorInstructor.findUniqueOrThrow({ where: { id: daily.id } })).classChangeSummaryAt!.getTime() === morning4.getTime() + HOUR, "coming back to the daily summary starts it from then");
 
-  await prisma.eventMessageSettings.create({ data: { eventId, senderName: "IMSDA Events", deliveryPaused: true, deliveryPausedAt: new Date() } });
+  await prisma.eventMessageSettings.create({ data: { eventId, senderName: "IMAdventist", deliveryPaused: true, deliveryPausedAt: new Date() } });
   await prisma.registration.update({ where: { id: regId }, data: { status: "SUBMITTED", cancelledAt: null } });
   await prisma.honorEnrollment.deleteMany({ where: { eventId } });
   await prisma.honorClassChange.create({

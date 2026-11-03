@@ -141,26 +141,26 @@ function inviteEmail(rawInput: {
   const signUpUrl = clubInviteSignUpUrl(input.email);
   const role = clubDirectorRoleLabels[input.role].toLocaleLowerCase("en-US");
   const invitedBy = input.source === "CLUB"
-    ? `${input.clubName}'s director or deputy has invited you as the club's ${role} on IMSDA Events.`
+    ? `${input.clubName}'s director or deputy has invited you as the club's ${role} on IMAdventist.`
     : input.source === "APPLICATION"
-      ? `Good news: the Iowa-Missouri Conference approved your application, and ${input.clubName} is now set up on IMSDA Events. You're invited as the club's ${role}.`
+      ? `Good news: the Iowa-Missouri Conference approved your application, and ${input.clubName} is now set up on IMAdventist. You're invited as the club's ${role}.`
       : input.source === "PEOPLE"
-        ? `The Iowa-Missouri Conference has invited you as ${input.clubName}'s ${role} on IMSDA Events.`
-        : `The Iowa-Missouri Conference has set up ${input.clubName} on IMSDA Events and invited you as the club's ${role}.`;
+        ? `The Iowa-Missouri Conference has invited you as ${input.clubName}'s ${role} on IMAdventist.`
+        : `The Iowa-Missouri Conference has set up ${input.clubName} on IMAdventist and invited you as the club's ${role}.`;
   const context = input.source !== "IMPORT"
     ? "Once you accept, you'll see this club under My club when you sign in."
     : "Your club's roster from this year's registration is already there. Please add each person's birth date as you go; until then they're marked \"birth date needed\".";
   // Club-created (#425) and application (#817) invites expire; a staff import invite (reusing this flow, #376) never did.
   const expiryLine = input.source !== "IMPORT" ? [`This invite expires in ${CLUB_INVITE_LIFETIME_DAYS} days.`, ""] : [];
   return {
-    subject: `You're invited to help run ${input.clubName} on IMSDA Events`,
+    subject: `You're invited to help run ${input.clubName} on IMAdventist`,
     bodyText: [
       `Hello ${input.name.trim() || "there"},`,
       "",
       invitedBy,
       "",
       "To accept:",
-      `1. New to IMSDA Events? Create your account at ${signUpUrl}`,
+      `1. New to IMAdventist? Create your account at ${signUpUrl}`,
       `   Already have one? Sign in at ${new URL("/account/sign-in", getServerEnv().APP_BASE_URL).toString()}`,
       `2. Use this email address: ${input.email}`,
       "3. On your account page, choose Accept next to the club invite.",
@@ -170,7 +170,7 @@ function inviteEmail(rawInput: {
       ...expiryLine,
       "If you weren't expecting this, you can ignore it. Nothing happens unless you accept.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

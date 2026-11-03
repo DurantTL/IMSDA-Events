@@ -53,7 +53,7 @@ function fakeDeliveryStore(overrides: Partial<MutableMessage> = {}) {
     templateKey: "REGISTRATION_CONFIRMATION_PAID",
     registrationId: "registration-1",
     recipientEmail: "attendee@example.test",
-    senderNameSnapshot: "IMSDA Events",
+    senderNameSnapshot: "IMAdventist",
     senderEmailSnapshot: "registration@imsda.org",
     replyToEmailSnapshot: "help@imsda.org",
     subjectSnapshot: "Registration received",
@@ -201,7 +201,7 @@ describe("external email queue", () => {
         toEmail: "attendee@example.test",
         subject: "Registration received",
         // The text part always ends with the shared footer block (#1443).
-        bodyText: expect.stringMatching(/^Your registration is saved\.\n\n--\nSent by IMSDA Events for the Iowa-Missouri Conference of Seventh-day Adventists\.\n/),
+        bodyText: expect.stringMatching(/^Your registration is saved\.\n\n--\nSent by IMAdventist for the Iowa-Missouri Conference of Seventh-day Adventists\.\n/),
         idempotencyKey: "outbox:message-1",
       }),
       dependencies.configuration,
@@ -246,7 +246,7 @@ describe("external email queue", () => {
 
     expect(payload).not.toBeNull();
     // The text part is flattened to plain text at send time (#1411); the stored snapshot stays as written.
-    expect(payload!.bodyText).toMatch(/^Registration confirmed\n\nHello Avery\.\n\n--\nSent by IMSDA Events /);
+    expect(payload!.bodyText).toMatch(/^Registration confirmed\n\nHello Avery\.\n\n--\nSent by IMAdventist /);
     expect(payload!.bodyHtml).toContain("<!DOCTYPE html>");
     expect(payload!.bodyHtml).toContain("<h1>Registration confirmed</h1>");
     expect(payload!.bodyHtml).toContain("<strong>Avery</strong>");
@@ -460,7 +460,7 @@ describe("external email queue", () => {
     });
     expect(sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
-        bodyText: expect.stringMatching(/^Manage: https:\/\/events\.example\.test\/manage\/private-token\n\n--\nSent by IMSDA Events for the Iowa-Missouri Conference of Seventh-day Adventists\.\n/),
+        bodyText: expect.stringMatching(/^Manage: https:\/\/events\.example\.test\/manage\/private-token\n\n--\nSent by IMAdventist for the Iowa-Missouri Conference of Seventh-day Adventists\.\n/),
       }),
       dependencies.configuration,
     );
@@ -797,9 +797,9 @@ describe("account email queue", () => {
       templateKey: "ACCOUNT_PASSWORD_RESET",
       registrationId: null,
       recipientEmail: "alex@imsda.org",
-      senderNameSnapshot: "IMSDA Events",
+      senderNameSnapshot: "IMAdventist",
       senderEmailSnapshot: "no-reply@imsda.org",
-      subjectSnapshot: "Reset your IMSDA Events password",
+      subjectSnapshot: "Reset your IMAdventist password",
       bodyTextSnapshot: "Choose a new one: {{account_action_link}}",
     });
   }
@@ -842,7 +842,7 @@ describe("account email queue", () => {
       expect.objectContaining({
         fromEmail: "no-reply@imsda.org",
         toEmail: "alex@imsda.org",
-        bodyText: expect.stringMatching(/^Choose a new one: https:\/\/events\.imsda\.test\/reset-password\?token=raw\n\n--\nSent by IMSDA Events for the Iowa-Missouri Conference of Seventh-day Adventists\.\n/),
+        bodyText: expect.stringMatching(/^Choose a new one: https:\/\/events\.imsda\.test\/reset-password\?token=raw\n\n--\nSent by IMAdventist for the Iowa-Missouri Conference of Seventh-day Adventists\.\n/),
       }),
       dependencies.configuration,
     );

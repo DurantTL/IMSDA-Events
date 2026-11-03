@@ -9,7 +9,7 @@ export default function PublicEventNotFound() {
     <main className={`public-registration-page public-event-page ${homeStyles.page} ${styles.eventPage}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" publicBrand wordmark />
+          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" wordmark />
         </div>
       </header>
       <section className="public-registration-not-found">

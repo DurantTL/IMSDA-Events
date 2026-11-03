@@ -368,7 +368,7 @@ export async function queueNotices(tx: Tx, input: { eventId: string; registratio
         recipientKind: notice.recipientKind,
         recipientEmail: notice.email,
         recipientName: notice.name,
-        senderNameSnapshot: settings?.senderName ?? "IMSDA Events",
+        senderNameSnapshot: settings?.senderName ?? "IMAdventist",
         senderEmailSnapshot: settings?.senderEmail ?? null,
         replyToEmailSnapshot: settings?.replyToEmail ?? null,
         subjectSnapshot: notice.subject,

@@ -163,7 +163,7 @@ vi.mock("@/modules/audit/audit-service", () => ({
 }));
 vi.mock("@/modules/communications/account-email", () => ({
   isAccountEmailConfigured: () => state.emailConfigured,
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }),
+  getAccountEmailSender: () => ({ name: "IMAdventist", address: "events@example.test", replyTo: null }),
 }));
 
 import { recordHealthPrivacyAcknowledgment } from "@/modules/health-records/acknowledgment";

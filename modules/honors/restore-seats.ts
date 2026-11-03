@@ -234,7 +234,7 @@ async function queueNotice(
   if (!registration) return null;
   const { email, name } = contactOf(registration);
   if (!email) return null;
-  const settings = settingsRow ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
+  const settings = settingsRow ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMAdventist", senderEmail: null, replyToEmail: null };
   // A club director opens the club's page; a group contact has no account, so the private link to their registration goes
   // in when the message is delivered (the sentinel is resolved there).
   const link = owner.kind === "club"

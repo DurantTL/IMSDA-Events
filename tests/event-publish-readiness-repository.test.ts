@@ -120,7 +120,7 @@ function mockPrisma(
       count: vi.fn().mockResolvedValue(publishedFormCount),
     },
     // The required publish items (#1408): a saved central sender and an adult attendee type.
-    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderName: "IMSDA Events", defaultSenderEmail: "events@example.test", defaultReplyToEmail: null }) },
+    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderName: "IMAdventist", defaultSenderEmail: "events@example.test", defaultReplyToEmail: null }) },
     eventAttendeeType: { findMany: vi.fn().mockResolvedValue([{ label: "Adult", minimumAge: 18 }]) },
     eventPaymentInstructionVersion: {
       findFirst: vi.fn().mockResolvedValue(null),

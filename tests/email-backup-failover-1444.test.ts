@@ -58,7 +58,7 @@ function fakeStore(options: { suppressed?: boolean; historyFails?: boolean; prio
     templateKey: "REGISTRATION_CONFIRMATION_PAID",
     registrationId: "registration-1",
     recipientEmail: "attendee@example.test",
-    senderNameSnapshot: "IMSDA Events",
+    senderNameSnapshot: "IMAdventist",
     senderEmailSnapshot: "registration@imsda.org",
     replyToEmailSnapshot: null,
     subjectSnapshot: "Registration received",

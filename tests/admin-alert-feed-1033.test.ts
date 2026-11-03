@@ -339,7 +339,7 @@ describe("what each alert writes (#1033)", () => {
 });
 
 describe("the club application and feature request alerts write beside the email (#1033)", () => {
-  const sender = { name: "IMSDA Events", address: "no-reply@imsda-events.test", replyTo: null };
+  const sender = { name: "IMAdventist", address: "no-reply@imsda-events.test", replyTo: null };
 
   beforeEach(() => {
     vi.resetModules();

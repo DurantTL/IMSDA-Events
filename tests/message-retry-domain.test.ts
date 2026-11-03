@@ -19,7 +19,7 @@ function fingerprintInput(
     recipientKind: "REGISTRANT",
     recipientEmail: "recipient@example.test",
     recipientName: "Sample Recipient",
-    senderNameSnapshot: "IMSDA Events",
+    senderNameSnapshot: "IMAdventist",
     senderEmailSnapshot: "registration@example.test",
     replyToEmailSnapshot: "help@example.test",
     subjectSnapshot: "Immutable subject",

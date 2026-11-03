@@ -179,7 +179,7 @@ describe("the reminder email (#910)", () => {
     expect(email.bodyText).toContain("Hello Alex Example,");
     expect(email.bodyText).toContain('"Spring Camporee Registration Due" is due on Saturday, December 5, 2026 (in 14 days).');
     expect(email.bodyText).toContain("https://events.example.test/account/clubs");
-    expect(email.bodyText).toContain("IMSDA Events");
+    expect(email.bodyText).toContain("IMAdventist");
     expect(email.bodyText).not.toContain("More details");
   });
 

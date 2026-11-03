@@ -1,5 +1,6 @@
 import { BrandLink } from "@/components/brand-link";
-import { BrandMark } from "@/components/brand-mark";
+import Image from "next/image";
+import { BRAND_SYMBOL_PATH } from "@/lib/brand";
 
 export default function PublicRegistrationLoading() {
   return (
@@ -10,7 +11,7 @@ export default function PublicRegistrationLoading() {
         </div>
       </header>
       <section className="public-registration-loading" role="status" aria-live="polite">
-        <span className="public-registration-loading-mark"><BrandMark /></span>
+        <span className="public-registration-loading-mark"><Image alt="" aria-hidden="true" height={48} src={BRAND_SYMBOL_PATH} width={48} /></span>
         <h1>Loading event registration…</h1>
         <p>We’re checking the published form and current availability.</p>
       </section>

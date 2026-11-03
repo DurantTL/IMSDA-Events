@@ -76,7 +76,7 @@ describe("the group's registration form (#650)", () => {
     expect(markup).not.toContain("Your church is billed");
     expect(markup).not.toContain("Price per person");
     expect(markup).not.toContain("club_name");
-    expect(markup).not.toContain("Club");
+    expect(markup.replace("Events &amp; Club Ministry", "")).not.toContain("Club");
   });
 
   it("keeps a church-billed club registrant's per-person price, with no total", () => {

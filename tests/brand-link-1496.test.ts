@@ -1,10 +1,10 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
  * Two rules from #1496:
- * 1. Every IMSDA Events logo (`BrandMark`) is drawn by the shared `BrandLink`, which links to `/calendar`.
+ * 1. Every IMAdventist logo is drawn by the shared `BrandLink`, which links to `/calendar`.
  * 2. Every sign-in page shows the shared "Back to events" link.
  * Source checks, like the other guards: rendering every page would need heavy session mocking.
  */
@@ -19,58 +19,30 @@ function listFiles(dir: string): string[] {
 }
 
 const read = (file: string) => readFileSync(join(root, file), "utf8");
-const count = (source: string, needle: string) => source.split(needle).length - 1;
 
-/**
- * Places a `<BrandMark` may stay outside `BrandLink`: only where a link is truly impossible. Each entry is the exact
- * number of uses in the file, so a new one fails.
- */
-const ALLOWED_BARE_BRAND_MARKS: Record<string, { uses: number; reason: string }> = {
-  "app/(public)/register/[eventSlug]/[formSlug]/loading.tsx": {
-    uses: 1,
-    reason: "The large decorative mark inside the role=status loading message; the header brand link on the same page is the link.",
-  },
-  "app/(public)/events/[eventSlug]/loading.tsx": {
-    uses: 1,
-    reason: "The large decorative mark inside the role=status loading message; the header brand link on the same page is the link.",
-  },
-  "app/(public)/manage/[token]/loading.tsx": {
-    uses: 1,
-    reason: "The large decorative mark inside the loading message; the header brand link on the same page is the link.",
-  },
-};
-
-describe("every IMSDA Events logo links to the calendar (#1496)", () => {
+describe("every IMAdventist logo links to the calendar (#1496, #1549)", () => {
   const sourceFiles = [...listFiles(join(root, "app")), ...listFiles(join(root, "components")), ...listFiles(join(root, "modules"))]
     .map((file) => relative(root, file))
     .filter((file) => file !== "components/brand-link.tsx");
 
-  it("renders BrandMark only inside BrandLink, apart from the reviewed allowlist", () => {
-    const found = sourceFiles
-      .map((file) => [file, count(read(file), "<BrandMark")] as const)
-      .filter(([, uses]) => uses > 0);
-    const unexpected = found.filter(([file, uses]) => (ALLOWED_BARE_BRAND_MARKS[file]?.uses ?? 0) !== uses);
-    expect(unexpected, "render the logo with <BrandLink> (components/brand-link.tsx), not a bare <BrandMark>").toEqual([]);
-    for (const [file, entry] of Object.entries(ALLOWED_BARE_BRAND_MARKS)) {
-      expect(entry.reason.length, `${file} needs a reason`).toBeGreaterThan(10);
-      expect(found.map(([name]) => name), `${file} no longer uses a bare BrandMark; remove it from the allowlist`).toContain(file);
-    }
+  it("has retired the old capital-I mark: no BrandMark component and no mark styles", () => {
+    expect(existsSync(join(root, "components/brand-mark.tsx"))).toBe(false);
+    const found = sourceFiles.filter((file) => read(file).includes("BrandMark"));
+    expect(found, "draw the logo with <BrandLink> (components/brand-link.tsx)").toEqual([]);
+    const css = read("app/globals.css");
+    expect(css).not.toContain(".brand-mark");
+    expect(css).not.toContain(".brand-flame");
   });
 
-  it("has BrandLink render the mark inside a link to /calendar named IMSDA Events calendar", () => {
+  it("has BrandLink render the symbol inside a link to /calendar named IMAdventist calendar", () => {
     const source = read("components/brand-link.tsx");
     expect(source).toContain('BRAND_LINK_HREF = "/calendar"');
-    expect(source).toContain('BRAND_LINK_LABEL = "IMSDA Events calendar"');
+    expect(source).toContain("BRAND_LINK_LABEL = BRAND_CALENDAR_LABEL");
     expect(source).toContain("label = BRAND_LINK_LABEL");
     expect(source).toContain("GuardedLink");
-    expect(source).toContain("<BrandMark");
+    expect(source).toContain("BRAND_SYMBOL_PATH");
     expect(source).toMatch(/aria-label=\{label\}/);
     expect(read("components/brand-link.module.css")).toContain("min-height: 44px");
-  });
-
-  it("keeps the wordmark text inside the link: no bare IMSDA/Events wordmark beside a mark", () => {
-    const bare = sourceFiles.filter((file) => /<\/BrandMark>|<BrandMark \/>\s*<span><strong>IMSDA/.test(read(file)));
-    expect(bare).toEqual([]);
   });
 
   it("opens the calendar in the top window from the embedded registration pages", () => {

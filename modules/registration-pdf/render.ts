@@ -78,9 +78,9 @@ export async function renderRegistrationPdf(input: RegistrationPdfRenderInput): 
   const subject = [model.clubName ?? model.registrantName, model.eventName].filter(Boolean).join(" - ");
   doc.setTitle(`${input.updated ? "Updated registration" : "Registration"}: ${model.eventName}`);
   doc.setSubject(subject);
-  doc.setAuthor("IMSDA Events");
-  doc.setCreator("IMSDA Events");
-  doc.setProducer("IMSDA Events");
+  doc.setAuthor("IMAdventist");
+  doc.setCreator("IMAdventist");
+  doc.setProducer("IMAdventist");
   doc.setCreationDate(input.generatedAt);
   doc.setModificationDate(input.generatedAt);
   const regular = await doc.embedFont(StandardFonts.Helvetica);

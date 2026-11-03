@@ -169,7 +169,7 @@ export function notRestoredNotice(input: {
       lines.push("Class changes have closed, so please contact the event office about these picks.");
     }
   }
-  lines.push("", "IMSDA Events");
+  lines.push("", "IMAdventist");
   const total = input.items.length;
   const subject = dropped.length > 0
     ? `${dropped.length === 1 ? "A class pick was" : `${dropped.length} class picks were`} not restored for ${input.eventName}`

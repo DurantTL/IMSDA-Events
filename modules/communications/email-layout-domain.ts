@@ -6,8 +6,8 @@
 
 import { validateEmail, validatePhone } from "@/lib/field-validation";
 
-export const DEFAULT_EMAIL_HEADER_NAME = "IMSDA Events";
-export const DEFAULT_EMAIL_CLUB_HEADER_NAME = "IMSDA Events";
+export const DEFAULT_EMAIL_HEADER_NAME = "IMAdventist";
+export const DEFAULT_EMAIL_CLUB_HEADER_NAME = "IMAdventist";
 export const DEFAULT_EMAIL_HELP_EMAIL = "support@imsda.org";
 export const DEFAULT_EMAIL_HELP_PHONE = "(515) 223-1197";
 

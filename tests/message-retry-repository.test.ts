@@ -32,7 +32,7 @@ import {
 
 const settings = {
   deliveryMode: "EXTERNAL_EMAIL" as const,
-  senderName: "IMSDA Events",
+  senderName: "IMAdventist",
   senderEmail: "registration@example.test",
   replyToEmail: "help@example.test",
   internalNotificationEmails: [],
@@ -51,7 +51,7 @@ function sourceMessage(
     recipientKind: "REGISTRANT" as const,
     recipientEmail: "recipient@example.test",
     recipientName: "Sample Recipient",
-    senderNameSnapshot: "IMSDA Events",
+    senderNameSnapshot: "IMAdventist",
     senderEmailSnapshot: "registration@example.test",
     replyToEmailSnapshot: "help@example.test",
     subjectSnapshot: "Immutable retry subject",

@@ -22,7 +22,7 @@ export default function UnsubscribeNotFound() {
           The link may be cut off, out of date, or no longer valid. Nothing was changed.
         </p>
         <p>
-          To stop announcements, open the unsubscribe link in the most recent announcement email from IMSDA Events. If that
+          To stop announcements, open the unsubscribe link in the most recent announcement email from IMAdventist. If that
           link does not work either, contact IMSDA and we will help.
         </p>
         <a className="primary-button" href="https://imsda.org/contact/" rel="noreferrer">

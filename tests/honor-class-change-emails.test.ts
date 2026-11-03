@@ -169,7 +169,7 @@ function world() {
 
 let w: World;
 const morning = new Date("2026-10-21T11:05:00.000Z"); // 6:05 AM Central
-const settings = { deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON", senderName: "IMSDA Events", senderEmail: "no-reply@imsda-events.test", replyToEmail: null };
+const settings = { deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON", senderName: "IMAdventist", senderEmail: "no-reply@imsda-events.test", replyToEmail: null };
 
 beforeEach(() => {
   vi.clearAllMocks();

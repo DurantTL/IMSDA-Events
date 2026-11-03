@@ -130,7 +130,7 @@ describe("opt-out rules (#838)", () => {
 describe("one-click unsubscribe headers on both providers (#838)", () => {
   const url = "https://events.imsda.test/api/public/unsubscribe/v1.abc.def";
   const input = {
-    fromName: "IMSDA Events",
+    fromName: "IMAdventist",
     fromEmail: "registration@imsda.org",
     toEmail: "attendee@example.test",
     subject: "Friday arrival information",

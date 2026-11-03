@@ -86,7 +86,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(now);
   mocks.getCurrentSession.mockResolvedValue({ user: admin });
-  mocks.getAccountEmailSender.mockReturnValue({ name: "IMSDA Events", address: "events@example.org", replyTo: null });
+  mocks.getAccountEmailSender.mockReturnValue({ name: "IMAdventist", address: "events@example.org", replyTo: null });
   mocks.outbox.create.mockResolvedValue({ id: "msg_test_1" });
   mocks.outbox.updateMany.mockResolvedValue({ count: 0 });
   mocks.outbox.findFirst.mockResolvedValue(row());
@@ -155,7 +155,7 @@ describe("email tester: sending", () => {
     });
     expect(data.accountUserId).toBeUndefined();
     expect(data.metadata).toMatchObject({ trigger: "SYSTEM_REPORT_TEST", realDelivery: true, testedByUserId: admin.id });
-    expect(data.bodyTextSnapshot).toMatch(/test email from the IMSDA Events System report/);
+    expect(data.bodyTextSnapshot).toMatch(/test email from the IMAdventist System report/);
     expect(data.bodyTextSnapshot).not.toMatch(/https?:|\{\{/);
     expect(mocks.processAccountEmailQueue).toHaveBeenCalledWith({ messageIds: ["msg_test_1"], limit: 1 });
 

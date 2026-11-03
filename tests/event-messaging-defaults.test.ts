@@ -43,7 +43,7 @@ beforeEach(() => {
 
 describe("new event messaging defaults (#1043)", () => {
   const platform = {
-    defaultSenderName: "IMSDA Events",
+    defaultSenderName: "IMAdventist",
     defaultSenderEmail: "notifications@imsda.org",
     defaultReplyToEmail: "registration@imsda.org",
   };
@@ -54,7 +54,7 @@ describe("new event messaging defaults (#1043)", () => {
     await ensureEventMessagingDefaults("event-1");
 
     const create = tx.eventMessageSettings.upsert.mock.calls[0]?.[0].create;
-    expect(create).toMatchObject({ eventId: "event-1", senderName: "IMSDA Events", replyToEmail: null });
+    expect(create).toMatchObject({ eventId: "event-1", senderName: "IMAdventist", replyToEmail: null });
     // The From address is the central one; an event never stores its own (#1043).
     expect(create).not.toHaveProperty("senderEmail");
   });
@@ -84,7 +84,7 @@ describe("new event messaging defaults (#1043)", () => {
     await ensureEventMessagingDefaults("event-1");
 
     expect(tx.eventMessageSettings.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: expect.objectContaining({ senderName: "IMSDA Events", replyToEmail: null }),
+      create: expect.objectContaining({ senderName: "IMAdventist", replyToEmail: null }),
     }));
   });
 });

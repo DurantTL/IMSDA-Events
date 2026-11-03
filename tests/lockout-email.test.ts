@@ -111,7 +111,7 @@ beforeEach(() => {
   resetNotificationSettingsCache();
   dependencies.getServerEnv.mockReturnValue({
     APP_BASE_URL: "https://events.imsda.org",
-    ACCOUNT_EMAIL_SENDER_NAME: "IMSDA Events",
+    ACCOUNT_EMAIL_SENDER_NAME: "IMAdventist",
     ACCOUNT_EMAIL_SENDER_ADDRESS: "no-reply@imsda.org",
     ACCOUNT_EMAIL_REPLY_TO: null,
   });

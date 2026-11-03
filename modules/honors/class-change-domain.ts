@@ -126,7 +126,7 @@ function footer(baseUrl: string) {
     "You can change how often you get these emails, or turn them off, on your classes page:",
     `${baseUrl}/account/instructor`,
     "",
-    "IMSDA Events",
+    "IMAdventist",
   ];
 }
 

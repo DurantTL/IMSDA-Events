@@ -716,7 +716,7 @@ async function main() {
   const mfMessage = await prisma.messageOutbox.create({
     data: {
       eventId: mfEventId, templateVersionId: mfVersion.id, templateKey: "EVENT_ANNOUNCEMENT", recipientKind: "REGISTRANT",
-      recipientEmail: "evdel.files@example.test", senderNameSnapshot: "IMSDA Events", subjectSnapshot: "S", bodyTextSnapshot: "B",
+      recipientEmail: "evdel.files@example.test", senderNameSnapshot: "IMAdventist", subjectSnapshot: "S", bodyTextSnapshot: "B",
       idempotencyKey: id("msgfile_outbox"), correlationId: id("msgfile_corr"), status: "CAPTURED",
     },
   });

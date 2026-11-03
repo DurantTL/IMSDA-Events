@@ -879,7 +879,7 @@ async function recordDuplicateCharge(
       key: `payments.duplicate-charge.${provider.id}`,
       severity: "URGENT",
       summary: `Square took a payment for registration ${attempt.registration.confirmationCode} that cannot be counted`,
-      detail: `Square payment ${provider.id} for ${(provider.amountCents / 100).toFixed(2)} USD: ${why}. It is not counted toward the balance. Review it and refund what is not owed in Square (a human action); IMSDA Events updates when Square confirms the refund.`,
+      detail: `Square payment ${provider.id} for ${(provider.amountCents / 100).toFixed(2)} USD: ${why}. It is not counted toward the balance. Review it and refund what is not owed in Square (a human action); IMAdventist updates when Square confirms the refund.`,
       context: {
         registrationId: attempt.registrationId,
         providerPaymentId: provider.id,
@@ -1509,7 +1509,7 @@ async function applyExternalSquarePayment(
       entityType: "Payment",
       entityId: created.id,
       correlationId: randomUUID(),
-      summary: `Applied a Square payment taken outside IMSDA Events to registration ${registration.confirmationCode}.`,
+      summary: `Applied a Square payment taken outside IMAdventist to registration ${registration.confirmationCode}.`,
       metadata: {
         provider: "SQUARE",
         providerPaymentId: payment.id,
@@ -1537,7 +1537,7 @@ async function applyExternalSquarePayment(
       objectId: payment.id,
       payloadHash,
       status: "PROCESSED",
-      reason: "Matched by confirmation code to a payment taken outside IMSDA Events.",
+      reason: "Matched by confirmation code to a payment taken outside IMAdventist.",
       occurredAt: event.occurredAt,
       receivedAt,
       processedAt: receivedAt,
@@ -2123,7 +2123,7 @@ export async function processSquareWebhook(
         event,
         payloadHash,
         receivedAt,
-        "The webhook event type is not used by IMSDA Events.",
+        "The webhook event type is not used by IMAdventist.",
         null
       );
     }

@@ -75,7 +75,7 @@ async function postToWebhook(
       body: JSON.stringify({
         // `text` is what Slack and Teams incoming webhooks render; the
         // structured fields are for anything else reading the same payload.
-        text: `[${alert.severity}] IMSDA Events: ${alert.summary}${alert.detail ? ` — ${alert.detail}` : ""}`,
+        text: `[${alert.severity}] IMAdventist: ${alert.summary}${alert.detail ? ` — ${alert.detail}` : ""}`,
         severity: alert.severity,
         key: alert.key,
         summary: alert.summary,

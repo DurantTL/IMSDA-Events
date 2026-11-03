@@ -27,7 +27,7 @@ function store(overrides: Partial<Row> = {}) {
     templateKey: "EVENT_ANNOUNCEMENT",
     registrationId: "registration-1",
     recipientEmail: "attendee@example.test",
-    senderNameSnapshot: "IMSDA Events",
+    senderNameSnapshot: "IMAdventist",
     senderEmailSnapshot: "registration@imsda.org",
     replyToEmailSnapshot: null,
     subjectSnapshot: "Friday arrival information",

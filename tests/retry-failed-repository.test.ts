@@ -66,7 +66,7 @@ function row(id: string, overrides: Partial<Row> = {}): Row {
     recipientKind: "REGISTRANT",
     recipientEmail: `${id}@example.test`,
     recipientName: `Synthetic ${id}`,
-    senderNameSnapshot: "IMSDA Events",
+    senderNameSnapshot: "IMAdventist",
     senderEmailSnapshot: "registration@example.test",
     replyToEmailSnapshot: null,
     subjectSnapshot: "Welcome",
@@ -90,7 +90,7 @@ function fixture(
   const messages = new Map(initial.map((message) => [message.id, message]));
   const settings = {
     deliveryMode: "EXTERNAL_EMAIL",
-    senderName: "IMSDA Events",
+    senderName: "IMAdventist",
     senderEmail: "registration@example.test",
     replyToEmail: null,
     internalNotificationEmails: [],

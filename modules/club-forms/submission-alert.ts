@@ -73,7 +73,7 @@ export function clubFormSubmittedContent(input: { formName: string; clubName: st
       "",
       "The answers are not in this email.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

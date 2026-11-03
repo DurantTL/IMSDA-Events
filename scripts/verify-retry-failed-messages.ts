@@ -126,7 +126,7 @@ async function runChecks(state: StubState) {
   await setSyntheticCentralSender(prisma);
   await prisma.eventMessageSettings.update({
     where: { eventId: ids.event },
-    data: { deliveryPaused: false, senderName: "IMSDA Events" },
+    data: { deliveryPaused: false, senderName: "IMAdventist" },
   });
 
   const registrationIds: string[] = [];
@@ -203,7 +203,7 @@ async function runChecks(state: StubState) {
   const retryLater = await prisma.messageOutbox.create({
     data: {
       eventId: ids.event, registrationId: registrationIds[0], templateKey: "CUSTOM_MESSAGE", recipientKind: "REGISTRANT",
-      recipientEmail: EMAIL("guest1"), senderNameSnapshot: "IMSDA Events", senderEmailSnapshot: EMAIL("sender"),
+      recipientEmail: EMAIL("guest1"), senderNameSnapshot: "IMAdventist", senderEmailSnapshot: EMAIL("sender"),
       subjectSnapshot: "Backoff check", bodyTextSnapshot: "Backoff check", idempotencyKey: `${P}-backoff`, correlationId: `${P}-backoff`,
       attemptCount: 4,
     },
@@ -223,7 +223,7 @@ async function runChecks(state: StubState) {
   await prisma.messageOutbox.create({
     data: {
       eventId: ids.event, templateKey: "INVOICE_DELIVERY", recipientKind: "REGISTRANT", recipientEmail: EMAIL("treasurer"),
-      senderNameSnapshot: "IMSDA Events", senderEmailSnapshot: EMAIL("sender"), subjectSnapshot: "Invoice", bodyTextSnapshot: "Invoice",
+      senderNameSnapshot: "IMAdventist", senderEmailSnapshot: EMAIL("sender"), subjectSnapshot: "Invoice", bodyTextSnapshot: "Invoice",
       status: "FAILED", metadata: { batchId }, idempotencyKey: `${P}-invoice`, correlationId: batchId,
     },
   });
@@ -336,7 +336,7 @@ async function runChecks(state: StubState) {
   const treeBatch = `${P}-tree-batch`;
   const treeRow = (key: string, extra: Record<string, unknown>) => ({
     eventId: ids.event, registrationId: registrationIds[0], templateKey: "CUSTOM_MESSAGE" as const, recipientKind: "REGISTRANT" as const,
-    recipientEmail: EMAIL("guest1"), senderNameSnapshot: "IMSDA Events", senderEmailSnapshot: EMAIL("sender"),
+    recipientEmail: EMAIL("guest1"), senderNameSnapshot: "IMAdventist", senderEmailSnapshot: EMAIL("sender"),
     subjectSnapshot: "Tree check", bodyTextSnapshot: "Tree check", idempotencyKey: `${P}-tree-${key}`, correlationId: `${P}-tree-${key}`,
     metadata: { batchId: treeBatch }, ...extra,
   });

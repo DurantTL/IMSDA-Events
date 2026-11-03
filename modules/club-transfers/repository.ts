@@ -228,11 +228,11 @@ export function transferNotificationEmail(input: {
     return {
       subject: `${input.toClubName} asked to transfer a member`,
       bodyText: [
-        `${input.toClubName} has asked to transfer ${input.memberName} from ${input.fromClubName} on IMSDA Events.`,
+        `${input.toClubName} has asked to transfer ${input.memberName} from ${input.fromClubName} on IMAdventist.`,
         "",
         "The same person leads both clubs, so conference staff will complete this transfer. There is nothing for you to accept or decline. Sign in to see the details.",
         "",
-        "IMSDA Events",
+        "IMAdventist",
       ].join("\n"),
     };
   }
@@ -240,22 +240,22 @@ export function transferNotificationEmail(input: {
     return {
       subject: `${input.toClubName} asked to transfer a member`,
       bodyText: [
-        `${input.toClubName} has asked to transfer ${input.memberName} from ${input.fromClubName} on IMSDA Events.`,
+        `${input.toClubName} has asked to transfer ${input.memberName} from ${input.fromClubName} on IMAdventist.`,
         "",
         `Sign in to see the details and accept or decline it from ${input.fromClubName}'s roster. If it isn't answered within 14 days, conference staff will follow up.`,
         "",
-        "IMSDA Events",
+        "IMAdventist",
       ].join("\n"),
     };
   }
   return {
     subject: `${input.memberName} has transferred to ${input.toClubName}`,
     bodyText: [
-      `${input.memberName} has moved from ${input.fromClubName} to ${input.toClubName} on IMSDA Events.`,
+      `${input.memberName} has moved from ${input.fromClubName} to ${input.toClubName} on IMAdventist.`,
       "",
       "Sign in to see the details.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

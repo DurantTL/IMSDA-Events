@@ -51,14 +51,14 @@ describe("event settings ownership labels (#1258)", () => {
   });
 
   it("labels the email display name and reply-to by comparison with the central sender", () => {
-    const central: EventEmailSender["central"] = { name: "IMSDA Events", replyTo: "reply@example.test" };
-    const inherit: EventEmailSender = { senderName: "IMSDA Events", replyToOverride: null, central };
+    const central: EventEmailSender["central"] = { name: "IMAdventist", replyTo: "reply@example.test" };
+    const inherit: EventEmailSender = { senderName: "IMAdventist", replyToOverride: null, central };
     expect(emailDisplayNameOwnership(inherit).source).toBe("central");
     expect(emailReplyToOwnership(inherit)).toMatchObject({ source: "central" });
     expect(emailReplyToOwnership(inherit).detail).toContain("reply@example.test");
     const own: EventEmailSender = { senderName: "Synthetic Women's Retreat", replyToOverride: "retreat@example.test", central };
     expect(emailDisplayNameOwnership(own)).toMatchObject({ source: "override" });
-    expect(emailDisplayNameOwnership(own).detail).toContain("Differs from the central sender name (IMSDA Events)");
+    expect(emailDisplayNameOwnership(own).detail).toContain("Differs from the central sender name (IMAdventist)");
     expect(emailReplyToOwnership(own)).toMatchObject({ source: "override" });
     expect(emailReplyToOwnership(own).detail).toContain("retreat@example.test");
     // A reply-to equal to the central one is not an override.
@@ -68,7 +68,7 @@ describe("event settings ownership labels (#1258)", () => {
   });
 
   it("says so when there is no reply-to anywhere", () => {
-    const none: EventEmailSender = { senderName: "IMSDA Events", replyToOverride: "  ", central: { name: "IMSDA Events", replyTo: null } };
+    const none: EventEmailSender = { senderName: "IMAdventist", replyToOverride: "  ", central: { name: "IMAdventist", replyTo: null } };
     expect(emailReplyToOwnership(none).detail).toContain("central From address");
   });
 
@@ -92,7 +92,7 @@ describe("event settings ownership labels (#1258)", () => {
       mode: "edit",
       initialEvent: event,
       platformDefaults: defaults,
-      emailSender: { senderName: "Synthetic Retreat Team", replyToOverride: null, central: { name: "IMSDA Events", replyTo: null } },
+      emailSender: { senderName: "Synthetic Retreat Team", replyToOverride: null, central: { name: "IMAdventist", replyTo: null } },
     }));
     // Timezone differs from the platform default (Chicago), edit verification matches it.
     expect(markup).toMatch(/data-ownership="override"[^>]*><strong>Event override\.<\/strong> Differs from the platform default/);

@@ -83,11 +83,11 @@ function personBody(input: {
   displayName: string;
   when: string;
 }) {
-  const subject = "Your IMSDA Events account is temporarily locked";
+  const subject = "Your IMAdventist account is temporarily locked";
   const bodyText = [
     `Hello ${greeting(input.displayName)},`,
     "",
-    `Someone tried to sign in to this IMSDA Events account with ${kindWording(input.kind)} at ${input.when}.`,
+    `Someone tried to sign in to this IMAdventist account with ${kindWording(input.kind)} at ${input.when}.`,
     "",
     `For your security, the account is locked for ${LOCK_MINUTES} minutes.`,
     "",
@@ -97,7 +97,7 @@ function personBody(input: {
     "",
     "If it was you, wait a few minutes and try again.",
     "",
-    "IMSDA Events",
+    "IMAdventist",
   ].join("\n");
   return { subject, bodyText };
 }
@@ -116,7 +116,7 @@ function officeBody(input: {
       "",
       `It unlocks automatically in ${LOCK_MINUTES} minutes.`,
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

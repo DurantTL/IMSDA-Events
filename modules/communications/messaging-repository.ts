@@ -153,7 +153,7 @@ import { emailIsClubLinked } from "@/modules/communications/email-layout";
 
 const fallbackSettings = {
   deliveryMode: "LOCAL_CAPTURE" as const,
-  senderName: "IMSDA Events",
+  senderName: "IMAdventist",
   senderEmail: null,
   replyToEmail: null,
   internalNotificationEmails: [] as string[],

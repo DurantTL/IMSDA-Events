@@ -223,7 +223,7 @@ export default async function MorePage({ searchParams }: { searchParams: Promise
       </div>
 
       {permissions.includes("VIEW_REPORTS") && <EventActivityPanel eventId={event.id} kind={kind} selection={activity} showAll={showAllActivity} />}
-      {process.env.NODE_ENV !== "production" && <section className="panel review-gate"><div><p className="eyebrow">Testing status</p><h2>This local workspace uses test data</h2><p>Changes stay in the local IMSDA Events database. Live card charging and external delivery remain off until their configured test connections are ready.</p></div><span className="review-badge">Local testing</span></section>}
+      {process.env.NODE_ENV !== "production" && <section className="panel review-gate"><div><p className="eyebrow">Testing status</p><h2>This local workspace uses test data</h2><p>Changes stay in the local IMAdventist database. Live card charging and external delivery remain off until their configured test connections are ready.</p></div><span className="review-badge">Local testing</span></section>}
     </section>
   );
 }

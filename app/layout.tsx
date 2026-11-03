@@ -4,6 +4,7 @@ import "@fontsource/noto-sans/500.css";
 import "@fontsource/noto-sans/600.css";
 import "@fontsource/noto-sans/700.css";
 import "./globals.css";
+import { BRAND_APPLE_TOUCH_PATH, PRODUCT_NAME } from "@/lib/brand";
 import { PublicWebVitals } from "@/components/public-metrics-beacon";
 import { sidebarCollapseInitScript } from "@/components/sidebar-collapse";
 import { UnsavedChangesDialogHost } from "@/components/unsaved-changes-dialog-host";
@@ -13,12 +14,13 @@ import { zodJitlessInitScript } from "@/modules/security/zod-jitless";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_BASE_URL ?? "http://localhost:3000"),
   title: {
-    default: "IMSDA Events",
-    template: "%s | IMSDA Events",
+    default: PRODUCT_NAME,
+    template: `%s | ${PRODUCT_NAME}`,
   },
   description:
     "Event information and registration for the Iowa-Missouri Conference.",
-  applicationName: "IMSDA Events",
+  applicationName: PRODUCT_NAME,
+  icons: { icon: "/brand/favicon.ico", apple: BRAND_APPLE_TOUCH_PATH },
 };
 
 // Reading the request nonce makes every page render per request, which the

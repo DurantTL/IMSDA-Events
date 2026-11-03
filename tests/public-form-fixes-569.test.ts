@@ -79,7 +79,7 @@ describe("unknown event slug page (#569)", () => {
     expect(html).toContain("Event not found");
     expect(html).toContain("no-such-event");
     expect(html).toContain("https://imsda.org/events/");
-    expect(html).toContain("IMSDA");
+    expect(html).toContain("IMAdventist");
   });
 });
 

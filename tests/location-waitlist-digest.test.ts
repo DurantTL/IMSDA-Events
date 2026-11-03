@@ -78,7 +78,7 @@ function fixture(options: {
 beforeEach(() => {
   vi.clearAllMocks();
   dependencies.isAccountEmailConfigured.mockReturnValue(true);
-  dependencies.getAccountEmailSender.mockReturnValue({ name: "IMSDA Events", address: "events@example.test", replyTo: null });
+  dependencies.getAccountEmailSender.mockReturnValue({ name: "IMAdventist", address: "events@example.test", replyTo: null });
   dependencies.processAccountEmailQueue.mockResolvedValue({ recoveredIds: [], sentIds: ["message-1", "message-2"], failedIds: [], rescheduledIds: [] });
 });
 

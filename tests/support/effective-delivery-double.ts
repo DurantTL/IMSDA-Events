@@ -14,11 +14,11 @@ type Row = Record<string, unknown> & { deliveryMode?: string };
 type Client = { eventMessageSettings: Record<string, (args: unknown) => Promise<Row | null>> };
 
 const withDefaults = (row: Row | null) => (row
-  ? { deliveryReason: row.deliveryMode === "EXTERNAL_EMAIL" ? "ON" : "NOT_CONFIGURED", replyToOverride: row.replyToEmail ?? null, central: { name: "IMSDA Events", email: null, replyTo: null }, ...row }
+  ? { deliveryReason: row.deliveryMode === "EXTERNAL_EMAIL" ? "ON" : "NOT_CONFIGURED", replyToOverride: row.replyToEmail ?? null, central: { name: "IMAdventist", email: null, replyTo: null }, ...row }
   : null);
 
 export const effectiveDeliveryDouble = {
-  FALLBACK_CENTRAL_SENDER_NAME: "IMSDA Events",
+  FALLBACK_CENTRAL_SENDER_NAME: "IMAdventist",
   loadEventEmailSettings: async (client: Client, eventId: string) => {
     const read = client.eventMessageSettings.findUnique ?? client.eventMessageSettings.findFirst;
     return withDefaults(await read!({ where: { eventId } }));
@@ -48,7 +48,7 @@ export const effectiveDeliveryDouble = {
       : { deliverable: true as const };
   },
   isEmailEnvironmentConfigured: () => true,
-  loadCentralSender: async () => ({ name: "IMSDA Events", email: null, replyTo: null }),
+  loadCentralSender: async () => ({ name: "IMAdventist", email: null, replyTo: null }),
   isPlatformEmailConfigured: () => true,
   pauseFields: () => ({}),
 };

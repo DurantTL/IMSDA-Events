@@ -266,7 +266,7 @@ export type AnnouncementBroadcastPreview = {
   skippedOptedOutCount: number;
   /** Of those, how many opted out of this event's announcements only. */
   skippedOptedOutEventCount: number;
-  /** And how many opted out of all IMSDA Events announcements. */
+  /** And how many opted out of all IMAdventist announcements. */
   skippedOptedOutAllCount: number;
   /** Marked essential by an event manager: it is sent to people who opted out, and none are skipped for that. */
   essential: boolean;

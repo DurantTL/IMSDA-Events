@@ -510,7 +510,7 @@ export function PlatformSettingsWorkspace({
           <EmailHeaderPreview eventName={draft.emailHeaderName} clubName={draft.emailClubHeaderName} />
           <label>Header name for event and general emails
             <input {...invalidProps("emailHeaderName", nameProblem)} autoComplete="off" maxLength={40} onBlur={() => setEmailLayoutTouched(true)} type="text" {...field("emailHeaderName")} />
-            <small>Up to 40 characters. Shown in the header bar and in &ldquo;Sent by&rdquo;. Default: IMSDA Events.</small>
+            <small>Up to 40 characters. Shown in the header bar and in &ldquo;Sent by&rdquo;. Default: IMAdventist.</small>
             {fieldError("emailHeaderName", nameProblem)}
           </label>
           <label>Header name for club emails

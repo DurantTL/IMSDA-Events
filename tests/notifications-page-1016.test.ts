@@ -82,7 +82,7 @@ beforeEach(() => {
     { eventId: "event-1", eventName: "Synthetic Camporee", addressCount: 2 },
     { eventId: "event-2", eventName: "Synthetic Retreat", addressCount: 0 },
   ]);
-  mocks.getPlatformSettings.mockResolvedValue({ ...addresses, defaultSenderName: "IMSDA Events", defaultSenderEmail: "events@imsda-events.test", defaultReplyToEmail: null });
+  mocks.getPlatformSettings.mockResolvedValue({ ...addresses, defaultSenderName: "IMAdventist", defaultSenderEmail: "events@imsda-events.test", defaultReplyToEmail: null });
   mocks.listEventEmailStates.mockResolvedValue([]);
   mocks.getAdminAttentionSummary.mockResolvedValue({ generatedAt: "2026-10-20T00:00:00.000Z", partial: false, truncated: false, total: 0, groups: [] });
   mocks.setNotificationEnabled.mockResolvedValue({ changed: true });
@@ -177,7 +177,7 @@ describe("email page, with the staff alerts (#1016, #1043)", () => {
       .filter((child) => child && typeof child === "object" && "type" in child && typeof child.type === "function");
     expect(children.map((child) => (child.type as { name: string }).name)).toEqual(["AdminSectionHeaderFor", "StaffPageHeader", "EmailDeliverySection", "NotificationsWorkspace", "EmailHealthSection", "MessageFileStorageSection"]);
     expect(children[3]!.props).toMatchObject({ addresses, switches: allOn, embedded: true });
-    expect(children[2]!.props).toMatchObject({ sender: { name: "IMSDA Events", email: "events@imsda-events.test", replyTo: "" }, platformConfigured: true });
+    expect(children[2]!.props).toMatchObject({ sender: { name: "IMAdventist", email: "events@imsda-events.test", replyTo: "" }, platformConfigured: true });
   });
 
   it("keeps the old Notifications address working by sending it to Email", () => {

@@ -142,7 +142,6 @@
 ".boundary-callout strong | 0.69rem",
 ".brand small | 0.68rem",
 ".brand strong | 1.12rem",
-".brand-flame | 1.35rem",
 ".builder-editor-head > label, .confirmation-editor label | 0.64rem",
 ".builder-editor-head input | 1rem",
 ".builder-editor-head textarea, .confirmation-editor textarea | 0.7rem",

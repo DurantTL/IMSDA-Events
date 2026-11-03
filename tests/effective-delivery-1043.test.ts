@@ -17,7 +17,7 @@ import {
   resolveEventEmailSettings,
 } from "@/modules/communications/effective-delivery";
 
-const central = { name: "IMSDA Events", email: "events@imsda-events.test", replyTo: "office@imsda-events.test" };
+const central = { name: "IMAdventist", email: "events@imsda-events.test", replyTo: "office@imsda-events.test" };
 
 function fakeClient(settings: Record<string, unknown> | null, platform: Record<string, unknown> | null = {
   defaultSenderName: central.name,
@@ -85,7 +85,7 @@ describe("effective delivery (#1043)", () => {
     expect(live).toMatchObject({ deliveryMode: "EXTERNAL_EMAIL", senderEmail: central.email });
 
     // Environment configured, central sender blank: the messages wait (EXTERNAL_EMAIL, no sender), they are not captured.
-    const noSender = await loadEventEmailSettings(fakeClient(row, { defaultSenderName: "IMSDA Events", defaultSenderEmail: null, defaultReplyToEmail: null }), "event-1");
+    const noSender = await loadEventEmailSettings(fakeClient(row, { defaultSenderName: "IMAdventist", defaultSenderEmail: null, defaultReplyToEmail: null }), "event-1");
     expect(noSender).toMatchObject({ deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "SENDER_MISSING", senderEmail: null });
 
     // Environment not configured (development, CI): capture, whatever the sender.
@@ -95,7 +95,7 @@ describe("effective delivery (#1043)", () => {
     mocks.isAccountEmailConfigured.mockReturnValue(true);
 
     // No settings row: not paused, with the central display name, never null unless asked.
-    expect(await loadEventEmailSettings(fakeClient(null), "event-1")).toMatchObject({ deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON", deliveryPaused: false, senderName: "IMSDA Events", senderEmail: central.email });
+    expect(await loadEventEmailSettings(fakeClient(null), "event-1")).toMatchObject({ deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON", deliveryPaused: false, senderName: "IMAdventist", senderEmail: central.email });
     expect(await loadEventEmailSettings(fakeClient(null), "event-1", { fallback: false })).toBeNull();
   });
 

@@ -98,7 +98,7 @@ describe("central email migration preview (#1043)", () => {
 
 describe("Delivery & sender states on the Email page (#1043)", () => {
   const render = (props: { platformConfigured: boolean; senderMissing?: boolean }) => renderToStaticMarkup(createElement(EmailDeliverySection, {
-    sender: { name: "IMSDA Events", email: "", replyTo: "" },
+    sender: { name: "IMAdventist", email: "", replyTo: "" },
     events: [],
     ...props,
   }));

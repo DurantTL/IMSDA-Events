@@ -90,7 +90,7 @@ export const serverEnvSchema = z
 
     // Sender identity for account email. Event messages take theirs from
     // EventMessageSettings; activation and password reset belong to no event.
-    ACCOUNT_EMAIL_SENDER_NAME: z.string().trim().min(1).max(100).default("IMSDA Events"),
+    ACCOUNT_EMAIL_SENDER_NAME: z.string().trim().min(1).max(100).default("IMAdventist"),
     ACCOUNT_EMAIL_SENDER_ADDRESS: optionalTrimmed,
     ACCOUNT_EMAIL_REPLY_TO: optionalTrimmed,
 

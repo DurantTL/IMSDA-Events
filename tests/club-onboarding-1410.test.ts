@@ -25,7 +25,7 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/modules/attendee-accounts/passkeys", () => ({ passkeysConfigured: mocks.passkeysConfigured }));
 vi.mock("@/modules/communications/account-email", () => ({
   isAccountEmailConfigured: mocks.emailConfigured,
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "no-reply@imsda.org", replyTo: null }),
+  getAccountEmailSender: () => ({ name: "IMAdventist", address: "no-reply@imsda.org", replyTo: null }),
 }));
 
 import { ClubDirectorsWorkspace } from "@/components/club-directors-workspace";

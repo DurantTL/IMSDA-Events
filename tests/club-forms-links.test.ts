@@ -48,7 +48,7 @@ vi.mock("@/lib/env", () => ({
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/communications/account-email", () => ({
   isAccountEmailConfigured: mocks.configured,
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }),
+  getAccountEmailSender: () => ({ name: "IMAdventist", address: "events@example.test", replyTo: null }),
 }));
 
 import { hashOpaqueToken } from "@/modules/access/tokens";

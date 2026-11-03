@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Email preferences",
-  description: "Choose which IMSDA Events announcements you receive.",
+  description: "Choose which IMAdventist announcements you receive.",
   robots: { index: false, follow: false, nocache: true },
 };
 
@@ -74,7 +74,7 @@ export default async function UnsubscribePage({
         {!state.all && (
           <form method="post" action={action}>
             <input type="hidden" name="action" value="all" />
-            <button className="secondary-button" type="submit">Stop all IMSDA Events announcements</button>
+            <button className="secondary-button" type="submit">Stop all IMAdventist announcements</button>
           </form>
         )}
         {optedOut && (

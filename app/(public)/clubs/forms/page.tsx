@@ -39,7 +39,7 @@ export default async function PublicClubFormsPage() {
     <main className={`public-registration-page public-calendar-page public-home-page ${homeStyles.page} ${styles.page}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" publicBrand wordmark />
+          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" wordmark />
           <nav aria-label="Explore" className={homeStyles.primaryNav}>
             <Link href="/events">Events</Link><Link href="/calendar">Calendar</Link><a aria-current="location" href="/clubs">Club ministry</a>
           </nav>

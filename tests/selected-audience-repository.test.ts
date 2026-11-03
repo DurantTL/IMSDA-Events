@@ -48,7 +48,7 @@ const event = {
 
 const settings = {
   deliveryMode: "EXTERNAL_EMAIL" as const,
-  senderName: "IMSDA Events",
+  senderName: "IMAdventist",
   senderEmail: "registration@example.test",
   replyToEmail: "help@example.test",
   internalNotificationEmails: [],

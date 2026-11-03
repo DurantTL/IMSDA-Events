@@ -29,7 +29,7 @@ function fakeStore(options: { recipientEmail?: string; suppressions?: Array<{ no
     templateKey: options.templateKey ?? "REGISTRATION_CONFIRMATION_PAID",
     registrationId: "registration-1",
     recipientEmail: options.recipientEmail ?? "attendee@example.test",
-    senderNameSnapshot: "IMSDA Events",
+    senderNameSnapshot: "IMAdventist",
     senderEmailSnapshot: "registration@imsda.org",
     replyToEmailSnapshot: null,
     subjectSnapshot: "Registration received",

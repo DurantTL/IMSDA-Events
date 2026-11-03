@@ -346,7 +346,7 @@ export function LoginForm({
       <button className="primary-button full-button" type="submit" disabled={busy}><LogIn aria-hidden="true" size={17} /> {busy ? "Signing in…" : "Sign in"}</button>
       {unified && (
         <div className="auth-alternate">
-          <strong>New to IMSDA Events?</strong>
+          <strong>New to IMAdventist?</strong>
           <span>Want one place to manage future registrations? Create an optional account. Registration itself never requires one.</span>
           <AccountComingSoonNotice />
           <Link className="secondary-button full-button" href="/account/sign-up">Create an account</Link>

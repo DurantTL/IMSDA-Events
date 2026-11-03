@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "@/lib/brand";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
 import { BrandLink } from "@/components/brand-link";
@@ -49,7 +50,7 @@ export function ClubPortalMastheadView({ model, role, formsHelpContact }: { mode
   return (
     <header className="club-masthead">
       <div className="club-masthead-inner">
-        <BrandLink label="IMSDA Events Club portal, calendar" className="club-masthead-brand" wordmark={<span><small>IMSDA Events</small><strong>Club portal</strong></span>} />
+        <BrandLink label="IMAdventist Club portal, calendar" className="club-masthead-brand" wordmark={<span><small>{PRODUCT_NAME}</small><strong>Club portal</strong></span>} />
         <div className={styles.account}>
           {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
           {model.identity && (

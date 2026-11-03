@@ -52,7 +52,7 @@ beforeEach(() => {
   vi.setSystemTime(now);
   mocks.getPrisma.mockReturnValue({ messageDeliveryAttempt: mocks.attempts, messageOutbox: mocks.outbox, messageProviderEvent: mocks.providerEvents });
   mocks.getEmailBackupStatus.mockReturnValue(active);
-  mocks.getAccountEmailSender.mockReturnValue({ name: "IMSDA Events", address: "events@example.org", replyTo: null });
+  mocks.getAccountEmailSender.mockReturnValue({ name: "IMAdventist", address: "events@example.org", replyTo: null });
   mocks.outbox.create.mockResolvedValue({ id: "msg_test_1" });
   mocks.outbox.updateMany.mockResolvedValue({ count: 0 });
   mocks.outbox.findFirst.mockResolvedValue({

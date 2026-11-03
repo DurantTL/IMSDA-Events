@@ -30,7 +30,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 vi.mock("@/modules/system-admin/platform-settings", () => ({ getPlatformSettings: mocks.getPlatformSettings }));
 vi.mock("@/modules/communications/account-email", () => ({
   AccountEmailNotConfiguredError: class extends Error {},
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@imsda.test", replyTo: null }),
+  getAccountEmailSender: () => ({ name: "IMAdventist", address: "events@imsda.test", replyTo: null }),
   isAccountEmailConfigured: mocks.isAccountEmailConfigured,
 }));
 vi.mock("@/modules/communications/email-delivery", () => ({ processAccountEmailQueue: mocks.processAccountEmailQueue }));

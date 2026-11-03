@@ -243,7 +243,7 @@ export function advancementNotice(input: {
     "You can still update your team's members before then, within the same team rules (team size, the alternate, and ages on the age date):",
     input.link,
     "",
-    "IMSDA Events",
+    "IMAdventist",
   ];
   return { subject: `${label} advanced to ${to}`, text: lines.join("\n") };
 }

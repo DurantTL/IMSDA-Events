@@ -56,7 +56,7 @@ describe("church owed, with teams", () => {
 
 describe("assignment emails, with teams", () => {
   const context: ClubAssignmentPreviewContext = {
-    eventId: "evt_1", deliveryMode: "EXTERNAL_EMAIL", senderName: "IMSDA Events", senderEmail: "notifications@imsda.org",
+    eventId: "evt_1", deliveryMode: "EXTERNAL_EMAIL", senderName: "IMAdventist", senderEmail: "notifications@imsda.org",
     replyToEmail: "registration@imsda.org", templateEnabled: true, templateVersionId: "msgver_1", templateVersionNumber: 1,
   };
   const candidate = (overrides: Partial<ClubAssignmentCandidate>): ClubAssignmentCandidate => ({

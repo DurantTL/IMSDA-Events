@@ -149,7 +149,7 @@ describe("server environment contract", () => {
     const result = validateServerEnv(productionEnv);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.env.ACCOUNT_EMAIL_SENDER_NAME).toBe("IMSDA Events");
+    expect(result.env.ACCOUNT_EMAIL_SENDER_NAME).toBe("IMAdventist");
   });
 
   it("leaves the same secrets optional outside production", () => {

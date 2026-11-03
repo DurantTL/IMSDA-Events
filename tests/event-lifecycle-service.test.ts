@@ -53,7 +53,7 @@ function mockPrisma(current: Row | null, options: { forms?: number; changedRows?
     },
     registrationFormVersion: { count: vi.fn().mockResolvedValue(options.forms ?? 1) },
     // The required publish items (#1408): a saved central sender and an adult attendee type, by default present.
-    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderName: "IMSDA Events", defaultSenderEmail: options.sender === undefined ? "events@example.test" : options.sender, defaultReplyToEmail: null }) },
+    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderName: "IMAdventist", defaultSenderEmail: options.sender === undefined ? "events@example.test" : options.sender, defaultReplyToEmail: null }) },
     eventAttendeeType: { findMany: vi.fn().mockResolvedValue(options.types ?? [{ label: "Adult", minimumAge: 18 }]) },
     eventLifecycleTransition: { create: vi.fn(async () => { order.push("history"); return {}; }) },
     auditLog: { create: vi.fn(async (_args: { data: { action: string; metadata: unknown } }) => { void _args; order.push("audit"); return {}; }) },

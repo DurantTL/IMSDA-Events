@@ -43,7 +43,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ APP_BASE_URL: "https://even
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/communications/account-email", () => ({
   isAccountEmailConfigured: mocks.configured,
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }),
+  getAccountEmailSender: () => ({ name: "IMAdventist", address: "events@example.test", replyTo: null }),
 }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: secondStepPending }));
@@ -401,7 +401,7 @@ describe("People & access club invites (#1276)", () => {
     await sendClubInvites({ inviteIds: ["invite-1"] }, "admin-1", now);
     expect(mocks.inviteUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "SENT", expiresAt: clubInviteExpiry(now) }) }));
     const message = mocks.outboxCreate.mock.calls[0][0].data;
-    expect(message.bodyTextSnapshot).toContain("The Iowa-Missouri Conference has invited you as Example Pathfinders's registrar on IMSDA Events.");
+    expect(message.bodyTextSnapshot).toContain("The Iowa-Missouri Conference has invited you as Example Pathfinders's registrar on IMAdventist.");
     expect(message.bodyTextSnapshot).toContain("This invite expires in 14 days.");
   });
 

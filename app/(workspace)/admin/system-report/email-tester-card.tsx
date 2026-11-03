@@ -79,7 +79,7 @@ function Result({ status }: { status: EmailTestStatus }) {
         <div className={`${styles.result} ${styles.resultOk}`}>
           <strong>Email works end to end.</strong>
           {status.provider && <p>Sent through {status.provider}.</p>}
-          <p>{took === null ? "" : `Took ${took} ${took === 1 ? "second" : "seconds"} from queue to delivery. `}Check the inbox for “IMSDA Events test email”.</p>
+          <p>{took === null ? "" : `Took ${took} ${took === 1 ? "second" : "seconds"} from queue to delivery. `}Check the inbox for “IMAdventist test email”.</p>
           {ref}
         </div>
       );
@@ -127,7 +127,7 @@ function Result({ status }: { status: EmailTestStatus }) {
           <strong>The test email was not confirmed as sent.</strong>
           <p>{status.reason}</p>
           <ol>
-            <li>Check the inbox for “IMSDA Events test email” in case it went out anyway.</li>
+            <li>Check the inbox for “IMAdventist test email” in case it went out anyway.</li>
             <li>If it does not, try again later. If it keeps happening, run Test connections and check Email settings.</li>
           </ol>
           {ref}
@@ -139,7 +139,7 @@ function Result({ status }: { status: EmailTestStatus }) {
           <strong>Sent, but no delivery notice came back.</strong>
           <p>The email may still have arrived. The problem is usually the notice link, not sending.</p>
           <ol>
-            <li>Check the inbox for “IMSDA Events test email”.</li>
+            <li>Check the inbox for “IMAdventist test email”.</li>
             <li>If it arrived, check Email settings → delivery notices: the notice address should be this site.</li>
             <li>If it did not arrive, wait 10 minutes and send again.</li>
           </ol>

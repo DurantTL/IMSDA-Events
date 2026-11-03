@@ -19,9 +19,9 @@ const emptyMessaging: MessagingWorkspaceData = {
   settings: {
     deliveryMode: "LOCAL_CAPTURE",
     deliveryReason: "NOT_CONFIGURED",
-    senderName: "IMSDA Events",
+    senderName: "IMAdventist",
     senderEmail: "",
-    centralSenderName: "IMSDA Events",
+    centralSenderName: "IMAdventist",
     centralReplyToEmail: "",
     replyToEmail: "",
     internalNotificationEmails: [],
