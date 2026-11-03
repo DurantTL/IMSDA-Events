@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => (await import("@/modules/site-content/hub-content-domain")).defaultHubContent() }));
 // The header's session links read cookies and the database (#1009); they have their own tests.
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
 vi.mock("@/modules/organizations/public-club-directory", () => ({
@@ -19,15 +20,31 @@ beforeEach(() => {
   mocks.listPublicClubs.mockResolvedValue([]);
 });
 
-describe("public clubs page header and back link (#470)", () => {
-  it("keeps the header logo on the Events site and labels the back link for where it goes", async () => {
+describe("public club-ministry front door (#1534)", () => {
+  it("reuses public branding and keeps discovery, forms, new-club and account destinations", async () => {
     const html = renderToStaticMarkup(await PublicClubsPage());
-
-    expect(html).not.toContain("imsda.org");
-    expect(html).toContain("Events home");
-    expect(html).not.toContain("All events");
-    // The header logo goes to the calendar (#1496); "Events home" is the only link to "/".
-    expect(html).toContain('aria-label="IMSDA Events calendar"');
-    expect(html.match(/href="\/"/g)?.length).toBe(1);
+    expect(html).toContain("<h1>Club ministry</h1>");
+    expect(html).toContain('aria-label="IMAdventist calendar"');
+    for (const href of ["/calendar", "/events", "#find-a-club", "/clubs/forms", "/clubs/register", "/account"]) {
+      expect(html).toContain(`href="${href}"`);
+    }
+    expect(html).toContain("No clubs are listed publicly yet");
+    expect(html).toContain("Only clubs that choose a public listing appear here.");
+    expect(mocks.listPublicClubs).toHaveBeenCalledExactlyOnceWith();
   });
+  it("renders shared searches before hydration and provides a native GET search", async () => {
+    const base = { churchName: "Synthetic Church", town: "Example", state: "IA", zip: "50309", meetingSchedule: "", latitude: null, longitude: null };
+    mocks.listPublicClubs.mockResolvedValue([
+      { ...base, id: "a", clubName: "Prairie Pathfinders" },
+      { ...base, id: "b", clubName: "River Adventurers" },
+    ]);
+    const html = renderToStaticMarkup(await PublicClubsPage({ searchParams: Promise.resolve({ q: ["Prairie", "River"] }) }));
+    expect(html).toContain("Prairie Pathfinders");
+    expect(html).not.toContain("River Adventurers");
+    expect(html).toContain('action="/clubs"');
+    expect(html).toContain('method="get"');
+    expect(html).toContain('name="q"');
+    expect(html).toContain('value="Prairie"');
+  });
+
 });

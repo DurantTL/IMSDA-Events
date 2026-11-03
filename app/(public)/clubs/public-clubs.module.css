@@ -1,0 +1,61 @@
+/* Public club pages reuse the reviewed IMAdventist shell and app tokens. */
+.page .hero { background: var(--imsda-navy); color: var(--card); }
+.page .hero h1 { color: var(--card); }
+.hero p { max-width: 62ch; line-height: 1.65; }
+.heroActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+.heroActions a { min-height: 48px; }
+.heroActions :global(.primary-button) { background: var(--imsda-gold); color: var(--imsda-navy); }
+.heroActions :global(.secondary-button) { background: var(--card); color: var(--imsda-navy); }
+.finder { display: grid; gap: 24px; min-width: 0; }
+.sectionHeading { display: grid; gap: 8px; }
+.sectionHeading h2, .nextSteps h2, .formIntro h2, .formGroup h2 { margin: 0; color: var(--imsda-navy); font-size: clamp(1.4rem, 2.3vw, 1.8rem); line-height: 1.3; }
+.sectionHeading p { margin: 0; max-width: 72ch; line-height: 1.6; }
+.sectionHeading h2, .formGroup h2 { scroll-margin-top: 24px; }
+.nextSteps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.nextSteps > div, .nextSteps > :global(.start-a-club-callout) { border: 1px solid var(--line); border-top: 4px solid var(--home-green); border-radius: var(--radius-card); padding: 24px; background: var(--card); }
+.nextSteps p, .formIntro p { line-height: 1.65; }
+.nextSteps a { margin: 4px 8px 0 0; }
+.eventLink { margin: 0; }
+.eventLink a, .categories a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-weight: 700; }
+.formIntro { display: flex; align-items: center; gap: 24px; padding: 24px; border: 1px solid var(--line); border-left: 4px solid var(--home-green); border-radius: var(--radius-card); background: var(--card); }
+.formIntro p { margin: 10px 0 0; max-width: 78ch; }
+.formIntro > a { flex-shrink: 0; }
+.categories { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.formGroup { display: grid; gap: 16px; min-width: 0; }
+.formList { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.formItem { display: flex; align-items: start; gap: 24px; padding: 22px 24px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-card); min-width: 0; }
+.formText { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.formText h3 { margin: 0; font-size: 1.125rem; color: var(--imsda-navy); line-height: 1.4; }
+.formText p { margin: 8px 0 0; font-size: 1rem; line-height: 1.65; }
+.formNote { color: var(--muted); }
+.formAction { flex-shrink: 0; }
+.formText :global(.copy-application-link) { margin-top: 14px; }
+.formText :global(.copy-application-link) code { overflow-wrap: anywhere; white-space: normal; font-size: .875rem; }
+.formText :global(.field-help) { margin: 4px 0 0; }
+@media (max-width: 760px) {
+  .nextSteps { grid-template-columns: 1fr; }
+  .formIntro, .formItem { flex-direction: column; align-items: stretch; gap: 16px; padding: 20px; }
+  .nextSteps > div, .nextSteps > :global(.start-a-club-callout) { padding: 20px; }
+  .formAction { align-self: start; }
+}
+.page .hero > div:first-child > p:not(:global(.public-registration-eyebrow)) { font-size: 1rem; line-height: 1.65; }
+
+.nextSteps > :global(.start-a-club-callout) { margin: 0; }
+@media screen { .nextSteps > :global(.start-a-club-callout) { display: block; } }
+.nextSteps :global(.start-a-club-icon) { display: none; }
+.nextSteps :global(.start-a-club-body) h2 { font-size: clamp(1.4rem, 2.3vw, 1.8rem); }
+.nextSteps :global(.start-a-club-body) p { margin: 16px 0; font-size: 1rem; }
+/* Published site links may fill more than a row; keep the session action reachable. */
+.page :global(.public-registration-header-inner) { flex-wrap: wrap; }
+.page :global(.public-header-links) { flex: 1 1 280px; min-width: 0; max-width: 100%; }
+.page :global(.public-header-nav) { flex: 1 1 200px; min-width: 0; }
+.page :global(.public-header-nav) ul { flex-wrap: wrap; }
+.page :global(.public-header-nav) :global(.text-button) { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .page :global(.public-header-links) { flex-basis: 100%; justify-content: flex-start; }
+}
+/* Keep the shared wordmark within the available header width at high zoom. */
+.page :global(.public-registration-brand) { min-width: 0; max-width: 100%; }
+.page :global(.public-registration-brand) > span { min-width: 0; }
+.page :global(.public-registration-brand) strong,
+.page :global(.public-registration-brand) small { white-space: normal; overflow-wrap: anywhere; }

@@ -9,7 +9,7 @@
 }
 
 .search input {
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .content {
@@ -26,9 +26,9 @@
   height: 360px;
   border-radius: 16px;
   border: 1px solid var(--line);
-  background: #eef2f4;
+  background: var(--paper);
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 1rem;
 }
 
 .list {
@@ -49,7 +49,7 @@
   border: 1px solid var(--line);
   border-radius: var(--field-radius, 10px);
   background: var(--card);
-  padding: 10px 12px;
+  padding: 16px;
   cursor: pointer;
 }
 
@@ -69,7 +69,7 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: #f1eefb;
+  background: var(--imsda-purple-soft);
   color: var(--imsda-purple, #4a2e83);
   flex-shrink: 0;
 }
@@ -81,28 +81,28 @@
 }
 
 .clubText strong {
-  font-size: 0.94rem;
+  font-size: 1.0625rem;
 }
 
 .clubText small {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 1rem;
 }
 
 .details {
   display: grid;
   gap: 6px;
   margin: 6px 0 0;
-  padding: 10px 12px;
+  padding: 16px;
   border-radius: var(--radius-card);
-  background: #fafafa;
+  background: var(--paper);
   border: 1px solid var(--line);
 }
 
 .details > div {
   display: flex;
   gap: 6px;
-  font-size: 0.85rem;
+  font-size: 1rem;
 }
 
 .details dt {
@@ -120,7 +120,7 @@
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: max(var(--type-body-floor, 0px), 0.82rem);
+  font-size: 1rem;
   margin: 0;
 }
 
@@ -132,8 +132,8 @@
 
 /* Another club at the same church as the selected one: they share a pin. */
 .clubButton.samePin {
-  border-color: #c9b8e6;
-  background: #fbf9fe;
+  border-color: var(--imsda-purple);
+  background: var(--imsda-purple-soft);
 }
 
 .samePinNote {
@@ -174,12 +174,12 @@
 .retryButton:focus-visible,
 .resetButton:focus-visible,
 .viewToggle button:focus-visible {
-  outline: 3px solid #f9a13a;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
 .clubButton:focus-visible {
-  outline: 3px solid var(--focus-ring);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -223,7 +223,7 @@
 .disclaimer {
   margin: 6px 0 0;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 1rem;
 }
 
 @media (max-width: 800px) {
@@ -248,7 +248,7 @@
 
   .viewToggle button[aria-pressed="true"] {
     border-color: var(--imsda-purple, #4a2e83);
-    background: #f6f1fb;
+    background: var(--imsda-purple-soft);
     font-weight: 600;
   }
 
@@ -257,3 +257,16 @@
     display: none;
   }
 }
+
+/* Keep expanded public details and long names readable at phone widths and zoom. */
+.layout, .list, .list > li { min-width: 0; }
+.clubButton { color: var(--ink); }
+.details > div { display: grid; grid-template-columns: 60px minmax(0, 1fr); line-height: 1.6; }
+.details dd, .selectionNote, .disclaimer { overflow-wrap: anywhere; }
+.disclaimer { line-height: 1.6; }
+.count small { font-size: 1rem; }
+.selectionNote { flex-wrap: wrap; }
+
+.count small { display: block; margin-top: 4px; }
+
+.clearFilters { justify-self: start; }

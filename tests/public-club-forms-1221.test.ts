@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => (await import("@/modules/site-content/hub-content-domain")).defaultHubContent() }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => { throw new Error(`REDIRECT ${to}`); },
   notFound: mocks.notFound,
