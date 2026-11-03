@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { CalendarDays, CalendarRange, DoorClosed, List } from "lucide-react";
 import { BrandLink } from "@/components/brand-link";
+import { PublicExploreNav } from "@/components/public-explore-nav";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { HubLink, SiteNoticesView } from "@/components/site-notices-view";
@@ -157,8 +158,8 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
     <main className={`public-registration-page public-calendar-page public-home-page ${homeStyles.page} ${styles.calendarPage}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" wordmark />
-          <nav aria-label="Explore" className={homeStyles.primaryNav}><Link href="/events">Events</Link><Link aria-current="page" href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
+          <BrandLink className="public-registration-brand public-event-brand-link" destination="home" wordmark />
+          <PublicExploreNav current="calendar" />
           <div className="public-header-links">
             <PublicHeaderSessionLinks navLinks={[]} />
           </div>

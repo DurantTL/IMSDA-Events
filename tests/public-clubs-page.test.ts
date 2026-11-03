@@ -25,7 +25,7 @@ describe("public club-ministry front door (#1534)", () => {
   it("reuses public branding and keeps discovery, forms, new-club and account destinations", async () => {
     const html = renderToStaticMarkup(await PublicClubsPage());
     expect(html).toContain("<h1>Club ministry</h1>");
-    expect(html).toContain('aria-label="IMAdventist calendar"');
+    expect(html).toContain('aria-label="IMAdventist home"');
     for (const href of ["/calendar", "/events", "#find-a-club", "/clubs/forms", "/clubs/register", "/account"]) {
       expect(html).toContain(`href="${href}"`);
     }

@@ -89,7 +89,7 @@ describe("public event presentation (#1533)", () => {
   it("shows public navigation and footer while retaining canonical metadata", async () => {
     const params = Promise.resolve({ eventSlug: "public-retreat" });
     const markup = renderToStaticMarkup(await PublicEventPage({ params }));
-    expect(markup).toContain('aria-label="IMAdventist calendar"');
+    expect(markup).toContain('aria-label="IMAdventist home"');
     expect(markup).toContain('aria-label="Explore"');
     expect(markup).not.toContain("Unexpected category");
     expect(markup).toContain('href="/events">Browse all events</a>');
@@ -102,8 +102,10 @@ describe("public event presentation (#1533)", () => {
   it("keeps loading and unavailable states branded without event data", () => {
     const loading = renderToStaticMarkup(PublicEventLoading());
     const unavailable = renderToStaticMarkup(PublicEventNotFound());
+    // The loading skeleton is the event page itself (logo goes Home); the unavailable page is an error page (calendar).
+    expect(loading).toContain('aria-label="IMAdventist home"');
+    expect(unavailable).toContain('aria-label="IMAdventist calendar"');
     for (const markup of [loading, unavailable]) {
-      expect(markup).toContain('aria-label="IMAdventist calendar"');
       expect(markup).not.toContain(landing.event.name);
       expect(markup).not.toContain("public-event-status-action");
     }

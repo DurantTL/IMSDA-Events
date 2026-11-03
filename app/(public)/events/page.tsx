@@ -4,6 +4,7 @@ import { CalendarDays, ChevronRight, MapPin } from "lucide-react";
 import { EventsSearchField } from "./events-search-field";
 import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { BrandLink } from "@/components/brand-link";
+import { PublicExploreNav } from "@/components/public-explore-nav";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
 import { HubLink, SiteNoticesView } from "@/components/site-notices-view";
@@ -110,8 +111,8 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
     <main className={`public-registration-page public-calendar-page public-home-page ${homeStyles.page} ${styles.directory}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" wordmark />
-          <nav aria-label="Explore" className={homeStyles.primaryNav}><Link aria-current="page" href="/events">Events</Link><Link href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
+          <BrandLink className="public-registration-brand public-event-brand-link" destination="home" wordmark />
+          <PublicExploreNav current="events" />
           <div className="public-header-links"><PublicHeaderSessionLinks navLinks={[]} /></div>
         </div>
       </header>

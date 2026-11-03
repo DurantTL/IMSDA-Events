@@ -37,6 +37,27 @@ describe("IMAdventist brand link (#1549)", () => {
   });
 });
 
+describe("public Home destination (#1561)", () => {
+  it("links to / named IMAdventist home when asked, and keeps /calendar otherwise", () => {
+    const home = renderToStaticMarkup(createElement(BrandLink, { destination: "home", wordmark: true }));
+    expect(home).toContain('href="/"');
+    expect(home).toContain('aria-label="IMAdventist home"');
+    const calendar = renderToStaticMarkup(createElement(BrandLink, { wordmark: true }));
+    expect(calendar).toContain('href="/calendar"');
+    expect(calendar).toContain('aria-label="IMAdventist calendar"');
+  });
+
+  it("draws Home first in the public header nav and marks only the current page", async () => {
+    const { PublicExploreNav } = await import("@/components/public-explore-nav");
+    const onHome = renderToStaticMarkup(createElement(PublicExploreNav, { current: "home" }));
+    expect(onHome).toMatch(/^<nav aria-label="Explore"[^>]*><a aria-current="page" href="\/">Home<\/a><a href="\/events">Events<\/a><a href="\/calendar">Calendar<\/a><a href="\/clubs">Club ministry<\/a><\/nav>$/);
+    const onClubForms = renderToStaticMarkup(createElement(PublicExploreNav, { current: "clubs", currentKind: "location" }));
+    expect(onClubForms).toContain('<a href="/">Home</a>');
+    expect(onClubForms).toContain('<a href="/clubs" aria-current="location">Club ministry</a>');
+    expect(renderToStaticMarkup(createElement(PublicExploreNav))).not.toContain("aria-current");
+  });
+});
+
 describe("root metadata (#1549)", () => {
   it("names the product IMAdventist in the default title, template and application name", () => {
     expect(metadata.title).toEqual({ default: "IMAdventist", template: "%s | IMAdventist" });
