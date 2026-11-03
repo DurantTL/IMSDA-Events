@@ -34,8 +34,7 @@ and usually a prepared worktree.
    If something fails and you can't fix it after two honest attempts, stop
    and report the failing output verbatim. Never weaken, skip, or delete a
    test.
-5. Commit with a clear message ending with
-   `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. For a review-fix
+5. Commit using the shared commit-message rules in `AGENTS.md`. For a review-fix
    round, add a new commit; don't amend.
 6. The final report lists:
    - the commit sha;

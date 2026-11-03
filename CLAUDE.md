@@ -70,13 +70,15 @@ subagents. The agents live in `.claude/agents/`.
 6. **Push and open the PR:** push, open the PR, and subscribe to its activity.
    When CI fails, read the job log, fix the cause, and run the affected
    `scripts/` checks locally before pushing again.
-7. **Clean up** an idle worktree with `rm -rf node_modules .next`.
+7. **Clean up** only generated dependencies and build output in an idle
+   issue worktree. Resolve and verify its absolute path first, preserve source
+   and uncommitted work, and use the current platform's native file operations.
 
 Rules to pass to every implementer:
 - Never run the full `npx vitest run`; CI and the main session do. Run only
   eslint, tsc (`NODE_OPTIONS=--max-old-space-size=8192`) and focused tests.
 - Follow the enforced rules in `AGENTS.md` → Checks.
-- End commits with `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
+- Follow the shared commit-message rules in `AGENTS.md`.
 
 ## Keeping usage down
 

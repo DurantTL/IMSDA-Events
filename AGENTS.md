@@ -52,6 +52,10 @@ Then `npm run dev`.
 - **Before a PR:** run the full `npx vitest run` (about four minutes).
   `npm run verify` is the canonical full check (lint, route types, TypeScript,
   tests, production build).
+- Run heavy checks (full lint, TypeScript, full tests, production build) one
+  at a time. Report every required check as passed, failed, or not run, with
+  the reason; interrupted runs are not passes. Report platform-specific
+  failures separately and retain the complete GitHub CI gate.
 - **CI database scripts:** CI also migrates and seeds a clean PostgreSQL database and runs about 90
   database-backed scripts (`npm run test:*`, listed in
   `.github/workflows/ci.yml`). When a change alters behavior that scripts
@@ -107,11 +111,18 @@ Then `npm run dev`.
 3. Implement only the issue's acceptance criteria, preserve unrelated changes,
    add proportional tests, and run targeted checks locally. Let the complete
    GitHub CI gate run for every code PR.
-4. Before reporting done, have the change reviewed with the site rules browser
+4. Before reporting done, have an independent read-only reviewer review the
+   issue and diff without the implementer's conclusions. Delegating this
+   review is authorized for Codex and Claude; it does not authorize extra
+   parallel builds. If delegation is unavailable, report the review gap.
+   Have the change reviewed with the site rules browser
    check (see Checks) and put its rules-checked list in the PR body. Pages the
    change does not touch need no browser check; say so when no page changed.
 5. Keep the modular monolith: add behavior to the owning `modules/` boundary,
    keep event authorization server-side, and use adapters for external systems.
+
+Commit messages have an imperative subject under 60 characters and no
+generated-by or co-author trailers.
 
 If requirements are unclear and the answer would materially change behavior,
 stop, apply the GitHub label `needs-decision`, and record the decision needed.
