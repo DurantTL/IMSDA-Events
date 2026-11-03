@@ -2,13 +2,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  headerLinks: vi.fn(),
   listPublicClubs: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => (await import("@/modules/site-content/hub-content-domain")).defaultHubContent() }));
+vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => ({ ...(await import("@/modules/site-content/hub-content-domain")).defaultHubContent(), navLinks: [{ label: "Unexpected category", href: "/unexpected-category" }] }) }));
 // The header's session links read cookies and the database (#1009); they have their own tests.
-vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
+vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: ({ navLinks }: { navLinks?: unknown }) => { mocks.headerLinks(navLinks); return null; } }));
 vi.mock("@/modules/organizations/public-club-directory", () => ({
   listPublicClubs: mocks.listPublicClubs,
 }));
@@ -31,6 +32,7 @@ describe("public club-ministry front door (#1534)", () => {
     expect(html).toContain("No clubs are listed publicly yet");
     expect(html).toContain("Only clubs that choose a public listing appear here.");
     expect(mocks.listPublicClubs).toHaveBeenCalledExactlyOnceWith();
+    expect(mocks.headerLinks).toHaveBeenCalledExactlyOnceWith([]);
   });
   it("renders shared searches before hydration and provides a native GET search", async () => {
     const base = { churchName: "Synthetic Church", town: "Example", state: "IA", zip: "50309", meetingSchedule: "", latitude: null, longitude: null };

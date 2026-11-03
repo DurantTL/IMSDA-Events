@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * #1221: the public Club forms page and the sign-in-aware club chooser behind its director links. Synthetic data only.
  */
 const mocks = vi.hoisted(() => ({
+  headerLinks: vi.fn(),
   listEnabled: vi.fn(),
   listFillModes: vi.fn(),
   listClosed: vi.fn(),
@@ -16,12 +17,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => (await import("@/modules/site-content/hub-content-domain")).defaultHubContent() }));
+vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => ({ ...(await import("@/modules/site-content/hub-content-domain")).defaultHubContent(), navLinks: [{ label: "Unexpected category", href: "/unexpected-category" }] }) }));
 vi.mock("next/navigation", () => ({
   redirect: (to: string) => { throw new Error(`REDIRECT ${to}`); },
   notFound: mocks.notFound,
 }));
-vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
+vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: ({ navLinks }: { navLinks?: unknown }) => { mocks.headerLinks(navLinks); return null; } }));
 vi.mock("@/modules/club-forms/public-index", () => ({ listEnabledPublicClubFormKeys: mocks.listEnabled, listPublicClubFormFillModes: mocks.listFillModes, listPublicClubFormClosedKeys: mocks.listClosed }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.attendeeSecondStepPending }));
@@ -126,6 +127,7 @@ describe("the Club forms page (#1221)", () => {
     expect(html).toContain(PRIVATE_LINK_LINE);
     expect(html).not.toContain(NOT_AVAILABLE_LINE);
     expect(html).toContain("<h1>Club forms</h1>");
+    expect(mocks.headerLinks).toHaveBeenCalledExactlyOnceWith([]);
   });
 
   it("shows Not available yet and drops the link when a form is off", async () => {

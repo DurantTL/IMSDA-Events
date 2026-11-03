@@ -45,15 +45,8 @@
 .nextSteps :global(.start-a-club-icon) { display: none; }
 .nextSteps :global(.start-a-club-body) h2 { font-size: clamp(1.4rem, 2.3vw, 1.8rem); }
 .nextSteps :global(.start-a-club-body) p { margin: 16px 0; font-size: 1rem; }
-/* Published site links may fill more than a row; keep the session action reachable. */
+/* Keep the primary menu and account action within the header at high zoom. */
 .page :global(.public-registration-header-inner) { flex-wrap: wrap; }
-.page :global(.public-header-links) { flex: 1 1 280px; min-width: 0; max-width: 100%; }
-.page :global(.public-header-nav) { flex: 1 1 200px; min-width: 0; }
-.page :global(.public-header-nav) ul { flex-wrap: wrap; }
-.page :global(.public-header-nav) :global(.text-button) { white-space: normal; overflow-wrap: anywhere; }
-@media (max-width: 760px) {
-  .page :global(.public-header-links) { flex-basis: 100%; justify-content: flex-start; }
-}
 /* Keep the shared wordmark within the available header width at high zoom. */
 .page :global(.public-registration-brand) { min-width: 0; max-width: 100%; }
 .page :global(.public-registration-brand) > span { min-width: 0; }

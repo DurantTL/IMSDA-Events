@@ -40,7 +40,7 @@ export default async function PublicClubsPage({ searchParams }: { searchParams?:
           <nav aria-label="Explore" className={homeStyles.primaryNav}>
             <Link href="/events">Events</Link><Link href="/calendar">Calendar</Link><a aria-current="page" href="/clubs">Club ministry</a>
           </nav>
-          <div className="public-header-links"><PublicHeaderSessionLinks navLinks={hubContent.navLinks} /></div>
+          <div className="public-header-links"><PublicHeaderSessionLinks navLinks={[]} /></div>
         </div>
       </header>
       <section className={`public-registration-hero calendar-hero public-home-banner ${styles.hero}`}>
