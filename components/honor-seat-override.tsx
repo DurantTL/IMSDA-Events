@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldAlert, Trash2 } from "lucide-react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { seatOverrideReasonMax, seatOverrideReasonMin } from "@/modules/honors/admin-placement-limits";
 
 /**
@@ -54,6 +55,8 @@ export function HonorSeatPlacementForm({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // Unsaved while anything is chosen or typed: the form opens empty, and a placement clears all four on success (#1468).
+  useUnsavedChangesGuard(offeringId !== "" || attendeeId !== "" || reason !== "" || requirementReason !== "");
   const chosenClass = classes.find((candidate) => candidate.id === offeringId);
   const chosenYouth = candidates.find((candidate) => candidate.id === attendeeId);
   const valid = attendeeId !== "" && offeringId !== "" && reason.trim().length >= seatOverrideReasonMin
@@ -137,6 +140,8 @@ export function HonorPickRemoveButton({ eventId, enrollmentId, who }: { eventId:
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const valid = reason.trim().length >= seatOverrideReasonMin;
+  // A reason typed for the removal is unsaved until the removal succeeds or is cancelled (#1468).
+  useUnsavedChangesGuard(reason !== "");
 
   async function remove(event: React.FormEvent) {
     event.preventDefault();
@@ -145,6 +150,7 @@ export function HonorPickRemoveButton({ eventId, enrollmentId, who }: { eventId:
     try {
       await post(`/api/events/${encodeURIComponent(eventId)}/honors/seat-overrides/${encodeURIComponent(enrollmentId)}/remove`, { reason: reason.trim() });
       setOpen(false);
+      setReason("");
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That could not be saved.");
@@ -169,7 +175,7 @@ export function HonorPickRemoveButton({ eventId, enrollmentId, who }: { eventId:
       </label>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <button className="secondary-button" disabled={saving || !valid} type="submit">{saving ? "Removing…" : "Remove pick"}</button>
-      <button className="secondary-button" onClick={() => setOpen(false)} type="button">Cancel</button>
+      <button className="secondary-button" onClick={() => { setOpen(false); setReason(""); }} type="button">Cancel</button>
     </form>
   );
 }

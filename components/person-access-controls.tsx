@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useConfirm } from "@/components/use-confirm";
+import { samePhoneNumber } from "@/components/form-has-edits";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   HAND_LINK_NOTE_MAX,
   HAND_LINK_REASON_CODES,
@@ -184,7 +186,9 @@ export function EventMembershipControls({ membership, targetIsSystemAdministrato
   const [role, setRole] = useState(membership.role);
   const [access, setAccess] = useState(membership.active ? "ACTIVE" : "INACTIVE");
   const base = `/api/events/${encodeURIComponent(membership.eventId)}/memberships/${encodeURIComponent(membership.membershipId)}`;
+  // A role or access pick that differs from what is saved; the page data refreshes after a save, so the saved values catch up (#1468).
   const dirty = role !== membership.role || (access === "ACTIVE") !== membership.active;
+  useUnsavedChangesGuard(dirty);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -260,6 +264,8 @@ export function AddToEvent({ email, displayName, events }: {
   const { busy, run, status } = useChange();
   const [eventId, setEventId] = useState("");
   const [role, setRole] = useState<string>("READ_ONLY_STAFF");
+  // Unsaved once an event is chosen; the role starts on its default and stays where it was after an add, so it is not counted alone (#1468).
+  useUnsavedChangesGuard(eventId !== "");
 
   async function add(event: FormEvent) {
     event.preventDefault();
@@ -308,6 +314,8 @@ export function RevokeClubRole({ organizationId, grantId, clubName, roleName, na
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
+  // A reason typed in the revoke dialog; a revoke or Cancel clears it (#1468).
+  useUnsavedChangesGuard(reason !== "");
 
   async function revoke() {
     setError("");
@@ -328,7 +336,7 @@ export function RevokeClubRole({ organizationId, grantId, clubName, roleName, na
         confirmLabel={`Revoke ${roleName} for ${clubName}`}
         destructive
         error={error}
-        onCancel={() => setOpen(false)}
+        onCancel={() => { setOpen(false); setReason(""); }}
         onConfirm={() => void revoke()}
         open={open}
         title={`Revoke ${roleName} for ${clubName}?`}
@@ -353,6 +361,8 @@ export function AddClubRole({ accountEmail, name, clubs }: {
   const [organizationId, setOrganizationId] = useState("");
   const [role, setRole] = useState<ClubRole>("DIRECTOR");
   const [reason, setReason] = useState("");
+  // Unsaved once a club is chosen or a reason typed; the role starts on Director and stays where it was after an add, so it is not counted alone (#1468).
+  useUnsavedChangesGuard(organizationId !== "" || reason !== "");
 
   async function add(event: FormEvent) {
     event.preventDefault();
@@ -419,6 +429,20 @@ export function AccountActions({ staff, account, isSelf, linkedEmailChangesToget
   const [reason, setReason] = useState<HandLinkReasonCode>("DIFFERENT_STAFF_EMAIL");
   const [note, setNote] = useState("");
   const [profile, setProfile] = useState({ displayName: "", jobTitle: "", phone: "", bio: "" });
+
+  // The open dialog against what `open()` filled it with: a changed email or profile field, a typed staff email or note, or a
+  // different reason. No dialog open is clean; Cancel and a successful change close it (#1468).
+  const dialogEdited = (() => {
+    if (form === "profile") {
+      return staff !== null && (profile.displayName !== staff.displayName || profile.jobTitle !== staff.jobTitle || !samePhoneNumber(profile.phone, staff.phone) || profile.bio !== staff.bio);
+    }
+    if (form === "change-staff-email") return email !== (staff?.email ?? "");
+    if (form === "change-account-email") return email !== (account?.email ?? "");
+    if (form === "link") return staffEmail !== "" || note !== "" || reason !== "DIFFERENT_STAFF_EMAIL";
+    if (form === "unlink") return note !== "" || reason !== "WRONG_PERSON_LINKED";
+    return false;
+  })();
+  useUnsavedChangesGuard(dialogEdited);
 
   const staffUrl = staff ? `/api/admin/users/${encodeURIComponent(staff.id)}` : "";
   const accountUrl = account ? `/api/admin/accounts/${encodeURIComponent(account.id)}` : "";

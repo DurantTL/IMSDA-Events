@@ -7,6 +7,7 @@ import Link from "next/link";
 import { CheckCircle2, Download, Mail, Printer, RefreshCw, Trophy } from "lucide-react";
 import { TEAM_LEVELS, teamLabel, teamLevelLabels, type TeamLevel, type TeamLevelInfo } from "@/modules/club-teams/domain";
 import { savedMessage } from "@/components/form-message";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   levelInfoFor,
   levelWhenWhere,
@@ -52,7 +53,9 @@ function LevelEditor({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const base = `team-result-${row.clubEventRegistrationId}-${level}`;
+  // Unsaved when the place, decision or note differs from the saved result; a save or Clear puts the saved result back in the fields (#1468).
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftOf(stored));
+  useUnsavedChangesGuard(canEdit && dirty);
   const label = teamLabel(row.clubName, row.teamName);
 
   function save(event: React.FormEvent<HTMLFormElement>) {

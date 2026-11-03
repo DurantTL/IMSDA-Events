@@ -2,7 +2,7 @@
 
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useConfirm } from "@/components/use-confirm";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Award, CalendarRange, ClipboardList, Copy, Pencil, Plus, Power, Save, Trash2, TriangleAlert, UsersRound, X } from "lucide-react";
 import { clubClassLevelLabels, clubClassLevels } from "@/modules/club-rosters/domain";
 import { cardCell } from "@/components/table-card-labels";
@@ -16,6 +16,9 @@ import type { HonorCopyPlan } from "@/modules/honors/copy";
 import { groupSessionsBySite, nextSessionOrder, sessionClassWarning, sharedSessionsLabel } from "@/modules/honors/session-order";
 import type { EventHonorSetup } from "@/modules/honors/repository";
 import { EmptyState } from "@/components/empty-state";
+import { formHasEdits, type FormEditOptions } from "@/components/form-has-edits";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type Offering = EventHonorSetup["offerings"][number];
 /** Every session's table sorts the same way, from one pair of address params (#1458); rows keep the server's order until a column is chosen. */
@@ -41,6 +44,13 @@ type ApiResult = Partial<EventHonorSetup> & {
   requirementImpact?: { offeringId: string; unmet: number };
   issues?: Array<{ message?: string }>;
 };
+
+/** The class form: the controlled span select and the honor pickers (their search box and ticks) are compared from state, not read from the form (#1468). */
+const classFormTracking: FormEditOptions = { ignore: ["span"], ignoreWithin: ".honor-multi-select" };
+/** The add-session form: the site starts on the first active site, so it doesn't count. The order box is re-keyed with its suggested default when the site
+ * changes, so an untouched suggestion compares clean while a typed name or order counts (#1468). */
+const addSessionTracking: FormEditOptions = { ignore: ["locationId"] };
+const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, index) => id === b[index]);
 
 function optionalNumber(value: FormDataEntryValue | null) {
   const text = String(value ?? "").trim();
@@ -86,6 +96,22 @@ export function HonorsSetupWorkspace({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // What the span select held when the add form last started clean: it stays where it was after a class is added (#1468).
+  const [newSpanBase, setNewSpanBase] = useState<"SINGLE_SESSION" | "ALL_SESSIONS">("SINGLE_SESSION");
+  // Unsaved work on this page: a typed session name, an open session edit that differs from the session, and the class form,
+  // whose typed fields are read from the form and whose honor picks and span are compared with what it opened with. Saving,
+  // Cancel, or opening another row takes the form off the page and clears it (#1468).
+  const edits = useEditedForms();
+  const classForm = useRef<HTMLFormElement>(null);
+  const { mark } = edits;
+  // The span decides which site and session fields exist, so what is typed is read again after each render that changes it.
+  useEffect(() => {
+    mark("class", classForm.current ? formHasEdits(classForm.current, classFormTracking) : false);
+  }, [mark, span, editSpan, editing]);
+  const classPicksEdited = editing
+    ? !sameIds(editHonorIds, editing.honorIds) || !sameIds(editPrerequisiteIds, editing.prerequisiteHonorIds) || editSpan !== editing.span
+    : newHonorIds.length > 0 || newPrerequisiteIds.length > 0 || span !== newSpanBase;
+  useUnsavedChangesGuard(edits.dirty || classPicksEdited);
   const base = `/api/events/${encodeURIComponent(eventId)}/honors`;
 
   // Sites in the location's sort order, sessions ordered within each site (#589).
@@ -167,7 +193,10 @@ export function HonorsSetupWorkspace({
         ?? nextSessionOrder(setup.sessions.filter((session) => (session.locationId ?? "") === newSessionSite)),
       locationId: hasSites ? String(form.get("locationId") ?? "") || null : null,
     }, "Session added.");
-    if (result) formElement.reset();
+    if (result) {
+      formElement.reset();
+      edits.clear("addSession");
+    }
   }
 
   async function saveSession(event: React.FormEvent<HTMLFormElement>) {
@@ -299,7 +328,9 @@ export function HonorsSetupWorkspace({
       setEditing(null);
       setNewHonorIds([]);
       setNewPrerequisiteIds([]);
+      if (!editing) setNewSpanBase(span);
       formElement.reset();
+      edits.clear("class");
     }
   }
 
@@ -446,7 +477,7 @@ export function HonorsSetupWorkspace({
           </div>
         ))}
         {editingSession && (
-          <form className="form-stack honor-inline-form" key={editingSession.id} onSubmit={saveSession}>
+          <form className="form-stack honor-inline-form" key={editingSession.id} onChange={edits.track("editSession")} onSubmit={saveSession} ref={edits.gone("editSession")}>
             <p className="eyebrow">Edit session</p>
             {hasSites && (
               <label>
@@ -475,7 +506,7 @@ export function HonorsSetupWorkspace({
             </button>
           </form>
         )}
-        <form className="form-stack honor-inline-form" onSubmit={addSession}>
+        <form className="form-stack honor-inline-form" onChange={edits.track("addSession", addSessionTracking)} onSubmit={addSession}>
           {hasSites && (
             <label>
               Site
@@ -508,7 +539,7 @@ export function HonorsSetupWorkspace({
         </form>
       </section>
 
-      <form className="panel form-stack" key={editing?.id ?? "new"} onSubmit={saveOffering}>
+      <form className="panel form-stack" key={editing?.id ?? "new"} onChange={edits.track("class", classFormTracking)} onSubmit={saveOffering} ref={classForm}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">Step 2</p>

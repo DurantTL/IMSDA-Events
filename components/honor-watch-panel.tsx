@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { Plus, Save, Trash2, X } from "lucide-react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import { HONOR_WATCHES_MAX_PER_EVENT, HONOR_WATCH_MAX_RECIPIENTS, searchWatchCatalog } from "@/modules/honors/watch-domain";
@@ -37,6 +38,11 @@ function nextKey() {
 
 function toDraft(row: Watch): Draft {
   return { localKey: row.id, id: row.id, name: row.name, recipientsText: row.recipients.join("\n"), savedRecipients: row.recipients, honorIds: row.honorIds, offeringIds: row.offeringIds, warnings: row.warnings };
+}
+
+/** What a watch holds that is saved, without the row's local key or the server's warnings (#1468). */
+function watchContent(draft: Draft) {
+  return { id: draft.id ?? null, name: draft.name, recipientsText: draft.recipientsText, honorIds: draft.honorIds, offeringIds: draft.offeringIds };
 }
 
 function blankDraft(): Draft {
@@ -87,6 +93,10 @@ export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const [classes, setClasses] = useState(initial.classes);
   const [drafts, setDrafts] = useState<Draft[]>(initial.watches.map(toDraft));
+  // The watches as last saved (or loaded). Unsaved when the drafts differ from them in any watch, field, pick or count, so a
+  // change put back, or a watch added and removed again, is clean. A save replaces them with what the server returned (#1468).
+  const [savedWatches, setSavedWatches] = useState(() => JSON.stringify(initial.watches.map((watch) => watchContent(toDraft(watch)))));
+  useUnsavedChangesGuard(JSON.stringify(drafts.map(watchContent)) !== savedWatches);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
@@ -121,6 +131,7 @@ export function HonorWatchPanel({ eventId, catalog, initial }: { eventId: string
       }
       setClasses(result.classes);
       setDrafts(result.watches.map(toDraft));
+      setSavedWatches(JSON.stringify(result.watches.map((watch) => watchContent(toDraft(watch)))));
       setNotice(watches.length === 0 ? "Saved. No honor is being watched." : `Saved. ${watches.length} honor watch${watches.length === 1 ? "" : "es"} will be sent each morning something changes.`);
     } catch {
       setError("The honor watches could not be saved. Check your connection and try again.");

@@ -53,6 +53,9 @@ import { findRegistrationToOpen, registrationMatchesSearch } from "@/modules/reg
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
 import { registrationAwaitingApproval, registrationMoneyStatus, registrationStatusWord, waitlistStatusText } from "@/modules/registrations/status-words";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
+import { samePhoneNumber } from "@/components/form-has-edits";
+import { useEditedForms } from "@/components/use-edited-forms";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 
 type LifecycleAction = "cancel" | "reactivate" | "waitlist" | "promote";
 type RegistrationOperationDraft = {
@@ -68,6 +71,14 @@ type RegistrationOperationDraft = {
   age: string;
   clientRequestId: string;
 };
+
+/** A transfer or substitution that holds typed work: any detail filled in, or (for a substitution) a name changed from the attendee's own (#1468). */
+function operationHasWork(draft: RegistrationOperationDraft, current: { firstName: string; lastName: string } | undefined) {
+  if ([draft.email, draft.phone, draft.reason, draft.age].some((value) => value.trim() !== "")) return true;
+  const first = draft.kind === "substitution" ? current?.firstName ?? "" : "";
+  const last = draft.kind === "substitution" ? current?.lastName ?? "" : "";
+  return draft.firstName.trim() !== first.trim() || draft.lastName.trim() !== last.trim();
+}
 
 const lifecycleCopy: Record<LifecycleAction, { eyebrow: string; title: string; detail: string; submit: string }> = {
   cancel: {
@@ -350,8 +361,16 @@ export function PeopleWorkspace({
   const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
   // The optional staff note in the lifecycle dialog; the dialog's field is uncontrolled, so each opening starts blank.
   const lifecycleReasonRef = useRef("");
-  useEffect(() => { lifecycleReasonRef.current = ""; }, [lifecycleAction]);
+  const edits = useEditedForms();
+  const { mark } = edits;
+  useEffect(() => { lifecycleReasonRef.current = ""; mark("lifecycleNote", false); }, [lifecycleAction, mark]);
   const [operationDraft, setOperationDraft] = useState<RegistrationOperationDraft | null>(null);
+  // Unsaved work in the open registration: the contact form, the add-attendee form, an attendee's email edit and the
+  // transfer or substitution details (each against what it opened with; a phone is compared from its own value), a transfer
+  // or substitution carried to its review step, and a note typed in the status dialog. Saving, Back, Cancel, or closing the
+  // registration takes the form off the page and clears it (#1468).
+  const operationEdited = operationDraft !== null && operationHasWork(operationDraft, selected?.attendees.find((attendee) => attendee.id === operationDraft.attendeeId));
+  useUnsavedChangesGuard(edits.dirty || operationEdited);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [emailingSelection, setEmailingSelection] = useState(false);
   const [resendingMessageId, setResendingMessageId] = useState<string | null>(null);
@@ -984,7 +1003,7 @@ export function PeopleWorkspace({
                   />
                 ) : operationDraft ? (
                   operationDraft.step === "details" ? (
-                    <form className="form-stack registration-operation" onSubmit={reviewRegistrationOperation}>
+                    <form className="form-stack registration-operation" onChange={edits.track("operation", { ignore: ["phone"] })} onSubmit={reviewRegistrationOperation} ref={edits.gone("operation", "operation:phone")}>
                       <div className="operation-step-heading">
                         <p className="eyebrow">Step 1 of 2 · Enter details</p>
                         <h3>{operationDraft.kind === "transfer" ? "Who should manage this registration now?" : `Who is replacing ${operationAttendee?.firstName ?? "this attendee"}?`}</h3>
@@ -998,7 +1017,7 @@ export function PeopleWorkspace({
                       </div>
                       <div className="form-grid two-column">
                         <label>{operationDraft.kind === "transfer" ? "New contact email" : "Replacement email (optional)"}<input name="email" type="email" required={operationDraft.kind === "transfer"} maxLength={160} defaultValue={operationDraft.email} /></label>
-                        <label>New phone (optional)<PhoneInput label="New phone" name="phone" defaultValue={operationDraft.phone} showNow={phoneAttempt === "operation"} /></label>
+                        <label>New phone (optional)<PhoneInput label="New phone" name="phone" defaultValue={operationDraft.phone} onValueChange={(value) => edits.mark("operation:phone", !samePhoneNumber(value, operationDraft.phone))} showNow={phoneAttempt === "operation"} /></label>
                       </div>
                       {operationDraft.kind === "substitution" && (
                         <label>Age on the event&apos;s age date (team events only)<input name="age" inputMode="numeric" pattern="[0-9]{1,3}" maxLength={3} defaultValue={operationDraft.age} /></label>
@@ -1131,7 +1150,7 @@ export function PeopleWorkspace({
                               <dt>Email</dt>
                               <dd>
                                 {editingAttendeeEmailId === attendee.id
-                                  ? <form className="inline-edit-form" onSubmit={(event) => updateAttendeeEmail(event, attendee.id)}>
+                                  ? <form className="inline-edit-form" onChange={edits.track("attendeeEmail")} onSubmit={(event) => updateAttendeeEmail(event, attendee.id)} ref={edits.gone("attendeeEmail")}>
                                       <input name="email" type="email" defaultValue={attendee.email} autoFocus placeholder="attendee@example.com" />
                                       <button className="text-button" type="submit" disabled={savingAttendeeEmail}>{savingAttendeeEmail ? "Saving…" : "Save"}</button>
                                       <button className="text-button" type="button" onClick={() => { setEditingAttendeeEmailId(null); setError(""); }}>Cancel</button>
@@ -1210,7 +1229,7 @@ export function PeopleWorkspace({
                 {selected.publicSubmission && <RegistrationSignaturesPanel key={selected.id} eventId={eventId} registrationId={selected.id} timeZone={eventTimezone} attendeeNames={Object.fromEntries(selected.attendees.map((attendee) => [attendee.id, `${attendee.firstName} ${attendee.lastName}`.trim()]))} />}
                 <RegistrationNotesTagsPanel eventId={eventId} subjectPath={`registrations/${selected.id}`} canManage={canEdit} />
                 {selected.publicSubmission && <p className="quiet-copy">This registration came through a published form. Submitted attendees, choices, and pricing stay together as one auditable snapshot.</p>}
-                {addingAttendee && <form className="form-stack inset-form" onSubmit={addAttendee}><div className="form-grid two-column"><label>First name<input name="firstName" required /></label><label>Last name<input name="lastName" required /></label></div><div className="form-grid two-column"><label>Email<input name="email" type="email" /></label><label>Phone<PhoneInput label="Phone" name="phone" showNow={phoneAttempt === "add"} /></label></div><label>Attendee type<select name="attendeeType" defaultValue="ATTENDEE"><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setAddingAttendee(false); setPhoneAttempt(null); setError(""); }}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add attendee"}</button></div></form>}
+                {addingAttendee && <form className="form-stack inset-form" onChange={edits.track("addAttendee", { ignore: ["phone"] })} onSubmit={addAttendee} ref={edits.gone("addAttendee", "addAttendee:phone")}><div className="form-grid two-column"><label>First name<input name="firstName" required /></label><label>Last name<input name="lastName" required /></label></div><div className="form-grid two-column"><label>Email<input name="email" type="email" /></label><label>Phone<PhoneInput label="Phone" name="phone" onValueChange={(value) => edits.mark("addAttendee:phone", value.trim() !== "")} showNow={phoneAttempt === "add"} /></label></div><label>Attendee type<select name="attendeeType" defaultValue="ATTENDEE"><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><button className="secondary-button" type="button" onClick={() => { setAddingAttendee(false); setPhoneAttempt(null); setError(""); }}>Cancel</button><button className="primary-button" type="submit" disabled={saving}>{saving ? "Adding…" : "Add attendee"}</button></div></form>}
                 {canEdit && !addingAttendee && (
                   <>
                     <div className="registration-management-actions">
@@ -1251,7 +1270,7 @@ export function PeopleWorkspace({
                       <p>{lifecycleCopy[lifecycleAction].detail}</p>
                       {lifecycleAction === "cancel" && <p className="confirm-scope">This releases the space held by <strong>{attendeeCountPhrase(selected.attendeeCount)}</strong> ({selected.confirmationCode}).</p>}
                       {lifecycleAction === "cancel" && selected.attendees.some((attendee) => attendee.checkedIn) && <div className="inline-notice" role="note">Already checked in. Cancelling does not undo the check-in.</div>}
-                      <label>Reason or staff note <textarea name="reason" rows={3} maxLength={500} placeholder="Optional — saved in the event audit history" onChange={(event) => { lifecycleReasonRef.current = event.target.value; }} /></label>
+                      <label>Reason or staff note <textarea name="reason" rows={3} maxLength={500} placeholder="Optional — saved in the event audit history" onChange={(event) => { lifecycleReasonRef.current = event.target.value; edits.mark("lifecycleNote", event.target.value.trim() !== ""); }} /></label>
                     </div>
                   </ConfirmDialog>
                 )}
@@ -1259,9 +1278,9 @@ export function PeopleWorkspace({
                 )}
               </div>
             ) : (
-              <form className="form-stack" onSubmit={saveRegistration}>
+              <form className="form-stack" onChange={edits.track("editContact", { ignore: ["phone"] })} onSubmit={saveRegistration} ref={edits.gone("editContact", "editContact:phone")}>
                 <div className="form-grid two-column"><label>First name<input name="firstName" required defaultValue={formRecord?.accountHolder.firstName} /></label><label>Last name<input name="lastName" required defaultValue={formRecord?.accountHolder.lastName} /></label></div>
-                <div className="form-grid two-column"><label>Email<input name="email" type="email" defaultValue={formRecord?.accountHolder.email} /></label><label>Phone<PhoneInput label="Phone" name="phone" defaultValue={formRecord?.accountHolder.phone} stored={formRecord?.accountHolder.phone} showNow={phoneAttempt === "edit"} /></label></div>
+                <div className="form-grid two-column"><label>Email<input name="email" type="email" defaultValue={formRecord?.accountHolder.email} /></label><label>Phone<PhoneInput label="Phone" name="phone" defaultValue={formRecord?.accountHolder.phone} onValueChange={(value) => edits.mark("editContact:phone", !samePhoneNumber(value, formRecord?.accountHolder.phone ?? ""))} stored={formRecord?.accountHolder.phone} showNow={phoneAttempt === "edit"} /></label></div>
                 {formRecord && !formRecord.publicSubmission && formRecord.attendeeCount === 1 && <label>Attendee type<select name="attendeeType" defaultValue={formRecord.attendeeType}><option value="ATTENDEE">Attendee</option><option value="WORKER">Event worker</option><option value="CHILD">Child</option></select></label>}
                 <p className="quiet-copy">This screen updates contact details only. Use the clearly named registration actions to change status, and Finance to record payments or refunds.</p>
                 {error && <p className="form-error" role="alert">{error}</p>}
