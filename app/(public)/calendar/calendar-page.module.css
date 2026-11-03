@@ -1,4 +1,3 @@
-.calendarPage :global(.public-header-links) { flex: 1 1 280px; }
 .calendarPage .hero { z-index: 7; max-width: 1180px; overflow: visible; margin: 24px auto 0; padding: 42px 44px; border-radius: var(--radius-modal); background: var(--imsda-navy); }
 .calendarPage .hero::after { display: none; }
 .calendarPage .hero h1 { color: var(--card); font-size: clamp(2.3rem, 4vw, 3.5rem); letter-spacing: -.025em; line-height: 1.08; }
@@ -10,9 +9,6 @@
 .calendarPage :global(.calendar-sticky-bar) { background: var(--card); box-shadow: var(--shadow); }
 @media (max-width: 760px) {
   .calendarPage .hero { margin: 12px; padding: 26px 22px; }
-  .calendarPage :global(.public-header-links) { flex-basis: 100%; flex-wrap: nowrap; justify-content: flex-start; }
-  .calendarPage :global(.public-header-nav) { flex: 1 1 auto; overflow-x: auto; }
-  .calendarPage :global(.public-header-nav) ul { width: max-content; flex-wrap: nowrap; }
   .calendarPage :global(.calendar-layout:has(.calendar-year-board)) { width: auto; }
 }
 @media (max-width: 360px) {
@@ -24,4 +20,16 @@
   .calendarPage :global(.calendar-today-link) { min-width: 44px; padding-inline: 2px; }
   .calendarPage :global(.calendar-month) { grid-template-columns: minmax(0, 1fr); overflow-x: auto; }
   .calendarPage :global(.calendar-weekdays), .calendarPage :global(.calendar-week) { min-width: 318px; }
+}
+/* A container query also responds to browser/text zoom within a narrow calendar. */
+.calendarPage { container: public-calendar / inline-size; }
+@container public-calendar (max-width: 340px) {
+  .calendarPage :global(.calendar-sticky-bar) { position: static; grid-template-columns: minmax(0, 1fr); }
+  .calendarPage :global(.calendar-toolbar) { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+  .calendarPage :global(.calendar-view-toggle) { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 6rem), 1fr)); min-width: 0; max-width: 100%; }
+  .calendarPage :global(.calendar-view-toggle) a { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+  .calendarPage :global(.calendar-month-nav) { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; min-width: 0; width: 100%; gap: 4px; }
+  .calendarPage :global(.calendar-month-nav) h2 { min-width: 0; font-size: 1rem; overflow-wrap: anywhere; }
+  .calendarPage :global(.calendar-month-nav) :global(.secondary-button) { width: 44px; min-width: 44px; min-height: 44px; }
+  .calendarPage :global(.calendar-today-link) { grid-column: 1 / -1; justify-self: center; }
 }

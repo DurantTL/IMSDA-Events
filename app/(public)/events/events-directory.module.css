@@ -1,6 +1,5 @@
 .directory :global(.public-registration-hero) { max-width: 1180px; margin: 24px auto 0; padding: 42px 44px; border-radius: var(--radius-modal); background: var(--imsda-navy); }
 .directory :global(.public-registration-hero) h1 { font-size: clamp(2.3rem, 4vw, 3.5rem); letter-spacing: -.025em; line-height: 1.08; }
-.directory :global(.public-header-links) { flex: 1 1 280px; }
 .heroDescription { max-width: 48ch; margin: 12px 0 0; color: var(--card); font-size: 1.08rem; }
 .discovery { display: grid; gap: 14px; padding: 20px 24px; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); }
 .directory :global(.open-events-filter) { gap: 10px; }
@@ -43,8 +42,5 @@
 }
 @media (max-width: 760px) {
   .directory :global(.public-registration-hero) { margin: 12px; padding: 26px 22px; }
-  .directory :global(.public-header-links) { flex-basis: 100%; flex-wrap: nowrap; justify-content: flex-start; }
-  .directory :global(.public-header-nav) { flex: 1 1 auto; overflow-x: auto; }
-  .directory :global(.public-header-nav) ul { width: max-content; flex-wrap: nowrap; }
   .discovery { padding: 18px; }
 }

@@ -18,7 +18,12 @@ const items = [
 ];
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
+vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => ({ ...(await import("@/modules/site-content/hub-content-domain")).defaultHubContent(), navLinks: [{ href: "/unexpected-category", label: "Unexpected category" }] }) }));
+vi.mock("@/components/public-header-session-links", async () => {
+  const { createElement } = await import("react");
+  const { PublicHeaderNavLinks } = await import("@/components/public-header-nav-links");
+  return { PublicHeaderSessionLinks: ({ navLinks }: { navLinks?: { href: string; label: string }[] }) => createElement(PublicHeaderNavLinks, { links: navLinks ?? [{ href: "/unexpected-category", label: "Unexpected category" }] }) };
+});
 vi.mock("@/modules/calendar/repository", () => ({
   conferenceToday: () => "2026-03-10",
   listPublicCalendarItems: async () => items,
@@ -37,6 +42,7 @@ describe("public calendar month render (#1202)", () => {
   it("uses the public site navigation and footer without changing calendar controls", async () => {
     const markup = await render({ month: "2026-03" });
     expect(markup).toContain('aria-label="Explore"');
+    expect(markup).not.toContain("Unexpected category");
     expect(markup).toContain('href="/events">Events</a>');
     expect(markup).toContain('aria-current="page" href="/calendar">Calendar</a>');
     expect(markup).toContain('href="/clubs">Club ministry</a>');

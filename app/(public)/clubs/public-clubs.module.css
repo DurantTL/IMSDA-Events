@@ -45,10 +45,3 @@
 .nextSteps :global(.start-a-club-icon) { display: none; }
 .nextSteps :global(.start-a-club-body) h2 { font-size: clamp(1.4rem, 2.3vw, 1.8rem); }
 .nextSteps :global(.start-a-club-body) p { margin: 16px 0; font-size: 1rem; }
-/* Keep the primary menu and account action within the header at high zoom. */
-.page :global(.public-registration-header-inner) { flex-wrap: wrap; }
-/* Keep the shared wordmark within the available header width at high zoom. */
-.page :global(.public-registration-brand) { min-width: 0; max-width: 100%; }
-.page :global(.public-registration-brand) > span { min-width: 0; }
-.page :global(.public-registration-brand) strong,
-.page :global(.public-registration-brand) small { white-space: normal; overflow-wrap: anywhere; }

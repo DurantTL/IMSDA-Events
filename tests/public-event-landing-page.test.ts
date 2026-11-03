@@ -19,10 +19,14 @@ vi.mock("next/navigation", () => ({
 // The page sanitizes custom HTML (#816) through a server-only module.
 vi.mock("server-only", () => ({}));
 // The header's session links read cookies and the database (#1009); they have their own tests.
-vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
+vi.mock("@/components/public-header-session-links", async () => {
+  const { createElement } = await import("react");
+  const { PublicHeaderNavLinks } = await import("@/components/public-header-nav-links");
+  return { PublicHeaderSessionLinks: ({ navLinks }: { navLinks?: { href: string; label: string }[] }) => createElement(PublicHeaderNavLinks, { links: navLinks ?? [{ href: "/unexpected-category", label: "Unexpected category" }] }) };
+});
 vi.mock("@/modules/site-content/hub-content", async () => {
   const { defaultHubContent } = await import("@/modules/site-content/hub-content-domain");
-  return { getPublishedHubContent: async () => defaultHubContent() };
+  return { getPublishedHubContent: async () => ({ ...defaultHubContent(), navLinks: [{ href: "/unexpected-category", label: "Unexpected category" }] }) };
 });
 
 import { describePublicEventLifecycle } from "@/modules/events/public-domain";
@@ -87,6 +91,7 @@ describe("public event presentation (#1533)", () => {
     const markup = renderToStaticMarkup(await PublicEventPage({ params }));
     expect(markup).toContain('aria-label="IMAdventist calendar"');
     expect(markup).toContain('aria-label="Explore"');
+    expect(markup).not.toContain("Unexpected category");
     expect(markup).toContain('href="/events">Browse all events</a>');
     expect(markup).toContain('class="home-footer"');
     const metadata = await generateMetadata({ params });

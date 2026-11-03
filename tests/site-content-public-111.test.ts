@@ -25,7 +25,11 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAtten
 vi.mock("@/modules/system-admin/homepage-ministries", () => ({ listHomepageMinistries: mocks.ministries }));
 vi.mock("@/modules/system-admin/platform-settings", () => ({ getPublicHelpContact: mocks.help }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ event: { findMany: mocks.eventFindMany } }) }));
-vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
+vi.mock("@/components/public-header-session-links", async () => {
+  const { createElement } = await import("react");
+  const { PublicHeaderNavLinks } = await import("@/components/public-header-nav-links");
+  return { PublicHeaderSessionLinks: ({ navLinks }: { navLinks?: { href: string; label: string }[] }) => createElement(PublicHeaderNavLinks, { links: navLinks ?? [{ href: "/unexpected-category", label: "Unexpected category" }] }) };
+});
 // The homepage test below swaps the real featured query for a stub so only the content's own rules are under test.
 vi.mock("@/modules/events/featured", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/modules/events/featured")>();
@@ -54,6 +58,16 @@ beforeEach(() => {
   mocks.curated.mockResolvedValue([]);
   mocks.flagged.mockResolvedValue([]);
   mocks.images.mockResolvedValue(new Map());
+});
+
+describe("fixed public discovery navigation (#1547)", () => {
+  it.each([false, true])("omits configured category links in the homepage and draft preview (preview=%s)", async (preview) => {
+    const content = withContent({ navLinks: [{ href: "/unexpected-category", label: "Unexpected category" }] });
+    const html = renderToStaticMarkup(await PublicHomePage({ content, preview }));
+    expect(html).not.toContain("Unexpected category");
+    expect(html).not.toContain('aria-label="Site links"');
+    for (const path of ["/events", "/calendar", "/clubs"]) expect(html).toContain(`href="${path}"`);
+  });
 });
 
 describe("the homepage with nothing curated", () => {

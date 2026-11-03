@@ -112,7 +112,7 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
         <div className="public-registration-header-inner">
           <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" publicBrand wordmark />
           <nav aria-label="Explore" className={homeStyles.primaryNav}><Link aria-current="page" href="/events">Events</Link><Link href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
-          <div className="public-header-links"><PublicHeaderSessionLinks navLinks={hubContent.navLinks} /></div>
+          <div className="public-header-links"><PublicHeaderSessionLinks navLinks={[]} /></div>
         </div>
       </header>
 
