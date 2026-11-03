@@ -1,13 +1,15 @@
 import { BrandLink } from "@/components/brand-link";
 import { BrandMark } from "@/components/brand-mark";
 import { EventLoadingTransition } from "@/components/event-loading-transition";
+import homeStyles from "@/components/public-home-page.module.css";
+import styles from "./event-page.module.css";
 
 export default function PublicEventLoading() {
   return (
-    <main className="public-registration-page public-event-page" aria-busy="true">
+    <main className={`public-registration-page public-event-page ${homeStyles.page} ${styles.eventPage}`} aria-busy="true">
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand" wordmark />
+          <BrandLink className="public-registration-brand" label="IMAdventist calendar" publicBrand wordmark />
         </div>
       </header>
       <EventLoadingTransition>

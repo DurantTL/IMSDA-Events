@@ -13,10 +13,10 @@ import {
 import { BrandLink } from "@/components/brand-link";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
-import { SiteNoticesView } from "@/components/site-notices-view";
+import { HubLink, SiteNoticesView } from "@/components/site-notices-view";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { getPublishedHubContent } from "@/modules/site-content/hub-content";
-import { activeNotices } from "@/modules/site-content/hub-content-domain";
+import { activeNotices, splitVerse } from "@/modules/site-content/hub-content-domain";
 import { EventInfoCards } from "@/components/event-info-cards";
 import {
   EventContentBlocks,
@@ -38,6 +38,8 @@ import { getServerEnv } from "@/lib/env";
 import { directionsTargets } from "@/modules/events/directions";
 import { getPublicEventLanding } from "@/modules/events/public-repository";
 import { announcementBodyForDisplay } from "@/modules/communications/message-file-rules";
+import homeStyles from "@/components/public-home-page.module.css";
+import styles from "./event-page.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +72,7 @@ export async function generateMetadata({
       title: `${landing.event.name} registration`,
       description,
       type: "website",
-      siteName: "IMSDA Events",
+      siteName: "IMAdventist",
       url: `/events/${encodeURIComponent(eventSlug)}`,
     },
   };
@@ -83,6 +85,7 @@ export default async function PublicEventPage({
   const landing = await getPublicEventLanding(eventSlug);
   if (!landing) notFound();
   const hubContent = await getPublishedHubContent();
+  const verse = hubContent.footer.verse ? splitVerse(hubContent.footer.verse) : null;
 
   // Directions come from the typed place only (#1213). The share link is the canonical address built from the saved
   // slug, never the route param or the visitor's own URL, and only for an event others can open (#1214).
@@ -267,17 +270,13 @@ export default async function PublicEventPage({
   ) : null;
 
   return (
-    <main className="public-registration-page public-event-page">
+    <main className={`public-registration-page public-event-page ${homeStyles.page} ${styles.eventPage}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
+          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" publicBrand wordmark />
+          <nav aria-label="Explore" className={homeStyles.primaryNav}><Link href="/events">Events</Link><Link href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
           <div className="public-header-links">
-            {landing.links.detailsUrl && (
-              <a className="public-event-details-link" href={landing.links.detailsUrl}>
-                Back to full event details <ExternalLink size={15} aria-hidden="true" />
-              </a>
-            )}
-            <PublicHeaderSessionLinks />
+            <PublicHeaderSessionLinks navLinks={hubContent.navLinks} />
           </div>
         </div>
       </header>
@@ -288,6 +287,12 @@ export default async function PublicEventPage({
       {/* One container (#720): every section below shares this width and left
           edge at every viewport, with the same side gutters on a phone. */}
       <div className="public-event-container">
+      <Link className={styles.backLink} href="/events">Browse all events</Link>
+      {landing.links.detailsUrl && (
+        <a className="public-event-details-link" href={landing.links.detailsUrl}>
+          Full event details <ExternalLink size={15} aria-hidden="true" />
+        </a>
+      )}
       {/* The header banner (#816) comes first and owns the page's h1. With one, the event
           header below is a plain details row with no second title or hero (#1004); without
           a banner nothing changes. */}
@@ -442,6 +447,13 @@ export default async function PublicEventPage({
       {!autoCards && optionsLayout}
 
       {helpSection}
+      <footer className="home-footer">
+        {verse && <p className="home-footer-verse">{verse.text}{verse.cite && <> <cite>{verse.cite}</cite></>}</p>}
+        {hubContent.footer.contactLines.map((line, index) => <p className={homeStyles.homeFooterContact} key={`${index}-${line}`}>{line}</p>)}
+        {hubContent.footer.links.length > 0 && <nav aria-label="Footer links" className={homeStyles.homeFooterLinks}><ul>
+          {hubContent.footer.links.map((link, index) => <li key={`${link.href}-${index}`}><HubLink href={link.href}>{link.label}</HubLink></li>)}
+        </ul></nav>}
+      </footer>
       </div>
     </main>
   );
