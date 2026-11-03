@@ -1,0 +1,27 @@
+.calendarPage :global(.public-header-links) { flex: 1 1 280px; }
+.calendarPage .hero { z-index: 7; max-width: 1180px; overflow: visible; margin: 24px auto 0; padding: 42px 44px; border-radius: var(--radius-modal); background: var(--imsda-navy); }
+.calendarPage .hero::after { display: none; }
+.calendarPage .hero h1 { color: var(--card); font-size: clamp(2.3rem, 4vw, 3.5rem); letter-spacing: -.025em; line-height: 1.08; }
+.calendarPage .hero > div:first-child > p:last-child { max-width: 56ch; color: var(--card); font-size: 1.08rem; }
+.calendarPage .hero :global(.public-registration-eyebrow) { color: var(--imsda-gold); font-size: .875rem; }
+.calendarPage .hero > div:first-child a { color: var(--card); }
+.calendarPage .hero :global(.calendar-subscribe-toggle) { background: var(--imsda-gold); color: var(--imsda-navy); }
+.calendarPage :global(.calendar-layout:has(.calendar-year-board)) { width: min(1440px, calc(100% - 48px)); max-width: 1440px; }
+.calendarPage :global(.calendar-sticky-bar) { background: var(--card); box-shadow: var(--shadow); }
+@media (max-width: 760px) {
+  .calendarPage .hero { margin: 12px; padding: 26px 22px; }
+  .calendarPage :global(.public-header-links) { flex-basis: 100%; flex-wrap: nowrap; justify-content: flex-start; }
+  .calendarPage :global(.public-header-nav) { flex: 1 1 auto; overflow-x: auto; }
+  .calendarPage :global(.public-header-nav) ul { width: max-content; flex-wrap: nowrap; }
+  .calendarPage :global(.calendar-layout:has(.calendar-year-board)) { width: auto; }
+}
+@media (max-width: 360px) {
+  .calendarPage :global(.calendar-sticky-bar) { grid-template-columns: minmax(0, 1fr); }
+  .calendarPage :global(.calendar-toolbar), .calendarPage :global(.calendar-view-toggle), .calendarPage :global(.calendar-month-nav) { min-width: 0; }
+  .calendarPage :global(.calendar-view-toggle a) { gap: 4px; padding-inline: 6px; }
+  .calendarPage :global(.calendar-month-nav) { gap: 3px; }
+  .calendarPage :global(.calendar-month-nav h2) { font-size: 1rem; font-weight: 700; }
+  .calendarPage :global(.calendar-today-link) { min-width: 44px; padding-inline: 2px; }
+  .calendarPage :global(.calendar-month) { grid-template-columns: minmax(0, 1fr); overflow-x: auto; }
+  .calendarPage :global(.calendar-weekdays), .calendarPage :global(.calendar-week) { min-width: 318px; }
+}
