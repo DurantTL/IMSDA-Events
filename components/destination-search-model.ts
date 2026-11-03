@@ -120,6 +120,7 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/admin/settings": ["platform", "configuration", "preferences", "options", "sign-in settings", "payment settings"],
   "/admin/readiness": ["ready", "checklist", "go live", "launch"],
   "/admin/system-report": ["health", "status", "report", "problems", "errors", "monitoring"],
+  "/admin/pauses": ["pause", "maintenance", "stop registration", "stop payments", "outage", "freeze", "turn off"],
   "/profile": ["account", "password", "multi-factor", "mfa", "security", "my details", "sign in"],
   "/overview": ["home", "dashboard", "summary"],
   "/check-in": ["arrival", "scan", "badge"],

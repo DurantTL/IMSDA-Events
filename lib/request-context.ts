@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { requestCorrelationId, setLogRequestFieldSource } from "@/lib/logger";
 import { withNoStore } from "@/lib/live-list-response";
+import { classifyPausableArea } from "@/modules/system-admin/area-pause-model";
 
 /**
  * One correlation ID per request, reachable from anywhere inside it.
@@ -71,7 +72,16 @@ export function withRequestContext<Arguments extends unknown[]>(
       path: url,
     };
 
-    const response = await runWithRequestContext(context, () => handler(request, ...rest));
+    const response = await runWithRequestContext(context, async () => {
+      // A paused area refuses the change before the handler runs (#1518). Only a request that matches an area reads the switch.
+      // Loaded on demand so every other route (and anything that imports this file) never pulls in the database client.
+      if (classifyPausableArea(request.method, rawPath(request.url))) {
+        const { refuseIfAreaPaused } = await import("@/modules/system-admin/area-pause");
+        const paused = await refuseIfAreaPaused(request);
+        if (paused) return paused;
+      }
+      return handler(request, ...rest);
+    });
     // Response headers are immutable once set on some responses, so failing to
     // attach the header must never turn a successful response into an error.
     try {
@@ -91,6 +101,15 @@ export function withRequestContext<Arguments extends unknown[]>(
  */
 export function redactTokenPath(pathname: string) {
   return pathname.replace(/^(\/(?:api\/public\/)?(?:club-forms|manage|unsubscribe|staff-invite|staff-invitations)\/)[^/]+/, "$1[redacted]");
+}
+
+/** The unredacted path, only to decide which area a request belongs to. Never logged. */
+function rawPath(url: string) {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return "";
+  }
 }
 
 function safePath(url: string) {

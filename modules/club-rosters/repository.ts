@@ -537,6 +537,8 @@ export async function removeRosterMember(organizationId: string, memberId: strin
               // and both references are `onDelete: Restrict`, so the Person stays rather than failing the removal.
               acknowledgmentEvidenceAsSubject: true,
               acknowledgmentEvidenceActed: true,
+              // A withdrawal (#130) names the person who withdrew, also `onDelete: Restrict`.
+              acknowledgmentWithdrawalsActed: true,
               // Merge history (#127) and the anonymization record both point at the Person with `onDelete: Restrict`.
               mergesAsPrimary: true,
               mergesAsSecondary: true,

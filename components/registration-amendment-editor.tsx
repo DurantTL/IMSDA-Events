@@ -118,6 +118,8 @@ const ACKNOWLEDGMENT_STATUS_LABEL: Record<string, string> = {
   ACKNOWLEDGED_EARLIER_VERSION: "Acknowledged (an earlier version)",
   REACKNOWLEDGMENT_REQUIRED: "Needs to be acknowledged again",
   NOT_ACKNOWLEDGED: "Not acknowledged yet",
+  DECLINED: "Declined",
+  WITHDRAWN: "Withdrawn",
 };
 
 function AmendmentField({

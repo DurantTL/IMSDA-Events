@@ -70,6 +70,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     healthSnapshots,
     heldHealthSnapshots,
     acknowledgmentEvidence,
+    acknowledgmentWithdrawals,
     signatureEvidence,
   ] = await Promise.all([
     db.registration.count({ where: inEvent }),
@@ -111,6 +112,8 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     countHeldHealthSnapshots(db, eventId),
     // Append-only acknowledgment evidence (#150): counted, never opened. Any row blocks the deletion.
     db.acknowledgmentEvidence.count({ where: inEvent }),
+    // Append-only withdrawals (#130): counted, never opened. Any row blocks the deletion.
+    db.acknowledgmentWithdrawal.count({ where: inEvent }),
     // Append-only typed signatures (#1265): counted, never opened. Any row blocks the deletion.
     db.signatureEvidence.count({ where: inEvent }),
   ]);
@@ -136,6 +139,7 @@ async function loadDeletionFacts(db: Db, eventId: string) {
     healthSnapshots,
     heldHealthSnapshots,
     acknowledgmentEvidence,
+    acknowledgmentWithdrawals,
     signatureEvidence,
   };
   return { event, facts: { isPublished: event.isPublished, counts } satisfies EventDeletionFacts };

@@ -6,7 +6,7 @@ import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { BrandLink } from "@/components/brand-link";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
-import { SiteNoticesView } from "@/components/site-notices-view";
+import { HubLink, SiteNoticesView } from "@/components/site-notices-view";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { addDays, calendarCountLabel, calendarItemStatusLine, formatDateRange, type CalendarItem } from "@/modules/calendar/domain";
 import {
@@ -28,10 +28,11 @@ import { pinFeatured } from "@/modules/events/featured-domain";
 import { listFeaturedEventRows } from "@/modules/events/featured";
 import { getPublishedHubContent } from "@/modules/site-content/hub-content";
 import { directoryFiltersInUse } from "@/modules/public-metrics/domain";
-import { activeNotices, applyCategoryPreferences } from "@/modules/site-content/hub-content-domain";
+import { activeNotices, applyCategoryPreferences, splitVerse } from "@/modules/site-content/hub-content-domain";
 import { clubRegistrationEntryPath } from "@/modules/club-registrations/entry-path";
 import { clubCapabilities } from "@/modules/organizations/director-grants-domain";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
+import homeStyles from "@/components/public-home-page.module.css";
 import styles from "./events-directory.module.css";
 
 export const dynamic = "force-dynamic";
@@ -103,13 +104,15 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
   const categories = applyCategoryPreferences(allCategories, hubContent.calendarCategories, filters.category);
   const { items, pinned } = pinFeatured(applyEventDirectoryFilters(openItems, filters), featuredRows);
   const clearHref = eventDirectoryHref({ audience: filter });
+  const verse = hubContent.footer.verse ? splitVerse(hubContent.footer.verse) : null;
 
   return (
-    <main className="public-registration-page public-calendar-page public-home-page">
+    <main className={`public-registration-page public-calendar-page public-home-page ${homeStyles.page} ${styles.directory}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
-          <div className="public-header-links"><PublicHeaderSessionLinks /></div>
+          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" publicBrand wordmark />
+          <nav aria-label="Explore" className={homeStyles.primaryNav}><Link aria-current="page" href="/events">Events</Link><Link href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
+          <div className="public-header-links"><PublicHeaderSessionLinks navLinks={hubContent.navLinks} /></div>
         </div>
       </header>
 
@@ -121,55 +124,62 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
 
       <section className="public-registration-hero calendar-hero public-home-banner">
         <div>
-          <p className="public-registration-eyebrow">Iowa-Missouri Conference</p>
+          <p className="public-registration-eyebrow">Iowa–Missouri Conference</p>
           <h1>Open for registration</h1>
+          <p className={styles.heroDescription}>Find a gathering for your family, your club, or your community.</p>
         </div>
       </section>
 
       <div className="calendar-layout">
-        <nav aria-label="Who the events are for" className="open-events-filter">
-          {openRegistrationFilters.map((value) => (
-            <Link aria-current={filter === value ? "page" : undefined} href={eventDirectoryHref({ ...filters, audience: value })} key={value}>{filterLabels[value]}</Link>
-          ))}
-        </nav>
+        <div className={styles.discovery}>
+          <nav aria-label="Who the events are for" className="open-events-filter">
+            {openRegistrationFilters.map((value) => (
+              <Link aria-current={filter === value ? "page" : undefined} href={eventDirectoryHref({ ...filters, audience: value })} key={value}>{filterLabels[value]}</Link>
+            ))}
+          </nav>
 
-        <SearchAsYouTypeForm action="/events" className={styles.eventsDirectoryForm} role="search" aria-label="Search and filter events">
-          {filter !== "all" && <input name="for" type="hidden" value={filter} />}
-          <div className={`${styles.eventsDirectoryField} ${styles.eventsDirectorySearch}`}>
-            <label htmlFor="events-q">Search events</label>
-            <EventsSearchField defaultValue={filters.q ?? ""} />
-          </div>
-          <div className={styles.eventsDirectoryField}>
-            <label htmlFor="events-from">From</label>
-            <input defaultValue={filters.from} id="events-from" max={windowEnd} min={today} name="from" type="date" />
-          </div>
-          <div className={styles.eventsDirectoryField}>
-            <label htmlFor="events-to">To</label>
-            <input defaultValue={filters.to} id="events-to" max={windowEnd} min={today} name="to" type="date" />
-          </div>
-          <div className={styles.eventsDirectoryField}>
-            <label htmlFor="events-category">Category</label>
-            <select defaultValue={filters.category} id="events-category" name="category">
-              <option value="">Any</option>
-              {categories.map((value) => <option key={value} value={value}>{value}</option>)}
-            </select>
-          </div>
-          <div className={styles.eventsDirectoryField}>
-            <label htmlFor="events-location">Location</label>
-            <select defaultValue={filters.location} id="events-location" name="location">
-              <option value="">Any</option>
-              {locations.map((value) => <option key={value} value={value}>{value}</option>)}
-            </select>
-          </div>
-          <div className={styles.eventsDirectoryActions}>
-            <button className="primary-button" type="submit">Show events</button>
-            {filtering && <Link className="secondary-button" href={clearHref}>Clear filters</Link>}
-          </div>
-        </SearchAsYouTypeForm>
-        <p className={styles.eventsDirectoryCount} role="status">{calendarCountLabel(items.length)}</p>
+          <SearchAsYouTypeForm action="/events" className={styles.eventsDirectoryForm} role="search" aria-label="Search and filter events">
+            {filter !== "all" && <input name="for" type="hidden" value={filter} />}
+            <div className={`${styles.eventsDirectoryField} ${styles.eventsDirectorySearch}`}>
+              <label htmlFor="events-q">Search events</label>
+              <EventsSearchField defaultValue={filters.q ?? ""} />
+            </div>
+            <details className={styles.eventsDirectoryMore} open={Boolean(filters.from || filters.to || filters.category || filters.location)}>
+              <summary>More filters</summary>
+              <div className={styles.eventsDirectoryFields}>
+                <div className={styles.eventsDirectoryField}>
+                  <label htmlFor="events-from">From</label>
+                  <input defaultValue={filters.from} id="events-from" max={windowEnd} min={today} name="from" type="date" />
+                </div>
+                <div className={styles.eventsDirectoryField}>
+                  <label htmlFor="events-to">To</label>
+                  <input defaultValue={filters.to} id="events-to" max={windowEnd} min={today} name="to" type="date" />
+                </div>
+                <div className={styles.eventsDirectoryField}>
+                  <label htmlFor="events-category">Category</label>
+                  <select defaultValue={filters.category} id="events-category" name="category">
+                    <option value="">Any</option>
+                    {categories.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </div>
+                <div className={styles.eventsDirectoryField}>
+                  <label htmlFor="events-location">Location</label>
+                  <select defaultValue={filters.location} id="events-location" name="location">
+                    <option value="">Any</option>
+                    {locations.map((value) => <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </div>
+              </div>
+            </details>
+            <div className={styles.eventsDirectoryActions}>
+              <button className="primary-button" type="submit">Show events</button>
+              {filtering && <Link className="secondary-button" href={clearHref}>Clear filters</Link>}
+            </div>
+          </SearchAsYouTypeForm>
+        </div>
 
         <section aria-labelledby="open-events-heading" className="calendar-agenda">
-          <h2 className="sr-only" id="open-events-heading">Events open for registration</h2>
+          <div className={styles.resultsHeading}><h2 id="open-events-heading">Events open for registration</h2><p className={styles.eventsDirectoryCount} role="status">{calendarCountLabel(items.length)}</p></div>
           {items.length === 0 ? (
             <div className="calendar-empty">
               <p>{filtering ? "No events match these filters." : emptyWording[filter]}</p>
@@ -182,6 +192,13 @@ export default async function OpenForRegistrationPage({ searchParams }: { search
             </ul>
           )}
         </section>
+        <footer className="home-footer">
+          {verse && <p className="home-footer-verse">{verse.text}{verse.cite && <> <cite>{verse.cite}</cite></>}</p>}
+          {hubContent.footer.contactLines.map((line, index) => <p className={homeStyles.homeFooterContact} key={`${index}-${line}`}>{line}</p>)}
+          {hubContent.footer.links.length > 0 && <nav aria-label="Footer links" className={homeStyles.homeFooterLinks}><ul>
+            {hubContent.footer.links.map((link, index) => <li key={`${link.href}-${index}`}><HubLink href={link.href}>{link.label}</HubLink></li>)}
+          </ul></nav>}
+        </footer>
       </div>
     </main>
   );

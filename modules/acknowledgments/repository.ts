@@ -8,6 +8,11 @@ import {
   approvedRequestMetadata,
   decideActing,
   evidenceRequestHash,
+  hasLiveAcceptance,
+  isLiveAcceptance,
+  latestLiveAction,
+  liveActMoment,
+  normalizePaperLocation,
   planAcknowledgments,
   policyContent,
   resolveAcknowledgmentStatus,
@@ -15,8 +20,11 @@ import {
   submissionEvidenceKey,
   textContent,
   acknowledgmentFields,
+  withdrawalRequestHash,
+  type AcknowledgmentAction,
   type AcknowledgmentChannel,
   type AcknowledgmentDisplay,
+  type HistoryRow,
   type AcknowledgmentStatusCode,
   type ActingDecision,
   type ShownContent,
@@ -42,6 +50,11 @@ import { formatPersonName } from "@/lib/person-name";
  * Evidence is written inside the caller's transaction, so it commits or rolls back with the registration it belongs to.
  * A retry cannot create a second row: an idempotency key replays the first result, and a unique index per subject kind
  * stops the same content being recorded twice for the same subject and field. Audit entries carry ids only, never text.
+ *
+ * Decline and withdrawal (#130) are further events on the same history, never edits: a decline is another evidence row
+ * (action DECLINE), a withdrawal is a separate append-only row naming the acceptance it withdraws. Every action write
+ * takes a transaction-scoped advisory lock on its subject and field first, so two submissions that race end in exactly
+ * one event. Status is derived from the history at read time (`latestLiveAction`), never stored.
  */
 
 export type AcknowledgmentErrorCode =
@@ -61,7 +74,16 @@ export type AcknowledgmentErrorCode =
   | "ACKNOWLEDGMENT_REFUSED"
   | "IDEMPOTENCY_CONFLICT"
   | "REASON_REQUIRED"
-  | "EVIDENCE_NOT_FOUND";
+  | "EVIDENCE_NOT_FOUND"
+  | "ALREADY_ACKNOWLEDGED"
+  | "EVIDENCE_NOT_WITHDRAWABLE"
+  | "EVIDENCE_VOIDED"
+  | "EVIDENCE_WITHDRAWN"
+  | "WITHDRAWN_AT_INVALID"
+  | "ACT_BEFORE_LATEST"
+  | "NOT_CURRENT_ACCEPTANCE"
+  | "PAPER_LOCATION_REQUIRED"
+  | "PAPER_LOCATION_NOT_ALLOWED";
 
 export type AcknowledgmentRefusal = {
   fieldId: string;
@@ -88,6 +110,9 @@ type Client = Prisma.TransactionClient | PrismaClient;
 const IN_SCOPE_STATUSES = ["SUBMITTED", "CONFIRMED", "WAITLISTED"] as const;
 /** Browser and clock allowance for an "acknowledged at" that is a little ahead of the server. */
 const FUTURE_TOLERANCE_MS = 5 * 60_000;
+/** Action writes queue on a per-subject advisory lock while holding a connection, so a burst of double submissions can
+ *  wait longer than Prisma's 2-second default for a free connection. */
+const ACTION_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 15_000 } as const;
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -105,6 +130,8 @@ export type EvidenceSummary = {
   subjectPersonId: string | null;
   actedByPersonId: string;
   channel: AcknowledgmentChannel;
+  /** ACKNOWLEDGE or DECLINE (#130). */
+  action: AcknowledgmentAction;
   fieldKey: string;
   fieldLabel: string;
   source: "TEXT" | "POLICY_VERSION";
@@ -116,6 +143,8 @@ export type EvidenceSummary = {
   recordedAt: string;
   /** When staff voided it (a correction, #150); null while it stands. The reason is only in the payload read. */
   voidedAt: string | null;
+  /** The withdrawal of this acceptance (#130), if any: when, and how. No wording, no metadata, no paper location. */
+  withdrawal: { id: string; withdrawnAt: string; recordedAt: string; channel: AcknowledgmentChannel } | null;
 };
 
 const summarySelect = {
@@ -125,6 +154,7 @@ const summarySelect = {
   subjectPersonId: true,
   actedByPersonId: true,
   channel: true,
+  action: true,
   fieldKey: true,
   fieldLabel: true,
   source: true,
@@ -135,6 +165,7 @@ const summarySelect = {
   acknowledgedAt: true,
   recordedAt: true,
   void: { select: { voidedAt: true } },
+  withdrawal: { select: { id: true, withdrawnAt: true, recordedAt: true, channel: true } },
 } as const;
 
 type SummaryRow = Prisma.AcknowledgmentEvidenceGetPayload<{ select: typeof summarySelect }>;
@@ -147,6 +178,7 @@ function summarize(row: SummaryRow): EvidenceSummary {
     subjectPersonId: row.subjectPersonId,
     actedByPersonId: row.actedByPersonId,
     channel: row.channel,
+    action: row.action,
     fieldKey: row.fieldKey,
     fieldLabel: row.fieldLabel,
     source: row.source,
@@ -155,6 +187,9 @@ function summarize(row: SummaryRow): EvidenceSummary {
     subjectMinorStatus: row.subjectMinorStatus,
     guardianAuthorityId: row.guardianAuthorityId,
     voidedAt: row.void?.voidedAt ? row.void.voidedAt.toISOString() : null,
+    withdrawal: row.withdrawal
+      ? { id: row.withdrawal.id, withdrawnAt: row.withdrawal.withdrawnAt.toISOString(), recordedAt: row.withdrawal.recordedAt.toISOString(), channel: row.withdrawal.channel }
+      : null,
     acknowledgedAt: row.acknowledgedAt.toISOString(),
     recordedAt: row.recordedAt.toISOString(),
   };
@@ -169,14 +204,22 @@ function summarize(row: SummaryRow): EvidenceSummary {
  * version is looked up by its id for this event and must be published and of the acknowledgment kind. A version of
  * another event's policy, a draft, or a policy of another kind is not found.
  */
-export async function resolveShownContent(eventId: string, field: RegistrationFormField): Promise<ShownContent> {
+/**
+ * Pass the transaction as `client` when calling inside one: a second pooled connection taken while the transaction holds
+ * one can starve the pool when several submissions for the same person wait on the subject lock at once.
+ */
+export async function resolveShownContent(
+  eventId: string,
+  field: RegistrationFormField,
+  client?: Pick<Prisma.TransactionClient, "consentPolicyVersion">,
+): Promise<ShownContent> {
   const config = field.acknowledgment;
   if (field.type !== "ACKNOWLEDGMENT" || !config) {
     throw new AcknowledgmentError("FIELD_NOT_FOUND", "That field is not an acknowledgment.");
   }
   if (config.source === "TEXT") return textContent(config.text);
   try {
-    const version = await getPolicyVersionForEvidence(eventId, config.policyVersionId, "ACKNOWLEDGMENT");
+    const version = await getPolicyVersionForEvidence(eventId, config.policyVersionId, "ACKNOWLEDGMENT", client);
     return policyContent(version);
   } catch (error) {
     if (error instanceof ConsentPolicyError || error instanceof PolicyKindMismatchError) {
@@ -244,6 +287,10 @@ export type RecordRequest = {
   acknowledgedAt: Date;
   idempotencyKey: string;
   requestMetadata?: Record<string, unknown>;
+  /** ACKNOWLEDGE (the default) or DECLINE (#130; staff-recorded only, never ONLINE). */
+  action?: AcknowledgmentAction;
+  /** Where a PAPER form lives; required for PAPER and refused for every other channel. Never its contents. */
+  paperLocation?: string | null;
 };
 
 export type RecordOutcome = {
@@ -254,7 +301,7 @@ export type RecordOutcome = {
   replayed: boolean;
 };
 
-/** The latest row (highest generation) for this subject, field and content: the one that is live unless it was voided. */
+/** The latest acceptance (highest generation) for this subject, field and content: the one that is live unless it was voided or withdrawn. */
 async function findByNaturalKey(client: Client, request: RecordRequest, contentRef: string) {
   return client.acknowledgmentEvidence.findFirst({
     where: {
@@ -262,6 +309,7 @@ async function findByNaturalKey(client: Client, request: RecordRequest, contentR
       registrationAttendeeId: request.attendee?.attendeeId ?? null,
       fieldKey: request.field.key,
       contentRef,
+      action: "ACKNOWLEDGE",
     },
     orderBy: { generation: "desc" },
     select: { ...summarySelect, generation: true },
@@ -269,16 +317,68 @@ async function findByNaturalKey(client: Client, request: RecordRequest, contentR
 }
 
 /**
- * Writes one acknowledgment inside the caller's transaction.
+ * Serializes every action write (acknowledge, decline, withdraw) for one subject and field: a transaction-scoped advisory
+ * lock, released at commit or rollback. Two submissions that race, under different request keys, take turns, so the second
+ * sees the first's row and ends in exactly one action event instead of two. The key never leaves the database.
+ */
+function subjectFieldLockKey(registrationId: string, attendeeId: string | null, fieldKey: string) {
+  // Always carries the registration id, so a registration-level subject never shares a lock with another registration's.
+  return `acknowledgment:${registrationId}:${attendeeId ?? "registration"}:${fieldKey}`;
+}
+
+async function lockSubjectField(tx: Client, registrationId: string, attendeeId: string | null, fieldKey: string) {
+  const key = subjectFieldLockKey(registrationId, attendeeId, fieldKey);
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
+}
+
+/** Everything recorded for one subject and field, oldest first, shaped for the status rules. */
+async function readSubjectHistory(client: Client, registrationId: string, attendeeId: string | null, fieldKey: string) {
+  const rows = await client.acknowledgmentEvidence.findMany({
+    where: { registrationId, registrationAttendeeId: attendeeId, fieldKey },
+    orderBy: [{ acknowledgedAt: "asc" }, { id: "asc" }],
+    select: { ...summarySelect, contentRef: true },
+  });
+  return rows.map((row) => {
+    const summary = summarize(row);
+    return { ...historyRow(summary), contentRef: row.contentRef, summary };
+  });
+}
+
+/** A summary as the status rules read it. */
+function historyRow(summary: EvidenceSummary): HistoryRow & { source: "TEXT" | "POLICY_VERSION"; policyVersionId: string | null } {
+  return {
+    id: summary.id,
+    action: summary.action,
+    acknowledgedAt: summary.acknowledgedAt,
+    recordedAt: summary.recordedAt,
+    voidedAt: summary.voidedAt,
+    withdrawal: summary.withdrawal,
+    source: summary.source,
+    policyVersionId: summary.policyVersionId,
+  };
+}
+
+/**
+ * Writes one acknowledgment or decline inside the caller's transaction.
  *
- * Order matters. A request that was already recorded under the same idempotency key replays its first result
- * before anything else is judged, so a retry still succeeds after the authority behind it has since changed. A
- * different request under the same key is refused. Otherwise who may act is decided (a minor needs the declared
- * responsible adult), and then the row is written once: the same subject, field and content a second time returns
- * the row already on file instead of adding a conflicting duplicate.
+ * Order matters. The subject and field are locked first (see `lockSubjectField`). A request that was already recorded
+ * under the same idempotency key then replays its first result before anything else is judged, so a retry still succeeds
+ * after the authority behind it has since changed. A different request under the same key is refused. Otherwise who may
+ * act is decided (a minor needs the declared responsible adult), and then the row is written once.
+ *
+ * - Acknowledge: the same subject, field and content a second time returns the live row already on file instead of adding a
+ *   duplicate; a voided or withdrawn one is followed by the next generation.
+ * - Decline: refused while a live acceptance exists (withdraw it instead); a repeat of the latest live decline of the
+ *   same content returns that row. A decline is never recorded online.
  */
 export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient, request: RecordRequest): Promise<RecordOutcome> {
-  const content = await resolveShownContent(request.eventId, request.field);
+  const action: AcknowledgmentAction = request.action ?? "ACKNOWLEDGE";
+  const location = normalizePaperLocation(request.channel, request.paperLocation);
+  if (!location.ok) throw new AcknowledgmentError(location.code, location.message);
+  if (action === "DECLINE" && request.channel === "ONLINE") {
+    throw new AcknowledgmentError("ACKNOWLEDGMENT_REFUSED", "A decline is recorded by staff, never from the online form.");
+  }
+  const content = await resolveShownContent(request.eventId, request.field, tx);
   const identity = {
     eventId: request.eventId,
     registrationId: request.registrationId,
@@ -287,8 +387,12 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
     actedByPersonId: request.actedByPersonId,
     channel: request.channel,
     contentRef: content.contentRef,
+    action,
+    paperLocation: location.value,
   };
   const requestHash = evidenceRequestHash(identity);
+
+  await lockSubjectField(tx, request.registrationId, request.attendee?.attendeeId ?? null, request.field.key);
 
   const keyed = await tx.acknowledgmentEvidence.findUnique({
     where: { eventId_idempotencyKey: { eventId: request.eventId, idempotencyKey: request.idempotencyKey } },
@@ -313,10 +417,28 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
   });
   if (!decision.allowed) throw new AcknowledgmentError(decision.code, decision.message);
 
-  const existing = await findByNaturalKey(tx, request, content.contentRef);
-  if (existing && !existing.void) return { evidence: summarize(existing), created: false, replayed: false };
-  // A voided acknowledgment can be recorded again: the next generation (all earlier ones are voided, so this is their count).
-  const generation = existing ? existing.generation + 1 : 0;
+  // Everything below is judged on the history under the lock, so racing requests see each other.
+  const history = await readSubjectHistory(tx, request.registrationId, request.attendee?.attendeeId ?? null, request.field.key);
+  const latest = latestLiveAction(history);
+  let generation = 0;
+  if (action === "DECLINE") {
+    if (hasLiveAcceptance(history)) {
+      throw new AcknowledgmentError("ALREADY_ACKNOWLEDGED", "This person has a standing acknowledgment. Withdraw it instead of recording a decline.");
+    }
+    if (latest?.kind === "DECLINE" && latest.row.contentRef === content.contentRef) {
+      return { evidence: latest.row.summary, created: false, replayed: false };
+    }
+  } else {
+    // The same content is returned only while it still stands: not voided and not ended by a later withdrawal.
+    const standing = history.find((row) => row.contentRef === content.contentRef && isLiveAcceptance(row, history));
+    if (standing) return { evidence: standing.summary, created: false, replayed: false };
+    // Every earlier acceptance of this content has ended (voided or withdrawn), so the next generation is their count.
+    generation = history.filter((row) => row.action === "ACKNOWLEDGE" && row.contentRef === content.contentRef).length;
+  }
+  // No out-of-order acts: nothing new may be dated before the latest live act, or the derived status and the guards would disagree.
+  if (latest && request.acknowledgedAt.getTime() < liveActMoment(latest)) {
+    throw new AcknowledgmentError("ACT_BEFORE_LATEST", "That date is before this person's latest recorded acknowledgment, decline or withdrawal. Check the date.");
+  }
 
   const id = randomUUID();
   const inserted = await tx.acknowledgmentEvidence.createMany({
@@ -330,6 +452,8 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
       actedByPersonId: request.actedByPersonId,
       recordedByUserId: request.recordedByUserId,
       channel: request.channel,
+      action,
+      paperLocation: location.value,
       formVersionId: request.formVersionId,
       fieldId: request.field.id,
       fieldKey: request.field.key,
@@ -342,6 +466,8 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
       subjectMinorStatus: request.attendee?.status ?? "ADULT",
       guardianAuthorityId: decision.guardianAuthorityId,
       acknowledgedAt: request.acknowledgedAt,
+      // App time taken after the lock, so rows for one subject and field are recorded in the order they were judged.
+      recordedAt: new Date(),
       requestMetadata: approvedRequestMetadata(request.requestMetadata) as Prisma.InputJsonValue,
       idempotencyKey: request.idempotencyKey,
       requestHash,
@@ -353,7 +479,7 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
     const winner = await tx.acknowledgmentEvidence.findUnique({
       where: { eventId_idempotencyKey: { eventId: request.eventId, idempotencyKey: request.idempotencyKey } },
       select: summarySelect,
-    }) ?? await findByNaturalKey(tx, request, content.contentRef);
+    }) ?? (action === "ACKNOWLEDGE" ? await findByNaturalKey(tx, request, content.contentRef) : null);
     if (!winner) throw new AcknowledgmentError("IDEMPOTENCY_CONFLICT", "That acknowledgment could not be recorded. Try again.");
     return { evidence: summarize(winner), created: false, replayed: false };
   }
@@ -361,17 +487,18 @@ export async function recordAcknowledgmentEvidence(tx: Prisma.TransactionClient,
   await writeAuditLog({
     eventId: request.eventId,
     actorUserId: request.recordedByUserId ?? undefined,
-    action: "ACKNOWLEDGMENT_RECORDED",
+    action: action === "DECLINE" ? "ACKNOWLEDGMENT_DECLINED" : "ACKNOWLEDGMENT_RECORDED",
     entityType: "AcknowledgmentEvidence",
     entityId: id,
-    // Ids and flags only: never the shown text, the label, or the request metadata.
-    summary: `Recorded an acknowledgment (${request.channel.toLowerCase().replace("_", " ")}).`,
+    // Ids and flags only: never the shown text, the label, the paper location, or the request metadata.
+    summary: `${action === "DECLINE" ? "Recorded a declined acknowledgment" : "Recorded an acknowledgment"} (${request.channel.toLowerCase().replace("_", " ")}).`,
     metadata: {
       eventId: request.eventId,
       registrationId: request.registrationId,
       registrationAttendeeId: request.attendee?.attendeeId ?? null,
       fieldKey: request.field.key,
       channel: request.channel,
+      action,
       source: content.source,
       policyVersionId: content.policyVersionId,
       subjectMinorStatus: request.attendee?.status ?? "ADULT",
@@ -417,6 +544,14 @@ export async function recordSubmissionAcknowledgments(tx: Prisma.TransactionClie
   const startDate = eventStartDate(input.event.startsAt, input.event.timezone);
   const refusals: AcknowledgmentRefusal[] = [];
   let recorded = 0;
+  // One transaction, several subjects and fields: take every lock up front in sorted key order, so two such transactions cannot deadlock.
+  const lockKeys = new Set<string>();
+  for (const item of planned) {
+    const attendee = item.attendeeClientId === null ? null : input.attendees.find((candidate) => candidate.clientId === item.attendeeClientId) ?? null;
+    if (item.attendeeClientId !== null && !attendee) continue;
+    lockKeys.add(subjectFieldLockKey(input.registrationId, attendee?.attendeeId ?? null, item.field.key));
+  }
+  for (const key of [...lockKeys].sort()) await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
   for (const item of planned) {
     const attendee = item.attendeeClientId === null
       ? null
@@ -475,6 +610,10 @@ export type StaffAcknowledgmentInput = {
   /** Who acknowledged. Defaults to the registrant for a registration-level field and to the attendee themselves otherwise. */
   actedByPersonId?: string | null;
   channel: "STAFF_ENTERED" | "PAPER";
+  /** ACKNOWLEDGE (the default) or DECLINE (#130). */
+  action?: AcknowledgmentAction;
+  /** Where a PAPER form physically lives (required for PAPER, refused otherwise); never what it says. */
+  paperLocation?: string | null;
   /** When it was given (a paper form's date); defaults to now and may not be in the future. */
   acknowledgedAt?: Date | null;
   actorUserId: string;
@@ -484,11 +623,13 @@ export type StaffAcknowledgmentInput = {
 };
 
 /**
- * Staff record that a person acknowledged, on screen or on paper, for an existing registration. The content recorded
+ * Staff record that a person acknowledged (or declined), on screen or on paper, for an existing registration. The content recorded
  * is what the registration's own form version shows for that field: staff cannot type different wording in. The person
  * who acknowledged must be the subject or, for a minor, the declared responsible adult; staff cannot stand in.
  */
 export async function recordStaffAcknowledgment(input: StaffAcknowledgmentInput, now = new Date()): Promise<RecordOutcome> {
+  const location = normalizePaperLocation(input.channel, input.paperLocation);
+  if (!location.ok) throw new AcknowledgmentError(location.code, location.message);
   const acknowledgedAt = input.acknowledgedAt ?? now;
   if (acknowledgedAt.getTime() > now.getTime() + FUTURE_TOLERANCE_MS) {
     throw new AcknowledgmentError("ACKNOWLEDGED_AT_INVALID", "The acknowledgment date cannot be in the future.");
@@ -551,12 +692,14 @@ export async function recordStaffAcknowledgment(input: StaffAcknowledgmentInput,
       attendee,
       actedByPersonId,
       channel: input.channel,
+      action: input.action ?? "ACKNOWLEDGE",
+      paperLocation: location.value,
       recordedByUserId: input.actorUserId,
       acknowledgedAt,
       idempotencyKey: staffEvidenceKey(input.clientRequestId),
       requestMetadata: { ...input.requestMetadata, formVersionId: submission.formVersionId },
     });
-  });
+  }, ACTION_TRANSACTION_OPTIONS);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -578,22 +721,22 @@ export type SubjectAcknowledgmentView = {
 async function statusAt(
   client: Client,
   eventId: string,
-  rows: ReadonlyArray<{ source: "TEXT" | "POLICY_VERSION"; policyVersionId: string | null; acknowledgedAt: string; voidedAt?: string | null }>,
+  rows: ReadonlyArray<EvidenceSummary>,
   at: Date,
 ): Promise<AcknowledgmentStatusCode> {
-  // Standing at a moment: given by then, and not yet voided by then. A void changes the answer only from its own moment on.
-  const given = rows.filter((row) => (
-    new Date(row.acknowledgedAt).getTime() <= at.getTime()
-    && !(row.voidedAt && new Date(row.voidedAt).getTime() <= at.getTime())
-  ));
-  const latest = given[given.length - 1] ?? null;
+  // The latest live act at the moment: given by then and not voided by then. A void or a withdrawal changes the answer
+  // only from its own moment on, so a past moment keeps the answer it had.
+  const latest = latestLiveAction(rows.map(historyRow), at);
   if (!latest) return resolveAcknowledgmentStatus({ evidence: null });
-  if (latest.source === "TEXT" || !latest.policyVersionId) return resolveAcknowledgmentStatus({ evidence: latest });
+  if (latest.kind === "DECLINE") return resolveAcknowledgmentStatus({ evidence: { source: latest.row.source, action: "DECLINE" } });
+  if (latest.kind === "WITHDRAWAL") return resolveAcknowledgmentStatus({ evidence: { source: latest.row.source, action: "WITHDRAWAL" } });
+  const accepted = latest.row;
+  if (accepted.source === "TEXT" || !accepted.policyVersionId) return resolveAcknowledgmentStatus({ evidence: accepted });
   const seen = await client.consentPolicyVersion.findUnique({
-    where: { id: latest.policyVersionId },
+    where: { id: accepted.policyVersionId },
     select: { versionNumber: true, policyId: true },
   });
-  if (!seen) return resolveAcknowledgmentStatus({ evidence: latest });
+  if (!seen) return resolveAcknowledgmentStatus({ evidence: accepted });
   let effective: { versionNumber: number } | null = null;
   try {
     effective = await getPolicyVersionEffectiveAt(eventId, seen.policyId, at, "ACKNOWLEDGMENT");
@@ -612,7 +755,7 @@ async function statusAt(
       })) > 0
     : false;
   return resolveAcknowledgmentStatus({
-    evidence: latest,
+    evidence: accepted,
     policy: { evidenceVersionNumber: seen.versionNumber, effective, laterVersionIsMaterial: laterMaterial },
   });
 }
@@ -687,9 +830,15 @@ export async function listRegistrationAcknowledgments(
 export async function getAcknowledgmentEvidencePayload(eventId: string, registrationId: string, evidenceId: string) {
   const row = await getPrisma().acknowledgmentEvidence.findFirst({
     where: { id: evidenceId, eventId, registrationId },
-    select: { ...summarySelect, shownText: true, requestMetadata: true, formVersionId: true },
+    select: { ...summarySelect, shownText: true, requestMetadata: true, formVersionId: true, paperLocation: true },
   });
   if (!row) throw new AcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found.");
+  const withdrawalRow = row.withdrawal
+    ? await getPrisma().acknowledgmentWithdrawal.findUnique({
+        where: { evidenceId: row.id },
+        select: { id: true, withdrawnAt: true, recordedAt: true, channel: true, actedByPersonId: true, recordedByUserId: true, paperLocation: true },
+      })
+    : null;
   const voidRow = await getPrisma().acknowledgmentVoid.findUnique({ where: { evidenceId: row.id }, select: { voidedAt: true, voidedByUserId: true, reason: true } });
   let policy: { id: string; versionNumber: number; title: string; bodyText: string; contentHash: string | null } | null = null;
   if (row.policyVersionId) {
@@ -701,6 +850,19 @@ export async function getAcknowledgmentEvidencePayload(eventId: string, registra
     evidence: summarize(row),
     // The void's reason is sensitive and lives only here, behind the sensitive-data permission.
     voided: voidRow ? { voidedAt: voidRow.voidedAt.toISOString(), voidedByUserId: voidRow.voidedByUserId, reason: voidRow.reason } : null,
+    // Where the paper form lives (never what it says): sensitive, so only in this payload, never in a summary.
+    paperLocation: row.paperLocation,
+    withdrawal: withdrawalRow
+      ? {
+          id: withdrawalRow.id,
+          withdrawnAt: withdrawalRow.withdrawnAt.toISOString(),
+          recordedAt: withdrawalRow.recordedAt.toISOString(),
+          channel: withdrawalRow.channel,
+          actedByPersonId: withdrawalRow.actedByPersonId,
+          recordedByUserId: withdrawalRow.recordedByUserId,
+          paperLocation: withdrawalRow.paperLocation,
+        }
+      : null,
     formVersionId: row.formVersionId,
     shownText: row.shownText,
     policyVersion: policy,
@@ -733,8 +895,14 @@ export async function voidAcknowledgmentEvidence(input: {
       select: { id: true, fieldKey: true, registrationAttendeeId: true },
     });
     if (!evidence) throw new AcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found.");
+    // Voiding changes what stands for this subject and field, so it takes turns with every other action on them.
+    await lockSubjectField(tx, input.registrationId, evidence.registrationAttendeeId, evidence.fieldKey);
     const existing = await tx.acknowledgmentVoid.findUnique({ where: { evidenceId: evidence.id }, select: { id: true, evidenceId: true, voidedAt: true } });
     if (existing) return { void: { id: existing.id, evidenceId: existing.evidenceId, voidedAt: existing.voidedAt.toISOString() }, created: false };
+    // Voiding a withdrawn acceptance would silently undo the withdrawal (and revive acceptances it ended): correct it by recording a fresh act.
+    if (await tx.acknowledgmentWithdrawal.findUnique({ where: { evidenceId: evidence.id }, select: { id: true } })) {
+      throw new AcknowledgmentError("EVIDENCE_WITHDRAWN", "That acknowledgment was withdrawn, so it cannot be voided. Record a new acknowledgment, decline or withdrawal instead.");
+    }
     const id = randomUUID();
     const inserted = await tx.acknowledgmentVoid.createMany({
       skipDuplicates: true,
@@ -754,7 +922,184 @@ export async function voidAcknowledgmentEvidence(input: {
       }, tx);
     }
     return { void: { id: row.id, evidenceId: row.evidenceId, voidedAt: row.voidedAt.toISOString() }, created: inserted.count === 1 };
-  });
+  }, ACTION_TRANSACTION_OPTIONS);
+}
+
+export type WithdrawalOutcome = {
+  withdrawal: { id: string; evidenceId: string; withdrawnAt: string; channel: AcknowledgmentChannel };
+  created: boolean;
+  replayed: boolean;
+};
+
+/**
+ * A withdrawal (#130): staff record that a person withdrew an earlier acceptance. It is a new append-only record naming the
+ * acceptance; the acceptance row is never touched and stays the evidence of what the person agreed to before `withdrawnAt`.
+ *
+ * Who may withdraw follows who may acknowledge for that subject: the subject themselves, or for a minor their declared
+ * responsible adult. Staff cannot stand in. A voided acceptance, or a decline, cannot be withdrawn. A second withdrawal of the
+ * same acceptance (same request id or not) returns the one already on file. The audit entry holds ids only; the paper location
+ * stays on the withdrawal row (and in the payload read behind VIEW_SENSITIVE_DATA).
+ */
+export async function withdrawAcknowledgmentEvidence(input: {
+  eventId: string;
+  registrationId: string;
+  evidenceId: string;
+  channel: "STAFF_ENTERED" | "PAPER";
+  /** Who withdrew. Defaults to the registrant for a registration-level field and to the attendee themselves otherwise. */
+  actedByPersonId?: string | null;
+  /** When it took effect; defaults to now, never in the future, never before the acceptance. */
+  withdrawnAt?: Date | null;
+  paperLocation?: string | null;
+  clientRequestId: string;
+  actorUserId: string;
+}, now = new Date()): Promise<WithdrawalOutcome> {
+  const location = normalizePaperLocation(input.channel, input.paperLocation);
+  if (!location.ok) throw new AcknowledgmentError(location.code, location.message);
+  const withdrawnAt = input.withdrawnAt ?? now;
+  if (withdrawnAt.getTime() > now.getTime() + FUTURE_TOLERANCE_MS) {
+    throw new AcknowledgmentError("WITHDRAWN_AT_INVALID", "The withdrawal date cannot be in the future.");
+  }
+  const idempotencyKey = staffEvidenceKey(input.clientRequestId);
+  return getPrisma().$transaction(async (tx) => {
+    const evidence = await tx.acknowledgmentEvidence.findFirst({
+      where: { id: input.evidenceId, eventId: input.eventId, registrationId: input.registrationId },
+      select: {
+        id: true, action: true, fieldKey: true, registrationAttendeeId: true, subjectPersonId: true, subjectMinorStatus: true, acknowledgedAt: true,
+        void: { select: { voidedAt: true } },
+      },
+    });
+    if (!evidence) throw new AcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found.");
+    await lockSubjectField(tx, input.registrationId, evidence.registrationAttendeeId, evidence.fieldKey);
+
+    const registration = await tx.registration.findFirst({
+      where: { id: input.registrationId, eventId: input.eventId },
+      select: {
+        accountHolderPersonId: true,
+        event: { select: { startsAt: true, timezone: true, ageOfMajority: true } },
+        attendees: { select: { id: true, personId: true, formResponses: true, profileSnapshot: true } },
+      },
+    });
+    if (!registration) throw new AcknowledgmentError("REGISTRATION_NOT_FOUND", "That registration was not found for this event.");
+    // The subject's standing on the event's start date, read as acknowledging reads it; an attendee removed since falls back to what was recorded.
+    const attendeeRow = evidence.registrationAttendeeId ? registration.attendees.find((candidate) => candidate.id === evidence.registrationAttendeeId) : null;
+    const subjectStatus: MinorStatus["status"] = attendeeRow
+      ? minorStatusAt(
+          personAgeFromAnswers(record(attendeeRow.formResponses), record(attendeeRow.profileSnapshot)),
+          eventStartDate(registration.event.startsAt, registration.event.timezone),
+          registration.event.ageOfMajority,
+        ).status
+      : (["MINOR", "ADULT", "UNKNOWN"] as const).find((status) => status === evidence.subjectMinorStatus) ?? "ADULT";
+    // The person who withdrew, resolved before the retry check: a retry that names the default person explicitly is the same request.
+    const actedByPersonId = input.actedByPersonId ?? evidence.subjectPersonId ?? registration.accountHolderPersonId;
+    // A retry replays the first result before anything else is judged, even if the acceptance has since been voided.
+    const requestHash = withdrawalRequestHash({
+      eventId: input.eventId, registrationId: input.registrationId, evidenceId: evidence.id, actedByPersonId, channel: input.channel, paperLocation: location.value,
+    });
+    const keyed = await tx.acknowledgmentWithdrawal.findUnique({
+      where: { eventId_idempotencyKey: { eventId: input.eventId, idempotencyKey } },
+      select: { id: true, evidenceId: true, withdrawnAt: true, channel: true, requestHash: true },
+    });
+    if (keyed) {
+      if (keyed.requestHash !== requestHash || keyed.evidenceId !== evidence.id) {
+        throw new AcknowledgmentError("IDEMPOTENCY_CONFLICT", "That request id was already used for a different withdrawal.");
+      }
+      return { withdrawal: summarizeWithdrawal(keyed), created: false, replayed: true };
+    }
+    // Withdrawing twice is the same withdrawal: the first stands.
+    const existing = await tx.acknowledgmentWithdrawal.findUnique({
+      where: { evidenceId: evidence.id },
+      select: { id: true, evidenceId: true, withdrawnAt: true, channel: true },
+    });
+    if (existing) return { withdrawal: summarizeWithdrawal(existing), created: false, replayed: false };
+
+    if (evidence.action !== "ACKNOWLEDGE") {
+      throw new AcknowledgmentError("EVIDENCE_NOT_WITHDRAWABLE", "Only an acknowledgment can be withdrawn. A decline stands as recorded.");
+    }
+    if (evidence.void) {
+      throw new AcknowledgmentError("EVIDENCE_VOIDED", "That acknowledgment was voided, so there is nothing to withdraw.");
+    }
+    // A withdrawal ends every acceptance for this subject and field, so it may target only the one that is the current latest live act.
+    const history = await readSubjectHistory(tx, input.registrationId, evidence.registrationAttendeeId, evidence.fieldKey);
+    const latest = latestLiveAction(history);
+    if (!latest || latest.kind !== "ACKNOWLEDGE" || latest.row.summary.id !== evidence.id) {
+      throw new AcknowledgmentError("NOT_CURRENT_ACCEPTANCE", "Only this person's current acknowledgment can be withdrawn. A newer record has taken its place or it has already ended.");
+    }
+    if (withdrawnAt.getTime() < liveActMoment(latest)) {
+      throw new AcknowledgmentError("ACT_BEFORE_LATEST", "The withdrawal date cannot be before the acknowledgment it withdraws.");
+    }
+
+    const onRegistration = actedByPersonId === registration.accountHolderPersonId
+      || registration.attendees.some((candidate) => candidate.personId === actedByPersonId)
+      || actedByPersonId === evidence.subjectPersonId;
+    if (!onRegistration) throw new AcknowledgmentError("ACTOR_NOT_FOUND", "The person who withdrew is not on this registration.");
+    const authority = evidence.subjectPersonId && subjectStatus === "MINOR"
+      ? await findActiveDeclaredAuthority(tx, input.eventId, evidence.subjectPersonId, input.registrationId)
+      : null;
+    const decision: ActingDecision = decideActing({
+      subject: { personId: evidence.subjectPersonId, status: subjectStatus },
+      actedByPersonId,
+      authority,
+    });
+    if (!decision.allowed) throw new AcknowledgmentError(decision.code, decision.message);
+
+    const id = randomUUID();
+    const inserted = await tx.acknowledgmentWithdrawal.createMany({
+      skipDuplicates: true,
+      data: [{
+        id,
+        eventId: input.eventId,
+        registrationId: input.registrationId,
+        evidenceId: evidence.id,
+        actedByPersonId,
+        recordedByUserId: input.actorUserId,
+        channel: input.channel,
+        subjectMinorStatus: subjectStatus,
+        guardianAuthorityId: decision.guardianAuthorityId,
+        paperLocation: location.value,
+        withdrawnAt,
+        recordedAt: new Date(),
+        idempotencyKey,
+        requestHash,
+      }],
+    });
+    if (inserted.count === 0) {
+      // Lost a race to another withdrawal of this acceptance: whatever won is the withdrawal.
+      const winner = await tx.acknowledgmentWithdrawal.findUnique({
+        where: { evidenceId: evidence.id },
+        select: { id: true, evidenceId: true, withdrawnAt: true, channel: true },
+      });
+      if (!winner) throw new AcknowledgmentError("IDEMPOTENCY_CONFLICT", "That withdrawal could not be recorded. Try again.");
+      return { withdrawal: summarizeWithdrawal(winner), created: false, replayed: false };
+    }
+    const row = await tx.acknowledgmentWithdrawal.findUniqueOrThrow({
+      where: { id },
+      select: { id: true, evidenceId: true, withdrawnAt: true, channel: true },
+    });
+    await writeAuditLog({
+      eventId: input.eventId,
+      actorUserId: input.actorUserId,
+      action: "ACKNOWLEDGMENT_WITHDRAWN",
+      entityType: "AcknowledgmentWithdrawal",
+      entityId: id,
+      summary: `Recorded a withdrawn acknowledgment (${input.channel.toLowerCase().replace("_", " ")}).`,
+      // Ids and flags only: never the wording, the paper location or the request id.
+      metadata: {
+        eventId: input.eventId,
+        registrationId: input.registrationId,
+        evidenceId: evidence.id,
+        registrationAttendeeId: evidence.registrationAttendeeId,
+        fieldKey: evidence.fieldKey,
+        channel: input.channel,
+        subjectMinorStatus: subjectStatus,
+        guardianAuthorityId: decision.guardianAuthorityId,
+      },
+    }, tx);
+    return { withdrawal: summarizeWithdrawal(row), created: true, replayed: false };
+  }, ACTION_TRANSACTION_OPTIONS);
+}
+
+function summarizeWithdrawal(row: { id: string; evidenceId: string; withdrawnAt: Date; channel: AcknowledgmentChannel }) {
+  return { id: row.id, evidenceId: row.evidenceId, withdrawnAt: row.withdrawnAt.toISOString(), channel: row.channel };
 }
 
 /** How many evidence rows an event holds (counts only), for the event deletion guard. */

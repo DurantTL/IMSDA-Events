@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import Image from "next/image";
 import { BrandMark } from "@/components/brand-mark";
 import { GuardedLink } from "@/components/guarded-link";
 import { NavigationLink } from "@/components/navigation-link";
@@ -17,6 +18,8 @@ type BrandLinkProps = Omit<ComponentProps<typeof GuardedLink>, "href" | "aria-la
   compact?: boolean;
   /** The "IMSDA Events" text beside the mark: true for the standard stacked wordmark, or your own text. */
   wordmark?: boolean | ReactNode;
+  /** The public homepage's IMAdventist presentation; staff and auth keep their existing mark. */
+  publicBrand?: boolean;
 };
 
 /**
@@ -29,13 +32,13 @@ type BrandLinkProps = Omit<ComponentProps<typeof GuardedLink>, "href" | "aria-la
  * It stays off by default because `GuardedLink` needs the app router, which a server-rendered page test lacks.
  * In the `/embed/*` iframe pass `target="_top"` so the calendar opens in the top window.
  */
-export function BrandLink({ compact = false, wordmark = false, guarded = false, label = BRAND_LINK_LABEL, className, ...rest }: BrandLinkProps) {
+export function BrandLink({ compact = false, wordmark = false, publicBrand = false, guarded = false, label = BRAND_LINK_LABEL, className, ...rest }: BrandLinkProps) {
   const classes = [styles.link, className ?? styles.standalone].join(" ");
   const Anchor = guarded ? GuardedLink : NavigationLink;
   return (
     <Anchor {...rest} className={classes} href={BRAND_LINK_HREF} aria-label={label}>
-      <BrandMark compact={compact} />
-      {wordmark === true ? <span><strong>IMSDA</strong><small>Events</small></span> : wordmark || null}
+      {publicBrand ? <Image alt="" aria-hidden="true" height={72} src="/brand/imadventist-symbol.png" width={72} /> : <BrandMark compact={compact} />}
+      {wordmark === true ? <span><strong>{publicBrand ? "IMAdventist" : "IMSDA"}</strong><small>{publicBrand ? "Events & Club Ministry" : "Events"}</small></span> : wordmark || null}
     </Anchor>
   );
 }

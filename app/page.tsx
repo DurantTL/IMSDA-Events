@@ -5,8 +5,9 @@ import { getPublishedHubContent } from "@/modules/site-content/hub-content";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "IMSDA Events",
-  description: "Register for Iowa-Missouri Conference events, manage your club, and see the conference calendar.",
+  title: "IMAdventist | Events & Club Ministry",
+  description: "Explore Iowa-Missouri Conference events, find a club, and plan your season with the conference calendar.",
+  icons: { icon: "/brand/favicon.ico" },
   alternates: { canonical: "/" },
   robots: { index: true, follow: true },
 };

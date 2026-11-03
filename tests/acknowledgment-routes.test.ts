@@ -22,6 +22,7 @@ const dependencies = vi.hoisted(() => {
     recordStaffAcknowledgment: vi.fn(),
     getAcknowledgmentEvidencePayload: vi.fn(),
     voidAcknowledgmentEvidence: vi.fn(),
+    withdrawAcknowledgmentEvidence: vi.fn(),
     logError: vi.fn(),
   };
 });
@@ -40,10 +41,12 @@ vi.mock("@/modules/acknowledgments/repository", () => ({
   recordStaffAcknowledgment: dependencies.recordStaffAcknowledgment,
   getAcknowledgmentEvidencePayload: dependencies.getAcknowledgmentEvidencePayload,
   voidAcknowledgmentEvidence: dependencies.voidAcknowledgmentEvidence,
+  withdrawAcknowledgmentEvidence: dependencies.withdrawAcknowledgmentEvidence,
 }));
 
 import { GET as listAcknowledgments, POST as recordAcknowledgment } from "@/app/api/events/[eventId]/registrations/[registrationId]/acknowledgments/route";
 import { POST as voidEvidence } from "@/app/api/events/[eventId]/registrations/[registrationId]/acknowledgments/[evidenceId]/void/route";
+import { POST as withdrawEvidence } from "@/app/api/events/[eventId]/registrations/[registrationId]/acknowledgments/[evidenceId]/withdraw/route";
 import { GET as readEvidence } from "@/app/api/events/[eventId]/registrations/[registrationId]/acknowledgments/[evidenceId]/route";
 
 const params = Promise.resolve({ eventId: "event-1", registrationId: "reg-1" });
@@ -53,7 +56,8 @@ const REQUEST_ID = "00000000-0000-4000-8000-000000000150";
 function post(body: unknown, headers: Record<string, string> = {}) {
   return new Request("http://localhost/api", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
 }
-const valid = { fieldKey: "att_ack", attendeeId: "att-1", channel: "PAPER", clientRequestId: REQUEST_ID };
+const LOCATION = "Synthetic office, event binder";
+const valid = { fieldKey: "att_ack", attendeeId: "att-1", channel: "PAPER", paperLocation: LOCATION, clientRequestId: REQUEST_ID };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -106,7 +110,7 @@ describe("recording a staff-entered or paper acknowledgment (#150)", () => {
     expect(dependencies.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "MANAGE_REGISTRATION", dependencies.findActiveMembership);
     const call = dependencies.recordStaffAcknowledgment.mock.calls[0]![0];
     expect(call).toMatchObject({
-      eventId: "event-1", registrationId: "reg-1", fieldKey: "att_ack", attendeeId: "att-1", channel: "PAPER", actorUserId: "user-1", clientRequestId: REQUEST_ID,
+      eventId: "event-1", registrationId: "reg-1", fieldKey: "att_ack", attendeeId: "att-1", channel: "PAPER", paperLocation: LOCATION, action: "ACKNOWLEDGE", actorUserId: "user-1", clientRequestId: REQUEST_ID,
       acknowledgedAt: new Date("2027-01-05T00:00:00.000Z"),
     });
     // Request metadata is approved keys only, and the user agent is a hash.
@@ -136,11 +140,34 @@ describe("recording a staff-entered or paper acknowledgment (#150)", () => {
     ["a request id that is not a UUID", { clientRequestId: "abc" }],
     ["a missing field key", { fieldKey: undefined }],
     ["a date that is not a date", { acknowledgedAt: "last week" }],
+    ["a paper form without a location", { paperLocation: undefined }],
+    ["a paper form with a blank location", { paperLocation: "   " }],
+    ["a paper location that is too long", { paperLocation: "x".repeat(201) }],
+    ["a location on a staff-entered record", { channel: "STAFF_ENTERED" }],
+    ["an action that does not exist", { action: "WITHDRAW" }],
   ])("refuses %s", async (_label, overrides) => {
     const response = await recordAcknowledgment(post({ ...valid, ...overrides }), { params });
     expect(response.status).toBe(400);
     expect((await response.json()).error).toBe("INVALID_ACKNOWLEDGMENT_REQUEST");
     expect(dependencies.recordStaffAcknowledgment).not.toHaveBeenCalled();
+  });
+
+  it("passes the action through, defaulting to an acknowledgment, and trims the paper location", async () => {
+    dependencies.recordStaffAcknowledgment.mockResolvedValue({ evidence: { id: "ev-1" }, created: true, replayed: false });
+    await recordAcknowledgment(post({ ...valid, paperLocation: `  ${LOCATION}  ` }), { params });
+    expect(dependencies.recordStaffAcknowledgment.mock.calls[0]![0]).toMatchObject({ action: "ACKNOWLEDGE", paperLocation: LOCATION });
+    const declined = await recordAcknowledgment(post({ ...valid, action: "DECLINE" }), { params });
+    expect(declined.status).toBe(201);
+    expect(dependencies.recordStaffAcknowledgment.mock.calls[1]![0]).toMatchObject({ action: "DECLINE", paperLocation: LOCATION });
+    await recordAcknowledgment(post({ ...valid, channel: "STAFF_ENTERED", paperLocation: undefined, action: "DECLINE" }), { params });
+    expect(dependencies.recordStaffAcknowledgment.mock.calls[2]![0]).toMatchObject({ action: "DECLINE", channel: "STAFF_ENTERED", paperLocation: null });
+  });
+
+  it("answers 409 ALREADY_ACKNOWLEDGED for a decline while a live acceptance stands", async () => {
+    dependencies.recordStaffAcknowledgment.mockRejectedValue(new dependencies.MockAcknowledgmentError("ALREADY_ACKNOWLEDGED", "Withdraw it instead."));
+    const response = await recordAcknowledgment(post({ ...valid, action: "DECLINE" }), { params });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("ALREADY_ACKNOWLEDGED");
   });
 
   it("refuses a cross-origin request and a caller without the permission", async () => {
@@ -257,8 +284,86 @@ describe("voiding an acknowledgment (#150)", () => {
     expect(dependencies.voidAcknowledgmentEvidence).not.toHaveBeenCalled();
   });
 
+  it("answers 409 EVIDENCE_WITHDRAWN for an acknowledgment that was withdrawn", async () => {
+    dependencies.voidAcknowledgmentEvidence.mockRejectedValue(new dependencies.MockAcknowledgmentError("EVIDENCE_WITHDRAWN", "Withdrawn."));
+    const response = await voidPost({ reason: "x" });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("EVIDENCE_WITHDRAWN");
+  });
+
   it("answers 404 for evidence that is not this registration's", async () => {
     dependencies.voidAcknowledgmentEvidence.mockRejectedValue(new dependencies.MockAcknowledgmentError("EVIDENCE_NOT_FOUND", "That acknowledgment evidence was not found."));
     expect((await voidPost({ reason: "x" })).status).toBe(404);
+  });
+});
+
+describe("withdrawing an acknowledgment (#130)", () => {
+  const withdrawBody = { channel: "PAPER", paperLocation: LOCATION, clientRequestId: REQUEST_ID };
+  const withdrawPost = (body: unknown) => withdrawEvidence(post(body), { params: evidenceParams });
+  const created = { withdrawal: { id: "wd-1", evidenceId: "ev-1", withdrawnAt: "2027-01-08T00:00:00.000Z", channel: "PAPER" }, created: true, replayed: false };
+
+  it("needs MANAGE_REGISTRATION only, takes the staff user from the session, and answers 201 for a new withdrawal", async () => {
+    dependencies.withdrawAcknowledgmentEvidence.mockResolvedValue(created);
+    const response = await withdrawPost({ ...withdrawBody, withdrawnAt: "2027-01-08T00:00:00.000Z", actedByPersonId: "p-1", paperLocation: `  ${LOCATION} ` });
+    expect(response.status).toBe(201);
+    expect(dependencies.requirePermission).toHaveBeenCalledTimes(1);
+    expect(dependencies.requirePermission).toHaveBeenCalledWith(expect.anything(), "event-1", "MANAGE_REGISTRATION", dependencies.findActiveMembership);
+    expect(dependencies.withdrawAcknowledgmentEvidence).toHaveBeenCalledWith({
+      eventId: "event-1", registrationId: "reg-1", evidenceId: "ev-1", channel: "PAPER", actedByPersonId: "p-1", withdrawnAt: new Date("2027-01-08T00:00:00.000Z"),
+      paperLocation: LOCATION, clientRequestId: REQUEST_ID, actorUserId: "user-1",
+    });
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect((await response.json()).withdrawal).toEqual(created.withdrawal);
+  });
+
+  it("answers 200 when it was already withdrawn, and for a retry", async () => {
+    dependencies.withdrawAcknowledgmentEvidence.mockResolvedValue({ ...created, created: false });
+    const response = await withdrawPost(withdrawBody);
+    expect(response.status).toBe(200);
+    expect((await response.json()).created).toBe(false);
+    expect(dependencies.withdrawAcknowledgmentEvidence.mock.calls[0]![0]).toMatchObject({ actedByPersonId: null, withdrawnAt: null });
+  });
+
+  it("refuses a caller without the permission, and a cross-origin request, before touching anything", async () => {
+    dependencies.requirePermission.mockRejectedValue(new dependencies.MockAccessDeniedError("No access.", "FORBIDDEN", 403));
+    expect((await withdrawPost(withdrawBody)).status).toBe(403);
+    dependencies.requirePermission.mockResolvedValue({ user: { id: "user-1" } });
+    dependencies.rejectCrossOriginRequest.mockReturnValue(new Response(null, { status: 403 }));
+    expect((await withdrawPost(withdrawBody)).status).toBe(403);
+    expect(dependencies.withdrawAcknowledgmentEvidence).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["an online channel", { channel: "ONLINE" }],
+    ["a missing channel", { channel: undefined }],
+    ["a missing request id", { clientRequestId: undefined }],
+    ["a paper withdrawal without a location", { paperLocation: undefined }],
+    ["a location on a staff-entered withdrawal", { channel: "STAFF_ENTERED" }],
+    ["a date that is not a date", { withdrawnAt: "last week" }],
+    ["an extra field", { reason: "x" }],
+    ["the staff user in the body", { actorUserId: "someone-else" }],
+  ])("refuses %s", async (_label, overrides) => {
+    const response = await withdrawPost({ ...withdrawBody, ...overrides });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe("INVALID_ACKNOWLEDGMENT_REQUEST");
+    expect(dependencies.withdrawAcknowledgmentEvidence).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["EVIDENCE_NOT_FOUND", 404],
+    ["ACTOR_NOT_FOUND", 404],
+    ["EVIDENCE_VOIDED", 409],
+    ["EVIDENCE_NOT_WITHDRAWABLE", 409],
+    ["IDEMPOTENCY_CONFLICT", 409],
+    ["WITHDRAWN_AT_INVALID", 400],
+    ["ACT_BEFORE_LATEST", 400],
+    ["NOT_CURRENT_ACCEPTANCE", 409],
+    ["ACTING_FOR_MINOR_NOT_AUTHORIZED", 403],
+    ["ACTING_FOR_ANOTHER_NOT_AUTHORIZED", 403],
+  ])("maps %s to %i", async (code, status) => {
+    dependencies.withdrawAcknowledgmentEvidence.mockRejectedValue(new dependencies.MockAcknowledgmentError(code, "Message."));
+    const response = await withdrawPost(withdrawBody);
+    expect(response.status).toBe(status);
+    expect((await response.json()).error).toBe(code);
   });
 });

@@ -27,6 +27,7 @@ import {
   BookmarkPlus,
   Megaphone,
   LineChart,
+  PauseCircle,
 } from "lucide-react";
 
 /**
@@ -123,6 +124,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
       { href: "/admin/settings", label: "Platform settings", description: "Organization identity, passkeys, invoice header and new-event defaults.", icon: CloudCog },
       { href: "/admin/readiness", label: "System readiness", description: "Whether the platform is ready for an event.", icon: CheckCircle2 },
       { href: "/admin/system-report", label: "System report", description: "Every health reading in one place: what was checked, when and what it found.", icon: HeartPulse },
+      { href: "/admin/pauses", label: "Pause an area", description: "Stop event registration, payments or the club portal for a few minutes while something is fixed. Pages stay readable.", icon: PauseCircle },
     ],
   },
 ];
@@ -227,6 +229,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/site-content(\/|$)/, "Homepage & site content"],
   [/^\/admin\/analytics(\/|$)/, "Public analytics"],
   [/^\/admin\/settings(\/|$)/, "Platform settings"],
+  [/^\/admin\/pauses(\/|$)/, "Pause an area"],
   [/^\/admin\/feature-requests(\/|$)/, "Feature requests"],
 ];
 
