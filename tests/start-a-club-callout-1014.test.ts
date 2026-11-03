@@ -60,11 +60,11 @@ describe("pages that show the callout (#1014)", () => {
     expect(source.slice(callout - 80, callout)).not.toContain("session.user &&");
   });
 
-  it("Find a club renders it above the club list and drops the old text link", () => {
+  it("Club ministry reuses it after the finder without duplicating its copy", () => {
     const source = read("app/(public)/clubs/page.tsx");
     expect(source).toContain('import { StartAClubCallout } from "@/components/start-a-club-callout"');
     expect(source.indexOf("<StartAClubCallout />")).toBeGreaterThan(-1);
-    expect(source.indexOf("<StartAClubCallout />")).toBeLessThan(source.indexOf("<PublicClubDirectory"));
+    expect(source.indexOf("<StartAClubCallout />")).toBeGreaterThan(source.indexOf("<PublicClubDirectory"));
     expect(source).not.toContain("applications are open all year");
   });
 

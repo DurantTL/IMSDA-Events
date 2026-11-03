@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type 
 import { List, MapPin, Search, UsersRound } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
-import { useClientSearch } from "@/components/search-as-you-type";
+import { SEARCH_DEBOUNCE_MS, useClientSearch } from "@/components/search-as-you-type";
 import type { PublicClubListing } from "@/modules/organizations/public-club-directory";
 import type { PublicClubMapStatus } from "@/components/public-club-map";
 import { announcedCountText, createRetryableLoader, effectiveView, unmappedSentence } from "@/components/public-club-finder-logic";
@@ -29,8 +29,8 @@ export function matches(club: PublicClubListing, query: string) {
  * club name, town, and meeting day/time — whatever the server sent, which
  * is already nothing more (see modules/organizations/public-club-directory).
  */
-export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
-  const search = useClientSearch();
+export function PublicClubDirectory({ clubs, initialSearch = "" }: { clubs: PublicClubListing[]; initialSearch?: string }) {
+  const search = useClientSearch(initialSearch, SEARCH_DEBOUNCE_MS, "q");
   const query = search.term;
   const [selection, setSelection] = useState<{ id: string; fromMap: boolean } | null>(null);
   const selectedId = selection?.id ?? null;
@@ -103,12 +103,13 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
 
   return (
     <div className={styles.layout}>
-      <div className={styles.searchBlock}>
+      <form action="/clubs" aria-label="Search clubs" className={styles.searchBlock} method="get" onSubmit={(event) => { event.preventDefault(); search.applyNow(); }} role="search">
         <label className={styles.searchLabel} htmlFor={searchId}>Search town, ZIP, club or church</label>
         <div className={`search-field ${styles.search}`} onMouseDown={focusSearchInput}>
           <Search aria-hidden="true" size={17} />
           <input
             id={searchId}
+            name="q"
             {...search.inputProps}
             placeholder="Town, ZIP, club or church"
             ref={searchRef}
@@ -116,7 +117,8 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
           />
           <SearchClearButton onClear={clearSearch} visible={search.value !== ""} />
         </div>
-      </div>
+        {filtered.length > 0 && search.value.trim() !== "" && <button className={`secondary-button ${styles.clearFilters}`} onClick={clearSearch} type="button">Clear filters</button>}
+      </form>
 
       {clubs.length > 0 && (
         <div className={styles.status}>
@@ -147,7 +149,7 @@ export function PublicClubDirectory({ clubs }: { clubs: PublicClubListing[] }) {
       )}
 
       {clubs.length === 0 ? (
-        <EmptyState className="empty-state panel" headingLevel={2} icon={<MapPin aria-hidden="true" size={26} />} title="No clubs are listed publicly yet">Check back soon.</EmptyState>
+        <EmptyState className="empty-state panel" headingLevel={2} icon={<MapPin aria-hidden="true" size={26} />} title="No clubs are listed publicly yet">Only clubs that choose a public listing appear here. Check back soon, or use Club forms if you already belong to a club.</EmptyState>
       ) : (
         <div className={styles.content} data-view={shownView}>
           {anyMappable && (

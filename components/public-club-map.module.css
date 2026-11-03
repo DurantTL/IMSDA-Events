@@ -123,3 +123,21 @@
     height: 260px;
   }
 }
+
+/* Public club discovery (#1534): the map controls follow the same touch and focus rules as the list. */
+.map :global(.leaflet-control-zoom) a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  color: var(--imsda-navy);
+}
+.map :global(.leaflet-control-zoom) a:focus-visible,
+.attribution a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.attribution a { display: inline-flex; align-items: center; min-height: 44px; }
+.map :global(.club-map-tooltip) { max-width: min(280px, 65vw); white-space: normal; overflow-wrap: anywhere; }
+.map :global(.club-map-tooltip) strong,
+.map :global(.club-map-tooltip) ul { font-size: 1rem; }
+.overlayNote { max-width: calc(100% - 24px); white-space: normal; text-align: center; overflow-wrap: anywhere; }
