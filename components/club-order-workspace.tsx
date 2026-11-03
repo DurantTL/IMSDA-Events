@@ -2,7 +2,7 @@
 
 import { ExportLink } from "@/components/export-link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useClientSearch } from "@/components/search-as-you-type";
+import { HonorCombobox } from "@/components/honor-combobox";
 import { AlertTriangle, CheckCircle2, Download, Eye, History, Info, PackageCheck, Plus, Printer, RotateCcw, Save, Trash2 } from "lucide-react";
 import styles from "@/components/club-orders.module.css";
 import { FormMessage, savedMessage } from "@/components/form-message";
@@ -13,9 +13,7 @@ import { ORDER_LIST_SECTIONS, activeHelperLines, formatSizeLabel, groupUnmatched
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import type { AwardableNeed, OrderBatchSummary, OrderableHonor, UnmatchedNeed, WaitingNeed } from "@/modules/club-orders/repository";
 import type { ClubStockRow } from "@/modules/club-supplies/repository";
-import { ListPager } from "@/components/list-pager";
-import { paginate } from "@/lib/pagination";
-import { effectiveChoice, makeSearchMatcher, searchResultSummary } from "@/lib/search-match";
+import { makeSearchMatcher } from "@/lib/search-match";
 import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
@@ -108,9 +106,6 @@ export function filterPickerHonors(honors: readonly OrderableHonor[], listed: Re
   return honors.filter((honor) => !listed.has(honor.honorId) && matches([honor.name]));
 }
 
-/** Most items the "add an item" picker lists at once. */
-const PICKER_PAGE_SIZE = 100;
-
 const HONOR_PICK_PREFIX = "honor:";
 
 /** What a line is addressed by: its catalog item id, or `honor:<id>` (#1330). */
@@ -201,17 +196,7 @@ export function ClubOrderWorkspace({
   const [beforeDate, setBeforeDate] = useState("");
   // Remembered per club on this device. The server snapshot is "not dismissed", so the first render matches the server.
   const promptDismissed = useSyncExternalStore(subscribeDismissed, () => readDismissed(organizationId), () => false);
-  const pickerSearch = useClientSearch();
-  const pickerQuery = pickerSearch.term;
-  const [pickerPage, setPickerPage] = useState(1);
   const [pickerItem, setPickerItem] = useState("");
-  // A new search starts on page 1 with nothing chosen, once the list has changed (not on every keystroke).
-  const [pickerTermSeen, setPickerTermSeen] = useState(pickerQuery);
-  if (pickerTermSeen !== pickerQuery) {
-    setPickerTermSeen(pickerQuery);
-    setPickerPage(1);
-    setPickerItem("");
-  }
   const [pickerQuantity, setPickerQuantity] = useState("1");
   const [busy, setBusy] = useState(false);
   const focusHonorId = useRef<string | null>(null);
@@ -255,20 +240,17 @@ export function ClubOrderWorkspace({
   const orderableHonorIds = useMemo(() => new Set(orderableHonors.map((honor) => honor.honorId)), [orderableHonors]);
   // Catalog items first, then honors with no catalog item. A honor's value is prefixed so it can't collide with an item id.
   const pickerItems = useMemo(() => {
-    const items = filterPickerItems(stock, new Set(onList.flatMap((line) => (line.itemId ? [line.itemId] : []))), pickerQuery)
+    const items = filterPickerItems(stock, new Set(onList.flatMap((line) => (line.itemId ? [line.itemId] : []))), "")
       .map((row) => ({
-        itemId: row.itemId,
-        label: `${row.name}${row.catalogNumber ? ` · ${row.catalogNumber}` : ""}${row.honorName && row.honorName !== row.name ? ` · honor: ${row.honorName}` : ""}`,
+        id: row.itemId,
+        name: `${row.name}${row.catalogNumber ? ` · ${row.catalogNumber}` : ""}${row.honorName && row.honorName !== row.name ? ` · honor: ${row.honorName}` : ""}`,
       }));
-    const honors = filterPickerHonors(orderableHonors, listedHonorIds, pickerQuery)
-      .map((honor) => ({ itemId: `${HONOR_PICK_PREFIX}${honor.honorId}`, label: `${honor.name} · ${NO_CATALOG_ITEM_LABEL}` }));
+    const honors = filterPickerHonors(orderableHonors, listedHonorIds, "")
+      .map((honor) => ({ id: `${HONOR_PICK_PREFIX}${honor.honorId}`, name: `${honor.name} · ${NO_CATALOG_ITEM_LABEL}` }));
     return [...items, ...honors];
-  }, [stock, orderableHonors, listedHonorIds, pickerQuery, onList]);
-  const pickerSlice = useMemo(() => paginate(pickerItems, pickerPage, PICKER_PAGE_SIZE), [pickerItems, pickerPage]);
-  const shownPickerItems = pickerSlice.items;
-  const pickerSummary = searchResultSummary(pickerItems.length, pickerQuery, "item");
-  // One match needs no second click, and a search can never leave a hidden item chosen (#799).
-  const chosenItem = effectiveChoice(pickerItem, shownPickerItems.map((row) => ({ id: row.itemId })), pickerQuery);
+  }, [stock, orderableHonors, listedHonorIds, onList]);
+  // The shared honor search box (#1553) does the narrowing; a choice that left the list (it was just added) is dropped.
+  const chosenItem = pickerItems.some((row) => row.id === pickerItem) ? pickerItem : "";
   // Honors that may have been handed out long ago: the club marks them so they aren't counted as needed.
   const earlier = useMemo(() => data.waiting.filter((need) => need.sourceType === "HONOR" && need.beforeFirstOrder), [data.waiting]);
   // Shown only while the club hasn't edited the helper list or handed anything out here: a one-time cleanup, never in read-only mode.
@@ -406,7 +388,6 @@ export function ClubOrderWorkspace({
     }
     if (await setQuantity(chosenItem, quantity, "Added to the list.")) {
       setPickerItem("");
-      pickerSearch.setValue(""); setPickerPage(1);
       setPickerQuantity("1");
     }
   }
@@ -724,19 +705,17 @@ export function ClubOrderWorkspace({
           <div className={styles.group}>
             <div className={styles.groupHead}><strong>Add an item</strong></div>
             <div className={styles.pickerRow}>
-              <label className={styles.pickerField} htmlFor="club-order-picker-search">
-                Search honors and items
-                <input className={styles.select} aria-describedby="club-order-picker-results" id="club-order-picker-search" {...pickerSearch.inputProps} placeholder="Honor or item name, or item number" type="search" />
-              </label>
-              <label className={styles.pickerField} htmlFor="club-order-picker-item">
-                Item
-                <select className={styles.select} id="club-order-picker-item" onChange={(event) => setPickerItem(event.target.value)} value={chosenItem}>
-                  <option value="">Choose an item</option>
-                  {shownPickerItems.map((row) => (
-                    <option key={row.itemId} value={row.itemId}>{row.label}</option>
-                  ))}
-                </select>
-              </label>
+              <div className={styles.pickerField}>
+                <HonorCombobox
+                  label="Search honors and items"
+                  noun="item"
+                  nounPlural="items"
+                  onChange={setPickerItem}
+                  options={pickerItems}
+                  placeholder="Honor or item name, or item number"
+                  value={chosenItem}
+                />
+              </div>
               <label className={styles.pickerField} htmlFor="club-order-picker-quantity">
                 Quantity
                 <input className={styles.select} id="club-order-picker-quantity" inputMode="numeric" min={1} onChange={(event) => setPickerQuantity(event.target.value)} type="number" value={pickerQuantity} />
@@ -745,8 +724,6 @@ export function ClubOrderWorkspace({
                 <Plus aria-hidden="true" size={14} /> Add to list
               </button>
             </div>
-            <ListPager label="Honor and item pages" onPage={(page) => { setPickerPage(page); setPickerItem(""); }} slice={pickerSlice} />
-            <p aria-live="polite" className="field-help" id="club-order-picker-results" role="status">{pickerSummary}</p>
             <p className={`field-help ${styles.helpText}`}>Honors with no catalog item can be added too; they are marked as ordered from AdventSource separately and have no item number. If an honor is missing, conference staff can link it in the supply catalog.</p>
           </div>
         )}
