@@ -1,6 +1,6 @@
 ---
 name: imsda-build
-description: Build exactly one codex-ready IMSDA Events GitHub issue through an isolated worktree and draft pull request. Use when given one issue number to claim, plan, implement, test, push, and open for review without merging or deploying.
+description: Build exactly one codex-ready or explicitly owner-approved IMSDA Events GitHub issue through an isolated worktree and ready-for-review pull request. Use when given one issue number to plan, implement, test, push, and open for review without merging or deploying.
 ---
 
 # Build one IMSDA issue (Claude Code wrapper)

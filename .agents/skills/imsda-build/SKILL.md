@@ -1,6 +1,6 @@
 ---
 name: imsda-build
-description: Build exactly one codex-ready IMSDA Events GitHub issue through an isolated worktree and draft pull request. Use when given one issue number to claim, plan, implement, test, push, and open for review without merging or deploying.
+description: Build exactly one codex-ready or explicitly owner-approved IMSDA Events GitHub issue through an isolated worktree and draft pull request. Use when given one issue number to claim, plan, implement, test, push, and open for review without merging or deploying.
 ---
 
 # Build one IMSDA issue
@@ -10,7 +10,9 @@ Accept exactly one positive issue number. Read root `AGENTS.md` before acting.
 ## Workflow
 
 1. Confirm `gh` authentication and the `imsda-events` remote. Read the issue and
-   require the `codex-ready` label. If scope is materially unclear, add
+   require `codex-ready` or explicit owner approval in the current conversation.
+   Approval never overrides `needs-decision`, `needs-human`, or human-only gates.
+   Record an owner-approved readiness exception in the PR. If scope is materially unclear, add
    `needs-decision`, state the missing decision, and stop.
 2. Search open and closed PRs, remote branches, and worktrees for the issue.
    Continue an existing build; do not create a duplicate.
@@ -24,7 +26,7 @@ Accept exactly one positive issue number. Read root `AGENTS.md` before acting.
 6. Implement only accepted scope, add proportional tests, and run targeted
    checks. Run broader checks when risk warrants; the full GitHub CI remains the
    canonical gate.
-7. Run the review workflow (`.agents/skills/imsda-review/SKILL.md`) on the
+7. Have an independent read-only reviewer run the review workflow (`.agents/skills/imsda-review/SKILL.md`) on the
    branch against `origin/main`, including the site rules browser check: each changed page opened in a
    real browser at 1280 px and 390 px and checked against the rules in
    `docs/SITE-RULES.md` that apply. Fix every rule it finds broken. If the
@@ -33,7 +35,8 @@ Accept exactly one positive issue number. Read root `AGENTS.md` before acting.
    put that list in the PR body.
 8. Check the diff against `origin/main`, commit only intended files, push the
    branch, and open a draft PR using the repository template. Link the issue and
-   report verification evidence and unresolved decisions.
+   report verification evidence and unresolved decisions. Codex opens draft PRs;
+   Claude's wrapper retains its ready-for-review policy.
 
 Never merge, deploy, run a production migration or import, issue refunds, send
 bulk communications, change live pricing/capacity, merge identities, or handle
