@@ -537,41 +537,6 @@ textarea:focus-visible {
   text-decoration: none;
 }
 
-.brand-mark {
-  position: relative;
-  display: grid;
-  width: 42px;
-  height: 42px;
-  flex: 0 0 42px;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 12px;
-  background: var(--imsda-gold);
-  color: var(--imsda-navy-deep);
-  box-shadow: inset 0 -8px 20px rgba(88, 44, 131, 0.12);
-}
-
-.brand-mark::after {
-  position: absolute;
-  right: -9px;
-  bottom: -10px;
-  width: 29px;
-  height: 29px;
-  border-radius: 50%;
-  background: var(--imsda-purple);
-  content: "";
-  opacity: 0.9;
-}
-
-.brand-flame {
-  position: relative;
-  z-index: 1;
-  font-family: Georgia, serif;
-  font-size: 1.35rem;
-  font-style: italic;
-  font-weight: 700;
-}
-
 .brand strong,
 .brand small { display: block; }
 
@@ -2147,7 +2112,7 @@ body:has(.auth-page) { padding-bottom: 0; }
     radial-gradient(circle at top right, rgb(88 44 131 / 10%), transparent 38%),
     var(--surface-soft);
 }
-.public-registration-embed-state .brand-mark {
+.public-registration-embed-state a:has(> img) {
   margin-bottom: 6px;
 }
 .public-registration-embed-state h1 {
@@ -5731,7 +5696,6 @@ body:has(.auth-page) { padding-bottom: 0; }
   .public-submission-detail dl > div { grid-template-columns: 1fr; gap: 3px; }
   body:has(.public-registration-page) { padding-bottom: 0; }
   .public-registration-header-inner { min-height: 68px; padding: 10px 16px; }
-  .public-registration-brand .brand-mark { width: 38px; height: 38px; flex-basis: 38px; }
   .public-registration-secure { border: 0; background: transparent; padding: 5px 0; font-size: 0; }
   .public-registration-secure svg { width: 19px; height: 19px; }
   .public-registration-hero { min-height: auto; margin: 15px 12px 14px; border-radius: 20px; padding: 25px 21px; }
@@ -10455,7 +10419,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-masthead { border-bottom: 1px solid var(--line); background: #fff; }
 .club-masthead-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 8px 0; }
 .club-masthead-brand { display: inline-flex; min-height: 44px; align-items: center; gap: 12px; color: var(--imsda-navy); text-decoration: none; }
-.club-masthead-brand > span:not(.brand-mark):not([data-navigation-pending]) { display: grid; line-height: 1.2; }
+.club-masthead-brand > span:not([data-navigation-pending]) { display: grid; line-height: 1.2; }
 .club-masthead-brand small { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-masthead-brand strong { font-size: 1.05rem; }
 .club-masthead-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 12px; min-width: 0; }

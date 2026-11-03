@@ -5,7 +5,7 @@ export default function EmbeddedRegistrationNotFound() {
   return (
     <main className="public-registration-embed-state">
       <BrandLink target="_top" />
-      <p className="public-registration-eyebrow">IMSDA Events</p>
+      <p className="public-registration-eyebrow">IMAdventist</p>
       <h1>Registration form unavailable</h1>
       <p>This form may have moved or may not be published yet.</p>
       <Link className="primary-button" href="https://imsda.org/events/" target="_top">

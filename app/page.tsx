@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { PRODUCT_DESCRIPTOR, PRODUCT_NAME } from "@/lib/brand";
 import { PublicHomePage } from "@/components/public-home-page";
 import { getPublishedHubContent } from "@/modules/site-content/hub-content";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "IMAdventist | Events & Club Ministry",
+  // Absolute: the root template would add a second "| IMAdventist".
+  title: { absolute: `${PRODUCT_NAME} | ${PRODUCT_DESCRIPTOR}` },
   description: "Explore Iowa-Missouri Conference events, find a club, and plan your season with the conference calendar.",
   icons: { icon: "/brand/favicon.ico" },
   alternates: { canonical: "/" },

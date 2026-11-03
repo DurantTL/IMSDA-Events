@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Create your account",
-  description: "Create an IMSDA Events account to see every registration made with your email address.",
+  description: "Create an IMAdventist account to see every registration made with your email address.",
   robots: { index: false, follow: false },
 };
 

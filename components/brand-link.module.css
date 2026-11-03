@@ -13,3 +13,11 @@
   align-items: center;
   justify-content: center;
 }
+
+/* The approved IMAdventist symbol. 42px matches the mark it replaced; pages may size it larger with a wrapper selector. */
+.symbol {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  object-fit: contain;
+}

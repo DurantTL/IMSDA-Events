@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Reset your password",
-  description: "Reset the password on your IMSDA Events account.",
+  description: "Reset the password on your IMAdventist account.",
   robots: { index: false, follow: false },
 };
 

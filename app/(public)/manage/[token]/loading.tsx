@@ -1,5 +1,6 @@
 import { BrandLink } from "@/components/brand-link";
-import { BrandMark } from "@/components/brand-mark";
+import Image from "next/image";
+import { BRAND_SYMBOL_PATH } from "@/lib/brand";
 
 export default function PublicManageLoading() {
   return (
@@ -11,7 +12,7 @@ export default function PublicManageLoading() {
       </header>
       <section className="public-registration-loading" aria-live="polite">
         <span className="public-registration-loading-mark">
-          <BrandMark />
+          <Image alt="" aria-hidden="true" height={48} src={BRAND_SYMBOL_PATH} width={48} />
         </span>
         <p className="public-registration-eyebrow">Private registration</p>
         <h1>Loading your registration…</h1>

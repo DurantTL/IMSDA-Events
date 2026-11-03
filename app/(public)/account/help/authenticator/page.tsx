@@ -4,7 +4,7 @@ import { BrandLink } from "@/components/brand-link";
 
 export const metadata: Metadata = {
   title: "Setting up an authenticator app",
-  description: "How to install and use an authenticator app for IMSDA Events two-step sign-in.",
+  description: "How to install and use an authenticator app for IMAdventist two-step sign-in.",
   robots: { index: false, follow: false },
 };
 
@@ -45,7 +45,7 @@ export default function AuthenticatorHelpPage() {
           </p>
           <p>
             <strong>3. Confirm with a code.</strong> The app now shows a six-digit code for this
-            account. Type that code back into IMSDA Events to turn the authenticator on.
+            account. Type that code back into IMAdventist to turn the authenticator on.
           </p>
           <p className="field-help">
             Prefer not to use an app? A passkey — your phone or computer&apos;s own fingerprint, face,

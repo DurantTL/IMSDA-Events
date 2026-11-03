@@ -1,5 +1,6 @@
 "use client";
 
+import { PRODUCT_NAME } from "@/lib/brand";
 import { BrandLink } from "@/components/brand-link";
 import { StaffViewerProvider } from "@/components/staff-viewer-context";
 import type { HelpViewer } from "@/modules/help/visibility";
@@ -388,7 +389,7 @@ export function AppShell({
       onKeyDown={(event) => { if (event.key === "Escape" && tooltip) setTooltip(null); }}>
       <a className="skip-link" href="#workspace-content">Skip to main content</a>
       <aside className="sidebar" aria-label="Application navigation" onScrollCapture={() => setTooltip(null)}>
-        <BrandLink guarded className="brand" wordmark={<span className="sidebar-link-label"><strong>IMSDA</strong><small>Events</small></span>} {...tipProps("IMSDA Events calendar")} />
+        <BrandLink guarded className="brand" wordmark={<span className="sidebar-link-label"><strong>{PRODUCT_NAME}</strong><small>Events</small></span>} {...tipProps("IMAdventist calendar")} />
 
         <SidebarToggle collapsed={collapsed} onToggle={toggleCollapsed} tipProps={tipProps("Expand sidebar")} />
 
