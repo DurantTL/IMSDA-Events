@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
  * Rule B6 guard scan (#1452): every component or page that renders a form with a
  * Save or Submit button either mounts `useUnsavedChangesGuard` or is on this list
  * with an honest reason. The list is not an excuse to stay unguarded:
- * "needs guard: follow-up #1468" entries are forms with several fields that are not
+ * Follow-up entries were forms with several fields that are not
  * saved instantly and still need the one-line hook mount.
  */
 const root = join(__dirname, "..");
@@ -28,7 +28,6 @@ const allowlist: Record<string, string> = {
   "components/attendee-sign-up-form.tsx": "sign-in",
   "components/attendee-verify-by-address-form.tsx": "sign-in",
   "components/background-check-review-panel.tsx": "action button only, no typed fields",
-  "components/cancellation-request-panel.tsx": "needs guard: follow-up #1468",
   "components/cancellation-requests-workspace.tsx": "action button only, no typed fields",
   "components/check-in-scanner.tsx": "action button only, no typed fields",
   "components/check-in-stations-panel.tsx": "action button only, no typed fields",
@@ -54,7 +53,6 @@ const allowlist: Record<string, string> = {
   "components/people-directory.tsx": "search or filter",
   "components/people-quick-filters.tsx": "search or filter",
   "components/public-lodging-assignment.tsx": "action button only, no typed fields",
-  "components/public-registration-contact-form.tsx": "needs guard: follow-up #1468",
   "components/public-registration-recovery-form.tsx": "sign-in",
   "components/public-responsible-adult.tsx": "action button only, no typed fields",
   "components/public-shirt-size-confirmation.tsx": "action button only, no typed fields",
@@ -148,6 +146,9 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
       "components/group-registration-editor.tsx",
       "components/public-lodging-preferences.tsx",
       "components/staff-invitation-registration.tsx",
+      // #1468 round 3f: public forms.
+      "components/public-registration-contact-form.tsx",
+      "components/cancellation-request-panel.tsx",
     ]) {
       expect(guarded(readFileSync(join(root, path), "utf8")), path).toBe(true);
     }
@@ -155,8 +156,9 @@ describe("unsaved changes guard scan (#1452, rule B6)", () => {
 
   it("lists the forms that still need a guard", () => {
     const pending = Object.entries(allowlist).filter(([, reason]) => reason === followUp).map(([path]) => path);
-    // Not a limit to raise: it only goes down as the follow-up mounts the hook.
-    expect(pending.length).toBeLessThanOrEqual(2);
+    // No follow-ups remain (#1468): a new form must mount the hook or be allow-listed with a real reason.
+    expect(pending).toEqual([]);
+    expect(pending.length).toBe(0);
   });
 });
 

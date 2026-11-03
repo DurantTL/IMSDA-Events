@@ -84,9 +84,9 @@ describe("unsaved-changes helpers, round 3e (#1468)", () => {
     }
   });
 
-  it("the two public entries are still on the follow-up list", () => {
+  it("the two public entries left the follow-up list in round 3f", () => {
     const list = readFileSync(join(__dirname, "unsaved-changes-guard-1452.test.ts"), "utf8");
-    expect(list).toContain('"components/public-registration-contact-form.tsx": "needs guard: follow-up #1468"');
-    expect(list).toContain('"components/cancellation-request-panel.tsx": "needs guard: follow-up #1468"');
+    expect(list).not.toContain('"components/public-registration-contact-form.tsx": "needs guard');
+    expect(list).not.toContain('"components/cancellation-request-panel.tsx": "needs guard');
   });
 });
