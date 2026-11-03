@@ -14,14 +14,21 @@ vi.mock("@/modules/event-info-cards/repository", () => ({
 }));
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(),
+  useParams: () => ({ eventSlug: "public-retreat" }),
 }));
 // The page sanitizes custom HTML (#816) through a server-only module.
 vi.mock("server-only", () => ({}));
 // The header's session links read cookies and the database (#1009); they have their own tests.
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
+vi.mock("@/modules/site-content/hub-content", async () => {
+  const { defaultHubContent } = await import("@/modules/site-content/hub-content-domain");
+  return { getPublishedHubContent: async () => defaultHubContent() };
+});
 
 import { describePublicEventLifecycle } from "@/modules/events/public-domain";
-import PublicEventPage from "@/app/(public)/events/[eventSlug]/page";
+import PublicEventPage, { generateMetadata } from "@/app/(public)/events/[eventSlug]/page";
+import PublicEventLoading from "@/app/(public)/events/[eventSlug]/loading";
+import PublicEventNotFound from "@/app/(public)/events/[eventSlug]/not-found";
 
 const landing = {
   event: {
@@ -72,6 +79,32 @@ const landing = {
 beforeEach(() => {
   vi.clearAllMocks();
   landingMocks.getPublicEventLanding.mockResolvedValue(landing);
+});
+
+describe("public event presentation (#1533)", () => {
+  it("shows public navigation and footer while retaining canonical metadata", async () => {
+    const params = Promise.resolve({ eventSlug: "public-retreat" });
+    const markup = renderToStaticMarkup(await PublicEventPage({ params }));
+    expect(markup).toContain('aria-label="IMAdventist calendar"');
+    expect(markup).toContain('aria-label="Explore"');
+    expect(markup).toContain('href="/events">Browse all events</a>');
+    expect(markup).toContain('class="home-footer"');
+    const metadata = await generateMetadata({ params });
+    expect(metadata.alternates?.canonical).toBe("/events/public-retreat");
+    expect(metadata.openGraph).toMatchObject({ siteName: "IMAdventist", url: "/events/public-retreat" });
+  });
+
+  it("keeps loading and unavailable states branded without event data", () => {
+    const loading = renderToStaticMarkup(PublicEventLoading());
+    const unavailable = renderToStaticMarkup(PublicEventNotFound());
+    for (const markup of [loading, unavailable]) {
+      expect(markup).toContain('aria-label="IMAdventist calendar"');
+      expect(markup).not.toContain(landing.event.name);
+      expect(markup).not.toContain("public-event-status-action");
+    }
+    expect(loading).toContain('aria-busy="true"');
+    expect(unavailable).toContain('href="/events"');
+  });
 });
 
 describe("public event landing announcement feed", () => {

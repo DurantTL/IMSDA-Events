@@ -1,0 +1,24 @@
+.eventPage :global(.public-header-links) { flex: 1 1 280px; }
+.eventPage :global(.public-registration-header-inner) { flex-wrap: wrap; }
+.eventPage :global(.public-event-container) { max-width: 1180px; padding-top: 20px; }
+.backLink { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 12px; color: var(--imsda-navy); font-weight: 700; text-underline-offset: 3px; }
+.eventPage :global(.public-event-container > .public-event-details-link) { width: auto; min-height: 44px; margin-left: 16px; margin-bottom: 12px; padding: 8px 12px; font-size: .875rem; }
+.eventPage :global(.public-event-hero) { min-height: 0; border-radius: var(--radius-modal); background: var(--imsda-navy); padding: 38px 44px; box-shadow: none; }
+.eventPage :global(.public-event-hero)::after { display: none; }
+.eventPage :global(.public-event-hero) h1 { max-width: 22ch; font-size: clamp(2.3rem, 4vw, 3.5rem); line-height: 1.08; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.eventPage :global(.auto-info-header) { border-radius: var(--radius-modal); background: var(--card); padding: 28px 32px; }
+.eventPage :global(.auto-info-header) h1 { font-size: clamp(2rem, 4vw, 3rem); line-height: 1.15; overflow-wrap: anywhere; }
+.eventPage :global(.public-event-status-block) { border-radius: var(--radius-info); margin-block: 24px; padding: 22px 24px; }
+.eventPage :global(.public-event-form-card) { border-radius: var(--radius-card); background: var(--card); box-shadow: none; }
+.eventPage :global(.event-schedule-day) { overflow-wrap: anywhere; }
+.eventPage :global(.event-countdown-figures) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); }
+.eventPage :global(.public-event-help-section) { margin-bottom: 0; padding-block: 24px; }
+.eventPage :global(.public-registration-loading), .eventPage :global(.public-registration-not-found) { border: 1px solid var(--line); border-radius: var(--radius-modal); background: var(--card); box-shadow: none; }
+.backLink:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .eventPage :global(.public-header-links) { flex-basis: 100%; flex-wrap: nowrap; justify-content: flex-start; }
+  .eventPage :global(.public-header-nav) { flex: 1 1 auto; overflow-x: auto; }
+  .eventPage :global(.public-header-nav) ul { width: max-content; flex-wrap: nowrap; }
+  .eventPage :global(.public-event-hero), .eventPage :global(.auto-info-header) { padding: 26px 22px; }
+  .eventPage :global(.public-event-status-block) { padding: 18px; }
+}
