@@ -99,7 +99,7 @@ describe("dispatching", () => {
       correlationId: "corr-1",
     });
     // Slack and Teams render `text`; everything else can read the fields.
-    expect(body.text).toContain("[URGENT] IMSDA Events: Email delivery is falling behind");
+    expect(body.text).toContain("[URGENT] IMAdventist: Email delivery is falling behind");
     expect(upserts).toHaveLength(1);
   });
 

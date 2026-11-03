@@ -26,7 +26,7 @@ const configuration: SesEmailConfiguration = {
   maxSendRate: 1000,
 };
 const input = {
-  fromName: "IMSDA Events",
+  fromName: "IMAdventist",
   fromEmail: "registration@imsda.org",
   toEmail: "attendee@example.test",
   subject: "Registration received",

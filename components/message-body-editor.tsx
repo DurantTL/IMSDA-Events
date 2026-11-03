@@ -803,7 +803,7 @@ function VisualEditor({ value, tokens, tokenLabels, imageLibrary, onChange }: Me
     >
       <EditorToolbar tokens={tokens} tokenLabels={tokenLabels} imageLibrary={imageLibrary} markChanged={() => { userEdited.current = true; }} />
       <div className="message-editor-email">
-        <div className="message-editor-email-header">IMSDA Events</div>
+        <div className="message-editor-email-header">IMAdventist</div>
         <div className="message-editor-email-body">
           <RichTextPlugin
             contentEditable={(

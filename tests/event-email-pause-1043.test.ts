@@ -54,7 +54,7 @@ beforeEach(() => {
   });
   mocks.tx.event.findUnique.mockResolvedValue({ id: "event-1" });
   mocks.tx.eventMessageSettings.findUnique.mockResolvedValue({ deliveryPaused: false });
-  mocks.tx.platformSettings.findUnique.mockResolvedValue({ defaultSenderName: "IMSDA Events" });
+  mocks.tx.platformSettings.findUnique.mockResolvedValue({ defaultSenderName: "IMAdventist" });
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.getCurrentSession.mockResolvedValue({ user: admin });
   mocks.updateCentralSender.mockImplementation(async (input) => input);
@@ -104,7 +104,7 @@ describe("pausing an event's email: system administrators only (#1043)", () => {
     mocks.tx.eventMessageSettings.findUnique.mockResolvedValue(null);
     await setEventEmailPaused({ eventId: "event-1", paused: true, actor: admin });
     expect(mocks.tx.eventMessageSettings.create.mock.calls[0]![0].data).toMatchObject({
-      eventId: "event-1", senderName: "IMSDA Events", deliveryPaused: true, deliveryPausedByUserId: "admin-1",
+      eventId: "event-1", senderName: "IMAdventist", deliveryPaused: true, deliveryPausedByUserId: "admin-1",
     });
   });
 
@@ -133,10 +133,10 @@ describe("/api/admin/email (#1043)", () => {
   });
 
   it("saves the central sender for a system administrator, trimming and lowercasing the address", async () => {
-    const response = await patch({ sender: { defaultSenderName: "IMSDA Events", defaultSenderEmail: " Events@IMSDA-Events.test ", defaultReplyToEmail: "" } });
+    const response = await patch({ sender: { defaultSenderName: "IMAdventist", defaultSenderEmail: " Events@IMSDA-Events.test ", defaultReplyToEmail: "" } });
     expect(response.status).toBe(200);
     expect(mocks.updateCentralSender).toHaveBeenCalledWith(
-      { defaultSenderName: "IMSDA Events", defaultSenderEmail: "events@imsda-events.test", defaultReplyToEmail: null },
+      { defaultSenderName: "IMAdventist", defaultSenderEmail: "events@imsda-events.test", defaultReplyToEmail: null },
       "admin-1",
     );
   });

@@ -54,7 +54,7 @@ const event = {
 function settingsWith(overrides: Record<string, unknown> = {}) {
   return {
     deliveryMode: "EXTERNAL_EMAIL" as const,
-    senderName: "IMSDA Events",
+    senderName: "IMAdventist",
     senderEmail: "registration@imsda.org",
     replyToEmail: "help@imsda.org",
     internalNotificationEmails: [],

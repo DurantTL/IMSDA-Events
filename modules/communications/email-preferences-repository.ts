@@ -138,7 +138,7 @@ async function recordOptOutOnce(
         entityId: row.id,
         correlationId: randomUUID(),
         summary: input.scope === "ALL"
-          ? "A recipient opted out of all IMSDA Events announcements."
+          ? "A recipient opted out of all IMAdventist announcements."
           : "A recipient opted out of this event's announcements.",
         metadata: { scope: input.scope, source: input.source },
       },

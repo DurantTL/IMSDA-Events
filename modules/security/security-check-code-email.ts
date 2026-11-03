@@ -31,9 +31,9 @@ export const SECURITY_CHECK_CODE_DISPLAY_SENTINEL = "{{security_check_code_displ
 function securityCheckCodeBody() {
   return {
     // No code in the subject: the provider's webhook stores the subject it was sent. The code is in the body only.
-    subject: "Your IMSDA Events security code",
+    subject: "Your IMAdventist security code",
     bodyText: [
-      "Enter this code on the IMSDA Events page where you asked for it, in place of the security check:",
+      "Enter this code on the IMAdventist page where you asked for it, in place of the security check:",
       "",
       SECURITY_CHECK_CODE_DISPLAY_SENTINEL,
       "",
@@ -43,7 +43,7 @@ function securityCheckCodeBody() {
       "Didn't ask for this?",
       "You can ignore this email. The code does nothing on its own and stops working by itself.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

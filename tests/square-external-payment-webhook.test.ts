@@ -125,7 +125,7 @@ beforeEach(() => {
   });
 });
 
-describe("Square payments taken outside IMSDA Events", () => {
+describe("Square payments taken outside IMAdventist", () => {
   it("applies a completed payment whose note names one registration and settles it exactly", async () => {
     const tx = transactionClient();
 

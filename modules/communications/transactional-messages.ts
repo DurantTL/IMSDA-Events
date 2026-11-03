@@ -150,7 +150,7 @@ export type QueuedTransactionalMessage = {
 
 const fallbackSettings = {
   deliveryMode: "LOCAL_CAPTURE" as const,
-  senderName: "IMSDA Events",
+  senderName: "IMAdventist",
   senderEmail: null,
   replyToEmail: null,
 };

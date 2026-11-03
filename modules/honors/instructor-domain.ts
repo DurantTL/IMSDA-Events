@@ -159,7 +159,7 @@ export type InstructorInviteInput = {
  */
 export function instructorInviteEmail(input: InstructorInviteInput) {
   return {
-    subject: `You're invited to teach at ${input.eventName} on IMSDA Events`,
+    subject: `You're invited to teach at ${input.eventName} on IMAdventist`,
     bodyText: [
       `Hello ${input.name.trim() || "there"},`,
       "",
@@ -167,7 +167,7 @@ export function instructorInviteEmail(input: InstructorInviteInput) {
       ...input.classNames.map((name) => `- ${name}`),
       "",
       "To accept:",
-      `1. New to IMSDA Events? Create your account at ${input.signUpUrl}`,
+      `1. New to IMAdventist? Create your account at ${input.signUpUrl}`,
       `   Already have one? Sign in at ${input.signInUrl}`,
       `2. Use this email address: ${input.email}`,
       "3. On your account page, choose Accept next to the instructor invite.",
@@ -176,7 +176,7 @@ export function instructorInviteEmail(input: InstructorInviteInput) {
       "",
       "If you weren't expecting this, you can ignore it. Nothing happens unless you accept.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

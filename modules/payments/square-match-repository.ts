@@ -261,7 +261,7 @@ export async function attachSquarePaymentToRegistration(
         entityType: "Payment",
         entityId: created.id,
         correlationId: randomUUID(),
-        summary: `Attached a Square payment taken outside IMSDA Events to registration ${registration.confirmationCode}.`,
+        summary: `Attached a Square payment taken outside IMAdventist to registration ${registration.confirmationCode}.`,
         metadata: {
           provider: "SQUARE",
           providerPaymentId: provider.id,

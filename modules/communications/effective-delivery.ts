@@ -37,7 +37,7 @@ export type EffectiveDelivery = { mode: EffectiveDeliveryMode; reason: Effective
 
 export type CentralSender = { name: string; email: string | null; replyTo: string | null };
 
-export const FALLBACK_CENTRAL_SENDER_NAME = "IMSDA Events";
+export const FALLBACK_CENTRAL_SENDER_NAME = "IMAdventist";
 
 type EmailSettingsClient = Prisma.TransactionClient | ReturnType<typeof getPrisma>;
 

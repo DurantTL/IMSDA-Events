@@ -15,6 +15,7 @@
  */
 
 import type { MessageTemplateKey } from "@prisma/client";
+import { BRAND_SYMBOL_PATH } from "@/lib/brand";
 import { escapeHtml, renderEmailBodyHtml, renderPreheaderHtml } from "@/modules/communications/email-html";
 import {
   DEFAULT_EMAIL_LAYOUT_SETTINGS,
@@ -152,22 +153,22 @@ export const EMAIL_WHY_LINES: Record<MessageTemplateKey, string> = {
   SHIRT_SIZE_REQUEST: "You got this because your registration needs a shirt size.",
   REGISTRATION_ACCESS_RECOVERY: `You got this because someone asked for a link to a registration using ${WHO}.`,
   EVENT_ANNOUNCEMENT: "You got this because you are registered for an event. Event staff send these updates to everyone registered.",
-  ACCOUNT_ACTIVATION: "You got this because an account was set up for you on IMSDA Events.",
-  ACCOUNT_PASSWORD_RESET: `You got this because someone asked to reset the password for ${WHO} on IMSDA Events.`,
-  ATTENDEE_EMAIL_VERIFICATION: `You got this because someone asked to create an IMSDA Events account with ${WHO}.`,
-  ATTENDEE_PASSWORD_RESET: `You got this because someone asked to reset the password for ${WHO} on IMSDA Events.`,
-  ATTENDEE_EDIT_VERIFICATION: "You got this because someone asked to change a registration while signed in to your IMSDA Events account.",
-  ATTENDEE_SIGN_IN_CODE: `You got this because someone asked to sign in to IMSDA Events with ${WHO}.`,
-  ATTENDEE_TWO_STEP_RECOVERY_CODE: `You got this because someone signed in to IMSDA Events as ${WHO} and asked to recover two-step sign-in.`,
-  ATTENDEE_TWO_STEP_RECOVERY_NOTICE: `You got this because two-step sign-in was reset on the IMSDA Events account for ${WHO}.`,
-  SECURITY_CHECK_CODE: `You got this because someone asked for a security code on IMSDA Events using ${WHO}.`,
+  ACCOUNT_ACTIVATION: "You got this because an account was set up for you on IMAdventist.",
+  ACCOUNT_PASSWORD_RESET: `You got this because someone asked to reset the password for ${WHO} on IMAdventist.`,
+  ATTENDEE_EMAIL_VERIFICATION: `You got this because someone asked to create an IMAdventist account with ${WHO}.`,
+  ATTENDEE_PASSWORD_RESET: `You got this because someone asked to reset the password for ${WHO} on IMAdventist.`,
+  ATTENDEE_EDIT_VERIFICATION: "You got this because someone asked to change a registration while signed in to your IMAdventist account.",
+  ATTENDEE_SIGN_IN_CODE: `You got this because someone asked to sign in to IMAdventist with ${WHO}.`,
+  ATTENDEE_TWO_STEP_RECOVERY_CODE: `You got this because someone signed in to IMAdventist as ${WHO} and asked to recover two-step sign-in.`,
+  ATTENDEE_TWO_STEP_RECOVERY_NOTICE: `You got this because two-step sign-in was reset on the IMAdventist account for ${WHO}.`,
+  SECURITY_CHECK_CODE: `You got this because someone asked for a security code on IMAdventist using ${WHO}.`,
   REGISTRATION_CONFIRMATION_ORGANIZATION_BILLED: "You got this because you registered for an event and your church or organization is being billed.",
-  CLUB_INVITE: "You got this because you were invited to a club role in IMSDA Events.",
-  CLUB_ASSIGNMENTS: "You got this because you have a club role in IMSDA Events.",
-  CUSTOM_MESSAGE: "You got this because event staff sent you a message through IMSDA Events.",
-  CLUB_TEAM_ROLE_NOTIFICATION: "You got this because you were given a club role in IMSDA Events.",
-  ACCOUNT_LOCKOUT: "You got this because sign-in to your IMSDA Events account was locked after too many failed tries.",
-  ATTENDEE_LOCKOUT: "You got this because sign-in to your IMSDA Events account was locked after too many failed tries.",
+  CLUB_INVITE: "You got this because you were invited to a club role in IMAdventist.",
+  CLUB_ASSIGNMENTS: "You got this because you have a club role in IMAdventist.",
+  CUSTOM_MESSAGE: "You got this because event staff sent you a message through IMAdventist.",
+  CLUB_TEAM_ROLE_NOTIFICATION: "You got this because you were given a club role in IMAdventist.",
+  ACCOUNT_LOCKOUT: "You got this because sign-in to your IMAdventist account was locked after too many failed tries.",
+  ATTENDEE_LOCKOUT: "You got this because sign-in to your IMAdventist account was locked after too many failed tries.",
   LOCATION_WAITLIST_DIGEST: "You got this because you coordinate or staff a location with a waitlist.",
   DEADLINE_REMINDER: "You got this because you are a club director or Area Coordinator and a conference deadline is coming up.",
   TEAM_PERMISSION_REQUEST: "You got this because you are the Area Coordinator, or event staff, for a team that needs permission.",
@@ -196,7 +197,7 @@ export const EMAIL_WHY_LINES: Record<MessageTemplateKey, string> = {
   SYSTEM_TEST_EMAIL: "You got this because a system administrator sent a test email to this address.",
 };
 
-const GENERIC_WHY = "You got this because of something you did on IMSDA Events.";
+const GENERIC_WHY = "You got this because of something you did on IMAdventist.";
 
 export function emailWhyLine(templateKey: MessageTemplateKey | string | null | undefined, recipientEmail?: string | null) {
   const line = templateKey ? (EMAIL_WHY_LINES as Record<string, string | undefined>)[templateKey] : undefined;
@@ -283,8 +284,8 @@ export function appendEmailPlainTextFooter(
   content: Pick<EmailFooterContent, "headerName" | "whyLine" | "helpLine">,
   options: { separator?: boolean } = {},
 ) {
-  // The closing "IMSDA Events" line of the account emails is the footer's job now, and would contradict a renamed header.
-  const body = bodyText.replace(/\s+$/, "").replace(/(^|\n\n)IMSDA Events$/, "");
+  // The closing "IMAdventist" line of the account emails is the footer's job now, and would contradict a renamed header.
+  const body = bodyText.replace(/\s+$/, "").replace(/(^|\n\n)(?:IMAdventist|IMSDA Events)$/, "");
   return `${body.replace(/\s+$/, "")}\n\n${emailPlainTextFooter(content, options)}\n`;
 }
 
@@ -415,6 +416,8 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
     calendar
       ? `<a href="${calendar}"${label ? ` aria-label="${label}"` : ""} style="color:${ink};color:inherit;text-decoration:none;">${inner}</a>`
       : inner;
+  // The approved symbol is served from the same site as the calendar link; without that address there is no absolute image URL, so only the name shows.
+  const symbolUrl = calendar ? `${new URL(calendar.replace(/&amp;/g, "&")).origin}${BRAND_SYMBOL_PATH}` : null;
   const preheaderHtml = renderPreheaderHtml(input.preheader);
   const bodyHtml = restyleRenderedButtons(input.bodyHtml ?? renderEmailBodyHtml(input.body ?? ""));
   const footerLines = [
@@ -444,8 +447,8 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">',
     `<tr><td bgcolor="${L.bar}" class="em-bar" style="background:${L.bar};border-radius:12px 12px 0 0;border-bottom:4px solid ${L.gold};padding:16px 24px;">`,
     '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>',
-    `<td width="34" height="34" align="center" valign="middle" bgcolor="${L.gold}" style="background:${L.gold};border-radius:8px;width:34px;height:34px;font-family:Georgia,'Times New Roman',serif;font-size:21px;font-style:italic;font-weight:bold;line-height:34px;color:${L.markInk};">${brandLink("i", L.markInk, "IMSDA Events calendar")}</td>`,
-    `<td style="padding-left:12px;font-family:${FONT};">`,
+    ...(symbolUrl ? [`<td width="34" height="34" valign="middle" style="width:34px;height:34px;">${brandLink(`<img src="${symbolUrl}" width="34" height="34" alt="IMAdventist" style="display:block;width:34px;height:34px;border:0;" />`, L.barInk, "IMAdventist calendar")}</td>`] : []),
+    `<td style="padding-left:${symbolUrl ? 12 : 0}px;font-family:${FONT};">`,
     ...(calendar ? [`<a href="${calendar}" style="color:${L.barInk};color:inherit;text-decoration:none;display:block;">`] : []),
     `<div class="em-bar-name" style="font-size:18px;line-height:20px;font-weight:bold;color:${L.barInk};">${escapeHtml(headerName)}</div>`,
     `<div class="em-bar-sub" style="font-size:12px;line-height:16px;color:${L.barSub};">${escapeHtml(EMAIL_HEADER_SUBLINE)}</div>`,
@@ -484,7 +487,7 @@ const CODE_BOX_PATTERN = /^[0-9A-Za-z ]{1,16}$/;
 const URL_PATTERN = /https?:\/\/[^\s<>"'()]+/gi;
 const TRAILING_URL_PUNCTUATION = /[.,;:!?]+$/;
 const LABELLED_URL_LINE = /^(.{1,80}?):\s+(https?:\/\/[^\s<>"']+)$/i;
-const SIGNATURE_LINES = new Set(["IMSDA Events"]);
+const SIGNATURE_LINES = new Set(["IMAdventist", "IMSDA Events"]);
 
 /** A line with the site's own web addresses turned into links. Plain text only: no Markdown, nothing else is linked. */
 function linkifyLine(line: string, origins: readonly string[] = []) {

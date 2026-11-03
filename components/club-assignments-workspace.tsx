@@ -61,7 +61,7 @@ const NO_RECIPIENTS: PreviewRecipient[] = [];
 
 const deliveryModeLabels: Record<ClubAssignmentPreview["deliveryMode"], string> = {
   EXTERNAL_EMAIL: "Emails are queued, not sent; Process email queue in the Delivery log sends them.",
-  LOCAL_CAPTURE: "Local capture: messages are captured inside IMSDA Events and no email is sent.",
+  LOCAL_CAPTURE: "Local capture: messages are captured inside IMAdventist and no email is sent.",
   DISABLED: "Delivery is off: rows are recorded as suppressed and no email is sent.",
 };
 
@@ -438,7 +438,7 @@ export function ClubAssignmentsWorkspace({
                     />
                     <span>
                       <strong>{`I reviewed all ${preview.includedCount} club${preview.includedCount === 1 ? "" : "s"} and the sample message above.`}</strong>
-                      <small>If an assignment, contact, template, or sender setting changes before this is created, IMSDA Events will stop and require a new review.</small>
+                      <small>If an assignment, contact, template, or sender setting changes before this is created, IMAdventist will stop and require a new review.</small>
                     </span>
                   </label>
                   <button type="submit" className="primary-button" disabled={loadingPreview || !confirmed}>

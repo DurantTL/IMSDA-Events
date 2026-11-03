@@ -1,5 +1,5 @@
 /**
- * Real-browser check that IMSDA Events works, or says plainly what is blocked, in privacy browsers (#1445, rules T2 and P1).
+ * Real-browser check that IMAdventist works, or says plainly what is blocked, in privacy browsers (#1445, rules T2 and P1).
  *
  * Drives Chromium, Firefox and WebKit (Playwright) through the key journeys with EasyList/EasyPrivacy-style request
  * blocking (`scripts/support/privacy-block-lists.ts`), in three modes: control (nothing blocked), shields (what Brave

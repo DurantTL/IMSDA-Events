@@ -96,7 +96,7 @@ export async function enqueueLodgingMessage(tx: Tx, input: {
   ]);
   if (!recipient) return { messageId: null, pending: false, skipped: "NO_REGISTRATION", recipientMasked: null };
   if (!recipient.email) return { messageId: null, pending: false, skipped: "NO_RECIPIENT", recipientMasked: null };
-  const settings = settingsRow ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
+  const settings = settingsRow ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMAdventist", senderEmail: null, replyToEmail: null };
   const rendered = renderLodgingMessage(input.content, recipient.name);
   const holdNote = suppressionNote(settings);
   const suppressed = holdNote !== null;

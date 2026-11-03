@@ -84,7 +84,7 @@ vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondS
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: vi.fn(), StaffActAsError: class StaffActAsError extends Error {} }));
 vi.mock("@/modules/communications/account-email", () => ({
   isAccountEmailConfigured: mocks.configured,
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }),
+  getAccountEmailSender: () => ({ name: "IMAdventist", address: "events@example.test", replyTo: null }),
 }));
 vi.mock("@/modules/communications/account-email-dispatch", () => ({ sendStaffInvitationEmail: mocks.sendStaffInvitationEmail, sendAccountRecoveryEmail: vi.fn() }));
 vi.mock("@/modules/access/auth-service", () => ({ issueAccountToken: mocks.issueAccountToken }));
@@ -210,7 +210,7 @@ describe("each kind of access alone", () => {
     expect(mocks.clubInviteCreate.mock.calls[0]![0].data.expiresAt).toBeInstanceOf(Date);
     const message = mocks.outboxCreate.mock.calls[0]![0].data;
     expect(message).toMatchObject({ templateKey: "CLUB_INVITE", recipientEmail: "pat@example.test", eventId: null });
-    expect(message.bodyTextSnapshot).toContain("The Iowa-Missouri Conference has invited you as Club club_1's registrar on IMSDA Events.");
+    expect(message.bodyTextSnapshot).toContain("The Iowa-Missouri Conference has invited you as Club club_1's registrar on IMAdventist.");
     expect(message.metadata).toMatchObject({ trigger: "CLUB_INVITE_SENT", accountEmail: true, clubInviteId: "ci-1" });
     expect(mocks.userCreate).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "CLUB_INVITE_CREATED", actorUserId: "u-sys" }), expect.anything());

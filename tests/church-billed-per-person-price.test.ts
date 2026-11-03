@@ -188,7 +188,7 @@ describe("registration form order summary", () => {
 
 describe("club packet", () => {
   const base = {
-    event: { name: "Synthetic Camporee", conferenceName: "IMSDA Events", startsOn: "2027-02-19T12:00:00.000Z", endsOn: "2027-02-21T12:00:00.000Z", timezone: "America/Chicago", earlyBirdDeadline: null, lateRateApplied: false },
+    event: { name: "Synthetic Camporee", conferenceName: "IMAdventist", startsOn: "2027-02-19T12:00:00.000Z", endsOn: "2027-02-21T12:00:00.000Z", timezone: "America/Chicago", earlyBirdDeadline: null, lateRateApplied: false },
     club: { organizationId: "org-1", organizationName: "Synthetic Club", sponsoringChurch: "Synthetic Church", directorName: "Pat Example", email: "pat@example.test", phone: "555-0100", submittedAt: "2027-01-05T00:00:00.000Z", confirmationCode: "CAMP-001" },
     headcounts: { pathfinder: 1, tlt: 0, staff: 0, child: 0, total: 1 },
     firstTimeCampers: 0,

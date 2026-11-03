@@ -73,8 +73,8 @@ describe("every template key has a header context and a why line (#1443)", () =>
   });
 
   it("picks the header name by context from the settings", () => {
-    const settings = { headerName: "IMSDA Events", clubHeaderName: "IMSDA Club Ministry", helpEmail: null, helpPhone: null };
-    expect(emailHeaderName(settings, "general")).toBe("IMSDA Events");
+    const settings = { headerName: "IMAdventist", clubHeaderName: "IMSDA Club Ministry", helpEmail: null, helpPhone: null };
+    expect(emailHeaderName(settings, "general")).toBe("IMAdventist");
     expect(emailHeaderName(settings, "club")).toBe("IMSDA Club Ministry");
   });
 });
@@ -127,7 +127,7 @@ function multiStore(rows: Array<Partial<Row> & { id: string; templateKey: string
     accountUserId: null,
     registrationId: null,
     recipientEmail: `${row.id}@example.org`,
-    senderNameSnapshot: "IMSDA Events",
+    senderNameSnapshot: "IMAdventist",
     senderEmailSnapshot: "registration@imsda.org",
     replyToEmailSnapshot: "events@example.org",
     subjectSnapshot: "Subject",
@@ -188,7 +188,7 @@ describe("delivery picks the header for the message's context (#1443)", () => {
         { id: "m3", templateKey: "REGISTRATION_CONFIRMATION_PAID", registration: { clubRegistration: { id: "club-reg-1" } } },
         { id: "m4", templateKey: "REGISTRATION_CONFIRMATION_PAID", registration: { clubRegistration: null } },
       ],
-      { emailHeaderName: "IMSDA Events", emailClubHeaderName: "IMSDA Club Ministry", emailHelpEmail: "help@example.org", emailHelpPhone: null, defaultSenderEmail: "registration@imsda.org" },
+      { emailHeaderName: "IMAdventist", emailClubHeaderName: "IMSDA Club Ministry", emailHelpEmail: "help@example.org", emailHelpPhone: null, defaultSenderEmail: "registration@imsda.org" },
     );
     const sent: Record<string, { html: string; text: string }> = {};
     const sendEmail = vi.fn(async (input: { toEmail: string; bodyHtml?: string | null; bodyText: string }) => {
@@ -206,12 +206,12 @@ describe("delivery picks the header for the message's context (#1443)", () => {
     expect(result.sentIds.sort()).toEqual(["m1", "m2", "m3", "m4"]);
     const header = (key: string) => /class="em-bar-name"[^>]*>([^<]*)</.exec(sent[key].html)?.[1];
     expect(header("m1")).toBe("IMSDA Club Ministry");
-    expect(header("m2")).toBe("IMSDA Events");
+    expect(header("m2")).toBe("IMAdventist");
     expect(header("m3")).toBe("IMSDA Club Ministry");
-    expect(header("m4")).toBe("IMSDA Events");
+    expect(header("m4")).toBe("IMAdventist");
     // The footer in the text part agrees with the header, and the event's own contact wins for event mail.
     expect(sent.m1.text).toContain("Sent by IMSDA Club Ministry for the Iowa-Missouri Conference");
-    expect(sent.m4.text).toContain("Sent by IMSDA Events for the Iowa-Missouri Conference");
+    expect(sent.m4.text).toContain("Sent by IMAdventist for the Iowa-Missouri Conference");
     expect(sent.m4.text).toContain("Questions about this event? Email events@example.org.");
     // One read of the layout settings for four messages.
     const layoutReads = store.platformSettings.findUnique.mock.calls.filter(
@@ -233,7 +233,7 @@ function deps(store: ReturnType<typeof multiStore>, sent: Array<{ html: string |
     ...extra,
   };
 }
-const SETTINGS_ROW = { emailHeaderName: "IMSDA Events", emailClubHeaderName: "IMSDA Club Ministry", emailHelpEmail: "help@example.org", emailHelpPhone: null, defaultSenderEmail: "registration@imsda.org" };
+const SETTINGS_ROW = { emailHeaderName: "IMAdventist", emailClubHeaderName: "IMSDA Club Ministry", emailHelpEmail: "help@example.org", emailHelpPhone: null, defaultSenderEmail: "registration@imsda.org" };
 
 describe("club invoices and every scope get the layout (#1443)", () => {
   it("gives an invoice to a club director the club header, and a billing contact the general one", async () => {
@@ -247,7 +247,7 @@ describe("club invoices and every scope get the layout (#1443)", () => {
     const sent: Array<{ html: string | null | undefined; text: string }> = [];
     await processExternalEmailQueue("event-1", { dependencies: deps(store, sent) });
     expect(sent[0].html).toMatch(/class="em-bar-name"[^>]*>IMSDA Club Ministry</);
-    expect(sent[1].html).toMatch(/class="em-bar-name"[^>]*>IMSDA Events</);
+    expect(sent[1].html).toMatch(/class="em-bar-name"[^>]*>IMAdventist</);
   });
 
   it("sends the account queue's text-only rows and the sign-in code box as HTML, never null, in both scopes", async () => {
@@ -288,7 +288,7 @@ describe("club invoices and every scope get the layout (#1443)", () => {
 
 describe("the staff preview picks the header delivery sends (#1443)", () => {
   it("agrees for a club-registration confirmation and a club-director invoice, and for their general twins", async () => {
-    const settings = { headerName: "IMSDA Events", clubHeaderName: "IMSDA Club Ministry", helpEmail: "help@example.org", helpPhone: null };
+    const settings = { headerName: "IMAdventist", clubHeaderName: "IMSDA Club Ministry", helpEmail: "help@example.org", helpPhone: null };
     const store = multiStore(
       [
         { id: "m1", templateKey: "REGISTRATION_CONFIRMATION_PAID", registration: { clubRegistration: { id: "c1" } } },
@@ -310,6 +310,6 @@ describe("the staff preview picks the header delivery sends (#1443)", () => {
     previews.forEach((preview, index) => {
       expect(sent[index].html, String(index)).toMatch(new RegExp(`class="em-bar-name"[^>]*>${preview.headerName}<`));
     });
-    expect(previews.map((preview) => preview.headerName)).toEqual(["IMSDA Club Ministry", "IMSDA Club Ministry", "IMSDA Events", "IMSDA Events"]);
+    expect(previews.map((preview) => preview.headerName)).toEqual(["IMSDA Club Ministry", "IMSDA Club Ministry", "IMAdventist", "IMAdventist"]);
   });
 });

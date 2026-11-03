@@ -17,7 +17,7 @@ vi.mock("@/modules/communications/effective-delivery", async (importOriginal) =>
 import { queueNotices as queueGeneralLinkNotices } from "@/modules/general-link-registrations/repository";
 import { queueNotices as queueStaffInvitationNotices } from "@/modules/staff-invitations/repository";
 
-const ON = { deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON", senderName: "IMSDA Events", senderEmail: "no-reply@imsda-events.test", replyToEmail: null };
+const ON = { deliveryMode: "EXTERNAL_EMAIL", deliveryReason: "ON", senderName: "IMAdventist", senderEmail: "no-reply@imsda-events.test", replyToEmail: null };
 const PAUSED = { ...ON, deliveryMode: "LOCAL_CAPTURE", deliveryReason: "PAUSED" };
 const DISABLED = { ...ON, deliveryMode: "DISABLED" };
 

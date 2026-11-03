@@ -111,7 +111,7 @@ function customFixture(attendeeCount: number, body = CUSTOM_BODY) {
     eventMessageSettings: {
       findUnique: vi.fn().mockResolvedValue({
         deliveryMode: "LOCAL_CAPTURE",
-        senderName: "IMSDA Events",
+        senderName: "IMAdventist",
         senderEmail: "events@example.test",
         replyToEmail: "help@example.test",
       }),

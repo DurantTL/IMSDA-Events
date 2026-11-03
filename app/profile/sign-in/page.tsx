@@ -30,7 +30,7 @@ export default async function ProfileSignInPage() {
         <div className="auth-heading">
           <p className="eyebrow">Edit profile</p>
           <h1>Sign in first</h1>
-          <p>Choose how you usually sign in to IMSDA Events.</p>
+          <p>Choose how you usually sign in to IMAdventist.</p>
         </div>
         <p className="quiet-copy">Account sign in is for registrations and clubs. Staff sign in is for event staff.</p>
         <div className="button-pair">

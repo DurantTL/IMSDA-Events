@@ -52,7 +52,7 @@ import {
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
 describe("the hidden preheader in the email document (#836)", () => {
-  const base = { title: "Friday arrival information", bodyHtml: "<p>Hello</p>", footer: "IMSDA Events" };
+  const base = { title: "Friday arrival information", bodyHtml: "<p>Hello</p>", footer: "IMAdventist" };
 
   it("leaves the document exactly as it was when there is no preview line", () => {
     const baseline = sha256(renderEmailHtmlDocument(base));
@@ -188,7 +188,7 @@ function announcementTransaction(options: { versionPreheader?: string | null | u
   const hasVersion = "versionPreheader" in options;
   const tx = {
     eventMessageSettings: {
-      findUnique: vi.fn().mockResolvedValue({ deliveryMode: "LOCAL_CAPTURE", senderName: "IMSDA Events", senderEmail: "events@example.test", replyToEmail: "help@example.test" }),
+      findUnique: vi.fn().mockResolvedValue({ deliveryMode: "LOCAL_CAPTURE", senderName: "IMAdventist", senderEmail: "events@example.test", replyToEmail: "help@example.test" }),
     },
     eventMessageTemplate: {
       findUnique: vi.fn().mockResolvedValue(hasVersion
@@ -341,7 +341,7 @@ describe("an announcement send runs the send check on the server (#836)", () => 
     const fake = {
       announcement: { findFirst: vi.fn(async () => announcement) },
       registration: { findMany: vi.fn(async () => [{ id: "registration-1", contactSnapshot: { email: "avery@example.test" }, accountHolderPerson: null }]) },
-      eventMessageSettings: { findUnique: vi.fn(async () => ({ deliveryMode: "LOCAL_CAPTURE", senderName: "IMSDA Events", senderEmail: null, replyToEmail: null })) },
+      eventMessageSettings: { findUnique: vi.fn(async () => ({ deliveryMode: "LOCAL_CAPTURE", senderName: "IMAdventist", senderEmail: null, replyToEmail: null })) },
       eventMessageTemplate: { findUnique: vi.fn(async () => ({ isEnabled: true, versions: version ? [version] : [] })) },
       announcementFile: { findMany: vi.fn(async () => []) },
       messageFile: { findMany: vi.fn(async () => []) },

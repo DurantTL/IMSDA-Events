@@ -1,7 +1,7 @@
 import styles from "@/components/email-header-preview.module.css";
 
 /** What the preview shows for a name that is blank, so the bar never looks empty while someone types. */
-const BLANK_NAME = "IMSDA Events";
+const BLANK_NAME = "IMAdventist";
 
 function shown(name: string) {
   return name.replace(/\s+/g, " ").trim() || BLANK_NAME;

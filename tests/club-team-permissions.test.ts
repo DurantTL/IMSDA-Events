@@ -52,7 +52,7 @@ function database(options: { existing?: Row[]; coordinator?: boolean; coordinato
     },
     clubDirectorGrant: { findFirst: vi.fn().mockResolvedValue(options.coordinatorDirectsClub ? { id: "grant-1" } : null) },
     eventTeamSettings: { findUnique: vi.fn().mockResolvedValue({ ageAsOf: "2026-01-01" }) },
-    eventMessageSettings: { findUnique: vi.fn().mockResolvedValue({ deliveryMode: "LOCAL_CAPTURE", senderName: "IMSDA Events", senderEmail: null, replyToEmail: null }) },
+    eventMessageSettings: { findUnique: vi.fn().mockResolvedValue({ deliveryMode: "LOCAL_CAPTURE", senderName: "IMAdventist", senderEmail: null, replyToEmail: null }) },
     eventMembership: { findMany: vi.fn().mockResolvedValue((options.staff ?? []).map((user) => ({ user }))) },
     adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: { upsert: vi.fn().mockImplementation(async ({ create }: { create: { recipientEmail: string; status: string } }) => ({ id: `msg-${create.recipientEmail}`, status: create.status })) },

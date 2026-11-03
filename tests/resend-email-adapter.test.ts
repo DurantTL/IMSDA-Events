@@ -8,7 +8,7 @@ import {
 } from "@/integrations/email/resend";
 
 const input = {
-  fromName: "IMSDA Events",
+  fromName: "IMAdventist",
   fromEmail: "registration@imsda.org",
   toEmail: "attendee@example.test",
   replyToEmail: "help@imsda.org",
@@ -51,7 +51,7 @@ describe("Resend email adapter", () => {
       "Idempotency-Key": input.idempotencyKey,
     });
     expect(JSON.parse(String(options?.body))).toMatchObject({
-      from: "IMSDA Events <registration@imsda.org>",
+      from: "IMAdventist <registration@imsda.org>",
       to: ["attendee@example.test"],
       reply_to: "help@imsda.org",
       subject: "Registration received",

@@ -55,7 +55,7 @@ export function rejectCrossOriginRequest(request: Request) {
     : Response.json(
         {
           error: "INVALID_REQUEST_ORIGIN",
-          message: "This request must come from the IMSDA Events workspace.",
+          message: "This request must come from the IMAdventist workspace.",
         },
         { status: 403 }
       );

@@ -513,7 +513,7 @@ async function runChecks(stub: Awaited<ReturnType<typeof startProviderStub>>) {
     await prisma.messageOutbox.create({
       data: {
         eventId: ids.scale, templateKey: stranger.key as never, recipientKind: stranger.kind as never, recipientEmail: `${P}-stranger${index}@example.test`,
-        senderNameSnapshot: "IMSDA Events", subjectSnapshot: "Not an event message", bodyTextSnapshot: "x", idempotencyKey: `${P}-stranger-${index}`, correlationId: `${P}-stranger-${index}`,
+        senderNameSnapshot: "IMAdventist", subjectSnapshot: "Not an event message", bodyTextSnapshot: "x", idempotencyKey: `${P}-stranger-${index}`, correlationId: `${P}-stranger-${index}`,
         status: "FAILED", createdAt: new Date(Date.now() + 60_000 + index),
       },
     });

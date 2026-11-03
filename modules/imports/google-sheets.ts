@@ -46,7 +46,7 @@ async function fetchTab(spreadsheetId: string, tabName: string) {
 // returns it in the same shape the manual multi-CSV WR26 bundle upload uses,
 // so both paths share one parser, preview, and commit flow. This is a
 // one-time, read-only pull for migrating legacy WR26 registrations into
-// IMSDA Events — it never writes back to the sheet.
+// IMAdventist — it never writes back to the sheet.
 export async function fetchWr26BundleFromGoogleSheet(url: string): Promise<Wr26BundleFile[]> {
   const spreadsheetId = extractGoogleSheetId(url);
   if (!spreadsheetId) {

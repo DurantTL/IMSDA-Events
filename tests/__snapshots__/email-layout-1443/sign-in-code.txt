@@ -8,6 +8,6 @@ Didn't try to sign in?
 Change your password. Someone may know it. You can ignore this code; it stops working on its own.
 
 --
-Sent by IMSDA Events for the Iowa-Missouri Conference of Seventh-day Adventists.
-You got this because someone asked to sign in to IMSDA Events with director@example.org.
+Sent by IMAdventist for the Iowa-Missouri Conference of Seventh-day Adventists.
+You got this because someone asked to sign in to IMAdventist with director@example.org.
 Need help? Call (515) 223-1197 or email support@imsda.org.

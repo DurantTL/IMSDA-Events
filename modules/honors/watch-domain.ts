@@ -134,7 +134,7 @@ export function buildHonorWatchSummary(input: { watchName: string; eventName: st
       "",
       "You are getting this because your address is on this honor watch. To change who is told, ask an event administrator.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

@@ -32,7 +32,7 @@ const configuration: SesEmailConfiguration = {
 };
 
 const input = {
-  fromName: "IMSDA Events",
+  fromName: "IMAdventist",
   fromEmail: "Registration@IMSDA.org",
   toEmail: "attendee@example.test",
   replyToEmail: "help@imsda.org",
@@ -53,7 +53,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe("SES MIME building", () => {
   it("carries text, HTML, reply-to, and a stable message id", async () => {
     const mime = await rawMime({ ...input, bodyHtml: "<p>Saved.</p>" });
-    expect(mime).toContain("From: IMSDA Events <registration@imsda.org>");
+    expect(mime).toContain("From: IMAdventist <registration@imsda.org>");
     expect(mime).toContain("To: attendee@example.test");
     expect(mime).toContain("Reply-To: help@imsda.org");
     expect(mime).toContain("Subject: Registration received");

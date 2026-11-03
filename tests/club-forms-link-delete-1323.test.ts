@@ -31,7 +31,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ SECRET_ENCRYPTION_KEY: "a-synthetic-encryption-key-for-club-form-tests", APP_BASE_URL: "https://events.imsda.test" }) }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
-vi.mock("@/modules/communications/account-email", () => ({ isAccountEmailConfigured: () => true, getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }) }));
+vi.mock("@/modules/communications/account-email", () => ({ isAccountEmailConfigured: () => true, getAccountEmailSender: () => ({ name: "IMAdventist", address: "events@example.test", replyTo: null }) }));
 
 import type { ClubFormsViewer } from "@/modules/club-forms/domain";
 import { prepareClubFormLinkBodyForDelivery, CLUB_FORM_LINK_SENTINEL } from "@/modules/club-forms/link-email";

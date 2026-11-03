@@ -47,7 +47,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   dependencies.getServerEnv.mockReturnValue({
     APP_BASE_URL: "https://events.imsda.org",
-    ACCOUNT_EMAIL_SENDER_NAME: "IMSDA Events",
+    ACCOUNT_EMAIL_SENDER_NAME: "IMAdventist",
     ACCOUNT_EMAIL_SENDER_ADDRESS: "no-reply@imsda.org",
     ACCOUNT_EMAIL_REPLY_TO: "help@imsda.org",
   });
@@ -69,7 +69,7 @@ describe("what the sign-in code puts in the outbox (#1410)", () => {
   it("queues a plain subject (the provider webhook stores subjects) and a body placeholder, never a code", async () => {
     const data = await queued();
     expect(data.templateKey).toBe("ATTENDEE_SIGN_IN_CODE");
-    expect(data.subjectSnapshot).toBe("Your IMSDA Events sign-in code");
+    expect(data.subjectSnapshot).toBe("Your IMAdventist sign-in code");
     expect(data.bodyTextSnapshot).toContain(SIGN_IN_CODE_DISPLAY_SENTINEL);
     expect(`${data.subjectSnapshot}\n${data.bodyTextSnapshot}`).not.toMatch(/\b\d{3}\s?\d{3}\b/);
   });

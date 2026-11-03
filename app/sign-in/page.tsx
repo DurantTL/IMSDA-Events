@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to IMSDA Events.",
+  description: "Sign in to IMAdventist.",
   robots: { index: false, follow: false },
 };
 

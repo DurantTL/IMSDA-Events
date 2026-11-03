@@ -160,7 +160,7 @@ async function queuePermissionRequest(
   }
   if (recipients.length === 0) return [];
 
-  const messageSettings = await loadEventEmailSettings(tx, input.eventId) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
+  const messageSettings = await loadEventEmailSettings(tx, input.eventId) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMAdventist", senderEmail: null, replyToEmail: null };
   const label = teamLabel(registration.clubRegistration?.organization.name ?? "A club", registration.clubRegistration?.teamName ?? null);
   const dateText = settings?.ageAsOf ? formatCalendarDate(settings.ageAsOf) : "the event date";
   const baseUrl = getServerEnv().APP_BASE_URL;
@@ -183,7 +183,7 @@ async function queuePermissionRequest(
       "The team is registered. Please review and approve or decline each person:",
       link,
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n");
     const holdNote = suppressionNote(messageSettings);
     const suppressed = holdNote !== null;

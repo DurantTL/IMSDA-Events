@@ -328,7 +328,7 @@ describe("coordinator masthead and navigation (#1186, #442)", () => {
 
   it("shows the IMSDA identity, Club coordination, the person and the coordinator role", () => {
     const out = html();
-    expect(out).toContain("IMSDA Events");
+    expect(out).toContain("IMAdventist");
     expect(out).toContain("Club coordination");
     expect(out).toContain("Sample Coordinator");
     expect(out).toContain("Area Coordinator");

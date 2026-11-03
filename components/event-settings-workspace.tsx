@@ -1139,7 +1139,7 @@ export function EventSettingsWorkspace({
             summary={blockSummary("public-info", draft, { publicState: publicPageOverview.publicState })}
             title={settingsBlockTitles["public-info"]}
           >
-            <p className="settings-block-intro">This event&rsquo;s public information lives on IMSDA Events. Link an IMSDA.org page too only if one still exists for this event.</p>
+            <p className="settings-block-intro">This event&rsquo;s public information lives on IMAdventist. Link an IMSDA.org page too only if one still exists for this event.</p>
             {publicPageOverview && (
               <dl className={styles.publicPageOverview}>
                 <div>
@@ -1171,7 +1171,7 @@ export function EventSettingsWorkspace({
             <label>
               IMSDA.org event page (optional)
               <input id={settingsFieldDomId("publicInfoUrl")} {...fieldAria("publicInfoUrl")} type="url" value={draft.publicInfoUrl ?? ""} maxLength={500} placeholder="https://imsda.org/event/your-event/" onChange={(event) => update("publicInfoUrl", event.target.value || null)} />
-              <small>Not required to publish. Leave blank when schedules, speakers, and event details live only on this event&rsquo;s IMSDA Events page.</small>
+              <small>Not required to publish. Leave blank when schedules, speakers, and event details live only on this event&rsquo;s IMAdventist page.</small>
             {fieldNote("publicInfoUrl")}</label>
             <label>
               Registration support contact

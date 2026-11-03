@@ -65,7 +65,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getServerEnv.mockReturnValue({
     APP_BASE_URL: "https://events.imsda.org",
-    ACCOUNT_EMAIL_SENDER_NAME: "IMSDA Events",
+    ACCOUNT_EMAIL_SENDER_NAME: "IMAdventist",
     ACCOUNT_EMAIL_SENDER_ADDRESS: "no-reply@imsda.org",
     ACCOUNT_EMAIL_REPLY_TO: "help@imsda.org",
   });
@@ -85,7 +85,7 @@ describe("the recovery code email", () => {
     await enqueueAttendeeEmail({ accountId: "acct_1", email: "Director@Example.com", displayName: "Test Director", selection: { kind: "two-step-recovery-code" } });
     const data = queued();
     expect(data.templateKey).toBe("ATTENDEE_TWO_STEP_RECOVERY_CODE");
-    expect(data.subjectSnapshot).toBe("Your IMSDA Events two-step recovery code");
+    expect(data.subjectSnapshot).toBe("Your IMAdventist two-step recovery code");
     expect(data.bodyTextSnapshot).toContain(TWO_STEP_RECOVERY_CODE_DISPLAY_SENTINEL);
     expect(`${data.subjectSnapshot}\n${data.bodyTextSnapshot}`).not.toMatch(/\b\d{3}\s?\d{3}\b/);
     expect(data.bodyTextSnapshot).not.toMatch(/two-factor|2fa|mfa/i);
@@ -121,9 +121,9 @@ describe("the recovery code email", () => {
   it("is a branded email with its own reason line", () => {
     const code = emailLayoutContent({ templateKey: "ATTENDEE_TWO_STEP_RECOVERY_CODE", recipientEmail: "director@example.test", replyToEmail: "help@imsda.org" });
     expect(code.context).toBe("general");
-    expect(code.whyLine).toBe("You got this because someone signed in to IMSDA Events as director@example.test and asked to recover two-step sign-in.");
+    expect(code.whyLine).toBe("You got this because someone signed in to IMAdventist as director@example.test and asked to recover two-step sign-in.");
     const notice = emailLayoutContent({ templateKey: "ATTENDEE_TWO_STEP_RECOVERY_NOTICE", recipientEmail: "director@example.test", replyToEmail: "help@imsda.org" });
-    expect(notice.whyLine).toBe("You got this because two-step sign-in was reset on the IMSDA Events account for director@example.test.");
+    expect(notice.whyLine).toBe("You got this because two-step sign-in was reset on the IMAdventist account for director@example.test.");
   });
 });
 
@@ -133,7 +133,7 @@ describe("the recovery notice email", () => {
     const data = queued();
     expect(data.templateKey).toBe("ATTENDEE_TWO_STEP_RECOVERY_NOTICE");
     expect(data.recipientEmail).toBe("director@example.test");
-    expect(data.subjectSnapshot).toBe("Two-step sign-in was reset on your IMSDA Events account");
+    expect(data.subjectSnapshot).toBe("Two-step sign-in was reset on your IMAdventist account");
     expect(data.bodyTextSnapshot).toContain("November 9, 2026 at 9:14 AM CST");
     expect(data.bodyTextSnapshot).toContain("Your passkeys and authenticator app were removed and your other devices were signed out.");
     expect(data.bodyTextSnapshot).toContain("Wasn't you?\nReset your password right away and contact the conference office.");

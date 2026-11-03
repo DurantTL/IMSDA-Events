@@ -155,14 +155,14 @@ describe("email HTML rendering", () => {
     const document = renderEmailHtmlDocument({
       title: 'Registration confirmed <"Women\'s Retreat">',
       body: "# Hello",
-      footer: "IMSDA Events",
+      footer: "IMAdventist",
     });
 
     expect(document.startsWith("<!DOCTYPE html>")).toBe(true);
     expect(document).toContain("</html>");
     expect(document).toContain("&lt;&quot;Women&#39;s Retreat&quot;&gt;");
     expect(document).not.toMatch(/<title>[^<]*<"/);
-    expect(document).toContain("IMSDA Events");
+    expect(document).toContain("IMAdventist");
   });
 
   it("produces a document for an empty body rather than failing", () => {

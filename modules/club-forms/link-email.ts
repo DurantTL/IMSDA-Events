@@ -36,7 +36,7 @@ export function clubFormLinkEmailContent(input: { clubName: string; formName: st
       "",
       "Please don't forward this email: anyone who has the link can fill in the form. If you weren't expecting it, you can ignore it. Nothing happens unless you fill the form in.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

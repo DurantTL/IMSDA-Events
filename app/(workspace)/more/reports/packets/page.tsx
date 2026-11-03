@@ -82,7 +82,7 @@ export default async function EventPacketsPage({
         <article className="event-packet-sheet event-packet-cover">
           <header>
             <PackageOpen size={34} aria-hidden="true" />
-            <div><p>IMSDA Events</p><h1>{packets.event.name}</h1></div>
+            <div><p>IMAdventist</p><h1>{packets.event.name}</h1></div>
           </header>
           <dl>
             <div><dt>Dates</dt><dd>{dateRange(packets.event.startsAt, packets.event.endsAt, packets.event.timezone)}</dd></div>

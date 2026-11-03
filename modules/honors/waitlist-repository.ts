@@ -141,7 +141,7 @@ async function queueOfferEmail(tx: Tx, input: {
 }) {
   const { email, name } = contactOf(input.registration);
   if (!email) return null;
-  const settings = await loadEventEmailSettings(tx, input.event.id) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
+  const settings = await loadEventEmailSettings(tx, input.event.id) ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMAdventist", senderEmail: null, replyToEmail: null };
   const base = getServerEnv().APP_BASE_URL;
   const link = input.organizationId ? `${base}/account/clubs/${input.organizationId}/events/${input.event.id}` : base;
   const where = input.sessionName ? `${input.className} (${input.sessionName})` : input.className;
@@ -155,7 +155,7 @@ async function queueOfferEmail(tx: Tx, input: {
     "Accept or decline it on your club's page:",
     link,
     "",
-    "IMSDA Events",
+    "IMAdventist",
   ].join("\n");
   const idempotencyKey = `honor-class-waitlist-offer:${input.entryId}:${input.offerCount}`;
   const holdNote = suppressionNote(settings);

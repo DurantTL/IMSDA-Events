@@ -35,7 +35,7 @@
  *    (no scroll-cue exemption; a table that does not fit is the shared `table-cards` cards, switched by its container's width),
  *    and a table clipped by its box or sticking out of it is `table-wider-than-box` (#997);
  *  - sticky bars (#996): when a page opens, no sticky or fixed action bar (one holding a button) sits on top of text;
- *  - the shell's "Loading IMSDA Events…" fallback is waited out before anything is measured, and a page that never
+ *  - the shell's "Loading IMAdventist…" fallback is waited out before anything is measured, and a page that never
  *    leaves it is a finding;
  *  - a full-page screenshot of every page and width, saved as an artifact.
  *
@@ -2911,9 +2911,9 @@ function barOverTextInPage() {
   return problems;
 }
 
-/** True while the workspace shell's loading fallback ("Loading IMSDA Events…") is on the page. */
+/** True while the workspace shell's loading fallback ("Loading IMAdventist…") is on the page. */
 function shellLoadingInPage() {
-  return Boolean(document.querySelector(".shell-loading")) || /Loading IMSDA Events/.test(document.body.innerText);
+  return Boolean(document.querySelector(".shell-loading")) || /Loading IMAdventist/.test(document.body.innerText);
 }
 
 /** Runs in the page after scrolling to the bottom: is the last content under a fixed bar? */
@@ -3318,7 +3318,7 @@ function injectDefects() {
     '<div style="width:14px;overflow:hidden"><span style="display:block">self-test squeezed text</span></div>',
     '<div style="width:50px;font:14px sans-serif;overflow-wrap:anywhere">Pathfinder Registration</div>',
     '<div style="position:fixed;left:0;right:0;top:140px;height:60px;z-index:30;background:#ccc"><button type="button" style="min-height:44px">self-test bar action</button></div><p style="position:absolute;top:150px;left:0;margin:0">self-test paragraph under an action bar</p>',
-    '<div class="shell-loading">Loading IMSDA Events…</div>',
+    '<div class="shell-loading">Loading IMAdventist…</div>',
     // A table wider than its box (#997): one in a clipping box, one in a scrolling box that claims a scroll cue.
     '<div style="width:300px;overflow:hidden"><table><tbody><tr><td><div style="width:900px">self-test clipped wide table</div></td></tr></tbody></table></div>',
     // A table that scrolls sideways is a finding even when its box claims a scroll cue (#1457).
@@ -3848,9 +3848,9 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
   }
 }
 
-/** Waits for the shell's "Loading IMSDA Events…" fallback to go away (#996); true when it did. */
+/** Waits for the shell's "Loading IMAdventist…" fallback to go away (#996); true when it did. */
 async function waitForShell(page: Page) {
-  return page.waitForFunction(() => !document.querySelector(".shell-loading") && !/Loading IMSDA Events/.test(document.body.innerText), undefined, { timeout: 20_000 })
+  return page.waitForFunction(() => !document.querySelector(".shell-loading") && !/Loading IMAdventist/.test(document.body.innerText), undefined, { timeout: 20_000 })
     .then(() => true, () => false);
 }
 
@@ -3858,7 +3858,7 @@ async function waitForShell(page: Page) {
 async function auditSqueezeAndBars(page: Page, name: string, width: number) {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(60);
-  if (await page.evaluate(shellLoadingInPage)) record("loading-screen", name, width, 'the page still shows "Loading IMSDA Events…" when it is measured');
+  if (await page.evaluate(shellLoadingInPage)) record("loading-screen", name, width, 'the page still shows "Loading IMAdventist…" when it is measured');
   for (const problem of await page.evaluate(squeezedTextInPage)) record("squeezed-text", name, width, problem);
   for (const problem of await page.evaluate(barOverTextInPage)) record("bar-over-text", name, width, problem);
 }

@@ -87,7 +87,7 @@ export function submittedEmailContent(rawInput: SubmittedEmailInput) {
       "Review it (sign-in required):",
       link("/admin/clubs/applications"),
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }
@@ -167,7 +167,7 @@ export async function queueDeclinedEmail(client: Outbox, input: DeclinedEmailInp
         "",
         "If you have questions, or things change, please contact the conference youth department.",
         "",
-        "IMSDA Events",
+        "IMAdventist",
       ].join("\n"),
       metadata: { trigger: "NEW_CLUB_APPLICATION_DECLINED", applicationId: input.applicationId, accountEmail: true, realDelivery: true },
       idempotencyKey: `new-club-application:${input.applicationId}:declined`,
@@ -196,7 +196,7 @@ export async function queueInviteLinkEmail(
       senderNameSnapshot: from.name,
       senderEmailSnapshot: from.address,
       replyToEmailSnapshot: from.replyTo,
-      subjectSnapshot: "Apply to start a new club on IMSDA Events",
+      subjectSnapshot: "Apply to start a new club on IMAdventist",
       bodyTextSnapshot: [
         `Hello ${name},`,
         "",
@@ -208,7 +208,7 @@ export async function queueInviteLinkEmail(
         "",
         "Please don't forward this email: anyone who has the link can submit the application. If you weren't expecting it, you can ignore it. Nothing happens unless you fill the application in.",
         "",
-        "IMSDA Events",
+        "IMAdventist",
       ].join("\n"),
       metadata: { trigger: "NEW_CLUB_APPLICATION_INVITE", inviteId: input.inviteId, accountEmail: false, realDelivery: true },
       idempotencyKey: `new-club-application-invite:${input.inviteId}:${randomUUID()}`,

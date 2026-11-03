@@ -111,7 +111,7 @@ describe("platform settings input", () => {
 
   it("does not edit the central email sender: that is System management > Email only (#1043)", () => {
     for (const field of ["defaultSenderName", "defaultSenderEmail", "defaultReplyToEmail"]) {
-      expect(platformSettingsInputSchema.safeParse(validInput({ [field]: "IMSDA Events" })).success).toBe(false);
+      expect(platformSettingsInputSchema.safeParse(validInput({ [field]: "IMAdventist" })).success).toBe(false);
     }
   });
 

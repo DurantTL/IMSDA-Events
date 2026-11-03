@@ -34,7 +34,7 @@ import { queueSubmittedEmail } from "@/modules/club-applications/email";
 import { queueRequestSubmittedEmail } from "@/modules/event-modules/request-email";
 import { sendDueLocationWaitlistDigests } from "@/modules/event-locations/waitlist-digest";
 
-const sender = { name: "IMSDA Events", address: "no-reply@imsda-events.test", replyTo: null };
+const sender = { name: "IMAdventist", address: "no-reply@imsda-events.test", replyTo: null };
 
 function outbox() {
   return { messageOutbox: { create: vi.fn().mockResolvedValue({ id: "message-1" }) }, adminAlertFeedItem: { createMany: vi.fn().mockResolvedValue({ count: 1 }) } };

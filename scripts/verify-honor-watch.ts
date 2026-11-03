@@ -238,7 +238,7 @@ async function main() {
   assert(edited.every((row) => row.summaryAt?.getTime() === cutoffOf(morning4).getTime()), "a save, even one that changes a watch's classes, keeps every summary point, so no change still owed is dropped");
   assert((await getHonorWatchPanel(eventId)).watches.length === 2, "the panel reads them back");
 
-  await prisma.eventMessageSettings.create({ data: { eventId, senderName: "IMSDA Events", deliveryPaused: true, deliveryPausedAt: new Date() } });
+  await prisma.eventMessageSettings.create({ data: { eventId, senderName: "IMAdventist", deliveryPaused: true, deliveryPausedAt: new Date() } });
   await prisma.honorClassChange.create({
     data: { eventId, offeringId: multi, enrollmentId: `${P}_p1`, registrationAttendeeId: attendee.y2!, kind: "JOINED", youthName: "Kid y2", clubName: null, ageOnEventDate: 13, at: new Date(morning4.getTime() + 3 * HOUR) },
   });

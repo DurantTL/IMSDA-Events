@@ -452,7 +452,7 @@ function noticeDatabase(options: { deliveryMode?: string; existingKeys?: string[
   const tx = {
     event: { findUnique: vi.fn().mockResolvedValue({ name: "PBE 2027" }) },
     eventTeamSettings: { findUnique: vi.fn().mockResolvedValue({ levelInfo: [{ level: "CONFERENCE", date: "2027-03-20", place: "Camp Heritage" }] }) },
-    eventMessageSettings: { findUnique: vi.fn().mockResolvedValue({ deliveryMode: options.deliveryMode ?? "LOCAL_CAPTURE", senderName: "IMSDA Events", senderEmail: null, replyToEmail: null }) },
+    eventMessageSettings: { findUnique: vi.fn().mockResolvedValue({ deliveryMode: options.deliveryMode ?? "LOCAL_CAPTURE", senderName: "IMAdventist", senderEmail: null, replyToEmail: null }) },
     clubEventRegistration: { findMany: vi.fn().mockResolvedValue([teamRow("a", "Aces", options.email === undefined ? "director-a@example.test" : options.email), teamRow("c", "Cubs", "director-c@example.test")]) },
     messageOutbox: {
       findUnique: vi.fn(async ({ where }: { where: { idempotencyKey: string } }) => (existing.has(where.idempotencyKey) ? { id: "existing" } : null)),

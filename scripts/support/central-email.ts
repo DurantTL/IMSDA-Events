@@ -29,6 +29,6 @@ export async function setSyntheticCentralSender(
 export async function clearSyntheticCentralSender(prisma: Pick<PrismaClient, "platformSettings">) {
   await prisma.platformSettings.updateMany({
     where: { id: "platform" },
-    data: { defaultSenderName: "IMSDA Events", defaultSenderEmail: null, defaultReplyToEmail: null },
+    data: { defaultSenderName: "IMAdventist", defaultSenderEmail: null, defaultReplyToEmail: null },
   });
 }

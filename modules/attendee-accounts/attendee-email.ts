@@ -72,11 +72,11 @@ function greeting(displayName: string) {
 
 function verificationBody(displayName: string) {
   return {
-    subject: "Your IMSDA Events verification code",
+    subject: "Your IMAdventist verification code",
     bodyText: [
       `Hello ${greeting(displayName)},`,
       "",
-      "Enter this code on the page where you started creating your IMSDA Events account:",
+      "Enter this code on the page where you started creating your IMAdventist account:",
       "",
       VERIFICATION_CODE_SENTINEL,
       "",
@@ -84,7 +84,7 @@ function verificationBody(displayName: string) {
       "",
       "If you did not start creating an account, you can ignore this. The code is useless on its own, and nothing has been created that can reach your registrations.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }
@@ -95,11 +95,11 @@ function verificationBody(displayName: string) {
  */
 function adminVerificationBody(displayName: string) {
   return {
-    subject: "Verify your IMSDA Events email address",
+    subject: "Verify your IMAdventist email address",
     bodyText: [
       `Hello ${greeting(displayName)},`,
       "",
-      "An IMSDA Events administrator asked us to verify this email address for your account. Enter this code, with this email address, on the Verify your email page:",
+      "An IMAdventist administrator asked us to verify this email address for your account. Enter this code, with this email address, on the Verify your email page:",
       "",
       `${attendeePublicUrl("/account/verify-email").toString()}`,
       "",
@@ -109,7 +109,7 @@ function adminVerificationBody(displayName: string) {
       "",
       "If you did not expect this, you can ignore it. Nothing changes unless the code is entered.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }
@@ -121,28 +121,28 @@ function adminVerificationBody(displayName: string) {
  */
 function alreadyRegisteredBody(displayName: string) {
   return {
-    subject: "Your IMSDA Events verification code",
+    subject: "Your IMAdventist verification code",
     bodyText: [
       `Hello ${greeting(displayName)},`,
       "",
-      "Someone asked to create an IMSDA Events account for this address, but one already exists.",
+      "Someone asked to create an IMAdventist account for this address, but one already exists.",
       "",
       "If that was you, sign in with your existing password instead. If you have forgotten it, use \"Forgot password\" on the sign-in page.",
       "",
       "If it was not you, no action is needed. Nothing has changed, and no new account was created.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }
 
 function passwordResetBody(displayName: string) {
   return {
-    subject: "Your IMSDA Events password reset code",
+    subject: "Your IMAdventist password reset code",
     bodyText: [
       `Hello ${greeting(displayName)},`,
       "",
-      "Enter this code on the page where you asked to reset your IMSDA Events password:",
+      "Enter this code on the page where you asked to reset your IMAdventist password:",
       "",
       PASSWORD_RESET_CODE_SENTINEL,
       "",
@@ -150,7 +150,7 @@ function passwordResetBody(displayName: string) {
       "",
       "If you did not ask to reset your password, no action is needed. Your current password still works, and this code cannot be used by anyone who only reads it.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }
@@ -162,24 +162,24 @@ function passwordResetBody(displayName: string) {
  */
 function federatedOnlyBody(displayName: string) {
   return {
-    subject: "Your IMSDA Events password reset code",
+    subject: "Your IMAdventist password reset code",
     bodyText: [
       `Hello ${greeting(displayName)},`,
       "",
-      "Someone asked to reset the password for this IMSDA Events account, but it has no password — it signs in with Google.",
+      "Someone asked to reset the password for this IMAdventist account, but it has no password — it signs in with Google.",
       "",
       "Use \"Sign in with Google\" on the sign-in page.",
       "",
       "If that was not you, no action is needed. Nothing has changed.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }
 
 function editVerificationBody(displayName: string) {
   return {
-    subject: "Your IMSDA Events edit verification code",
+    subject: "Your IMAdventist edit verification code",
     bodyText: [
       `Hello ${greeting(displayName)},`,
       "",
@@ -191,7 +191,7 @@ function editVerificationBody(displayName: string) {
       "",
       "If you did not request a registration change, no action is needed.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }
@@ -199,7 +199,7 @@ function editVerificationBody(displayName: string) {
 function signInCodeBody() {
   return {
     // No code in the subject: the provider's webhook stores the subject it was sent. The code is in the body only, minted at delivery.
-    subject: "Your IMSDA Events sign-in code",
+    subject: "Your IMAdventist sign-in code",
     bodyText: [
       "Enter this code to finish signing in:",
       "",
@@ -211,7 +211,7 @@ function signInCodeBody() {
       "Didn't try to sign in?",
       "Change your password. Someone may know it. You can ignore this code; it stops working on its own.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }
@@ -219,7 +219,7 @@ function signInCodeBody() {
 function twoStepRecoveryCodeBody() {
   return {
     // No code in the subject: the provider's webhook stores the subject it was sent. The code is in the body only, minted at delivery.
-    subject: "Your IMSDA Events two-step recovery code",
+    subject: "Your IMAdventist two-step recovery code",
     bodyText: [
       "Enter this code to recover your two-step sign-in:",
       "",
@@ -231,7 +231,7 @@ function twoStepRecoveryCodeBody() {
       "Didn't ask for this?",
       "Change your password. Someone may know it. You can ignore this code; it stops working on its own.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }
@@ -239,11 +239,11 @@ function twoStepRecoveryCodeBody() {
 /** Sent after a recovery completed. It carries no code and no link that grants access. */
 function twoStepRecoveredBody(displayName: string, occurredAt: Date) {
   return {
-    subject: "Two-step sign-in was reset on your IMSDA Events account",
+    subject: "Two-step sign-in was reset on your IMAdventist account",
     bodyText: [
       `Hello ${greeting(displayName)},`,
       "",
-      `Two-step sign-in was reset on your IMSDA Events account on ${formatInConferenceTime(occurredAt, { dateStyle: "long", timeStyle: "short" })}.`,
+      `Two-step sign-in was reset on your IMAdventist account on ${formatInConferenceTime(occurredAt, { dateStyle: "long", timeStyle: "short" })}.`,
       "",
       "Your passkeys and authenticator app were removed and your other devices were signed out. You'll set up two-step sign-in again the next time you open club pages.",
       "",
@@ -251,7 +251,7 @@ function twoStepRecoveredBody(displayName: string, occurredAt: Date) {
       "Wasn't you?",
       "Reset your password right away and contact the conference office.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

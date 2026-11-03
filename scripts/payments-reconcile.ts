@@ -82,7 +82,7 @@ async function main() {
 
     const actionable = report.findings.filter(isActionable);
     if (actionable.length === 0) {
-      console.log("  [.] Every completed Square payment is recorded in IMSDA Events.\n");
+      console.log("  [.] Every completed Square payment is recorded in IMAdventist.\n");
     } else {
       for (const finding of actionable) {
         console.log(`  [!] [${finding.code}] ${formatCents(finding.amountCents)} ${finding.providerPaymentId}`);

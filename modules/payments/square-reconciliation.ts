@@ -1,5 +1,5 @@
 /**
- * Read-only reconciliation between Square and IMSDA Events: every payment
+ * Read-only reconciliation between Square and IMAdventist: every payment
  * Square accepted for the configured location in a window, checked against
  * what this database recorded.
  *
@@ -136,7 +136,7 @@ async function classify(
       ...base,
       code: "RECORDED",
       confirmationCode: recorded.registration.confirmationCode,
-      detail: "Recorded in IMSDA Events.",
+      detail: "Recorded in IMAdventist.",
     };
   }
   const attempt = await prisma.paymentAttempt.findFirst({

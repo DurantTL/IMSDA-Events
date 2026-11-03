@@ -29,7 +29,7 @@ function fixture() {
     eventMessageSettings: {
       findUnique: vi.fn().mockResolvedValue({
         deliveryMode: "LOCAL_CAPTURE",
-        senderName: "IMSDA Events",
+        senderName: "IMAdventist",
         senderEmail: "events@example.test",
         replyToEmail: "office@example.test",
         internalNotificationEmails: ["team@example.test"],

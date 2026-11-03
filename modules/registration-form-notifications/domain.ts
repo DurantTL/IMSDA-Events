@@ -182,10 +182,10 @@ export function notificationEmailContent(input: NotificationEmailInput, escape: 
     `Includes: ${e(input.includes)}`,
     "",
     input.noMatchingSections
-      ? "None of the sections chosen for this notification were in this registration's form version, so there is no PDF. Open the registration in IMSDA Events for the details."
+      ? "None of the sections chosen for this notification were in this registration's form version, so there is no PDF. Open the registration in IMAdventist for the details."
       : input.hasPdf
       ? (input.updated ? "The attached PDF is the updated copy." : "The details are in the attached PDF.")
-      : "The PDF could not be attached. Open the registration in IMSDA Events for the details.",
+      : "The PDF could not be attached. Open the registration in IMAdventist for the details.",
   ];
   return { subject, source: lines.join("\n") };
 }

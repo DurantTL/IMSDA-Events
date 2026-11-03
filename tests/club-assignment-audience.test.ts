@@ -9,7 +9,7 @@ import { emptyClubAssignmentFields } from "@/modules/club-registrations/assignme
 const context: ClubAssignmentPreviewContext = {
   eventId: "evt_camp26",
   deliveryMode: "EXTERNAL_EMAIL",
-  senderName: "IMSDA Events",
+  senderName: "IMAdventist",
   senderEmail: "notifications@imsda.org",
   replyToEmail: "registration@imsda.org",
   templateEnabled: true,

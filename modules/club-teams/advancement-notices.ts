@@ -121,7 +121,7 @@ export async function sendAdvancementNotices(eventId: string, toLevel: TeamLevel
       loadEventEmailSettings(tx, eventId),
     ]);
     if (!event || !settings) throw new ClubTeamError("RESULT_INVALID", "This event doesn't use team rules, so it has no team levels.");
-    const delivery = messageSettings ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMSDA Events", senderEmail: null, replyToEmail: null };
+    const delivery = messageSettings ?? { deliveryMode: "LOCAL_CAPTURE" as const, senderName: "IMAdventist", senderEmail: null, replyToEmail: null };
     const info = levelInfoFor(levelInfoFromJson(settings.levelInfo), toLevel);
     const teams = await advancedTeams(tx, eventId, toLevel);
     const base = getServerEnv().APP_BASE_URL;

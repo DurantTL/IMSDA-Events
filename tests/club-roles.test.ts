@@ -67,7 +67,7 @@ vi.mock("@/modules/club-rosters/repository", async () => {
 vi.mock("@/modules/organizations/club-profile-repository", () => ({ updateClubProfile: mocks.updateClubProfile }));
 vi.mock("@/modules/communications/account-email", () => ({
   isAccountEmailConfigured: mocks.emailConfigured,
-  getAccountEmailSender: () => ({ name: "IMSDA Events", address: "events@example.test", replyTo: null }),
+  getAccountEmailSender: () => ({ name: "IMAdventist", address: "events@example.test", replyTo: null }),
 }));
 vi.mock("@/modules/communications/email-delivery", () => ({
   processAccountEmailQueue: mocks.processAccountEmailQueue,

@@ -41,7 +41,7 @@ function settingsRow(paused: boolean) {
 function baseTx(paused: boolean) {
   return {
     eventMessageSettings: { findUnique: vi.fn().mockResolvedValue(settingsRow(paused)) },
-    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderName: "IMSDA Events", defaultSenderEmail: "events@example.test", defaultReplyToEmail: "office@example.test" }) },
+    platformSettings: { findUnique: vi.fn().mockResolvedValue({ defaultSenderName: "IMAdventist", defaultSenderEmail: "events@example.test", defaultReplyToEmail: "office@example.test" }) },
   };
 }
 

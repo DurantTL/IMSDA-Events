@@ -98,7 +98,7 @@ function squareListedPayment(
  * Square call in this codebase that is safe to run against Production from an
  * operator's terminal: it takes no money, changes nothing, and is what
  * `npm run payments:reconcile` uses to find payments Square accepted that
- * IMSDA Events never recorded.
+ * IMAdventist never recorded.
  */
 export async function listSquarePayments(
   configuration: SquareRuntimeConfiguration,

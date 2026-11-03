@@ -46,7 +46,7 @@ function clubInput(): BuildClubEventRecordInput {
 function eventInfo() {
   return {
     name: "Spring Camporee 2026",
-    conferenceName: "IMSDA Events",
+    conferenceName: "IMAdventist",
     startsOn: "2026-05-01T00:00:00.000Z",
     endsOn: "2026-05-03T00:00:00.000Z",
     timezone: "America/Chicago",

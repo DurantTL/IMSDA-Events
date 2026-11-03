@@ -166,7 +166,7 @@ function settingsDraftFromMessaging(
   messaging: MessagingWorkspaceData | null,
 ): MessagingSettingsDraft {
   return {
-    senderName: messaging?.settings.senderName ?? "IMSDA Events",
+    senderName: messaging?.settings.senderName ?? "IMAdventist",
     replyToEmail: messaging?.settings.replyToEmail ?? "",
     internalNotificationEmails:
       messaging?.settings.internalNotificationEmails.join("\n") ?? "",
@@ -1639,7 +1639,7 @@ export function CommunicationsWorkspace({
                       {announcementOptOuts.map((row) => (
                         <li key={row.registrationId}>
                           <strong>{row.contactName || row.confirmationCode}</strong> · {row.confirmationCode} · {row.email}
-                          {" "}— {row.scope === "ALL" ? "all IMSDA Events announcements" : "this event's announcements"}
+                          {" "}— {row.scope === "ALL" ? "all IMAdventist announcements" : "this event's announcements"}
                         </li>
                       ))}
                     </ul>
@@ -1748,7 +1748,7 @@ export function CommunicationsWorkspace({
                 {messaging.settings.deliveryMode === "EXTERNAL_EMAIL"
                   ? "This creates queued email rows only. It does not send them; a separate Process email queue action in the Delivery log is still required."
                   : messaging.settings.deliveryMode === "LOCAL_CAPTURE"
-                    ? "This renders and captures the reviewed reminders inside IMSDA Events. No email provider is contacted."
+                    ? "This renders and captures the reviewed reminders inside IMAdventist. No email provider is contacted."
                     : "Delivery is off. The reviewed rows will be recorded as suppressed for audit history, and no email will be sent."}
               </p>
             </div>
@@ -1768,7 +1768,7 @@ export function CommunicationsWorkspace({
               <span>
                 <strong>I reviewed all {messaging.reminderPreview.includedCount} recipient{messaging.reminderPreview.includedCount === 1 ? "" : "s"} and the total balance of <Money cents={messaging.reminderPreview.totalBalanceCents} />.</strong>
                 <small>
-                  I understand this action uses the exact preview above. If a registration, payment, refund, email, template, or sender setting changes, IMSDA Events will stop and require a new review.
+                  I understand this action uses the exact preview above. If a registration, payment, refund, email, template, or sender setting changes, IMAdventist will stop and require a new review.
                 </small>
               </span>
             </label>
@@ -1896,7 +1896,7 @@ export function CommunicationsWorkspace({
                 {messaging.settings.deliveryMode === "EXTERNAL_EMAIL"
                   ? "This creates queued email rows only. It does not send them; a separate Process email queue action in the Delivery log is still required."
                   : messaging.settings.deliveryMode === "LOCAL_CAPTURE"
-                    ? "This renders and captures the reviewed requests inside IMSDA Events. No email provider is contacted."
+                    ? "This renders and captures the reviewed requests inside IMAdventist. No email provider is contacted."
                     : "Delivery is off. The reviewed rows will be recorded as suppressed for audit history, and no email will be sent."}
               </p>
               <p>
@@ -1919,7 +1919,7 @@ export function CommunicationsWorkspace({
               <span>
                 <strong>I reviewed all {messaging.shirtSizePreview.includedCount} recipient{messaging.shirtSizePreview.includedCount === 1 ? "" : "s"} covering {messaging.shirtSizePreview.missingAttendeeCount} attendee{messaging.shirtSizePreview.missingAttendeeCount === 1 ? "" : "s"} without a size.</strong>
                 <small>
-                  I understand this action uses the exact preview above. If an attendee answers, or a registration, email, template, or sender setting changes, IMSDA Events will stop and require a new review.
+                  I understand this action uses the exact preview above. If an attendee answers, or a registration, email, template, or sender setting changes, IMAdventist will stop and require a new review.
                 </small>
               </span>
             </label>
@@ -1980,7 +1980,7 @@ export function CommunicationsWorkspace({
               <label>
                 Inbox preview line (optional)
                 <input id="template-preheader" value={templatePreheader} maxLength={PREHEADER_MAX_LENGTH} onChange={(event) => setTemplatePreheader(event.target.value)} aria-describedby="template-preheader-help" />
-                <small id="template-preheader-help" className="field-help">Shown under the subject in Gmail, Outlook and on phones, instead of &ldquo;IMSDA Events&rdquo;. Plain text on one line; the same {"{{tokens}}"} as the subject.</small>
+                <small id="template-preheader-help" className="field-help">Shown under the subject in Gmail, Outlook and on phones, instead of &ldquo;IMAdventist&rdquo;. Plain text on one line; the same {"{{tokens}}"} as the subject.</small>
               </label>
               <div className="message-body-field" id="template-body">
                 <strong>Message body</strong>
@@ -2033,7 +2033,7 @@ export function CommunicationsWorkspace({
                   <div><dt>From</dt><dd>{messaging.settings.senderName}{messaging.settings.senderEmail ? ` <${messaging.settings.senderEmail}>` : ""}</dd></div>
                   <div><dt>Reply to</dt><dd>{messaging.settings.replyToEmail || "Not configured"}</dd></div>
                   <div><dt>Subject</dt><dd>{preview.subject || "No subject"}</dd></div>
-                  <div><dt>Preview</dt><dd>{preview.preheader ?? "None. Inboxes show “IMSDA Events”."}</dd></div>
+                  <div><dt>Preview</dt><dd>{preview.preheader ?? "None. Inboxes show “IMAdventist”."}</dd></div>
                 </dl>
                 <iframe
                   className="message-body-html"

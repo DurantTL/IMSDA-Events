@@ -379,7 +379,7 @@ export function PublicSquarePayment({
           currencyCode: "USD",
           total: {
             amount: (checkout.amountCents / 100).toFixed(2),
-            label: "IMSDA Events registration",
+            label: "IMAdventist registration",
           },
         });
 
@@ -1016,7 +1016,7 @@ export function PublicSquarePayment({
           )}
           <p>
             Use an available digital wallet or enter a card. Payment details go
-            directly to Square and are never stored by IMSDA Events.
+            directly to Square and are never stored by IMAdventist.
           </p>
         </div>
       </div>

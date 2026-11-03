@@ -82,7 +82,7 @@ function world(options: { watch?: Partial<{ honorIds: string[]; offeringIds: str
     }),
   });
   mocks.loadEventEmailSettings.mockResolvedValue({
-    senderName: "IMSDA Events", senderEmail: "events@imsda-events.test", replyToEmail: null, deliveryMode: "EXTERNAL_EMAIL",
+    senderName: "IMAdventist", senderEmail: "events@imsda-events.test", replyToEmail: null, deliveryMode: "EXTERNAL_EMAIL",
     ...(options.paused ? { deliveryReason: "PAUSED" } : {}),
   });
   return { watch, outbox, tx };

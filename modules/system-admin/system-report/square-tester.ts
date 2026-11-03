@@ -283,7 +283,7 @@ async function checkLink(fetcher: Fetcher, configuration: SquareRuntimeConfigura
       currency: "USD",
       locationId: configuration.locationId,
       referenceId: `system-test-${ref}`,
-      itemName: "IMSDA Events System report test (never paid)",
+      itemName: "IMAdventist System report test (never paid)",
       paymentNote: "System report test. Not a real payment.",
       redirectUrl: new URL("/", configuration.webhookNotificationUrl).toString(),
     }, fetcher);

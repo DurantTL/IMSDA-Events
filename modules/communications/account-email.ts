@@ -93,11 +93,11 @@ export function accountEmailContent(
   if (purpose === "ACCOUNT_ACTIVATION") {
     return {
       templateKey: "ACCOUNT_ACTIVATION" as const,
-      subject: "Set up your IMSDA Events account",
+      subject: "Set up your IMAdventist account",
       bodyText: [
         `Hello ${name},`,
         "",
-        "An IMSDA Events account has been created for you. Choose a password to activate it:",
+        "An IMAdventist account has been created for you. Choose a password to activate it:",
         "",
         ACCOUNT_ACTION_LINK_SENTINEL,
         "",
@@ -106,17 +106,17 @@ export function accountEmailContent(
         "",
         "If you were not expecting this, you can ignore it — the account cannot be used until a password is set.",
         "",
-        "IMSDA Events",
+        "IMAdventist",
       ].join("\n"),
     };
   }
   return {
     templateKey: "ACCOUNT_PASSWORD_RESET" as const,
-    subject: "Reset your IMSDA Events password",
+    subject: "Reset your IMAdventist password",
     bodyText: [
       `Hello ${name},`,
       "",
-      "Someone asked to reset the password for this IMSDA Events account. Choose a new one here:",
+      "Someone asked to reset the password for this IMAdventist account. Choose a new one here:",
       "",
       ACCOUNT_ACTION_LINK_SENTINEL,
       "",
@@ -124,7 +124,7 @@ export function accountEmailContent(
       "",
       "If you did not ask for this, no action is needed — your current password still works and this link can only be used by whoever opens it first.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

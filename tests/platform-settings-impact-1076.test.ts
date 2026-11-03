@@ -18,8 +18,8 @@ const saved: PlatformSettingsDraft = {
   invoiceHeaderPhone: "(515) 555-0100",
   publicHelpPhone: "",
   publicHelpEmail: "help@example.test",
-  emailHeaderName: "IMSDA Events",
-  emailClubHeaderName: "IMSDA Events",
+  emailHeaderName: "IMAdventist",
+  emailClubHeaderName: "IMAdventist",
   emailHelpEmail: "support@example.test",
   emailHelpPhone: "(515) 555-0100",
 };

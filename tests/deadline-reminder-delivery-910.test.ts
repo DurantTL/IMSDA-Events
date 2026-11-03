@@ -25,7 +25,7 @@ function store(templateKey = "DEADLINE_REMINDER") {
     templateKey,
     registrationId: null,
     recipientEmail: "director@example.test",
-    senderNameSnapshot: "IMSDA Events",
+    senderNameSnapshot: "IMAdventist",
     senderEmailSnapshot: "events@example.test",
     replyToEmailSnapshot: null,
     subjectSnapshot: "Deadline reminder: Reports Due (December 5, 2026)",

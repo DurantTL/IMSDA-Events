@@ -21,16 +21,23 @@ const doc = (overrides: Partial<Parameters<typeof renderEmailLayoutDocument>[0]>
 
 describe("the shared email layout (#1443)", () => {
   it("has the approved structure: navy bar with a gold border and mark, a white card, and the footer lines", () => {
-    const html = doc({ headerName: "IMSDA Events", whyLine: "You got this because of a test.", helpLine: "Need help? Email support@imsda.org." });
+    const html = doc({ headerName: "IMAdventist", whyLine: "You got this because of a test.", helpLine: "Need help? Email support@imsda.org." });
     expect(html).toContain("border-bottom:4px solid #f0b323");
-    expect(html).toContain('font-style:italic');
-    expect(html).toContain(">i</td>");
+    expect(html).not.toContain('font-style:italic');
+    expect(html).not.toContain(">i</td>");
     expect(html).toContain(">Iowa-Missouri Conference</div>");
     expect(html).toContain("Sent by <b");
     expect(html).toContain("for the Iowa-Missouri Conference of Seventh-day Adventists.");
     expect(html).toContain("You got this because of a test.");
     expect(html).toContain("Need help? Email support@imsda.org.");
     expect(html).toContain("<p>Body</p>");
+  });
+
+  it("shows the approved IMAdventist symbol from the site's own address, and no image without one (#1549)", () => {
+    const withSite = doc({ calendarUrl: "https://events.example.org/calendar" });
+    expect(withSite).toContain('<img src="https://events.example.org/brand/imadventist-symbol.png"');
+    expect(withSite).toContain('alt="IMAdventist"');
+    expect(doc()).not.toContain("<img");
   });
 
   it("is a 600px table layout with inline styles and a dark-mode block in the head", () => {
@@ -135,19 +142,19 @@ describe("the footer's help line (#1443)", () => {
     expect(emailLayoutSettingsFromRow({ emailHelpEmail: null, emailHelpPhone: null }).helpEmail).toBeNull();
     expect(emailLayoutSettingsFromRow({}).helpEmail).toBe("support@imsda.org");
     expect(emailLayoutSettingsFromRow(null)).toEqual(DEFAULT_EMAIL_LAYOUT_SETTINGS);
-    expect(emailLayoutSettingsFromRow({ emailHeaderName: "  " }).headerName).toBe("IMSDA Events");
+    expect(emailLayoutSettingsFromRow({ emailHeaderName: "  " }).headerName).toBe("IMAdventist");
   });
 });
 
 describe("the plain-text part (#1443)", () => {
-  const content = { headerName: "IMSDA Events", whyLine: "You got this because of a test.", helpLine: "Need help? Email support@imsda.org." };
+  const content = { headerName: "IMAdventist", whyLine: "You got this because of a test.", helpLine: "Need help? Email support@imsda.org." };
 
   it("ends with the footer block", () => {
     expect(appendEmailPlainTextFooter("Hello.\n", content)).toBe([
       "Hello.",
       "",
       "--",
-      "Sent by IMSDA Events for the Iowa-Missouri Conference of Seventh-day Adventists.",
+      "Sent by IMAdventist for the Iowa-Missouri Conference of Seventh-day Adventists.",
       "You got this because of a test.",
       "Need help? Email support@imsda.org.",
       "",
@@ -204,10 +211,10 @@ describe("a body written as plain text (#1443)", () => {
   });
 
   it("shows a short title over more text as a note box and drops the closing signature", () => {
-    const html = plainTextToEmailBodyHtml("Intro.\n\nDidn't try to sign in?\nChange your password.\n\nIMSDA Events");
+    const html = plainTextToEmailBodyHtml("Intro.\n\nDidn't try to sign in?\nChange your password.\n\nIMAdventist");
     expect(html).toContain("Didn&#39;t try to sign in?");
     expect(html).toContain('class="em-note"');
-    expect(html).not.toContain(">IMSDA Events<");
+    expect(html).not.toContain(">IMAdventist<");
   });
 });
 
@@ -248,7 +255,7 @@ describe("the email header wordmark links to the public calendar (#1496)", () =>
   it("links the mark and the name to the absolute calendar address", () => {
     const html = doc({ calendarUrl });
     expect(html.match(/href="https:\/\/events\.example\.org\/calendar"/g)).toHaveLength(2);
-    expect(html).toContain('aria-label="IMSDA Events calendar"');
+    expect(html).toContain('aria-label="IMAdventist calendar"');
     expect(html).toContain('class="em-bar-name"');
   });
 

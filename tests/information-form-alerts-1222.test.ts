@@ -55,7 +55,7 @@ vi.mock("@/modules/communications/account-email", () => ({
   isAccountEmailConfigured: mocks.configured,
   getAccountEmailSender: () => {
     if (mocks.senderFails) throw new Error("sender settings broken");
-    return { name: "IMSDA Events", address: "events@example.test", replyTo: null };
+    return { name: "IMAdventist", address: "events@example.test", replyTo: null };
   },
 }));
 vi.mock("@/modules/communications/email-delivery", () => ({ processAccountEmailQueue: mocks.deliver }));

@@ -46,14 +46,14 @@ function inviteEmailContent(rawInput: { name: string; email: string }) {
   const name = neutralizePlaceholders(rawInput.name.trim());
   const signUpUrl = clubInviteSignUpUrl(rawInput.email);
   return {
-    subject: "You're invited to be an Area Coordinator on IMSDA Events",
+    subject: "You're invited to be an Area Coordinator on IMAdventist",
     bodyText: [
       `Hello ${name || "there"},`,
       "",
-      "The Iowa-Missouri Conference has invited you as an Area Coordinator on IMSDA Events. Area Coordinators see every club, view only (ages, not birth dates).",
+      "The Iowa-Missouri Conference has invited you as an Area Coordinator on IMAdventist. Area Coordinators see every club, view only (ages, not birth dates).",
       "",
       "To accept:",
-      `1. New to IMSDA Events? Create your account at ${signUpUrl}`,
+      `1. New to IMAdventist? Create your account at ${signUpUrl}`,
       `   Already have one? Sign in at ${new URL("/account/sign-in", getServerEnv().APP_BASE_URL).toString()}`,
       `2. Use this email address: ${rawInput.email}`,
       "3. On your account page, choose Accept next to the Area Coordinator invite.",
@@ -62,7 +62,7 @@ function inviteEmailContent(rawInput: { name: string; email: string }) {
       "",
       "If you weren't expecting this, you can ignore it. Nothing happens unless you accept.",
       "",
-      "IMSDA Events",
+      "IMAdventist",
     ].join("\n"),
   };
 }

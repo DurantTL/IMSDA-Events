@@ -6,7 +6,7 @@ import { getClubEventRecords } from "@/modules/reporting/club-event-reports-repo
 import { assignmentKey } from "@/modules/reporting/club-event-reports";
 import { buildClubPacket, withClubPacketAssignment, type ClubPacket } from "@/modules/reporting/club-packet";
 
-export const CONFERENCE_NAME = "IMSDA Events";
+export const CONFERENCE_NAME = "IMAdventist";
 
 /**
  * One club's printable packet (Q1, #411): the same active-registration data

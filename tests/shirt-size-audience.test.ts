@@ -10,7 +10,7 @@ const context: ShirtSizePreviewContext = {
   eventId: "evt_wr26",
   eventSupportsShirtSizes: true,
   deliveryMode: "EXTERNAL_EMAIL",
-  senderName: "IMSDA Events",
+  senderName: "IMAdventist",
   senderEmail: "notifications@imsda.org",
   replyToEmail: "registration@imsda.org",
   templateEnabled: true,

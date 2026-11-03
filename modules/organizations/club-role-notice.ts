@@ -46,7 +46,7 @@ export function clubRoleGivenEmail(input: {
   }
   lines.push(`Open ${input.clubName}: ${input.portalUrl}`, "");
   if (!input.twoStepOn) lines.push("Your own event registrations work without it.", "");
-  lines.push("IMSDA Events");
+  lines.push("IMAdventist");
   return { subject: `You're now ${role} of ${input.clubName}`, bodyText: lines.join("\n") };
 }
 

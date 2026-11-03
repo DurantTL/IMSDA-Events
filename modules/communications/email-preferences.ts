@@ -7,7 +7,7 @@ import { createHash, createHmac } from "node:crypto";
  * reminders and safety or schedule-change notices always go, so nothing here applies to any other template.
  *
  * The preference lives on the normalised email address, so it follows the address across registrations and events.
- * An opt-out covers either one event's announcements or all IMSDA Events announcements.
+ * An opt-out covers either one event's announcements or all IMAdventist announcements.
  *
  * The unsubscribe link carries an opaque token: 32 bytes of HMAC-SHA256 output (keyed from the same secret as private
  * registration links, under its own domain prefix) and nothing readable. It holds no address, event, registration id or
@@ -24,7 +24,7 @@ export const ANNOUNCEMENT_OPT_OUT_TEMPLATE_KEY = "EVENT_ANNOUNCEMENT";
 export const DEADLINE_REMINDER_TEMPLATE_KEY = "DEADLINE_REMINDER";
 
 /**
- * Whether deadline reminders honour an opt-out of ALL IMSDA Events announcements, both when staff preview and send a
+ * Whether deadline reminders honour an opt-out of ALL IMAdventist announcements, both when staff preview and send a
  * batch and again at delivery. The one switch for that decision. Deadlines count as essential (owner decision, #915),
  * so it is false: reminders go to everyone, and only provider suppression (bounces, complaints) stops one.
  */
@@ -80,7 +80,7 @@ export function announcementOptOutFor(
 
 export const ANNOUNCEMENT_OPT_OUT_REASON = {
   EVENT: "Opted out of this event's announcements",
-  ALL: "Opted out of all IMSDA Events announcements",
+  ALL: "Opted out of all IMAdventist announcements",
 } as const satisfies Record<AnnouncementOptOutScope, string>;
 
 /** Why a deadline reminder was not sent, as recorded on the outbox row. */

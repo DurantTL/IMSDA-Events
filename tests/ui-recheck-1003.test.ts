@@ -136,7 +136,7 @@ describe("staff loading state (#1003)", () => {
     const loading = read("app/(workspace)/loading.tsx");
     expect(loading).toContain("content-skeleton");
     expect(loading).toContain('role="status"');
-    expect(loading).not.toContain("Loading IMSDA Events");
+    expect(loading).not.toContain("Loading IMAdventist");
     expect(css).toMatch(/\.content-skeleton \{/);
   });
 });

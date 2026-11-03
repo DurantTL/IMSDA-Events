@@ -92,7 +92,7 @@ beforeEach(() => {
   mocks.getPrisma.mockReturnValue(db);
   mocks.isAccountEmailConfigured.mockReturnValue(true);
   mocks.isNotificationEnabled.mockResolvedValue(true);
-  mocks.getAccountEmailSender.mockReturnValue({ name: "IMSDA Events", address: "events@example.test", replyTo: null });
+  mocks.getAccountEmailSender.mockReturnValue({ name: "IMAdventist", address: "events@example.test", replyTo: null });
   db.organization.findFirst.mockResolvedValue({ id: "club-a", name: "Club A" });
   db.organization.findUniqueOrThrow.mockImplementation(async ({ where }: { where: { id: string } }) => ({ name: where.id === "club-a" ? "Club A" : "Club B" }));
   db.clubRosterMember.findMany.mockImplementation(async ({ where }: { where: { organizationId: string } }) => (

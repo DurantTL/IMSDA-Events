@@ -8,7 +8,7 @@ import {
 const context: BalanceReminderPreviewContext = {
   eventId: "event-1",
   deliveryMode: "LOCAL_CAPTURE",
-  senderName: "IMSDA Events",
+  senderName: "IMAdventist",
   senderEmail: "registration@example.test",
   replyToEmail: "help@example.test",
   templateEnabled: true,

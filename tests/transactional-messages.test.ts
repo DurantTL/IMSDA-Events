@@ -53,7 +53,7 @@ function transactionFixture() {
     eventMessageSettings: {
       findUnique: vi.fn().mockResolvedValue({
         deliveryMode: "LOCAL_CAPTURE",
-        senderName: "IMSDA Events",
+        senderName: "IMAdventist",
         senderEmail: "events@example.test",
         replyToEmail: "help@example.test",
       }),
@@ -300,7 +300,7 @@ describe("transactional lifecycle messages", () => {
     expect(first.create).toMatchObject({
       templateKey: "REGISTRATION_UPDATED",
       recipientEmail: "old-contact@example.test",
-      senderNameSnapshot: "IMSDA Events",
+      senderNameSnapshot: "IMAdventist",
       senderEmailSnapshot: "events@example.test",
       replyToEmailSnapshot: "help@example.test",
       status: "PENDING",

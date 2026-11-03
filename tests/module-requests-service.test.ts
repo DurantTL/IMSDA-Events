@@ -143,7 +143,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   memberships({ ...grants });
   mocks.getPlatformSettings.mockResolvedValue({ supportContact: "office@imsda-events.test" });
-  mocks.getAccountEmailSender.mockReturnValue({ name: "IMSDA Events", address: "events@imsda-events.test", replyTo: null });
+  mocks.getAccountEmailSender.mockReturnValue({ name: "IMAdventist", address: "events@imsda-events.test", replyTo: null });
   mocks.isAccountEmailConfigured.mockReturnValue(false);
 });
 
