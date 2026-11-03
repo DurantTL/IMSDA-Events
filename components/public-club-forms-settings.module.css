@@ -1,0 +1,23 @@
+/* Public Club forms page settings (#1562). Text is 0.875rem or larger; every control is at least 44px tall. */
+.workspace { display: grid; gap: 16px; padding-bottom: 32px; }
+.stateBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.9rem); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.actions button, .actions a { min-height: 44px; }
+.group { display: grid; gap: 10px; }
+.group h2 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.05rem); }
+.list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.item { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); padding: 12px 14px; min-width: 0; }
+.itemHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.itemHead h3 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.95rem); }
+.fields { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.fields label, .intro { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; min-width: 0; }
+.fields select, .fields textarea, .intro textarea { min-height: 44px; width: 100%; box-sizing: border-box; font: inherit; font-weight: 400; }
+.wide { grid-column: 1 / -1; }
+.rowButtons { display: flex; flex-wrap: wrap; gap: 8px; }
+.rowButtons button { min-height: 44px; min-width: 44px; }
+.check { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.check input { width: 24px; height: 24px; min-height: 24px; }
+.hiddenItem { opacity: 0.8; border-style: dashed; }
+.note { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
+.status { min-height: 24px; margin: 0; }
+.error { color: #b3261e; font-weight: 700; }

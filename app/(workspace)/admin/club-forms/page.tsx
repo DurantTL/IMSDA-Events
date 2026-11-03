@@ -74,7 +74,7 @@ export default async function AdminClubFormsPage({ searchParams }: { searchParam
       <AdminPageHeader path="/admin/club-forms" />
       <StaffPageHeader
         description="Forms clubs fill in for their members or send by private link. Every form starts off. A form that is on shows in each club's Forms tab for its director and deputy. Wording that is drafted from the conference's summaries should be checked against the official forms before you turn a form on."
-        primary={<Link className="secondary-button" href="/more/club-forms">See submitted forms</Link>}
+        primary={<><Link className="secondary-button" href="/admin/club-forms/public-page">Public club forms page</Link><Link className="secondary-button" href="/more/club-forms">See submitted forms</Link></>}
       />
       {user.globalRole === "SYSTEM_ADMIN"
         ? <ClubFormSync pendingCount={templates.filter((template) => template.needsSync).length} />

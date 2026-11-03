@@ -104,6 +104,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     items: [
       { href: "/admin/forms", label: "All forms", description: "Every club, general and event form in one list.", icon: ListChecks },
       { href: "/admin/club-forms", label: "Club forms", description: "The forms clubs fill in for events.", icon: ClipboardList },
+      { href: "/admin/club-forms/public-page", label: "Public club forms page", description: "Which forms visitors see on the public Club forms page, with preview and publish.", icon: Megaphone },
       { href: "/admin/form-templates", label: "Form templates", description: "The registration forms event staff start from.", icon: FileStack },
       { href: "/admin/question-library", label: "Question library", description: "Saved questions anyone building a form can add.", icon: BookmarkPlus },
       { href: "/admin/information-forms", label: "Information forms", description: "Surveys and interest forms that belong to no event.", icon: ClipboardPen },
@@ -213,6 +214,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/information-forms\/[^/]+\/responses(\/|$)/, "Form responses"],
   [/^\/admin\/information-forms\/[^/]+(\/|$)/, "Information form"],
   [/^\/admin\/information-forms(\/|$)/, "Information forms"],
+  [/^\/admin\/club-forms\/public-page(\/|$)/, "Public club forms page"],
   [/^\/admin\/club-forms\/[^/]+(\/|$)/, "Club form builder"],
   [/^\/admin\/club-forms(\/|$)/, "Club forms"],
   [/^\/admin\/club-supplies(\/|$)/, "Club supply catalog"],

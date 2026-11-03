@@ -50,7 +50,7 @@ describe("the Clubs sidebar", () => {
   it("lists only the club areas, with the club management pages opened in #1232, and lights the most specific page", () => {
     // The flat page list behind the phone bar and the active match (#1245): the grouped sidebar's pages, each once.
     expect([...clubsAdminNavigation.map((item) => item.href)].sort()).toEqual([
-      "/admin/club-forms", "/admin/club-supplies", "/admin/clubs", "/admin/clubs/applications", "/admin/clubs/health-import",
+      "/admin/club-forms", "/admin/club-forms/public-page", "/admin/club-supplies", "/admin/clubs", "/admin/clubs/applications", "/admin/clubs/health-import",
       "/admin/clubs/import", "/admin/clubs/invites", "/admin/clubs/leaders", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary",
       "/admin/clubs/transfers", "/admin/honors", "/admin/organizations/background-checks", "/admin/people",
     ]);
