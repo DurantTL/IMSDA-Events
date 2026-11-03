@@ -22,6 +22,18 @@ export function HonorsReportMemberPicker({ members, memberId }: { members: reado
   }, [value]);
   return (
     <div ref={holder}>
+      {/* Without scripts the search box cannot work, so a plain select (first, so its choice is the one read) stands in (S5). */}
+      <noscript>
+        <style>{".honors-report-member-search{display:none}"}</style>
+        <label>
+          Member
+          <select defaultValue={memberId} name="member">
+            <option value="">Choose a member</option>
+            {members.map((member) => <option key={member.memberId} value={member.memberId}>{member.label}</option>)}
+          </select>
+        </label>
+      </noscript>
+      <div className="honors-report-member-search">
       <HonorCombobox
         label="Member"
         name="member"
@@ -32,6 +44,7 @@ export function HonorsReportMemberPicker({ members, memberId }: { members: reado
         placeholder="Search members by name"
         value={value}
       />
+      </div>
     </div>
   );
 }

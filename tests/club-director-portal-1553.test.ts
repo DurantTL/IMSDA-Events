@@ -21,7 +21,16 @@ describe("honors print report, one person (#1553)", () => {
     expect(html).toContain('value="Blake Example"');
     expect(html).toContain('name="member"');
     expect(html).toMatch(/<input[^>]*name="member"[^>]*value="m2"|<input[^>]*type="hidden"[^>]*value="m2"/);
-    expect(html).not.toContain("<select");
+    expect(html.replace(/<noscript>[\s\S]*?<\/noscript>/, "")).not.toContain("<select");
+  });
+  it("still works without scripts: a plain member select inside noscript, ahead of the search box", () => {
+    const html = renderToStaticMarkup(createElement(HonorsReportMemberPicker, { members, memberId: "m2" }));
+    const noscript = html.slice(html.indexOf("<noscript>"), html.indexOf("</noscript>"));
+    expect(noscript).toContain('<select name="member"');
+    expect(noscript).toContain('<option value="m1">Avery Example</option>');
+    expect(noscript).toMatch(/<option value="m2" selected/);
+    expect(html.indexOf("<noscript>")).toBeLessThan(html.indexOf('role="combobox"'));
+    expect(noscript).toContain("honors-report-member-search{display:none}");
   });
   it("is used by the report page in place of the member select", () => {
     const page = read("app/(public)/account/(portal)/clubs/[organizationId]/exports/honors/page.tsx");
@@ -67,6 +76,13 @@ describe("Help back link (#1553)", () => {
   it("the contextual Help full-guide link carries the current club page", () => {
     const html = renderToStaticMarkup(createElement(ContextualHelp, { help: { guideId: "g", title: "T", summary: "S", steps: ["a"], fullHref: "/account/help/g" } }));
     expect(html).toContain("/account/help/g?from=%2Faccount%2Fclubs%2Fclub-1%2Frecords");
+  });
+  it("the Help index shows Back only when a club page is known", () => {
+    const hidden = renderToStaticMarkup(createElement(HelpBackLink, { fallbackHref: "/account/clubs", fallbackLabel: "", from: null, hideWithoutTarget: true }));
+    expect(hidden).toBe("");
+    const shown = renderToStaticMarkup(createElement(HelpBackLink, { fallbackHref: "/account/clubs", fallbackLabel: "", from: "/account/clubs/club-1/honors", hideWithoutTarget: true }));
+    expect(shown).toContain('href="/account/clubs/club-1/honors"');
+    expect(read("app/(public)/account/(portal)/help/page.tsx")).toContain("hideWithoutTarget");
   });
   it("the portal layout tracks the club page and the guide page reads a validated from", () => {
     expect(read("app/(public)/account/(portal)/layout.tsx")).toContain("<HelpReturnTracker />");

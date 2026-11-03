@@ -37,9 +37,10 @@ const subscribeNever = () => () => {};
  * The Back link on Help pages (#1553): the club page the director came from (`from`, already checked on the server,
  * else the one this tab remembered), else the fixed Help page. The server render always shows the fixed page.
  */
-export function HelpBackLink({ from, fallbackHref, fallbackLabel }: { from: string | null; fallbackHref: string; fallbackLabel: string }) {
+export function HelpBackLink({ from, fallbackHref, fallbackLabel, hideWithoutTarget = false }: { from: string | null; fallbackHref: string; fallbackLabel: string; /** On the Help index there is no fixed parent: show the link only when a club page is known. */ hideWithoutTarget?: boolean }) {
   const stored = useSyncExternalStore(subscribeNever, readStored, () => null);
   const target = clubHelpReturnPath(from) ?? stored;
+  if (!target && hideWithoutTarget) return null;
   return target
     ? <BackLink href={target}>Back to where you were</BackLink>
     : <BackLink href={fallbackHref}>{fallbackLabel}</BackLink>;
