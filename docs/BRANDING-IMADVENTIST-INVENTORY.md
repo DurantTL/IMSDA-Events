@@ -52,5 +52,3 @@ None of these were changed by this work. Each is a live data change.
 4. **Authenticator and passkey enrolments** already created under the old names.
 5. **Provider-side names** (Square application and item names, Cloudflare Turnstile widget name, Google OAuth consent
    screen): configured outside this repository.
-6. **App favicon file**: `app/favicon.ico` differs from `public/brand/favicon.ico`. Root metadata now points to the brand
-   icon; replacing the file-convention icon needs a binary copy that was not done here.
