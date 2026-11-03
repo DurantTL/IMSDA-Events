@@ -34,6 +34,17 @@ async function render(searchParams: Record<string, string>) {
 }
 
 describe("public calendar month render (#1202)", () => {
+  it("uses the public site navigation and footer without changing calendar controls", async () => {
+    const markup = await render({ month: "2026-03" });
+    expect(markup).toContain('aria-label="Explore"');
+    expect(markup).toContain('href="/events">Events</a>');
+    expect(markup).toContain('aria-current="page" href="/calendar">Calendar</a>');
+    expect(markup).toContain('href="/clubs">Club ministry</a>');
+    expect(markup).toContain('aria-label="IMAdventist calendar"');
+    expect(markup).toContain('class="home-footer"');
+    expect(markup).toContain('aria-label="Calendar view"');
+  });
+
   it("draws bars with continuation glyphs, date ranges and accessible names", async () => {
     const markup = await render({ month: "2026-03", filter: "everything" });
     expect(markup).toContain('aria-label="Honors Weekend, February 26 – March 7, 2026"');

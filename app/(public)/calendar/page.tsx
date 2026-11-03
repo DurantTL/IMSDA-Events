@@ -5,9 +5,9 @@ import { CalendarDays, CalendarRange, DoorClosed, List } from "lucide-react";
 import { BrandLink } from "@/components/brand-link";
 import { PublicHeaderSessionLinks } from "@/components/public-header-session-links";
 import { PublicMetricsBeacon } from "@/components/public-metrics-beacon";
-import { SiteNoticesView } from "@/components/site-notices-view";
+import { HubLink, SiteNoticesView } from "@/components/site-notices-view";
 import { getPublishedHubContent } from "@/modules/site-content/hub-content";
-import { activeNotices } from "@/modules/site-content/hub-content-domain";
+import { activeNotices, splitVerse } from "@/modules/site-content/hub-content-domain";
 import { CalendarSubscribe } from "@/components/calendar-subscribe";
 import { CalendarViewBar, type CalendarViewTab } from "@/components/calendar-view-bar";
 import { AgendaItem } from "@/components/calendar-agenda-item";
@@ -57,6 +57,8 @@ import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/rep
 import { buildCalendarYear, parseYearDate, parseYearParam } from "@/modules/calendar/year";
 import { CalendarYearView } from "@/components/calendar-year-view";
 import { buildSubscribeLinks, siteBaseUrl } from "@/modules/calendar/subscribe";
+import homeStyles from "@/components/public-home-page.module.css";
+import styles from "./calendar-page.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -149,14 +151,16 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const calendarYear = view === "year" ? buildCalendarYear(year, items, toneMap) : null;
   const yearList = view === "year" ? firstPerSeries(itemsOverlapping(items, `${year}-01-01`, `${year}-12-31`)) : [];
   const yearKeyEntries = view === "year" ? monthKeyEntries(yearList, toneMap) : [];
+  const verse = hubContent.footer.verse ? splitVerse(hubContent.footer.verse) : null;
 
   return (
-    <main className="public-registration-page public-calendar-page">
+    <main className={`public-registration-page public-calendar-page public-home-page ${homeStyles.page} ${styles.calendarPage}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
+          <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" publicBrand wordmark />
+          <nav aria-label="Explore" className={homeStyles.primaryNav}><Link href="/events">Events</Link><Link aria-current="page" href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
           <div className="public-header-links">
-            <PublicHeaderSessionLinks />
+            <PublicHeaderSessionLinks navLinks={hubContent.navLinks} />
           </div>
         </div>
       </header>
@@ -164,15 +168,16 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
       <PublicMetricsBeacon />
       <SiteNoticesView notices={activeNotices(hubContent, today)} />
 
-      <div className="calendar-layout">
-        <div className="calendar-head">
+      <section className={`public-registration-hero calendar-hero public-home-banner calendar-head ${styles.hero}`}>
           <div>
+            <p className="public-registration-eyebrow">Iowa–Missouri Conference</p>
             <h1>Calendar</h1>
             <p>Camps, conventions, and ministry dates across Iowa and Missouri. <Link href="/events">See all events open for registration</Link>.</p>
           </div>
           <CalendarSubscribe links={buildSubscribeLinks(siteBaseUrl())} variant="button" />
-        </div>
+      </section>
 
+      <div className="calendar-layout">
         <CalendarViewBar
           activeFilter={filter}
           chips={chips}
@@ -370,6 +375,13 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
             )}
           </section>
         )}
+        <footer className="home-footer">
+          {verse && <p className="home-footer-verse">{verse.text}{verse.cite && <> <cite>{verse.cite}</cite></>}</p>}
+          {hubContent.footer.contactLines.map((line, index) => <p className={homeStyles.homeFooterContact} key={`${index}-${line}`}>{line}</p>)}
+          {hubContent.footer.links.length > 0 && <nav aria-label="Footer links" className={homeStyles.homeFooterLinks}><ul>
+            {hubContent.footer.links.map((link, index) => <li key={`${link.href}-${index}`}><HubLink href={link.href}>{link.label}</HubLink></li>)}
+          </ul></nav>}
+        </footer>
       </div>
     </main>
   );
