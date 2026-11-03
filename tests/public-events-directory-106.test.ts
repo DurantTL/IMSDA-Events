@@ -20,7 +20,11 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAtten
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: mocks.listDirectedClubs }));
 vi.mock("@/modules/events/featured", () => ({ listFeaturedEventRows: mocks.listFeaturedEventRows }));
 vi.mock("@/modules/site-content/hub-content", () => ({ getPublishedHubContent: mocks.hubContent }));
-vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
+vi.mock("@/components/public-header-session-links", async () => {
+  const { createElement } = await import("react");
+  const { PublicHeaderNavLinks } = await import("@/components/public-header-nav-links");
+  return { PublicHeaderSessionLinks: ({ navLinks }: { navLinks?: { href: string; label: string }[] }) => createElement(PublicHeaderNavLinks, { links: navLinks ?? [{ href: "/unexpected-category", label: "Unexpected category" }] }) };
+});
 
 import OpenForRegistrationPage from "@/app/(public)/events/page";
 import styles from "@/app/(public)/events/events-directory.module.css";
@@ -151,7 +155,7 @@ describe("the page (#106)", () => {
     mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
     mocks.listDirectedClubs.mockResolvedValue([]);
     mocks.listFeaturedEventRows.mockResolvedValue([]);
-    mocks.hubContent.mockResolvedValue(defaultHubContent());
+    mocks.hubContent.mockResolvedValue({ ...defaultHubContent(), navLinks: [{ href: "/unexpected-category", label: "Unexpected category" }] });
     mocks.listPublicCalendarItems.mockResolvedValue([
       item("camp", { title: "Camp Meeting", category: "Camp", location: "Lake Site" }),
       item("retreat", { title: "Women's Retreat", category: "Retreat", location: "Hill Lodge", clubEvent: true }),
@@ -172,6 +176,7 @@ describe("the page (#106)", () => {
     expect(html).toContain("Show events");
     expect(html).toContain("<summary>More filters</summary>");
     expect(html).toContain('aria-label="Explore"');
+    expect(html).not.toContain("Unexpected category");
     expect(html).not.toContain("Clear filters");
     expect(html).toContain("2 events");
     expect(html).toContain(`class="${styles.eventsDirectoryCount}" role="status"`);

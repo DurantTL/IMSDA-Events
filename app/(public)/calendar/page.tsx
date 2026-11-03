@@ -160,7 +160,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
           <BrandLink className="public-registration-brand public-event-brand-link" label="IMAdventist calendar" publicBrand wordmark />
           <nav aria-label="Explore" className={homeStyles.primaryNav}><Link href="/events">Events</Link><Link aria-current="page" href="/calendar">Calendar</Link><a href="/clubs">Club ministry</a></nav>
           <div className="public-header-links">
-            <PublicHeaderSessionLinks navLinks={hubContent.navLinks} />
+            <PublicHeaderSessionLinks navLinks={[]} />
           </div>
         </div>
       </header>
