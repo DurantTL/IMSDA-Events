@@ -275,7 +275,7 @@ export default async function PublicEventPage({
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
           <BrandLink className="public-registration-brand public-event-brand-link" destination="home" wordmark />
-          <PublicExploreNav />
+          <PublicExploreNav current="events" currentKind="location" />
           <div className="public-header-links">
             <PublicHeaderSessionLinks navLinks={[]} />
           </div>

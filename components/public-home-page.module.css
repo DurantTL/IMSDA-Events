@@ -61,6 +61,8 @@
 @media (max-width: 1000px) { .primaryNav { gap: 0; } .page :global(.public-registration-header-inner) { flex-wrap: wrap; } }
 @media (max-width: 760px) { .page .hero { min-height: 0; margin: 12px; padding: 26px 22px; } .page .hero h1 { font-size: 2.35rem; } .page :global(.calendar-layout) { width: auto; margin: 24px 12px 40px; gap: 28px; } .page :global(.home-links) ul { grid-template-columns: minmax(0, 1fr); } .primaryNav { order: 3; width: 100%; overflow-x: auto; } .page :global(.public-registration-brand) img { width: 46px; height: 46px; } .page :global(.public-registration-brand) strong { font-size: 1.4rem; } }
 @media (max-width: 390px) { .heroActions a { width: 100%; } }
+/* Four nav links (#1561) fit a 360px phone with tighter link padding. */
+@media (max-width: 380px) { .primaryNav a { padding: 0 5px; } }
 /* Public introduction text must shrink and wrap when zoom reduces the available space. */
 .page :global(.public-registration-hero) > div { min-width: 0; max-width: 100%; }
 .page :global(.public-registration-hero) h1,
