@@ -6,4 +6,7 @@ export const PRODUCT_NAME = "IMAdventist";
 export const PRODUCT_DESCRIPTOR = "Events & Club Ministry";
 /** The approved symbol, shared with the public site. */
 export const BRAND_SYMBOL_PATH = "/brand/imadventist-symbol.png";
+/** Small copies of the symbol: 68px for the email header, 180px for the home-screen icon. */
+export const BRAND_EMAIL_SYMBOL_PATH = "/brand/imadventist-symbol-email.png";
+export const BRAND_APPLE_TOUCH_PATH = "/brand/imadventist-apple-touch.png";
 export const BRAND_CALENDAR_LABEL = `${PRODUCT_NAME} calendar`;

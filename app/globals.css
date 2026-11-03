@@ -12764,6 +12764,11 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (min-width: 801px) {
   .account-header-identity { max-width: 34ch; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; white-space: normal; }
 }
+/* The IMAdventist descriptor is a second line of text; on a phone it crowds Sign out and the name (#1549). The link keeps its aria-label. */
+@media (max-width: 420px) {
+  .account-portal .public-registration-brand > span small { display: none; }
+  .account-portal .public-registration-header-inner { gap: 8px; }
+}
 .attendee-ov-layout {
   display: grid; grid-template-columns: minmax(0, 1fr) 320px; align-items: start; gap: 24px;
   max-width: 1180px; margin: 0 auto 48px;

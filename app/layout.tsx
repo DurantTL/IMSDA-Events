@@ -4,7 +4,7 @@ import "@fontsource/noto-sans/500.css";
 import "@fontsource/noto-sans/600.css";
 import "@fontsource/noto-sans/700.css";
 import "./globals.css";
-import { BRAND_SYMBOL_PATH, PRODUCT_NAME } from "@/lib/brand";
+import { BRAND_APPLE_TOUCH_PATH, PRODUCT_NAME } from "@/lib/brand";
 import { PublicWebVitals } from "@/components/public-metrics-beacon";
 import { sidebarCollapseInitScript } from "@/components/sidebar-collapse";
 import { UnsavedChangesDialogHost } from "@/components/unsaved-changes-dialog-host";
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description:
     "Event information and registration for the Iowa-Missouri Conference.",
   applicationName: PRODUCT_NAME,
-  icons: { icon: "/brand/favicon.ico", apple: BRAND_SYMBOL_PATH },
+  icons: { icon: "/brand/favicon.ico", apple: BRAND_APPLE_TOUCH_PATH },
 };
 
 // Reading the request nonce makes every page render per request, which the

@@ -15,7 +15,7 @@
  */
 
 import type { MessageTemplateKey } from "@prisma/client";
-import { BRAND_SYMBOL_PATH } from "@/lib/brand";
+import { BRAND_CALENDAR_LABEL, BRAND_EMAIL_SYMBOL_PATH } from "@/lib/brand";
 import { escapeHtml, renderEmailBodyHtml, renderPreheaderHtml } from "@/modules/communications/email-html";
 import {
   DEFAULT_EMAIL_LAYOUT_SETTINGS,
@@ -417,7 +417,7 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
       ? `<a href="${calendar}"${label ? ` aria-label="${label}"` : ""} style="color:${ink};color:inherit;text-decoration:none;">${inner}</a>`
       : inner;
   // The approved symbol is served from the same site as the calendar link; without that address there is no absolute image URL, so only the name shows.
-  const symbolUrl = calendar ? `${new URL(calendar.replace(/&amp;/g, "&")).origin}${BRAND_SYMBOL_PATH}` : null;
+  const symbolUrl = calendar ? `${new URL(calendar.replace(/&amp;/g, "&")).origin}${BRAND_EMAIL_SYMBOL_PATH}` : null;
   const preheaderHtml = renderPreheaderHtml(input.preheader);
   const bodyHtml = restyleRenderedButtons(input.bodyHtml ?? renderEmailBodyHtml(input.body ?? ""));
   const footerLines = [
@@ -447,7 +447,7 @@ export function renderEmailLayoutDocument(input: EmailLayoutInput) {
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">',
     `<tr><td bgcolor="${L.bar}" class="em-bar" style="background:${L.bar};border-radius:12px 12px 0 0;border-bottom:4px solid ${L.gold};padding:16px 24px;">`,
     '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>',
-    ...(symbolUrl ? [`<td width="34" height="34" valign="middle" style="width:34px;height:34px;">${brandLink(`<img src="${symbolUrl}" width="34" height="34" alt="IMAdventist" style="display:block;width:34px;height:34px;border:0;" />`, L.barInk, "IMAdventist calendar")}</td>`] : []),
+    ...(symbolUrl ? [`<td width="34" height="34" valign="middle" style="width:34px;height:34px;">${brandLink(`<img src="${symbolUrl}" width="34" height="34" alt="" style="display:block;width:34px;height:34px;border:0;" />`, L.barInk, BRAND_CALENDAR_LABEL)}</td>`] : []),
     `<td style="padding-left:${symbolUrl ? 12 : 0}px;font-family:${FONT};">`,
     ...(calendar ? [`<a href="${calendar}" style="color:${L.barInk};color:inherit;text-decoration:none;display:block;">`] : []),
     `<div class="em-bar-name" style="font-size:18px;line-height:20px;font-weight:bold;color:${L.barInk};">${escapeHtml(headerName)}</div>`,

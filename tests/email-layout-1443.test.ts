@@ -35,8 +35,9 @@ describe("the shared email layout (#1443)", () => {
 
   it("shows the approved IMAdventist symbol from the site's own address, and no image without one (#1549)", () => {
     const withSite = doc({ calendarUrl: "https://events.example.org/calendar" });
-    expect(withSite).toContain('<img src="https://events.example.org/brand/imadventist-symbol.png"');
-    expect(withSite).toContain('alt="IMAdventist"');
+    expect(withSite).toContain('<img src="https://events.example.org/brand/imadventist-symbol-email.png"');
+    expect(withSite).toContain('alt=""');
+    expect(withSite).not.toContain("imadventist-symbol.png");
     expect(doc()).not.toContain("<img");
   });
 
@@ -215,6 +216,15 @@ describe("a body written as plain text (#1443)", () => {
     expect(html).toContain("Didn&#39;t try to sign in?");
     expect(html).toContain('class="em-note"');
     expect(html).not.toContain(">IMAdventist<");
+  });
+
+  it("still drops the legacy IMSDA Events closing signature from stored messages (#1549)", () => {
+    const html = plainTextToEmailBodyHtml("Intro.\n\nDidn't try to sign in?\nChange your password.\n\nIMSDA Events");
+    expect(html).not.toContain(">IMSDA Events<");
+    const content = { headerName: "IMAdventist", whyLine: "Because.", helpLine: null };
+    const text = appendEmailPlainTextFooter("Hello.\n\nIMSDA Events", content);
+    expect(text.startsWith("Hello.\n\n")).toBe(true);
+    expect(text.split("IMSDA Events").length).toBe(1);
   });
 });
 

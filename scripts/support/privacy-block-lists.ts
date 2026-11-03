@@ -23,7 +23,7 @@ export const BLOCK_FILTERS: BlockFilter[] = [
   { name: "||apis.google.com^", pattern: /^https?:\/\/apis\.google\.com\//i, hits: "Google sign-in client library" },
   { name: "||sentry.io^", pattern: /^https?:\/\/([^/]+\.)?sentry\.io\//i, hits: "Square's own error telemetry" },
   { name: "||google-analytics.com^ / ||googletagmanager.com^ / ||doubleclick.net^", pattern: /^https?:\/\/([^/]+\.)?(google-analytics|googletagmanager|doubleclick)\.(com|net)\//i, hits: "Generic third-party trackers (none are used; proves nothing depends on them)" },
-  { name: "/api/public-metrics", pattern: /\/api\/public-metrics(\?|$)/i, hits: "IMAdventist' own first-party analytics beacon" },
+  { name: "/api/public-metrics", pattern: /\/api\/public-metrics(\?|$)/i, hits: "IMAdventist's own first-party analytics beacon" },
   { name: "*/beacon*, */analytics*, */collect?*, */track*, */pixel*", pattern: /\/(beacon|analytics|track|pixel)([/.?_-]|$)|\/collect\?/i, hits: "Generic EasyPrivacy path rules" },
   { name: "*/metrics*", pattern: /\/metrics([/.?]|$)/i, hits: "Generic EasyPrivacy path rule" },
   { name: "*/vitals*", pattern: /\/vitals([/.?]|$)/i, hits: "Generic web-vitals reporting endpoints" },
