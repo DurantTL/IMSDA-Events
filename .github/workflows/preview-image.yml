@@ -51,7 +51,7 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=staff-preview
-          cache-to: type=gha,mode=max,scope=staff-preview
+          cache-to: type=gha,mode=max,scope=staff-preview,ignore-error=true,timeout=2m
 
       - name: Request Render preview deployment
         if: env.RENDER_DEPLOY_HOOK != ''
