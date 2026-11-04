@@ -47,13 +47,13 @@ export function CoordinatorMonthPicker({ clubYear, month, query, clubs, now }: V
     <nav aria-label="Report month" className={styles.picker}>
       <div className={styles.stepper}>
         {previous ? (
-          <Link className={styles.step} href={href(previous)}><ChevronLeft aria-hidden="true" size={16} /> Previous<span className="sr-only"> month, {reportMonthLabel(previous)}</span></Link>
+          <Link className={styles.step} href={href(previous)} scroll={false}><ChevronLeft aria-hidden="true" size={16} /> Previous<span className="sr-only"> month, {reportMonthLabel(previous)}</span></Link>
         ) : (
           <span className={`${styles.step} ${styles.stepOff}`}><ChevronLeft aria-hidden="true" size={16} /> Previous<span className="sr-only"> month, none</span></span>
         )}
         <strong className={styles.current}>{reportMonthLabel(month)}</strong>
         {next ? (
-          <Link className={styles.step} href={href(next)}>Next<span className="sr-only"> month, {reportMonthLabel(next)}</span> <ChevronRight aria-hidden="true" size={16} /></Link>
+          <Link className={styles.step} href={href(next)} scroll={false}>Next<span className="sr-only"> month, {reportMonthLabel(next)}</span> <ChevronRight aria-hidden="true" size={16} /></Link>
         ) : (
           <span className={`${styles.step} ${styles.stepOff}`}>Next<span className="sr-only"> month, none</span> <ChevronRight aria-hidden="true" size={16} /></span>
         )}
@@ -65,6 +65,7 @@ export function CoordinatorMonthPicker({ clubYear, month, query, clubs, now }: V
               aria-current={total.month === month ? "date" : undefined}
               className={`${styles.monthLink}${total.month === month ? ` ${styles.monthSelected}` : ""}`}
               href={href(total.month)}
+              scroll={false}
             >
               <span aria-hidden="true" className={styles.monthName}>{shortMonth(total.month)}</span>
               <span className="sr-only">{reportMonthLabel(total.month)}</span>

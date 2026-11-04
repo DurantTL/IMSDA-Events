@@ -12,10 +12,13 @@ export default async function AreaClubsLayout({ children }: { children: React.Re
   return (
     <>
       <CoordinatorShellHeader>
-        <section className="public-registration-hero public-manage-hero account-page-hero">
-          <div>
-            <p className="public-registration-eyebrow">Area Coordinator · view only</p>
-            <h1>Clubs</h1>
+        {/* The club director's banner (club-banner in globals.css), so both portals' headers look the same (#1554). */}
+        <section aria-label="Area Coordinator" className="club-banner">
+          <div className="club-banner-inner">
+            <div className="club-banner-identity">
+              <h1>Clubs</h1>
+              <p>Area Coordinator · view only</p>
+            </div>
           </div>
         </section>
       </CoordinatorShellHeader>
