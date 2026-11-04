@@ -21,14 +21,16 @@ import styles from "@/app/(public)/clubs/public-clubs.module.css";
  * Staff tools such as copying an application link do not belong here: they live on the director forms page and in the
  * Clubs administration form settings.
  */
-export async function renderPublicClubForms(settings: PublicClubFormsSettings | null) {
+export async function renderPublicClubForms(settings: PublicClubFormsSettings | null, options: { as?: "main" | "div" } = {}) {
+  // The staff preview sits inside the workspace's own <main>, so it uses a <div> and the page keeps one main landmark.
+  const Outer = options.as ?? "main";
   const [enabled, fillModes, closed, hubContent] = await Promise.all([listEnabledPublicClubFormKeys(), listPublicClubFormFillModes(), listPublicClubFormClosedKeys(), getPublishedHubContent()]);
   const verse = hubContent.footer.verse ? splitVerse(hubContent.footer.verse) : null;
   const groups = applyPublicClubFormsSettings(settings).filter((group) => group.items.length > 0);
   const intro = publicClubFormsIntro(settings);
 
   return (
-    <main className={`public-registration-page public-calendar-page public-home-page ${homeStyles.page} ${styles.page}`}>
+    <Outer className={`public-registration-page public-calendar-page public-home-page ${homeStyles.page} ${styles.page}`}>
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
           <BrandLink className="public-registration-brand public-event-brand-link" destination="home" wordmark />
@@ -82,6 +84,6 @@ export async function renderPublicClubForms(settings: PublicClubFormsSettings | 
           </ul></nav>}
         </footer>
       </div>
-    </main>
+    </Outer>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Eye, Save, Send, Undo2 } from "lucide-react";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import {
   publicClubFormsLimits,
@@ -103,6 +104,9 @@ function Editor({ initial, forms, groups, hasDraft, draftUpdatedAt, publishedAt,
   }
 
   const save = () => send("/api/admin/club-forms/public-page", "PUT", { intro, items }).then(() => { setDirty(false); router.refresh(); return "Draft saved. Visitors do not see it until you publish."; });
+
+  // Rule B6: leaving with unsaved edits asks first; saving clears `dirty`, so the question stops.
+  useUnsavedChangesGuard(dirty);
 
   const canPreview = hasDraft && !dirty;
 

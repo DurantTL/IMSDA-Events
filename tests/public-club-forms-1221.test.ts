@@ -270,3 +270,18 @@ describe("the club chooser (#1221)", () => {
     expect(clubChooseDestination("a/../b?x=1", "orders")).toBe("/account/clubs/a%2F..%2Fb%3Fx%3D1/orders");
   });
 });
+
+describe("the main landmark on the Club forms view (#1562)", () => {
+  it("keeps one <main> on the public page and uses a <div> for the staff preview", async () => {
+    const { renderPublicClubForms } = await import("@/components/public-club-forms-view");
+    mocks.listEnabled.mockResolvedValue(new Set());
+    mocks.listFillModes.mockResolvedValue(new Map());
+    mocks.listClosed.mockResolvedValue(new Set());
+    const count = (html: string) => (html.match(/<main[\s>]/g) ?? []).length;
+    expect(count(renderToStaticMarkup(await PublicClubFormsPage()))).toBe(1);
+    const preview = renderToStaticMarkup(await renderPublicClubForms(null, { as: "div" }));
+    expect(count(preview)).toBe(0);
+    expect(preview).toContain("<h1>Club forms</h1>");
+    expect(preview).toContain("public-registration-page");
+  });
+});

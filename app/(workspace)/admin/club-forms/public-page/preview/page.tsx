@@ -24,7 +24,7 @@ export default async function PublicClubFormsPreviewPage() {
       <p className={styles.previewBar} role="status">
         Preview: not published. Visitors do not see this yet. <Link href="/admin/club-forms/public-page">Back to editing</Link>
       </p>
-      {await renderPublicClubForms(draft)}
+      {await renderPublicClubForms(draft, { as: "div" })}
     </>
   );
 }

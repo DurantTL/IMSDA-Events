@@ -178,6 +178,14 @@ describe("the settings and preview pages (#1562)", () => {
     expect(source).toMatch(/export function PublicClubFormsSettings[\s\S]*?useState\(""\)[\s\S]*?function Editor/);
   });
 
+  it("guards unsaved edits (rule B6) and the preview sits in the workspace's one <main>", async () => {
+    const { readFileSync } = await import("node:fs");
+    const editor = readFileSync("components/public-club-forms-settings.tsx", "utf8");
+    expect(editor).toContain('from "@/components/use-unsaved-changes-guard"');
+    expect(editor).toMatch(/useUnsavedChangesGuard\(dirty\)/);
+    expect(readFileSync("app/(workspace)/admin/club-forms/public-page/preview/page.tsx", "utf8")).toContain('{ as: "div" }');
+  });
+
   it("shows the preview to a Clubs administrator with a draft", async () => {
     mocks.hasClubsAdministration.mockResolvedValue(true);
     const preview = (await import("@/app/(workspace)/admin/club-forms/public-page/preview/page")).default;
