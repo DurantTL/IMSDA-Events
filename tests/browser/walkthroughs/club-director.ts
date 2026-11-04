@@ -239,10 +239,12 @@ export const clubDirectorWalkthroughActions: Record<string, WalkthroughActions> 
     steps: {
       "open-orders": async (ctx) => {
         await open(ctx, `${ctx.clubPath}/orders`);
-        const item = ctx.page.locator("select").filter({ has: ctx.page.locator("option", { hasText: ctx.supplyName }) }).first();
-        const value = await item.locator("option", { hasText: ctx.supplyName }).first().getAttribute("value");
-        await item.selectOption(value);
-        return item;
+        // The shared item search box (#1553): type the name, then pick it from the list.
+        const box = ctx.page.getByRole("combobox", { name: "Search honors and items" });
+        await box.click();
+        await box.fill(ctx.supplyName);
+        await ctx.page.locator('[role="listbox"] [role="option"]', { hasText: ctx.supplyName }).first().click();
+        return box;
       },
       "add-item": async (ctx) => ctx.page.getByRole("button", { name: "Add to list", exact: true }),
       "on-list": async (ctx) => {

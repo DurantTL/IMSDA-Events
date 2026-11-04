@@ -183,7 +183,6 @@ describe("search boxes search as you type (#1431)", () => {
       "components/calendar-admin-workspace.tsx",
       "components/club-earned-awards-workspace.tsx",
       "components/club-honors-workspace.tsx",
-      "components/club-order-workspace.tsx",
       "components/club-roster-workspace.tsx",
       "components/club-supply-catalog-workspace.tsx",
       "components/club-supply-stock-workspace.tsx",

@@ -10351,7 +10351,9 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .honors-report-mode[aria-current="page"] { background: var(--imsda-purple, #5b3a8c); color: #fff; }
 .honors-report-panel .honors-report-controls { flex-direction: row; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
 .honors-report-controls > label { display: grid; gap: 4px; flex: 0 1 160px; min-width: 0; font-weight: 700; }
-.honors-report-controls > label.honors-report-member { flex: 1 1 240px; }
+.honors-report-controls > .honors-report-member { flex: 1 1 240px; }
+/* The nested Member label reads like the Club year label beside it. */
+.honors-report-controls > .honors-report-member label { font-size: inherit; font-weight: 700; }
 .honors-report-controls select { min-height: 44px; }
 /* With scripts, choosing a year or member shows the report; Show report is visually hidden but still reachable by keyboard. */
 .auto-submit-enhanced .auto-submit-go:not(:focus) {

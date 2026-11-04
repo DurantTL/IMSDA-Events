@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { HelpBackLink } from "@/components/help-return";
+import { clubHelpReturnPath } from "@/lib/help-return";
+import { firstParam } from "@/lib/search-params";
 import { loadPortalHelpViewer } from "@/modules/help/portal-viewer";
 import { visiblePortalGuides } from "@/modules/help/portal-visibility";
 import styles from "@/app/(workspace)/help/help.module.css";
@@ -16,7 +19,8 @@ export const metadata: Metadata = {
  * listed is decided here, on the server, from the same checks the portal layout uses. The page grants nothing, adds
  * no staff or system menu, and holds no registration, club or personal data.
  */
-export default async function PortalHelpPage() {
+export default async function PortalHelpPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const from = clubHelpReturnPath(firstParam((await searchParams).from));
   const viewer = await loadPortalHelpViewer();
   const guides = visiblePortalGuides(viewer);
 
@@ -31,6 +35,7 @@ export default async function PortalHelpPage() {
       </section>
       <div className="account-page-body">
         <div className={styles.page}>
+          <HelpBackLink fallbackHref="/account/clubs" fallbackLabel="" from={from} hideWithoutTarget useRemembered />
           <div className={styles.note} role="note">
             <strong>Reading a guide is not a task completion</strong>
             <p>Reading a guide does not file a report, finish a registration, approve anything or give anyone access. Those happen on the working pages, by the people allowed to do them.</p>

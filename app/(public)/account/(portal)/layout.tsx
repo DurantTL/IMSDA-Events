@@ -12,6 +12,7 @@ import { accountSignOutMode, otherWorkspaceContextsForAttendee } from "@/modules
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { signInStepRedirectPath } from "@/modules/attendee-accounts/portal-second-step";
+import { HelpReturnTracker } from "@/components/help-return";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
 import { accountNeedsSignInStep } from "@/modules/attendee-accounts/sign-in-gate";
 import { isAreaCoordinator } from "@/modules/organizations/area-coordinators";
@@ -106,6 +107,7 @@ export default async function AccountPortalLayout({ children }: { children: Reac
   return (
     <main className="public-registration-page public-manage-page account-portal">
       <AttendeeAuthReturn />
+      <HelpReturnTracker />
       <header className="public-registration-header">
         <div className="public-registration-header-inner">
           <BrandLink className="public-registration-brand public-event-brand-link" wordmark />

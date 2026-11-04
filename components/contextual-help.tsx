@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { helpHrefFrom } from "@/lib/help-return";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { ContextualHelpData } from "@/modules/help/contextual";
 import styles from "./contextual-help.module.css";
@@ -13,6 +15,8 @@ import styles from "./contextual-help.module.css";
  */
 export function ContextualHelp({ help }: { help: ContextualHelpData }) {
   const titleId = useId();
+  // The full guide opens in a new tab, so it is told which club page to go Back to (#1553).
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const close = () => setOpen(false);
@@ -57,7 +61,7 @@ export function ContextualHelp({ help }: { help: ContextualHelpData }) {
           <ol className={styles.steps}>{help.steps.map((step) => <li key={step}>{step}</li>)}</ol>
           <p className={styles.text}>Your changes on the page are kept while this is open.</p>
           <div className={styles.actions}>
-            <a className={`secondary-button ${styles.action}`} href={help.fullHref} rel="noopener noreferrer" target="_blank">
+            <a className={`secondary-button ${styles.action}`} href={helpHrefFrom(help.fullHref, pathname)} rel="noopener noreferrer" target="_blank">
               Open the full guide<span className="sr-only"> (opens in a new tab)</span>
             </a>
             <button className={`primary-button ${styles.action}`} onClick={close} type="button">Close</button>

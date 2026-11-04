@@ -187,12 +187,11 @@ export async function registerClubForEvent(page: Page, input: { contact: { first
 
 /** The "Add an item" picker on Orders: finds the item by typing part of its name, chooses it, sets the quantity, adds it. */
 export async function addOrderLine(page: Page, input: { item: string; quantity: number }) {
-  const search = page.locator("#club-order-picker-search");
+  const search = page.getByRole("combobox", { name: "Search honors and items" });
   await search.fill(input.item);
-  const select = page.locator("#club-order-picker-item");
-  const option = select.locator("option", { hasText: input.item }).first();
-  await option.waitFor({ state: "attached", timeout: SLOW });
-  await select.selectOption({ label: ((await option.textContent()) ?? "").trim() });
+  const option = page.getByRole("option").filter({ hasText: input.item }).first();
+  await option.waitFor({ state: "visible", timeout: SLOW });
+  await option.click();
   await page.locator("#club-order-picker-quantity").fill(String(input.quantity));
   await page.getByRole("button", { name: exactly("Add to list") }).click();
 }

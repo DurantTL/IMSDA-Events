@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AutoSubmitForm } from "@/components/auto-submit-form";
 import { BackLink } from "@/components/back-link";
 import { HonorsPrintReport } from "@/components/honors-print-report";
+import { HonorsReportMemberPicker } from "@/components/honors-report-member-picker";
 import { PrintReportButton } from "@/components/print-report-button";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { rosterYearView } from "@/modules/club-rosters/domain";
@@ -57,13 +58,9 @@ export default async function ClubHonorsReportPage({
             </select>
           </label>
           {person && (
-            <label className="honors-report-member">
-              Member
-              <select defaultValue={chosen?.memberId ?? ""} name="member">
-                <option value="">Choose a member</option>
-                {members.map((member) => <option key={member.memberId} value={member.memberId}>{member.label}</option>)}
-              </select>
-            </label>
+            <div className="honors-report-member">
+              <HonorsReportMemberPicker memberId={chosen?.memberId ?? ""} members={members} />
+            </div>
           )}
           <div className="honors-report-buttons">
             <button className="primary-button auto-submit-go" type="submit">Show report</button>

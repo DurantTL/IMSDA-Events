@@ -320,9 +320,10 @@ describe("honors with no catalog item on the order list (#1330)", () => {
 
   it("offers a not-yet-listed honor in the picker, labelled, and not one already on the list", () => {
     const html = renderHonors(false);
-    expect(html).toContain(`<option value="honor:honor-orient">Orienteering · ${NO_CATALOG_ITEM_LABEL}</option>`);
-    expect(html).toContain(`<option value="honor:honor-kayak">Kayaking · ${NO_CATALOG_ITEM_LABEL}</option>`);
-    expect(html).not.toContain('value="honor:honor-arch"');
+    const listbox = html.slice(html.indexOf('role="listbox"'), html.indexOf("</ul>", html.indexOf('role="listbox"')));
+    expect(listbox).toContain(`role="option">Orienteering · ${NO_CATALOG_ITEM_LABEL}</li>`);
+    expect(listbox).toContain(`role="option">Kayaking · ${NO_CATALOG_ITEM_LABEL}</li>`);
+    expect(listbox).not.toContain("Archery");
     expect(filterPickerHonors(orderableHonors, new Set(["honor-arch"]), "kay").map((honor) => honor.honorId)).toEqual(["honor-kayak"]);
     expect(filterPickerHonors(orderableHonors, new Set(), "").map((honor) => honor.honorId)).toHaveLength(3);
   });
@@ -344,5 +345,13 @@ describe("honors with no catalog item on the order list (#1330)", () => {
     expect(viewer).toContain("Archery");
     const noOptions = renderToStaticMarkup(createElement(ClubOrderWorkspace, { organizationId: "club-1", initial: withHonors, stock, readOnly: false }));
     expect(noOptions).not.toContain("Add to list: Orienteering");
+  });
+
+  it("says why there is nothing to add instead of an empty search box (#1553)", () => {
+    const empty = { ...data, lines: [], orderableHonors: [] };
+    const noCatalog = renderToStaticMarkup(createElement(ClubOrderWorkspace, { organizationId: "club-1", initial: empty, stock: [], readOnly: false }));
+    expect(noCatalog).not.toContain("Search honors and items");
+    expect(noCatalog).toContain("No supply items are loaded yet. Conference staff add them to the supply catalog.");
+    expect(render(false)).toContain("Search honors and items");
   });
 });
