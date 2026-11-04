@@ -287,7 +287,7 @@ describe("the club print report holds honor names and counts only (#819)", () =>
   });
 });
 
-describe("the Area Coordinator All clubs search (#819)", () => {
+describe("the Area Coordinator club search (#819)", () => {
   const clubs = [
     { organizationId: "a", name: "Alpine Eagles", sponsoringChurch: "Fixture Valley Church", city: "Fixtureville" },
     { organizationId: "b", name: "Bay Trailblazers", sponsoringChurch: "Harbor Church", city: "Bayport" },
@@ -308,7 +308,7 @@ describe("the Area Coordinator All clubs search (#819)", () => {
     expect(input).toEqual(clubs);
   });
 
-  describe("the page", () => {
+  describe("the old club list page (#1551)", () => {
     beforeEach(() => {
       vi.clearAllMocks();
       mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "account-1" } });
@@ -321,23 +321,37 @@ describe("the Area Coordinator All clubs search (#819)", () => {
     const render = async (search: Record<string, string>) =>
       renderToStaticMarkup(await MyClubsPage({ searchParams: Promise.resolve(search) }));
 
-    it("shows a search box and every club without a search", async () => {
+    it("sends a coordinator who directs no club to Clubs at a glance, carrying the search over", async () => {
+      await expect(render({})).rejects.toThrow("REDIRECT /account/area-clubs/overview");
+      await expect(render({ q: "harbor" })).rejects.toThrow("REDIRECT /account/area-clubs/overview?q=harbor");
+      await expect(render({ q: "  nothing here " })).rejects.toThrow("REDIRECT /account/area-clubs/overview?q=nothing%20here");
+      expect(mocks.listClubsForArea).not.toHaveBeenCalled();
+    });
+
+    it("sends staff acting as an Area Coordinator there too, even with an attendee account that directs a club", async () => {
+      mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR" });
+      mocks.isAreaCoordinator.mockResolvedValue(false);
+      mocks.listDirectedClubs.mockResolvedValue([{ organizationId: "a", name: "Alpine Eagles", role: "DIRECTOR", sponsoringChurch: null }]);
+      await expect(render({ q: "bay" })).rejects.toThrow("REDIRECT /account/area-clubs/overview?q=bay");
+    });
+
+    it("gives a coordinator who directs one club the same redirect to it as any director", async () => {
+      mocks.listDirectedClubs.mockResolvedValue([{ organizationId: "a", name: "Alpine Eagles", role: "DIRECTOR", sponsoringChurch: null }]);
+      await expect(render({})).rejects.toThrow("REDIRECT /account/clubs/a");
+    });
+
+    it("lists only their own clubs, with no view-only clubs, for a coordinator who directs several", async () => {
+      mocks.listDirectedClubs.mockResolvedValue([
+        { organizationId: "a", name: "Alpine Eagles", role: "DIRECTOR", sponsoringChurch: "Fixture Valley Church" },
+        { organizationId: "b", name: "Bay Trailblazers", role: "DIRECTOR", sponsoringChurch: "Harbor Church" },
+      ]);
       const html = await render({});
-      expect(html).toContain('name="q"');
+      expect(html).toContain("My clubs");
       expect(html).toContain("Alpine Eagles");
-      expect(html).toContain("Cedar Ridge");
-    });
-
-    it("filters by church or city and says how many match", async () => {
-      const html = await render({ q: "harbor" });
       expect(html).toContain("Bay Trailblazers");
-      expect(html).not.toContain("Alpine Eagles");
-      expect(html).toContain("1 of 3 clubs match");
-      expect((await render({ q: "fixtureville" })).includes("Alpine Eagles")).toBe(true);
-    });
-
-    it("says so when nothing matches", async () => {
-      expect(await render({ q: "nothing here" })).toContain("matches “nothing here”");
+      expect(html).not.toContain("Cedar Ridge");
+      expect(html).not.toContain("View only");
+      expect(mocks.listClubsForArea).not.toHaveBeenCalled();
     });
   });
 });

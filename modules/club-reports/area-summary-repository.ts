@@ -27,7 +27,7 @@ export async function getAreaClubsSummary(
   const clubs = await prisma.organization.findMany({
     where: { type: "CLUB", isActive: true },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, parentOrganization: { select: { name: true } }, ...clubJoinSelect },
+    select: { id: true, name: true, city: true, parentOrganization: { select: { name: true, city: true } }, ...clubJoinSelect },
   });
   const clubIds = clubs.map((club) => club.id);
   const [reports, standings, rosterGroups, adultGroups, grants] = await Promise.all([
@@ -69,6 +69,8 @@ export async function getAreaClubsSummary(
       id: club.id,
       name: club.name,
       church: club.parentOrganization?.name ?? "",
+      // The club's own city, else its church's, as the club list search has always matched (#1551).
+      city: club.city ?? club.parentOrganization?.city ?? null,
       directors: grants
         .filter((grant) => grant.organizationId === club.id && directorGrantIsActive(grant, now))
         .map((grant) => grant.attendeeAccount.displayName),

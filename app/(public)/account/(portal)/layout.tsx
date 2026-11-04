@@ -3,7 +3,8 @@ import { AccountWorkspaceMenu } from "@/components/account-workspace-menu";
 import { redirect } from "next/navigation";
 import { AccountHeaderActions } from "@/components/account-header-actions";
 import { AccountAnnouncementBanner } from "@/components/account-announcement-banner";
-import { AccountSectionNav, type AccountNavItem } from "@/components/account-section-nav";
+import { accountPortalNavItems, workspaceMenuNavItems } from "@/components/account-portal-nav";
+import { AccountSectionNav } from "@/components/account-section-nav";
 import { ActAsBanner } from "@/components/act-as-banner";
 import { AttendeeAuthReturn } from "@/components/attendee-sign-in-form";
 import { BrandLink } from "@/components/brand-link";
@@ -71,38 +72,13 @@ export default async function AccountPortalLayout({ children }: { children: Reac
     ])
     : [[], false, []];
 
-  const actingAsAreaCoordinator = acting?.role === "AREA_COORDINATOR";
-  const actingAsDirector = acting?.role === "CLUB_DIRECTOR";
-
-  // The attendee's own tabs come first and in the same order for everyone (#1175); a workspace tab follows only
-  // when the existing grant (director, Area Coordinator) is real, so an ordinary attendee sees just these three.
-  const items: AccountNavItem[] = [
-    ...(chromeAccount
-      ? [
-        { href: "/account", label: "Overview" },
-        { href: "/account/registrations", label: "My registrations" },
-        { href: "/account/profile", label: "Profile" },
-      ]
-      : []),
-    // Area Coordinators see every club (#387), so the tab is just "Clubs".
-    ...(areaCoordinator || actingAsAreaCoordinator
-      ? [{ href: "/account/clubs", label: "Clubs", matchChildren: true, alsoMatchPrefix: "/account/area/" }]
-      : clubs.length > 0 || actingAsDirector
-        ? [{ href: "/account/clubs", label: clubs.length === 1 || actingAsDirector ? "My club" : "My clubs", matchChildren: true }]
-        : []),
-    ...(areaCoordinator || actingAsAreaCoordinator
-      ? [{ href: "/account/area-clubs/overview", label: "Club coordination", alsoMatchPrefix: "/account/area-clubs/" }]
-      : []),
-    // An Area Coordinator sees the clubs waitlisted at the locations they coordinate (#599).
-    ...(areaCoordinator ? [{ href: "/account/waitlists", label: "Waitlists" }] : []),
-    // Portal help (#1259): last, for anyone using the portal. Which guides it lists is decided on its own pages.
-    { href: "/account/help", label: "Help", matchChildren: true },
-  ];
-  // A separate attendee cookie must not add personal or coordinator destinations to a director act-as menu.
-  const workspaceMenuItems = acting
-    ? items.filter((item) => item.href === "/account/clubs" || item.href === "/account/help"
-      || (actingAsAreaCoordinator && item.href === "/account/area-clubs/overview"))
-    : items;
+  const items = accountPortalNavItems({
+    hasAccount: Boolean(chromeAccount),
+    directedClubCount: clubs.length,
+    areaCoordinator,
+    actingRole: acting?.role ?? null,
+  });
+  const workspaceMenuItems = workspaceMenuNavItems(items, acting?.role ?? null);
 
   return (
     <main className="public-registration-page public-manage-page account-portal">

@@ -70,9 +70,9 @@ describe("layout classes (#722)", () => {
     expect(css).toMatch(/\.account-nav, \.account-page-body, \.account-overview-grid, \.act-as-banner-account \{ margin-right: 12px/);
   });
 
-  it("wraps the Clubs sub-menu in the page-body column on both pages that show it", () => {
-    expect(areaClubsNavItems.map((item) => item.label)).toEqual(["Overview", "All clubs", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
-    for (const file of ["app/(public)/account/(portal)/area-clubs/layout.tsx", "app/(public)/account/(portal)/clubs/page.tsx"]) {
+  it("wraps the Club coordination sub-menu in the page-body column on both pages that show it", () => {
+    expect(areaClubsNavItems.map((item) => item.label)).toEqual(["Overview", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
+    for (const file of ["app/(public)/account/(portal)/area-clubs/layout.tsx", "app/(public)/account/(portal)/area/[organizationId]/layout.tsx"]) {
       expect(readFileSync(file, "utf8")).toContain("<CoordinatorShellHeader>");
     }
     expect(readFileSync("components/coordinator-shell-header.tsx", "utf8")).toContain("<AreaClubsSubNav");
@@ -87,6 +87,6 @@ describe("layout classes (#722)", () => {
     expect(layout).toContain('variant="secondary"');
     expect(layout).toContain("View only");
     expect(css).toMatch(/\.area-club-layout > :is\(a, p\.inline-notice\)/);
-    expect(layout).toContain('href="/account/clubs"');
+    expect(layout).toContain('href="/account/area-clubs/overview#clubs-at-a-glance"');
   });
 });

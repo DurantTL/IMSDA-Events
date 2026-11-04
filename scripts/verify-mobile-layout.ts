@@ -292,7 +292,6 @@ const pages: PageSpec[] = [
   club("health", "/health"),
   // Area Coordinator.
   { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
-  area("all-clubs", "/account/clubs"),
   area("events", "/account/area-clubs/events"),
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),

@@ -201,7 +201,7 @@ describe("guide text", () => {
 
 describe("the portal and its permitted next steps", () => {
   it("adds a Help tab to the portal layout for signed-in accounts, without a staff or system menu", () => {
-    const layout = readFileSync(join(root, "app/(public)/account/(portal)/layout.tsx"), "utf8");
+    const layout = readFileSync(join(root, "components/account-portal-nav.ts"), "utf8");
     expect(layout).toContain('href: "/account/help", label: "Help"');
     expect(layout).not.toMatch(/\/help"[^\n]*staff/i);
   });

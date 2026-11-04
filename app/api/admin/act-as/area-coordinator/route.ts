@@ -20,7 +20,7 @@ async function postHandler(request: Request) {
     if (!sessionId) throw new Error("A system administrator session is missing its session id.");
     await actAsAreaCoordinator(actor, sessionId);
     return Response.json({
-      href: "/account/clubs",
+      href: "/account/area-clubs/overview",
       message: `You're acting as an ${systemRoleText.AREA_COORDINATOR.name} for the next ${ACT_AS_MINUTES / 60} hours, view only.`,
     });
   } catch (error) {

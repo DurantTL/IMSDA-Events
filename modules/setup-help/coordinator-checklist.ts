@@ -30,9 +30,9 @@ export function buildCoordinatorChecklist(facts: CoordinatorChecklistFacts): Che
       detail: "See every active club and open one. Your view is read only.",
       done: false,
       reference: true,
-      href: "/account/clubs",
+      href: "/account/area-clubs/overview#clubs-at-a-glance",
       linkable: true,
-      actionLabel: "Open All clubs",
+      actionLabel: "Open Clubs at a glance",
       helpHref: portalGuideHref("walkthrough-coordinator-clubs"),
     },
     {

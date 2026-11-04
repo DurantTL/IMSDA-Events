@@ -28,6 +28,8 @@ export type AreaSummaryInput = {
   id: string;
   name: string;
   church: string;
+  /** The club's city, else its church's, for the Overview search (#1551). Optional so older callers keep compiling. */
+  city?: string | null;
   directors: string[];
   rosterSize: number;
   /** Active roster members of type Adult or Staff (#1186). Optional so older callers keep compiling; counts only. */
@@ -43,6 +45,7 @@ export type AreaClubSummary = {
   id: string;
   name: string;
   church: string;
+  city?: string | null;
   directors: string[];
   rosterSize: number;
   adultCount: number;
@@ -83,6 +86,7 @@ export function summarizeClub(input: AreaSummaryInput, clubYear: string, now: Da
     id: input.id,
     name: input.name,
     church: input.church,
+    city: input.city ?? null,
     directors: input.directors,
     rosterSize: input.rosterSize,
     adultCount: input.adultCount ?? 0,
