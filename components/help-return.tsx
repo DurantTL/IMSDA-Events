@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useEffect, useSyncExternalStore } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { clubHelpReturnPath, HELP_RETURN_STORAGE_KEY } from "@/lib/help-return";
 
@@ -17,29 +17,35 @@ function readStored(): string | null {
  * Remembers the last club page in this tab (#1553), so Help's Back can return to it from any club page. It renders
  * nothing and stores only an internal club path, never anything about a person.
  */
-export function HelpReturnTracker() {
+function Tracker() {
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   useEffect(() => {
-    const here = clubHelpReturnPath(`${pathname}${window.location.search}`) ?? clubHelpReturnPath(pathname);
-    if (!here) return;
+    const here = clubHelpReturnPath(search ? `${pathname}?${search}` : pathname);
     try {
-      window.sessionStorage.setItem(HELP_RETURN_STORAGE_KEY, here);
+      if (here) window.sessionStorage.setItem(HELP_RETURN_STORAGE_KEY, here);
+      // Help pages keep what was remembered; any other portal page that is not a club page forgets it, so Back is never stale.
+      else if (!pathname.startsWith("/account/help")) window.sessionStorage.removeItem(HELP_RETURN_STORAGE_KEY);
     } catch {
       // Storage can be blocked; Help's Back then uses its fixed page.
     }
-  }, [pathname]);
+  }, [pathname, search]);
   return null;
+}
+
+export function HelpReturnTracker() {
+  return <Suspense fallback={null}><Tracker /></Suspense>;
 }
 
 const subscribeNever = () => () => {};
 
 /**
- * The Back link on Help pages (#1553): the club page the director came from (`from`, already checked on the server,
- * else the one this tab remembered), else the fixed Help page. The server render always shows the fixed page.
+ * The Back link on Help pages (#1553): the club page the director came from (`from`, already checked on the server;
+ * the Help index also falls back on the one this tab remembered), else the fixed Help page. The server render always shows the fixed page.
  */
-export function HelpBackLink({ from, fallbackHref, fallbackLabel, hideWithoutTarget = false }: { from: string | null; fallbackHref: string; fallbackLabel: string; /** On the Help index there is no fixed parent: show the link only when a club page is known. */ hideWithoutTarget?: boolean }) {
+export function HelpBackLink({ from, fallbackHref, fallbackLabel, hideWithoutTarget = false, useRemembered = false }: { from: string | null; fallbackHref: string; fallbackLabel: string; /** On the Help index there is no fixed parent: show the link only when a club page is known. */ hideWithoutTarget?: boolean; /** Only the Help index may fall back on the remembered club page; a guide uses its own `from`. */ useRemembered?: boolean }) {
   const stored = useSyncExternalStore(subscribeNever, readStored, () => null);
-  const target = clubHelpReturnPath(from) ?? stored;
+  const target = clubHelpReturnPath(from) ?? (useRemembered ? stored : null);
   if (!target && hideWithoutTarget) return null;
   return target
     ? <BackLink href={target}>Back to where you were</BackLink>

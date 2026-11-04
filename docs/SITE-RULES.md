@@ -91,7 +91,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | --- | --- | --- | --- | --- |
 | B9 | Every delete or cancel asks for confirmation in the same style, and offers Undo where possible. | `tests/confirm-guard-1448.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; system administrator pages planned (#1439)); `npm run test:event-journeys` (attendee and event staff pages): cancellation request and withdraw, Publish event | #1433 |
 | B10 | Buttons show "Saving…" while working, and success and error messages appear in the same place. | `tests/saving-messages-1455.test.ts` | `npm run test:event-journeys` (attendee and event staff pages): Create account, Apply, Submit, Save, Send request, Create draft event, Run test submission, Publish, Check in and Undo | #1433 |
-| B11 | Every Download or Export button works the same, with the same file naming. | `tests/exports-rule11-1458.test.ts` | `npm run test:event-journeys` (event staff: Download CSV on the attendee list, file name and rows) | #1433 |
+| B11 | Every Download or Export button works the same, with the same file naming. One approved exception: a club's one-month attendance export is named `<club>-<YYYY-MM>-monthly-report.csv` (#1553), covered by `tests/club-meeting-attendance.test.ts`. | `tests/exports-rule11-1458.test.ts` | `npm run test:event-journeys` (event staff: Download CSV on the attendee list, file name and rows) | #1433 |
 
 ## Behavior: words and display
 

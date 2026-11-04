@@ -91,7 +91,7 @@ export function orderSectionLinks(hasWaiting: boolean, readOnly = false): { id: 
   ];
 }
 
-/** The picker's matches (#1324): active items not already listed, found by name, item number, size or linked honor name. */
+/** The picker's items (#1324): active items not already listed. With a query it keeps those found by name, item number, size or linked honor name; the picker passes none and the shared search box narrows by the label (#1553). */
 export function filterPickerItems(stock: readonly ClubStockRow[], listed: ReadonlySet<string>, query: string) {
   const matches = makeSearchMatcher(query);
   return stock.filter((row) => row.isActive && !listed.has(row.itemId) && matches([row.name, row.catalogNumber, row.sizeLabel, row.honorName]));
@@ -243,7 +243,7 @@ export function ClubOrderWorkspace({
     const items = filterPickerItems(stock, new Set(onList.flatMap((line) => (line.itemId ? [line.itemId] : []))), "")
       .map((row) => ({
         id: row.itemId,
-        name: `${row.name}${row.catalogNumber ? ` · ${row.catalogNumber}` : ""}${row.honorName && row.honorName !== row.name ? ` · honor: ${row.honorName}` : ""}`,
+        name: `${row.name}${row.catalogNumber ? ` · ${row.catalogNumber}` : ""}${row.sizeLabel ? ` · ${row.sizeLabel}` : ""}${row.honorName && row.honorName !== row.name ? ` · honor: ${row.honorName}` : ""}`,
       }));
     const honors = filterPickerHonors(orderableHonors, listedHonorIds, "")
       .map((honor) => ({ id: `${HONOR_PICK_PREFIX}${honor.honorId}`, name: `${honor.name} · ${NO_CATALOG_ITEM_LABEL}` }));

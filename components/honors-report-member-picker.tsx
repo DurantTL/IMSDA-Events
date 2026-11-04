@@ -18,6 +18,8 @@ export function HonorsReportMemberPicker({ members, memberId }: { members: reado
   useEffect(() => {
     if (value === settled.current) return;
     settled.current = value;
+    // Clearing the box is not a choice: keep the report as it is.
+    if (value === "") return;
     holder.current?.closest("form")?.requestSubmit();
   }, [value]);
   return (
@@ -34,16 +36,16 @@ export function HonorsReportMemberPicker({ members, memberId }: { members: reado
         </label>
       </noscript>
       <div className="honors-report-member-search">
-      <HonorCombobox
-        label="Member"
-        name="member"
-        noun="member"
-        nounPlural="members"
-        onChange={setValue}
-        options={members.map((member) => ({ id: member.memberId, name: member.label }))}
-        placeholder="Search members by name"
-        value={value}
-      />
+        <HonorCombobox
+          label="Member"
+          name="member"
+          noun="member"
+          nounPlural="members"
+          onChange={setValue}
+          options={members.map((member) => ({ id: member.memberId, name: member.label }))}
+          placeholder="Search members by name"
+          value={value}
+        />
       </div>
     </div>
   );

@@ -4,12 +4,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/account/clubs/club-1/records", useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/account/clubs/club-1/records", useSearchParams: () => new URLSearchParams(), useRouter: () => ({ push: vi.fn() }) }));
 
 import { HonorsReportMemberPicker } from "@/components/honors-report-member-picker";
 import { ContextualHelp } from "@/components/contextual-help";
 import { HelpBackLink } from "@/components/help-return";
-import { clubHelpReturnPath, helpHrefFrom } from "@/lib/help-return";
+import { clubHelpReturnPath, helpHrefFrom, HELP_RETURN_STORAGE_KEY } from "@/lib/help-return";
 
 const read = (file: string) => readFileSync(path.join(process.cwd(), file), "utf8");
 
@@ -31,6 +31,11 @@ describe("honors print report, one person (#1553)", () => {
     expect(noscript).toMatch(/<option value="m2" selected/);
     expect(html.indexOf("<noscript>")).toBeLessThan(html.indexOf('role="combobox"'));
     expect(noscript).toContain("honors-report-member-search{display:none}");
+  });
+  it("does not submit when the box is cleared", () => {
+    const source = read("components/honors-report-member-picker.tsx");
+    expect(source.indexOf('if (value === "") return;')).toBeGreaterThan(-1);
+    expect(source.indexOf('if (value === "") return;')).toBeLessThan(source.indexOf("requestSubmit()"));
   });
   it("is used by the report page in place of the member select", () => {
     const page = read("app/(public)/account/(portal)/clubs/[organizationId]/exports/honors/page.tsx");
@@ -76,6 +81,20 @@ describe("Help back link (#1553)", () => {
   it("the contextual Help full-guide link carries the current club page", () => {
     const html = renderToStaticMarkup(createElement(ContextualHelp, { help: { guideId: "g", title: "T", summary: "S", steps: ["a"], fullHref: "/account/help/g" } }));
     expect(html).toContain("/account/help/g?from=%2Faccount%2Fclubs%2Fclub-1%2Frecords");
+  });
+  it("a guide never uses the remembered club page; only the Help index may", () => {
+    const store = new Map<string, string>([[HELP_RETURN_STORAGE_KEY, "/account/clubs/club-1/roster"]]);
+    vi.stubGlobal("window", { sessionStorage: { getItem: (key: string) => store.get(key) ?? null } });
+    try {
+      // renderToStaticMarkup uses the server snapshot, so check precedence through the source contract instead.
+      const source = read("components/help-return.tsx");
+      expect(source).toContain("(useRemembered ? stored : null)");
+      expect(source).toContain("pathname.startsWith(\"/account/help\")");
+      expect(source).toContain("removeItem(HELP_RETURN_STORAGE_KEY)");
+      expect(source).toContain("useSearchParams()");
+      expect(read("app/(public)/account/(portal)/help/[guideId]/page.tsx")).not.toContain("useRemembered");
+      expect(read("app/(public)/account/(portal)/help/page.tsx")).toContain("useRemembered");
+    } finally { vi.unstubAllGlobals(); }
   });
   it("the Help index shows Back only when a club page is known", () => {
     const hidden = renderToStaticMarkup(createElement(HelpBackLink, { fallbackHref: "/account/clubs", fallbackLabel: "", from: null, hideWithoutTarget: true }));

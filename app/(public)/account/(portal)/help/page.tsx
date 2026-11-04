@@ -35,7 +35,7 @@ export default async function PortalHelpPage({ searchParams }: { searchParams: P
       </section>
       <div className="account-page-body">
         <div className={styles.page}>
-          <HelpBackLink fallbackHref="/account/clubs" fallbackLabel="" from={from} hideWithoutTarget />
+          <HelpBackLink fallbackHref="/account/clubs" fallbackLabel="" from={from} hideWithoutTarget useRemembered />
           <div className={styles.note} role="note">
             <strong>Reading a guide is not a task completion</strong>
             <p>Reading a guide does not file a report, finish a registration, approve anything or give anyone access. Those happen on the working pages, by the people allowed to do them.</p>

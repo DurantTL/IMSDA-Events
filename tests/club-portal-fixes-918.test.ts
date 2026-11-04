@@ -281,6 +281,9 @@ describe("4 and 5. the item searches visibly narrow what they search", () => {
     expect(filterHonorsByWordPrefix(options, "polo")).toHaveLength(2);
     expect(filterHonorsByWordPrefix(options, "nk")).toHaveLength(1);
     expect(filterHonorsByWordPrefix(options, "zzz")).toHaveLength(0);
+    // The size is in the label too, so "polo m" finds the medium shirt only.
+    expect(options.map((option) => option.name)).toContain("Polo Shirt \u00b7 UN-204 \u00b7 M");
+    expect(filterHonorsByWordPrefix(options, "polo m").map((option) => option.id)).toEqual(["a"]);
   });
   it("Orders: a long catalog is not capped or paged, the search box narrows it", () => {
     const many: ClubStockRow[] = Array.from({ length: 250 }, (_, index) => ({ itemId: `i${index}`, section: "MISCELLANEOUS", name: `Patch ${index}`, catalogNumber: `P-${index}`, sizeLabel: null, isActive: true, quantityOnHand: 0 }));
