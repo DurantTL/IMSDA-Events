@@ -29,6 +29,7 @@ export default async function PublicClubFormsSettingsPage() {
       />
       <PublicClubFormsSettings
         draftDiffers={state.draftDiffers}
+        draftId={state.draftId}
         draftUpdatedAt={state.draftUpdatedAt}
         forms={publicClubFormGroups.flatMap((group) => group.items.map((item) => ({ id: item.id, name: item.name })))}
         groups={publicClubFormGroups.map((group) => ({ id: group.id, title: group.title }))}

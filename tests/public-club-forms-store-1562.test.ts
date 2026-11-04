@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the in-memory fake database receives loosely typed Prisma arguments */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@prisma/client";
 
 /** #1562: the settings store (audit rows, publish, refusals, fallback) and the two staff pages' access checks. Synthetic data only. */
 const mocks = vi.hoisted(() => ({
@@ -38,7 +39,25 @@ const fakeTable = () => ({
   delete: async ({ where }: any) => {
     rows = rows.filter((row) => row.id !== where.id);
   },
+  create: async ({ data }: any) => {
+    if (rows.some((row) => row.status === data.status)) throw uniqueViolation();
+    const row = { id: `row-${++counter}`, updatedAt: new Date(2026, 10, 3, 12, counter), ...data } as Row;
+    rows.push(row);
+    return row;
+  },
+  findUniqueOrThrow: async ({ where }: any) => rows.find((row) => row.id === where.id)!,
+  updateMany: async ({ where, data }: any) => {
+    const hit = rows.filter((row) => row.id === where.id && row.status === where.status && row.updatedAt.getTime() === where.updatedAt.getTime());
+    hit.forEach((row) => Object.assign(row, data, { updatedAt: new Date(2026, 10, 3, 12, ++counter) }));
+    return { count: hit.length };
+  },
+  deleteMany: async ({ where }: any) => {
+    const before = rows.length;
+    rows = rows.filter((row) => !(row.id === where.id && row.status === where.status && row.updatedAt.getTime() === where.updatedAt.getTime()));
+    return { count: before - rows.length };
+  },
 });
+const uniqueViolation = () => new Prisma.PrismaClientKnownRequestError("unique", { code: "P2002", clientVersion: "test" });
 const client = () => ({
   publicClubFormsSetting: fakeTable(),
   $transaction: async (run: (tx: unknown) => unknown) => {
@@ -137,6 +156,100 @@ describe("saving, publishing and discarding (#1562)", () => {
   });
 });
 
+describe("a second editor is refused instead of overwriting (#1601)", () => {
+  const stale = { code: "DRAFT_CHANGED", message: "Someone else changed this page. Reload to see their changes." };
+  const baseOf = () => ({ id: rows[0].id, updatedAt: rows[0].updatedAt.toISOString() });
+  const other = () => {
+    const changed = edited();
+    changed.intro = "A different synthetic intro.";
+    return changed;
+  };
+
+  it("saves normally when the base matches, and returns the next base", async () => {
+    const first = await savePublicClubFormsDraft(edited(), "admin-1", null);
+    expect(first.draftId).toBe(rows[0].id);
+    const second = await savePublicClubFormsDraft(other(), "admin-1", { id: first.draftId, updatedAt: first.draftUpdatedAt });
+    expect(second.draftUpdatedAt).not.toBe(first.draftUpdatedAt);
+    expect((rows[0].content as { intro: string }).intro).toBe("A different synthetic intro.");
+    expect(await getPublicClubFormsAdminState()).toMatchObject({ draftId: first.draftId, draftUpdatedAt: second.draftUpdatedAt });
+  });
+
+  it("refuses a save made from an older version and writes nothing", async () => {
+    await savePublicClubFormsDraft(edited(), "admin-1");
+    const old = baseOf();
+    await savePublicClubFormsDraft(other(), "admin-2", old);
+    mocks.writeAuditLog.mockClear();
+    const theirs = JSON.stringify(rows[0].content);
+    await expect(savePublicClubFormsDraft(edited(), "admin-1", old)).rejects.toMatchObject(stale);
+    expect(JSON.stringify(rows[0].content)).toBe(theirs);
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("refuses a save that expected no draft when one now exists, and one that expected a draft that was discarded", async () => {
+    await savePublicClubFormsDraft(edited(), "admin-2");
+    await expect(savePublicClubFormsDraft(other(), "admin-1", null)).rejects.toMatchObject(stale);
+    const old = baseOf();
+    await discardPublicClubFormsDraft("admin-2");
+    await expect(savePublicClubFormsDraft(other(), "admin-1", old)).rejects.toMatchObject(stale);
+    expect(rows).toHaveLength(0);
+  });
+
+  it("treats a racing first save (database unique violation) as a conflict", async () => {
+    mocks.getPrisma.mockImplementation(() => ({
+      publicClubFormsSetting: fakeTable(),
+      $transaction: async (run: (tx: unknown) => unknown) => run({ publicClubFormsSetting: { ...fakeTable(), create: async () => { throw uniqueViolation(); } } }),
+    }));
+    await expect(savePublicClubFormsDraft(edited(), "admin-1", null)).rejects.toMatchObject(stale);
+  });
+
+  it("refuses a save that loses the race between the read and the write", async () => {
+    await savePublicClubFormsDraft(edited(), "admin-1");
+    const old = baseOf();
+    mocks.getPrisma.mockImplementation(() => ({
+      publicClubFormsSetting: fakeTable(),
+      $transaction: async (run: (tx: unknown) => unknown) => run({ publicClubFormsSetting: { ...fakeTable(), updateMany: async () => ({ count: 0 }) } }),
+    }));
+    await expect(savePublicClubFormsDraft(other(), "admin-1", old)).rejects.toMatchObject(stale);
+  });
+
+  it("refuses publish from an older version, and publishes with the current one", async () => {
+    await savePublicClubFormsDraft(edited(), "admin-1");
+    const old = baseOf();
+    await savePublicClubFormsDraft(other(), "admin-2", old);
+    mocks.writeAuditLog.mockClear();
+    await expect(publishPublicClubFormsDraft("admin-1", old)).rejects.toMatchObject(stale);
+    expect(rows.map((row) => row.status)).toEqual(["DRAFT"]);
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+    await publishPublicClubFormsDraft("admin-1", baseOf());
+    expect(rows.map((row) => row.status)).toEqual(["PUBLISHED"]);
+  });
+
+  it("refuses publish when the draft it was made from has been discarded or published", async () => {
+    await savePublicClubFormsDraft(edited(), "admin-1");
+    const old = baseOf();
+    await discardPublicClubFormsDraft("admin-2");
+    await expect(publishPublicClubFormsDraft("admin-1", old)).rejects.toMatchObject(stale);
+  });
+
+  it("refuses discard from an older version and leaves the draft, and discards with the current one", async () => {
+    await savePublicClubFormsDraft(edited(), "admin-1");
+    const old = baseOf();
+    await savePublicClubFormsDraft(other(), "admin-2", old);
+    mocks.writeAuditLog.mockClear();
+    await expect(discardPublicClubFormsDraft("admin-1", old)).rejects.toMatchObject(stale);
+    expect(rows).toHaveLength(1);
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+    await discardPublicClubFormsDraft("admin-1", baseOf());
+    expect(rows).toHaveLength(0);
+  });
+
+  it("skips the check when a caller sends no base (older callers keep working)", async () => {
+    await savePublicClubFormsDraft(edited(), "admin-1");
+    await expect(savePublicClubFormsDraft(other(), "admin-2")).resolves.toBeTruthy();
+    await expect(publishPublicClubFormsDraft("admin-2")).resolves.toBeTruthy();
+  });
+});
+
 describe("the settings and preview pages (#1562)", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -148,7 +261,7 @@ describe("the settings and preview pages (#1562)", () => {
     vi.doMock("@/components/public-club-forms-view", () => ({ renderPublicClubForms: async () => null }));
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u1", globalRole: "USER" } });
     mocks.hasClubsAdministration.mockResolvedValue(false);
-    mocks.getState.mockResolvedValue({ content: defaultPublicClubFormsSettings(), hasDraft: true, draftUpdatedAt: "2026-11-03T12:00:00.000Z", publishedAt: null, draftDiffers: true });
+    mocks.getState.mockResolvedValue({ content: defaultPublicClubFormsSettings(), hasDraft: true, draftId: "row-1", draftUpdatedAt: "2026-11-03T12:00:00.000Z", publishedAt: null, draftDiffers: true });
     mocks.getDraft.mockResolvedValue(defaultPublicClubFormsSettings());
   });
 

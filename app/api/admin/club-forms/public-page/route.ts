@@ -2,6 +2,7 @@ import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { clubFormApiError, readClubFormJson } from "@/modules/club-forms/api-errors";
 import { discardPublicClubFormsDraft, getPublicClubFormsAdminState, savePublicClubFormsDraft } from "@/modules/club-forms/public-index-settings";
+import { readOptionalJsonObject, readPublicClubFormsBase } from "@/modules/club-forms/public-index-settings-base";
 import { requireClubsAdministration } from "@/modules/organizations/access";
 
 const noStore = { "Cache-Control": "private, no-store, max-age=0" };
@@ -22,7 +23,10 @@ async function putHandler(request: Request) {
   if (originError) return originError;
   try {
     const admin = await requireClubsAdministration();
-    return Response.json(await savePublicClubFormsDraft(await readClubFormJson(request), admin.id), { headers: noStore });
+    // The body is the settings plus the optional `base` (the draft version the editor started from, #1601).
+    const body = await readClubFormJson(request);
+    const base = body && typeof body === "object" && !Array.isArray(body) ? readPublicClubFormsBase(body as Record<string, unknown>) : undefined;
+    return Response.json(await savePublicClubFormsDraft(body, admin.id, base), { headers: noStore });
   } catch (error) {
     return clubFormApiError(error, "Saving the public club forms draft");
   }
@@ -33,7 +37,7 @@ async function deleteHandler(request: Request) {
   if (originError) return originError;
   try {
     const admin = await requireClubsAdministration();
-    await discardPublicClubFormsDraft(admin.id);
+    await discardPublicClubFormsDraft(admin.id, readPublicClubFormsBase(await readOptionalJsonObject(request)));
     return Response.json({ discarded: true }, { headers: noStore });
   } catch (error) {
     return clubFormApiError(error, "Discarding the public club forms draft");

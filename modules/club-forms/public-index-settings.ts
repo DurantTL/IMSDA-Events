@@ -20,6 +20,27 @@ import {
  * audited. The caller has passed `requireClubsAdministration`; nothing here checks who is asking.
  */
 
+/**
+ * What the editor last saw of the draft: its id and `updatedAt` (as returned by the state read or a save), or null for
+ * "there was no draft". A save, publish or discard carrying it is refused with 409 when the draft has since changed, so
+ * two editors cannot silently overwrite each other. Omitted (undefined) by callers that do not track it, which skips
+ * the check, as the homepage editor does (#1601).
+ */
+export type PublicClubFormsDraftBase = { id: string; updatedAt: string } | null;
+
+export const staleMessage = "Someone else changed this page. Reload to see their changes.";
+const staleDraft = () => new ClubFormError("DRAFT_CHANGED", staleMessage);
+
+function matchesBase(draft: { id: string; updatedAt: Date } | null, base: PublicClubFormsDraftBase | undefined) {
+  if (base === undefined) return true;
+  if (base === null) return draft === null;
+  return draft !== null && draft.id === base.id && draft.updatedAt.toISOString() === base.updatedAt;
+}
+
+function isUniqueViolation(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
 const asJson = (content: PublicClubFormsSettings) => content as unknown as Prisma.InputJsonValue;
 
 export function validatePublicClubFormsSettings(input: unknown): PublicClubFormsSettings {
@@ -52,6 +73,8 @@ export type PublicClubFormsAdminState = {
   /** What the editor starts from, complete: the draft, else the published settings, else today's page. */
   content: PublicClubFormsSettings;
   hasDraft: boolean;
+  /** With `draftUpdatedAt`, the version the editor sends back as `base`. */
+  draftId: string | null;
   draftUpdatedAt: string | null;
   publishedAt: string | null;
   /** Whether the draft differs from what is live (or from today's built-in page when nothing is published). */
@@ -67,48 +90,74 @@ export async function getPublicClubFormsAdminState(): Promise<PublicClubFormsAdm
   return {
     content: completePublicClubFormsSettings(draft ?? published),
     hasDraft: Boolean(draftRow),
+    draftId: draftRow ? draftRow.id : null,
     draftUpdatedAt: draftRow ? draftRow.updatedAt.toISOString() : null,
     publishedAt: publishedRow ? publishedRow.updatedAt.toISOString() : null,
     draftDiffers: draft ? changedPublicClubFormsKeys(published, draft).length > 0 : false,
   };
 }
 
-/** Saves the working draft and audits it. Saving never changes what visitors see. */
-export async function savePublicClubFormsDraft(input: unknown, actorUserId: string) {
+/**
+ * Saves the working draft and audits it. Saving never changes what visitors see. The row is only changed while it is
+ * still the draft and unchanged since it was read, so another save or a publish in between is a 409, not a lost update.
+ */
+export async function savePublicClubFormsDraft(input: unknown, actorUserId: string, base?: PublicClubFormsDraftBase) {
   const content = completePublicClubFormsSettings(validatePublicClubFormsSettings(input));
-  return getPrisma().$transaction(async (tx) => {
-    const live = await tx.publicClubFormsSetting.findUnique({ where: { status: "PUBLISHED" }, select: { content: true } });
-    const row = await tx.publicClubFormsSetting.upsert({
-      where: { status: "DRAFT" },
-      create: { status: "DRAFT", content: asJson(content), updatedByUserId: actorUserId },
-      update: { content: asJson(content), updatedByUserId: actorUserId },
+  try {
+    return await getPrisma().$transaction(async (tx) => {
+      const live = await tx.publicClubFormsSetting.findUnique({ where: { status: "PUBLISHED" }, select: { content: true } });
+      const existing = await tx.publicClubFormsSetting.findUnique({ where: { status: "DRAFT" }, select: { id: true, updatedAt: true } });
+      if (!matchesBase(existing, base)) throw staleDraft();
+      let id: string;
+      if (existing) {
+        const changed = await tx.publicClubFormsSetting.updateMany({
+          where: { id: existing.id, status: "DRAFT", updatedAt: existing.updatedAt },
+          data: { content: asJson(content), updatedByUserId: actorUserId },
+        });
+        if (changed.count !== 1) throw staleDraft();
+        id = existing.id;
+      } else {
+        id = (await tx.publicClubFormsSetting.create({ data: { status: "DRAFT", content: asJson(content), updatedByUserId: actorUserId } })).id;
+      }
+      const row = await tx.publicClubFormsSetting.findUniqueOrThrow({ where: { id } });
+      await writeAuditLog({
+        actorUserId,
+        action: "PUBLIC_CLUB_FORMS_DRAFT_SAVED",
+        entityType: "PublicClubFormsSetting",
+        entityId: row.id,
+        summary: "Saved the public Club forms page draft.",
+        metadata: { changedKeys: changedPublicClubFormsKeys(live ? parsePublicClubFormsSettings(live.content) : null, content) },
+      }, tx);
+      return { draftId: row.id, draftUpdatedAt: row.updatedAt.toISOString() };
     });
-    await writeAuditLog({
-      actorUserId,
-      action: "PUBLIC_CLUB_FORMS_DRAFT_SAVED",
-      entityType: "PublicClubFormsSetting",
-      entityId: row.id,
-      summary: "Saved the public Club forms page draft.",
-      metadata: { changedKeys: changedPublicClubFormsKeys(live ? parsePublicClubFormsSettings(live.content) : null, content) },
-    }, tx);
-    return { draftUpdatedAt: row.updatedAt.toISOString() };
-  });
+  } catch (error) {
+    // A second first save at the same moment: the database allows one draft only.
+    if (isUniqueViolation(error)) throw staleDraft();
+    throw error;
+  }
 }
 
 /** Publishes the draft: it becomes the one PUBLISHED version and the draft is cleared, in one transaction. */
-export async function publishPublicClubFormsDraft(actorUserId: string) {
+export async function publishPublicClubFormsDraft(actorUserId: string, base?: PublicClubFormsDraftBase) {
   return getPrisma().$transaction(async (tx) => {
     const draft = await tx.publicClubFormsSetting.findUnique({ where: { status: "DRAFT" } });
-    if (!draft) throw new ClubFormError("VALIDATION_FAILED", "There is no draft to publish. Save a draft first.");
+    if (!draft) {
+      if (base) throw staleDraft();
+      throw new ClubFormError("VALIDATION_FAILED", "There is no draft to publish. Save a draft first.");
+    }
+    if (!matchesBase(draft, base)) throw staleDraft();
     const content = parsePublicClubFormsSettings(draft.content);
     if (!content) throw new ClubFormError("VALIDATION_FAILED", "The draft no longer fits the rules. Fix it and save again before publishing.");
+    // Claim the draft first, conditional on it being unchanged since it was read: a save or a second publish at the
+    // same moment changes nothing and reports a conflict, so what goes live is exactly what the audit row describes.
+    const claimed = await tx.publicClubFormsSetting.deleteMany({ where: { id: draft.id, status: "DRAFT", updatedAt: draft.updatedAt } });
+    if (claimed.count !== 1) throw staleDraft();
     const previous = await tx.publicClubFormsSetting.findUnique({ where: { status: "PUBLISHED" }, select: { content: true } });
     const row = await tx.publicClubFormsSetting.upsert({
       where: { status: "PUBLISHED" },
       create: { status: "PUBLISHED", content: asJson(content), updatedByUserId: actorUserId },
       update: { content: asJson(content), updatedByUserId: actorUserId },
     });
-    await tx.publicClubFormsSetting.delete({ where: { id: draft.id } });
     await writeAuditLog({
       actorUserId,
       action: "PUBLIC_CLUB_FORMS_PUBLISHED",
@@ -121,12 +170,17 @@ export async function publishPublicClubFormsDraft(actorUserId: string) {
   });
 }
 
-/** Throws the working draft away; the published settings are untouched. */
-export async function discardPublicClubFormsDraft(actorUserId: string) {
+/** Throws the working draft away; the published settings are untouched. Only a draft unchanged since it was read is deleted. */
+export async function discardPublicClubFormsDraft(actorUserId: string, base?: PublicClubFormsDraftBase) {
   await getPrisma().$transaction(async (tx) => {
-    const draft = await tx.publicClubFormsSetting.findUnique({ where: { status: "DRAFT" }, select: { id: true } });
-    if (!draft) throw new ClubFormError("VALIDATION_FAILED", "There is no draft to discard.");
-    await tx.publicClubFormsSetting.delete({ where: { id: draft.id } });
+    const draft = await tx.publicClubFormsSetting.findUnique({ where: { status: "DRAFT" }, select: { id: true, updatedAt: true } });
+    if (!draft) {
+      if (base) throw staleDraft();
+      throw new ClubFormError("VALIDATION_FAILED", "There is no draft to discard.");
+    }
+    if (!matchesBase(draft, base)) throw staleDraft();
+    const removed = await tx.publicClubFormsSetting.deleteMany({ where: { id: draft.id, status: "DRAFT", updatedAt: draft.updatedAt } });
+    if (removed.count !== 1) throw staleDraft();
     await writeAuditLog({
       actorUserId,
       action: "PUBLIC_CLUB_FORMS_DRAFT_DISCARDED",
