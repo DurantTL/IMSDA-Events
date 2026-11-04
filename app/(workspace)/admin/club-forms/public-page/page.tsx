@@ -34,7 +34,6 @@ export default async function PublicClubFormsSettingsPage() {
         groups={publicClubFormGroups.map((group) => ({ id: group.id, title: group.title }))}
         hasDraft={state.hasDraft}
         initial={state.content}
-        key={`${state.draftUpdatedAt}|${state.publishedAt}`}
         publishedAt={state.publishedAt}
       />
     </section>

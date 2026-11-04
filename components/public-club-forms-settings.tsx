@@ -37,15 +37,26 @@ async function send(url: string, method: string, body?: unknown): Promise<Record
   return result;
 }
 
-/** Which forms the public Club forms page lists, in what group and order, with what line, plus its intro (#1562). */
-export function PublicClubFormsSettings({ initial, forms, groups, hasDraft, draftUpdatedAt, publishedAt, draftDiffers }: Props) {
+/** Changes after a save, publish or discard refresh, so the editor starts again from what is stored. */
+export const editorResetKey = (draftUpdatedAt: string | null, publishedAt: string | null) => `${draftUpdatedAt}|${publishedAt}`;
+
+/**
+ * Which forms the public Club forms page lists, in what group and order, with what line, plus its intro (#1562). The
+ * editor is remounted from the stored values after every refresh (so a discard shows the stored page again); the
+ * confirmation message lives out here so it survives that remount.
+ */
+export function PublicClubFormsSettings(props: Props) {
+  const [message, setMessage] = useState("");
+  return <Editor {...props} key={editorResetKey(props.draftUpdatedAt, props.publishedAt)} message={message} setMessage={setMessage} />;
+}
+
+function Editor({ initial, forms, groups, hasDraft, draftUpdatedAt, publishedAt, draftDiffers, message, setMessage }: Props & { message: string; setMessage: (message: string) => void }) {
   const router = useRouter();
   const { confirm, confirmDialog } = useConfirm();
   const [intro, setIntro] = useState(initial.intro);
   const [items, setItems] = useState<PublicClubFormSettingItem[]>(initial.items);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const names = new Map(forms.map((form) => [form.id, form.name]));

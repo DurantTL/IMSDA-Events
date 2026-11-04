@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the in-memory fake database receives loosely typed Prisma arguments */
-import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** #1562: the settings store (audit rows, publish, refusals, fallback) and the two staff pages' access checks. Synthetic data only. */
@@ -168,24 +167,15 @@ describe("the settings and preview pages (#1562)", () => {
     await expect(settings()).rejects.toThrow("REDIRECT /staff/sign-in");
   });
 
-  it("keys the editor on the draft and published times, so a discard or publish resets what it shows", async () => {
-    mocks.hasClubsAdministration.mockResolvedValue(true);
-    const settings = (await import("@/app/(workspace)/admin/club-forms/public-page/page")).default;
-    const find = (node: unknown): ReactElement | null => {
-      if (!isValidElement(node)) return null;
-      const element = node as ReactElement<{ children?: unknown }>;
-      if (element.props && "hasDraft" in (element.props as object)) return element;
-      for (const child of Children.toArray(element.props?.children as ReactNode)) {
-        const found = find(child);
-        if (found) return found;
-      }
-      return null;
-    };
-    const first = find(await settings())!;
-    mocks.getState.mockResolvedValue({ content: defaultPublicClubFormsSettings(), hasDraft: false, draftUpdatedAt: null, publishedAt: null, draftDiffers: false });
-    const afterDiscard = find(await settings())!;
-    expect(first.key).toBeTruthy();
-    expect(afterDiscard.key).not.toBe(first.key);
+  it("resets the editor when the stored draft or published time changes, e.g. after a discard", async () => {
+    const { editorResetKey } = await import("@/components/public-club-forms-settings");
+    expect(editorResetKey("2026-11-03T12:00:00.000Z", null)).not.toBe(editorResetKey(null, null));
+    expect(editorResetKey(null, "2026-11-03T13:00:00.000Z")).not.toBe(editorResetKey(null, null));
+    // The confirmation message is held outside the keyed editor so it survives the remount.
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("components/public-club-forms-settings.tsx", "utf8");
+    expect(source).toMatch(/<Editor \{\.\.\.props\} key=\{editorResetKey\(/);
+    expect(source).toMatch(/export function PublicClubFormsSettings[\s\S]*?useState\(""\)[\s\S]*?function Editor/);
   });
 
   it("shows the preview to a Clubs administrator with a draft", async () => {
