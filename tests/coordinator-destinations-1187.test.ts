@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Coordinator workspace B (#1187): Monthly Records, Points, Club events, Team
@@ -323,6 +323,9 @@ describe("Team approvals page (#1187)", () => {
 });
 
 describe("New clubs page (#1187)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   const application = {
     id: "app-1", clubName: "Sample Valley Pathfinders", clubType: "PATHFINDER", status: "PENDING",
     church: { name: "Sample Valley Church", type: "CHURCH", isOther: false, unavailable: false, needsChoice: false },
@@ -375,7 +378,6 @@ describe("New clubs page (#1187)", () => {
     // Staff view is unchanged: no collapsing.
     const staff = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [cancelled("app-2", "Recent Cancelled Club", "2026-10-06T12:00:00Z")], canDecide: true, churches: [] }));
     expect(staff).not.toContain("<details");
-    vi.useRealTimers();
   });
 
   it("shows the empty state when every application has aged off (#1554)", async () => {
@@ -384,7 +386,6 @@ describe("New clubs page (#1187)", () => {
     mocks.listNewClubApplications.mockResolvedValue([{ ...application, status: "DECLINED", decidedAt: "2026-09-01T12:00:00Z" }]);
     const html = renderToStaticMarkup(await NewClubsPage());
     expect(html).toContain("No new club applications yet");
-    vi.useRealTimers();
   });
 
   it("shows unavailable, never no applications, when the read fails", async () => {
