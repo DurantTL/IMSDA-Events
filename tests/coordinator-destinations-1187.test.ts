@@ -373,8 +373,10 @@ describe("New clubs page (#1187)", () => {
 
 describe("coordinator destination layout (#1187 phone audit)", () => {
   const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
-  it("keeps each event's date line below its heading, not pulled up under it", () => {
-    expect(css).toContain(".coordinator-event-head .field-help { margin: 4px 0 0; }");
+  it("keeps each event's date line in the summary, below its heading", () => {
+    const moduleCss = readFileSync(join(process.cwd(), "components/coordinator-destinations.module.css"), "utf8");
+    expect(moduleCss).toContain(".summaryMeta");
+    expect(css).not.toContain(".coordinator-event-head .field-help");
   });
   it("gives every record link a 44px by 44px target", () => {
     expect(css).toMatch(/\.coordinator-record-links a[^{]*\{[^}]*min-height: 44px; min-width: 44px;/);
