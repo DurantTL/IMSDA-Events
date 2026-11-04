@@ -346,4 +346,12 @@ describe("honors with no catalog item on the order list (#1330)", () => {
     const noOptions = renderToStaticMarkup(createElement(ClubOrderWorkspace, { organizationId: "club-1", initial: withHonors, stock, readOnly: false }));
     expect(noOptions).not.toContain("Add to list: Orienteering");
   });
+
+  it("says why there is nothing to add instead of an empty search box (#1553)", () => {
+    const empty = { ...data, lines: [], orderableHonors: [] };
+    const noCatalog = renderToStaticMarkup(createElement(ClubOrderWorkspace, { organizationId: "club-1", initial: empty, stock: [], readOnly: false }));
+    expect(noCatalog).not.toContain("Search honors and items");
+    expect(noCatalog).toContain("No supply items are loaded yet. Conference staff add them to the supply catalog.");
+    expect(render(false)).toContain("Search honors and items");
+  });
 });

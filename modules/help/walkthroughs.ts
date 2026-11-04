@@ -179,7 +179,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     keywords: ["orders", "order list", "supplies", "stock", "on hand", "add an item", "catalog", "adventsource", "step by step", "walkthrough", "screenshots"],
     sourceFiles: [`${CLUB}/orders/page.tsx`, "components/club-order-workspace.tsx", "components/club-orders.module.css", ...SHELL, "components/club-supply-stock-workspace.tsx", "components/club-uniform-section.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
-      { id: "open-orders", text: "Open Orders. Under Add an item, pick an item.", alt: "The Orders page with the Item choice under Add an item marked." },
+      { id: "open-orders", text: "Open Orders. Under Add an item, pick an item.", alt: "The Orders page with the item search box under Add an item marked." },
       { id: "add-item", text: "Choose Add to list.", alt: "The Add an item form with an item picked and the Add to list button marked." },
       { id: "on-list", text: "The item is now on Your order list. You can change its quantity there.", alt: "Your order list showing the item that was added." },
       { id: "stock", text: "Under Inventory, type how many you have on hand. Then choose Save.", alt: "The Inventory list with a count box and Save button marked." },

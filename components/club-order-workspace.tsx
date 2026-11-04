@@ -704,6 +704,10 @@ export function ClubOrderWorkspace({
         {!readOnly && (
           <div className={styles.group}>
             <div className={styles.groupHead}><strong>Add an item</strong></div>
+            {pickerItems.length === 0 ? (
+              // Nothing left to pick (#1553): say why instead of an empty search box.
+              <p className={`field-help ${styles.helpText}`}>{stock.some((row) => row.isActive) ? "Every item and honor is already on your list." : "No supply items are loaded yet. Conference staff add them to the supply catalog."}</p>
+            ) : (
             <div className={styles.pickerRow}>
               <div className={styles.pickerField}>
                 <HonorCombobox
@@ -724,6 +728,7 @@ export function ClubOrderWorkspace({
                 <Plus aria-hidden="true" size={14} /> Add to list
               </button>
             </div>
+            )}
             <p className={`field-help ${styles.helpText}`}>Honors with no catalog item can be added too; they are marked as ordered from AdventSource separately and have no item number. If an honor is missing, conference staff can link it in the supply catalog.</p>
           </div>
         )}
