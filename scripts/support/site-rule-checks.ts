@@ -48,14 +48,15 @@ export const AREA_ROLLUP_WORDS = ["Registered", "Not registered"];
 const L4_FLAGS = ["Missing", "Late", "To review", "No director", "No roster yet"];
 /**
  * Chips that use the shared look but are not the status of a record (decided in #1439): a person's role in the club
- * (Director, Deputy, Registrar, Reporter) and the Sterling Volunteers background-check state of a roster person.
+ * (Director, Deputy, Registrar, Reporter), the Sterling Volunteers background-check state of a roster person, and an
+ * Area Coordinator's access to a club in Clubs at a glance ("Your club", "View only"; approved mockup, #1551).
  */
 /**
  * Chips about whether something can be done, not about a record: an event's registration window, and a yearly form's
  * "Done" next to its "Missing" (the L4 flag).
  */
 const AVAILABILITY_WORDS = ["Open", "Closed", "Registration opens soon", "Registration closed", "Not open for clubs yet", "Done"];
-const NOT_A_RECORD_STATUS = [...Object.values(clubDirectorRoleLabels), "Clear", "Not in compliance", "No record", "No record yet"];
+const NOT_A_RECORD_STATUS = [...Object.values(clubDirectorRoleLabels), "Clear", "Not in compliance", "No record", "No record yet", "Your club", "View only"];
 
 export const clean = (text: string) => text.replace(/\[es\]\s*/g, "").replace(/\s+/g, " ").trim();
 
