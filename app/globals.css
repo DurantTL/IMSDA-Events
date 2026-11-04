@@ -10311,7 +10311,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-roster-tools:has(.honor-combobox) > .honor-name-search { flex: 1 1 220px; }
 .club-roster-tools:has(.honor-combobox) > .honor-combobox { flex: 1 1 220px; }
 .honor-combobox-list li { padding: 8px 10px; border-radius: 8px; cursor: pointer; overflow-wrap: anywhere; }
-.honor-combobox-list li.active, .honor-combobox-list li:hover { background: var(--panel-tint, #eef4f6); }
+.honor-combobox-list li.active, .honor-combobox-list li:not([aria-disabled="true"]):hover { background: var(--panel-tint, #eef4f6); }
 .honor-combobox-list li[aria-selected="true"] { outline: 2px solid var(--imsda-purple, #5b3a8c); outline-offset: -2px; }
 .honor-combobox-list .honor-combobox-empty { cursor: default; color: var(--muted); }
 @media (max-width: 640px), (pointer: coarse) { .honor-combobox-list li { min-height: 44px; display: flex; align-items: center; } }

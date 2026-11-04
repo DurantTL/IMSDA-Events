@@ -1,0 +1,10 @@
+/* A choice that is listed but cannot be picked (#1600): greyed, with its reason after the name. */
+.unavailable {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.detail {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}

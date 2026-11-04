@@ -4,9 +4,30 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "re
 import { Search } from "lucide-react";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { visibleBottomBarTop } from "@/components/fixed-bottom-bars";
+import styles from "@/components/honor-combobox.module.css";
 import { comboboxKeyResult, comboboxPopoverPlacement, filterHonorsByWordPrefix, type ComboboxPlacement } from "@/modules/honors/honor-search";
 
-export type HonorComboboxOption = { id: string; name: string };
+export type HonorComboboxOption = {
+  id: string;
+  name: string;
+  /** Short text shown after the name (for example the seats left). Not searched. */
+  detail?: string;
+  /**
+   * Lists the choice but does not let it be picked (#1600): greyed, with this short reason ("Full"), `aria-disabled`,
+   * skipped by the arrow keys, ignored by click and Enter.
+   */
+  unavailableReason?: string;
+};
+
+const isUnavailable = (choice: HonorComboboxOption | undefined) => Boolean(choice?.unavailableReason);
+
+/** The index of the nearest pickable choice from `from`, stepping by `step` and wrapping; `from` itself when none can be picked. */
+function nextPickable(choices: readonly HonorComboboxOption[], from: number, step: 1 | -1) {
+  for (let tried = 0, index = from; tried < choices.length; tried += 1, index = (index + step + choices.length) % choices.length) {
+    if (!isUnavailable(choices[index])) return index;
+  }
+  return from;
+}
 
 /** The visible box the list may use: the window, narrowed by the keyboard and by any scrolling or clipping parent (a dialog). */
 function visibleBounds(from: HTMLElement) {
@@ -46,6 +67,7 @@ export function HonorCombobox({
   name,
   required = false,
   describedBy,
+  disabled = false,
   placeholder,
   noun = "honor",
   nounPlural = `${noun}s`,
@@ -58,6 +80,7 @@ export function HonorCombobox({
   name?: string;
   required?: boolean;
   describedBy?: string;
+  disabled?: boolean;
   placeholder?: string;
   /** What is being chosen, in the words the page uses. Honors by default; the class tracking page passes "class" (#827). */
   noun?: string;
@@ -83,7 +106,10 @@ export function HonorCombobox({
     () => (allLabel !== undefined && query.trim() === "" ? [{ id: "", name: allLabel }, ...matches] : [...matches]),
     [allLabel, matches, query],
   );
-  const safeActive = Math.min(active, Math.max(choices.length - 1, 0));
+  // The highlighted choice is always one that can be picked; if none can, it stays where it is and Enter does nothing.
+  const clampedActive = Math.min(active, Math.max(choices.length - 1, 0));
+  const safeActive = nextPickable(choices, clampedActive, 1);
+  const activeIsPickable = choices.length > 0 && !isUnavailable(choices[safeActive]);
 
   // Place the floating list each time it opens or its matches change, and again if the window,
   // the on-screen keyboard or any scrolling box moves the field.
@@ -139,7 +165,7 @@ export function HonorCombobox({
   }, [open, safeActive, baseId]);
 
   function choose(choice: HonorComboboxOption | undefined) {
-    if (!choice) return;
+    if (!choice || isUnavailable(choice)) return;
     onChange(choice.id);
     setTyped(null);
     setOpen(false);
@@ -160,7 +186,9 @@ export function HonorCombobox({
     if (result.choose) { choose(choices[result.active]); return; }
     if (!result.open && event.key === "Tab") { close(); return; }
     setOpen(result.open);
-    setActive(result.active);
+    // Arrow keys skip choices that are listed but unavailable.
+    const step = event.key === "ArrowUp" ? -1 : 1;
+    setActive(event.key === "ArrowDown" || event.key === "ArrowUp" ? nextPickable(choices, result.active, step) : result.active);
     if (!result.open && event.key === "Escape" && result.handled) setTyped(null);
   }
 
@@ -170,12 +198,13 @@ export function HonorCombobox({
       <div className="search-field" onMouseDown={focusSearchInput} ref={fieldRef}>
       <Search aria-hidden="true" size={16} />
       <input
-        aria-activedescendant={open && choices.length > 0 ? optionId(safeActive) : undefined}
+        aria-activedescendant={open && activeIsPickable ? optionId(safeActive) : undefined}
         aria-autocomplete="list"
         aria-controls={listId}
         aria-describedby={describedBy}
         aria-expanded={open}
         autoComplete="off"
+        disabled={disabled}
         id={`${baseId}-input`}
         ref={inputRef}
         onBlur={close}
@@ -207,19 +236,26 @@ export function HonorCombobox({
         role="listbox"
         style={placement.side === "above" ? { maxHeight: placement.maxHeight, top: "auto", bottom: placement.lift } : { maxHeight: placement.maxHeight }}
       >
-        {choices.map((choice, index) => (
-          <li
-            aria-selected={index === safeActive}
-            className={index === safeActive ? "active" : undefined}
-            id={optionId(index)}
-            key={choice.id || "all"}
-            // mousedown, not click: the input's blur would otherwise close the list first.
-            onMouseDown={(event) => { event.preventDefault(); choose(choice); }}
-            role="option"
-          >
-            {choice.name}
-          </li>
-        ))}
+        {choices.map((choice, index) => {
+          const unavailable = isUnavailable(choice);
+          return (
+            <li
+              aria-disabled={unavailable ? "true" : undefined}
+              aria-selected={!unavailable && index === safeActive}
+              className={[!unavailable && index === safeActive ? "active" : "", unavailable ? styles.unavailable : ""].filter(Boolean).join(" ") || undefined}
+              id={optionId(index)}
+              key={choice.id || "all"}
+              // mousedown, not click: the input's blur would otherwise close the list first. An unavailable choice only keeps focus in the input.
+              onMouseDown={(event) => { event.preventDefault(); choose(choice); }}
+              role="option"
+            >
+              {choice.name}
+              {(choice.unavailableReason ?? choice.detail) && (
+                <span className={styles.detail}>{" "}({choice.unavailableReason ?? choice.detail})</span>
+              )}
+            </li>
+          );
+        })}
         {choices.length === 0 && <li className="honor-combobox-empty" role="presentation">No {noun} matches</li>}
       </ul>
       <span aria-live="polite" className="sr-only" role="status">
