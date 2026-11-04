@@ -1,5 +1,5 @@
-import { ExportLink } from "@/components/export-link";
 import { ListPager } from "@/components/list-pager";
+import { ExportLink } from "@/components/export-link";
 import { ColumnHeader } from "@/components/column-header";
 import { ExactValue } from "@/components/exact-value";
 import { NavigationLink as Link } from "@/components/navigation-link";
@@ -13,6 +13,7 @@ import { buildCoordinatorChecklist, COORDINATOR_CHECKLIST_GUIDE_HREF } from "@/m
 import { CoordinatorRetryButton } from "@/components/coordinator-retry-button";
 import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
+import styles from "./coordinator-clubs-glance.module.css";
 import { sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
 import type { CoordinatorGlanceSortColumn } from "@/modules/club-reports/area-table-sort";
 import type { AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
@@ -130,8 +131,9 @@ export function CoordinatorHelp() {
 }
 
 /**
- * Club-name search, "N of M clubs shown" and the table. The search narrows this
- * table only; the CSV above it is the full year for every available club.
+ * The one club list (#1551): search by club, church or city, "N of M clubs shown" and the table. Each club name
+ * links to the same place as its open button: a club the coordinator directs opens normally, any other club opens
+ * view only. The search narrows this table only; the CSV above it is the full year for every available club.
  */
 export function CoordinatorClubsAtAGlance({
   clubs,
@@ -139,13 +141,17 @@ export function CoordinatorClubsAtAGlance({
   query,
   now = new Date(),
   sorting,
+  ownClubIds = [],
 }: {
   clubs: AreaClubSummary[];
   overview: CoordinatorOverview;
   query: string;
   now?: Date;
   sorting?: ServerSort<CoordinatorGlanceSortColumn>;
+  /** Clubs the viewer directs. Only these open normally; the link is navigation, never authority (the pages check). */
+  ownClubIds?: readonly string[];
 }) {
+  const own = new Set(ownClubIds);
   // Sorting only reorders the clubs the search already narrowed to (#1458).
   const accessors: Record<CoordinatorGlanceSortColumn, (club: AreaClubSummary) => SortValue> = {
     club: (club) => club.name,
@@ -159,7 +165,7 @@ export function CoordinatorClubsAtAGlance({
   const sortWords: Record<CoordinatorGlanceSortColumn, string> = { club: "club name", roster: "roster", adults: "adults and staff", record: `${overview.monthLabel} record`, sterling: "Sterling Volunteers not in compliance" };
   const clearHref = `/account/area-clubs/overview?year=${encodeURIComponent(overview.clubYear)}`;
   return (
-    <section aria-labelledby="coordinator-clubs-title" className="coordinator-clubs">
+    <section aria-labelledby="coordinator-clubs-title" className="coordinator-clubs" id="clubs-at-a-glance">
       <h3 id="coordinator-clubs-title">Clubs at a glance</h3>
       <div className="coordinator-export">
         <div className="intro-actions">
@@ -179,11 +185,11 @@ export function CoordinatorClubsAtAGlance({
         </>
       ) : (
         <>
-          <AreaClubSearch basePath="/account/area-clubs/overview" clubYear={overview.clubYear} label="Search clubs by name" query={query} shown={shown.length} total={clubs.length} />
-          <ListPager label="Clubs shown" noun="clubs" nounOne="club" slice={{ from: shown.length === 0 ? 0 : 1, to: shown.length, total: shown.length, page: 1, pageCount: 1 }} />
+          <AreaClubSearch basePath="/account/area-clubs/overview" clubYear={overview.clubYear} label="Search clubs" placeholder="Club, church or city" query={query} shown={shown.length} total={clubs.length} />
+          <ListPager announce={false} label="Clubs shown" noun="clubs" nounOne="club" slice={{ from: shown.length === 0 ? 0 : 1, to: shown.length, total: shown.length, page: 1, pageCount: 1 }} />
           {shown.length === 0 ? (
             <p className="report-empty">
-              No club name matches “{query}”.{" "}
+              No club name, church or city matches “{query}”.{" "}
               <Link className="text-button" href={clearHref}>Clear filters</Link>
             </p>
           ) : (
@@ -204,10 +210,15 @@ export function CoordinatorClubsAtAGlance({
                 <tbody role="rowgroup">
                   {shown.map((club) => {
                     const record = clubRecordStatus(club, overview.month, now);
+                    const mine = own.has(club.id);
+                    const href = mine ? `/account/clubs/${encodeURIComponent(club.id)}` : `/account/area/${encodeURIComponent(club.id)}`;
                     return (
                       <tr key={club.id} role="row">
                         <th className="coordinator-club-cell" role="rowheader" scope="row">
-                          <span translate="no">{club.name}</span>
+                          <span className={styles.name}>
+                            <Link className={styles.nameLink} href={href} prefetch={false} translate="no">{club.name}</Link>
+                            <span className={`status-chip ${mine ? "green" : "neutral"}`}>{mine ? "Your club" : "View only"}</span>
+                          </span>
                           {club.church && <small translate="no">{club.church}</small>}
                           <small>Director: {club.directors.length > 0 ? <ExactValue>{club.directors.join(", ")}</ExactValue> : "none listed"}</small>
                         </th>
@@ -220,9 +231,9 @@ export function CoordinatorClubsAtAGlance({
                           {/* Counts only: who and why stay with the club (#479). */}
                           {club.backgroundChecks.notInCompliance} not in compliance · {club.backgroundChecks.expiringSoon} expiring soon · {club.backgroundChecks.missing} missing
                         </td>
-                        <td {...cardCell("Open club")}>
-                          <Link className="secondary-button" href={`/account/area/${club.id}`}>
-                            Open club<span className="sr-only">: {club.name}</span>
+                        <td {...cardCell(null)} className={styles.open}>
+                          <Link className={mine ? "primary-button" : "secondary-button"} href={href} prefetch={false}>
+                            {mine ? "Open my club" : "Open club"}<span className="sr-only">: {club.name}</span>
                           </Link>
                         </td>
                       </tr>
@@ -239,7 +250,7 @@ export function CoordinatorClubsAtAGlance({
 }
 
 /** The whole Overview body for either outcome of the read. */
-export function CoordinatorOverviewBody({ data, query, now = new Date(), sorting }: { data: CoordinatorOverviewData; query: string; now?: Date; sorting?: ServerSort<CoordinatorGlanceSortColumn> }) {
+export function CoordinatorOverviewBody({ data, query, now = new Date(), sorting, ownClubIds = [] }: { data: CoordinatorOverviewData; query: string; now?: Date; sorting?: ServerSort<CoordinatorGlanceSortColumn>; ownClubIds?: readonly string[] }) {
   if (data.status === "unavailable") return <CoordinatorUnavailable />;
   const { clubs, overview } = data;
   // Both come from the club rows above, so neither can show a club the table does not (#1435).
@@ -270,7 +281,7 @@ export function CoordinatorOverviewBody({ data, query, now = new Date(), sorting
       <CoordinatorSummary overview={overview} />
       <CoordinatorWhosMissing clubCount={clubs.length} monthLabel={overview.monthLabel} query={query} rows={shownMissing} totalMissing={missing.length} />
       <div className="coordinator-overview-layout">
-        <CoordinatorClubsAtAGlance clubs={clubs} now={now} overview={overview} query={query} sorting={sorting} />
+        <CoordinatorClubsAtAGlance clubs={clubs} now={now} overview={overview} ownClubIds={ownClubIds} query={query} sorting={sorting} />
         <div className="coordinator-overview-side">
           <CoordinatorFollowUp clubYear={overview.clubYear} overview={overview} query={query} />
           <CoordinatorHelp />

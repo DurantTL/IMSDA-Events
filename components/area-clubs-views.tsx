@@ -62,7 +62,7 @@ function NoClubs({ query }: { query?: string }) {
  * are carried along. The page filters on the server with `filterClubsByName`.
  * The form itself is a small client component (#1013) so typing filters live.
  */
-export function AreaClubSearch({ label = "Search clubs by name", ...props }: { basePath: string; clubYear?: string; query: string; sort?: LeaderboardSort; shown: number; total: number; label?: string }) {
+export function AreaClubSearch({ label = "Search clubs by name", ...props }: { basePath: string; clubYear?: string; query: string; sort?: LeaderboardSort; shown: number; total: number; label?: string; placeholder?: string }) {
   return <AreaClubSearchForm {...props} label={label} />;
 }
 

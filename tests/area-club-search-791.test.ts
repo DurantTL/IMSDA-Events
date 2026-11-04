@@ -24,6 +24,7 @@ vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAtten
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: async () => [] }));
+vi.mock("@/modules/organizations/own-directed-club-ids", () => ({ currentOwnDirectedClubIds: async () => [] }));
 // Which clubs haven't started next year's roster (#414) has its own tests; this page test is about the search box.
 vi.mock("@/modules/club-rosters/carry-forward", () => ({ listClubsNewYearStatus: async () => null }));
 vi.mock("@/modules/club-reports/area-summary-repository", () => ({
@@ -142,7 +143,7 @@ describe.each([
 
   it("says so when no club matches", async () => {
     const out = await html(Page, { q: "nothing here" });
-    expect(out).toContain("No club name matches");
+    expect(out).toContain(name === "overview" ? "No club name, church or city matches" : "No club name matches");
   });
 });
 

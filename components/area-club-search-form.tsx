@@ -34,6 +34,7 @@ export function AreaClubSearchForm({
   clubYear,
   label,
   month,
+  placeholder,
   query,
   shown,
   sort,
@@ -44,6 +45,8 @@ export function AreaClubSearchForm({
   label: string;
   /** A report month ("YYYY-MM") a page keeps across searches (#1315). */
   month?: string;
+  /** Hint text in the box; the label is used when absent. */
+  placeholder?: string;
   query: string;
   shown: number;
   sort?: string;
@@ -72,7 +75,7 @@ export function AreaClubSearchForm({
           maxLength={80}
           name="q"
           onChange={(event) => setHasText(event.target.value !== "")}
-          placeholder={label}
+          placeholder={placeholder ?? label}
           type="search"
         />
         <SearchClearButton

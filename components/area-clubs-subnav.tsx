@@ -2,15 +2,16 @@ import { AccountSectionNav, type AccountNavItem } from "@/components/account-sec
 
 /**
  * The coordinator's task navigation (#1186): Overview first, then every
- * destination the Clubs menu (#657) always had, with the same routes. "All
- * clubs" stays lit for the coordinator's club pages (`/account/area/...`).
+ * destination the Clubs menu (#657) always had, with the same routes. There is
+ * no "All clubs" tab (#1551): Overview's Clubs at a glance is the one club list
+ * and stays lit for the coordinator's club pages (`/account/area/...`).
  * Waitlists is added only for a real Area Coordinator (#599), never for a staff
  * act-as; the page itself still checks on the server, so a link only mirrors that.
  */
 export function coordinatorNavItems({ showWaitlists = false }: { showWaitlists?: boolean } = {}): AccountNavItem[] {
   return [
-    { href: "/account/area-clubs/overview", label: "Overview" },
-    { href: "/account/clubs", label: "All clubs", matchChildren: true, alsoMatchPrefix: "/account/area/" },
+    // Overview owns the club list (Clubs at a glance, #1551), so it stays lit on the view-only club pages.
+    { href: "/account/area-clubs/overview", label: "Overview", alsoMatchPrefix: "/account/area/" },
     { href: "/account/area-clubs/reports", label: "Monthly Records" },
     { href: "/account/area-clubs/points", label: "Points" },
     { href: "/account/area-clubs/events", label: "Club events" },

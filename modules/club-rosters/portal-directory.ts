@@ -30,3 +30,9 @@ export function portalDirectoryHref(query: string, page = 1) {
   if (page > 1) params.set("page", String(page));
   return `/account/clubs${params.size ? `?${params}` : ""}`;
 }
+
+/** Where the old club list sends an Area Coordinator (#1551): Clubs at a glance, carrying any search over. */
+export function coordinatorClubsPath(query: string) {
+  const text = query.trim();
+  return `/account/area-clubs/overview${text ? `?q=${encodeURIComponent(text)}` : ""}`;
+}

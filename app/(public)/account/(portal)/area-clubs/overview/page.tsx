@@ -14,6 +14,7 @@ import { buildCoordinatorOverview } from "@/modules/club-reports/coordinator-ove
 import { listClubsNewYearStatus } from "@/modules/club-rosters/carry-forward";
 import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
 import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-club-ids";
 
 export const metadata: Metadata = { title: "Club overview", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export default async function AreaOverviewPage({ searchParams }: { searchParams:
   const clubYear = resolveAreaClubYear(params.year);
   const query = parseClubQuery(params.q);
   const now = new Date();
-  const [clubs, deadlines, newYearStatus] = await Promise.all([
+  const [clubs, deadlines, newYearStatus, ownClubIds] = await Promise.all([
     getAreaClubsSummary(clubYear).catch((error: unknown) => {
       // Logged without club or person data; the page shows "unavailable" instead of any count.
       logError("Coordinator overview summary read failed", error, { clubYear });
@@ -40,6 +41,8 @@ export default async function AreaOverviewPage({ searchParams }: { searchParams:
     listUpcomingDeadlines(),
     // Which clubs haven't started next year's roster (#414): counts only, August through October.
     carryForwardOversightOpen(now) ? listClubsNewYearStatus(now) : Promise.resolve(null),
+    // The clubs this coordinator also directs open normally from Clubs at a glance; every other club opens view only (#1551).
+    currentOwnDirectedClubIds(),
   ]);
   const data: CoordinatorOverviewData = clubs
     ? { status: "ready", clubs, overview: buildCoordinatorOverview(clubs, clubYear, now) }
@@ -49,7 +52,7 @@ export default async function AreaOverviewPage({ searchParams }: { searchParams:
       <UpcomingDeadlines deadlines={deadlines} />
       <section className="public-manage-card page-stack area-overview-page coordinator-overview">
         <CoordinatorOverviewHeading clubYear={clubYear} />
-        <CoordinatorOverviewBody data={data} now={now} query={query} sorting={serverSort("/account/area-clubs/overview", params, COORDINATOR_GLANCE_SORT_COLUMNS, { key: null, dir: "asc" })} />
+        <CoordinatorOverviewBody data={data} now={now} ownClubIds={ownClubIds} query={query} sorting={serverSort("/account/area-clubs/overview", params, COORDINATOR_GLANCE_SORT_COLUMNS, { key: null, dir: "asc" })} />
         {clubs && <ClubNewYearStatus clubHref={(id) => `/account/area/${id}`} status={newYearStatus} />}
       </section>
     </>

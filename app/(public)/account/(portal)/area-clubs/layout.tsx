@@ -16,7 +16,7 @@ export default async function AreaClubsLayout({ children }: { children: React.Re
         <section aria-label="Area Coordinator" className="club-banner">
           <div className="club-banner-inner">
             <div className="club-banner-identity">
-              <h1>Clubs</h1>
+              <h1>Club coordination</h1>
               <p>Area Coordinator · view only</p>
             </div>
           </div>

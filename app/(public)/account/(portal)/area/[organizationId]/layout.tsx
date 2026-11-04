@@ -43,7 +43,7 @@ export default async function AreaClubLayout({
         </section>
       </CoordinatorShellHeader>
       <div className="club-roster-layout area-club-layout">
-        <BackLink href="/account/clubs">All clubs</BackLink>
+        <BackLink href="/account/area-clubs/overview#clubs-at-a-glance">Clubs at a glance</BackLink>
         <AccountSectionNav items={areaClubPortalNavItems({ organizationId })} label="Club" variant="secondary" />
         <p className="inline-notice" role="status">
           <Eye aria-hidden="true" size={14} /> View only. You see what the club&apos;s director sees, with ages instead of

@@ -56,6 +56,8 @@ describe("outdated-guide check", () => {
     expect(problems).toEqual([expect.objectContaining({ source: "staff", subject: "gone", kind: "missing-page" })]);
     expect(routeHasPage("/account/clubs/[organizationId]/records", ["/account/clubs/[organizationId]/records"])).toBe(true);
     expect(routeHasPage("/account/clubs/[organizationId]", ["/account/clubs"])).toBe(false);
+    expect(routeHasPage("/account/clubs#x", ["/account/clubs"])).toBe(true);
+    expect(routeHasPage("/bogus#x", ["/account/clubs"])).toBe(false);
     expect(run({ routes: ["/known"] })).toEqual([expect.objectContaining({ source: "portal", subject: "club", kind: "missing-page" })]);
   });
 

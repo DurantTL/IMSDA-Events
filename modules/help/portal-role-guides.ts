@@ -182,7 +182,7 @@ export const newCoordinatorGuides: readonly PortalGuide[] = [
     changes: ["Nothing. Your role is view only. Directors keep their own club's records."],
     steps: [
       "Open Overview. It shows the clubs, how many filed this month's Monthly Record, and Who's missing what.",
-      "Open All clubs to find a club. Search by club, church or city, then choose Open. See the Find a club guide.",
+      "On Overview, use Clubs at a glance to find a club. Search by club, church or city, then choose the club name or Open club. See the Find a club guide.",
       "Open Monthly Records to see which clubs filed each month. See the Follow Monthly Records guide.",
       "Open Points to see the club ranking for the year.",
       "Use Who's missing what on Overview to follow up with clubs that are behind. See the Follow up with clubs that are behind guide.",

@@ -78,7 +78,7 @@ describe("Coordinator header (#1554)", () => {
     expect(layout).toContain('className="club-banner"');
     expect(layout).toContain('className="club-banner-inner"');
     expect(layout).toContain('className="club-banner-identity"');
-    expect(layout).toContain("<h1>Clubs</h1>");
+    expect(layout).toContain("<h1>Club coordination</h1>");
     expect(layout).toContain("Area Coordinator · view only");
     expect(layout).not.toContain("account-page-hero");
     expect(layout).not.toContain("public-registration-hero");
