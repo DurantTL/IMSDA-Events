@@ -29,6 +29,7 @@ vi.mock("@/modules/club-rosters/api-errors", () => ({
 
 import { DELETE, GET, PUT } from "@/app/api/admin/club-forms/public-page/route";
 import { POST as PUBLISH } from "@/app/api/admin/club-forms/public-page/publish/route";
+import { ClubFormError } from "@/modules/club-forms/errors";
 import { publicClubFormGroups, publicClubFormView } from "@/modules/club-forms/public-index-domain";
 import {
   applyPublicClubFormsSettings,
@@ -131,6 +132,64 @@ describe("overlaying settings on the fixed list (#1562)", () => {
   it("names what changed by form id and field only", () => {
     const after = settingsWith((s) => { s.intro = "New"; s.items[1].shown = false; s.items[2].description = "Other"; });
     expect(changedPublicClubFormsKeys(null, after)).toEqual(["intro", `${after.items[1].id}:shown`, `${after.items[2].id}:description`]);
+  });
+});
+
+describe("the routes pass the editor's base to the store and show a conflict as 409 (#1601)", () => {
+  const url = "https://events.imsda.test/api/admin/club-forms/public-page";
+  const request = (method: string, body?: unknown) =>
+    new Request(url, { method, headers: { "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const base = { id: "row-1", updatedAt: "2026-11-03T15:00:00.000Z" };
+  const conflict = () => new ClubFormError("DRAFT_CHANGED", "Someone else changed this page. Reload to see their changes.");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.rejectCrossOriginRequest.mockReturnValue(null);
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "admin-1", globalRole: "SYSTEM_ADMIN" } });
+    mocks.save.mockResolvedValue({ draftId: "row-1", draftUpdatedAt: "2026-11-03T15:00:00.000Z" });
+    mocks.discard.mockResolvedValue(undefined);
+    mocks.publish.mockResolvedValue({ publishedAt: "2026-11-03T15:00:00.000Z" });
+  });
+
+  it("passes the base on save, publish and discard, and undefined when none is sent", async () => {
+    await PUT(request("PUT", { ...defaultPublicClubFormsSettings(), base }));
+    expect(mocks.save).toHaveBeenLastCalledWith(expect.objectContaining({ intro: expect.any(String) }), "admin-1", base);
+    await PUT(request("PUT", { ...defaultPublicClubFormsSettings(), base: null }));
+    expect(mocks.save.mock.calls.at(-1)?.[2]).toBeNull();
+    await PUT(request("PUT", defaultPublicClubFormsSettings()));
+    expect(mocks.save.mock.calls.at(-1)?.[2]).toBeUndefined();
+    await PUBLISH(request("POST", { base }));
+    expect(mocks.publish).toHaveBeenLastCalledWith("admin-1", base);
+    await DELETE(request("DELETE", { base }));
+    expect(mocks.discard).toHaveBeenLastCalledWith("admin-1", base);
+    await DELETE(request("DELETE"));
+    expect(mocks.discard).toHaveBeenLastCalledWith("admin-1", undefined);
+  });
+
+  it("treats a malformed base as a conflict, never as a skipped check", async () => {
+    await PUBLISH(request("POST", { base: "nonsense" }));
+    expect(mocks.publish).toHaveBeenLastCalledWith("admin-1", { id: "", updatedAt: "" });
+  });
+
+  it("answers 409 with the plain message on save, publish and discard", async () => {
+    mocks.save.mockRejectedValue(conflict());
+    mocks.publish.mockRejectedValue(conflict());
+    mocks.discard.mockRejectedValue(conflict());
+    for (const response of [await PUT(request("PUT", { ...defaultPublicClubFormsSettings(), base })), await PUBLISH(request("POST", { base })), await DELETE(request("DELETE", { base }))]) {
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ error: "DRAFT_CHANGED", message: "Someone else changed this page. Reload to see their changes." });
+    }
+  });
+
+  it("does not reach the store for someone who is not a Clubs or System administrator", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-3", globalRole: "USER" } });
+    mocks.isActiveClubsAdministrator.mockResolvedValue(false);
+    expect((await PUT(request("PUT", { ...defaultPublicClubFormsSettings(), base }))).status).toBe(403);
+    expect((await PUBLISH(request("POST", { base }))).status).toBe(403);
+    expect((await DELETE(request("DELETE", { base }))).status).toBe(403);
+    expect(mocks.save).not.toHaveBeenCalled();
+    expect(mocks.publish).not.toHaveBeenCalled();
+    expect(mocks.discard).not.toHaveBeenCalled();
   });
 });
 

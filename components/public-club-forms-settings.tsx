@@ -19,6 +19,8 @@ type Props = {
   forms: { id: string; name: string }[];
   groups: { id: string; title: string }[];
   hasDraft: boolean;
+  /** With `draftUpdatedAt`, the draft version the editor started from; sent back so a change by someone else is refused. */
+  draftId: string | null;
   draftUpdatedAt: string | null;
   publishedAt: string | null;
   /** Whether the draft differs from what is live. */
@@ -51,7 +53,7 @@ export function PublicClubFormsSettings(props: Props) {
   return <Editor {...props} key={editorResetKey(props.draftUpdatedAt, props.publishedAt)} message={message} setMessage={setMessage} />;
 }
 
-function Editor({ initial, forms, groups, hasDraft, draftUpdatedAt, publishedAt, draftDiffers, message, setMessage }: Props & { message: string; setMessage: (message: string) => void }) {
+function Editor({ initial, forms, groups, hasDraft, draftId, draftUpdatedAt, publishedAt, draftDiffers, message, setMessage }: Props & { message: string; setMessage: (message: string) => void }) {
   const router = useRouter();
   const { confirm, confirmDialog } = useConfirm();
   const [intro, setIntro] = useState(initial.intro);
@@ -59,6 +61,8 @@ function Editor({ initial, forms, groups, hasDraft, draftUpdatedAt, publishedAt,
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // The draft version this editor last saw; moves forward with each save so the same editor can keep saving.
+  const [base, setBase] = useState<{ id: string; updatedAt: string } | null>(draftId && draftUpdatedAt ? { id: draftId, updatedAt: draftUpdatedAt } : null);
 
   const names = new Map(forms.map((form) => [form.id, form.name]));
 
@@ -103,7 +107,13 @@ function Editor({ initial, forms, groups, hasDraft, draftUpdatedAt, publishedAt,
     }
   }
 
-  const save = () => send("/api/admin/club-forms/public-page", "PUT", { intro, items }).then(() => { setDirty(false); router.refresh(); return "Draft saved. Visitors do not see it until you publish."; });
+  const save = async () => {
+    const result = await send("/api/admin/club-forms/public-page", "PUT", { intro, items, base }) as { draftId?: string; draftUpdatedAt?: string };
+    if (result.draftId && result.draftUpdatedAt) setBase({ id: result.draftId, updatedAt: result.draftUpdatedAt });
+    setDirty(false);
+    router.refresh();
+    return "Draft saved. Visitors do not see it until you publish.";
+  };
 
   // Rule B6: leaving with unsaved edits asks first; saving clears `dirty`, so the question stops.
   useUnsavedChangesGuard(dirty);
@@ -127,7 +137,8 @@ function Editor({ initial, forms, groups, hasDraft, draftUpdatedAt, publishedAt,
           disabled={busy || dirty || !hasDraft || !draftDiffers}
           onClick={() => void run(async () => {
             if (!(await confirm({ title: "Publish the Club forms page?", body: <p>Visitors will see these changes right away.</p>, confirmLabel: "Publish" }))) return "";
-            await send("/api/admin/club-forms/public-page/publish", "POST");
+            await send("/api/admin/club-forms/public-page/publish", "POST", { base });
+            setBase(null);
             router.refresh();
             return "Published. The public Club forms page is updated.";
           })}
@@ -138,7 +149,8 @@ function Editor({ initial, forms, groups, hasDraft, draftUpdatedAt, publishedAt,
           disabled={busy || !hasDraft}
           onClick={() => void run(async () => {
             if (!(await confirm({ title: "Discard the draft?", body: <p>The published page is not changed.</p>, confirmLabel: "Discard draft" }))) return "";
-            await send("/api/admin/club-forms/public-page", "DELETE");
+            await send("/api/admin/club-forms/public-page", "DELETE", { base });
+            setBase(null);
             router.refresh();
             return "Draft discarded.";
           })}
