@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Coordinator workspace B (#1187): Monthly Records, Points, Club events, Team
@@ -323,6 +323,9 @@ describe("Team approvals page (#1187)", () => {
 });
 
 describe("New clubs page (#1187)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   const application = {
     id: "app-1", clubName: "Sample Valley Pathfinders", clubType: "PATHFINDER", status: "PENDING",
     church: { name: "Sample Valley Church", type: "CHURCH", isOther: false, unavailable: false, needsChoice: false },
@@ -355,6 +358,34 @@ describe("New clubs page (#1187)", () => {
     expect(html).not.toContain("/admin/");
     const admin = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [decided], canDecide: true, churches: [] }));
     expect(admin).toContain('href="/admin/organizations/club-9/profile"');
+  });
+
+  it("shows a cancelled application as one collapsed line to coordinators and drops it after 30 days (#1554)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-04T12:00:00Z"));
+    const cancelled = (id: string, name: string, decidedAt: string) =>
+      ({ ...application, id, clubName: name, status: "DECLINED", decidedAt }) as NewClubApplicationRecord;
+    mocks.listNewClubApplications.mockResolvedValue([
+      application,
+      cancelled("app-2", "Recent Cancelled Club", "2026-10-06T12:00:00Z"),
+      cancelled("app-3", "Old Cancelled Club", "2026-10-04T12:00:00Z"),
+    ]);
+    const html = renderToStaticMarkup(await NewClubsPage());
+    expect(html).toContain("Sample Valley Pathfinders");
+    expect(html).toMatch(/<details[^>]*data-application-collapsed="app-2"[^>]*><summary/);
+    expect(html).toContain("Recent Cancelled Club");
+    expect(html).not.toContain("Old Cancelled Club");
+    // Staff view is unchanged: no collapsing.
+    const staff = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [cancelled("app-2", "Recent Cancelled Club", "2026-10-06T12:00:00Z")], canDecide: true, churches: [] }));
+    expect(staff).not.toContain("<details");
+  });
+
+  it("shows the empty state when every application has aged off (#1554)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-04T12:00:00Z"));
+    mocks.listNewClubApplications.mockResolvedValue([{ ...application, status: "DECLINED", decidedAt: "2026-09-01T12:00:00Z" }]);
+    const html = renderToStaticMarkup(await NewClubsPage());
+    expect(html).toContain("No new club applications yet");
   });
 
   it("shows unavailable, never no applications, when the read fails", async () => {

@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/empty-state";
 import { NewClubApplicationsQueue } from "@/components/new-club-applications-queue";
 import { logError } from "@/lib/logger";
 import { listNewClubApplications } from "@/modules/club-applications/repository";
+import { isVisibleToCoordinator } from "@/modules/club-applications/domain";
 import { currentApplicationViewer } from "@/modules/club-applications/viewer";
 import { NEW_CLUBS_DECISION_TEXT } from "@/modules/club-reports/coordinator-destinations-domain";
 
@@ -20,7 +21,9 @@ export default async function AreaNewClubApplicationsPage() {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
   const viewer = await currentApplicationViewer();
   if (!viewer) notFound();
-  const applications = await listNewClubApplications(viewer).catch((error: unknown) => {
+  // A cancelled application leaves a coordinator's list 30 days after it was cancelled (#1554); staff still see it.
+  const now = new Date();
+  const applications = await listNewClubApplications(viewer).then((rows) => rows.filter((row) => isVisibleToCoordinator(row, now))).catch((error: unknown) => {
     // A failed read is "unavailable", never "no applications".
     logError("Coordinator new club applications read failed", error);
     return null;
@@ -42,7 +45,7 @@ export default async function AreaNewClubApplicationsPage() {
           </EmptyState>
         </div>
       ) : (
-        <NewClubApplicationsQueue applications={applications} canDecide={false} churches={[]} />
+        <NewClubApplicationsQueue applications={applications} canDecide={false} churches={[]} collapseCancelled />
       )}
     </section>
   );

@@ -1,0 +1,33 @@
+.cancelled {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-info);
+}
+
+.cancelled[open] > .summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-height: 44px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.name {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.date {
+  color: var(--muted);
+}
+
+.cancelled > :global(.nca-card) {
+  border: 0;
+}
