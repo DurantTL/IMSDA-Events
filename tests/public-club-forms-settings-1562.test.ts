@@ -185,3 +185,15 @@ describe("the public page settings routes are for system administrators and Club
     });
   }
 });
+
+describe("the audit diff compares order within a group (#1562)", () => {
+  it("flags only the forms that moved, not every form after them", () => {
+    const after = settingsWith((s) => {
+      const [first] = s.items.splice(0, 1);
+      s.items.push({ ...first, groupId: "ongoing" });
+    });
+    expect(changedPublicClubFormsKeys(null, after)).toEqual(["new-club:group"]);
+    const swapped = settingsWith((s) => { [s.items[0], s.items[1]] = [s.items[1], s.items[0]]; });
+    expect(changedPublicClubFormsKeys(null, swapped).sort()).toEqual(["new-club:order", "yearly-registration:order"]);
+  });
+});

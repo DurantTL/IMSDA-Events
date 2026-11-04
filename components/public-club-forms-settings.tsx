@@ -158,7 +158,7 @@ export function PublicClubFormsSettings({ initial, forms, groups, hasDraft, draf
                       </div>
                     </div>
                     <div className={styles.fields}>
-                      <label className={styles.check}>
+                      <label className={`${styles.check} ${styles.wide}`}>
                         <input checked={item.shown} onChange={(event) => update(item.id, { shown: event.target.checked })} type="checkbox" />
                         Show on the public page
                       </label>

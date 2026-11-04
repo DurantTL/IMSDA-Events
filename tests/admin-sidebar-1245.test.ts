@@ -115,7 +115,7 @@ describe("the Clubs sidebar groups", () => {
       ["/admin/clubs/summary", "/admin/clubs/transfers", "/admin/organizations/background-checks", "/admin/honors", "/admin/club-supplies", "/admin/clubs/import", "/admin/clubs/health-import"],
       ["/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary?view=points#points"],
       ["/admin/clubs/summary?view=events#club-events"],
-      ["/admin/club-forms"],
+      ["/admin/club-forms", "/admin/club-forms/public-page"],
       ["/admin/clubs/applications", "/admin/clubs/invites"],
       ["/admin/clubs/leaders", "/admin/people"],
     ]);

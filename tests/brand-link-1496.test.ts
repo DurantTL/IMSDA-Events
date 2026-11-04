@@ -53,7 +53,7 @@ describe("every IMAdventist logo links to the calendar (#1496, #1549)", () => {
       "components/public-home-page.tsx",
       "app/(public)/calendar/page.tsx",
       "app/(public)/clubs/page.tsx",
-      "app/(public)/clubs/forms/page.tsx",
+      "components/public-club-forms-view.tsx",
       "app/(public)/events/page.tsx",
       "app/(public)/events/[eventSlug]/page.tsx",
       "app/(public)/events/[eventSlug]/loading.tsx",

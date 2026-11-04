@@ -97,14 +97,19 @@ export function changedPublicClubFormsKeys(before: PublicClubFormsSettings | nul
   const b = completePublicClubFormsSettings(after);
   const keys: string[] = [];
   if (a.intro !== b.intro) keys.push("intro");
-  const previous = new Map(a.items.map((item, index) => [item.id, { item, index }]));
-  b.items.forEach((item, index) => {
+  // Order is compared within each group, among the forms that stay in it, so moving one form does not flag the rest.
+  const previous = new Map(a.items.map((item) => [item.id, item]));
+  const nextGroup = new Map(b.items.map((item) => [item.id, item.groupId]));
+  const stays = (item: PublicClubFormSettingItem) => previous.get(item.id)?.groupId === nextGroup.get(item.id);
+  const position = (settings: PublicClubFormsSettings, id: string, groupId: string) =>
+    settings.items.filter((entry) => entry.groupId === groupId && stays(entry)).findIndex((entry) => entry.id === id);
+  for (const item of b.items) {
     const old = previous.get(item.id);
-    if (!old) return;
-    if (old.item.shown !== item.shown) keys.push(`${item.id}:shown`);
-    if (old.item.groupId !== item.groupId) keys.push(`${item.id}:group`);
-    if (old.item.description !== item.description) keys.push(`${item.id}:description`);
-    if (old.index !== index) keys.push(`${item.id}:order`);
-  });
+    if (!old) continue;
+    if (old.shown !== item.shown) keys.push(`${item.id}:shown`);
+    if (old.groupId !== item.groupId) keys.push(`${item.id}:group`);
+    if (old.description !== item.description) keys.push(`${item.id}:description`);
+    if (old.groupId === item.groupId && position(a, item.id, item.groupId) !== position(b, item.id, item.groupId)) keys.push(`${item.id}:order`);
+  }
   return keys;
 }

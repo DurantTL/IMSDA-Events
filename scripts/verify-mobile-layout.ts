@@ -442,6 +442,8 @@ const pages: PageSpec[] = [
   // Homepage & site content (#111): the editor, its preview of the draft, and the analytics view. seedHubContent fills both.
   staff("site-content", "/admin/site-content", "system-admin"),
   staff("site-content-preview", "/admin/site-content/preview", "system-admin"),
+  staff("public-club-forms-settings", "/admin/club-forms/public-page", "system-admin"),
+  staff("public-club-forms-preview", "/admin/club-forms/public-page/preview", "system-admin"),
   staff("analytics", "/admin/analytics", "system-admin"),
   staff("system-email", "/admin/email", "system-admin"),
   staff("system-readiness", "/admin/readiness", "system-admin"),

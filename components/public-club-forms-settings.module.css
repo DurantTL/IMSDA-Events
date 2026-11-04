@@ -15,8 +15,8 @@
 .wide { grid-column: 1 / -1; }
 .rowButtons { display: flex; flex-wrap: wrap; gap: 8px; }
 .rowButtons button { min-height: 44px; min-width: 44px; }
-.check { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.check input { width: 24px; height: 24px; min-height: 24px; }
+.fields label.check { display: flex; flex-direction: row; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.fields label.check input { width: 24px; height: 24px; min-height: 24px; flex: none; margin: 0; }
 .hiddenItem { opacity: 0.8; border-style: dashed; }
 .note { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
 .status { min-height: 24px; margin: 0; }
