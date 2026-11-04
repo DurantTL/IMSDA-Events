@@ -357,6 +357,36 @@ describe("New clubs page (#1187)", () => {
     expect(admin).toContain('href="/admin/organizations/club-9/profile"');
   });
 
+  it("shows a cancelled application as one collapsed line to coordinators and drops it after 30 days (#1554)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-04T12:00:00Z"));
+    const cancelled = (id: string, name: string, decidedAt: string) =>
+      ({ ...application, id, clubName: name, status: "DECLINED", decidedAt }) as NewClubApplicationRecord;
+    mocks.listNewClubApplications.mockResolvedValue([
+      application,
+      cancelled("app-2", "Recent Cancelled Club", "2026-10-06T12:00:00Z"),
+      cancelled("app-3", "Old Cancelled Club", "2026-10-04T12:00:00Z"),
+    ]);
+    const html = renderToStaticMarkup(await NewClubsPage());
+    expect(html).toContain("Sample Valley Pathfinders");
+    expect(html).toMatch(/<details[^>]*data-application-collapsed="app-2"[^>]*><summary/);
+    expect(html).toContain("Recent Cancelled Club");
+    expect(html).not.toContain("Old Cancelled Club");
+    // Staff view is unchanged: no collapsing.
+    const staff = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [cancelled("app-2", "Recent Cancelled Club", "2026-10-06T12:00:00Z")], canDecide: true, churches: [] }));
+    expect(staff).not.toContain("<details");
+    vi.useRealTimers();
+  });
+
+  it("shows the empty state when every application has aged off (#1554)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-04T12:00:00Z"));
+    mocks.listNewClubApplications.mockResolvedValue([{ ...application, status: "DECLINED", decidedAt: "2026-09-01T12:00:00Z" }]);
+    const html = renderToStaticMarkup(await NewClubsPage());
+    expect(html).toContain("No new club applications yet");
+    vi.useRealTimers();
+  });
+
   it("shows unavailable, never no applications, when the read fails", async () => {
     mocks.listNewClubApplications.mockRejectedValue(new Error("db down"));
     const html = renderToStaticMarkup(await NewClubsPage());

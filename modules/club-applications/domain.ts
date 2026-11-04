@@ -44,6 +44,26 @@ export const newClubSourceOrgType: Record<NewClubTypeValue, string> = {
 export const MAX_APPLICATION_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_OTHER_BOARD_MEMBERS = 20;
 export const DECLINE_REASON_MAX = 500;
+/** How long a cancelled application stays on an Area Coordinator's list, counted from when it was cancelled (#1554). */
+export const COORDINATOR_CANCELLED_VISIBLE_DAYS = 30;
+
+/**
+ * Whether a coordinator still sees this application (#1554). Waiting and
+ * confirmed ones always stay. A cancelled one (stored as DECLINED, `decidedAt`
+ * is the cancellation time) drops off 30 days after it was cancelled. The
+ * record itself is kept and staff see every one. A cancelled application with
+ * no recorded time stays, since its age can't be known.
+ */
+export function isVisibleToCoordinator(
+  application: { status: NewClubApplicationStatusValue; decidedAt: string | null },
+  now: Date,
+): boolean {
+  if (application.status !== "DECLINED" || !application.decidedAt) return true;
+  const cancelledAt = new Date(application.decidedAt).getTime();
+  if (Number.isNaN(cancelledAt)) return true;
+  return now.getTime() - cancelledAt < COORDINATOR_CANCELLED_VISIBLE_DAYS * 24 * 60 * 60 * 1000;
+}
+
 /** How long a private "apply for a new club" link stays usable. */
 export const NEW_CLUB_INVITE_LIFETIME_DAYS = 30;
 
