@@ -186,7 +186,7 @@ export function CoordinatorClubsAtAGlance({
       ) : (
         <>
           <AreaClubSearch basePath="/account/area-clubs/overview" clubYear={overview.clubYear} label="Search clubs" placeholder="Club, church or city" query={query} shown={shown.length} total={clubs.length} />
-          <ListPager label="Clubs shown" noun="clubs" nounOne="club" slice={{ from: shown.length === 0 ? 0 : 1, to: shown.length, total: shown.length, page: 1, pageCount: 1 }} />
+          <ListPager announce={false} label="Clubs shown" noun="clubs" nounOne="club" slice={{ from: shown.length === 0 ? 0 : 1, to: shown.length, total: shown.length, page: 1, pageCount: 1 }} />
           {shown.length === 0 ? (
             <p className="report-empty">
               No club name, church or city matches “{query}”.{" "}
