@@ -613,7 +613,7 @@ async function coordinatorClubsJourney(ctx: Ctx, page: J.Page) {
   // coordinator's brief asked for "only their area's clubs", but no area exists in the data model; the club stands for
   // "a club outside the area" and is expected to be listed.
   ctx.rec.record("Coordinator: Clubs at a glance", "Scope", "every active club is listed (#387), including one outside any area", "pass", "the outside club is listed with View only, as the role is defined");
-  assert(await page.getByText(/\d+ of \d+ clubs shown/).count(), "the list does not say how many clubs it shows");
+  assert(await page.getByText(/Showing 1.\d+ of \d+ clubs/).count(), "the list does not say how many clubs it shows");
   await page.locator(`a[href$="/account/area/${clubs.complete.clubId}"]`).first().click();
   await page.waitForURL(new RegExp(`/account/area/${clubs.complete.clubId}$`), { timeout: 20_000 });
   await coordinatorVisited(ctx, page, "Club (view only)");

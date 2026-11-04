@@ -79,7 +79,7 @@ describe("portal guide registry", () => {
   it("points every destination at an existing page and only at portal or public pages", () => {
     const routes = listPageRoutes();
     for (const destination of Object.values(portalDestinations)) {
-      expect(routeHasPage(destination.path, routes), destination.path).toBe(true);
+      expect(routeHasPage(destination.path.split("#")[0]!, routes), destination.path).toBe(true);
       expect(destination.path, destination.id).toMatch(/^\/(account|recover-registration)/);
     }
     for (const guide of portalGuides) {

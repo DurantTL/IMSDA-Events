@@ -29,7 +29,7 @@ export const portalDestinations: Record<string, PortalDestination> = {
   "club-forms": { id: "club-forms", label: "Forms", path: "/account/clubs/[organizationId]/forms", audience: "director", formsRole: true },
   "club-events": { id: "club-events", label: "Club events", path: "/account/clubs/[organizationId]/events", audience: "director", capability: "registerForEvents" },
   "club-settings": { id: "club-settings", label: "Club settings", path: "/account/clubs/[organizationId]/club-info", audience: "director", capability: "manageTeam" },
-  "coordinator-clubs": { id: "coordinator-clubs", label: "Clubs at a glance", path: "/account/area-clubs/overview", audience: "coordinator" },
+  "coordinator-clubs": { id: "coordinator-clubs", label: "Clubs at a glance", path: "/account/area-clubs/overview#clubs-at-a-glance", audience: "coordinator" },
   "coordinator-overview": { id: "coordinator-overview", label: "Overview", path: "/account/area-clubs/overview", audience: "coordinator" },
   "coordinator-records": { id: "coordinator-records", label: "Monthly Records summary", path: "/account/area-clubs/reports", audience: "coordinator" },
   "coordinator-points": { id: "coordinator-points", label: "Points", path: "/account/area-clubs/points", audience: "coordinator" },

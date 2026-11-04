@@ -11,18 +11,9 @@
   align-items: center;
   min-height: 44px;
   color: var(--imsda-navy);
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-
-.badge {
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--imsda-navy-soft);
-  color: var(--imsda-navy);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   font-weight: 700;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 760px) {

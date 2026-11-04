@@ -196,7 +196,7 @@ describe("overview markup (#1186)", () => {
     expect(out).toContain("Director: none listed");
     expect(out).toContain("0 not in compliance");
     expect(out).toContain('href="/account/area/c1"');
-    expect(out).toContain("6 of 6 clubs shown");
+    expect(out).toContain("Showing 1\u20136 of 6 clubs");
     expect(out).not.toMatch(/background check/i);
   });
 
@@ -211,12 +211,12 @@ describe("overview markup (#1186)", () => {
     const find = (query: string) => renderToStaticMarkup(createElement(CoordinatorOverviewBody, { data, now, query, ownClubIds: ["h1"] }));
     for (const query of ["seaside", "port"]) {
       const out = find(query);
-      expect(out).toContain("1 of 2 clubs shown");
+      expect(out).toContain("Showing 1\u20131 of 1 club");
       expect(out).toContain("Harbor Club");
       expect(out).not.toContain("Orchard Club");
     }
     const all = find("");
-    expect(all).toContain("2 of 2 clubs shown");
+    expect(all).toContain("Showing 1\u20132 of 2 clubs");
     expect(all).toContain('href="/account/clubs/h1"');
     expect(all).toContain("Your club");
     expect(all).toContain("Open my club");
@@ -232,7 +232,7 @@ describe("overview markup (#1186)", () => {
 
   it("filters the table by search while the summary and follow-up stay whole, with N of M shown", () => {
     const out = render(ready(six), "bra");
-    expect(out).toContain("1 of 6 clubs shown");
+    expect(out).toContain("Showing 1\u20131 of 1 club");
     expect(out).toContain("Bravo Club");
     expect(out).not.toContain('href="/account/area/c1"');
     expect(out).toContain("3 of 6 September records");
@@ -246,7 +246,7 @@ describe("overview markup (#1186)", () => {
     expect(none).toContain("No club name, church or city matches");
     expect(none).toContain("Clear filters");
     expect(none).toContain('href="/account/area-clubs/overview?year=2026-27"');
-    expect(none).toContain("0 of 6 clubs shown");
+    expect(none).not.toContain("Showing");
     const empty = render(ready([]));
     expect(empty).toContain("No active clubs are available to this role yet.");
     expect(empty).not.toContain("No club name, church or city matches");

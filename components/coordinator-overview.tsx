@@ -1,3 +1,4 @@
+import { ListPager } from "@/components/list-pager";
 import { ExportLink } from "@/components/export-link";
 import { ColumnHeader } from "@/components/column-header";
 import { ExactValue } from "@/components/exact-value";
@@ -185,7 +186,7 @@ export function CoordinatorClubsAtAGlance({
       ) : (
         <>
           <AreaClubSearch basePath="/account/area-clubs/overview" clubYear={overview.clubYear} label="Search clubs" placeholder="Club, church or city" query={query} shown={shown.length} total={clubs.length} />
-          <p className="quiet-copy" role="status">{shown.length} of {clubs.length} {clubs.length === 1 ? "club" : "clubs"} shown</p>
+          <ListPager label="Clubs shown" noun="clubs" nounOne="club" slice={{ from: shown.length === 0 ? 0 : 1, to: shown.length, total: shown.length, page: 1, pageCount: 1 }} />
           {shown.length === 0 ? (
             <p className="report-empty">
               No club name, church or city matches “{query}”.{" "}
@@ -216,7 +217,7 @@ export function CoordinatorClubsAtAGlance({
                         <th className="coordinator-club-cell" role="rowheader" scope="row">
                           <span className={styles.name}>
                             <Link className={styles.nameLink} href={href} prefetch={false} translate="no">{club.name}</Link>
-                            <span className={styles.badge}>{mine ? "Your club" : "View only"}</span>
+                            <span className={`status-chip ${mine ? "green" : "neutral"}`}>{mine ? "Your club" : "View only"}</span>
                           </span>
                           {club.church && <small translate="no">{club.church}</small>}
                           <small>Director: {club.directors.length > 0 ? <ExactValue>{club.directors.join(", ")}</ExactValue> : "none listed"}</small>
