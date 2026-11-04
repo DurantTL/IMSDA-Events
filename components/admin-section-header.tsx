@@ -13,7 +13,8 @@ export function AdminSectionHeader({ nav }: { nav: AdminSectionNav }) {
   return (
     <div className={styles.header} data-testid="admin-section-header" data-section={nav.section}>
       <p className={`eyebrow ${styles.name}`}>{nav.name}</p>
-      <DashboardTabs label={nav.navLabel} tabs={nav.tabs} />
+      <div className={styles.sectionNavigation}><DashboardTabs label={nav.navLabel} tabs={nav.tabs} /></div>
+      {(nav.localTabs?.length ?? 0) > 1 && <div className={styles.localNavigation}><DashboardTabs label={`${nav.name} page views`} tabs={nav.localTabs!} /></div>}
       {nav.back ? <BackLink href={nav.back.href} variant="staff">{nav.back.label}</BackLink> : null}
     </div>
   );

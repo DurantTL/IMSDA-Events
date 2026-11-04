@@ -1,3 +1,6 @@
+"use client";
+
+import { handleGuardedLinkClick } from "@/components/link-guard";
 import {
   ADMIN_ROLE_LABELS,
   adminRoleSwitchNote,
@@ -40,6 +43,7 @@ export function AdminRoleSwitcher({
               className="admin-role-link"
               href={adminRoleSwitchHref(role)}
               key={role}
+              onClick={(event) => handleGuardedLinkClick({ event, run: () => window.location.assign(adminRoleSwitchHref(role)) })}
             >
               <span>{ADMIN_ROLE_LABELS[role]}</span>
               {typeof count === "number" && count > 0 && (

@@ -28,6 +28,8 @@ export type AdminSectionNav = {
   name: string;
   navLabel: string;
   tabs: AdminSectionTab[];
+  /** Tabs for the current page's views or anchors; workspace destinations live in the sidebar. */
+  localTabs?: AdminSectionTab[];
   back?: AdminBackLink;
 };
 
@@ -208,11 +210,14 @@ export function buildAdminSectionNav(input: {
 }): AdminSectionNav {
   const { section, pathname } = input;
   const back = input.back === undefined ? adminBackLink(section, pathname, input) : input.back;
+  const tabs = adminSectionTabs(section, pathname, input);
+  const localTabs = tabs.filter((tab) => tab.href.startsWith("#") || (pathOf(tab.href) === pathname && tab.href.includes("?view=")));
   return {
     section,
     name: sectionNames[section],
     navLabel: `${sectionNames[section]} sections`,
-    tabs: adminSectionTabs(section, pathname, input),
+    tabs,
+    localTabs,
     ...(back ? { back } : {}),
   };
 }

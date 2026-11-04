@@ -101,6 +101,18 @@ Then `npm run dev`.
 
 ## Build workflow
 
+### Staff redesign development exception (#1559)
+
+For #1565–#1596, create each issue branch from
+`origin/codex/neon-preview-setup` and target its PR at
+`codex/neon-preview-setup`, not `main`. Compare implementation/review diffs
+against that same development base. Keep one issue per worktree/PR, the full
+required checks and independent review. The owner merges reviewed work into
+the development branch for preview testing. Production promotion is a separate
+owner-approved release PR to `main`; never merge to `main` merely to preview.
+All other work retains its existing base/target policy. This exception does
+not change #98 priorities or grant permission for any human-only action.
+
 1. Query the installed Graphify project before broad repository searches
    (`graphify query "<question>"`). Verify every finding against current source;
    Graphify is derived and rebuildable. When the `graphify` CLI is not
