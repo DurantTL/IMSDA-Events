@@ -299,7 +299,7 @@ export const clubsAdminGroups: readonly ClubsNavGroup[] = [
   {
     key: "clubs-forms",
     label: "Forms",
-    items: [{ href: "/admin/club-forms", label: "Club forms", icon: ListChecks }],
+    items: [{ href: "/admin/club-forms", label: "Club forms", icon: ListChecks }, { href: "/admin/club-forms/public-page", label: "Public club forms page", icon: Megaphone }],
   },
   {
     key: "clubs-applications",

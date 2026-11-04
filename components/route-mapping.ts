@@ -72,6 +72,7 @@ const menuRoutes: readonly Menu[] = [
   ["/admin/people", "System", "System management", "People", "People & access"],
   ["/admin/forms", "System", "System management", "Forms", "All forms"],
   ["/admin/club-forms", "System", "System management", "Forms", "Club forms"],
+  ["/admin/club-forms/public-page", "System", "System management", "Forms", "Public club forms page"],
   ["/admin/form-templates", "System", "System management", "Forms", "Form templates"],
   ["/admin/question-library", "System", "System management", "Forms", "Question library"],
   ["/admin/information-forms", "System", "System management", "Forms", "Information forms"],
@@ -141,6 +142,7 @@ const aliasRoutes: readonly (readonly [route: string, destinationPath: string])[
 /** Sub-pages reached from a parent page: [route, parent route, source file that links to it]. */
 const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn: string])[] = [
   ["/admin/site-content/preview", "/admin/site-content", "components/site-content-workspace.tsx"],
+  ["/admin/club-forms/public-page/preview", "/admin/club-forms/public-page", "components/public-club-forms-settings.tsx"],
   ["/admin/clubs/health-import", "/admin/organizations", "app/(workspace)/admin/organizations/page.tsx"],
   ["/admin/clubs/import", "/admin/organizations", "app/(workspace)/admin/organizations/page.tsx"],
   ["/admin/organizations/import", "/admin/organizations", "app/(workspace)/admin/organizations/page.tsx"],

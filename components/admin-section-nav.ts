@@ -185,6 +185,7 @@ export function adminBackLink(
   if (/^\/admin\/clubs\/reports\/year-end(\/|$)/.test(pathname)) return { href: "/admin/clubs/reports", label: "Back to Monthly Records" };
   match = /^\/admin\/clubs\/reports\/([^/]+)\/[^/]+(\/|$)/.exec(pathname);
   if (match) return options.viaParent ? clubPage(match[1]) : { href: "/admin/clubs/reports", label: "Back to Monthly Records" };
+  if (/^\/admin\/club-forms\/public-page\/preview(\/|$)/.test(pathname)) return { href: "/admin/club-forms/public-page", label: "Back to editing" };
   if (/^\/admin\/club-forms\/[^/]+(\/|$)/.test(pathname)) return { href: "/admin/club-forms", label: "Back to club forms" };
   if (/^\/admin\/form-templates\/[^/]+(\/|$)/.test(pathname)) return { href: "/admin/form-templates", label: "Back to form templates" };
   match = /^\/admin\/information-forms\/([^/]+)\/responses(\/|$)/.exec(pathname);

@@ -2916,6 +2916,20 @@ model SiteContentRevision {
   @@index([status])
 }
 
+/// What staff choose for the public Club forms page (#1562): which forms show, their group, order and short line, and the
+/// intro text, as one JSON document. At most one DRAFT (the working copy) and one PUBLISHED row. It only overlays the
+/// code's fixed list of forms by item id; it holds no club data.
+model PublicClubFormsSetting {
+  id              String            @id @default(cuid())
+  status          SiteContentStatus @default(DRAFT)
+  content         Json
+  updatedByUserId String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([status])
+}
+
 enum PublicMetric {
   EVENT_PAGE_VIEW
   DIRECTORY_SEARCH

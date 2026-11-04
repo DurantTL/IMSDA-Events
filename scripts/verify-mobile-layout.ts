@@ -81,6 +81,7 @@ import { loadEnvConfig } from "@next/env";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
 import { clubYearChoices } from "../modules/club-rosters/domain";
+import { defaultPublicClubFormsSettings } from "../modules/club-forms/public-index-settings-domain";
 
 loadEnvConfig(process.cwd());
 
@@ -442,6 +443,8 @@ const pages: PageSpec[] = [
   // Homepage & site content (#111): the editor, its preview of the draft, and the analytics view. seedHubContent fills both.
   staff("site-content", "/admin/site-content", "system-admin"),
   staff("site-content-preview", "/admin/site-content/preview", "system-admin"),
+  staff("public-club-forms-settings", "/admin/club-forms/public-page", "system-admin"),
+  { ...staff("public-club-forms-preview", "/admin/club-forms/public-page/preview", "system-admin"), expectText: /Preview: not published/ },
   staff("analytics", "/admin/analytics", "system-admin"),
   staff("system-email", "/admin/email", "system-admin"),
   staff("system-readiness", "/admin/readiness", "system-admin"),
@@ -1104,6 +1107,8 @@ async function cleanupStaffInviteEvent(prisma: PrismaClient) {
   const personIds = [...new Set(registrations.flatMap((row) => [row.accountHolderPersonId, ...row.attendees.map((attendee) => attendee.personId)]).filter((id): id is string => Boolean(id)))];
   await prisma.siteContentRevision.deleteMany({ where: { id: { in: [`${P}_site_published`, `${P}_site_draft`] } } })
     .catch((error: Error) => console.error(`Could not remove the synthetic hub content: ${error.message}`));
+  await prisma.publicClubFormsSetting.deleteMany({ where: { id: `${P}_club_forms_draft` } })
+    .catch((error: Error) => console.error(`Could not remove the synthetic club forms draft: ${error.message}`));
   await prisma.$transaction([
     prisma.$executeRaw`SELECT set_config('imsda.event_deletion', 'on', true)`,
     prisma.messageOutbox.deleteMany({ where: { OR: [{ eventId: staffInviteEventId }, { registrationId: { in: registrationIds } }] } }),
@@ -1380,6 +1385,10 @@ async function seedHubContent(prisma: PrismaClient) {
   }
   if (!(await prisma.siteContentRevision.findFirst({ where: { status: "DRAFT" }, select: { id: true } }))) {
     await prisma.siteContentRevision.create({ data: { id: `${P}_site_draft`, status: "DRAFT", content } });
+  }
+  // The public Club forms page draft (#1562): the preview redirects to the editor without one.
+  if (!(await prisma.publicClubFormsSetting.findUnique({ where: { status: "DRAFT" }, select: { id: true } }))) {
+    await prisma.publicClubFormsSetting.create({ data: { id: `${P}_club_forms_draft`, status: "DRAFT", content: defaultPublicClubFormsSettings() } });
   }
 }
 
