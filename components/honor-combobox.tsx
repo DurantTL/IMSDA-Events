@@ -250,12 +250,15 @@ export function HonorCombobox({
               onMouseDown={(event) => { event.preventDefault(); choose(choice); }}
               role="option"
             >
-              <span className={styles.label}>
-                {choice.name}
-                {(choice.unavailableReason ?? choice.detail) && (
+              {/* One wrapper keeps the name and its note together on the phone flex row; plain names stay unwrapped. */}
+              {choice.unavailableReason ?? choice.detail ? (
+                <span className={styles.label}>
+                  {choice.name}
                   <span className={styles.detail}>{" "}({choice.unavailableReason ?? choice.detail})</span>
-                )}
-              </span>
+                </span>
+              ) : (
+                choice.name
+              )}
             </li>
           );
         })}
