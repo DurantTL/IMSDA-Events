@@ -45,13 +45,25 @@ describe("Club events collapse (#1554)", () => {
 
   it("names each event in its summary, with the date and headcount", () => {
     const html = render();
-    expect(html).toMatch(/<summary[^>]*><span[^>]*><h3[^>]*>Synthetic Event 1<\/h3>.*October 9, 2026.*12 people/);
+    expect(html).toMatch(/<summary[^>]*><div[^>]*><h3[^>]*>Synthetic Event 1<\/h3>.*October 9, 2026.*12 people/);
     for (const summary of html.match(/<summary[\s\S]*?<\/summary>/g) ?? []) expect(summary).not.toContain("<a ");
   });
 
   it("opens every match while a search is active", () => {
     const details = render("Alpha").match(/<details[^>]*>/g) ?? [];
     expect(details.every((tag) => /\bopen=""/.test(tag))).toBe(true);
+  });
+
+  it("shows a chevron in every summary, hides the native marker and keeps the h3 out of a span", () => {
+    const html = render();
+    expect(html.match(/<svg[^>]*lucide-chevron-down[^>]*aria-hidden="true"/g) ?? []).toHaveLength(5);
+    expect(html).toContain("<div class=\"_summaryText");
+    expect(html).not.toMatch(/<span[^>]*><h3/);
+    const css = read("components/coordinator-destinations.module.css");
+    expect(css).toContain("list-style: none");
+    expect(css).toContain("::-webkit-details-marker");
+    expect(css).toMatch(/\.event\[open\][^{]*\.chevron \{[^}]*rotate/);
+    expect(css).toContain("prefers-reduced-motion");
   });
 
   it("gives the summary a 44px tap target in a CSS module", () => {

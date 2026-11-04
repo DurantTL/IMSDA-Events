@@ -2,7 +2,7 @@ import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { ColumnHeader } from "@/components/column-header";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
-import { Download } from "lucide-react";
+import { ChevronDown, Download } from "lucide-react";
 import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
@@ -197,13 +197,14 @@ export function CoordinatorClubEvents({
         // A search opens every match, since the coordinator asked to see those clubs.
         <details className={styles.event} key={event.id} open={Boolean(query) || index < COORDINATOR_EVENTS_OPEN_BY_DEFAULT}>
           <summary className={styles.summary}>
-            <span className={styles.summaryText}>
-              <h3 id={`coordinator-event-${event.id}`} translate="no">{event.name}</h3>
+            <div className={styles.summaryText}>
+              <h3 translate="no">{event.name}</h3>
               <span className={styles.summaryMeta}>
                 {new Date(event.startsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: event.timezone })}
                 {" · "}{registeredClubsLabel(event.clubs.filter((club) => club.status === "REGISTERED").length)} · {formatNumber(eventHeadcount(event.clubs))} people
               </span>
-            </span>
+            </div>
+            <ChevronDown aria-hidden="true" className={styles.chevron} size={20} />
           </summary>
           <div className={styles.body}>
             <div className="coordinator-event-head">
