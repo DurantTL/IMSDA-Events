@@ -186,7 +186,8 @@ export function HonorCombobox({
     if (result.choose) { choose(choices[result.active]); return; }
     if (!result.open && event.key === "Tab") { close(); return; }
     setOpen(result.open);
-    // Arrow keys skip choices that are listed but unavailable.
+    // Only the arrow keys move the highlight, and they skip choices that are listed but unavailable. Home and End are not handled here;
+    // if comboboxKeyResult ever handles them, End must search backward from the last choice.
     const step = event.key === "ArrowUp" ? -1 : 1;
     setActive(event.key === "ArrowDown" || event.key === "ArrowUp" ? nextPickable(choices, result.active, step) : result.active);
     if (!result.open && event.key === "Escape" && result.handled) setTyped(null);
@@ -249,10 +250,12 @@ export function HonorCombobox({
               onMouseDown={(event) => { event.preventDefault(); choose(choice); }}
               role="option"
             >
-              {choice.name}
-              {(choice.unavailableReason ?? choice.detail) && (
-                <span className={styles.detail}>{" "}({choice.unavailableReason ?? choice.detail})</span>
-              )}
+              <span className={styles.label}>
+                {choice.name}
+                {(choice.unavailableReason ?? choice.detail) && (
+                  <span className={styles.detail}>{" "}({choice.unavailableReason ?? choice.detail})</span>
+                )}
+              </span>
             </li>
           );
         })}

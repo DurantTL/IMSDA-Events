@@ -37,6 +37,24 @@ describe("HonorCombobox unavailable choices", () => {
     expect(items().map((li) => li.getAttribute("aria-disabled"))).toEqual([null, "true", null, "true", null]);
   });
 
+  it("keeps the name and its reason in one wrapper, so they wrap together with a space between", async () => {
+    mounted = await mount(createElement(Harness, { onPick: () => {} }));
+    await focus();
+    const row = items()[1]!;
+    expect(row.children).toHaveLength(1);
+    expect(row.children[0]!.textContent).toBe("Archery (Full)");
+  });
+
+  it("gives unavailable rows no active state, even when they are the only match", async () => {
+    mounted = await mount(createElement(Harness, { onPick: () => {} }));
+    await focus();
+    await typeInto(input(), "arch");
+    const row = items()[0]!;
+    expect(row.className).not.toContain("active");
+    expect(row.getAttribute("aria-selected")).toBe("false");
+    expect(row.getAttribute("aria-disabled")).toBe("true");
+  });
+
   it("narrows by name as you type, not by the reason (S4)", async () => {
     mounted = await mount(createElement(Harness, { onPick: () => {} }));
     await focus();

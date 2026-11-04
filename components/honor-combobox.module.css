@@ -8,3 +8,7 @@
   color: var(--muted);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
+
+.label {
+  min-width: 0;
+}
