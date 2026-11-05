@@ -24,16 +24,16 @@ Ticking only records that someone did the work. This sheet remains the full inst
 
 | # | Item | Owner | Blocks | Done |
 | --- | --- | --- | --- | --- |
-| 1 | Build the external, on-premises backup server | Jonathan Swena | 2, 3, 4 | ☐ |
-| 2 | Keep a copy of the encryption key, apart from the database dumps | Jonathan Swena | Real birth dates | ☐ |
-| 3 | Test-restore the key copy | Jonathan Swena | Real birth dates | ☐ |
-| 4 | Send nightly database backups off the host | Server operator *(fill in)* | Real birth dates, WR26 | ☐ |
-| 5 | Confirm an unattended restore rehearsal passes | Server operator *(fill in)* | Real birth dates, WR26 | ☐ |
-| 6 | Confirm the database is reachable only from the app | Server operator *(fill in)* | Real birth dates | ☐ |
-| 7 | Confirm HTTPS end to end | Server operator *(fill in)* | Real birth dates | ☐ |
-| 8 | Confirm MFA for everyone who can see club data | Caleb Durant | Real birth dates | ☐ |
-| 9 | Write the key rotation procedure | Jonathan Swena | Before the first rotation | ☐ |
-| 10 | Tell club directors how removal works | Caleb Durant | Director onboarding | ☐ |
+| 1 | Build the external, on-premises backup server | Jonathan Swena | 2, 3, 4 | 2026-11-05 CD |
+| 2 | Keep a copy of the encryption key, apart from the database dumps | Jonathan Swena | Real birth dates | 2026-11-05 CD |
+| 3 | Test-restore the key copy | Jonathan Swena | Real birth dates | 2026-11-05 CD |
+| 4 | Send nightly database backups off the host | Server operator *(fill in)* | Real birth dates, WR26 | 2026-11-05 CD |
+| 5 | Confirm an unattended restore rehearsal passes | Server operator *(fill in)* | Real birth dates, WR26 | 2026-11-05 CD |
+| 6 | Confirm the database is reachable only from the app | Server operator *(fill in)* | Real birth dates | 2026-11-05 CD |
+| 7 | Confirm HTTPS end to end | Server operator *(fill in)* | Real birth dates | 2026-11-05 CD |
+| 8 | Confirm MFA for everyone who can see club data | Caleb Durant | Real birth dates | 2026-11-05 CD |
+| 9 | Write the key rotation procedure | Jonathan Swena | Before the first rotation | 2026-11-05 CD |
+| 10 | Tell club directors how removal works | Caleb Durant | Director onboarding | 2026-11-05 CD |
 | 11 | Lock down how the encryption key is reached | Jonathan Swena | Real birth dates | ☐ |
 
 ## The items
@@ -196,9 +196,9 @@ GitHub or chat.
 
 | Step | What | Done |
 | --- | --- | --- |
-| A | Only Cloudflare can reach the server | ☐ |
-| B | SSL/TLS mode is Full (strict) | ☐ |
-| C | Rate-limit settings match Cloudflare | ☐ |
+| A | Only Cloudflare can reach the server | 2026-11-05 CD |
+| B | SSL/TLS mode is Full (strict) | 2026-11-05 CD |
+| C | Rate-limit settings match Cloudflare | 2026-11-05 CD |
 
 ### A. Only Cloudflare can reach the server
 
@@ -310,4 +310,5 @@ every request, and Nginx refuses any request without it.
 
 | Date | Item | What was done | Evidence kept at | Initials |
 | --- | --- | --- | --- | --- |
-| | | | | |
+| 2026-11-05 | 1–10, A–C | Reported done by Caleb Durant | Caleb Durant | CD |
+| 2026-11-05 | 11 | Still open: the key is a plain value in the env file and on the xCloud environment page | — | CD |

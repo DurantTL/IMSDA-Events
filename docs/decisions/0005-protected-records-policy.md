@@ -9,8 +9,9 @@ Date: 2026-08-09
 
 **Addendum A (club roster birth dates) is Accepted** as of 2026-09-22; see the end
 of this document. It covers only roster birth dates. **Addendum B (Pathfinder Health Record) is Accepted (interim)** as
-of 2026-10-14 (see its status line); the feature stays switched off in production
-until the prerequisites listed there are met.
+of 2026-10-14 and finally on 2026-11-05 (see its status line); the feature stays
+switched off in production until the encryption key is moved out of the env file
+(server checklist item 11).
 
 ## Context
 
@@ -426,8 +427,9 @@ birth dates need their own protection.
 
 ## Addendum B: Pathfinder Health Record
 
-Status: **Accepted (interim), 2026-10-14, Communication Director and IT
-Director.** Approved as written by the two of them as an interim measure
+Status: **Accepted, 2026-11-05, Communication Director and IT Director**
+(final; see "Decided 2026-11-05" below). First accepted as interim on 2026-10-14
+by the same two people. Approved as written by the two of them as an interim measure
 (issue #923). The reason given: health information currently has no security at
 all (paper forms and Cognito), so this design is better than the status quo
 now. The full sign-off list under "Sign-off" still applies for final
@@ -866,7 +868,37 @@ list shows a null person.
 **Migration.** `20261025200000_health_break_glass_uses` adds one enum and one table (`HealthBreakGlassUse`), and
 makes `HealthSnapshotBreakGlass.personId` nullable with `ON DELETE SET NULL` (it was `CASCADE`).
 
+### Decided 2026-11-05 (Communication Director)
+
+Answers from Caleb Durant, Communication Director, on 2026-11-05 to the open
+items that blocked production use. Where they differ from "Still open" or
+"Sign-off" below, these are the current rule.
+
+1. **Key backup restore test: done** (#1521, reported by Caleb).
+2. **Server checklist:** every item is done except item 11. The encryption key
+   is still a plain value in the server's env file and the xCloud environment
+   page. It must move to the root-only key file before health records are
+   switched on (`docs/DEPLOY-DOCKER.md`, "Loading the encryption key from a
+   protected file").
+3. **Sign-off:** final acceptance needs only the IT Director and the
+   Communication Director. Both have accepted. No other owners are required.
+4. **Retention periods** do not block use. Counsel's review, if any, is a change
+   made as it comes, not a gate.
+5. **Acknowledgment wording:** confirmed as written in
+   `modules/health-records/acknowledgment-domain.ts`. The version is unchanged.
+6. **Coordinator window start:** no start bound is needed. Access follows the
+   event's dates only (it ends at the end of the event's last day).
+7. **After the site is retired** (#1550): decided later. Not a gate.
+8. **Key versioning, rotation and key health check** (#1516): build it now,
+   before real records exist, because adding a key version is simplest while
+   nothing is sealed. Not a gate for switching on.
+9. **Break-glass screen:** added to the build queue (#98) as its own issue.
+10. **Coordinator entry point:** to be built (a link to the coordinator health
+    page from Club coordination).
+
 ### Still open (blocking production use)
+
+Answered on 2026-11-05 (above). Kept for the record.
 
 These are the remaining decisions from section 6 of the options report plus
 questions this build raised.
@@ -895,6 +927,9 @@ questions this build raised.
   no links to them; #658's event sheet is the natural place to link from.
 
 ### Prerequisites before real records
+
+Status 2026-11-05: 1, 2 and 3 are met. 4 is met except checklist item 11 (move
+the key out of the env file), which is the last step before switching on.
 
 1. This addendum Accepted (done, interim, 2026-10-14; final acceptance needs
    the full sign-off list).
