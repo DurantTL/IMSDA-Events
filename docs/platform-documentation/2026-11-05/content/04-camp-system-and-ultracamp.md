@@ -4,7 +4,7 @@
 
 Prepared October 21, 2026 for IMSDA leadership, camp operations and the development team. Repository baseline: main `5e367b7c4d1b3c173d37c0415e335be76170b300`. This report examines overnight youth/summer/residential camp, separately from Camp Meeting, camporees and adult retreats. It is discovery and documentation; it changes no roadmap, account, policy or production setting.
 
-> **Updated November 5, 2026** (main `ad9237d`): the product is now called **IMAdventist** (Events & Club Ministry) with a new symbol, and every product mention below uses the new name. The conference name, support@imsda.org and the website address are unchanged. Source links in the body still point to the October 21 baseline they were checked against. No residential camp or UltraCamp work has been built since October 21; the discovery questions and options below still apply.
+> **Updated November 5, 2026** (main `ad9237d`): every product mention below uses the name **IMAdventist** (Events & Club Ministry). Source links in the body still point to the October 21 baseline they were checked against. No residential camp or UltraCamp work has been built since October 21; the discovery questions and options below still apply.
 
 IMAdventist already has a substantial reusable foundation. A camp system would add the continuous responsibility for an individual child across enrollment, housing, activities, supervision, care, money and release. A conference event with lodging and meal tickets does not establish all of those capabilities.
 

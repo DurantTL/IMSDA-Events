@@ -4,7 +4,7 @@ For club directors, deputies and Area Coordinators · November 2026
 
 **Start at [events.imsda.org](https://events.imsda.org).** IMAdventist (Events & Club Ministry) keeps club records and event registrations together. Directors keep their club's information up to date. Area Coordinators review progress and follow up with directors. The roster records who is in the club. An event registration records who is going to one event.
 
-**New since October:** the system is now called IMAdventist and has a new symbol. The website, the conference office and support@imsda.org are unchanged. Area Coordinators now find every club under **Club coordination**.
+**No earlier training needed.** This handout assumes you are new to the system. It covers signing in, everyday club tasks and where to get help.
 
 ## Sign in and open your work
 

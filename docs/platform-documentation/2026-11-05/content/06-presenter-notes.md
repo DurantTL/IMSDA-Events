@@ -4,7 +4,7 @@ For club directors, deputies and Area Coordinators · November 2026
 
 This orientation follows fictional Riverton Pathfinders through ordinary tasks, then switches to an Area Coordinator's view of the same records. The screenshots come from a local copy of the current app filled with invented training records. They show what the app does at the source version below; your own role decides which tools you see.
 
-**What changed since the October 21 pack:** the product is now called **IMAdventist** (Events & Club Ministry) with a new symbol. Area Coordinators find every club under **Club coordination**. Sign-in pages have **Back to events** and a **Security check**. Help has **Step by step** picture guides. Slide 2 summarizes these for people who saw the October training; skip it for newcomers.
+**Who this is for:** people who are seeing **IMAdventist** (Events & Club Ministry) for the first time. No earlier training is assumed. Slide 2 is a short orientation for everyone: what the system is, where directors and coordinators work, and a few habits that work the same on every page.
 
 **How to present:** show the screenshot, point to the numbered outline, then use the Say paragraph in your own words. The numbered pink outlines are added for training; they are not part of the app.
 
@@ -42,28 +42,28 @@ Point to the two role labels: Club portal for Jordan and Club coordination for A
 - [modules/club-rosters/portal-nav.ts](https://github.com/DurantTL/IMSDA-Events/blob/ad9237d/modules/club-rosters/portal-nav.ts)
 - [components/area-clubs-subnav.tsx](https://github.com/DurantTL/IMSDA-Events/blob/ad9237d/components/area-clubs-subnav.tsx)
 
-## 2. Same system, new name and a few new habits
+## 2. What works the same on every page
 
 ### Say
 
-If you saw the October version of this training, the work itself has not changed. Three things have. First, the name: the system is now IMAdventist, with a new symbol. The conference, its email address and the website are the same. Second, some things moved. Area Coordinators now find every club under Club coordination. Third, the app is more careful with your work. If you start typing in a form and try to leave, it asks before throwing your changes away. Search boxes filter as you type, and table headers sort.
+Before we look at any one task, here is what works the same on every page. The system is called IMAdventist: Events & Club Ministry. It keeps club records and event registrations together, and you start at events.imsda.org. Questions go to the conference office or support@imsda.org. Directors and deputies open My club in the account menu. Area Coordinators open Club coordination. Help has step-by-step picture guides. The app is also careful with your work. If you start typing in a form and try to leave, it asks before throwing your changes away. Search boxes filter as you type, and table headers sort.
 
 ### Point to
 
-This slide replaces the October title slide. Skip it for people who are new to the system.
+Keep this short. Each habit comes up again during the story.
 
 ### On the slide
 
-**New name and logo**
+**What IMAdventist is**
 
-- The system is now called IMAdventist: Events & Club Ministry.
-- The new symbol replaces the old capital-I mark everywhere, including emails.
-- The conference name, support@imsda.org and the website address are unchanged.
+- IMAdventist: Events & Club Ministry keeps club records and event registrations together.
+- Start at events.imsda.org.
+- Questions go to the conference office or support@imsda.org.
 
-**Easier to find your way**
+**Where to find your work**
 
-- Coordinators: Clubs is now part of Club coordination. Waitlists moved there too.
-- Sign-in pages have a Back to events link and a Security check.
+- Directors and deputies: My club in the account menu.
+- Area Coordinators: Club coordination in the account menu.
 - Help has step-by-step picture guides for directors and coordinators.
 
 **Safer everyday work**
@@ -512,7 +512,7 @@ Point to Membership total, then Save draft.
 
 ### Say
 
-Every club page has Forms help at the top. It covers common form problems, translation, and how to reach the conference office. The Help page in your account menu has short guides and new Step by step guides, with a picture of the real screen for each step. Reading a guide doesn't finish a task; the work happens on the working pages.
+Every club page has Forms help at the top. It covers common form problems, translation, and how to reach the conference office. The Help page in your account menu has short guides and Step by step guides, with a picture of the real screen for each step. Reading a guide doesn't finish a task; the work happens on the working pages.
 
 ### On the slide
 
@@ -533,7 +533,7 @@ Every club page has Forms help at the top. It covers common form problems, trans
 
 ### Say
 
-Now we switch to Alex. Alex's account page has an Area Coordinator card with upcoming club events and clubs that need attention. Everything for coordinators now lives under Club coordination in the account menu. The old Clubs and All clubs pages are part of it now.
+Now we switch to Alex. Alex's account page has an Area Coordinator card with upcoming club events and clubs that need attention. Everything for coordinators lives under Club coordination in the account menu.
 
 ### Point to
 
@@ -718,7 +718,7 @@ A few small changes apply everywhere. If you start editing and try to leave, the
 
 ### Say
 
-Some of what we called planned in October is now done: the event form builder improvements, the public site redesign and the picture guides. Other items are still planned or are longer-term possibilities. Planned means tracked work that has not been built. Possible means an idea that still needs decisions. None of the planned or possible items are in the app today.
+Some of what you see today was finished recently: the event form builder improvements, the public site redesign and the picture guides. Other items are still planned or are longer-term possibilities. Planned means tracked work that has not been built. Possible means an idea that still needs decisions. None of the planned or possible items are in the app today.
 
 ### Point to
 
@@ -726,7 +726,7 @@ Keep the three labels distinct. Don't promise dates.
 
 ### On the slide
 
-**Delivered since October**
+**Already built**
 
 - Event form builder: templates, a question library, phone editing and All/Any rules.
 - Redesigned public home, events, calendar, event and club ministry pages.

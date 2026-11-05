@@ -2,7 +2,7 @@
 
 Prepared October 21, 2026. Technical reference for maintainers, administrators and project reviewers.
 
-> **Updated November 5, 2026** (main `ad9237d`): the product is now called **IMAdventist** (Events & Club Ministry) with a new symbol, and every product mention below uses the new name. The conference name, support@imsda.org and the website address are unchanged. Source links in the body still point to the October 21 baseline they were checked against. The test counts and CI runs below are the October 21 evidence and were not re-run for this update. Since then the repository has added real-browser club and event journeys required in CI (#1439), a code check for every site rule (#1440) and a per-area pause switch (#1518). Use the current GitHub CI results for today's numbers.
+> **Updated November 5, 2026** (main `ad9237d`): every product mention below uses the name **IMAdventist** (Events & Club Ministry). Source links in the body still point to the October 21 baseline they were checked against. The test counts and CI runs below are the October 21 evidence and were not re-run for this update. Since then the repository has added real-browser club and event journeys required in CI (#1439), a code check for every site rule (#1440) and a per-area pause switch (#1518). Use the current GitHub CI results for today's numbers.
 
 **Baseline:** repository main at `5e367b7c4d1b3c173d37c0415e335be76170b300`. The latest application-source merge is `72a6cb214185cd7b74696f8913535f85330b690f`; subsequent merges added the design reference documents. This report uses read-only source inspection and actual GitHub Actions run/job/log summaries. No application code or tests were changed, and no new application test run was started for this report.
 
