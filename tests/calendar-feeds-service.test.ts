@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   audits: [] as Array<Record<string, unknown>>,
   nextId: 1,
   missFingerprintOnce: false,
+  previousFingerprints: [] as string[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -18,9 +19,11 @@ vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/secret-box", () => ({
   SecretBoxError: class SecretBoxError extends Error {},
   isSecretEncryptionConfigured: () => true,
-  sealSecret: (value: string) => `v1.${Buffer.from(value).toString("base64url")}`,
+  sealSecret: (value: string) => `v2.1.${Buffer.from(value).toString("base64url")}`,
   fingerprintSecret: (value: string, purpose: string) => `fp.${purpose}.${Buffer.from(value).toString("base64url")}`,
-  openSecret: (sealed: string) => Buffer.from(String(sealed).slice(3), "base64url").toString("utf8"),
+  fingerprintSecretCandidates: (value: string, purpose: string) => [`fp.${purpose}.${Buffer.from(value).toString("base64url")}`, ...state.previousFingerprints],
+  previousSecretKeyVersion: () => null,
+  openSecret: (sealed: string) => Buffer.from(String(sealed).slice(5), "base64url").toString("utf8"),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: async (entry: Record<string, unknown>) => { state.audits.push(entry); } }));
 vi.mock("@/lib/prisma", () => {
@@ -112,6 +115,7 @@ beforeEach(() => {
   state.entryWrites = 0;
   state.audits = [];
   state.nextId = 1;
+  state.previousFingerprints = [];
   body = ics;
 });
 
@@ -120,15 +124,15 @@ describe("imported calendar feeds", () => {
     const feeds = await createCalendarFeed(input, "admin-1");
     const stored = JSON.stringify(state.feeds);
     expect(stored).not.toContain("private-abc123SECRET");
-    expect(state.feeds[0].sealedUrl).toMatch(/^v1\./);
-    expect(JSON.stringify(feeds)).not.toMatch(/SECRET|sealedUrl|v1\./);
+    expect(state.feeds[0].sealedUrl).toMatch(/^v2\.1\./);
+    expect(JSON.stringify(feeds)).not.toMatch(/SECRET|sealedUrl|v[12]\./);
     expect(feeds[0]).toMatchObject({ urlHint: "calendar.example.test….ics", imported: false });
     expect(JSON.stringify(state.audits)).not.toContain("SECRET");
   });
 
   it("rewrites webcal:// and refuses unsafe addresses", async () => {
     await createCalendarFeed({ ...input, url: "webcal://calendar.example.test/ical/x/basic.ics" }, "admin-1");
-    expect(Buffer.from(String(state.feeds[0].sealedUrl).slice(3), "base64url").toString()).toMatch(/^https:\/\//);
+    expect(Buffer.from(String(state.feeds[0].sealedUrl).slice(5), "base64url").toString()).toMatch(/^https:\/\//);
     for (const url of ["http://calendar.example.test/a.ics", "https://127.0.0.1/a.ics", "https://u:p@calendar.example.test/a.ics"]) {
       await expect(createCalendarFeed({ ...input, url }, "admin-1")).rejects.toMatchObject({ code: "INVALID_FEED" });
     }
@@ -233,7 +237,7 @@ describe("imported calendar feeds", () => {
     const now = new Date("2026-10-03T12:00:00Z");
     const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
     const make = (id: string, extra: Record<string, unknown>) => state.feeds.push({
-      id, name: id, sealedUrl: `v1.${Buffer.from(privateUrl).toString("base64url")}`, urlHint: "x", urlFingerprint: `fp-${id}`, isEnabled: true, refreshMinutes: 60,
+      id, name: id, sealedUrl: `v2.1.${Buffer.from(privateUrl).toString("base64url")}`, urlHint: "x", urlFingerprint: `fp-${id}`, isEnabled: true, refreshMinutes: 60,
       lastSucceededAt: minutesAgo(500), lastFetchedAt: minutesAgo(500), defaultCategory: "", defaultEntryType: "STANDARD", publishNewItems: false, updatedByUserId: "admin-1", ...extra,
     });
     make("due-1", { lastFetchedAt: minutesAgo(400) });
@@ -312,6 +316,21 @@ describe("imported calendar feeds", () => {
     await createCalendarFeed({ ...input, name: "Other", url: "https://calendar.example.test/ical/other/basic.ics" }, "admin-1");
     await updateCalendarFeed(state.feeds[0].id, { url: privateUrl }, "admin-1");
     await expect(updateCalendarFeed(state.feeds[1].id, { url: privateUrl }, "admin-1")).rejects.toMatchObject({ code: "INVALID_FEED" });
+  });
+
+  it("also matches the previous key's fingerprint while a key rotation is under way (#1516)", async () => {
+    await addFeed();
+    // The saved feed has not been re-fingerprinted yet: its fingerprint is the previous key's.
+    state.feeds[0].urlFingerprint = "fp.previous-key.of-the-saved-address";
+    await expect(createCalendarFeed({ ...input, name: "Again" }, "admin-1")).resolves.toBeDefined();
+    expect(state.feeds).toHaveLength(2);
+    state.feeds.pop();
+    state.previousFingerprints = ["fp.previous-key.of-the-saved-address"];
+    await expect(createCalendarFeed({ ...input, name: "Again" }, "admin-1")).rejects.toMatchObject({
+      code: "INVALID_FEED",
+      message: "This calendar is already connected as Synthetic Google calendar.",
+    });
+    expect(state.feeds).toHaveLength(1);
   });
 
   it("answers a save that loses the unique-constraint race with the same friendly message", async () => {
