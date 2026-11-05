@@ -1,5 +1,7 @@
 # IMSDA Events — documentation and training pack
 
+> **Superseded.** The current pack is [November 5, 2026](../2026-11-05/README.md), with the IMAdventist name, new screenshots and updated training. This October pack is kept as a historical record.
+
 Prepared October 21, 2026. The reference reports use source baseline: [main `5e367b7c`](https://github.com/DurantTL/IMSDA-Events/commit/5e367b7c4d1b3c173d37c0415e335be76170b300).
 
 This pack explains the current system, consolidates accessibility/usability findings, supplies practical help and communication drafts, and separates future possibilities from implemented behavior. Camp-system/UltraCamp discovery and the technical verification report are separate documents so each can be shared with the right audience.
