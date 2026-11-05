@@ -38,6 +38,9 @@ describe("picking the roster member for the link (#1618)", () => {
   it("takes the later club year when an event spans two", () => {
     expect(pickRosterMemberId([{ id: "old", clubYear: "2025-26", status: "ACTIVE" }, { id: "new", clubYear: "2026-27", status: "ACTIVE" }])).toBe("new");
   });
+  it("gives null when every row is inactive, since the record page loads active members only", () => {
+    expect(pickRosterMemberId([{ id: "gone", clubYear: "2026-27", status: "INACTIVE" }])).toBeNull();
+  });
   it("prefers an active row over a later inactive one", () => {
     expect(pickRosterMemberId([{ id: "active", clubYear: "2025-26", status: "ACTIVE" }, { id: "gone", clubYear: "2026-27", status: "INACTIVE" }])).toBe("active");
   });

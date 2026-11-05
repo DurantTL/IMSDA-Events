@@ -122,14 +122,13 @@ export type HealthAttendeeRow = {
 };
 
 /**
- * The roster row an attendee's Health Record link points at (#1618). One match
- * is used as is. When an event spans two club years, an ACTIVE row wins over an
- * inactive one, then the later club year. None gives null.
+ * The roster row an attendee's Health Record link points at (#1618). Only an
+ * ACTIVE row counts, because the Health Record page loads active members only;
+ * of those, the later club year wins when an event spans two. None gives null.
  */
 export function pickRosterMemberId(rows: ReadonlyArray<{ id: string; clubYear?: string | null; status?: string | null }>): string | null {
-  const ranked = [...rows].sort((a, b) =>
-    Number(b.status === "ACTIVE") - Number(a.status === "ACTIVE") || (b.clubYear ?? "").localeCompare(a.clubYear ?? ""));
-  return ranked[0]?.id ?? null;
+  const active = rows.filter((row) => row.status === "ACTIVE").sort((a, b) => (b.clubYear ?? "").localeCompare(a.clubYear ?? ""));
+  return active[0]?.id ?? null;
 }
 
 export type HealthClubSheet = {

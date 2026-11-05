@@ -267,14 +267,16 @@ export function AreaClubEvents({ events, clubHref, healthEventIds, query, sortin
                 {" · "}{event.clubs.filter((club) => club.status === "REGISTERED").length} clubs registered · {formatNumber(eventHeadcount(event.clubs))} people
               </p>
             </div>
-            <div className="coordinator-event-head">
-              <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>Kitchen report</Link>
-              {healthEventIds?.includes(event.id) && (
+            {healthEventIds?.includes(event.id) ? (
+              <div className="coordinator-event-head">
+                <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>Kitchen report</Link>
                 <Link className="secondary-button" href={areaHealthHref(event.id)}>
                   Health information<span className="sr-only">: {event.name}</span>
                 </Link>
-              )}
-            </div>
+              </div>
+            ) : (
+              <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>Kitchen report</Link>
+            )}
           </div>
           <div className="report-table-wrap">
             <table role="table" className="report-table table-cards">

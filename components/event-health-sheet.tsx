@@ -1,3 +1,4 @@
+import styles from "./event-health-sheet.module.css";
 import { HEALTH_TEXT, type HealthAttendeeRow, type HealthClubSheet } from "@/modules/coordinator-health/domain";
 
 function formatDate(value: string | null) {
@@ -48,7 +49,7 @@ export function EventHealthSheet({ clubs, clubLinks, attendeeHref }: { clubs: He
                     <tr key={attendee.attendeeId}>
                       <th scope="row" translate="no">
                         {attendeeHref && attendee.rosterMemberId
-                          ? <a href={attendeeHref(club.organizationId, attendee.rosterMemberId)}>{attendee.name}<span className="sr-only">: Health Record</span></a>
+                          ? <a className={styles.attendeeLink} href={attendeeHref(club.organizationId, attendee.rosterMemberId)}>{attendee.name}<span className="sr-only">: Health Record</span></a>
                           : attendee.name}
                       </th>
                       <td translate={attendee.dietary ? "no" : undefined}>{attendee.dietary ?? "None entered"}</td>
