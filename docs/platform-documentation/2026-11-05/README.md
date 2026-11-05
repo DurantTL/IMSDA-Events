@@ -14,7 +14,7 @@ Prepared November 5, 2026 from [main `ad9237d`](https://github.com/DurantTL/IMSD
 
 - [Getting started PowerPoint, 31 slides with speaker notes](exports/IMAdventist-getting-started.pptx) · [PDF](exports/IMAdventist-getting-started.pdf)
 - Presenter notes: [PDF](exports/06-presenter-notes.pdf) · [Word](exports/06-presenter-notes.docx) · [Web page](exports/06-presenter-notes.html) · [Markdown](content/06-presenter-notes.md)
-- Quick-start handout (4 pages): [PDF](exports/07-club-quick-start.pdf) · [Word](exports/07-club-quick-start.docx) · [Web page](exports/07-club-quick-start.html) · [Markdown](content/07-club-quick-start.md)
+- Quick-start handout (5 pages): [PDF](exports/07-club-quick-start.pdf) · [Word](exports/07-club-quick-start.docx) · [Web page](exports/07-club-quick-start.html) · [Markdown](content/07-club-quick-start.md)
 - [Screenshot gallery, 44 fictional training screenshots](exports/IMAdventist-training-screenshot-gallery.html)
 
 **Choose a route:** slides 1–2 introduce the system for everyone. Slides 3–6 cover the public site and sign-in. Slides 7–21 follow director Jordan Ellis. Slides 22–28 follow Area Coordinator Alex Morgan. Slides 29–31 cover everyday habits, what is planned, and signing out. Directors only: slides 1–21 and 31. Coordinators only: slides 1–6 and 22–31.

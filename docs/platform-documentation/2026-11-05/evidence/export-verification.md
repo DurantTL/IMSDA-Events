@@ -3,7 +3,7 @@
 ## What was checked
 
 - **Deck:** 31 slides, 77 embedded pictures (screenshots and the IMAdventist symbol), every picture has alternative text, every slide has speaker notes. Titles, bullets and captions are editable text; screenshots are embedded images. The PowerPoint and its PDF open without errors.
-- **PDFs:** all eight open, contain selectable text and are tagged. Page counts: deck 31, presenter notes 22, quick-start 4, reports 01–05 between 10 and 13. Tags alone do not prove PDF/UA or WCAG conformance.
+- **PDFs:** all eight open, contain selectable text and are tagged. Page counts: deck 31, presenter notes 22, quick-start 5, reports 01–05 between 10 and 13. Tags alone do not prove PDF/UA or WCAG conformance.
 - **Word files:** all seven pass a ZIP integrity check.
 - **Web pages:** all eight HTML files were opened at 390 px and 1280 px wide. None scrolls sideways. Every image loads (the gallery loads its pictures as you scroll).
 - **Links:** every local link in the README and content files points to a file that exists. The `{{portal_url}}` entries in the help kit are runtime template tokens, not links.

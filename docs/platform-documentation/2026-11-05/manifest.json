@@ -11,7 +11,7 @@
     {
       "path": "README.md",
       "bytes": 5123,
-      "sha256": "84d953f87d3914b24f098417afe40f4084ec8e1ae23c58063e5fb0987dbb54f8"
+      "sha256": "04923d0e3d4d7b6d443598af935153debc76a01ffd813579d9bb6f63d977761f"
     },
     {
       "path": "assets/FONT-LICENSE.txt",
@@ -285,13 +285,13 @@
     },
     {
       "path": "content/07-club-quick-start.md",
-      "bytes": 7108,
-      "sha256": "cbb72dcf479f54b73d57071f52e43728f2466cb6ff036ac8562276dd44b49676"
+      "bytes": 8291,
+      "sha256": "7a945aae7ef78edbd446c400ff24d93fb48df54766153f809fbdb1d3f0d3c0e7"
     },
     {
       "path": "evidence/export-verification.md",
       "bytes": 2012,
-      "sha256": "68b086c4b0c4278c3746dfe4f542bb725f623ef615fd16381f5b20ea740eca89"
+      "sha256": "226a0b43b9d5134a364f18feb15966b49faa7ca7ddc640dc0c7e0d2b2d1444cf"
     },
     {
       "path": "evidence/screenshot-capture.json",
@@ -395,18 +395,18 @@
     },
     {
       "path": "exports/07-club-quick-start.docx",
-      "bytes": 14246,
-      "sha256": "ae1f57b4fd4b082181cc001e55c460bc0506538194df9efe723d945223206b0f"
+      "bytes": 14763,
+      "sha256": "a6a142a8a3f5685d7b4cefd24747f76babf3f4ab16b169b31cca684e40cffa4a"
     },
     {
       "path": "exports/07-club-quick-start.html",
-      "bytes": 12596,
-      "sha256": "08e03377f12f2e4f46f6d85d2ff62aa76c0df911aad408efa31fcd667978b1fb"
+      "bytes": 14060,
+      "sha256": "11cb5d7f5717f3b050597a01e25b362089b6059cd378a156db1ab29e3890ac69"
     },
     {
       "path": "exports/07-club-quick-start.pdf",
-      "bytes": 1052510,
-      "sha256": "16cd9769b3407d5b705dfd5d00d3ee089b0b28e6b5d0f8c0ae31e172dd8881dd"
+      "bytes": 1063548,
+      "sha256": "a072d73857432f8ec1ce61b199de5dacee573f38fb097861d4519d53551d11ef"
     },
     {
       "path": "exports/IMAdventist-getting-started.pdf",
