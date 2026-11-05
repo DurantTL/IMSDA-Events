@@ -16,7 +16,7 @@ function emergencyNote(attendee: HealthAttendeeRow) {
   return null;
 }
 
-export function EventHealthSheet({ clubs, clubLinks }: { clubs: HealthClubSheet[]; clubLinks?: (organizationId: string) => { view: string; sheet: string } }) {
+export function EventHealthSheet({ clubs, clubLinks, attendeeHref }: { clubs: HealthClubSheet[]; clubLinks?: (organizationId: string) => { view: string; sheet: string }; attendeeHref?: (organizationId: string, rosterMemberId: string) => string }) {
   if (clubs.length === 0) return <p className="quiet-copy">No club has registered for this event.</p>;
   return (
     <div className="event-health-sheet">
@@ -46,7 +46,11 @@ export function EventHealthSheet({ clubs, clubLinks }: { clubs: HealthClubSheet[
                 <tbody>
                   {club.attendees.map((attendee) => (
                     <tr key={attendee.attendeeId}>
-                      <th scope="row" translate="no">{attendee.name}</th>
+                      <th scope="row" translate="no">
+                        {attendeeHref && attendee.rosterMemberId
+                          ? <a href={attendeeHref(club.organizationId, attendee.rosterMemberId)}>{attendee.name}<span className="sr-only">: Health Record</span></a>
+                          : attendee.name}
+                      </th>
                       <td translate={attendee.dietary ? "no" : undefined}>{attendee.dietary ?? "None entered"}</td>
                       <td>{attendee.medicalFlag ?? "Not answered"}</td>
                       <td>{HEALTH_TEXT.medicationsValue}</td>

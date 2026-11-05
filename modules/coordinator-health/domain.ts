@@ -117,7 +117,20 @@ export type HealthAttendeeRow = {
   medicalFlag: "Yes" | "No" | null;
   emergencyContacts: EmergencyContact[];
   emergencyStatus: EmergencyStatus;
+  /** The attendee's roster member in this club (#1618), for the per-attendee Health Record link; null when none matches. */
+  rosterMemberId: string | null;
 };
+
+/**
+ * The roster row an attendee's Health Record link points at (#1618). One match
+ * is used as is. When an event spans two club years, an ACTIVE row wins over an
+ * inactive one, then the later club year. None gives null.
+ */
+export function pickRosterMemberId(rows: ReadonlyArray<{ id: string; clubYear?: string | null; status?: string | null }>): string | null {
+  const ranked = [...rows].sort((a, b) =>
+    Number(b.status === "ACTIVE") - Number(a.status === "ACTIVE") || (b.clubYear ?? "").localeCompare(a.clubYear ?? ""));
+  return ranked[0]?.id ?? null;
+}
 
 export type HealthClubSheet = {
   organizationId: string;
@@ -214,4 +227,9 @@ export function sortAttendees(rows: HealthAttendeeRow[]) {
 /** Where an Area Coordinator opens an event's health sheet (#1618); the page itself decides who gets in. */
 export function areaHealthHref(eventId: string) {
   return `/account/area/health?event=${encodeURIComponent(eventId)}`;
+}
+
+/** An Area Coordinator's per-attendee Health Record page (#1618); that page does its own switch, step and window checks. */
+export function areaAttendeeHealthHref(eventId: string, organizationId: string, memberId: string) {
+  return `/account/area-clubs/health/${encodeURIComponent(eventId)}/${encodeURIComponent(organizationId)}/${encodeURIComponent(memberId)}`;
 }

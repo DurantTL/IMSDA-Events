@@ -27,6 +27,7 @@ import {
   PASSENGER_LIST_KEY,
   PASSENGER_SLOTS,
   PERMISSION_SLIP_KEY,
+  pickRosterMemberId,
   slipContact,
   SLIP_EMERGENCY_KEY,
   sortAttendees,
@@ -207,7 +208,7 @@ export async function loadEventHealth(
   const [rosterMembers, submissions] = organizationIds.length === 0 ? [[], []] : await Promise.all([
     prisma.clubRosterMember.findMany({
       where: { organizationId: { in: organizationIds }, clubYear: { in: years }, personId: { in: personIds } },
-      select: { id: true, organizationId: true, personId: true },
+      select: { id: true, organizationId: true, personId: true, clubYear: true, status: true },
     }),
     prisma.clubFormSubmission.findMany({
       where: {
@@ -256,6 +257,7 @@ export async function loadEventHealth(
     const key = `${member.organizationId}:${member.personId}`;
     membersByPerson.set(key, (membersByPerson.get(key) ?? new Set()).add(member.id));
   }
+  const rosterRowsByPerson = Map.groupBy(rosterMembers, (member) => `${member.organizationId}:${member.personId}`);
   const dates = eventCalendarDates(event);
   const clubs: HealthClubSheet[] = registrations.map((row) => {
     const organizationId = row.organization.id;
@@ -314,6 +316,7 @@ export async function loadEventHealth(
         medicalFlag: medicalFlagFromResponses(attendee.formResponses),
         emergencyContacts: sortContacts(contacts),
         emergencyStatus,
+        rosterMemberId: pickRosterMemberId(rosterRowsByPerson.get(`${organizationId}:${attendee.personId}`) ?? []),
       };
     });
     // One sheet per registration: a club's teams (#809) each get their own, named "Team (Club)".

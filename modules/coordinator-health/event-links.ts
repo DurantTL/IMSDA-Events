@@ -1,6 +1,5 @@
 import "server-only";
 
-import { logError } from "@/lib/logger";
 import { resolveAreaHealthViewer } from "@/modules/coordinator-health/access";
 import { listHealthEvents } from "@/modules/coordinator-health/repository";
 
@@ -19,8 +18,8 @@ export async function areaHealthLinkEventIds(): Promise<string[]> {
     const viewer = await resolveAreaHealthViewer();
     if (!viewer) return [];
     return (await listHealthEvents(viewer)).map((event) => event.id);
-  } catch (error) {
-    logError("Coordinator health links read failed", error);
+  } catch {
+    // Nothing in this module logs (privacy guard); a failed read just hides the links.
     return [];
   }
 }

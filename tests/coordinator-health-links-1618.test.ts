@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/modules/coordinator-health/access", () => ({ resolveAreaHealthViewer: mocks.resolveAreaHealthViewer }));
 vi.mock("@/modules/coordinator-health/repository", () => ({ listHealthEvents: mocks.listHealthEvents }));
 
