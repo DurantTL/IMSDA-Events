@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
 import { resolveClubsActor } from "@/modules/access/admin-roles";
@@ -31,7 +31,8 @@ export type AreaCoordinatorInviteErrorCode =
   | "INVITE_EXPIRED"
   | "INVITE_ALREADY_OPEN"
   | "INVITE_RESEND_TOO_SOON"
-  | "EMAIL_NOT_CONFIGURED";
+  | "EMAIL_NOT_CONFIGURED"
+  | "NOTHING_TO_SEND";
 
 export class AreaCoordinatorInviteError extends Error {
   constructor(public readonly code: AreaCoordinatorInviteErrorCode, message: string) {
@@ -126,6 +127,78 @@ export async function createAreaCoordinatorInvite(
     metadata: { emailQueued: canSend },
   }, tx);
   return { inviteId: invite.id, messageId };
+}
+
+/**
+ * Creates an invite that is not emailed yet (#1608): the CSV import. It stays PENDING, with no send time or expiry, until a
+ * system administrator presses Send. One open invite per email: an existing one, or a race lost to the unique index,
+ * answers `created: false` and writes nothing.
+ */
+export async function createPendingAreaCoordinatorInvite(
+  client: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
+  input: { email: string; name: string; actorUserId: string },
+): Promise<{ created: boolean; inviteId?: string }> {
+  const email = input.email.trim().toLowerCase();
+  if (await findOpenAreaCoordinatorInvite(client, email)) return { created: false };
+  try {
+    const invite = await client.areaCoordinatorInvite.create({
+      data: { email, name: input.name.trim(), status: "PENDING", createdByUserId: input.actorUserId },
+      select: { id: true },
+    });
+    return { created: true, inviteId: invite.id };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return { created: false };
+    throw error;
+  }
+}
+
+/** How many Area Coordinator invites are waiting to be sent. */
+export function countPendingAreaCoordinatorInvites() {
+  return getPrisma().areaCoordinatorInvite.count({ where: { status: "PENDING" } });
+}
+
+/**
+ * A system administrator presses Send (#1608): the only way an imported invite is emailed. Every PENDING invite is queued
+ * through the usual invite email and marked SENT with its send time, count and 14-day expiry; the status write is guarded so
+ * an invite cancelled in the meantime is not emailed. One audit entry carries the count only. Returns the queued message ids
+ * for delivery.
+ */
+export async function sendPendingAreaCoordinatorInvites(actorUserId: string, now = new Date()) {
+  if (!isAccountEmailConfigured()) {
+    throw new AreaCoordinatorInviteError("EMAIL_NOT_CONFIGURED", "Account email isn't set up on this server, so invites can't be sent yet.");
+  }
+  const prisma = getPrisma();
+  const invites = await prisma.areaCoordinatorInvite.findMany({
+    where: { status: "PENDING" },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true, email: true, name: true },
+  });
+  if (invites.length === 0) throw new AreaCoordinatorInviteError("NOTHING_TO_SEND", "There are no Area Coordinator invites waiting to be sent.");
+
+  const correlationId = randomUUID();
+  const messageIds: string[] = [];
+  for (const invite of invites) {
+    const messageId = await prisma.$transaction(async (tx) => {
+      const guarded = await tx.areaCoordinatorInvite.updateMany({
+        where: { id: invite.id, status: "PENDING" },
+        data: { status: "SENT", sentAt: now, sentCount: { increment: 1 }, expiresAt: clubInviteExpiry(now) },
+      });
+      if (guarded.count === 0) return null;
+      const queuedId = await queueMessage(tx, invite, correlationId);
+      await tx.areaCoordinatorInvite.update({ where: { id: invite.id }, data: { lastMessageId: queuedId } });
+      return queuedId;
+    });
+    if (messageId) messageIds.push(messageId);
+  }
+  if (messageIds.length === 0) throw new AreaCoordinatorInviteError("NOTHING_TO_SEND", "There are no Area Coordinator invites waiting to be sent.");
+  await writeAuditLog({
+    actorUserId,
+    action: "AREA_COORDINATOR_INVITES_SENT",
+    entityType: "AreaCoordinatorInvite",
+    summary: `Sent ${messageIds.length} Area Coordinator invite${messageIds.length === 1 ? "" : "s"}.`,
+    metadata: { count: messageIds.length },
+  });
+  return { sent: messageIds.length, messageIds };
 }
 
 /** Sent invites waiting for this account, matched on its verified email. Excludes expired ones. */

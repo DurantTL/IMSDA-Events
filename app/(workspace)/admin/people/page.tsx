@@ -2,12 +2,14 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { AreaCoordinatorImport } from "@/components/area-coordinator-import";
 import { ActAsButton } from "@/components/act-as-button";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { InvitePerson } from "@/components/invite-person";
 import { sliceFromCount } from "@/lib/pagination";
 import { PeopleDirectory } from "@/components/people-directory";
 import { PendingInvites } from "@/components/pending-invites";
+import { countPendingAreaCoordinatorInvites } from "@/modules/organizations/area-coordinator-invites";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { listClubOptions, listEventOptions, searchPeople } from "@/modules/system-admin/people-directory";
 import { listPendingInvitesPage } from "@/modules/system-admin/pending-invites";
@@ -45,11 +47,12 @@ export default async function PeopleAccessPage({
   // Pending invites (#1276) show above the list when no role filter is on, and are the list when it is the only role (#1277).
   const pendingOnly = filters.roles.length === 1 && filters.roles[0].kind === "pending";
   const showPending = peopleFilterCount(filters) === 0 || pendingOnly;
-  const [result, pending] = await Promise.all([
+  const [result, pending, waitingAreaInvites] = await Promise.all([
     pendingOnly
       ? { rows: [], page: 1, pageCount: 1, total: 0 }
       : searchPeople(query, parsePeoplePage(params.page), viewer.scope, filters),
     showPending ? listPendingInvitesPage({ query, scope: viewer.scope }, parsePeoplePage(params.pendingPage)) : { invites: [], emailConfigured: false, total: 0, page: 1, pageSize: 1 },
+    full ? countPendingAreaCoordinatorInvites() : 0,
   ]);
   return (
     <>
@@ -59,6 +62,7 @@ export default async function PeopleAccessPage({
         primary={(
           <>
             <InvitePerson clubOptions={clubOptions} eventOptions={eventOptions} scope={viewer.scope} />
+            {full ? <AreaCoordinatorImport pendingCount={waitingAreaInvites} /> : null}
             {viewer.scope === "full" ? (
               <ActAsButton
                 access="View only"

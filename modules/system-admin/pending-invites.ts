@@ -25,6 +25,8 @@ export type PendingInvite = {
   what: string;
   sentAt: string | null;
   expired: boolean;
+  /** An imported Area Coordinator invite (#1608) waiting for a system administrator to press Send. */
+  notSent?: boolean;
   /** Family-side invites carry no secret, so staff can pass this link on themselves when email isn't set up. */
   signUpUrl?: string;
 };
@@ -33,7 +35,7 @@ export type PendingInvite = {
 export const PENDING_INVITES_PAGE_SIZE = 25;
 
 const clubSelect = { id: true, email: true, name: true, role: true, sentAt: true, createdAt: true, expiresAt: true, organization: { select: { name: true } } } as const;
-const areaSelect = { id: true, email: true, name: true, sentAt: true, createdAt: true, expiresAt: true } as const;
+const areaSelect = { id: true, status: true, email: true, name: true, sentAt: true, createdAt: true, expiresAt: true } as const;
 const staffSelect = {
   id: true, email: true, displayName: true, createdAt: true,
   resetTokens: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true, expiresAt: true, usedAt: true } },
@@ -62,6 +64,7 @@ const fromArea = (invite: AreaRow, now: Date): PendingInvite => ({
   what: "Area Coordinator",
   sentAt: (invite.sentAt ?? invite.createdAt).toISOString(),
   expired: Boolean(invite.expiresAt && invite.expiresAt <= now),
+  ...(invite.status === "PENDING" ? { notSent: true } : {}),
   signUpUrl: clubInviteSignUpUrl(invite.email),
 });
 
