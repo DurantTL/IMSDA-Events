@@ -151,19 +151,34 @@ describe("the Clubs sidebar groups", () => {
     }
   });
 
-  it("draws the groups closed, opens the one holding the page, and keeps the health import rule", () => {
+  it("shows four primary destinations and opens More club tools for secondary pages", () => {
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
     navigation.pathname = "/admin/clubs";
     const home = sidebarOf(render({ user: staff, adminRoleView: view }));
-    for (const group of clubsAdminGroups) {
-      expect(toggle(home, group.key), group.key).not.toBeNull();
-      expect(expanded(home, group.key), group.key).toBe(false);
-    }
+    const primary = home.slice(0, home.indexOf('class="nav-group"'));
+    const primaryLinks = Array.from(primary.matchAll(/href="([^"]+)"[^>]*>(?:(?!<\/a>).)*<span>([^<]+)<\/span>/g));
+    expect(primaryLinks.map(([, href, label]) => [href, label])).toEqual([
+      ["/admin/clubs", "Overview"],
+      ["/admin/clubs/summary", "Club directory"],
+      ["/admin/clubs/reports", "Monthly records"],
+      ["/admin/clubs/applications", "Applications"],
+    ]);
+    expect(home).toContain("More club tools");
+    expect(toggle(home, "clubs-clubs")).not.toBeNull();
+    expect(expanded(home, "clubs-clubs")).toBe(false);
     expect(home).toContain('aria-current="page" href="/admin/clubs"');
+    for (const item of clubsAdminGroups.flatMap((group) => group.items)) {
+      expect(home.split(`href="${item.href}"`), item.href).toHaveLength(2);
+    }
+    navigation.pathname = "/admin/clubs/reports/club-1/2026-10";
+    navigation.search = "year=2026-27";
+    const report = sidebarOf(render({ user: staff, adminRoleView: view }));
+    expect(report).toContain('aria-current="page" href="/admin/clubs/reports?year=2026-27"');
+    expect(expanded(report, "clubs-clubs")).toBe(false);
     navigation.pathname = "/admin/clubs/invites";
     const invites = sidebarOf(render({ user: staff, adminRoleView: view }));
-    expect(expanded(invites, "clubs-applications")).toBe(true);
-    expect(expanded(invites, "clubs-clubs")).toBe(false);
+    expect(expanded(invites, "clubs-clubs")).toBe(true);
+    expect(invites).toContain('aria-current="page" href="/admin/clubs/invites"');
     expect(home).toContain("/admin/clubs/health-import");
     const off = sidebarOf(render({ user: staff, adminRoleView: { ...view, healthImport: false } }));
     expect(off).not.toContain("/admin/clubs/health-import");

@@ -328,6 +328,24 @@ export const clubsAdminNavigation: readonly NavigationItem[] = [
   ...clubsAdminGroups.flatMap((group) => group.items.filter((item) => !item.href.includes("#"))),
 ];
 
+const clubsDesktopLabels: Readonly<Record<string, string>> = {
+  [clubsAdminHomeItem.href]: "Overview",
+  "/admin/clubs/summary": "Club directory",
+  "/admin/clubs/reports": "Monthly records",
+  "/admin/clubs/applications": "Applications",
+};
+
+export const clubsDesktopPrimary = clubsAdminNavigation.flatMap((item) => {
+  const label = clubsDesktopLabels[item.href];
+  return label ? [{ ...item, label }] : [];
+});
+
+export const clubsDesktopMore = {
+  key: "clubs-clubs",
+  label: "More club tools",
+  items: clubsAdminGroups.flatMap((group) => group.items.filter((item) => !clubsDesktopLabels[item.href])),
+} as const;
+
 /** The Clubs pages that read `?year=`; their sidebar links carry the year the viewer picked. */
 export const clubsAdminYearPaths: readonly string[] = ["/admin/clubs", "/admin/clubs/summary", "/admin/clubs/reports", "/admin/clubs/reports/year-end"];
 

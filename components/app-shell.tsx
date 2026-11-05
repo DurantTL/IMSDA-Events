@@ -72,9 +72,9 @@ import {
   sidebarActiveHref,
   sidebarSections,
   clubsAdminActiveHref,
-  clubsAdminGroups,
+  clubsDesktopMore,
+  clubsDesktopPrimary,
   clubsAdminHealthImportHref,
-  clubsAdminHomeItem,
   clubsAdminHrefForYear,
   clubsAdminNavigation,
   eventsAdminHomeItem,
@@ -175,15 +175,18 @@ export function AppShell({
   // Set up and Reports open and close (#964). Saved per browser; the server
   // always renders with nothing saved, and the pages inside a group open it.
   const savedGroups = useSyncExternalStore(subscribeSidebarGroups, getSidebarGroupsSnapshot, getSidebarGroupsServerSnapshot);
-  const [dismissedGroup, setDismissedGroup] = useState<{ section: SidebarGroupKey; pathname: string } | null>(null);
+  const searchParams = useSearchParams();
+  const sidebarPage = pathname === "/admin/clubs/summary"
+    ? `${pathname}?view=${searchParams.get("view") ?? "directory"}`
+    : pathname;
+  const [dismissedGroup, setDismissedGroup] = useState<{ section: SidebarGroupKey; page: string } | null>(null);
   // Closing a group lasts for that page only: any navigation forgets it. Reset
   // while rendering, not in an effect, so the very render after navigating is right.
-  const [lastPathname, setLastPathname] = useState(pathname);
-  if (lastPathname !== pathname) {
-    setLastPathname(pathname);
-    setDismissedGroup(dismissalAfterNavigation(dismissedGroup, lastPathname, pathname));
+  const [lastSidebarPage, setLastSidebarPage] = useState(sidebarPage);
+  if (lastSidebarPage !== sidebarPage) {
+    setLastSidebarPage(sidebarPage);
+    setDismissedGroup(dismissalAfterNavigation(dismissedGroup, lastSidebarPage, sidebarPage));
   }
-  const searchParams = useSearchParams();
   // The staff-only profile page (#623) lives inside the shell but is no nav item.
   const isProfileRoute = pathname === "/profile" || pathname.startsWith("/profile/");
   // Help & learning (#1077) is open to every staff member and is no nav item: it lights its own link only.
@@ -312,7 +315,7 @@ export function AppShell({
   };
   function toggleGroup(section: SidebarGroupKey, open: boolean) {
     setSidebarGroupOpen(section, !open);
-    setDismissedGroup(open ? { section, pathname } : null);
+    setDismissedGroup(open ? { section, page: sidebarPage } : null);
   }
   // On /admin pages a system administrator's sidebar lists the system groups (#966), not the event workspace's.
   const showSystemNav = !clubsView && (showsSystemChrome({ isSystemAdmin, pathname }) || (workspaceKind === "system" && (isHelpRoute || isProfileRoute)));
@@ -465,47 +468,45 @@ export function AppShell({
               <span>{eventsAdminHomeItem.label}</span>
             </GuardedLink>
           )}
-          {clubsView && (
-            <>
-              <GuardedLink className={activeClubsHref === clubsAdminHomeItem.href ? "nav-item active" : "nav-item"} href={clubsAdminHrefForYear(clubsAdminHomeItem.href, clubsLinkYear)} aria-current={activeClubsHref === clubsAdminHomeItem.href ? "page" : undefined} {...tipProps(clubsAdminHomeItem.label)}>
-                <clubsAdminHomeItem.icon aria-hidden="true" size={19} strokeWidth={1.9} />
-                <span>{clubsAdminHomeItem.label}</span>
-              </GuardedLink>
-              {clubsAdminGroups.map((group) => {
-                const items = group.items.filter(showClubsItem);
-                // Points and Events open a view of the Club summary; they light on that view (#1304), as the section tabs do.
-                const isActive = (item: NavigationItem) => activeClubsHref === item.href;
-                const open = resolveSidebarGroupOpen({
-                  saved: savedGroups[group.key],
-                  containsCurrentPage: items.some(isActive),
-                  dismissedOnThisPage: dismissedGroup?.section === group.key && dismissedGroup.pathname === pathname,
-                });
-                return (
-                  <div className="nav-group" key={group.key} data-open={open ? "true" : "false"}>
-                    <button
-                      type="button"
-                      className="nav-group-toggle"
-                      id={`nav-group-${group.key}-toggle`}
-                      aria-expanded={open}
-                      aria-controls={`nav-group-${group.key}`}
-                      onClick={() => toggleGroup(group.key, open)}
-                    >
-                      <span>{group.label}</span>
-                      <ChevronDown aria-hidden="true" size={14} />
-                    </button>
-                    <div className="nav-group-items" id={`nav-group-${group.key}`} role="group" aria-labelledby={`nav-group-${group.key}-toggle`} hidden={!open}>
-                      {items.map((item) => (
-                        <GuardedLink key={item.href} className={isActive(item) ? "nav-item active" : "nav-item"} href={clubsAdminHrefForYear(item.href, clubsLinkYear)} aria-current={isActive(item) ? "page" : undefined} {...tipProps(item.label)}>
-                          <item.icon aria-hidden="true" size={19} strokeWidth={1.9} />
-                          <span>{item.label}</span>
-                        </GuardedLink>
-                      ))}
-                    </div>
+          {clubsView && (() => {
+            const group = clubsDesktopMore;
+            const items = group.items.filter(showClubsItem);
+            const open = resolveSidebarGroupOpen({
+              saved: savedGroups[group.key],
+              containsCurrentPage: items.some((item) => activeClubsHref === item.href),
+              dismissedOnThisPage: dismissedGroup?.section === group.key && dismissedGroup.page === sidebarPage,
+            });
+            const renderClubLink = (item: NavigationItem) => {
+              const active = activeClubsHref === item.href;
+              return (
+                <GuardedLink key={item.href} className={active ? "nav-item active" : "nav-item"} href={clubsAdminHrefForYear(item.href, clubsLinkYear)} aria-current={active ? "page" : undefined} {...tipProps(item.label)}>
+                  <item.icon aria-hidden="true" size={19} strokeWidth={1.9} />
+                  <span>{item.label}</span>
+                </GuardedLink>
+              );
+            };
+            return (
+              <>
+                {clubsDesktopPrimary.map(renderClubLink)}
+                <div className="nav-group" data-open={open ? "true" : "false"}>
+                  <button
+                    type="button"
+                    className="nav-group-toggle"
+                    id={`nav-group-${group.key}-toggle`}
+                    aria-expanded={open}
+                    aria-controls={`nav-group-${group.key}`}
+                    onClick={() => toggleGroup(group.key, open)}
+                  >
+                    <span>{group.label}</span>
+                    <ChevronDown aria-hidden="true" size={14} />
+                  </button>
+                  <div className="nav-group-items" id={`nav-group-${group.key}`} role="group" aria-labelledby={`nav-group-${group.key}-toggle`} hidden={!open}>
+                    {items.map(renderClubLink)}
                   </div>
-                );
-              })}
-            </>
-          )}
+                </div>
+              </>
+            );
+          })()}
           {showSystemNav && (
             <>
               {adminRoleView && <GuardedLink className={pathname === "/admin" ? "nav-item active" : "nav-item"} href={returnToSystemHref(selectedEventId)} aria-current={pathname === "/admin" ? "page" : undefined} {...tipProps("System overview")}><LayoutDashboard size={19} aria-hidden="true" /><span>Overview</span></GuardedLink>}
@@ -527,7 +528,7 @@ export function AppShell({
                 const open = resolveSidebarGroupOpen({
                   saved: savedGroups[group.key],
                   containsCurrentPage: group.items.some((item) => activeSystemEntry === systemNavEntryKey(group, item)),
-                  dismissedOnThisPage: dismissedGroup?.section === group.key && dismissedGroup.pathname === pathname,
+                  dismissedOnThisPage: dismissedGroup?.section === group.key && dismissedGroup.page === sidebarPage,
                 });
                 return (
                   <div className="nav-group" key={group.key} data-open={open ? "true" : "false"}>
@@ -566,7 +567,7 @@ export function AppShell({
             const open = resolveSidebarGroupOpen({
               saved: savedGroups[section],
               containsCurrentPage: items.some(isItemActive),
-              dismissedOnThisPage: dismissedGroup?.section === section && dismissedGroup.pathname === pathname,
+              dismissedOnThisPage: dismissedGroup?.section === section && dismissedGroup.page === sidebarPage,
             });
             return (
               <div className="nav-group" key={section} data-open={open ? "true" : "false"}>
