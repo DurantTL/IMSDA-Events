@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { areaHealthHref } from "@/modules/coordinator-health/domain";
 import { ColumnHeader } from "@/components/column-header";
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { Download } from "lucide-react";
@@ -249,7 +250,7 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
   );
 }
 
-export function AreaClubEvents({ events, clubHref, query, sorting }: { events: AreaClubEvent[]; clubHref: (organizationId: string) => string; query?: string; sorting?: ServerSort<EventClubSortColumn> }) {
+export function AreaClubEvents({ events, clubHref, healthEventIds, query, sorting }: { events: AreaClubEvent[]; clubHref: (organizationId: string) => string; healthEventIds?: readonly string[]; query?: string; sorting?: ServerSort<EventClubSortColumn> }) {
   // A search narrows each event's club rows and hides events with no match; the event's own totals stay whole (#791).
   const shownEvents = query ? events.filter((event) => filterClubsByName(event.clubs, query).length > 0) : events;
   if (shownEvents.length === 0) return <><p className="report-empty">{query ? noClubsText(query) : "No club events this club year."}</p>{query ? null : <EventSetupHelp context="club events" id="staff-club-events-none" />}</>;
@@ -266,7 +267,14 @@ export function AreaClubEvents({ events, clubHref, query, sorting }: { events: A
                 {" · "}{event.clubs.filter((club) => club.status === "REGISTERED").length} clubs registered · {formatNumber(eventHeadcount(event.clubs))} people
               </p>
             </div>
-            <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>Kitchen report</Link>
+            <div className="coordinator-event-head">
+              <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>Kitchen report</Link>
+              {healthEventIds?.includes(event.id) && (
+                <Link className="secondary-button" href={areaHealthHref(event.id)}>
+                  Health information<span className="sr-only">: {event.name}</span>
+                </Link>
+              )}
+            </div>
           </div>
           <div className="report-table-wrap">
             <table role="table" className="report-table table-cards">

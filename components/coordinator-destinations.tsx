@@ -1,5 +1,6 @@
 import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { areaHealthHref } from "@/modules/coordinator-health/domain";
 import { ColumnHeader } from "@/components/column-header";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { ChevronDown, Download } from "lucide-react";
@@ -176,11 +177,14 @@ export function CoordinatorMonthlyRecordsHelp() {
  */
 export function CoordinatorClubEvents({
   events,
+  healthEventIds,
   query,
   clearHref,
   sorting,
 }: {
   events: AreaClubEvent[];
+  /** Events that get a Health information link: already checked server side against the health page's own rules (#1618). */
+  healthEventIds?: readonly string[];
   query: string;
   clearHref: string;
   sorting?: ServerSort<EventClubSortColumn>;
@@ -211,6 +215,11 @@ export function CoordinatorClubEvents({
               <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>
                 Kitchen report<span className="sr-only">: {event.name}</span>
               </Link>
+              {healthEventIds?.includes(event.id) && (
+                <Link className="secondary-button" href={areaHealthHref(event.id)}>
+                  Health information<span className="sr-only">: {event.name}</span>
+                </Link>
+              )}
             </div>
             <CoordinatorScrollRegion label={`Club registrations for ${event.name}`}>
               <table className="report-table table-cards" role="table">

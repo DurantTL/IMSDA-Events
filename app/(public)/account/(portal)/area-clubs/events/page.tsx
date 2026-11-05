@@ -8,6 +8,7 @@ import { CoordinatorClubEvents, CoordinatorClubEventsHelp, CoordinatorDestinatio
 import { logError } from "@/lib/logger";
 import { filterClubsByName, parseClubQuery } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
+import { areaHealthLinkEventIds } from "@/modules/coordinator-health/event-links";
 import { listAreaClubEvents } from "@/modules/club-reports/area-summary-repository";
 import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
 
@@ -26,10 +27,13 @@ export default async function AreaEventsPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
   const query = parseClubQuery(params.q);
-  const allEvents = await listAreaClubEvents(clubYear).catch((error: unknown) => {
-    logError("Coordinator club events read failed", error, { clubYear });
-    return null;
-  });
+  const [allEvents, healthEventIds] = await Promise.all([
+    listAreaClubEvents(clubYear).catch((error: unknown) => {
+      logError("Coordinator club events read failed", error, { clubYear });
+      return null;
+    }),
+    areaHealthLinkEventIds(),
+  ]);
   // The component narrows the rows; the counts here only feed the search status line.
   const events = allEvents ?? [];
   const total = new Set(events.flatMap((event) => event.clubs.map((club) => club.organizationId))).size;
@@ -43,7 +47,7 @@ export default async function AreaEventsPage({ searchParams }: { searchParams: P
         <>
           <CoordinatorClubEventsHelp />
           <AreaClubSearch basePath="/account/area-clubs/events" clubYear={clubYear} query={query} shown={shown} total={total} />
-          <CoordinatorClubEvents clearHref={`/account/area-clubs/events?year=${encodeURIComponent(clubYear)}`} events={allEvents} query={query} sorting={serverSort("/account/area-clubs/events", params, EVENT_CLUB_SORT_COLUMNS, { key: null, dir: "asc" })} />
+          <CoordinatorClubEvents clearHref={`/account/area-clubs/events?year=${encodeURIComponent(clubYear)}`} events={allEvents} healthEventIds={healthEventIds} query={query} sorting={serverSort("/account/area-clubs/events", params, EVENT_CLUB_SORT_COLUMNS, { key: null, dir: "asc" })} />
         </>
       )}
     </section>

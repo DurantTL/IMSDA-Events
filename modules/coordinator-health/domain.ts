@@ -210,3 +210,8 @@ const HEALTH_ANSWER_KEY = new RegExp(`^(?:${SLIP_EMERGENCY_KEY}|${ACTIVITY_DATE_
 export function sortAttendees(rows: HealthAttendeeRow[]) {
   return [...rows].sort((left, right) => left.name.localeCompare(right.name, "en-US"));
 }
+
+/** Where an Area Coordinator opens an event's health sheet (#1618); the page itself decides who gets in. */
+export function areaHealthHref(eventId: string) {
+  return `/account/area/health?event=${encodeURIComponent(eventId)}`;
+}
