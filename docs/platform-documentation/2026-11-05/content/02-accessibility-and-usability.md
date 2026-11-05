@@ -2,7 +2,7 @@
 
 Prepared October 21, 2026. Source baseline: main `5e367b7c4d1b3c173d37c0415e335be76170b300`.
 
-> **Updated November 5, 2026** (main `ad9237d`): the product is now called **IMAdventist** (Events & Club Ministry) with a new symbol, and every product mention below uses the new name. The conference name, support@imsda.org and the website address are unchanged. Source links in the body still point to the October 21 baseline they were checked against.
+> **Updated November 5, 2026** (main `ad9237d`): every product mention below uses the name **IMAdventist** (Events & Club Ministry). Source links in the body still point to the October 21 baseline they were checked against.
 >
 > Several cross-cutting behaviors have been built since this review: unsaved-changes prompts (#1452, #1468), one error summary and field messages (#1450), confirmations for deletes and cancels (#1448), access pages that say who to ask (#1447), empty lists that explain why (#1449, #1494), search as you type (#1431), sortable headers (#1458), tables that turn into cards instead of scrolling sideways (#1457) and shared status words (#1453, #1479). The findings below have **not** been re-audited against those changes; check each finding's owner issue for its current state before acting on it.
 

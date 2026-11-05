@@ -7,7 +7,8 @@
 - **Word files:** all seven pass a ZIP integrity check.
 - **Web pages:** all eight HTML files were opened at 390 px and 1280 px wide. None scrolls sideways. Every image loads (the gallery loads its pictures as you scroll).
 - **Links:** every local link in the README and content files points to a file that exists. The `{{portal_url}}` entries in the help kit are runtime template tokens, not links.
-- **Product name:** "IMSDA Events" no longer appears in the deck, notes, handout or report titles. The one remaining mention is the help kit's instruction to say IMAdventist instead.
+- **Product name:** "IMSDA Events" does not appear in the deck, notes, handout or reports.
+- **No earlier training assumed:** revised the same day so the deck, presenter notes, handout and report notes are written for first-time users. No slide or page refers to an October training, a renamed product or features that "moved".
 - **Screenshots:** 44, each recorded in `screenshot-capture.json` with route, state, pixel size, SHA-256 and the slides that use it. The full contact sheet and each deck page were looked at by eye.
 - **Fact check:** an independent read-only review compared the deck text and the quick-start handout with the current application source. Its findings were fixed before publishing; see the pull request for the list.
 

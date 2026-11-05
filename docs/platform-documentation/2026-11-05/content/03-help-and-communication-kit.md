@@ -2,9 +2,9 @@
 
 Prepared October 21, 2026. Source baseline: main `5e367b7c4d1b3c173d37c0415e335be76170b300`.
 
-> **Updated November 5, 2026** (main `ad9237d`): the product is now called **IMAdventist** (Events & Club Ministry) with a new symbol, and every product mention below uses the new name. The conference name, support@imsda.org and the website address are unchanged. Source links in the body still point to the October 21 baseline they were checked against.
+> **Updated November 5, 2026** (main `ad9237d`): every product mention below uses the name **IMAdventist** (Events & Club Ministry). Source links in the body still point to the October 21 baseline they were checked against.
 >
-> **When you use these drafts:** say IMAdventist, not IMSDA Events. Area Coordinators now open **Club coordination** from the account menu (Overview, Monthly Records, Points, Club events, Team approvals, New clubs, Waitlists). Point people to **Help → Step by step** guides, which show a picture of each step. The November quick-start handout (`07-club-quick-start`) carries the current labels.
+> **When you use these drafts:** call the system IMAdventist. Area Coordinators open **Club coordination** from the account menu (Overview, Monthly Records, Points, Club events, Team approvals, New clubs, Waitlists). Point people to **Help → Step by step** guides, which show a picture of each step. The November quick-start handout (`07-club-quick-start`) carries the current labels.
 
 This kit contains ready-to-edit guidance and message drafts. It describes features present in the repository and identifies future presentation work separately. It does not establish which release is serving, enable a feature, change the agreed menus or send a message. Review the applicable event configuration before publishing any instructions.
 

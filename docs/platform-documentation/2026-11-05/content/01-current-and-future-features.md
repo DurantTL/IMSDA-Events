@@ -2,7 +2,7 @@
 
 Prepared October 21, 2026 · source main `5e367b7c4d1b3c173d37c0415e335be76170b300`
 
-> **Updated November 5, 2026** (main `ad9237d`): the product is now called **IMAdventist** (Events & Club Ministry) with a new symbol, and every product mention below uses the new name. The conference name, support@imsda.org and the website address are unchanged. Source links in the body still point to the October 21 baseline they were checked against.
+> **Updated November 5, 2026** (main `ad9237d`): every product mention below uses the name **IMAdventist** (Events & Club Ministry). Source links in the body still point to the October 21 baseline they were checked against.
 >
 > **Status changes since October 21** (from merged pull requests; not re-checked in a browser for this report):
 >

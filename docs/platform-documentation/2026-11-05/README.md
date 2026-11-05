@@ -6,7 +6,7 @@ Prepared November 5, 2026 from [main `ad9237d`](https://github.com/DurantTL/IMSD
 
 - **New name and logo.** Every document, slide and screenshot uses **IMAdventist** (Events & Club Ministry) and the new symbol. The conference name, support@imsda.org and events.imsda.org are unchanged.
 - **New screenshots.** All 44 screenshots were retaken from the current app with fictional data. They show the new branding, the merged **Club coordination** area for Area Coordinators, the Security check and Back to events on sign-in, and the Step by step Help guides.
-- **New deck.** The getting-started presentation is rebuilt as 31 slides, with a "What is new since October 21" slide for people who saw the earlier training. The story moved to Winter Camporee (December 4–6) because Fall Camporee has passed.
+- **New deck.** The getting-started presentation is rebuilt as 31 slides for people who are seeing IMAdventist for the first time. No earlier training is assumed; the October 21 pack was never presented. Slide 2 is a short orientation to what works the same on every page. The story uses Winter Camporee (December 4–6) because Fall Camporee has passed.
 - **Rewritten presenter notes and quick-start handout** with today's menu names and buttons.
 - **Reference reports 01–05** carry the new name and a dated update note at the top. Report 01 also has corrected status labels for features that shipped since October. Reports 02–05 were **not** re-audited; their findings and evidence are still dated October 21.
 
@@ -17,7 +17,7 @@ Prepared November 5, 2026 from [main `ad9237d`](https://github.com/DurantTL/IMSD
 - Quick-start handout (4 pages): [PDF](exports/07-club-quick-start.pdf) · [Word](exports/07-club-quick-start.docx) · [Web page](exports/07-club-quick-start.html) · [Markdown](content/07-club-quick-start.md)
 - [Screenshot gallery, 44 fictional training screenshots](exports/IMAdventist-training-screenshot-gallery.html)
 
-**Choose a route:** slide 2 is for people who saw the October training. Slides 3–6 cover the public site and sign-in. Slides 7–21 follow director Jordan Ellis. Slides 22–28 follow Area Coordinator Alex Morgan. Slides 29–31 cover everyday habits, what is planned, and signing out. Directors only: slides 1–21 and 31. Coordinators only: slides 1–6 and 22–31.
+**Choose a route:** slides 1–2 introduce the system for everyone. Slides 3–6 cover the public site and sign-in. Slides 7–21 follow director Jordan Ellis. Slides 22–28 follow Area Coordinator Alex Morgan. Slides 29–31 cover everyday habits, what is planned, and signing out. Directors only: slides 1–21 and 31. Coordinators only: slides 1–6 and 22–31.
 
 ![Presentation overview](previews/deck-overview.png)
 
