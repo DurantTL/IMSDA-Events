@@ -72,7 +72,7 @@ describe("canonical staff workspace navigation", () => {
     expect(switcher).not.toContain("/admin-role/EVENTS_ADMIN");
     expect(renderToStaticMarkup(h(StaffCreateMenu, { isSystemAdmin: false, clubFormsAccess: false, canManageForms: false, eventId: "" }))).toBe("");
     const forms = renderToStaticMarkup(h(StaffCreateMenu, { isSystemAdmin: false, clubFormsAccess: false, canManageForms: true, eventId: "synthetic_event" }));
-    expect(forms).toContain('/registration-builder?event=synthetic_event');
+    expect(forms).toContain('aria-haspopup="dialog"');
     expect(forms).not.toContain('/event-setup');
   });
 

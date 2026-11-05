@@ -1,9 +1,33 @@
-.menu { position: relative; }
-.trigger { min-height: 44px; font-size: max(var(--type-staff-floor, 0px), .875rem); list-style: none; }
-.trigger::-webkit-details-marker { display: none; }
-.trigger:focus-visible, .links a:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 3px; }
-.links { position: absolute; z-index: 30; right: 0; top: calc(100% + 8px); width: 240px; max-width: calc(100vw - 32px); display: grid; gap: 2px; padding: 8px; border: 1px solid var(--line); border-radius: var(--field-radius); background: var(--card); box-shadow: var(--shadow); }
-.links a { display: flex; align-items: center; min-height: 44px; padding: 8px 12px; border-radius: var(--radius-sm); text-decoration: none; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), .875rem); }
-.links a:hover { background: var(--imsda-navy-soft); }
-/* #1566 owns phone action placement; preserve the existing phone header here. */
+.trigger {
+  min-height: 44px;
+  font-size: max(var(--type-staff-floor, 0px), .875rem);
+}
+
+.dialog { width: min(100%, 34rem); }
+.dialog .close { min-width: 44px; min-height: 44px; }
+.choices { display: grid; gap: 8px; }
+
+.choices .choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  justify-content: stretch;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--imsda-navy);
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), .875rem);
+  text-align: start;
+  text-decoration: none;
+}
+
+.choice:hover { background: var(--imsda-navy-soft); }
+.choice strong, .choice small { display: block; font-size: inherit; }
+.choice:focus-visible, .trigger:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 3px; }
+
+/* #1566 owns phone action placement. */
 @media (max-width: 800px) { .menu { display: none; } }

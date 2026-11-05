@@ -648,7 +648,7 @@ export function AppShell({
             </p>
           </div>
           <div className="header-actions">
-            <StaffCreateMenu isSystemAdmin={isSystemAdmin} clubFormsAccess={isSystemAdmin || Boolean(selectedEvent?.clubFormsAccess) || Boolean(adminRoleView?.held.includes("CLUBS_ADMIN"))} canManageForms={selectedPermissions.has("MANAGE_FORMS")} eventId={eventWorkspaceVisible ? selectedEventId : ""} />
+            <StaffCreateMenu isSystemAdmin={isSystemAdmin} clubFormsAccess={isSystemAdmin || Boolean(adminRoleView?.held.includes("CLUBS_ADMIN"))} canManageForms={selectedPermissions.has("MANAGE_FORMS")} eventId={eventWorkspaceVisible ? selectedEventId : ""} />
             {canSwitchToAttendee
               ? (
                 <form action="/api/auth/switch-to-attendee" method="post">
