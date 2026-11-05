@@ -22,6 +22,12 @@ const items = [
 ];
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/system-admin/homepage-ministries", () => ({
+  listHomepageMinistries: async () => [
+    { position: 1, name: "Pathfinders", description: null, linkHref: null, categories: ["Pathfinders"], icon: "Compass" },
+    { position: 5, name: "Camp Heritage", description: null, linkHref: null, categories: ["Camps"], icon: "Tent" },
+  ],
+}));
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: () => null }));
 vi.mock("@/modules/calendar/repository", () => ({
   conferenceToday: () => "2026-10-27",
@@ -61,10 +67,10 @@ describe("public calendar Year view render (#1250)", () => {
   });
 
   it("renders twelve months with month-name links that keep the filter", async () => {
-    const markup = await render({ view: "year", year: "2027", filter: "club" });
+    const markup = await render({ view: "year", year: "2027", filter: "ministry-1" });
     expect(grid(markup).match(/class="calendar-year-month"/g)).toHaveLength(12);
-    expect(grid(markup)).toContain('href="/calendar?month=2027-01&amp;filter=club"');
-    expect(grid(markup)).toContain('href="/calendar?month=2027-12&amp;filter=club"');
+    expect(grid(markup)).toContain('href="/calendar?month=2027-01&amp;filter=ministry-1"');
+    expect(grid(markup)).toContain('href="/calendar?month=2027-12&amp;filter=ministry-1"');
     expect(markup).not.toContain('class="calendar-month"');
   });
 
@@ -109,12 +115,12 @@ describe("public calendar Year view render (#1250)", () => {
   });
 
   it("shows the picked day's items with a way back to the year's list", async () => {
-    const markup = await render({ view: "year", year: "2027", date: "2027-03-06", filter: "club" });
+    const markup = await render({ view: "year", year: "2027", date: "2027-03-06", filter: "ministry-1" });
     const panel = markup.slice(markup.indexOf('id="calendar-year-detail"'), markup.indexOf('class="calendar-key"'));
     expect(panel).toContain("Events on March 6, 2027");
-    expect(panel).toContain("Nothing on March 6, 2027 in Club events.");
+    expect(panel).toContain("Nothing on March 6, 2027 in Pathfinders.");
     expect(panel).toContain("Back to the year&#x27;s list");
-    expect(panel).toContain('href="/calendar?view=year&amp;year=2027&amp;filter=club#calendar-year-detail"');
+    expect(panel).toContain('href="/calendar?view=year&amp;year=2027&amp;filter=ministry-1#calendar-year-detail"');
     const main = await render({ view: "year", year: "2027", date: "2027-03-06" });
     expect(main).toContain("2 items on March 6, 2027 in Main events.");
     expect(main).toContain('aria-current="true"');
@@ -152,7 +158,7 @@ describe("public calendar Year view render (#1250)", () => {
 
   it("keeps the year in the chips", async () => {
     const markup = await render({ view: "year", year: "2027", date: "2027-03-06" });
-    expect(markup).toContain('href="/calendar?view=year&amp;year=2027&amp;filter=club&amp;date=2027-03-06"');
+    expect(markup).toContain('href="/calendar?view=year&amp;year=2027&amp;filter=ministry-1&amp;date=2027-03-06"');
   });
 
   it("adds a + to a day whose items outnumber its two marks", async () => {

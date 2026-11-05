@@ -39,7 +39,7 @@ import {
   type EntryFilters,
   type EntrySort,
 } from "@/modules/calendar/admin-list";
-import { buildCalendarFilterGroups, calendarCategoryChoices, categoryOnPublicFilter, type CalendarCategoryChoices } from "@/modules/calendar/filter-groups";
+import { buildCalendarFilterGroups, calendarCategoryChoices, eventOnPublicFilter, type CalendarCategoryChoices } from "@/modules/calendar/filter-groups";
 import { calendarStatusLabels, closureLabel, formatDateRange } from "@/modules/calendar/domain";
 import { describeRepeat, previewOccurrences, weekdayLabels, type RepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry, CalendarAdminEvent } from "@/modules/calendar/repository";
@@ -422,7 +422,7 @@ export function CalendarAdminWorkspace({
   ].filter(Boolean))].sort();
   // Events that sit on no public button, for the Events tab's "Not on a public filter" list.
   const [eventListParams, setEventListParams] = useAddressParams(defaultEventListParams, parseEventListParams);
-  const unmatchedEvents = events.filter((event) => !categoryOnPublicFilter(event.calendarCategory, publicFilters.matched));
+  const unmatchedEvents = events.filter((event) => !eventOnPublicFilter(event, publicFilters.matched));
   const shownEvents = eventListParams.events === unmatchedEventsValue ? unmatchedEvents : events;
 
   return (

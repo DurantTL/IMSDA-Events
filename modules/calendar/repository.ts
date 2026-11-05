@@ -508,6 +508,8 @@ export async function listCalendarEvents(now = new Date()) {
     isPublished: event.isPublished,
     showOnCalendar: event.showOnCalendar,
     calendarCategory: event.calendarCategory ?? "",
+    /** A club-audience event, for "Not on a public filter" when it has no category (#1611). */
+    clubEvent: event.audience === "CLUB",
     /** The calendar items linked to this event (#445, #1086), by date. */
     linkedEntries: event.calendarEntryLinks.map((link) => ({ id: link.id, title: link.title })),
   }));

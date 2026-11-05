@@ -15,6 +15,7 @@ import {
   buildCalendarFilterGroups,
   calendarCategoryChoices,
   categoryOnPublicFilter,
+  eventOnPublicFilter,
   filterByGroup,
   resolveCalendarFilter,
 } from "@/modules/calendar/filter-groups";
@@ -77,7 +78,10 @@ describe("old links (#1611)", () => {
     expect(resolveCalendarFilter("pathfinders", undefined, groups)).toEqual({ slug: "ministry-1" });
     expect(resolveCalendarFilter("adventurers", undefined, groups)).toEqual({ slug: "ministry-2" });
     expect(resolveCalendarFilter("camps", undefined, groups)).toEqual({ slug: "ministry-5" });
-    expect(resolveCalendarFilter("club", undefined, groups)).toEqual({ slug: "ministry-1" });
+    // Club needs Pathfinders AND Adventurers on one tile: separate tiles would each show less than the old link did.
+    expect(resolveCalendarFilter("club", undefined, groups)).toEqual({ slug: "everything" });
+    const together = buildCalendarFilterGroups([{ position: 1, name: "Clubs", categories: ["pathfinders", "Adventurers"] }, ...tiles.slice(1)]);
+    expect(resolveCalendarFilter("club", undefined, together)).toEqual({ slug: "ministry-1" });
     expect(resolveCalendarFilter("ministries", undefined, groups)).toEqual({ slug: "everything" });
     expect(resolveCalendarFilter("pathfinders", undefined, buildCalendarFilterGroups(fallbackHomepageMinistries))).toEqual({ slug: "everything" });
   });
@@ -144,7 +148,8 @@ describe("the category dropdown (#1611)", () => {
   });
 
   it("keeps a differently spelled match without a mark, and a closure spelling as on a filter", () => {
-    expect(html({ defaultValue: "pathfinders" })).toContain('<option value="pathfinders" selected="">pathfinders</option>');
+    expect(html({ defaultValue: "PATHFINDERS " })).toContain('<option value="Pathfinders" selected="">Pathfinders</option>');
+    expect(html({ defaultValue: "PATHFINDERS " })).not.toContain("PATHFINDERS");
     expect(html({ defaultValue: "Holiday" })).toContain(">Holiday</option>");
     expect(html({ defaultValue: "Holiday" })).not.toContain("Not on a public filter");
   });
@@ -179,6 +184,18 @@ describe("Not on a public filter in Calendar admin (#1611)", () => {
   });
 });
 
+describe("events with no category (#1611)", () => {
+  const { matched } = calendarCategoryChoices(groups);
+
+  it("counts a club-audience event with a blank category as not on a public filter, so staff can categorize it", () => {
+    expect(eventOnPublicFilter({ calendarCategory: "", clubEvent: true }, matched)).toBe(false);
+    expect(eventOnPublicFilter({ calendarCategory: "  ", clubEvent: true }, matched)).toBe(false);
+    expect(eventOnPublicFilter({ calendarCategory: "", clubEvent: false }, matched)).toBe(true);
+    expect(eventOnPublicFilter({ calendarCategory: "Pathfinders", clubEvent: true }, matched)).toBe(true);
+    expect(eventOnPublicFilter({ calendarCategory: "Retreats" }, matched)).toBe(false);
+  });
+});
+
 describe("Calendar admin wiring (#1611)", () => {
   const source = readFileSync(resolve(__dirname, "../components/calendar-admin-workspace.tsx"), "utf8");
 
@@ -190,5 +207,15 @@ describe("Calendar admin wiring (#1611)", () => {
 
   it("takes the embed widget's filter list from the server's read of the tiles", () => {
     expect(source).toContain("filterSlugs={publicFilters.filterSlugs}");
+  });
+});
+
+describe("Platform settings category refusal beside the field (#1611)", () => {
+  it("shows the message next to the tile's categories field, linked with aria-describedby and aria-invalid", () => {
+    const editor = readFileSync(resolve(__dirname, "../components/homepage-ministries-editor.tsx"), "utf8");
+    expect(editor).toContain("aria-invalid={categoryProblems[tile.position] ? true : undefined}");
+    expect(editor).toContain("aria-describedby={categoryProblems[tile.position] ?");
+    expect(editor).toContain('id={`ministry-${tile.position}-categories-error`}');
+    expect(editor).toContain('{error && <p className="form-error" role="alert">{error}</p>}');
   });
 });

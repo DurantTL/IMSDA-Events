@@ -32,11 +32,13 @@ export function CalendarCategorySelect({
   placeholder?: string;
   value?: string;
 }) {
-  const current = (value ?? defaultValue ?? "").trim();
-  const listed = choices.options.some((option) => option === current);
-  const extra = current && current !== chooseCategoryValue && !listed ? current : null;
+  const raw = (value ?? defaultValue ?? "").trim();
+  // A saved "PATHFINDERS" is the listed "Pathfinders": select that option instead of adding a duplicate.
+  const listedOption = choices.options.find((option) => option.trim().toLowerCase() === raw.toLowerCase());
+  const current = listedOption ?? raw;
+  const extra = current && current !== chooseCategoryValue && !listedOption ? current : null;
   return (
-    <select aria-label={label} defaultValue={value === undefined ? defaultValue ?? "" : undefined} name={name} onChange={onChange} value={value}>
+    <select aria-label={label} defaultValue={value === undefined ? current : undefined} name={name} onChange={onChange} value={value === undefined ? undefined : current}>
       {placeholder && <option value={chooseCategoryValue}>{placeholder}</option>}
       {choices.options.map((option) => <option key={option} value={option}>{option}</option>)}
       {extra && <option value={extra}>{categoryOnPublicFilter(extra, choices.matched) ? extra : `${extra} (${notOnPublicFilterLabel})`}</option>}

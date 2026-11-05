@@ -95,15 +95,19 @@ const legacyFilterCategories: Readonly<Record<string, readonly string[]>> = {
 
 const tileSlugPattern = /^ministry-\d+$/;
 
-/** The first tile chip that lists one of these category names. */
+/** The first tile chip that lists ALL of these category names, so an old link never shows less than it used to. */
 function tileCovering(names: readonly string[], groups: readonly CalendarFilterGroup[]) {
   const wanted = names.map(lower);
-  return groups.find((group) => tileSlugPattern.test(group.slug) && group.categories.some((category) => wanted.includes(lower(category))));
+  return groups.find((group) => {
+    if (!tileSlugPattern.test(group.slug)) return false;
+    const listed = group.categories.map(lower);
+    return wanted.every((name) => listed.includes(name));
+  });
 }
 
 /**
  * The chosen filter from the URL. `?filter=` wins when it names a chip. An old `?filter=` slug (`pathfinders`, `adventurers`,
- * `camps`, `ministries`, `club`) goes to the tile that covers it, else to Everything. An old `?category=` link maps to the
+ * `camps`, `ministries`, `club`) goes to the one tile that lists all of its categories (`club` needs Pathfinders and Adventurers on the same tile), else to Everything. An old `?category=` link maps to the
  * chip that lists that category (a tile first), else to Everything narrowed to that one category, so a shared link never
  * shows more or less than it used to. No param is the default group.
  */
@@ -148,4 +152,13 @@ export function calendarCategoryChoices(groups: readonly CalendarFilterGroup[]):
 export function categoryOnPublicFilter(category: string, matched: readonly string[]) {
   const key = lower(category);
   return !key || matched.some((name) => lower(name) === key);
+}
+
+/**
+ * Whether a calendar event is on a public chip. Like `categoryOnPublicFilter`, except a club-audience registration event with
+ * no category counts as not on one: it sits on no tile (the old Club events chip is gone), so staff should categorize it (#1611).
+ */
+export function eventOnPublicFilter(event: { calendarCategory: string; clubEvent?: boolean }, matched: readonly string[]) {
+  if (!lower(event.calendarCategory) && event.clubEvent) return false;
+  return categoryOnPublicFilter(event.calendarCategory, matched);
 }

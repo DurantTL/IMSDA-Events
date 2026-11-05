@@ -49,11 +49,14 @@ export function HomepageMinistriesEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The "needs a category" refusal, beside the tile's own field as well as in the summary above (rule B7), by tile position.
+  const [categoryProblems, setCategoryProblems] = useState<Record<number, string>>({});
   const dirty = JSON.stringify(tiles) !== JSON.stringify(saved);
   useUnsavedChangesGuard(dirty);
 
   function change(position: number, patch: Partial<TileDraft>) {
     setTiles((current) => current.map((tile) => (tile.position === position ? { ...tile, ...patch } : tile)));
+    if ("categories" in patch) setCategoryProblems((current) => { const next = { ...current }; delete next[position]; return next; });
   }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
@@ -61,6 +64,7 @@ export function HomepageMinistriesEditor({
     setSaving(true);
     setError("");
     setNotice("");
+    setCategoryProblems({});
     try {
       const response = await fetch("/api/admin/platform-settings/homepage-ministries", {
         method: "PATCH",
@@ -68,6 +72,14 @@ export function HomepageMinistriesEditor({
         body: JSON.stringify({ ministries: tiles.map(toPayload) }),
       });
       const result = await response.json().catch(() => ({}));
+      if (!response.ok && Array.isArray(result.issues)) {
+        const problems: Record<number, string> = {};
+        for (const issue of result.issues as Array<{ path?: unknown[]; message?: string }>) {
+          const index = issue.path?.[0] === "ministries" && issue.path[2] === "categories" ? Number(issue.path[1]) : NaN;
+          if (Number.isInteger(index) && tiles[index] && issue.message) problems[tiles[index].position] = issue.message;
+        }
+        setCategoryProblems(problems);
+      }
       if (!response.ok || !Array.isArray(result.ministries)) throw new Error(result.message ?? "The homepage ministries could not be saved.");
       const next = (result.ministries as HomepageMinistry[]).map(toDraft);
       setSaved(next);
@@ -109,7 +121,16 @@ export function HomepageMinistriesEditor({
             </label>
             <label>
               Calendar categories
-              <input autoComplete="off" maxLength={400} required value={tile.categories} onChange={(event) => change(tile.position, { categories: event.target.value })} />
+              <input
+                aria-describedby={categoryProblems[tile.position] ? `ministry-${tile.position}-categories-error` : undefined}
+                aria-invalid={categoryProblems[tile.position] ? true : undefined}
+                autoComplete="off"
+                maxLength={400}
+                required
+                value={tile.categories}
+                onChange={(event) => change(tile.position, { categories: event.target.value })}
+              />
+              {categoryProblems[tile.position] && <small className="field-error-message" id={`ministry-${tile.position}-categories-error`} role="alert">{categoryProblems[tile.position]}</small>}
             </label>
             <label>
               Link
