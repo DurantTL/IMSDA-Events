@@ -36,6 +36,8 @@ export function CsvImportDialog({
   onImported,
   templateHref,
   title,
+  templateLabel = "CSV template",
+  uploadLabel = "Upload CSV",
   variant = "account",
 }: {
   eyebrow: string;
@@ -44,6 +46,10 @@ export function CsvImportDialog({
   onImported: (result: ImportResponse) => void;
   templateHref: string;
   title: string;
+  /** The template link's text. */
+  templateLabel?: string;
+  /** The button that opens the dialog. */
+  uploadLabel?: string;
   variant?: "account" | "staff";
 }) {
   const [open, setOpen] = useState(false);
@@ -145,8 +151,8 @@ export function CsvImportDialog({
 
   return (
     <>
-      <ExportLink className="text-button" href={templateHref}><Download aria-hidden="true" size={14} /> CSV template</ExportLink>
-      <button className="text-button" onClick={() => setOpen(true)} type="button"><Upload aria-hidden="true" size={14} /> Upload CSV</button>
+      <ExportLink className="text-button" href={templateHref}><Download aria-hidden="true" size={14} /> {templateLabel}</ExportLink>
+      <button className="text-button" onClick={() => setOpen(true)} type="button"><Upload aria-hidden="true" size={14} /> {uploadLabel}</button>
       {open && (
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) close(); }} role="presentation">
           <section aria-labelledby="csv-import-title" aria-modal="true" className="modal-card roster-csv-dialog" ref={dialogRef} role="dialog" tabIndex={-1}>
