@@ -280,8 +280,8 @@
     },
     {
       "path": "content/06-presenter-notes.md",
-      "bytes": 32656,
-      "sha256": "a955c79404d15fc7c0b94b1e1511d47ad48d8a6c5ac0c5b087d277ca3821b3bd"
+      "bytes": 32885,
+      "sha256": "d672ddd5cd7ef31dc373cd7f723c660fdbedfe43516da02a97b57e1521735dea"
     },
     {
       "path": "content/07-club-quick-start.md",
@@ -306,7 +306,7 @@
     {
       "path": "exports/01-current-and-future-features.docx",
       "bytes": 26791,
-      "sha256": "9497ce9d6a4df224726f1a484ca1b9c124dea7814ba254280ae2d2e05ce2aee3"
+      "sha256": "931b8a9c2efe91f18cf019060415bb6fa4e79021c4475e1c3d6ea625c15bc8db"
     },
     {
       "path": "exports/01-current-and-future-features.html",
@@ -316,12 +316,12 @@
     {
       "path": "exports/01-current-and-future-features.pdf",
       "bytes": 1304269,
-      "sha256": "731ee0da153a22bbde565cc7ee5d54a6739861a14acebcff79f3879f218f7879"
+      "sha256": "626166dd856df683ff0d61cd7f9c4123849a460ced96fe9bc70f5d9e3ad0b61d"
     },
     {
       "path": "exports/02-accessibility-and-usability.docx",
-      "bytes": 22593,
-      "sha256": "bda2e4d81be879b4bd800aef09b0939742c75f6fa4b7621580c3f7de0281363d"
+      "bytes": 22594,
+      "sha256": "6344cf2b726069e9b963c4dae4aefac97c10003fa1f7ce7ba90291622e259d37"
     },
     {
       "path": "exports/02-accessibility-and-usability.html",
@@ -331,12 +331,12 @@
     {
       "path": "exports/02-accessibility-and-usability.pdf",
       "bytes": 1152337,
-      "sha256": "16d163241752e03405cb53eaf746ac38140902b4d75bfc914c1ecac5295fdb89"
+      "sha256": "6134a96b3fd9b32bb33c5d0004a52f50db6038b7bf4d3537706edfa73ca1ac0d"
     },
     {
       "path": "exports/03-help-and-communication-kit.docx",
-      "bytes": 23408,
-      "sha256": "54e59f7254ac4febee56fa1585293d2c7c1107539896c0041168d1a50ad03335"
+      "bytes": 23409,
+      "sha256": "621756d08c477c8f24a2900f99e5139efaa8969a59cc0d3a2b190af6f874b6be"
     },
     {
       "path": "exports/03-help-and-communication-kit.html",
@@ -346,12 +346,12 @@
     {
       "path": "exports/03-help-and-communication-kit.pdf",
       "bytes": 1207554,
-      "sha256": "0264fd73991dc9b5a73b4834eb872fa43e9c5459e80826ad63dc0efa0da38def"
+      "sha256": "42f2bfb3ff757ff213a465bb2b17fc35b0ceffdfe6e1004a6ad54551cb636ac1"
     },
     {
       "path": "exports/04-camp-system-and-ultracamp.docx",
-      "bytes": 23103,
-      "sha256": "66580eed0b77c42fb07a33a8c352a34d526b5398ca8ecaa68eac8eac4696a68e"
+      "bytes": 23104,
+      "sha256": "673f31ba1d3413609794e513919adf02d0be373756e5c97307afbfd31cf5ae1f"
     },
     {
       "path": "exports/04-camp-system-and-ultracamp.html",
@@ -361,12 +361,12 @@
     {
       "path": "exports/04-camp-system-and-ultracamp.pdf",
       "bytes": 1156415,
-      "sha256": "16f3cd0a2e574952ccc35cc2155e119107d4e7161915a093934180fb9fd33e0c"
+      "sha256": "7a15f6067b1a02809226855b5f51d8d74b84bcf5e1f33fe3a7ac4d5bf424fc9d"
     },
     {
       "path": "exports/05-code-and-verification-evidence.docx",
       "bytes": 23924,
-      "sha256": "75da4f35832367530e3a69c3887e660b806e5df8125549b5253e5fb4c8673428"
+      "sha256": "8aeb3eef65df3d3fb15f57dc40aa51717561e65ea6d2a60aa339a80a6444c833"
     },
     {
       "path": "exports/05-code-and-verification-evidence.html",
@@ -376,27 +376,27 @@
     {
       "path": "exports/05-code-and-verification-evidence.pdf",
       "bytes": 1210417,
-      "sha256": "01e1599f0cb2e7613fab5ed288737538c07596972919f128659ab38744da3786"
+      "sha256": "67b65a6b4b484139b9bc9fac3112cfbb7fa117bfba9b1e08adb0f7ff0353c3d1"
     },
     {
       "path": "exports/06-presenter-notes.docx",
-      "bytes": 26168,
-      "sha256": "58edb7a1004c7273f9dcafd3958c3aca55a6ead56ae1e79b24eb6bbda9876227"
+      "bytes": 26185,
+      "sha256": "59a696161fabe8bc31448ee41a1abe7d614d01d9e0f7afee241ac52c3f80d386"
     },
     {
       "path": "exports/06-presenter-notes.html",
-      "bytes": 45011,
-      "sha256": "b16e60f45317732bfb8333d134d551d1dda58b62a5ab51989f7b8d1b0eb3e3d0"
+      "bytes": 45258,
+      "sha256": "fe6e7ee79277d444ecd7aaed61a8341e1f309a6275c1931b6d4a0e2bb05c9b76"
     },
     {
       "path": "exports/06-presenter-notes.pdf",
-      "bytes": 1361356,
-      "sha256": "7bb4c6327c21e8bb1a3ea78736bbe385695d1b4530273543afb1162f2af93d94"
+      "bytes": 1362892,
+      "sha256": "3431933a036293ab8f51d7ef90b12b3a730fdceb1b8b6f7c327d54ada3a84e78"
     },
     {
       "path": "exports/07-club-quick-start.docx",
       "bytes": 14273,
-      "sha256": "b20d16e2f47f881ae0d3b7ee88c63d56c486ecab9151f91b64e651269851dd37"
+      "sha256": "26f3f94ac4827c1cb83ecad52d9128782ca82741c369e375fb018c46864913ef"
     },
     {
       "path": "exports/07-club-quick-start.html",
@@ -406,17 +406,17 @@
     {
       "path": "exports/07-club-quick-start.pdf",
       "bytes": 1069011,
-      "sha256": "575cbb4a5e0016caed151cec5acb119e29ccad409d7ec5891c856a27849889ea"
+      "sha256": "b717e420ebff8d90261ee52ff2f63d7a94b473118f725eca47cb92cc30206a64"
     },
     {
       "path": "exports/IMAdventist-getting-started.pdf",
       "bytes": 7967972,
-      "sha256": "21f8891b2f76a73ace4e35b3c6a111d4b539286cb267857527e9180795bcb15b"
+      "sha256": "6ce18ee8a90b53eefbcbcee9f2398a19a3ce7811579757034a9a16b5d049f2a7"
     },
     {
       "path": "exports/IMAdventist-getting-started.pptx",
       "bytes": 17873243,
-      "sha256": "c2ab285619f726b8c93b0587a7b4cd5e7c732bb61fc37cfbefb3ab535b337f8f"
+      "sha256": "91ef68537f8d3e155364238c51f8de8e8b8021859e78e37320c14b58a1e70e6c"
     },
     {
       "path": "exports/IMAdventist-training-screenshot-gallery.html",

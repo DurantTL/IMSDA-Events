@@ -14,7 +14,7 @@ This orientation follows fictional Riverton Pathfinders through ordinary tasks, 
 
 **Source version:** main [ad9237d](https://github.com/DurantTL/IMSDA-Events/commit/ad9237d). The capture register (`evidence/screenshot-capture.json`) lists each route and state.
 
-**Shorter sessions:** directors only: slides 1–21 and 31. Coordinators only: slides 1–7 and 22–31.
+**Shorter sessions:** directors only: slides 1–21 and 31. Coordinators only: slides 1–6 and 22–31.
 
 ## 1. Follow a club through a real task
 
@@ -411,7 +411,8 @@ Point to the confirmation number.
 
 ### Preparation references (not spoken)
 
-- [components/club-event-registration.tsx](https://github.com/DurantTL/IMSDA-Events/blob/ad9237d/components/club-event-registration.tsx)
+- [components/club-registration-workspace.tsx](https://github.com/DurantTL/IMSDA-Events/blob/ad9237d/components/club-registration-workspace.tsx)
+- [app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx](https://github.com/DurantTL/IMSDA-Events/blob/ad9237d/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/events/%5BeventId%5D/page.tsx)
 
 ## 17. Record a class, then confirm the insignia
 
@@ -505,7 +506,7 @@ Point to Membership total, then Save draft.
 
 ### Preparation references (not spoken)
 
-- [app/(public)/account/(portal)/clubs/[organizationId]/reports/year-end/[reportYear]/page.tsx](https://github.com/DurantTL/IMSDA-Events/blob/ad9237d/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/reports/year-end/%5BreportYear%5D/page.tsx)
+- [app/(public)/account/(portal)/clubs/[organizationId]/reports/year-end/[year]/page.tsx](https://github.com/DurantTL/IMSDA-Events/blob/ad9237d/app/%28public%29/account/%28portal%29/clubs/%5BorganizationId%5D/reports/year-end/%5Byear%5D/page.tsx)
 
 ## 21. Help is one click away
 
