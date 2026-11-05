@@ -5,7 +5,7 @@
 
 import { escapeHtmlAttribute } from "@/modules/forms/embed";
 import { filterByCategory, firstPerSeries, type CalendarItem } from "@/modules/calendar/domain";
-import { filterByGroup, resolveCalendarFilter } from "@/modules/calendar/filter-groups";
+import { filterByGroup, resolveCalendarFilter, type CalendarFilterGroup } from "@/modules/calendar/filter-groups";
 import { firstParam } from "@/lib/search-params";
 
 export const defaultWidgetLimit = 5;
@@ -26,11 +26,13 @@ export type WidgetOptions = {
   filter?: string | string[];
   category?: string | string[];
   limit?: number;
+  /** The chips the filter is read against (`loadCalendarFilterGroups`, #1611). */
+  groups: readonly CalendarFilterGroup[];
 };
 
 /** The resolved filter the widget uses and the "View full calendar" link keeps. */
-export function resolveWidgetFilter(filter: string | string[] | undefined, category: string | string[] | undefined) {
-  return resolveCalendarFilter(firstParam(filter), firstParam(category)?.slice(0, maxCategoryLength) || undefined);
+export function resolveWidgetFilter(filter: string | string[] | undefined, category: string | string[] | undefined, groups: readonly CalendarFilterGroup[]) {
+  return resolveCalendarFilter(firstParam(filter), firstParam(category)?.slice(0, maxCategoryLength) || undefined, groups);
 }
 
 /** An item shows its linked event's own dates when it has them (#1086), so ordering and "over" use those. */
@@ -43,10 +45,10 @@ const shownEnd = (item: CalendarItem) => item.eventEndsOn ?? item.endsOn;
  * yesterday) stays until its last day. Dates are the ones the widget shows (the linked event's when set).
  */
 export function selectWidgetItems(items: CalendarItem[], options: WidgetOptions) {
-  const { slug, category } = resolveWidgetFilter(options.filter, options.category);
+  const { slug, category } = resolveWidgetFilter(options.filter, options.category, options.groups);
   const limit = Math.min(maxWidgetLimit, Math.max(minWidgetLimit, options.limit ?? defaultWidgetLimit));
   const upcoming = items.filter((item) => shownEnd(item) >= options.today);
-  const filtered = filterByCategory(filterByGroup(upcoming, slug), category);
+  const filtered = filterByCategory(filterByGroup(upcoming, slug, options.groups), category);
   const ordered = [...filtered].sort((a, b) =>
     shownStart(a).localeCompare(shownStart(b)) || shownEnd(a).localeCompare(shownEnd(b)) || a.startsOn.localeCompare(b.startsOn) || a.endsOn.localeCompare(b.endsOn) || a.title.localeCompare(b.title) || a.key.localeCompare(b.key));
   const seenEvents = new Set<string>();

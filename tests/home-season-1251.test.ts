@@ -283,20 +283,18 @@ describe("ministry tiles (#1251)", () => {
   it("orders by position and falls back to the six names with no upcoming line", () => {
     const tiles = ministryTiles(fallbackHomepageMinistries, [item("a")], TODAY, NOW);
     expect(tiles.map((entry) => entry.name)).toEqual(["Pathfinders", "Adventurers", "Women's Ministries", "Men's Ministries", "Camp Meeting", "Youth"]);
-    expect(tiles.every((entry) => entry.next === null && entry.href === "/calendar?view=list")).toBe(true);
+    expect(tiles.every((entry) => entry.next === null && entry.href === `/calendar?view=list&filter=ministry-${entry.position}`)).toBe(true);
   });
 
-  it("links to the tile's own link, else the calendar filtered to a single category, else the calendar", () => {
-    expect(ministryLinkHref({ linkHref: "/clubs", categories: ["Youth"] })).toBe("/clubs");
-    expect(ministryLinkHref({ linkHref: "https://example.test/x", categories: [] })).toBe("https://example.test/x");
-    expect(ministryLinkHref({ linkHref: null, categories: ["Women's Ministries"] })).toBe("/calendar?view=list&category=Women's%20Ministries");
-    // Two or more categories: no single-category filter could show them all.
-    expect(ministryLinkHref({ linkHref: null, categories: ["Women's Ministries", "Youth"] })).toBe("/calendar?view=list");
-    expect(ministryLinkHref({ linkHref: null, categories: [" Youth ", " "] })).toBe("/calendar?view=list&category=Youth");
-    expect(ministryLinkHref({ linkHref: "", categories: [] })).toBe("/calendar?view=list");
+  it("links to the tile's own link, else the calendar's list on the tile's own button (#1611)", () => {
+    expect(ministryLinkHref({ linkHref: "/clubs", position: 6 })).toBe("/clubs");
+    expect(ministryLinkHref({ linkHref: "https://example.test/x", position: 2 })).toBe("https://example.test/x");
+    // The slug follows the position, so one tile with several categories still opens all of them, and a rename changes nothing.
+    expect(ministryLinkHref({ linkHref: null, position: 3 })).toBe("/calendar?view=list&filter=ministry-3");
+    expect(ministryLinkHref({ linkHref: "", position: 6 })).toBe("/calendar?view=list&filter=ministry-6");
     // A stored link that fails the rule is never used.
-    expect(ministryLinkHref({ linkHref: "//evil.example", categories: ["Youth"] })).toBe("/calendar?view=list&category=Youth");
-    expect(ministryLinkHref({ linkHref: "javascript:alert(1)", categories: [] })).toBe("/calendar?view=list");
+    expect(ministryLinkHref({ linkHref: "//evil.example", position: 1 })).toBe("/calendar?view=list&filter=ministry-1");
+    expect(ministryLinkHref({ linkHref: "javascript:alert(1)", position: 4 })).toBe("/calendar?view=list&filter=ministry-4");
   });
 });
 

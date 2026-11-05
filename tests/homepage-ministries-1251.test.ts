@@ -43,6 +43,14 @@ describe("homepage ministries input (#1251)", () => {
     expect(homepageMinistriesInputSchema.safeParse(sixTiles({ categories: ["a".repeat(41)] })).success).toBe(false);
   });
 
+  it("refuses a tile with no categories, naming the tile (#1611)", () => {
+    const result = homepageMinistriesInputSchema.safeParse({ ministries: [tile(1), tile(2, { name: "Camp Heritage", categories: [] }), ...[3, 4, 5, 6].map((position) => tile(position))] });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({ path: ["ministries", 1, "categories"] });
+    expect(result.error?.issues[0].message).toBe("Tile 2 (Camp Heritage) needs at least one calendar category, because each tile is a button on the public calendar.");
+    expect(homepageMinistriesInputSchema.safeParse(sixTiles({ categories: [] })).success).toBe(false);
+  });
+
   it("limits a description to 200 plain-text characters on one line", () => {
     expect(homepageMinistriesInputSchema.safeParse(sixTiles({ description: "a".repeat(200) })).success).toBe(true);
     expect(homepageMinistriesInputSchema.safeParse(sixTiles({ description: "a".repeat(201) })).success).toBe(false);
@@ -158,5 +166,18 @@ describe("the homepage ministries route (#1251)", () => {
     const good = await PATCH(request(sixTiles()));
     expect(good.status).toBe(200);
     expect(upsert).toHaveBeenCalledTimes(6);
+  });
+
+  it("refuses a tile with no categories with a clear message and writes nothing (#1611)", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "admin-1", globalRole: "SYSTEM_ADMIN" } });
+    const upsert = vi.fn();
+    const tx = { homepageMinistry: { findMany: vi.fn().mockResolvedValue([]), upsert }, auditLog: { create: vi.fn() } };
+    mocks.getPrisma.mockReturnValue({ $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)), homepageMinistry: { findMany: vi.fn().mockResolvedValue([]) } });
+    const body = sixTiles();
+    body.ministries[2] = tile(3, { name: "Women's Ministries", categories: [] });
+    const response = await PATCH(request(body));
+    expect(response.status).toBe(400);
+    expect((await response.json()).message).toContain("Tile 3 (Women's Ministries) needs at least one calendar category");
+    expect(upsert).not.toHaveBeenCalled();
   });
 });

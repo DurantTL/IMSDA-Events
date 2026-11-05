@@ -5,6 +5,7 @@ import { Save, Sparkles } from "lucide-react";
 import {
   homepageMinistryDescriptionMax,
   homepageMinistryIcons,
+  ministryLinkHref,
   type HomepageMinistry,
 } from "@/modules/system-admin/homepage-ministries-domain";
 import styles from "@/components/homepage-ministries-editor.module.css";
@@ -90,9 +91,10 @@ export function HomepageMinistriesEditor({
           </div>
         </div>
         <p className="field-help platform-note">
-          The six &ldquo;Find your place&rdquo; tiles on the front page. Each shows its next upcoming calendar item from the categories you list
-          (separate them with commas, as they are spelled on the calendar). Leave the link blank to open the calendar filtered to the
-          category when a tile has exactly one, or the whole calendar when it has two or more. A link starts with / for a page on this site, or https:// for another site. Changes are recorded in the audit log.
+          The six &ldquo;Find your place&rdquo; tiles on the front page. Each is also a filter button on the public calendar, in this order,
+          so every tile needs at least one category. Each shows its next upcoming calendar item from the categories you list
+          (separate them with commas, as they are spelled on the calendar). Leave the link blank to open the calendar on the tile&apos;s button, which shows
+          all of its categories. A link starts with / for a page on this site, or https:// for another site. Changes are recorded in the audit log.
         </p>
         {error && <p className="form-error" role="alert">{error}</p>}
         {notice && <p className="inline-notice" role="status">{notice}</p>}
@@ -107,11 +109,11 @@ export function HomepageMinistriesEditor({
             </label>
             <label>
               Calendar categories
-              <input autoComplete="off" maxLength={400} value={tile.categories} onChange={(event) => change(tile.position, { categories: event.target.value })} />
+              <input autoComplete="off" maxLength={400} required value={tile.categories} onChange={(event) => change(tile.position, { categories: event.target.value })} />
             </label>
             <label>
               Link
-              <input autoComplete="off" maxLength={500} placeholder="/calendar?view=list" value={tile.linkHref} onChange={(event) => change(tile.position, { linkHref: event.target.value })} />
+              <input autoComplete="off" maxLength={500} placeholder={ministryLinkHref({ linkHref: null, position: tile.position })} value={tile.linkHref} onChange={(event) => change(tile.position, { linkHref: event.target.value })} />
             </label>
             <label>
               Icon

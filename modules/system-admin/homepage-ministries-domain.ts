@@ -15,7 +15,6 @@ export const homepageMinistryCount = 6;
 /** The longest calendar category (modules/calendar/schemas.ts). */
 const calendarCategoryMax = 40;
 export const homepageMinistryDescriptionMax = 200;
-export const defaultMinistryLink = "/calendar?view=list";
 
 export type HomepageMinistry = {
   position: number;
@@ -43,18 +42,16 @@ export function isValidMinistryLink(value: string): boolean {
   }
 }
 
-/** The calendar filtered to one category, in the one format the calendar reads. */
-export function calendarCategoryHref(category: string) {
-  return `/calendar?view=list&category=${encodeURIComponent(category)}`;
+/** The calendar filter slug of the tile at this position. Based on the position, so renaming a tile never breaks a shared link (#1611). */
+export function ministryFilterSlug(position: number) {
+  return `ministry-${position}`;
 }
 
-/** A tile's link: its own link if staff set one, else the calendar filtered to its category when it has exactly one, else the whole calendar. */
-export function ministryLinkHref(ministry: Pick<HomepageMinistry, "linkHref" | "categories">): string {
+/** A tile's link: its own link if staff set one, else the calendar's list view on that tile's filter button, which shows every category the tile lists. */
+export function ministryLinkHref(ministry: Pick<HomepageMinistry, "linkHref" | "position">): string {
   const own = ministry.linkHref?.trim();
   if (own && isValidMinistryLink(own)) return own;
-  // The calendar filters by one category, so with two or more the filtered page would hide some of the tile's items.
-  const categories = ministry.categories.map((category) => category.trim()).filter(Boolean);
-  return categories.length === 1 ? calendarCategoryHref(categories[0]) : defaultMinistryLink;
+  return `/calendar?view=list&filter=${ministryFilterSlug(ministry.position)}`;
 }
 
 const blankToNull = (value: unknown) => (typeof value === "string" ? value.trim() : value);
@@ -92,7 +89,18 @@ export const homepageMinistriesInputSchema = z.object({
 }).strict().refine(
   (value) => new Set(value.ministries.map((tile) => tile.position)).size === homepageMinistryCount,
   "Each tile needs its own position.",
-);
+).superRefine((value, context) => {
+  // Each tile is a button on the public calendar (#1611), and a button with no category would be empty.
+  value.ministries.forEach((tile, index) => {
+    if (tile.categories.length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["ministries", index, "categories"],
+        message: `Tile ${tile.position} (${tile.name}) needs at least one calendar category, because each tile is a button on the public calendar.`,
+      });
+    }
+  });
+});
 
 export type HomepageMinistriesInput = z.infer<typeof homepageMinistriesInputSchema>;
 

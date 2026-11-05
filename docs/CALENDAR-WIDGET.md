@@ -10,7 +10,7 @@ allow-list (`EMBED_ALLOWED_ORIGINS`; imsda.org and its subdomains by default).
 Options (query string):
 
 - `limit`: 1 to 12 items, default 5.
-- `filter`: a calendar filter group slug (`main` by default, `everything`, `camps`, ...).
+- `filter`: a calendar filter button slug (`main` by default, `ministry-1` to `ministry-6` for the six homepage tiles, `schools`, `meetings`, `closed`, `everything`). Old slugs (`camps`, `pathfinders`, `adventurers`, `ministries`, `club`) go to the tile that lists that category, else Everything (#1611).
 - `category`: one category name (first 40 characters), as on `/calendar`.
 
 Items already under way stay until their last day; a repeating entry shows once. IMSDA events

@@ -152,7 +152,7 @@ describe("public front page (#373)", () => {
       ]);
       mocks.listPublicCalendarItems.mockResolvedValue([{ ...item(5), registrationStatus: "OPEN", registrationClosesOn: "2026-09-24" }]);
       const html = await render();
-      expect(html).toContain('href="/calendar?view=list&amp;category=youth"');
+      expect(html).toContain('href="/calendar?view=list&amp;filter=ministry-1"');
       expect(html).toContain("Ages 10 to 15.");
       expect(html).toContain("Next: Fictitious Camp 5, Oct 5");
       expect(html).toContain("Registration closes tomorrow");
