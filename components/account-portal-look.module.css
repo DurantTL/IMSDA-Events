@@ -1,6 +1,6 @@
 /* The attendee account's look (#1555, site rule L9): flatter cards with a thin border and links without underlines, as in
    the club portal. The club and coordinator shells draw their own pages, so those are left as they are. */
-.content :global(.account-page-banner) {
+.content :global(.account-portal-tabs) {
   margin-bottom: 20px;
 }
 
@@ -10,13 +10,17 @@
   box-shadow: none;
 }
 
-.content:not(:has(:global(.club-shell))):not(:has(:global(.coordinator-shell))) :is(:global(.empty-state-link), :global(.text-button)) {
+/* Text links read as the club portal's do (its "Set up two-step sign-in" and "Help guide" links): bold purple, no underline
+   until hover or focus. The bold purple against regular dark text is the cue that they are links. Buttons keep their own look. */
+.content:not(:has(:global(.club-shell))):not(:has(:global(.coordinator-shell))) :is(:global(.empty-state-link), :global(.text-button), :global(.text-link), :global(.public-manage-inline-link), :global(.report-record-link), :global(.field-help) > a, :global(.quiet-copy) > a) {
+  color: var(--imsda-purple);
+  font-weight: 700;
   text-decoration: none;
 }
 
-.content:not(:has(:global(.club-shell))):not(:has(:global(.coordinator-shell))) :is(:global(.empty-state-link), :global(.text-button)):hover {
-  text-decoration: none;
-  color: var(--imsda-navy);
+.content:not(:has(:global(.club-shell))):not(:has(:global(.coordinator-shell))) :is(:global(.empty-state-link), :global(.text-link), :global(.public-manage-inline-link), :global(.report-record-link), :global(.field-help) > a, :global(.quiet-copy) > a):is(:hover, :focus-visible) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* A section heading above cards or a list (Overview, My registrations): the gap the club home keeps under its card headings. */

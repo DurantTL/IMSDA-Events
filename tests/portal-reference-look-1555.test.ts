@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
+import { readdirSync, statSync } from "node:fs";
+import path from "node:path";
 import { read } from "./helpers/css-source";
+
+function listFiles(dir: string, prefix = ""): string[] {
+  return readdirSync(path.join(process.cwd(), dir)).flatMap((name) => {
+    const relative = prefix ? `${prefix}/${name}` : name;
+    return statSync(path.join(process.cwd(), dir, name)).isDirectory() ? listFiles(`${dir}/${name}`, relative) : [relative];
+  });
+}
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/account/area-clubs/overview",
@@ -113,20 +122,26 @@ describe("L9: the attendee account uses the club portal's shared pieces (#1555)"
   });
 
   it("uses the club portal's underline tabs, fed by accountPortalNavItems", () => {
-    expect(portalLayout).toContain('<ClubPortalNav items={items} label="Your account" />');
+    const tabs = read("components/account-portal-tabs.tsx");
+    expect(tabs).toContain('<ClubPortalNav items={items} label="Your account" />');
+    expect(portalLayout).toContain("<AccountPortalTabsProvider items={items}>");
+    expect(portalLayout).not.toContain("<ClubPortalNav");
     expect(portalLayout).not.toContain("AccountSectionNav");
+    expect(banner).toContain("<AccountPortalTabs />");
+    // masthead, band, tabs: the tabs follow the band's closing tag
+    expect(banner.indexOf("</section>")).toBeLessThan(banner.indexOf("<AccountPortalTabs />"));
     expect(portalLayout).toContain("accountPortalNavItems({");
   });
 
   it("hides the account header and tabs on club and coordinator pages, which draw their own masthead", () => {
-    expect(globalsCss).toContain(".account-portal:has(.club-shell) > :is(.account-masthead, .account-portal-tabs) { display: none; }");
-    expect(globalsCss).toContain(".account-portal:has(.coordinator-shell) > :is(.account-masthead, .account-portal-tabs) { display: none; }");
+    expect(globalsCss).toContain(".account-portal:has(.club-shell) > .account-masthead { display: none; }");
+    expect(globalsCss).toContain(".account-portal:has(.coordinator-shell) > .account-masthead { display: none; }");
   });
 
   it("opens every attendee page with the navy club banner, not the gradient hero", () => {
     expect(banner).toContain('className="club-banner account-page-banner"');
     expect(banner).toContain("club-banner-inner");
-    const pages = ["page", "registrations/page", "help/page", "help/[guideId]/page", "clubs/page", "clubs/choose/page", "instructor/page", "instructor/[offeringId]/page", "area/health/page"];
+    const pages = ["page", "registrations/page", "help/page", "help/[guideId]/page", "clubs/page", "clubs/choose/page", "instructor/page", "instructor/[offeringId]/page", "area/health/page", "club-registration/[eventSlug]/page", "not-found"];
     for (const page of pages) {
       const source = read(`app/(public)/account/(portal)/${page}.tsx`);
       expect(source, page).toContain("<AccountPageBanner");
@@ -134,6 +149,24 @@ describe("L9: the attendee account uses the club portal's shared pieces (#1555)"
     }
     const profile = read("components/profile-view.tsx");
     expect(profile).toContain("<AccountPageBanner");
+  });
+
+  it("every page under the portal layout has a banner, a shell of its own, or a redirect, so the tabs never go missing", () => {
+    const root = "app/(public)/account/(portal)";
+    const files = listFiles(root).filter((file) => /(^|\/)(page|not-found)\.tsx$/.test(file));
+    const ownShell = (file: string) => /^(clubs\/\[organizationId\]|area\/\[organizationId\]|area-clubs)\//.test(file);
+    const offenders = files.filter((file) => {
+      if (ownShell(file)) return false;
+      const source = read(`${root}/${file}`);
+      if (source.includes("<AccountPageBanner") || source.includes("<CoordinatorBanner") || source.includes("<ProfileView")) return false;
+      return !/^\s*redirect\(/m.test(source) || /return \(\s*</.test(source);
+    });
+    expect(offenders).toEqual([]);
+    expect(read(`${root}/error.tsx`)).toContain("<AccountPortalTabs />");
+    expect(read(`${root}/clubs/[organizationId]/layout.tsx`)).toContain("<ClubPortalNav");
+    expect(read(`${root}/area/[organizationId]/layout.tsx`)).toContain("<ClubPortalNav");
+    expect(read(`${root}/area-clubs/layout.tsx`)).toContain("<CoordinatorBanner />");
+    expect(read("components/profile-view.tsx")).toContain("<AccountPageBanner");
   });
 
   it("titles the Overview sections with the shared eyebrow-and-heading markup", () => {
@@ -149,6 +182,8 @@ describe("L9: the attendee account uses the club portal's shared pieces (#1555)"
     const css = read("components/account-portal-look.module.css");
     expect(css).toMatch(/box-shadow: none/);
     expect(css).toMatch(/text-decoration: none/);
+    expect(css).toMatch(/\.field-help\) > a/);
+    expect(css).toContain("color: var(--imsda-purple)");
     expect(css).toContain(":not(:has(:global(.club-shell)))");
     expect(css).toContain(":not(:has(:global(.coordinator-shell)))");
     expect(read("components/account-content.tsx")).toContain("styles.content");

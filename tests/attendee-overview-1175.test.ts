@@ -27,10 +27,11 @@ vi.mock("next/navigation", () => ({
     throw new Error(`REDIRECT ${path}`);
   },
 }));
-vi.mock("@/components/club-portal-nav", () => ({
-  ClubPortalNav: (props: { items: Array<{ href: string; label: string }> }) => {
+vi.mock("@/components/account-portal-tabs", () => ({
+  AccountPortalTabs: () => null,
+  AccountPortalTabsProvider: (props: { items: Array<{ href: string; label: string }>; children: unknown }) => {
     mocks.navItems = props.items;
-    return createElement("nav", null, props.items.map((item) => item.label).join("|"));
+    return createElement("nav", null, props.items.map((item) => item.label).join("|"), props.children as never);
   },
 }));
 vi.mock("@/components/act-as-banner", () => ({ ActAsBanner: () => null }));
