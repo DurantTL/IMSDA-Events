@@ -21,6 +21,8 @@ import { listAreaCoordinatorInvitesForAccount } from "@/modules/organizations/ar
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import { logError } from "@/lib/logger";
+import { AccountPageBanner } from "@/components/account-page-banner";
+import { PortalSectionHeading } from "@/components/portal-section-heading";
 
 export const dynamic = "force-dynamic";
 
@@ -101,13 +103,9 @@ export default async function AttendeeAccountOverviewPage() {
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Your account</p>
-          <h1>Hello, <span translate="no">{account.displayName}</span></h1>
-          <p>Here are your event plans and anything you need to finish.</p>
-        </div>
-      </section>
+      <AccountPageBanner title={<>Hello, <span translate="no">{account.displayName}</span></>}>
+        <p>Here are your event plans and anything you need to finish.</p>
+      </AccountPageBanner>
 
       {invites.length > 0 && <ClubInviteAccept invites={invites} fill="first" />}
       {areaInvites.length > 0 && <AreaCoordinatorInviteAccept invites={areaInvites} fill={invites.length > 0 ? "none" : "first"} />}
@@ -116,7 +114,7 @@ export default async function AttendeeAccountOverviewPage() {
       <div className="attendee-ov-layout">
         <div className="attendee-ov-main">
           <section aria-labelledby="attendee-ov-upcoming">
-            <h2 className="attendee-ov-heading" id="attendee-ov-upcoming">Coming up for you</h2>
+            <PortalSectionHeading eyebrow="Your events" id="attendee-ov-upcoming" title="Coming up for you" />
             {!registrationsResult.ok ? (
               <div className="attendee-ov-notice" role="alert">
                 <CircleAlert size={20} aria-hidden="true" />
@@ -169,7 +167,7 @@ export default async function AttendeeAccountOverviewPage() {
 
           {hasWorkspaceCards && (
             <section aria-labelledby="attendee-ov-roles">
-              <h2 className="attendee-ov-heading" id="attendee-ov-roles">Your other roles</h2>
+              <PortalSectionHeading eyebrow="Your account" id="attendee-ov-roles" title="Your other roles" />
               <div className="attendee-ov-roles">
                 {areaCoordinator && (
                   <Suspense fallback={<AreaCoordinatorCardSkeleton />}>

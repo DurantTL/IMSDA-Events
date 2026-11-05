@@ -13,7 +13,7 @@ import { coordinatorBannerYearLabel } from "@/components/coordinator-banner-year
  * Site rule L9 (docs/SITE-RULES.md, #1555): the club director portal is the reference look for the Area Coordinator
  * portal and the attendee account. Round 1 (here): the coordinator header, navy band and tabs reuse the club portal's
  * shared pieces, and the "Your account" drop-down sits inside both portals' masthead row, not on a bar of its own.
- * Round 3 will add the attendee account (its header, hero and tabs) to this guard. Source scans only.
+ * Round 3 adds the attendee account (its header, banner, tabs and section headings). Source scans only.
  */
 
 const clubMasthead = read("components/club-portal-masthead-view.tsx");
@@ -83,6 +83,75 @@ describe("L9: the account drop-down lives in the masthead row, not on a bar of i
 
   it("does not recompute the menu items in a masthead", () => {
     for (const source of [clubMasthead, coordinatorMasthead, sharedActions, menu]) expect(source).not.toContain("workspaceMenuNavItems");
+  });
+});
+
+describe("L9: the attendee account uses the club portal's shared pieces (#1555)", () => {
+  const masthead = read("components/account-portal-masthead.tsx");
+  const actions = read("components/account-header-actions.tsx");
+  const banner = read("components/account-page-banner.tsx");
+
+  it("draws its header as the club masthead row, with the shared outlined buttons and no account drop-down", () => {
+    expect(portalLayout).toContain("<AccountPortalMasthead");
+    expect(portalLayout).not.toContain("public-registration-header");
+    expect(masthead).toContain('className="club-masthead account-masthead"');
+    expect(masthead).toContain("club-masthead-inner");
+    expect(masthead).toContain("club-masthead-brand");
+    expect(masthead).toContain("<AccountHeaderActions");
+    expect(actions).toContain("<PortalMastheadActions");
+    expect(actions).toContain("accountMenu={false}");
+    expect(actions).toContain("styles.action");
+    expect(actions).not.toContain("text-button");
+    expect(sharedActions).toContain("accountMenu && <AccountWorkspaceMenu />");
+  });
+
+  it("keeps the workspace switch, the sign-out mode and the act-as behaviour", () => {
+    expect(portalLayout).toContain("otherWorkspaceContextsForAttendee");
+    expect(portalLayout).toContain("accountSignOutMode(");
+    expect(portalLayout).toContain("identity={acting ? undefined : chromeAccount?.displayName}");
+    expect(actions).toContain("contexts.map");
+  });
+
+  it("uses the club portal's underline tabs, fed by accountPortalNavItems", () => {
+    expect(portalLayout).toContain('<ClubPortalNav items={items} label="Your account" />');
+    expect(portalLayout).not.toContain("AccountSectionNav");
+    expect(portalLayout).toContain("accountPortalNavItems({");
+  });
+
+  it("hides the account header and tabs on club and coordinator pages, which draw their own masthead", () => {
+    expect(globalsCss).toContain(".account-portal:has(.club-shell) > :is(.account-masthead, .account-portal-tabs) { display: none; }");
+    expect(globalsCss).toContain(".account-portal:has(.coordinator-shell) > :is(.account-masthead, .account-portal-tabs) { display: none; }");
+  });
+
+  it("opens every attendee page with the navy club banner, not the gradient hero", () => {
+    expect(banner).toContain('className="club-banner account-page-banner"');
+    expect(banner).toContain("club-banner-inner");
+    const pages = ["page", "registrations/page", "help/page", "help/[guideId]/page", "clubs/page", "clubs/choose/page", "instructor/page", "instructor/[offeringId]/page", "area/health/page"];
+    for (const page of pages) {
+      const source = read(`app/(public)/account/(portal)/${page}.tsx`);
+      expect(source, page).toContain("<AccountPageBanner");
+      expect(source, page).not.toContain("account-page-hero");
+    }
+    const profile = read("components/profile-view.tsx");
+    expect(profile).toContain("<AccountPageBanner");
+  });
+
+  it("titles the Overview sections with the shared eyebrow-and-heading markup", () => {
+    const overview = read("app/(public)/account/(portal)/page.tsx");
+    expect(overview).toContain('<PortalSectionHeading eyebrow="Your events"');
+    expect(overview).toContain('title="Your other roles"');
+    expect(overview).toContain('className="attendee-ov-layout"');
+    expect(read("components/portal-section-heading.tsx")).toContain("public-manage-card-heading");
+    expect(read("components/coordinator-section-heading.tsx")).toContain("PortalSectionHeading");
+  });
+
+  it("flattens cards and drops link underlines in a CSS module, not on the club or coordinator shells", () => {
+    const css = read("components/account-portal-look.module.css");
+    expect(css).toMatch(/box-shadow: none/);
+    expect(css).toMatch(/text-decoration: none/);
+    expect(css).toContain(":not(:has(:global(.club-shell)))");
+    expect(css).toContain(":not(:has(:global(.coordinator-shell)))");
+    expect(read("components/account-content.tsx")).toContain("styles.content");
   });
 });
 

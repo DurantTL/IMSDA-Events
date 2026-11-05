@@ -3837,7 +3837,7 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
       await menu.locator("summary").click();
       await menu.locator('a[href="/account/registrations"]').click();
     } else {
-      await page.locator('.account-nav-primary a[href="/account/registrations"]').click();
+      await page.locator('.account-portal-tabs a[href="/account/registrations"]').click();
     }
     await page.waitForURL(`${baseUrl}/account/registrations`, { timeout: 30_000 });
     await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading]'), undefined, { timeout: 30_000 });

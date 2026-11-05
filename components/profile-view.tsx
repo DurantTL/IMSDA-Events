@@ -9,6 +9,8 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { VerifiedEmailExplainer } from "@/components/verified-email-explainer";
 import { StaffPasskeyManager } from "@/components/staff-passkey-manager";
 import type { ProfileData } from "@/modules/account-profile/load-profile";
+import { AccountPageBanner } from "@/components/account-page-banner";
+import { PortalSectionHeading } from "@/components/portal-section-heading";
 
 /**
  * The one shared Edit profile view (#543, #646). `/profile` renders it inside
@@ -124,13 +126,9 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Your account</p>
-          <h1>Edit profile</h1>
-          <p>Your details, two-step sign-in, passkeys and signed-in devices.</p>
-        </div>
-      </section>
+      <AccountPageBanner title="Edit profile">
+        <p>Your details, two-step sign-in, passkeys and signed-in devices.</p>
+      </AccountPageBanner>
 
       {staffSections && <div className="account-page-body profile-portal-staff">{staffSections}</div>}
 
@@ -139,7 +137,7 @@ export function ProfileView({ data, variant }: { data: ProfileData; variant: "sh
           <div className="account-page-body">
             <div className="public-manage-card profile-account-card">
               <div className="profile-account-heading-row">
-                <h2 className="profile-account-heading" id="profile-registration-heading">Registration account</h2>
+                <PortalSectionHeading eyebrow="Your account" id="profile-registration-heading" title="Registration account" />
                 <div className="profile-account-actions">
                   {backLinks}
                   <AttendeeSignOutButton className="secondary-button" label="Sign out of registration account" />

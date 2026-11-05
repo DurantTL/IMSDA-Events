@@ -1,0 +1,25 @@
+/* The attendee account's look (#1555, site rule L9): flatter cards with a thin border and links without underlines, as in
+   the club portal. The club and coordinator shells draw their own pages, so those are left as they are. */
+.content :global(.account-page-banner) {
+  margin-bottom: 20px;
+}
+
+.content:not(:has(:global(.club-shell))):not(:has(:global(.coordinator-shell))) :is(:global(.public-manage-card), :global(.attendee-ov-card), :global(.attendee-ov-empty), :global(.attendee-ov-notice)) {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.content:not(:has(:global(.club-shell))):not(:has(:global(.coordinator-shell))) :is(:global(.empty-state-link), :global(.text-button)) {
+  text-decoration: none;
+}
+
+.content:not(:has(:global(.club-shell))):not(:has(:global(.coordinator-shell))) :is(:global(.empty-state-link), :global(.text-button)):hover {
+  text-decoration: none;
+  color: var(--imsda-navy);
+}
+
+/* A section heading above cards or a list (Overview, My registrations): the gap the club home keeps under its card headings. */
+.content :is(:global(.attendee-ov-main), :global(.attendee-ov-roles)) > :global(section) > :global(.public-manage-card-heading) {
+  margin-bottom: 12px;
+}

@@ -11,6 +11,7 @@ import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 import { firstParam } from "@/lib/search-params";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -45,12 +46,7 @@ export default async function ChooseClubPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Club forms</p>
-          <h1>Choose your club</h1>
-        </div>
-      </section>
+      <AccountPageBanner title="Choose your club" context="Club forms" />
       <div className="account-page-body">
         <section className="public-manage-card">
           {clubs.length === 0 ? (

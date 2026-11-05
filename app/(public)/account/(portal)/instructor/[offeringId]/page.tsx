@@ -6,6 +6,7 @@ import { InstructorRoster } from "@/components/instructor-roster";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { HonorInstructorError, getInstructorRoster } from "@/modules/honors/instructor-repository";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const metadata: Metadata = { title: "Class roster", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -40,13 +41,9 @@ export default async function InstructorRosterPage({ params }: { params: Promise
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">{view.header.eventName} · {view.header.session}</p>
-          <h1 translate="no">{view.header.honorName}</h1>
-          {view.header.room && <p>Room {view.header.room}</p>}
-        </div>
-      </section>
+      <AccountPageBanner title={<span translate="no">{view.header.honorName}</span>} context={`${view.header.eventName} · ${view.header.session}`}>
+        {view.header.room && <p>Room {view.header.room}</p>}
+      </AccountPageBanner>
       <div className="account-page-body">
         <p><Link href="/account/instructor">Back to your classes</Link></p>
         {view.sterlingWarning && <div className="inline-notice error" role="status"><ShieldAlert size={17} aria-hidden="true" /> {view.sterlingWarning}</div>}

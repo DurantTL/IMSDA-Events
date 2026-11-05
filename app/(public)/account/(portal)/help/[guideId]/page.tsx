@@ -12,6 +12,7 @@ import { walkthroughManifest } from "@/modules/help/walkthrough-manifest-data";
 import { loadPortalHelpViewer } from "@/modules/help/portal-viewer";
 import { portalGuideForViewer, portalGuideLinksForViewer, portalUnavailableText } from "@/modules/help/portal-visibility";
 import styles from "@/app/(workspace)/help/help.module.css";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -47,12 +48,7 @@ export default async function PortalGuidePage({ params, searchParams }: { params
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Help</p>
-          <h1>{guide.title}</h1>
-        </div>
-      </section>
+      <AccountPageBanner title={guide.title} context="Help" />
       <div className="account-page-body">
         <HelpBackLink fallbackHref="/account/help" fallbackLabel="Back to Help" from={from} />
         <article className={styles.page}>

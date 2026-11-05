@@ -15,8 +15,8 @@ vi.mock("next/navigation", () => ({
     throw new Error(`REDIRECT ${path}`);
   },
 }));
-vi.mock("@/components/account-section-nav", () => ({
-  AccountSectionNav: (props: { items: Array<{ href: string; label: string }> }) => {
+vi.mock("@/components/club-portal-nav", () => ({
+  ClubPortalNav: (props: { items: Array<{ href: string; label: string }> }) => {
     mocks.navItems = props.items;
     return createElement("nav", null, props.items.map((item) => item.label).join("|"));
   },

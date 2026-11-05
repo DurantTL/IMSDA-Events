@@ -8,6 +8,7 @@ import { requireSecondStepForAreaCoordinator } from "@/modules/organizations/are
 import { resolveAreaHealthViewer } from "@/modules/coordinator-health/access";
 import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const metadata: Metadata = { title: "Event health information", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -33,12 +34,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
     const events = await listHealthEvents(viewer);
     return (
       <>
-        <section className="public-registration-hero public-manage-hero account-page-hero">
-          <div>
-            <p className="public-registration-eyebrow">Area Coordinator · confidential · view only</p>
-            <h1>Event health information</h1>
-          </div>
-        </section>
+        <AccountPageBanner title="Event health information" context="Area Coordinator · confidential · view only" />
         <div className="account-page-body club-roster-stack">
           <BackLink href="/account/area-clubs/overview#clubs-at-a-glance">Back to clubs at a glance</BackLink>
           <p className="inline-notice" role="status">Dietary notes as entered, the medical-need flag, and emergency contacts for club events. Each event is available through its last day. Every time you open or print one it is recorded.</p>
@@ -68,12 +64,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   }
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Area Coordinator · confidential · view only</p>
-          <h1>{data.event.name}</h1>
-        </div>
-      </section>
+      <AccountPageBanner title={data.event.name} context="Area Coordinator · confidential · view only" />
       <div className="account-page-body club-roster-stack">
         <BackLink href="/account/area/health">Back to events</BackLink>
         <p className="inline-notice" role="status">Available through {formatCalendarDate(data.event.availableThrough)}, the last day of the event. This view is recorded.</p>
