@@ -3772,7 +3772,7 @@ async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: n
       const group = sidebar.locator('button[aria-controls^="nav-group-clubs"][aria-expanded="false"]').first();
       if (await group.count()) await group.click();
     }
-    const destination = await page.evaluate((useSidebar) => {
+    const destination = await page.evaluate((useSidebar: boolean) => {
       const selector = useSidebar ? '#primary-navigation a[href]' : '[data-testid="admin-section-header"] nav a[href]';
       const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(selector))
         .filter((link) => link.getClientRects().length > 0 && new URL(link.href).pathname !== location.pathname && !link.hash);
