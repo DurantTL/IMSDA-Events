@@ -3,6 +3,7 @@ import { ExportLink } from "@/components/export-link";
 import { ColumnHeader } from "@/components/column-header";
 import { ExactValue } from "@/components/exact-value";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { yearLabel } from "@/modules/club-rosters/home-view";
 import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { Building2, Download, FileText, UsersRound } from "lucide-react";
@@ -44,7 +45,7 @@ export type CoordinatorOverviewData =
 /** Task heading in the club portal's eyebrow-and-heading pattern (#1555), the club year actually queried, and the honest scope. It claims no ministry or area filter. */
 export function CoordinatorOverviewHeading({ clubYear }: { clubYear: string }) {
   return (
-    <CoordinatorSectionHeading eyebrow={`Club year ${clubYear}`} title="Club overview">
+    <CoordinatorSectionHeading eyebrow={`Club year ${yearLabel(clubYear)}`} title="Club overview">
       <p>{COORDINATOR_SCOPE_TEXT}</p>
     </CoordinatorSectionHeading>
   );
@@ -223,7 +224,7 @@ export function CoordinatorClubsAtAGlance({
                           {club.backgroundChecks.notInCompliance} not in compliance · {club.backgroundChecks.expiringSoon} expiring soon · {club.backgroundChecks.missing} missing
                         </td>
                         <td {...cardCell(null)} className={styles.open}>
-                          <Link className={mine ? "primary-button" : "secondary-button"} href={href} prefetch={false}>
+                          <Link className={`${mine ? "primary-button" : "secondary-button"} ${styles.openLink}`} href={href} prefetch={false}>
                             {mine ? "Open my club" : "Open club"}<span className="sr-only">: {club.name}</span>
                           </Link>
                         </td>

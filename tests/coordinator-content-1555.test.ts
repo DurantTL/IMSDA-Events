@@ -4,6 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
 import { CoordinatorSummaryTiles } from "@/components/coordinator-summary-tiles";
+import { ClubYearHomeCard } from "@/components/club-year-tiles";
+import { CoordinatorOverviewHeading } from "@/components/coordinator-overview";
+import { CoordinatorDestinationHeading } from "@/components/coordinator-destinations";
 import { areaViewedClubNavItems } from "@/modules/club-rosters/portal-nav";
 
 const read = (path: string) => readFileSync(path, "utf8");
@@ -24,10 +27,9 @@ describe("coordinator page content uses the club portal's pieces (#1555, rule L9
     expect(html).toContain('aria-hidden="true"');
   });
 
-  it("gives a viewed club one tab row: All clubs first, then the club's own view-only tabs", () => {
+  it("gives a viewed club one tab row of the club's own view-only tabs, with no All clubs tab (#1551)", () => {
     const items = areaViewedClubNavItems({ organizationId: "club-1" });
-    expect(items[0]).toMatchObject({ href: "/account/area-clubs/overview", label: "All clubs" });
-    expect(items.map((item) => item.label)).toEqual(["All clubs", "Home", "Roster", "Honors", "Events", "Club forms", "Monthly Records", "Earned awards"]);
+    expect(items.map((item) => item.label)).toEqual(["Home", "Roster", "Honors", "Events", "Club forms", "Monthly Records", "Earned awards"]);
   });
 
   it("builds the viewed club's layout on the club banner and ClubPortalNav, with no second tab row or gradient hero", () => {
@@ -57,5 +59,19 @@ describe("coordinator page content uses the club portal's pieces (#1555, rule L9
     const page = read("app/(public)/account/(portal)/waitlists/page.tsx");
     expect(page).toContain("<EmptyState");
     expect(page).toContain("action={{");
+  });
+
+  it("shows the roster's per-class counts in the viewed club's Roster tile", () => {
+    const html = renderToStaticMarkup(createElement(ClubYearHomeCard, {
+      clubYear: "2026-27", roster: { active: 6, staff: 1, members: 5, byClass: [{ classLevel: "FRIEND", label: "Friend", count: 4 }, { classLevel: "COMPANION", label: "Companion", count: 1 }] } as never,
+      rosterHref: "#r", honors: null, compliance: null, complianceHref: "#c", events: { open: 0, registered: 0 }, eventsHref: "#e", reports: null, reportsHref: "#m",
+    }));
+    expect(html).toContain("Friend 4 · Companion 1");
+    expect(html).toContain("Club year 2026–27");
+  });
+
+  it("writes the club year with an en dash in every coordinator eyebrow", () => {
+    expect(renderToStaticMarkup(createElement(CoordinatorOverviewHeading, { clubYear: "2026-27" }))).toContain("Club year 2026–27");
+    expect(renderToStaticMarkup(createElement(CoordinatorDestinationHeading, { clubYear: "2026-27", title: "Points" }))).toContain("Club year 2026–27");
   });
 });

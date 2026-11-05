@@ -1,6 +1,7 @@
 import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { ColumnHeader } from "@/components/column-header";
+import { yearLabel } from "@/modules/club-rosters/home-view";
 import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { ChevronDown, Download } from "lucide-react";
@@ -40,7 +41,7 @@ export function registeredClubsLabel(count: number): string {
 /** Task heading in the club portal's eyebrow-and-heading pattern (#1555): the club year actually queried as the eyebrow, and the honest scope (no ministry or area filter is claimed). */
 export function CoordinatorDestinationHeading({ title, clubYear }: { title: string; clubYear?: string }) {
   return (
-    <CoordinatorSectionHeading eyebrow={clubYear ? `Club year ${clubYear}` : "Club coordination"} title={title}>
+    <CoordinatorSectionHeading eyebrow={clubYear ? `Club year ${yearLabel(clubYear)}` : "Club coordination"} title={title}>
       <p>{COORDINATOR_SCOPE_TEXT}</p>
     </CoordinatorSectionHeading>
   );

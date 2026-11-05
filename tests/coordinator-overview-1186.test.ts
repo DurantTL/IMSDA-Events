@@ -182,7 +182,7 @@ describe("overview markup (#1186)", () => {
   it("shows the heading, the queried year and the honest scope, and claims no ministry or area filter", () => {
     const out = renderToStaticMarkup(createElement(CoordinatorOverviewHeading, { clubYear }));
     expect(out).toContain("Club overview");
-    expect(out).toContain("2026-27");
+    expect(out).toContain("2026–27");
     expect(out).toContain("All active clubs available to this role");
     expect(out).not.toMatch(/ministry|area filter/i);
   });

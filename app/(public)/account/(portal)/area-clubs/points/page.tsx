@@ -23,8 +23,13 @@ export const metadata: Metadata = { title: "Club points", robots: { index: false
 export const dynamic = "force-dynamic";
 
 const BASE_PATH = "/account/area-clubs/points";
-/** One icon per summary tile, in the order `pointsSummaryTiles` returns them: leader, median, on-time registration, report points. */
-const POINTS_TILE_ICONS = [<Trophy key="leader" size={16} />, <Medal key="median" size={16} />, <CalendarCheck key="on-time" size={16} />, <ListChecks key="report" size={16} />];
+/** One icon per summary tile, keyed by the tile's label from `pointsSummaryTiles`. */
+const POINTS_TILE_ICONS: Record<string, React.ReactNode> = {
+  "Points leader": <Trophy size={16} />,
+  "Median total": <Medal size={16} />,
+  "On-time yearly registration": <CalendarCheck size={16} />,
+  "Report points": <ListChecks size={16} />,
+};
 
 /**
  * Points (#1187, #1316): a summary band, the top clubs as split bars and the ranking table with one Records link per
@@ -59,7 +64,7 @@ export default async function AreaPointsPage({ searchParams }: { searchParams: P
           </div>
           <CoordinatorSummaryTiles
             label={`Points summary for ${clubYear}, all ${allClubs.length} clubs`}
-            tiles={pointsSummaryTiles(allClubs).map((tile, index) => ({ ...tile, value: typeof tile.value === "number" ? tile.value.toLocaleString("en-US") : tile.value, icon: POINTS_TILE_ICONS[index] ?? <Trophy size={16} /> }))}
+            tiles={pointsSummaryTiles(allClubs).map((tile) => ({ ...tile, value: typeof tile.value === "number" ? tile.value.toLocaleString("en-US") : tile.value, icon: POINTS_TILE_ICONS[tile.label] ?? <Trophy size={16} /> }))}
           />
           {clubs.length === 0 ? (
             query ? <CoordinatorNoMatch clearHref={pointsPageHref(BASE_PATH, { year: clubYear, sort })} query={query} /> : <><p className="report-empty">No active clubs yet.</p><CoordinatorSetupHelp context="points" id="points-none" /></>

@@ -171,6 +171,9 @@ export function ClubYearHomeCard({
           <dt className={styles.term}><UsersRound size={16} aria-hidden="true" /> Roster</dt>
           <dd className="club-home-count-value">{roster.active}</dd>
           <dd className="club-home-count-definition">{`active this club year · ${roster.staff} staff · ${roster.members} members`}</dd>
+          {roster.byClass.length > 0 && (
+            <dd className="club-home-count-definition">{roster.byClass.map((entry) => `${entry.label} ${entry.count}`).join(" · ")}</dd>
+          )}
           {open(rosterHref, "Open roster")}
         </div>
         {honors && (
