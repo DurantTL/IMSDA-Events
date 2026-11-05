@@ -661,7 +661,7 @@ export function CalendarAdminWorkspace({
                   onChange={(change) => setEventListParams({ events: change.target.checked ? unmatchedEventsValue : "" })}
                   type="checkbox"
                 />{" "}
-                Only events with a category that is {notOnPublicFilterLabel.charAt(0).toLowerCase() + notOnPublicFilterLabel.slice(1)} ({unmatchedEvents.length})
+                Only events {notOnPublicFilterLabel.charAt(0).toLowerCase() + notOnPublicFilterLabel.slice(1)} ({unmatchedEvents.length})
               </label>
               {eventListParams.events === unmatchedEventsValue && shownEvents.length > 0 && (
                 <button className="text-button" onClick={() => setEventListParams({ events: "" })} type="button">Clear filters</button>

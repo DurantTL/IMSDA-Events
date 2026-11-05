@@ -119,6 +119,7 @@ export function HomepageMinistriesEditor({
               <input maxLength={homepageMinistryDescriptionMax} value={tile.description} onChange={(event) => change(tile.position, { description: event.target.value })} />
               <small>Plain text, up to {homepageMinistryDescriptionMax} characters. Leave blank to show the name and upcoming event only.</small>
             </label>
+            <div className={styles.ministryCategoryField}>
             <label>
               Calendar categories
               <input
@@ -130,8 +131,10 @@ export function HomepageMinistriesEditor({
                 value={tile.categories}
                 onChange={(event) => change(tile.position, { categories: event.target.value })}
               />
-              {categoryProblems[tile.position] && <small className="field-error-message" id={`ministry-${tile.position}-categories-error`} role="alert">{categoryProblems[tile.position]}</small>}
             </label>
+            {/* Outside the label so it describes the field without becoming part of its name; the summary above is the one alert. */}
+            {categoryProblems[tile.position] && <small className="field-error-message" id={`ministry-${tile.position}-categories-error`}>{categoryProblems[tile.position]}</small>}
+            </div>
             <label>
               Link
               <input autoComplete="off" maxLength={500} placeholder={ministryLinkHref({ linkHref: null, position: tile.position })} value={tile.linkHref} onChange={(event) => change(tile.position, { linkHref: event.target.value })} />
