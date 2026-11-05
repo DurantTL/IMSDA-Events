@@ -89,11 +89,11 @@ describe("AppShell default event (#465)", () => {
     expect(render({ user: admin })).not.toContain("Continuing with");
   });
 
-  it("selects nothing (with a placeholder) instead of events[0] when nothing could be chosen automatically", () => {
+  it("does not require or silently select an event in the System workspace", () => {
     navigation.pathname = "/admin";
     const markup = render({ user: admin, defaultEventId: null, autoSelected: false });
 
-    expect(markup).toContain("Choose an event");
+    expect(markup).not.toContain('id="event-picker"');
     expect(markup).not.toContain('selected="">Draft First');
     expect(markup).not.toContain("?event=evt_draft_first");
   });

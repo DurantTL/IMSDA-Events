@@ -3,6 +3,29 @@
 How back links, "reached from more than one place," and the staff nav
 groupings work, so later pages follow the same pattern.
 
+## Staff workspaces (#1565)
+
+The desktop sidebar selects Events, Clubs or System before showing that
+workspace's destinations. `staffWorkspaceFor` derives presentation from the
+existing admin section and System registries; it never grants access. Shared
+Clubs/System pages retain the selected role context. Help keeps that context.
+
+Events has a portfolio at `/events-admin` and a separate selected-event
+workspace. Only selected-event work shows an event picker and event operations.
+Clubs and System do not require an event. Workspace switches use the existing
+non-prefetched role routes and unsaved-change guard. The brand still opens
+`/calendar`.
+
+The desktop Create menu opens authorized existing event and form tools. It
+does not publish records. Phone placement remains with #1566; this slice
+preserves the existing phone controls. Desktop section headers retain local
+views/anchors and parent links while workspace destinations live in the sidebar.
+
+See [the generated staff route matrix](STAFF-WORKSPACE-ROUTES.md) for all
+page patterns. Regenerate it with `npx tsx docs/generate-staff-workspace-map.ts`
+after changing the existing registries or adding a staff page. Keep URL aliases,
+server guards, search predicates and module states with their current owners.
+
 ## Back links
 
 Every page below a section's top level gets a back link to its parent, with
