@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
 import { notFound } from "next/navigation";
 import { CoordinatorUnavailable } from "@/components/coordinator-overview";
 import { EmptyState } from "@/components/empty-state";
@@ -31,7 +32,7 @@ export default async function AreaNewClubApplicationsPage() {
   return (
     <section className="page-stack">
       <div className="public-manage-card">
-        <h2>New clubs</h2>
+        <CoordinatorSectionHeading eyebrow="Club coordination" title="New clubs" />
         <p className="field-help">
           People who applied to start a new club. {NEW_CLUBS_DECISION_TEXT} Contact details and attachments are for your review and are not to be shared.
         </p>

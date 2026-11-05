@@ -14,12 +14,13 @@ import { currentStaffActingContext } from "@/modules/organizations/staff-act-as"
  * layout uses: during a staff act-as, or while this session's second step is
  * pending, no attendee identity or Waitlists is shown. It is chrome
  * only; every page and route handler under it checks the coordinator grant
- * itself, and nothing here grants or hides authority. `children` (a page hero)
- * sits between the masthead and the navigation. The wrapper class lets
+ * itself, and nothing here grants or hides authority. `children` (the navy banner)
+ * sits between the masthead and the navigation; `nav` replaces the coordinator's task tabs, as on a viewed club, where the
+ * club's own tabs are the one row (#1555). The wrapper class lets
  * globals.css retire the account header and tabs on these pages, as the club
  * shell does.
  */
-export async function CoordinatorShellHeader({ children }: { children?: React.ReactNode } = {}) {
+export async function CoordinatorShellHeader({ children, nav }: { children?: React.ReactNode; nav?: React.ReactNode } = {}) {
   const [{ account, via, sessionId }, staffSession, acting] = await Promise.all([getCurrentAttendee(), getCurrentSession(), currentStaffActingContext()]);
   const actingAs = Boolean(acting);
   const secondStepPending = Boolean(account && via === "attendee" && (await accountNeedsSecondStep(account.id, sessionId)) !== "OK");
@@ -36,7 +37,7 @@ export async function CoordinatorShellHeader({ children }: { children?: React.Re
     <div className="coordinator-shell">
       <CoordinatorMastheadView model={model} formsHelpContact={await getFormsHelpContact()} />
       {children}
-      <AreaClubsSubNav items={coordinatorNavItems({ showWaitlists: model.showWaitlists })} />
+      {nav ?? <AreaClubsSubNav items={coordinatorNavItems({ showWaitlists: model.showWaitlists })} />}
     </div>
   );
 }

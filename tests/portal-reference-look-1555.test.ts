@@ -43,7 +43,9 @@ describe("L9: the Area Coordinator header uses the club portal's shared pieces (
   });
 
   it("uses the club banner, with the year box, on the coordinator band", () => {
-    const layout = read("app/(public)/account/(portal)/area-clubs/layout.tsx");
+    expect(read("app/(public)/account/(portal)/area-clubs/layout.tsx")).toContain("<CoordinatorBanner />");
+    expect(read("app/(public)/account/(portal)/waitlists/page.tsx")).toContain("<CoordinatorBanner />");
+    const layout = read("components/coordinator-banner.tsx");
     expect(layout).toContain('className="club-banner"');
     expect(layout).toContain("club-banner-inner");
     expect(layout).toContain("<CoordinatorBannerYear");

@@ -1,6 +1,7 @@
 import { CalendarClock, CircleAlert, ExternalLink } from "lucide-react";
 import { formatDateRange } from "@/modules/calendar/domain";
 import type { DeadlineListItem } from "@/modules/calendar/deadlines";
+import styles from "./upcoming-deadlines.module.css";
 
 /**
  * "Upcoming deadlines" (#910) for the club home and the Area Coordinator
@@ -16,7 +17,7 @@ export function UpcomingDeadlines({ deadlines, headingId = "upcoming-deadlines-h
         <h2 id={headingId}>Upcoming deadlines</h2>
       </div>
       {deadlines.length === 0 ? (
-        <p className="public-manage-empty">
+        <p className={`public-manage-empty ${styles.empty}`}>
           <CalendarClock size={17} aria-hidden="true" /> No deadlines in the next 90 days.
         </p>
       ) : (

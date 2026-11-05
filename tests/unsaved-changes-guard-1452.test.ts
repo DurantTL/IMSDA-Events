@@ -21,7 +21,6 @@ const allowlist: Record<string, string> = {
   "app/(workspace)/more/club-forms/page.tsx": "search or filter",
   "app/(workspace)/more/reports/clubs/check-in-book/page.tsx": "search or filter",
   "components/app-shell.tsx": "action button only, no typed fields",
-  "components/area-club-search-form.tsx": "search or filter",
   "components/attendee-pass-grid.tsx": "action button only, no typed fields",
   "components/attendee-password-reset-form.tsx": "sign-in",
   "components/attendee-sign-in-form.tsx": "sign-in",

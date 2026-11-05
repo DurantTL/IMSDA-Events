@@ -1,7 +1,8 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { ColumnHeader } from "@/components/column-header";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { RecordsByMonthChart, ReportSummaryBand, YearStrip, shortMonth } from "@/components/club-report-charts";
+import { ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Clock } from "lucide-react";
+import { CoordinatorSummaryTiles } from "@/components/coordinator-summary-tiles";
+import { RecordsByMonthChart, YearStrip, shortMonth } from "@/components/club-report-charts";
 import { ListPager } from "@/components/list-pager";
 import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
@@ -26,6 +27,8 @@ import styles from "./coordinator-monthly-records.module.css";
  * `clubs` is the list after the page's name search. The band and the chart describe those clubs, the same clubs the
  * full-year grid below shows, so the page tells one story.
  */
+
+const formatNumber = (value: number) => value.toLocaleString("en-US");
 
 const stateWords: Record<RecordState, { icon: string; word: string }> = {
   SUBMITTED: { icon: "✓", word: "Submitted" },
@@ -86,12 +89,12 @@ export function CoordinatorMonthBand({ clubs, month, now }: { clubs: readonly Ar
     ? `${summary.drafts} ${summary.drafts === 1 ? "draft" : "drafts"} saved`
     : `Month not ended; due ${summary.dueText}`;
   return (
-    <ReportSummaryBand
+    <CoordinatorSummaryTiles
       label={`${reportMonthLabel(month)} records`}
       tiles={[
-        { label: "Submitted", value: summary.submitted, detail: submittedDetail },
-        { label: "Not submitted", value: summary.notSubmitted, detail: notSubmittedDetail },
-        { label: "Not due yet", value: summary.notDue, detail: summary.monthEnded ? undefined : `Due ${summary.dueText}` },
+        { label: "Submitted", value: formatNumber(summary.submitted), detail: submittedDetail, icon: <CircleCheck size={16} /> },
+        { label: "Not submitted", value: formatNumber(summary.notSubmitted), detail: notSubmittedDetail, icon: <CircleAlert size={16} /> },
+        { label: "Not due yet", value: formatNumber(summary.notDue), detail: summary.monthEnded ? undefined : `Due ${summary.dueText}`, icon: <Clock size={16} /> },
       ]}
     />
   );

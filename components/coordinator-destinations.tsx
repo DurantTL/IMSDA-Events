@@ -1,6 +1,8 @@
 import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { ColumnHeader } from "@/components/column-header";
+import { yearLabel } from "@/modules/club-rosters/home-view";
+import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { ChevronDown, Download } from "lucide-react";
 import { SortOrderNote } from "@/components/list-sort";
@@ -36,16 +38,12 @@ export function registeredClubsLabel(count: number): string {
   return `${count} ${count === 1 ? "club" : "clubs"} registered`;
 }
 
-/** Task heading, the club year actually queried, and the honest scope (no ministry or area filter is claimed). */
+/** Task heading in the club portal's eyebrow-and-heading pattern (#1555): the club year actually queried as the eyebrow, and the honest scope (no ministry or area filter is claimed). */
 export function CoordinatorDestinationHeading({ title, clubYear }: { title: string; clubYear?: string }) {
   return (
-    <header className="coordinator-overview-heading">
-      <h2>{title}</h2>
-      <p className="coordinator-overview-scope">
-        {clubYear && <><span>Club year <strong>{clubYear}</strong></span><span aria-hidden="true"> · </span></>}
-        <span>{COORDINATOR_SCOPE_TEXT}</span>
-      </p>
-    </header>
+    <CoordinatorSectionHeading eyebrow={clubYear ? `Club year ${yearLabel(clubYear)}` : "Club coordination"} title={title}>
+      <p>{COORDINATOR_SCOPE_TEXT}</p>
+    </CoordinatorSectionHeading>
   );
 }
 
@@ -230,7 +228,7 @@ export function CoordinatorClubEvents({
                       <td {...cardCell("Status")}>{eventStatusLabels[club.status]}</td>
                       <td {...cardCell("Headcount")}>{club.headcount ?? "—"}</td>
                       <td {...cardCell("Open club")}>
-                        <Link className="secondary-button" href={`/account/area/${encodeURIComponent(club.organizationId)}`}>
+                        <Link className={`secondary-button ${styles.openClub}`} href={`/account/area/${encodeURIComponent(club.organizationId)}`}>
                           Open club<span className="sr-only">: {club.name}</span>
                         </Link>
                       </td>

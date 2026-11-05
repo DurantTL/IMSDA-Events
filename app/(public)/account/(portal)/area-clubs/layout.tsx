@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
-import { CoordinatorBannerYear } from "@/components/coordinator-banner-year";
+import { CoordinatorBanner } from "@/components/coordinator-banner";
 import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
-import { clubYearFor } from "@/modules/club-rosters/domain";
 import { currentAreaCoordinatorViewerActive, requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
 
 /** The Area Coordinator's Clubs section (#657): its own menu, view only, nothing for anyone but a coordinator. */
@@ -14,16 +13,7 @@ export default async function AreaClubsLayout({ children }: { children: React.Re
   return (
     <>
       <CoordinatorShellHeader>
-        {/* The club director's banner (club-banner in globals.css), so both portals' headers look the same (#1554). */}
-        <section aria-label="Area Coordinator" className="club-banner">
-          <div className="club-banner-inner">
-            <div className="club-banner-identity">
-              <h1>Club coordination</h1>
-              <p>Area Coordinator · view only</p>
-            </div>
-            <CoordinatorBannerYear currentYear={clubYearFor(new Date())} />
-          </div>
-        </section>
+        <CoordinatorBanner />
       </CoordinatorShellHeader>
       <div className="account-page-body">{children}</div>
     </>

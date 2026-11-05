@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { CalendarDays, CheckCircle2, FileText, UserCog } from "lucide-react";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
-import { ClubYearTiles } from "@/components/club-year-tiles";
+import { ClubYearHomeCard, ClubYearTiles } from "@/components/club-year-tiles";
 import { clubComplianceReminderCounts, clubRosterComplianceStatuses } from "@/modules/background-checks/repository";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { clubRegistrationWord } from "@/modules/registrations/status-words";
@@ -110,19 +110,35 @@ export async function ClubOverview({
 
   return (
     <>
-      <ClubYearTiles
-        headingLevel={headingLevel}
-        compliance={complianceTile}
-        complianceHref="#open-club-roster"
-        events={{ open: open.length, registered: registered.length }}
-        eventsHref="#open-club-events"
-        honors={honors}
-        honorsHref={honorsHref ?? staffHonorsHrefForYear}
-        reports={reportProgress}
-        reportsHref="#open-club-reports"
-        roster={roster}
-        rosterHref="#open-club-roster"
-      />
+      {portalView ? (
+        <ClubYearHomeCard
+          clubYear={clubYear}
+          compliance={complianceTile}
+          complianceHref="#open-club-roster"
+          events={{ open: open.length, registered: registered.length }}
+          eventsHref="#open-club-events"
+          honors={honors}
+          honorsHref={honorsHref ?? staffHonorsHrefForYear}
+          reports={reportProgress}
+          reportsHref="#open-club-reports"
+          roster={roster}
+          rosterHref="#open-club-roster"
+        />
+      ) : (
+        <ClubYearTiles
+          headingLevel={headingLevel}
+          compliance={complianceTile}
+          complianceHref="#open-club-roster"
+          events={{ open: open.length, registered: registered.length }}
+          eventsHref="#open-club-events"
+          honors={honors}
+          honorsHref={honorsHref ?? staffHonorsHrefForYear}
+          reports={reportProgress}
+          reportsHref="#open-club-reports"
+          roster={roster}
+          rosterHref="#open-club-roster"
+        />
+      )}
       <p className="club-year-tiles-points quiet-copy">
         <FileText size={15} aria-hidden="true" /> {yearToDate(submittedReports, reportYear.registrationOnTime)} points this club year.
       </p>

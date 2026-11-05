@@ -74,7 +74,8 @@ describe("Club events collapse (#1554)", () => {
 
 describe("Coordinator header (#1554)", () => {
   it("uses the club director banner instead of the account hero", () => {
-    const layout = read("app/(public)/account/(portal)/area-clubs/layout.tsx");
+    const layout = read("components/coordinator-banner.tsx");
+    expect(read("app/(public)/account/(portal)/area-clubs/layout.tsx")).toContain("<CoordinatorBanner />");
     expect(layout).toContain('className="club-banner"');
     expect(layout).toContain('className="club-banner-inner"');
     expect(layout).toContain('className="club-banner-identity"');

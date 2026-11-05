@@ -3,8 +3,11 @@ import { ExportLink } from "@/components/export-link";
 import { ColumnHeader } from "@/components/column-header";
 import { ExactValue } from "@/components/exact-value";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { yearLabel } from "@/modules/club-rosters/home-view";
+import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
-import { Download } from "lucide-react";
+import { Building2, Download, FileText, UsersRound } from "lucide-react";
+import { CoordinatorSummaryTiles } from "@/components/coordinator-summary-tiles";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { CoordinatorWhosMissing } from "@/components/coordinator-whos-missing";
 import { SetupChecklistPanel } from "@/components/setup-checklist-panel";
@@ -39,17 +42,12 @@ export type CoordinatorOverviewData =
   | { status: "ready"; clubs: AreaClubSummary[]; overview: CoordinatorOverview }
   | { status: "unavailable" };
 
-/** Task heading, the club year actually queried, and the honest scope. It claims no ministry or area filter. */
+/** Task heading in the club portal's eyebrow-and-heading pattern (#1555), the club year actually queried, and the honest scope. It claims no ministry or area filter. */
 export function CoordinatorOverviewHeading({ clubYear }: { clubYear: string }) {
   return (
-    <header className="coordinator-overview-heading">
-      <h2>Club overview</h2>
-      <p className="coordinator-overview-scope">
-        <span>Club year <strong>{clubYear}</strong></span>
-        <span aria-hidden="true"> · </span>
-        <span>{COORDINATOR_SCOPE_TEXT}</span>
-      </p>
-    </header>
+    <CoordinatorSectionHeading eyebrow={`Club year ${yearLabel(clubYear)}`} title="Club overview">
+      <p>{COORDINATOR_SCOPE_TEXT}</p>
+    </CoordinatorSectionHeading>
   );
 }
 
@@ -68,23 +66,17 @@ export function CoordinatorUnavailable({ what = "The club overview" }: { what?: 
 
 export function CoordinatorSummary({ overview }: { overview: CoordinatorOverview }) {
   return (
-    <section aria-labelledby="coordinator-summary-title" className="coordinator-summary">
+    <>
       <h3 className="sr-only" id="coordinator-summary-title">Summary for {overview.clubYear}</h3>
-      <dl>
-        <div>
-          <dt>Active clubs</dt>
-          <dd>{formatNumber(overview.activeClubs)}</dd>
-        </div>
-        <div>
-          <dt>Submitted records, {overview.monthLabel} (due {overview.dueText})</dt>
-          <dd>{overview.recordsText}</dd>
-        </div>
-        <div>
-          <dt>Roster members, {overview.clubYear}</dt>
-          <dd>{formatNumber(overview.rosterMembers)}</dd>
-        </div>
-      </dl>
-    </section>
+      <CoordinatorSummaryTiles
+        headingId="coordinator-summary-title"
+        tiles={[
+          { label: "Active clubs", value: formatNumber(overview.activeClubs), icon: <Building2 size={16} /> },
+          { label: `Submitted records, ${overview.monthLabel} (due ${overview.dueText})`, value: overview.recordsText, icon: <FileText size={16} /> },
+          { label: `Roster members, ${overview.clubYear}`, value: formatNumber(overview.rosterMembers), icon: <UsersRound size={16} /> },
+        ]}
+      />
+    </>
   );
 }
 
@@ -232,7 +224,7 @@ export function CoordinatorClubsAtAGlance({
                           {club.backgroundChecks.notInCompliance} not in compliance · {club.backgroundChecks.expiringSoon} expiring soon · {club.backgroundChecks.missing} missing
                         </td>
                         <td {...cardCell(null)} className={styles.open}>
-                          <Link className={mine ? "primary-button" : "secondary-button"} href={href} prefetch={false}>
+                          <Link className={`${mine ? "primary-button" : "secondary-button"} ${styles.openLink}`} href={href} prefetch={false}>
                             {mine ? "Open my club" : "Open club"}<span className="sr-only">: {club.name}</span>
                           </Link>
                         </td>
