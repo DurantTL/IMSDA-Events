@@ -1,4 +1,5 @@
 import "server-only";
+import { logError } from "@/lib/logger";
 
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
@@ -200,13 +201,18 @@ export async function sendPendingAreaCoordinatorInvites(actorUserId: string, exp
   } finally {
     // Written even when a queue write fails part-way, so invites already marked SENT are on the record.
     if (messageIds.length > 0) {
-      await writeAuditLog({
-        actorUserId,
-        action: "AREA_COORDINATOR_INVITES_SENT",
-        entityType: "AreaCoordinatorInvite",
-        summary: `Sent ${messageIds.length} Area Coordinator invite${messageIds.length === 1 ? "" : "s"}.`,
-        metadata: { count: messageIds.length },
-      });
+      // Its own try, so a failed audit write never hides the queue error that brought us here.
+      try {
+        await writeAuditLog({
+          actorUserId,
+          action: "AREA_COORDINATOR_INVITES_SENT",
+          entityType: "AreaCoordinatorInvite",
+          summary: `Sent ${messageIds.length} Area Coordinator invite${messageIds.length === 1 ? "" : "s"}.`,
+          metadata: { count: messageIds.length },
+        });
+      } catch (error) {
+        logError("Sending Area Coordinator invites: the audit entry could not be written.", error, { count: messageIds.length });
+      }
     }
   }
   if (messageIds.length === 0) throw new AreaCoordinatorInviteError("NOTHING_TO_SEND", "There are no Area Coordinator invites waiting to be sent.");

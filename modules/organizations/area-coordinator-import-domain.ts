@@ -1,6 +1,7 @@
 import { isValidInvitationEmail, normalizeInvitationEmail } from "@/modules/staff-invitations/domain";
 import { CsvImportError, parseCsvMatrix } from "@/modules/imports/csv-parser";
 import { toCsv } from "@/modules/reporting/csv";
+import { formatPersonName } from "@/lib/person-name";
 
 /**
  * Area Coordinator CSV import (#1608): pure parsing and planning. The columns are the ones a FluentCRM contacts export
@@ -99,7 +100,7 @@ export function planAreaCoordinatorImport(
 ): AreaCoordinatorImportStep[] {
   const seen = new Set<string>();
   return rows.map((row) => {
-    const inviteName = [row.firstName, row.lastName].filter(Boolean).join(" ");
+    const inviteName = formatPersonName(row);
     const name = inviteName ? (row.rawEmail ? `${inviteName} (${row.rawEmail})` : inviteName) : row.rawEmail;
     const base = { line: row.line, name, email: row.email, inviteName };
     if (row.problem) return { ...base, action: "ERROR" as const, message: row.problem };

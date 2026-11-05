@@ -111,7 +111,7 @@ export function PendingInvites({ invites, emailConfigured, heading = "Pending in
               </p>
               <div className={styles.pendingActions}>
                 {invite.notSent ? (
-                  <p className={styles.note}>Not sent yet. Use Send Area Coordinator invites above.</p>
+                  <p className={styles.note}>Use Send Area Coordinator invites above.</p>
                 ) : copyInstead ? (
                   <p className={styles.note}>Account email isn&apos;t set up, so this invite can&apos;t be emailed. Give them the sign-up link instead.</p>
                 ) : (
