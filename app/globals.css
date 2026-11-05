@@ -10410,9 +10410,8 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-masthead-brand > span:not([data-navigation-pending]) { display: grid; line-height: 1.2; }
 .club-masthead-brand small { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-masthead-brand strong { font-size: 1.05rem; }
-.club-masthead-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 12px; min-width: 0; }
 .club-masthead-identity { min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--muted); font-size: 0.9rem; }
-.club-masthead-link { min-height: 44px; padding-inline: 4px; font-weight: 800; }
+.account-portal .account-nav a { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
 .club-banner { background: var(--imsda-navy); color: #fff; }
 .club-banner-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0; }
 .club-banner-identity { min-width: 0; flex: 1 1 16rem; }
@@ -10426,7 +10425,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .club-banner-inner { padding: 14px 0; }
   .club-banner h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.25rem; }
   .club-banner-year { flex: 0 0 auto; padding: 6px 10px; }
-  .club-masthead-account { justify-content: flex-start; }
 }
 @media print {
   .club-masthead, .club-banner { display: none !important; }
