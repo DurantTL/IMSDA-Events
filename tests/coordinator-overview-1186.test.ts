@@ -361,7 +361,8 @@ describe("coordinator masthead and navigation (#1186, #442)", () => {
     expect(out).toContain("Club coordination");
     expect(out).toContain("Sample Coordinator");
     expect(out).toContain("Area Coordinator");
-    expect(out).toContain('href="/account"');
+    expect(out).not.toContain("My account");
+    expect(out).toContain("Sign out");
   });
 
   it("shows no identity during a staff act-as, and says so", () => {
@@ -476,7 +477,7 @@ describe("coordinator shell header wiring (#1186, #442)", () => {
   it.each([
     ["Area Coordinator", { role: "AREA_COORDINATOR" }, "Acting as Area Coordinator"],
     ["club director", { role: "CLUB_DIRECTOR", organizationId: "club-1" }, "Acting as club director"],
-  ])("shows no identity, My account or Waitlists during a staff act-as as %s, and names that role", async (_label, acting, expectedLabel) => {
+  ])("shows no identity or Waitlists during a staff act-as as %s, and names that role", async (_label, acting, expectedLabel) => {
     mocks.currentStaffActingContext.mockResolvedValue(acting);
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", globalRole: "SYSTEM_ADMIN" } });
     const out = await html();

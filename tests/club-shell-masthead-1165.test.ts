@@ -1,9 +1,10 @@
-import { createElement } from "react";
+import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => "/account/clubs/club-1" }));
 
+import { AccountWorkspaceMenuProvider } from "@/components/account-workspace-menu-context";
 import { clubBannerYearLabel } from "@/components/club-banner-year";
 import { clubMastheadModel, ClubPortalMastheadView } from "@/components/club-portal-masthead-view";
 import { readFileSync } from "node:fs";
@@ -15,10 +16,10 @@ const base = { account, secondStepPending: false, actingAs: false, clubCount: 1,
 const html = (over: Partial<Parameters<typeof clubMastheadModel>[0]>) => renderToStaticMarkup(createElement(ClubPortalMastheadView, { model: clubMastheadModel({ ...base, ...over }), role: "DIRECTOR" }));
 
 describe("club masthead identity (#1165, #442)", () => {
-  it("shows the attendee, My account and Sign out for a signed-in director of one club, with no Switch club", () => {
+  it("shows the attendee and Sign out for a signed-in director of one club, with no Switch club and no My account button (#1555)", () => {
     const out = html({ clubCount: 1 });
     expect(out).toContain("Sample Director");
-    expect(out).toContain('href="/account"');
+    expect(out).not.toContain("My account");
     expect(out).not.toContain("Switch club");
     expect(out).toContain("Sign out");
   });
@@ -32,7 +33,7 @@ describe("club masthead identity (#1165, #442)", () => {
     expect(html({ clubCount: 2 })).toContain("Switch club");
   });
 
-  it("shows no attendee identity, My account or Switch club while a staff act-as is active, and says so", () => {
+  it("shows no attendee identity or Switch club while a staff act-as is active, and says so", () => {
     const out = html({ actingAs: true, clubCount: 3, signOut: "none" });
     expect(out).toContain("Acting as club director");
     expect(out).not.toContain("Sample Director");
@@ -41,12 +42,23 @@ describe("club masthead identity (#1165, #442)", () => {
     expect(out).not.toContain("Sign out");
   });
 
-  it("hides the attendee identity, My account and Switch club while this session's second step is pending", () => {
+  it("hides the attendee identity and Switch club while this session's second step is pending", () => {
     const out = html({ secondStepPending: true, clubCount: 3 });
     expect(out).not.toContain("Sample Director");
     expect(out).not.toContain("My account");
     expect(out).not.toContain("Switch club");
     expect(out).not.toContain("Acting as");
+  });
+
+  it("renders the Your account drop-down inside the masthead header from the layout's list, and nothing without one (#1555)", () => {
+    const model = clubMastheadModel({ ...base });
+    const items = [{ href: "/account/registrations", label: "My registrations" }, { href: "/account/clubs", label: "My club", matchChildren: true }];
+    const out = renderToStaticMarkup(createElement(AccountWorkspaceMenuProvider as ComponentType<{ items: typeof items }>, { items }, createElement(ClubPortalMastheadView, { model, role: "DIRECTOR" })));
+    const header = out.slice(out.indexOf("<header"), out.indexOf("</header>"));
+    expect(header).toContain("Your account");
+    expect(header).toContain('href="/account/registrations"');
+    expect(header).toContain('aria-current="page"');
+    expect(html({})).not.toContain("Your account");
   });
 
   it("never links to a staff or system destination", () => {

@@ -1,0 +1,79 @@
+/* The "Your account" drop-down in the club and coordinator masthead row (#1555). The trigger wears the masthead's outlined
+   button (club-portal-masthead-view.module.css .action); this file only styles the panel. */
+.menu {
+  position: relative;
+}
+
+.trigger {
+  list-style: none;
+}
+
+.trigger::-webkit-details-marker {
+  display: none;
+}
+
+.menu[open] > .trigger {
+  background: var(--imsda-navy-soft);
+}
+
+.panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 18rem;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: 0 12px 28px rgb(0 44 69 / 18%);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--imsda-navy);
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.link[aria-current] {
+  background: var(--imsda-navy-soft);
+  box-shadow: inset 3px 0 var(--imsda-purple);
+}
+
+.link:hover {
+  background: var(--imsda-navy-soft);
+}
+
+.link:focus-visible {
+  outline: 3px solid var(--imsda-purple);
+  outline-offset: -3px;
+}
+
+/* On a phone the trigger can sit anywhere in the header row, so the panel hangs from the row (its .account wrapper is
+   positioned) and spans its width, which keeps it on screen at 360 and 390 px. */
+@media (max-width: 640px) {
+  .menu {
+    position: static;
+  }
+
+  .panel {
+    right: 0;
+    left: 0;
+    width: auto;
+    max-width: none;
+  }
+}

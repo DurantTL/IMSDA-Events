@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { CoordinatorBannerYear } from "@/components/coordinator-banner-year";
 import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
+import { clubYearFor } from "@/modules/club-rosters/domain";
 import { currentAreaCoordinatorViewerActive, requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
 
 /** The Area Coordinator's Clubs section (#657): its own menu, view only, nothing for anyone but a coordinator. */
@@ -19,6 +21,7 @@ export default async function AreaClubsLayout({ children }: { children: React.Re
               <h1>Club coordination</h1>
               <p>Area Coordinator · view only</p>
             </div>
+            <CoordinatorBannerYear currentYear={clubYearFor(new Date())} />
           </div>
         </section>
       </CoordinatorShellHeader>

@@ -3819,6 +3819,7 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
         return animate(frames, options);
       };
     });
+    // The "Your account" drop-down sits in the club and coordinator masthead row (#1555); the details element itself carries the class.
     const menu = page.locator(".account-workspace-menu:visible");
     if (await menu.count()) {
       await menu.locator("summary").click();
@@ -3832,7 +3833,7 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
         if (!(await menu.locator(`a[href="${href}"]`).count())) throw new Error(`Missing account destination ${href}`);
       }
       await page.keyboard.press("Escape");
-      if (await menu.locator("details").getAttribute("open") !== null) throw new Error("Escape did not close the account menu");
+      if (await menu.getAttribute("open") !== null) throw new Error("Escape did not close the account menu");
       await menu.locator("summary").click();
       await menu.locator('a[href="/account/registrations"]').click();
     } else {

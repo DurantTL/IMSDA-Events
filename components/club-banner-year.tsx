@@ -14,7 +14,7 @@ export function clubBannerYearLabel(yearParam: string | null | undefined, now = 
   return { label: "Viewing", value: `${dash(view.clubYear)} (read-only)` };
 }
 
-function YearBox({ label, value }: { label: string; value: string }) {
+export function YearBox({ label, value }: { label: string; value: string }) {
   return (
     <p className="club-banner-year">
       <span>{label}</span>

@@ -135,6 +135,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | L6 | Tabs use the one shared tabs component, with keyboard support. | `tests/tabs-shared-1353.test.ts` | `npm run test:event-journeys` (the form builder's sidebar tabs: tablist, one selected tab, arrow keys; no attendee page has tabs) | #1353 |
 | L7 | Dialogs use the shared `useAccessibleDialog` hook (focus trap, Escape, return focus). | `tests/dialogs-shared-hook-1354.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; other roles planned (#1439)); `npm run test:event-journeys` (event staff: the builder's publish form dialog, the Publish event confirm dialog) | #1354 |
 | L8 | Identical radius and color values use the shared tokens in `app/globals.css`. Values that differ wait for a later mockup issue. | `tests/look-guard-1440.test.ts` | none (code rule) | #1350 |
+| L9 | The club director portal is the reference look for the Area Coordinator portal and the attendee account: their header, banner, tabs, section headings, cards and buttons use the club portal's shared styles and look the same unless a page has a stated reason not to. Admin and staff pages follow the Workspace direction (#1559). | `tests/portal-reference-look-1555.test.ts` | browser test: club, coordinator and attendee account pages at 1280 and 390 px; `npm run test:club-journeys` (club director and area coordinator pages) | #1555; Caleb, Nov 4–5 |
 
 ## Page checks (AGENTS.md → Checks)
 
