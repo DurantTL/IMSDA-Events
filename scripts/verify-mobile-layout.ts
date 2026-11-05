@@ -3766,14 +3766,21 @@ async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: n
     });
     // Two genuine links in the same browser turn: the last destination must win,
     // even when the first route has not finished fetching. No router mocks or fake product delays.
-    const destination = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-testid="admin-section-header"] nav a[href]'))
-        .filter((link) => new URL(link.href).pathname !== location.pathname && !link.hash);
+    const sidebar = page.locator("#primary-navigation");
+    const useSidebar = await sidebar.isVisible();
+    if (useSidebar) {
+      const group = sidebar.locator('button[aria-controls^="nav-group-clubs"][aria-expanded="false"]').first();
+      if (await group.count()) await group.click();
+    }
+    const destination = await page.evaluate((useSidebar) => {
+      const selector = useSidebar ? '#primary-navigation a[href]' : '[data-testid="admin-section-header"] nav a[href]';
+      const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(selector))
+        .filter((link) => link.getClientRects().length > 0 && new URL(link.href).pathname !== location.pathname && !link.hash);
       if (links.length < 2) throw new Error("The dashboard needs two navigation destinations for the rapid-click check");
       links[0]!.click();
       links[1]!.click();
       return links[1]!.href;
-    });
+    }, useSidebar);
     await page.waitForURL(destination, { timeout: 30_000 });
     await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading], .shell-loading'), undefined, { timeout: 30_000 });
     await page.waitForFunction(() => Number(document.getElementById("workspace-content")?.dataset.navigationAudit) > 0, undefined, { timeout: 5000 });
