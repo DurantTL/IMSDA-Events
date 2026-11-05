@@ -13,12 +13,14 @@ import {
   isUpcoming,
   maxBulkEntries,
   planBulkAction,
+  unmatchedCategoryFilter,
   type CalendarEntryQuery,
   type EntryFilters,
   type BulkAction,
   type BulkChange,
   type BulkSkip,
 } from "@/modules/calendar/admin-list";
+import { loadCalendarCategoryChoices } from "@/modules/calendar/public-filters";
 import { clampPage } from "@/lib/pagination";
 import { segmentWindows } from "@/lib/segment-window";
 import {
@@ -282,7 +284,9 @@ async function upcomingRepeatingEntryIds(prisma: ReturnType<typeof getPrisma>, t
 /** The where-clause for a set of filters, with the series lookup the time filter needs. */
 async function entryWhereFor(prisma: ReturnType<typeof getPrisma>, filters: EntryFilters, today: string) {
   const seriesIds = filters.time === "all" ? [] : await upcomingRepeatingEntryIds(prisma, today);
-  return buildEntryWhere(filters, today, seriesIds) as Prisma.CalendarEntryWhereInput;
+  // "Not on a public filter" needs the names the public buttons list, which come from the homepage tiles (#1611).
+  const publicCategories = filters.category === unmatchedCategoryFilter ? (await loadCalendarCategoryChoices()).matched : [];
+  return buildEntryWhere(filters, today, seriesIds, publicCategories) as Prisma.CalendarEntryWhereInput;
 }
 
 export type CalendarEntryPage = {
@@ -504,6 +508,8 @@ export async function listCalendarEvents(now = new Date()) {
     isPublished: event.isPublished,
     showOnCalendar: event.showOnCalendar,
     calendarCategory: event.calendarCategory ?? "",
+    /** A club-audience event, for "Not on a public filter" when it has no category (#1611). */
+    clubEvent: event.audience === "CLUB",
     /** The calendar items linked to this event (#445, #1086), by date. */
     linkedEntries: event.calendarEntryLinks.map((link) => ({ id: link.id, title: link.title })),
   }));

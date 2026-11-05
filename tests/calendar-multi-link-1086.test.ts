@@ -342,7 +342,7 @@ describe("the calendar admin for a shared event (#1086)", () => {
   };
   const linkedEvent = { id: "event-1", name: "Honors Weekend 2027", slug: "honors-weekend-2027", isArchived: false, isPublished: true, showOnCalendar: true, startsOn: "2027-02-05", endsOn: "2027-02-07", otherLinkedItems: 2, showsWithRegister: true };
   const events: CalendarAdminEvent[] = [
-    { id: "event-1", name: "Honors Weekend 2027", startsOn: "2027-02-05", endsOn: "2027-02-07", isPublished: true, showOnCalendar: true, calendarCategory: "", linkedEntries: [{ id: "ia", title: "Iowa" }, { id: "es", title: "Spanish" }] },
+    { id: "event-1", name: "Honors Weekend 2027", startsOn: "2027-02-05", endsOn: "2027-02-07", isPublished: true, showOnCalendar: true, calendarCategory: "", clubEvent: false, linkedEntries: [{ id: "ia", title: "Iowa" }, { id: "es", title: "Spanish" }] },
   ];
   const render = (overrides: Partial<CalendarAdminEntry>) =>
     renderToStaticMarkup(createElement(CalendarEntryRegistration, { entry: { ...base, ...overrides }, events, saving: false, send: async () => true }));

@@ -8,6 +8,7 @@ import { TabList, TabPanel } from "@/components/tab-list";
 import { ActionsMenu } from "@/components/actions-menu";
 import { TYPED_TEXT_ADDRESS_MODE, useAddressParams, useClientSearch, writeAddressParams } from "@/components/search-as-you-type";
 import { CalendarDays, Eye, EyeOff, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { CalendarCategorySelect, chooseCategoryValue, notOnPublicFilterLabel } from "@/components/calendar-category-select";
 import { CalendarEntryRegistration } from "@/components/calendar-entry-registration";
 import { CalendarFeedsPanel } from "@/components/calendar-feeds-panel";
 import { CalendarWidgetEmbed } from "@/components/calendar-widget-embed";
@@ -32,11 +33,13 @@ import {
   parseEntrySort,
   staffSourceFilter,
   summarizeSkips,
+  unmatchedCategoryFilter,
   type BulkAction,
   type BulkSkip,
   type EntryFilters,
   type EntrySort,
 } from "@/modules/calendar/admin-list";
+import { buildCalendarFilterGroups, calendarCategoryChoices, eventOnPublicFilter, type CalendarCategoryChoices } from "@/modules/calendar/filter-groups";
 import { calendarStatusLabels, closureLabel, formatDateRange } from "@/modules/calendar/domain";
 import { describeRepeat, previewOccurrences, weekdayLabels, type RepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry, CalendarAdminEvent } from "@/modules/calendar/repository";
@@ -75,6 +78,23 @@ function parseEntryListParams(params: URLSearchParams): EntryListParams {
 
 /** Where the loaded page sits in the whole list, from the server. */
 export type EntryListInfo = { total: number; page: number; pageSize: number; totalAll: number; categories: string[] };
+
+/** What Calendar admin knows about the public buttons (#1611): the category dropdown, the names on a button, and the buttons' `?filter=` values. */
+export type PublicCategoryFilters = CalendarCategoryChoices & { filterSlugs: string[] };
+
+/** Without the server's read (a test, a preview) the fixed buttons are all there is. */
+const noTileFilters: PublicCategoryFilters = (() => {
+  const groups = buildCalendarFilterGroups([]);
+  return { ...calendarCategoryChoices(groups), filterSlugs: groups.map((group) => group.slug) };
+})();
+
+/** The Events tab's one filter lives in the address too (`?events=unmatched`; rule B2): events on no public button. */
+const unmatchedEventsValue = "unmatched";
+type EventListParams = { events: string };
+const defaultEventListParams: EventListParams = { events: "" };
+function parseEventListParams(params: URLSearchParams): EventListParams {
+  return { events: params.get("events") === unmatchedEventsValue ? unmatchedEventsValue : "" };
+}
 
 export const noRepeat: RepeatDraft = { frequency: "NEVER", interval: 1, weekdays: [], endMode: "never", until: "", count: 10, weekStart: 0 };
 
@@ -138,6 +158,7 @@ export function CalendarAdminWorkspace({
   initialFeeds = [],
   initialReminders = { batches: [], emailConfigured: true },
   widgetEmbedCode = "",
+  publicFilters = noTileFilters,
   initialEntryList,
   initialQueryKey = "",
 }: {
@@ -152,6 +173,8 @@ export function CalendarAdminWorkspace({
   initialReminders?: PendingReminders;
   /** The upcoming-events widget's embed code (#107); empty hides the section. */
   widgetEmbedCode?: string;
+  /** The categories to pick from and the names on a public calendar button, read from the homepage tiles on the server (#1611). */
+  publicFilters?: PublicCategoryFilters;
 }) {
   const [tab, setTab] = useState<CalendarTab>("entries");
   const [reminderCount, setReminderCount] = useState(initialReminders.batches.length);
@@ -177,7 +200,7 @@ export function CalendarAdminWorkspace({
   const search = useClientSearch(defaultEntryFilters.search, undefined, "q");
   // The list filters on the settled search term, not on every keystroke.
   const filters = useMemo(() => ({ ...dropdownFilters, search: search.term }), [dropdownFilters, search.term]);
-  const [bulkCategory, setBulkCategory] = useState("");
+  const [bulkCategory, setBulkCategory] = useState(chooseCategoryValue);
   const [bulkTarget, setBulkTarget] = useState<BulkAction | null>(null);
   const [loadingEntries, setLoadingEntries] = useState(false);
   // A category typed for a published event, not saved yet. Saving puts the saved category back in the box (the form is
@@ -392,10 +415,15 @@ export function CalendarAdminWorkspace({
     }
   }
 
+  // The Category filter lists what is in use; the dropdowns in the forms list the public buttons' categories (#1611).
   const categoryOptions = [...new Set([
     ...entryList.categories,
     ...events.map((event) => event.calendarCategory),
   ].filter(Boolean))].sort();
+  // Events that sit on no public button, for the Events tab's "Not on a public filter" list.
+  const [eventListParams, setEventListParams] = useAddressParams(defaultEventListParams, parseEventListParams);
+  const unmatchedEvents = events.filter((event) => !eventOnPublicFilter(event, publicFilters.matched));
+  const shownEvents = eventListParams.events === unmatchedEventsValue ? unmatchedEvents : events;
 
   return (
     <section className="page-stack calendar-admin">
@@ -407,10 +435,6 @@ export function CalendarAdminWorkspace({
           </a>
         )}
       />
-
-      <datalist id="calendar-categories">
-        {categoryOptions.map((category) => <option key={category} value={category} />)}
-      </datalist>
 
       <TabList
         label="Calendar settings"
@@ -451,6 +475,7 @@ export function CalendarAdminWorkspace({
           <EntryForm
             eyebrow="New entry"
             heading="Add a date to the calendar"
+            choices={publicFilters}
             onSubmit={(body) => call("/api/admin/calendar/entries", "POST", body, body.isPublished ? "Added to the public calendar." : "Saved as a draft.")}
             saving={saving}
             submitLabel="Add to calendar"
@@ -496,15 +521,14 @@ export function CalendarAdminWorkspace({
                 {selected.size > 0 && (
                   <div className="calendar-admin-actions" role="group" aria-label={`Change ${describeEntryCount(selected.size)}`}>
                     <strong>{selected.size} selected</strong>
-                    <input
-                      aria-label="Category for the selected entries"
-                      list="calendar-categories"
-                      maxLength={40}
+                    <CalendarCategorySelect
+                      choices={publicFilters}
+                      label="Category for the selected entries"
                       onChange={(event) => setBulkCategory(event.target.value)}
-                      placeholder="Category"
+                      placeholder="Choose a category"
                       value={bulkCategory}
                     />
-                    <button className="secondary-button" disabled={saving || !bulkCategory.trim()} onClick={() => setBulkTarget({ action: "setCategory", category: bulkCategory.trim() })} type="button">Set category</button>
+                    <button className="secondary-button" disabled={saving || bulkCategory === chooseCategoryValue} onClick={() => setBulkTarget({ action: "setCategory", category: bulkCategory.trim() })} type="button">Set category</button>
                     <button className="secondary-button" disabled={saving} onClick={() => setBulkTarget({ action: "setCategory", category: "" })} type="button">Clear category</button>
                     <button className="secondary-button" disabled={saving} onClick={() => setBulkTarget({ action: "publish" })} type="button">Publish</button>
                     <button className="secondary-button" disabled={saving} onClick={() => setBulkTarget({ action: "unpublish" })} type="button">Unpublish</button>
@@ -617,7 +641,7 @@ export function CalendarAdminWorkspace({
 
       {tab === "events" && (
         <TabPanel id={calendarPanelId("events")} tabId={calendarTabId("events")}>
-          {widgetEmbedCode && <CalendarWidgetEmbed code={widgetEmbedCode} />}
+          {widgetEmbedCode && <CalendarWidgetEmbed code={widgetEmbedCode} filterSlugs={publicFilters.filterSlugs} />}
         <section className="panel">
           <div className="section-heading">
             <div>
@@ -629,8 +653,25 @@ export function CalendarAdminWorkspace({
           {events.length === 0 ? (
             <EmptyState announce={false} hint="Create an event first; published events then appear here." icon={<CalendarDays aria-hidden="true" size={27} />} title="No upcoming events">There are no upcoming events to show on the calendar.</EmptyState>
           ) : (
+            <>
+            <div className="calendar-filters filter-bar-stack">
+              <label className="checkbox-label">
+                <input
+                  checked={eventListParams.events === unmatchedEventsValue}
+                  onChange={(change) => setEventListParams({ events: change.target.checked ? unmatchedEventsValue : "" })}
+                  type="checkbox"
+                />{" "}
+                Only events {notOnPublicFilterLabel.charAt(0).toLowerCase() + notOnPublicFilterLabel.slice(1)} ({unmatchedEvents.length})
+              </label>
+              {eventListParams.events === unmatchedEventsValue && shownEvents.length > 0 && (
+                <button className="text-button" onClick={() => setEventListParams({ events: "" })} type="button">Clear filters</button>
+              )}
+            </div>
+            {shownEvents.length === 0 ? (
+              <NoMatchesState clear={{ onClick: () => setEventListParams({ events: "" }) }} known={`${events.length} ${events.length === 1 ? "event is" : "events are"} on the calendar page in all.`} noun="events" query="" />
+            ) : (
             <ul className="calendar-admin-list">
-              {events.map((event) => {
+              {shownEvents.map((event) => {
                 const visible = event.isPublished && event.showOnCalendar;
                 return (
                   <li key={event.id}>
@@ -658,7 +699,7 @@ export function CalendarAdminWorkspace({
                     >
                       <label>
                         <span className="sr-only">Category for {event.name}</span>
-                        <input defaultValue={event.calendarCategory} list="calendar-categories" maxLength={40} name="category" placeholder="Category" />
+                        <CalendarCategorySelect choices={publicFilters} defaultValue={event.calendarCategory} name="category" />
                       </label>
                       <button className="secondary-button" disabled={saving} type="submit"><Save aria-hidden="true" size={14} /><span className="sr-only">Save category</span></button>
                       <button
@@ -680,6 +721,8 @@ export function CalendarAdminWorkspace({
                 );
               })}
             </ul>
+            )}
+            </>
           )}
         </section>
         </TabPanel>
@@ -687,6 +730,7 @@ export function CalendarAdminWorkspace({
 
       {editing && (
         <EditEntryDialog
+          choices={publicFilters}
           entry={editing}
           error={error}
           onCancel={closeEdit}
@@ -748,6 +792,7 @@ type EntryBody = {
 const entryFormTracking: FormEditOptions = { ignore: ["startsOn", "entryType"], ignoreWithin: ".calendar-repeat-editor" };
 
 function EntryForm({
+  choices,
   entry = null,
   error = "",
   eyebrow,
@@ -757,6 +802,8 @@ function EntryForm({
   saving,
   submitLabel,
 }: {
+  /** The category dropdown's choices (#1611). */
+  choices: PublicCategoryFilters;
   entry?: CalendarAdminEntry | null;
   /** Shown above the actions; the new-entry form leaves it to the page-level notice. */
   error?: string;
@@ -854,7 +901,7 @@ function EntryForm({
         </label>
         <label>
           Category (optional)
-          <input defaultValue={entry?.category ?? ""} list="calendar-categories" maxLength={40} name="category" placeholder="e.g. Youth" />
+          <CalendarCategorySelect choices={choices} defaultValue={entry?.category ?? ""} name="category" />
         </label>
         <label>
           Type
@@ -901,12 +948,14 @@ function EntryForm({
 
 /** Edit an entry in a dialog over the list, so the page doesn't jump to the top (#869). */
 function EditEntryDialog({
+  choices,
   entry,
   error,
   onCancel,
   onSubmit,
   saving,
 }: {
+  choices: PublicCategoryFilters;
   entry: CalendarAdminEntry;
   error: string;
   onCancel: () => void;
@@ -932,7 +981,7 @@ function EditEntryDialog({
             <X aria-hidden="true" size={18} />
           </button>
         </div>
-        <EntryForm entry={entry} error={error} onCancel={onCancel} onSubmit={onSubmit} saving={saving} submitLabel="Save entry" />
+        <EntryForm choices={choices} entry={entry} error={error} onCancel={onCancel} onSubmit={onSubmit} saving={saving} submitLabel="Save entry" />
       </section>
     </div>
   );
@@ -1107,6 +1156,7 @@ function EntryFiltersBar({
         <select onChange={(event) => onChange({ category: event.target.value })} value={filters.category}>
           <option value="">Any category</option>
           <option value={noCategoryFilter}>No category</option>
+          <option value={unmatchedCategoryFilter}>{notOnPublicFilterLabel}</option>
           {categories.map((category) => <option key={category} value={category}>{category}</option>)}
         </select>
       </label>

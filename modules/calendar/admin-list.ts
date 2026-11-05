@@ -4,6 +4,7 @@
  * definition and tests need no database.
  */
 
+import { categoryOnPublicFilter } from "@/modules/calendar/filter-groups";
 import { expandOccurrences, type RepeatRule } from "@/modules/calendar/recurrence";
 
 /** Entries per page. The list is paged and filtered in the database, so every entry is reachable (#1492). */
@@ -27,6 +28,8 @@ export type AdminListEntry = {
 };
 
 export const noCategoryFilter = "__none__";
+/** The Category filter's "Not on a public filter" (#1611): a category that no public calendar button lists. */
+export const unmatchedCategoryFilter = "__unmatched__";
 export const staffSourceFilter = "__staff__";
 
 export type EntryStateFilter = "all" | "published" | "draft" | "hidden" | "removed";
@@ -35,7 +38,7 @@ export type EntrySort = "date" | "title" | "category";
 
 export type EntryFilters = {
   search: string;
-  /** "" = any, `noCategoryFilter` = no category, otherwise the category name. */
+  /** "" = any, `noCategoryFilter` = no category, `unmatchedCategoryFilter` = on no public button, otherwise the category name. */
   category: string;
   /** "" = any, `staffSourceFilter` = staff-made, otherwise an imported feed's id. */
   source: string;
@@ -109,8 +112,10 @@ export function entryQueryParams(query: CalendarEntryQuery): URLSearchParams {
  * The database where-clause for the filters: the same rules as `matchesFilters`. `upcomingRepeatingIds` are the repeating
  * entries that started before `today` but still have an occurrence on or after it (worked out by `isUpcoming`, which
  * expands the rule), so a series that began in the past is never dropped from "Upcoming" or put under "Past".
+ * `publicCategories` are the names some public button lists (`calendarCategoryChoices(...).matched`); the "Not on a public
+ * filter" choice is every entry with a category outside them, matched ignoring case (#1611).
  */
-export function buildEntryWhere(filters: EntryFilters, today: string, upcomingRepeatingIds: readonly string[]) {
+export function buildEntryWhere(filters: EntryFilters, today: string, upcomingRepeatingIds: readonly string[], publicCategories: readonly string[] = []) {
   const and: Array<Record<string, unknown>> = [];
   const needle = filters.search.trim();
   if (needle) {
@@ -121,7 +126,10 @@ export function buildEntryWhere(filters: EntryFilters, today: string, upcomingRe
     ] });
   }
   if (filters.category === noCategoryFilter) and.push({ category: "" });
-  else if (filters.category) and.push({ category: filters.category });
+  else if (filters.category === unmatchedCategoryFilter) {
+    and.push({ category: { not: "" } });
+    if (publicCategories.length > 0) and.push({ NOT: { OR: publicCategories.map((name) => ({ category: { equals: name, mode: "insensitive" } })) } });
+  } else if (filters.category) and.push({ category: filters.category });
   if (filters.source === staffSourceFilter) and.push({ sourceFeedId: null });
   else if (filters.source) and.push({ sourceFeedId: filters.source });
   if (filters.entryType) and.push({ entryType: filters.entryType });
@@ -171,10 +179,12 @@ export function isUpcoming(entry: Pick<AdminListEntry, "startsOn" | "endsOn" | "
   return expandOccurrences(entry, rule, entry.repeatExceptions ?? [], today, "9999-12-31").length > 0;
 }
 
-export function matchesFilters(entry: AdminListEntry, filters: EntryFilters, today: string) {
+export function matchesFilters(entry: AdminListEntry, filters: EntryFilters, today: string, publicCategories: readonly string[] = []) {
   if (!matchesSearch(entry, filters.search)) return false;
   if (filters.category === noCategoryFilter) {
     if (entry.category !== "") return false;
+  } else if (filters.category === unmatchedCategoryFilter) {
+    if (categoryOnPublicFilter(entry.category, publicCategories)) return false;
   } else if (filters.category && entry.category !== filters.category) return false;
   if (filters.source === staffSourceFilter) {
     if (entry.sourceFeedId !== null) return false;

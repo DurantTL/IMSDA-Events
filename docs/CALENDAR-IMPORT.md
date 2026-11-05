@@ -78,7 +78,7 @@ feed and paste it again).
 ## Sorting through many entries (#796)
 
 The **Calendar entries** list has a search box (title, location and description,
-any case), filters that combine (category or "No category", source, state, when,
+any case), filters that combine (category, "No category", "Not on a public filter", source, state, when,
 type) and a sort (date soonest first by default, title, category). "When" defaults
 to Upcoming; a repeating entry counts as upcoming while any of its occurrences
 (skipped dates excluded) is today or later, so one that repeats a set number of times
@@ -87,11 +87,46 @@ order. It loads the newest 1000 entries by start date and says so when it reache
 that limit, because Past and All counts are then incomplete.
 
 Tick rows, or **Select all N matching** (the whole filtered set, not only the rows
-shown; up to 500 at a time), then **Set category** (an existing or new name, or
+shown; up to 500 at a time), then **Set category** (pick one from the list, or
 **Clear category**), **Publish**, **Unpublish**, **Hide** or **Unhide**. A confirm
 step names the action and the count, and a notice reports how many changed and
 how many were skipped, by reason (already in that state, not imported, gone from
 its feed, no longer exists).
+
+## Categories and the public calendar's buttons (#1611)
+
+The public calendar's filter buttons come from the six homepage "Find your place"
+tiles (Platform settings > Homepage ministries), so a category staff set here only
+shows under a button when a tile lists it. The buttons, in order:
+
+1. **Main events** (the default: everything except Schools, Meetings and closures
+   and holidays).
+2. The six tiles, in position order, each labelled with the tile name. A button
+   includes every category the tile lists (any case, spaces ignored) and has a
+   fixed address (`?filter=ministry-1` to `ministry-6`, by tile position), so
+   renaming a tile never breaks a shared link. Two tiles may list the same
+   category; the item then shows under both.
+3. **Schools**, **Meetings**, **Office closed & holidays** and **Everything**.
+
+Old links keep working: `?filter=pathfinders`, `adventurers`, `camps`, `ministries`
+and `club` go to the tile that lists that category (else Everything), and
+`?category=X` goes to the tile that lists X (else Everything narrowed to X).
+The embed widget reads the same buttons (`/embed/calendar?filter=ministry-2`).
+
+Every tile must list at least one category: Platform settings refuses to save a
+tile with none. (If the tiles can't be read, the six default names show with no
+categories and the calendar still works; those buttons are empty.)
+
+The category box (single entry, imported entry, an event's category and bulk
+**Set category**) is a list: the tiles' categories, then Schools, Meetings and
+Office closure, then **No category**. A saved category that isn't in the list is
+still shown and kept, marked **Not on a public filter** when no button lists it;
+saving it unchanged is allowed, and the server still accepts any category up to
+40 characters. To find those, choose **Not on a public filter** in the Category
+filter (Calendar entries) or tick **Only events with a category that is not on a
+public filter** (Events tab), then fix them with **Set category**. Both lists
+are built on the server by one function (`modules/calendar/public-filters.ts`),
+which reads the tiles.
 
 Rules, all enforced by `POST /api/admin/calendar/entries/bulk` (system
 administrators only, 500 entries at most, one transaction):

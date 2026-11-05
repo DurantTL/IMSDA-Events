@@ -18,6 +18,12 @@ const items = [
 ];
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/system-admin/homepage-ministries", () => ({
+  listHomepageMinistries: async () => [
+    { position: 1, name: "Pathfinders", description: null, linkHref: null, categories: ["Pathfinders"], icon: "Compass" },
+    { position: 5, name: "Camp Heritage", description: null, linkHref: null, categories: ["Camps"], icon: "Tent" },
+  ],
+}));
 vi.mock("@/modules/site-content/hub-content", async () => ({ getPublishedHubContent: async () => ({ ...(await import("@/modules/site-content/hub-content-domain")).defaultHubContent(), navLinks: [{ href: "/unexpected-category", label: "Unexpected category" }] }) }));
 vi.mock("@/components/public-header-session-links", async () => {
   const { createElement } = await import("react");
@@ -96,16 +102,16 @@ describe("public calendar month render (#1202)", () => {
   });
 
   it("applies the category filter to the panel and the bars", async () => {
-    const markup = await render({ month: "2026-03", date: "2026-03-02", filter: "camps" });
+    const markup = await render({ month: "2026-03", date: "2026-03-02", filter: "ministry-5" });
     const panel = markup.slice(markup.indexOf('id="calendar-day-detail"'), markup.indexOf('class="calendar-key"'));
-    expect(panel).toContain("1 event on March 2, 2026 in Camps.");
+    expect(panel).toContain("1 event on March 2, 2026 in Camp Heritage.");
     expect(panel.match(/calendar-panel-item /g)?.length).toBe(1);
     expect(markup).not.toContain("Honors Weekend, February");
   });
 
   it("fills the panel with the legacy category link like the matching group", async () => {
     const markup = await render({ month: "2026-03", date: "2026-03-02", category: "Camps" });
-    expect(markup).toContain("1 event on March 2, 2026 in Camps.");
+    expect(markup).toContain("1 event on March 2, 2026 in Camp Heritage.");
   });
 });
 
@@ -114,7 +120,7 @@ describe("public calendar compact month page (#1249)", () => {
     const markup = await render({ month: "2026-03" });
     expect(markup).not.toContain("Office closed day");
     expect(markup).toContain('aria-current="page" href="/calendar?month=2026-03">Main events');
-    expect(markup).toContain('href="/calendar?month=2026-03&amp;filter=club"');
+    expect(markup).toContain('href="/calendar?month=2026-03&amp;filter=ministry-1"');
     expect(markup).toContain('href="/calendar?month=2026-03&amp;filter=everything"');
   });
 
@@ -128,7 +134,7 @@ describe("public calendar compact month page (#1249)", () => {
     const tones = (markup: string) => [...markup.matchAll(/calendar-tone-(\d|event|closure)[^"]*"[^>]*data-calendar-key="(honors|trip)"/g)].map((match) => `${match[2]}:${match[1]}`).sort();
     const everything = tones(await render({ month: "2026-03", filter: "everything" }));
     expect(everything.length).toBeGreaterThan(0);
-    expect(tones(await render({ month: "2026-03", filter: "camps" }))).toEqual(everything.filter((entry) => entry.startsWith("trip:")));
+    expect(tones(await render({ month: "2026-03", filter: "ministry-5" }))).toEqual(everything.filter((entry) => entry.startsWith("trip:")));
   });
 
   it("lists the month beside the grid: the first three, then a disclosure for the rest", async () => {

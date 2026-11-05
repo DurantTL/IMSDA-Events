@@ -53,7 +53,8 @@ import {
   type CalendarTone,
 } from "@/modules/calendar/domain";
 import { calendarHref, parseCalendarView, type CalendarHrefParams } from "@/modules/calendar/calendar-href";
-import { calendarFilterGroups, filterByGroup, resolveCalendarFilter } from "@/modules/calendar/filter-groups";
+import { filterByGroup, resolveCalendarFilter } from "@/modules/calendar/filter-groups";
+import { loadCalendarFilterGroups } from "@/modules/calendar/public-filters";
 import { conferenceToday, listPublicCalendarItems } from "@/modules/calendar/repository";
 import { buildCalendarYear, parseYearDate, parseYearParam } from "@/modules/calendar/year";
 import { CalendarYearView } from "@/components/calendar-year-view";
@@ -93,7 +94,9 @@ function groupByMonth(items: CalendarItem[], from: string) {
 export default async function PublicCalendarPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const view = parseCalendarView(params.view);
-  const { slug: filter, category } = resolveCalendarFilter(params.filter, params.category?.slice(0, 40) || undefined);
+  // The chips are the homepage's six ministry tiles plus a few fixed ones (#1611).
+  const calendarFilterGroups = await loadCalendarFilterGroups();
+  const { slug: filter, category } = resolveCalendarFilter(params.filter, params.category?.slice(0, 40) || undefined, calendarFilterGroups);
   const filterLabel = calendarFilterGroups.find((group) => group.slug === filter)?.label ?? "";
   const today = conferenceToday();
   // A selected date (month view only) shows only that date's items in the month list and decides the month shown, so an
@@ -109,7 +112,7 @@ export default async function PublicCalendarPage({ searchParams }: { searchParam
   const [allItems, hubContent] = await Promise.all([listPublicCalendarItems(from, to), getPublishedHubContent()]);
   // Colours come from every item before any filter, so choosing a chip never changes a colour (#1202).
   const toneMap = calendarToneMap(allItems);
-  const items = filterByCategory(filterByGroup(allItems, filter), category);
+  const items = filterByCategory(filterByGroup(allItems, filter, calendarFilterGroups), category);
   const monthItems = itemsOverlapping(items, firstOfMonth(month), lastOfMonth(month));
   const currentMonthKey = monthKey(month);
   const monthParam = view === "month" ? params.month : undefined;

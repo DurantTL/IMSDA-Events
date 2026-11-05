@@ -48,7 +48,7 @@ const entry: CalendarAdminEntry = {
   possibleMatch: null,
 };
 const events: CalendarAdminEvent[] = [
-  { id: "event-1", name: "Women's Retreat 2026", startsOn: "2026-10-09", endsOn: "2026-10-11", isPublished: true, showOnCalendar: true, calendarCategory: "", linkedEntries: [] },
+  { id: "event-1", name: "Women's Retreat 2026", startsOn: "2026-10-09", endsOn: "2026-10-11", isPublished: true, showOnCalendar: true, calendarCategory: "", clubEvent: false, linkedEntries: [] },
 ];
 const send = async () => true;
 const render = (overrides: Partial<CalendarAdminEntry>) =>

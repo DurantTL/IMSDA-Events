@@ -3,3 +3,6 @@
 .ministryTileFields > legend { padding: 0 6px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; }
 .ministryTileFields label { min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .ministryTileFields label > small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+/* The categories field and its error message, kept outside the label so the message describes the field without naming it. */
+.ministryCategoryField { display: grid; gap: 4px; min-width: 0; }
+.ministryCategoryField > small { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
