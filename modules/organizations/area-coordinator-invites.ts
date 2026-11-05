@@ -32,7 +32,8 @@ export type AreaCoordinatorInviteErrorCode =
   | "INVITE_ALREADY_OPEN"
   | "INVITE_RESEND_TOO_SOON"
   | "EMAIL_NOT_CONFIGURED"
-  | "NOTHING_TO_SEND";
+  | "NOTHING_TO_SEND"
+  | "LIST_CHANGED";
 
 export class AreaCoordinatorInviteError extends Error {
   constructor(public readonly code: AreaCoordinatorInviteErrorCode, message: string) {
@@ -163,7 +164,7 @@ export function countPendingAreaCoordinatorInvites() {
  * an invite cancelled in the meantime is not emailed. One audit entry carries the count only. Returns the queued message ids
  * for delivery.
  */
-export async function sendPendingAreaCoordinatorInvites(actorUserId: string, now = new Date()) {
+export async function sendPendingAreaCoordinatorInvites(actorUserId: string, expectedCount: number, now = new Date()) {
   if (!isAccountEmailConfigured()) {
     throw new AreaCoordinatorInviteError("EMAIL_NOT_CONFIGURED", "Account email isn't set up on this server, so invites can't be sent yet.");
   }
@@ -175,29 +176,40 @@ export async function sendPendingAreaCoordinatorInvites(actorUserId: string, now
   });
   if (invites.length === 0) throw new AreaCoordinatorInviteError("NOTHING_TO_SEND", "There are no Area Coordinator invites waiting to be sent.");
 
+  // The administrator confirmed a number; if the list moved since, send nothing.
+  if (invites.length !== expectedCount) {
+    throw new AreaCoordinatorInviteError("LIST_CHANGED", "The list changed. Reload the page and check the number before sending.");
+  }
+
   const correlationId = randomUUID();
   const messageIds: string[] = [];
-  for (const invite of invites) {
-    const messageId = await prisma.$transaction(async (tx) => {
-      const guarded = await tx.areaCoordinatorInvite.updateMany({
-        where: { id: invite.id, status: "PENDING" },
-        data: { status: "SENT", sentAt: now, sentCount: { increment: 1 }, expiresAt: clubInviteExpiry(now) },
+  try {
+    for (const invite of invites) {
+      const messageId = await prisma.$transaction(async (tx) => {
+        const guarded = await tx.areaCoordinatorInvite.updateMany({
+          where: { id: invite.id, status: "PENDING" },
+          data: { status: "SENT", sentAt: now, sentCount: { increment: 1 }, expiresAt: clubInviteExpiry(now) },
+        });
+        if (guarded.count === 0) return null;
+        const queuedId = await queueMessage(tx, invite, correlationId);
+        await tx.areaCoordinatorInvite.update({ where: { id: invite.id }, data: { lastMessageId: queuedId } });
+        return queuedId;
       });
-      if (guarded.count === 0) return null;
-      const queuedId = await queueMessage(tx, invite, correlationId);
-      await tx.areaCoordinatorInvite.update({ where: { id: invite.id }, data: { lastMessageId: queuedId } });
-      return queuedId;
-    });
-    if (messageId) messageIds.push(messageId);
+      if (messageId) messageIds.push(messageId);
+    }
+  } finally {
+    // Written even when a queue write fails part-way, so invites already marked SENT are on the record.
+    if (messageIds.length > 0) {
+      await writeAuditLog({
+        actorUserId,
+        action: "AREA_COORDINATOR_INVITES_SENT",
+        entityType: "AreaCoordinatorInvite",
+        summary: `Sent ${messageIds.length} Area Coordinator invite${messageIds.length === 1 ? "" : "s"}.`,
+        metadata: { count: messageIds.length },
+      });
+    }
   }
   if (messageIds.length === 0) throw new AreaCoordinatorInviteError("NOTHING_TO_SEND", "There are no Area Coordinator invites waiting to be sent.");
-  await writeAuditLog({
-    actorUserId,
-    action: "AREA_COORDINATOR_INVITES_SENT",
-    entityType: "AreaCoordinatorInvite",
-    summary: `Sent ${messageIds.length} Area Coordinator invite${messageIds.length === 1 ? "" : "s"}.`,
-    metadata: { count: messageIds.length },
-  });
   return { sent: messageIds.length, messageIds };
 }
 
@@ -274,14 +286,17 @@ export async function resendAreaCoordinatorInvite(inviteId: string, actorUserId:
       select: { id: true, email: true, name: true, status: true, sentAt: true },
     });
     if (!invite) throw new AreaCoordinatorInviteError("INVITE_NOT_FOUND", "That invite could not be found.");
-    if (invite.status !== "SENT" && invite.status !== "PENDING") {
+    if (invite.status === "PENDING") {
+      throw new AreaCoordinatorInviteError("INVITE_NOT_OPEN", "That invite hasn't been sent yet. A system administrator sends imported invites with the Send button on People & access.");
+    }
+    if (invite.status !== "SENT") {
       throw new AreaCoordinatorInviteError("INVITE_NOT_OPEN", "That invite was already accepted or cancelled.");
     }
     if (invite.sentAt && now.getTime() - invite.sentAt.getTime() < CLUB_INVITE_RESEND_COOLDOWN_MINUTES * 60 * 1000) {
       throw new AreaCoordinatorInviteError("INVITE_RESEND_TOO_SOON", `Wait at least ${CLUB_INVITE_RESEND_COOLDOWN_MINUTES} minutes between resends.`);
     }
     const guarded = await tx.areaCoordinatorInvite.updateMany({
-      where: { id: invite.id, status: { in: [...OPEN_STATUSES] } },
+      where: { id: invite.id, status: "SENT" },
       data: { status: "SENT", sentAt: now, sentCount: { increment: 1 }, expiresAt: clubInviteExpiry(now) },
     });
     if (guarded.count === 0) throw new AreaCoordinatorInviteError("INVITE_NOT_OPEN", "That invite was already accepted or cancelled.");

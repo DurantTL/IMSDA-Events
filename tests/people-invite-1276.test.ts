@@ -551,7 +551,7 @@ describe("resending and cancelling an Area Coordinator invite", () => {
     signInAs("clubsAdmin");
     const response = await areaInviteAction(post("/api/admin/area-coordinator-invites/aci-1", { action: "resend" }), ctx({ inviteId: "aci-1" }));
     expect(response.status).toBe(200);
-    expect(mocks.acUpdateMany).toHaveBeenCalledWith({ where: { id: "aci-1", status: { in: ["PENDING", "SENT"] } }, data: expect.objectContaining({ status: "SENT", sentCount: { increment: 1 }, expiresAt: expect.any(Date) }) });
+    expect(mocks.acUpdateMany).toHaveBeenCalledWith({ where: { id: "aci-1", status: "SENT" }, data: expect.objectContaining({ status: "SENT", sentCount: { increment: 1 }, expiresAt: expect.any(Date) }) });
     expect(mocks.outboxCreate).toHaveBeenCalledTimes(1);
     expect(mocks.deliverAfter).toHaveBeenCalledWith(["msg-1"]);
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_RESENT", actorUserId: "u-clubs" }), expect.anything());

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Send } from "lucide-react";
@@ -18,6 +19,7 @@ export function AreaCoordinatorImport({ pendingCount }: { pendingCount: number }
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [notConfigured, setNotConfigured] = useState(false);
 
   async function send() {
     const noun = `Area Coordinator invite${pendingCount === 1 ? "" : "s"}`;
@@ -30,10 +32,14 @@ export function AreaCoordinatorImport({ pendingCount }: { pendingCount: number }
     setBusy(true);
     setMessage("");
     setError("");
+    setNotConfigured(false);
     try {
-      const response = await fetch(`${BASE}/send`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      const result = await response.json().catch(() => ({})) as { message?: string };
-      if (!response.ok) throw new Error(result.message ?? "The invites could not be sent.");
+      const response = await fetch(`${BASE}/send`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedCount: pendingCount }) });
+      const result = await response.json().catch(() => ({})) as { message?: string; error?: string };
+      if (!response.ok) {
+        setNotConfigured(result.error === "EMAIL_NOT_CONFIGURED");
+        throw new Error(result.message ?? "The invites could not be sent.");
+      }
       setMessage(result.message ?? "Invites sent.");
       router.refresh();
     } catch (caught) {
@@ -57,6 +63,7 @@ export function AreaCoordinatorImport({ pendingCount }: { pendingCount: number }
         )}
         importUrl={`${BASE}/import`}
         onImported={() => router.refresh()}
+        templateLabel="Area Coordinator CSV template"
         templateHref={`${BASE}/template`}
         title="Import Area Coordinators"
         uploadLabel="Import Area Coordinators"
@@ -68,7 +75,11 @@ export function AreaCoordinatorImport({ pendingCount }: { pendingCount: number }
         </button>
       ) : null}
       {message ? <p aria-live="polite" role="status">{message}</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? (
+        <div className="inline-notice error" role="alert">
+          {error}{notConfigured ? <> Check the <Link href="/admin/system-report">System report</Link> to see what is missing.</> : null}
+        </div>
+      ) : null}
     </>
   );
 }

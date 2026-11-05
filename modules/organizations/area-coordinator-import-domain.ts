@@ -107,6 +107,6 @@ export function planAreaCoordinatorImport(
     seen.add(row.email);
     if (existing.grantEmails.has(row.email)) return { ...base, action: "SKIP" as const, message: "Already an Area Coordinator." };
     if (existing.openInviteEmails.has(row.email)) return { ...base, action: "SKIP" as const, message: "Already has an open Area Coordinator invite." };
-    return { ...base, action: "ADD" as const, message: "A pending invite will be created. Nothing is emailed until you press Send." };
+    return { ...base, action: "ADD" as const, message: "Will be added. Not emailed until you press Send." };
   });
 }

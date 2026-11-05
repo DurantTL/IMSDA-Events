@@ -100,7 +100,7 @@ export function PendingInvites({ invites, emailConfigured, heading = "Pending in
         {invites.map((invite) => {
           const who = invite.name || invite.email;
           // A family-side invite carries no secret, so without email staff pass the sign-up link on themselves.
-          const copyInstead = !emailConfigured && invite.kind !== "staff" && !invite.expired && invite.signUpUrl;
+          const copyInstead = !emailConfigured && invite.kind !== "staff" && !invite.notSent && !invite.expired && invite.signUpUrl;
           return (
             <li className={styles.pendingRow} key={`${invite.kind}-${invite.id}`}>
               <strong translate="no">{who}</strong>
@@ -110,7 +110,9 @@ export function PendingInvites({ invites, emailConfigured, heading = "Pending in
                 {invite.expired ? "Expired" : invite.notSent || !invite.sentAt ? "Not sent yet" : `Sent ${formatInConferenceTime(invite.sentAt)}`}
               </p>
               <div className={styles.pendingActions}>
-                {copyInstead ? (
+                {invite.notSent ? (
+                  <p className={styles.note}>Not sent yet. Use Send Area Coordinator invites above.</p>
+                ) : copyInstead ? (
                   <p className={styles.note}>Account email isn&apos;t set up, so this invite can&apos;t be emailed. Give them the sign-up link instead.</p>
                 ) : (
                   <button aria-label={`Resend invite to ${who}`} className="secondary-button" disabled={busy !== null} onClick={() => void resend(invite)} type="button">
