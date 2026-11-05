@@ -8103,8 +8103,6 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .account-page-hero { min-height: 0; margin-top: 16px; padding: 26px 32px; }
 .account-page-hero h1 { font-size: 1.9rem; }
 .account-page-body { display: grid; gap: 16px; max-width: 1180px; margin: 0 auto 48px; }
-/* A tab row that opens a page body (#722): keep the column, shrink the bottom gap so the page below sits close. */
-.account-page-body.account-page-subnav { margin-bottom: 16px; }
 .account-page-body > * { min-width: 0; }
 .account-security-grid { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
 .account-overview-grid {
@@ -10397,25 +10395,13 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 }
 
 
-/* Account context remains reachable when a club or coordinator masthead replaces the attendee tabs (#1302). */
+/* Account context remains reachable when a club or coordinator masthead replaces the attendee tabs (#1302). The "Your account"
+   drop-down now lives in that masthead row (components/account-workspace-menu.module.css, #1555). */
 .account-content { min-width: 0; }
-.account-workspace-menu { display: none; position: relative; z-index: 40; width: min(1180px, calc(100% - 24px)); margin: 8px auto; }
-.account-portal:has(.club-shell, .coordinator-shell) > .account-workspace-menu { display: flex; justify-content: flex-end; }
-.account-workspace-menu details { position: relative; }
-.account-workspace-menu summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--imsda-navy); font-size: 0.95rem; font-weight: 700; cursor: pointer; list-style: none; }
-.account-workspace-menu summary::-webkit-details-marker { display: none; }
-.account-workspace-menu details[open] > summary { background: var(--imsda-navy-soft); }
-.account-workspace-menu nav { position: absolute; top: calc(100% + 4px); right: 0; width: 18rem; max-width: calc(100vw - 24px); padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: 0 12px 28px rgb(0 44 69 / 18%); }
-.account-workspace-menu ul { margin: 0; padding: 0; list-style: none; }
-.account-workspace-menu a { display: flex; align-items: center; min-height: 44px; padding: 10px 12px; border-radius: 8px; color: var(--imsda-navy); font-size: 1rem; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
-.account-workspace-menu a[aria-current] { background: var(--imsda-navy-soft); box-shadow: inset 3px 0 var(--imsda-purple); }
-.account-workspace-menu a:hover { background: var(--imsda-navy-soft); }
-.account-workspace-menu :is(a, summary):focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; }
-.account-portal :is(.account-nav a, .account-workspace-menu summary) { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
 @media print { .account-workspace-menu { display: none !important; } }
 
 /* Club shell (#1165): Club portal masthead, navy club banner and the tab row (club-portal-nav.module.css). On club
-   pages the shell's own masthead replaces the account header and the account tabs (My account stays a link in the masthead). */
+   pages the shell's own masthead replaces the account header and the account tabs (the "Your account" drop-down sits in the masthead row). */
 .account-portal:has(.club-shell) > :is(.public-registration-header, .account-nav-primary) { display: none; }
 .club-shell { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; min-width: 0; }
 .club-masthead { border-bottom: 1px solid var(--line); background: #fff; }
@@ -10424,9 +10410,8 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-masthead-brand > span:not([data-navigation-pending]) { display: grid; line-height: 1.2; }
 .club-masthead-brand small { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-masthead-brand strong { font-size: 1.05rem; }
-.club-masthead-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 12px; min-width: 0; }
 .club-masthead-identity { min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--muted); font-size: 0.9rem; }
-.club-masthead-link { min-height: 44px; padding-inline: 4px; font-weight: 800; }
+.account-portal .account-nav a { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
 .club-banner { background: var(--imsda-navy); color: #fff; }
 .club-banner-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0; }
 .club-banner-identity { min-width: 0; flex: 1 1 16rem; }
@@ -10440,7 +10425,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .club-banner-inner { padding: 14px 0; }
   .club-banner h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.25rem; }
   .club-banner-year { flex: 0 0 auto; padding: 6px 10px; }
-  .club-masthead-account { justify-content: flex-start; }
 }
 @media print {
   .club-masthead, .club-banner { display: none !important; }
@@ -12902,7 +12886,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* Coordinator workspace (#1186): "Club coordination" masthead (reuses the club masthead rules), the Overview summary, clubs table,
    follow-up and help panels. On these pages the shell's masthead replaces the account header and tabs, as on club pages. */
 .account-portal:has(.coordinator-shell) > :is(.public-registration-header, .account-nav-primary) { display: none; }
-.coordinator-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.coordinator-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; margin-bottom: 16px; }
 .coordinator-overview { min-width: 0; }
 .coordinator-overview-heading h2 { margin: 0; font-size: 1.4rem; line-height: 1.25; }
 .coordinator-overview-scope { margin: 4px 0 0; color: var(--muted); font-size: 0.95rem; overflow-wrap: anywhere; }

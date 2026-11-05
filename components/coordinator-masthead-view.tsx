@@ -1,9 +1,9 @@
 import { PRODUCT_NAME } from "@/lib/brand";
-import { NavigationLink as Link } from "@/components/navigation-link";
-import { AttendeeSignOutButton } from "@/components/attendee-sign-out-button";
+import { PortalMastheadActions } from "@/components/portal-masthead-actions";
 import { BrandLink } from "@/components/brand-link";
 import { systemRoleText } from "@/modules/access/role-descriptions";
 import type { AccountSignOutMode } from "@/modules/access/workspace-contexts";
+import type { FormsHelpContact } from "@/modules/system-admin/forms-help-contact";
 
 export const COORDINATOR_ROLE_LABEL = systemRoleText.AREA_COORDINATOR.name;
 
@@ -12,7 +12,6 @@ export type CoordinatorMastheadModel = {
   identity: string | null;
   /** Shown instead of any identity while a system administrator is acting as an Area Coordinator (#442). */
   actingLabel: string | null;
-  showMyAccount: boolean;
   /** Only a real coordinator (not an act-as) is offered Waitlists, the same rule as the portal tabs (#599). */
   showWaitlists: boolean;
   signOut: AccountSignOutMode;
@@ -21,7 +20,7 @@ export type CoordinatorMastheadModel = {
 /**
  * What the coordinator masthead shows, decided the way the club masthead and the
  * portal layout decide their chrome (#1165): the account counts only when its
- * second step is not pending, and a staff act-as shows no identity, My account,
+ * second step is not pending, and a staff act-as shows no identity,
  * Waitlists or sign-out, and never reads as a real coordinator grant.
  */
 export function coordinatorMastheadModel(input: {
@@ -38,35 +37,36 @@ export function coordinatorMastheadModel(input: {
     const actingLabel = input.actingRole === "AREA_COORDINATOR" || input.actingRole == null
       ? `Acting as ${COORDINATOR_ROLE_LABEL}`
       : input.actingRole === "CLUB_DIRECTOR" ? "Acting as club director" : "Staff act-as";
-    return { identity: null, actingLabel, showMyAccount: false, showWaitlists: false, signOut: "none" };
+    return { identity: null, actingLabel, showWaitlists: false, signOut: "none" };
   }
   const chromeAccount = input.secondStepPending ? null : input.account;
   return {
     identity: chromeAccount?.displayName ?? null,
     actingLabel: null,
-    showMyAccount: Boolean(chromeAccount),
     showWaitlists: Boolean(chromeAccount) && input.isCoordinator,
     signOut: input.signOut,
   };
 }
 
-/** The masthead markup: IMSDA identity, "Club coordination", the person and role. No staff or system links, no role picker. Profile and security stay under My account. */
-export function CoordinatorMastheadView({ model }: { model: CoordinatorMastheadModel }) {
+/** The masthead markup: IMSDA identity, "Club coordination", the person and role. No staff or system links, no role picker. The same outlined buttons as the club masthead (#1555): the "Your account" drop-down (Profile and security live there), Forms help and Sign out. */
+export function CoordinatorMastheadView({ model, formsHelpContact }: { model: CoordinatorMastheadModel; formsHelpContact?: FormsHelpContact }) {
   return (
     <header className="club-masthead coordinator-masthead">
       <div className="club-masthead-inner">
         <BrandLink label="IMAdventist Club coordination, calendar" className="club-masthead-brand" wordmark={<span><small>{PRODUCT_NAME}</small><strong>Club coordination</strong></span>} />
-        <div className="club-masthead-account">
-          {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
-          {model.identity && (
-            <span className="club-masthead-identity">
-              <span className="club-masthead-name" translate="no">{model.identity}</span>
-              <span className="club-masthead-role"> · {COORDINATOR_ROLE_LABEL}</span>
-            </span>
-          )}
-          {model.showMyAccount && <Link className="text-button club-masthead-link" href="/account">My account</Link>}
-          {model.signOut !== "none" && <AttendeeSignOutButton className="text-button club-masthead-link" endStaffSession={model.signOut === "both"} />}
-        </div>
+        <PortalMastheadActions
+          formsHelpContact={formsHelpContact}
+          signOut={model.signOut}
+          identity={<>
+            {model.actingLabel && <span className="club-masthead-identity">{model.actingLabel}</span>}
+            {model.identity && (
+              <span className="club-masthead-identity">
+                <span className="club-masthead-name" translate="no">{model.identity}</span>
+                <span className="club-masthead-role"> · {COORDINATOR_ROLE_LABEL}</span>
+              </span>
+            )}
+          </>}
+        />
       </div>
     </header>
   );

@@ -1,5 +1,5 @@
 import { AccountContent } from "@/components/account-content";
-import { AccountWorkspaceMenu } from "@/components/account-workspace-menu";
+import { AccountWorkspaceMenuProvider } from "@/components/account-workspace-menu-context";
 import { redirect } from "next/navigation";
 import { AccountHeaderActions } from "@/components/account-header-actions";
 import { AccountAnnouncementBanner } from "@/components/account-announcement-banner";
@@ -97,8 +97,10 @@ export default async function AccountPortalLayout({ children }: { children: Reac
       <ActAsBanner acting={acting} inAccount />
       <AccountSectionNav items={items} label="Your account" />
       {chromeAccount && <AccountAnnouncementBanner accountId={chromeAccount.id} announcements={bannerAnnouncements} />}
-      <AccountWorkspaceMenu items={workspaceMenuItems} />
-      <AccountContent>{children}</AccountContent>
+      {/* The club and coordinator mastheads show this list as their "Your account" drop-down (#1555); it is worked out once, here. */}
+      <AccountWorkspaceMenuProvider items={workspaceMenuItems}>
+        <AccountContent>{children}</AccountContent>
+      </AccountWorkspaceMenuProvider>
     </main>
   );
 }

@@ -1,4 +1,5 @@
-import { AccountSectionNav, type AccountNavItem } from "@/components/account-section-nav";
+import type { AccountNavItem } from "@/components/account-section-nav";
+import { ClubPortalNav } from "@/components/club-portal-nav";
 
 /**
  * The coordinator's task navigation (#1186): Overview first, then every
@@ -24,15 +25,10 @@ export function coordinatorNavItems({ showWaitlists = false }: { showWaitlists?:
 export const areaClubsNavItems: AccountNavItem[] = coordinatorNavItems();
 
 /**
- * The Area Coordinator's Clubs menu (#657). The tab row sits in the same
- * 1180px column as the hero and the page body (#722). On a phone the row
- * scrolls sideways, with the scroll arrows and edge fades as the cue and the
- * current tab kept in view.
+ * The Area Coordinator's task tabs (#657, #1555): the club portal's own tab strip (`ClubPortalNav`), so both portals
+ * look the same: a full-width white row, left-aligned, a purple underline on the current tab, and on a phone a row
+ * that scrolls sideways with no arrow buttons. Active matching (`alsoMatchPrefix`) is the shared one.
  */
 export function AreaClubsSubNav({ items = areaClubsNavItems }: { items?: AccountNavItem[] }) {
-  return (
-    <div className="account-page-body account-page-subnav">
-      <AccountSectionNav items={items} label="Club coordination" variant="secondary" />
-    </div>
-  );
+  return <ClubPortalNav items={items} label="Club coordination" />;
 }

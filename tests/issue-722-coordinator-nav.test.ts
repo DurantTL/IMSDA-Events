@@ -76,7 +76,7 @@ describe("layout classes (#722)", () => {
       expect(readFileSync(file, "utf8")).toContain("<CoordinatorShellHeader>");
     }
     expect(readFileSync("components/coordinator-shell-header.tsx", "utf8")).toContain("<AreaClubsSubNav");
-    expect(readFileSync("components/area-clubs-subnav.tsx", "utf8")).toContain('className="account-page-body account-page-subnav"');
+    expect(readFileSync("components/area-clubs-subnav.tsx", "utf8")).toContain("<ClubPortalNav");
   });
 
   it("drops the stacked bar buttons from the coordinator club page", () => {

@@ -2,13 +2,11 @@ import "server-only";
 
 import { areaPointsCsv, areaSummaryCsv } from "@/modules/club-reports/area-summary-domain";
 import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
-import { clubYearFor } from "@/modules/club-rosters/domain";
+import { resolveAreaClubYear } from "@/modules/club-reports/area-club-year";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 
-/** `?year=` for the cross-club views: a club year like "2026-27", else the current one. */
-export function resolveAreaClubYear(requested: string | undefined, now = new Date()) {
-  return requested && /^\d{4}-\d{2}$/.test(requested) ? requested : clubYearFor(now);
-}
+// The coordinator's `?year=` rule lives in a client-safe file so the banner's year box can use it too (#1555).
+export { resolveAreaClubYear };
 
 /** The CSV download for the coordinator's and the office's cross-club views. Authorize before calling. */
 export async function areaExportResponse(url: URL) {
