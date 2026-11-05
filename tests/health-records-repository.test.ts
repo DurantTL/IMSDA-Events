@@ -287,7 +287,7 @@ describe("director entry and viewing", () => {
     // One ciphertext per field, none shared, each in the sealed format.
     const sealed = state.fields.map((field) => field.sealedValue as string);
     expect(new Set(sealed).size).toBe(sealed.length);
-    expect(sealed.every((value) => value.startsWith("v1."))).toBe(true);
+    expect(sealed.every((value) => value.startsWith("v2.1."))).toBe(true);
     expect(state.fields.map((field) => field.fieldKey)).toContain("allergyDetails");
   });
 

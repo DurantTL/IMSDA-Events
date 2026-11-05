@@ -19,6 +19,13 @@ const optionalTrimmed = z
   .optional()
   .transform((value) => (value ? value : undefined));
 
+/** A key version is a positive whole number. */
+const keyVersion = z
+  .string()
+  .trim()
+  .regex(/^[1-9]\d{0,5}$/, "must be a positive whole number")
+  .transform(Number);
+
 export const serverEnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -170,6 +177,16 @@ export const serverEnvSchema = z
     // error. `resolveEncryptionKey` does the loading before this schema runs.
     SECRET_ENCRYPTION_KEY: optionalTrimmed,
     SECRET_ENCRYPTION_KEY_FILE: optionalTrimmed,
+    // Key versioning and rotation (#1516). Every sealed value records the key
+    // version that sealed it. New writes always use the current key and
+    // version; while a rotation is under way the old key is loaded read-only as
+    // SECRET_ENCRYPTION_PREVIOUS_KEY (or the file named by
+    // SECRET_ENCRYPTION_PREVIOUS_KEY_FILE) with its own version, and is used
+    // only to open values still sealed with it. See docs/DEPLOY-DOCKER.md.
+    SECRET_ENCRYPTION_KEY_VERSION: keyVersion.default(1),
+    SECRET_ENCRYPTION_PREVIOUS_KEY: optionalTrimmed,
+    SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: optionalTrimmed,
+    SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: keyVersion.optional(),
 
     // Pathfinder Health Record (#611). Off unless exactly "true": with it off
     // there are no health routes, no Health tab, and nothing is stored. Do not
@@ -230,6 +247,38 @@ export const serverEnvSchema = z
         context.addIssue({
           code: "custom",
           path: [key],
+          message: `must contain at least ${SECRET_MIN_LENGTH} characters in production`,
+        });
+      }
+    }
+
+    // Key rotation (#1516). Messages name the variable and the rule, never a key.
+    if (value.SECRET_ENCRYPTION_PREVIOUS_KEY) {
+      const previousVersion = value.SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION;
+      if (previousVersion === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION"],
+          message: "is required when a previous encryption key is set",
+        });
+      } else if (previousVersion >= value.SECRET_ENCRYPTION_KEY_VERSION) {
+        context.addIssue({
+          code: "custom",
+          path: ["SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION"],
+          message: "must be lower than SECRET_ENCRYPTION_KEY_VERSION",
+        });
+      }
+      if (value.SECRET_ENCRYPTION_PREVIOUS_KEY === value.SECRET_ENCRYPTION_KEY) {
+        context.addIssue({
+          code: "custom",
+          path: ["SECRET_ENCRYPTION_PREVIOUS_KEY"],
+          message: "must not be the same key as the current encryption key",
+        });
+      }
+      if (isProduction && value.SECRET_ENCRYPTION_PREVIOUS_KEY.length < SECRET_MIN_LENGTH) {
+        context.addIssue({
+          code: "custom",
+          path: ["SECRET_ENCRYPTION_PREVIOUS_KEY"],
           message: `must contain at least ${SECRET_MIN_LENGTH} characters in production`,
         });
       }
@@ -465,6 +514,10 @@ export const SERVER_ENV_KEYS = [
     "MESSAGE_FILE_SWEEP_DELETE",
     "SECRET_ENCRYPTION_KEY",
     "SECRET_ENCRYPTION_KEY_FILE",
+    "SECRET_ENCRYPTION_KEY_VERSION",
+    "SECRET_ENCRYPTION_PREVIOUS_KEY",
+    "SECRET_ENCRYPTION_PREVIOUS_KEY_FILE",
+    "SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION",
     "HEALTH_RECORDS_ENABLED",
     "GEOCODING_ENABLED",
     "GEOCODING_PROVIDER",
@@ -478,17 +531,13 @@ export type EncryptionKeyResolution =
   | { ok: true; key: string | undefined; source: "file" | "env" | "none" }
   | { ok: false; issue: string };
 
-/**
- * Finds the encryption key: from the file named by SECRET_ENCRYPTION_KEY_FILE,
- * or from SECRET_ENCRYPTION_KEY itself. The file keeps the key out of the env
- * file and out of `docker inspect`. Messages name the variable and the path,
- * never the key or any part of the file's contents.
- */
-export function resolveEncryptionKey(
-  source: Record<string, string | undefined> = process.env,
+function resolveKeyFrom(
+  source: Record<string, string | undefined>,
+  plainName: string,
+  fileName: string,
 ): EncryptionKeyResolution {
-  const filePath = source.SECRET_ENCRYPTION_KEY_FILE?.trim();
-  const plain = source.SECRET_ENCRYPTION_KEY?.trim();
+  const filePath = source[fileName]?.trim();
+  const plain = source[plainName]?.trim();
 
   if (!filePath) {
     return plain ? { ok: true, key: plain, source: "env" } : { ok: true, key: undefined, source: "none" };
@@ -496,8 +545,7 @@ export function resolveEncryptionKey(
   if (plain) {
     return {
       ok: false,
-      issue:
-        "SECRET_ENCRYPTION_KEY_FILE: SECRET_ENCRYPTION_KEY and SECRET_ENCRYPTION_KEY_FILE are both set; set only one (remove SECRET_ENCRYPTION_KEY from the environment)",
+      issue: `${fileName}: ${plainName} and ${fileName} are both set; set only one (remove ${plainName} from the environment)`,
     };
   }
 
@@ -510,17 +558,52 @@ export function resolveEncryptionKey(
       code === "ENOENT" ? "the file does not exist"
       : code === "EACCES" || code === "EPERM" ? "the file is not readable by this process (check its owner and mode)"
       : `the file could not be read (${code ?? "unknown error"})`;
-    return { ok: false, issue: `SECRET_ENCRYPTION_KEY_FILE: ${filePath}: ${reason}` };
+    return { ok: false, issue: `${fileName}: ${filePath}: ${reason}` };
   }
 
   const key = contents.trim();
   if (!key) {
-    return { ok: false, issue: `SECRET_ENCRYPTION_KEY_FILE: ${filePath}: the file is empty` };
+    return { ok: false, issue: `${fileName}: ${filePath}: the file is empty` };
   }
   return { ok: true, key, source: "file" };
 }
 
-export type EncryptionKeyStatus = { configured: boolean; source: "file" | "env" | null };
+/**
+ * Finds the encryption key: from the file named by SECRET_ENCRYPTION_KEY_FILE,
+ * or from SECRET_ENCRYPTION_KEY itself. The file keeps the key out of the env
+ * file and out of `docker inspect`. Messages name the variable and the path,
+ * never the key or any part of the file's contents.
+ */
+export function resolveEncryptionKey(
+  source: Record<string, string | undefined> = process.env,
+): EncryptionKeyResolution {
+  return resolveKeyFrom(source, "SECRET_ENCRYPTION_KEY", "SECRET_ENCRYPTION_KEY_FILE");
+}
+
+/**
+ * The previous key, loaded read-only during a rotation (#1516), from
+ * SECRET_ENCRYPTION_PREVIOUS_KEY or the file named by
+ * SECRET_ENCRYPTION_PREVIOUS_KEY_FILE. Same rules and message style as the
+ * current key.
+ */
+export function resolvePreviousEncryptionKey(
+  source: Record<string, string | undefined> = process.env,
+): EncryptionKeyResolution {
+  return resolveKeyFrom(source, "SECRET_ENCRYPTION_PREVIOUS_KEY", "SECRET_ENCRYPTION_PREVIOUS_KEY_FILE");
+}
+
+/**
+ * Numbers, booleans and the source only: never key text. `version` is the
+ * version new values are sealed with (null when SECRET_ENCRYPTION_KEY_VERSION
+ * is not a valid number); `previousVersion` is null when no previous key is set.
+ */
+export type EncryptionKeyStatus = {
+  configured: boolean;
+  source: "file" | "env" | null;
+  version: number | null;
+  previousKeyLoaded: boolean;
+  previousVersion: number | null;
+};
 
 let cachedKeyStatus: EncryptionKeyStatus | undefined;
 
@@ -536,19 +619,33 @@ export function getEncryptionKeyStatus(source?: Record<string, string | undefine
   return cachedKeyStatus;
 }
 
+function parseKeyVersion(raw: string | undefined, fallback: number | null): number | null {
+  const text = raw?.trim();
+  if (!text) return fallback;
+  const parsed = keyVersion.safeParse(text);
+  return parsed.success ? parsed.data : null;
+}
+
 function describeEncryptionKey(source: Record<string, string | undefined>): EncryptionKeyStatus {
   const resolved = resolveEncryptionKey(source);
+  const previous = resolvePreviousEncryptionKey(source);
+  const versions = {
+    version: parseKeyVersion(source.SECRET_ENCRYPTION_KEY_VERSION, 1),
+    previousKeyLoaded: Boolean(previous.ok && previous.key),
+    previousVersion: parseKeyVersion(source.SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION, null),
+  };
   if (resolved.ok && resolved.key && resolved.source !== "none") {
-    return { configured: true, source: resolved.source };
+    return { configured: true, source: resolved.source, ...versions };
   }
   // A configured-but-unusable file is still a file deployment; say so.
   const fileConfigured = Boolean(source.SECRET_ENCRYPTION_KEY_FILE?.trim());
-  return { configured: false, source: fileConfigured ? "file" : null };
+  return { configured: false, source: fileConfigured ? "file" : null, ...versions };
 }
 
 function readSource(
   source: Record<string, string | undefined>,
   encryptionKey: string | undefined,
+  previousEncryptionKey: string | undefined,
 ) {
   return Object.fromEntries(
     SERVER_ENV_KEYS
@@ -556,7 +653,9 @@ function readSource(
         key,
         key === "SECRET_ENCRYPTION_KEY"
           ? encryptionKey
-          : source[key]?.trim() ? source[key] : undefined,
+          : key === "SECRET_ENCRYPTION_PREVIOUS_KEY"
+            ? previousEncryptionKey
+            : source[key]?.trim() ? source[key] : undefined,
       ])
       .filter(([, value]) => value !== undefined),
   );
@@ -570,20 +669,23 @@ export function validateServerEnv(
   source: Record<string, string | undefined> = process.env,
 ): ServerEnvValidation {
   const encryption = resolveEncryptionKey(source);
+  const previous = resolvePreviousEncryptionKey(source);
   const result = serverEnvSchema.safeParse(
-    readSource(source, encryption.ok ? encryption.key : undefined),
+    readSource(source, encryption.ok ? encryption.key : undefined, previous.ok ? previous.key : undefined),
   );
-  if (result.success && encryption.ok) return { ok: true, env: result.data };
+  if (result.success && encryption.ok && previous.ok) return { ok: true, env: result.data };
 
   const issues = result.success
     ? []
     : result.error.issues
         .filter((issue) => encryption.ok || issue.path[0] !== "SECRET_ENCRYPTION_KEY")
+        .filter((issue) => previous.ok || issue.path[0] !== "SECRET_ENCRYPTION_PREVIOUS_KEY")
         .map((issue) => {
           const variable = issue.path.join(".") || "environment";
           return `${variable}: ${issue.message}`;
         });
   if (!encryption.ok) issues.push(encryption.issue);
+  if (!previous.ok) issues.push(previous.issue);
   return { ok: false, issues };
 }
 

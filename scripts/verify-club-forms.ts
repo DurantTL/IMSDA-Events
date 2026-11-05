@@ -220,7 +220,7 @@ async function main() {
   const stored = await prisma.$queryRaw<Array<{ text: string; sealed: string | null; flag: boolean }>>`
     SELECT s::text AS text, s."sealedSensitiveAnswers" AS sealed, s."hasSensitiveAnswers" AS flag
     FROM "ClubFormSubmission" s WHERE s.id = ${submitted.id}`;
-  assert(stored.length === 1 && stored[0].flag && stored[0].sealed?.startsWith("v1."), "the row carries a sealed value");
+  assert(stored.length === 1 && stored[0].flag && stored[0].sealed?.startsWith("v2."), "the row carries a sealed value");
   for (const secret of [SECRET_PHYSICIAN, SECRET_PHONE]) {
     assert(!stored[0].text.includes(secret), "no sensitive plaintext in any column of the row");
   }
@@ -422,7 +422,7 @@ async function main() {
   const viaLink = await prisma.clubFormSubmission.findFirstOrThrow({ where: { linkId: queued.linkId } });
   assert(viaLink.organizationId === clubs.a && viaLink.enteredVia === "LINK" && viaLink.status === "SUBMITTED", "a link submission lands in the link's club");
   assert(viaLink.rosterMemberId === rileyRow.id && viaLink.enteredByAccountId === null && viaLink.enteredByUserId === null, "the link's member is kept, and no one is credited");
-  assert(viaLink.hasSensitiveAnswers && viaLink.sealedSensitiveAnswers?.startsWith("v1."), "a link submission seals sensitive answers");
+  assert(viaLink.hasSensitiveAnswers && viaLink.sealedSensitiveAnswers?.startsWith("v2."), "a link submission seals sensitive answers");
   assert(!JSON.stringify(viaLink).includes(SECRET_PHYSICIAN), "no sensitive plaintext in the link submission row");
   await expectCode(links.submitClubFormViaLink(token, slipAnswers), "LINK_UNAVAILABLE", "a used link is dead for submitting");
   await expectCode(links.resolveClubFormLinkForFill(token), "LINK_UNAVAILABLE", "a used link is dead for opening");
