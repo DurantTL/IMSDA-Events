@@ -115,12 +115,20 @@ Ticking only records that someone did the work. This sheet remains the full inst
 - **Proof:** the list of system administrators, each with MFA on.
 
 ### 9. Write the key rotation procedure
+- **Draft for the custodian to review (Jonathan Swena).** The procedure below is
+  built and written; it is not signed off until the custodian has read it and,
+  ideally, rehearsed it. This box stays unticked until then.
 - **Why:** if the key is ever exposed, it must be replaced without losing data.
-- **How:** a short written procedure: keep the old and new keys available, run
-  the re-seal step, confirm, then retire the old key and update the backup copy
-  (item 2). The engineering side of the re-seal step is built when it's first
-  needed.
-- **Proof:** the procedure is written and kept with the key copy.
+- **How:** the full steps are in `docs/DEPLOY-DOCKER.md`, "Rotating the
+  encryption key" (#1516). In short: back up the database and the current key;
+  make a new key; load the old key as `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE` (with
+  its version) and the new one as `SECRET_ENCRYPTION_KEY_FILE` (version + 1);
+  restart; run `npm run key:rotate` (dry run), then `npm run key:rotate -- --apply`
+  until nothing is left; `npm run key:check` must exit 0; update the off-site
+  copy of the key (item 2) and test-restore it (item 3); then remove the old key
+  and run `key:check` again. Running a rotation in production is a human step.
+- **Proof:** the custodian has reviewed the procedure, and the procedure is kept
+  with the key copy.
 
 ### 10. Tell club directors how removal works
 - **Why:** retention is each club's decision. Nothing is deleted automatically.
@@ -180,7 +188,7 @@ Ticking only records that someone did the work. This sheet remains the full inst
   - the master copy's account is separate from the backup account;
   - `/etc/imsda/secret-encryption-key` is `root:root` mode 0400, the env file and
     panel have no `SECRET_ENCRYPTION_KEY`, and `/api/health` (read with the token-from-the-container command next to `APP_RELEASE_SHA` in `docs/DEPLOY-DOCKER.md`) shows
-    `"encryptionKey":{"configured":true,"source":"file"}`.
+    `"encryptionKey":{"configured":true,"source":"file",...}` (with the key version fields).
 
 ## Behind Cloudflare
 

@@ -121,8 +121,9 @@ builds, naming the variable in the deploy output.
 `SECRET_ENCRYPTION_KEY` seals the TOTP secrets behind two-factor
 authentication and every club roster birth date (ADR 0005 Addendum A).
 **Changing it makes every enrolled authenticator unreadable and loses every
-roster birth date for good.** Never change it without the re-seal procedure and
-the key backup in `docs/SERVER-SECURITY-CHECKLIST.md` (items 2, 3, 9, and 11).
+roster birth date for good.** Never change it without the re-seal procedure
+("Rotating the encryption key", below) and the key backup in
+`docs/SERVER-SECURITY-CHECKLIST.md` (items 2, 3, 9, and 11).
 
 The last two are what send activation and password-reset email. They are
 required rather than optional because there is no manual substitute at scale: an
@@ -1548,8 +1549,8 @@ How the app behaves (`lib/env.ts`):
   `OUTBOX_SWEEP_TOKEN` (`scripts/outbox-sweep.sh`), so it gets no key file. Giving
   it one only widens who can read the key. (The `docker-compose.yml` development
   stack still passes `SECRET_ENCRYPTION_KEY` as a plain variable.)
-- `/api/health` (with a bearer token, see "Uptime monitor") reports `"encryptionKey": {"configured": true, "source": "file"}`
-  (or `"env"`). `configured: false` with `source: "file"` means the file variable
+- `/api/health` (with a bearer token, see "Uptime monitor") reports `"encryptionKey": {"configured": true, "source": "file", "version": 1, "previousKeyLoaded": false, "previousVersion": null}`
+  (or `"env"`; the version fields come from "Rotating the encryption key" below). `configured: false` with `source: "file"` means the file variable
   is set but the file could not be used. The value is never shown.
 
 **File ownership and mode.** The `Dockerfile` has no `USER` line, so the app
@@ -1685,7 +1686,7 @@ systemctl start imsda-xcloud-runtime-guard.timer
 
 ```bash
 T="$(docker exec xcloud-site-239298-app-1 printenv OUTBOX_SWEEP_TOKEN)"; printf 'Authorization: Bearer %s\n' "$T" | curl -s -H @- http://127.0.0.1:8100/api/health | grep -o '"encryptionKey":{[^}]*}'
-# expect: "encryptionKey":{"configured":true,"source":"file"}
+# expect: "encryptionKey":{"configured":true,"source":"file",...} (plus version fields, see "Rotating the encryption key")
 docker inspect xcloud-site-<id>-app-1 --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -c '^SECRET_ENCRYPTION_KEY='
 # expect 0 (only SECRET_ENCRYPTION_KEY_FILE, a path, is listed)
 ```
@@ -1713,7 +1714,7 @@ good.
 - **Never** store the key with the database backups (`imsda_events_backups`, the
   off-host copy, #875) or in the same place as anything that can read them. The
   key and the dumps together open everything; apart, neither does.
-- When the key is rotated, replace both copies and test again.
+- When the key is rotated ("Rotating the encryption key" below), replace both copies and test again.
 
 **Restore test (once before health records go live, then after any change to the
 key or the backup process).** It restores a dump into a scratch database and opens
@@ -1792,6 +1793,88 @@ shred -u /root/keytest/backup-key /root/keytest/db.env && rmdir /root/keytest
    it will show the key status (configured, and loaded from a file or the
    environment) and the date of the last restore test, and this date goes there
    too.
+
+### Rotating the encryption key (#1516)
+
+Every sealed value records the key version that sealed it (`v2.<version>.…`; a
+value from before versioning counts as version 1). The app seals new values with
+the current key and opens each value with the key of its version. During a
+rotation the old key is also loaded, read-only. `npm run key:rotate` then
+re-seals every value with the new key, and `npm run key:check` proves nothing is
+left on the old one.
+
+**Running a rotation in production is a human step.** The key custodian (or a
+system administrator) does it; automation does not. Every sealed column is
+covered: staff and attendee authenticator secrets, the short-lived emailed
+codes, roster birth dates (club rosters and the Sterling Volunteers list),
+sensitive club form answers, calendar feed addresses (and their fingerprints),
+health record fields and sealed health copies. The list is
+`modules/security/sealed-columns.ts`.
+
+The settings:
+
+| Variable | Meaning |
+| --- | --- |
+| `SECRET_ENCRYPTION_KEY` / `_FILE` | The current key. |
+| `SECRET_ENCRYPTION_KEY_VERSION` | Its version, a whole number from 1 (default 1). |
+| `SECRET_ENCRYPTION_PREVIOUS_KEY` / `_FILE` | The old key, only while rotating. Same file rules as the current key. |
+| `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` | The old key's version. Required with a previous key, and lower than the current version. |
+
+Startup stops (naming the variable, never a key) if a previous key has no
+version, its version is not lower than the current one, it is the same key as
+the current one, or it is under 32 characters in production.
+
+Steps:
+
+1. **Back up first.** Take a database backup and confirm you hold the current
+   key (both offline copies, "Keeping and testing the key backup" above). Do not
+   start without both.
+2. **Make the new key.** At least 32 random characters, for example
+   `openssl rand -base64 48`. Put it in the password manager as the new key and
+   keep the old entry; label each with its version.
+3. **Load both keys.** The old key goes in `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE`
+   (a root-only `0400` file, mounted like the current one) with
+   `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=<old version>`. The new key goes in
+   `SECRET_ENCRYPTION_KEY_FILE` with `SECRET_ENCRYPTION_KEY_VERSION=<old version + 1>`.
+   Restart the app. `/api/health` (with a token) now reports
+   `"version"`, `"previousKeyLoaded": true` and `"previousVersion"`.
+4. **Dry run.** Inside the app container: `npm run key:rotate`. It writes
+   nothing and prints, per column, how many values it would re-seal, how many
+   are already current and how many are unreadable. Unreadable must be 0; if
+   not, stop and find out why before going on.
+5. **Apply.** `npm run key:rotate -- --apply`. It works in batches, skips values
+   already on the new version, and leaves a value alone if it changed while the
+   command ran. If it exits 1 (something was skipped), just run it again until
+   it reports nothing left. It is safe to stop and to rerun. The app keeps
+   working throughout, because it opens each value with the key of its version.
+6. **Check.** `npm run key:check` must exit 0: every value is on the current
+   version and opens. It prints counts only.
+7. **Back up the new key and test it.** Add the new key to both offline copies,
+   then run the restore test above with the new key (`npm run key:restore-check`
+   on a restored dump taken **after** step 5). Do not go on until it passes.
+8. **Remove the old key.** Delete the three `SECRET_ENCRYPTION_PREVIOUS_KEY*`
+   settings (and the old key file from the server), restart, and run
+   `npm run key:check` once more. Keep the old key in the password manager,
+   marked retired, until the next restore test of an older backup is no longer
+   needed: a database backup taken before step 5 can only be opened with the old
+   key.
+
+Things to know:
+
+- **Rollback.** Code from before this change cannot read the new `v2` values.
+  Once any value has been written by this version, rolling the app image back
+  to an older one leaves it unable to open them. Roll forward instead.
+- **Old backups.** A dump taken before the rotation is sealed with the old key.
+  Restoring it needs the old key (as `SECRET_ENCRYPTION_KEY_FILE` for
+  `key:restore-check`, which opens a value with whichever key you give it).
+- **Calendar feeds.** Each feed's address fingerprint is recomputed with its
+  address, and so is the copy on items a deleted feed left behind. While the old
+  key is loaded, adding a calendar also checks the old fingerprint, so a
+  duplicate is not missed. An item left by a feed deleted long ago keeps an old
+  fingerprint it can't recompute; after the old key is removed it will not
+  re-link to a re-added identical feed (it stays as an ordinary staff item).
+- **Short-lived codes** (emailed sign-in and reset codes) are re-sealed like
+  everything else, expired or not.
 
 ## Message files: storage, the quota and the sweep (#845)
 
