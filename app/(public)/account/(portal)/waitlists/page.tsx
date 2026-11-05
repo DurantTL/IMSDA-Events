@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ListChecks } from "lucide-react";
+import { CoordinatorBanner } from "@/components/coordinator-banner";
+import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
+import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
+import { EmptyState } from "@/components/empty-state";
 import { getPrisma } from "@/lib/prisma";
 import { listWaitingClubsForCoordinator } from "@/modules/event-locations/waitlist";
 import { currentAreaCoordinator, requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
@@ -26,27 +30,40 @@ export default async function AreaWaitlistsPage() {
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Area Coordinator · view only</p>
-          <h1>Waitlists</h1>
-        </div>
-      </section>
+      <CoordinatorShellHeader>
+        <CoordinatorBanner />
+      </CoordinatorShellHeader>
       <div className="account-page-body">
         <section className="public-manage-card">
+          <CoordinatorSectionHeading eyebrow="Club coordination" title="Waitlists">
+            <p>Clubs waiting for a seat at the event locations you coordinate, in first-come order. View only.</p>
+          </CoordinatorSectionHeading>
           {locations.length === 0 ? (
-            <p className="public-manage-empty">
-              <ListChecks size={17} aria-hidden="true" /> You aren&apos;t set as the coordinator of any event location yet.
-              Event staff choose the coordinator for each location.
-            </p>
+            <EmptyState
+              action={{ label: "Open Help guides", href: "/account/help" }}
+              actionClass="secondary-button"
+              announce={false}
+              canCreate
+              icon={<ListChecks size={20} aria-hidden="true" />}
+              title="You aren't set as a location coordinator yet"
+            >
+              Waitlists appear here for each event location you coordinate. Event staff choose the coordinator for each location, so ask them to add you.
+            </EmptyState>
           ) : withClubs.length === 0 ? (
-            <p className="public-manage-empty">
-              <ListChecks size={17} aria-hidden="true" /> No clubs are waiting at your locations right now. Check back after a location fills up.
-            </p>
+            <EmptyState
+              action={{ label: "Back to Overview", href: "/account/area-clubs/overview" }}
+              actionClass="secondary-button"
+              announce={false}
+              canCreate
+              icon={<ListChecks size={20} aria-hidden="true" />}
+              title="No clubs are waiting right now"
+            >
+              A club joins a waitlist when a location fills up. Check back after that happens; this page needs nothing from you until then.
+            </EmptyState>
           ) : (
             withClubs.map((location) => (
               <div key={location.locationId}>
-                <h2 translate="no">{location.locationName}</h2>
+                <h3 translate="no">{location.locationName}</h3>
                 <p className="field-help" translate="no">{location.eventName}</p>
                 <ol className="public-manage-club-list">
                   {location.clubs.map((club) => (

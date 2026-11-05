@@ -165,7 +165,7 @@ describe("overview numbers come from the clubs the owning query returned (#1186)
     expect(overview).toMatchObject({ month: "2027-09", monthNotDue: true, recordsText: "Not due yet" });
     expect(overview.followUp).toEqual([]);
     const out = render({ status: "ready", clubs: future, overview });
-    expect(out).toContain("<dd>Not due yet</dd>");
+    expect(out).toContain('<dd class="club-home-count-value">Not due yet</dd>');
     expect(out).not.toMatch(/0 of 1/);
     expect(out).toContain("not due yet");
   });

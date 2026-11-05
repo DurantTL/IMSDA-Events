@@ -1,0 +1,3 @@
+/* The empty line keeps its icon beside the text, never above it (#1555). */
+.empty { display: flex; align-items: flex-start; gap: 8px; }
+.empty > svg { flex: 0 0 auto; margin: 2px 0 0; }

@@ -38,7 +38,9 @@ describe("AreaClubSearch markup (#1013)", () => {
     expect(html).toContain('name="year"');
     expect(html).toContain('value="2026"');
     expect(html).toContain('name="sort"');
-    expect(html).toContain('type="submit"');
+    // Typing searches and Enter still submits the form, so there is no separate Search button (#1555, rule S4).
+    expect(html).not.toContain('type="submit"');
+    expect(html).toContain('<label for="area-club-search">');
   });
 
   it("keeps the polite status line and a Clear link that keeps year and sort", () => {

@@ -96,3 +96,13 @@ export function areaClubPortalNavItems({ organizationId }: { organizationId: str
     { href: `${base}/awards`, label: "Earned awards", group: "Records", hideGroupLabel: true },
   ];
 }
+
+/**
+ * The one tab row of a club an Area Coordinator is viewing (#1555), like the club home's: "All clubs" first, then the
+ * club's own view-only tabs. "All clubs" is how the coordinator gets back to Clubs at a glance, and from there to the
+ * other coordinator tabs (Monthly Records, Points, ...). It points at the list only; it opens no club page and grants
+ * nothing, and each page below still checks access on the server.
+ */
+export function areaViewedClubNavItems({ organizationId }: { organizationId: string }): AccountNavItem[] {
+  return [{ href: "/account/area-clubs/overview", label: "All clubs" }, ...areaClubPortalNavItems({ organizationId })];
+}

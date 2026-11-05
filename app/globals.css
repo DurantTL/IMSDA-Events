@@ -11084,8 +11084,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 /* #918: the member's name is the most prominent thing in its row; "Class history" is a quiet secondary link under it. */
 .roster-card-name .roster-class-history-link { margin-top: 4px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8125rem); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .roster-card-name .roster-class-history-link:hover, .roster-card-name .roster-class-history-link:focus-visible { color: var(--imsda-purple); }
-.area-club-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.area-club-search .search-field { max-width: 360px; padding: 0 12px; }
 
 /* Lodging assignments (#200). Household colours come with a name in the text: colour is never the only cue. */
 .lodging-assign {
@@ -12888,12 +12886,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .account-portal:has(.coordinator-shell) > :is(.public-registration-header, .account-nav-primary) { display: none; }
 .coordinator-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; margin-bottom: 16px; }
 .coordinator-overview { min-width: 0; }
-.coordinator-overview-heading h2 { margin: 0; font-size: 1.4rem; line-height: 1.25; }
-.coordinator-overview-scope { margin: 4px 0 0; color: var(--muted); font-size: 0.95rem; overflow-wrap: anywhere; }
-.coordinator-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
-.coordinator-summary dl > div { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 12px 14px; }
-.coordinator-summary dt { color: var(--muted); font-size: 0.875rem; font-weight: 700; }
-.coordinator-summary dd { margin: 4px 0 0; color: var(--imsda-navy); font-size: 1.4rem; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
 .coordinator-overview-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 20rem); gap: 20px; align-items: start; }
 .coordinator-overview-side { display: grid; gap: 16px; min-width: 0; }
 .coordinator-clubs, .coordinator-panel { min-width: 0; }
@@ -12914,10 +12906,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (max-width: 860px) {
   .coordinator-overview-layout { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 640px) {
-  .coordinator-summary dl { grid-template-columns: minmax(0, 1fr); }
-}
-
 /* Coordinator destination pages (#1187): Monthly Records, Points, Club events, Team approvals, New clubs. Wide grids sit in a
    labelled, keyboard-reachable scroll region; links and buttons keep 44px targets; small text stays at 0.875rem or larger. */
 .coordinator-destination { min-width: 0; }

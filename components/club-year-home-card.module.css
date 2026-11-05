@@ -1,0 +1,5 @@
+/* The coordinator's view of a club, in the club home's card look (#1555): an icon beside each tile label, links kept to their text width. */
+.term { display: flex; align-items: center; gap: 8px; }
+.term > svg { flex: 0 0 auto; color: var(--imsda-purple); }
+.link { justify-self: start; }
+.link :global(.club-home-link) { margin-top: 4px; max-width: 100%; white-space: normal; text-align: left; }

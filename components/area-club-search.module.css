@@ -1,0 +1,8 @@
+/* The coordinator club search (#1555), laid out like the club roster's search: a bold label over the shared .search-field box. */
+.search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); }
+.field { display: grid; flex: 1 1 18rem; min-width: 0; gap: 4px; color: var(--ink); font-weight: 700; }
+.box { min-width: 0; }
+.box input { font-weight: 500; }
+.search > :global(.text-button) { min-height: 44px; display: inline-flex; align-items: center; }
+.search > small { flex: 1 1 100%; margin: 0; color: var(--muted); font-size: var(--text-helper-min); }
+.search > small:empty { display: none; }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
 import { notFound } from "next/navigation";
 import { CoordinatorUnavailable } from "@/components/coordinator-overview";
 import { TeamPermissionPanel } from "@/components/team-permission-panel";
@@ -51,7 +52,7 @@ export default async function TeamPermissionsPage() {
   return (
     <section className="page-stack">
       <div className="public-manage-card">
-        <h2>Team approvals</h2>
+        <CoordinatorSectionHeading eyebrow="Club coordination" title="Team approvals" />
         <p>{teamPermissionsIntro.summary}</p>
         <h3 id="team-approval-rules-heading">{teamPermissionsIntro.rulesHeading}</h3>
         <p className="field-help">{teamPermissionsIntro.rulesLead}</p>

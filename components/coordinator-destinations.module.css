@@ -55,3 +55,6 @@
   min-width: 0;
   padding: 0 16px 14px;
 }
+
+/* "Open club" stays on one line in the table's last column (#1555). */
+.openClub { white-space: nowrap; }

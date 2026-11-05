@@ -3,8 +3,10 @@ import { serverSort } from "@/lib/list-sort";
 import { COORDINATOR_RANKING_DEFAULT_SORT, COORDINATOR_RANKING_SORT_COLUMNS, rankingFirstDirection } from "@/modules/club-reports/area-table-sort";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
+import { CalendarCheck, ListChecks, Medal, Trophy } from "lucide-react";
+import { CoordinatorSummaryTiles } from "@/components/coordinator-summary-tiles";
 import { AreaClubSearch } from "@/components/area-clubs-views";
-import { PointsBars, ReportSummaryBand } from "@/components/club-report-charts";
+import { PointsBars } from "@/components/club-report-charts";
 import { CoordinatorPointsRanking, ShowTopLink } from "@/components/coordinator-points";
 import { CoordinatorUnavailable } from "@/components/coordinator-overview";
 import { CoordinatorDestinationHeading, CoordinatorExportLink, CoordinatorNoMatch } from "@/components/coordinator-destinations";
@@ -21,6 +23,8 @@ export const metadata: Metadata = { title: "Club points", robots: { index: false
 export const dynamic = "force-dynamic";
 
 const BASE_PATH = "/account/area-clubs/points";
+/** One icon per summary tile, in the order `pointsSummaryTiles` returns them: leader, median, on-time registration, report points. */
+const POINTS_TILE_ICONS = [<Trophy key="leader" size={16} />, <Medal key="median" size={16} />, <CalendarCheck key="on-time" size={16} />, <ListChecks key="report" size={16} />];
 
 /**
  * Points (#1187, #1316): a summary band, the top clubs as split bars and the ranking table with one Records link per
@@ -53,7 +57,10 @@ export default async function AreaPointsPage({ searchParams }: { searchParams: P
             <CoordinatorExportLink clubYear={clubYear} kind="points" />
             <AreaClubSearch basePath={BASE_PATH} clubYear={clubYear} query={query} shown={clubs.length} sort={sort} total={allClubs.length} />
           </div>
-          <ReportSummaryBand label={`Points summary for ${clubYear}, all ${allClubs.length} clubs`} tiles={pointsSummaryTiles(allClubs)} />
+          <CoordinatorSummaryTiles
+            label={`Points summary for ${clubYear}, all ${allClubs.length} clubs`}
+            tiles={pointsSummaryTiles(allClubs).map((tile, index) => ({ ...tile, value: typeof tile.value === "number" ? tile.value.toLocaleString("en-US") : tile.value, icon: POINTS_TILE_ICONS[index] ?? <Trophy size={16} /> }))}
+          />
           {clubs.length === 0 ? (
             query ? <CoordinatorNoMatch clearHref={pointsPageHref(BASE_PATH, { year: clubYear, sort })} query={query} /> : <><p className="report-empty">No active clubs yet.</p><CoordinatorSetupHelp context="points" id="points-none" /></>
           ) : (
