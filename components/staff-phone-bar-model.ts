@@ -7,7 +7,7 @@ import type { EventTab, EventTabKey } from "@/components/staff-event-tabs";
  * tabs, so a phone cannot reach a page a desktop cannot, nor the other way round (`tests/mobile-directory-parity.test.ts`).
  */
 export type PhoneBarKey = "home" | "events" | "check-in" | "clubs" | "more";
-/** `also` names the items dropped because they open the same page (a Clubs Administrator's Home is the Clubs landing). */
+/** `also` names the items folded into this one because they open the same page (staff with no admin role: Events is their event tab). */
 export type PhoneBarItem = { key: PhoneBarKey; label: string; href: string; also?: PhoneBarKey[] };
 
 export const phoneBarLabels: Record<PhoneBarKey, string> = { home: "Home", events: "Events", "check-in": "Check-in", clubs: "Clubs", more: "More" };
@@ -34,12 +34,14 @@ export function phoneBarItems(input: {
   ];
   const items: PhoneBarItem[] = [];
   // Home from a role's main dashboard (not the event's first tab) is its own slot: it never absorbs Events, and it gives way to
-  // the Clubs item when both open the same page (a Clubs Administrator's Home and Clubs are both /admin/clubs).
+  // any other item that opens the same page (a Clubs Administrator's Home and Clubs are both /admin/clubs; an Events
+  // Administrator's Home and Events are both /events-admin), so no page has two bar links.
   const dashboardHome = input.homeHref !== undefined;
+  const pathOf = (href: string) => new URL(href, "https://events.example.test").pathname;
   for (const [key, href] of candidates) {
     if (!href) continue;
-    if (dashboardHome && key === "clubs") {
-      const same = items.findIndex((item) => item.key === "home" && item.href === href);
+    if (dashboardHome && key !== "home" && key !== "more") {
+      const same = items.findIndex((item) => item.key === "home" && pathOf(item.href) === pathOf(href));
       if (same >= 0) items.splice(same, 1);
     }
     if (dashboardHome && key === "events") {

@@ -488,11 +488,15 @@ describe("a phone reaches exactly the pages a desktop reaches (#475, #1565)", ()
     }
   });
 
-  it("starts every phone bar with Home and ends it with More, whatever the role", () => {
+  it("starts every phone bar with Home (or the area that opens the same page) and ends it with More, whatever the role", () => {
     for (const scenario of scenarios) {
       const bar = navFor(scenario).phoneItems;
       if (bar.length === 0) continue;
-      expect(bar[0].key, scenario.name).toBe("home");
+      // A dashboard Home gives way to the item that opens the same page (an Events Administrator's Events), so no page
+      // has two bar links.
+      expect(["home", "events", "clubs"], scenario.name).toContain(bar[0].key);
+      const paths = bar.map((item) => new URL(item.href, "https://events.example.test").pathname);
+      expect(new Set(paths).size, scenario.name).toBe(paths.length);
       const more = bar.findIndex((item) => item.key === "more");
       if (more >= 0) expect(more, scenario.name).toBe(bar.length - 1);
       expect(bar.length, scenario.name).toBeLessThanOrEqual(5);

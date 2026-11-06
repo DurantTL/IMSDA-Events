@@ -103,6 +103,8 @@ describe("what it shows", () => {
     // The section's tab row (Overview, New clubs (2) ...) is the shell's since #1565; the page header no longer draws it.
     expect(html).not.toMatch(/<a aria-current="page" href="\/admin\/clubs\?year=[\d-]+">Overview</);
     expect(html).not.toContain('aria-label="Club administration sections"');
+    // The waiting count the section row used to show ("New clubs (2)") still reaches the page, in its card.
+    expect(html).toMatch(/data-card="new-applications">(?:(?!<\/article>).)*<strong>2<\/strong>/);
     expect(html).toContain("1 of 2");
     expect(html).toContain("<strong>20</strong> roster members");
     expect(html).toContain("<strong>14</strong> people registered");

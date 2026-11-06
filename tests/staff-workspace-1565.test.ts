@@ -126,13 +126,14 @@ describe("the phone bar's where-you-are (#1565)", () => {
   const events = { roles: ["EVENTS_ADMIN"] as AdminRole[], admin: false };
 
   it("keeps Events its own slot for an Events Administrator, lit on event pages and Events pages, never Home", () => {
-    for (const path of ["/overview", "/finance", "/archived-events"]) {
+    for (const path of ["/overview", "/finance", "/archived-events", "/events-admin"]) {
       const html = shell(path, events);
-      expect([...phone(html).matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]).slice(0, 2), path).toEqual(["Home", "Events"]);
+      // Home (/events-admin) and Events open the same page, so Home gives way: one bar link per page.
+      expect([...phone(html).matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]), path).not.toContain("Home");
+      const hrefs = [...phone(html).matchAll(/<a [^>]*href="([^"?]+)/g)].map((match) => match[1]);
+      expect(hrefs.filter((href) => href === "/events-admin"), path).toHaveLength(1);
       expect(lit(html), path).toEqual(["Events"]);
     }
-    // Home is lit only on exactly its own page, and not when Events owns that page.
-    expect(lit(shell("/events-admin", events))).toEqual(["Events"]);
   });
 
   it("drops Home for a Clubs Administrator, whose Home and Clubs open the same page: one /admin/clubs item", () => {
