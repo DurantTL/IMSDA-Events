@@ -1,21 +1,12 @@
 "use client";
 
-import { BRAND_CALENDAR_LABEL, PRODUCT_NAME } from "@/lib/brand";
 import { BrandLink } from "@/components/brand-link";
+import { PRODUCT_NAME } from "@/lib/brand";
 import { StaffViewerProvider } from "@/components/staff-viewer-context";
 import type { HelpViewer } from "@/modules/help/visibility";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import {
-  ArrowRightLeft,
-  ChevronDown,
-  Eye,
-  LifeBuoy,
-  Megaphone,
-  Search,
-  LayoutDashboard,
-  ShieldCheck,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, LifeBuoy } from "lucide-react";
 import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
@@ -24,66 +15,47 @@ import { requestedClubYear } from "@/components/clubs-year-selector-model";
 import { DestinationSearch } from "@/components/destination-search";
 import { GuardedLink } from "@/components/guarded-link";
 import { WorkspaceContent, workspacePageKey } from "@/components/workspace-content";
-import { SystemPhoneMenu } from "@/components/system-phone-menu";
 import { moduleDestinationStates } from "@/components/module-destination-states";
-import { activeWorkContext, returnToSystemHref, showsSystemChrome, systemMenuGroups, workContextSwitches } from "@/components/work-context-model";
 import { buildSearchDestinations } from "@/components/destination-search-model";
 import { eventToRemember, resolveShellEvent, switchEvent } from "@/components/shell-event-selection";
-import {
-  applySidebarAttribute,
-  getSidebarCollapsedServerSnapshot,
-  getSidebarCollapsedSnapshot,
-  setSidebarCollapsed,
-  subscribeSidebarCollapsed,
-} from "@/components/sidebar-collapse";
-import {
-  dismissalAfterNavigation,
-  getSidebarGroupsServerSnapshot,
-  getSidebarGroupsSnapshot,
-  resolveSidebarGroupOpen,
-  type SidebarGroupKey,
-  setSidebarGroupOpen,
-  subscribeSidebarGroups,
-} from "@/components/sidebar-groups";
-import { SidebarToggle } from "@/components/sidebar-toggle";
-import { createEventHrefFor, isSystemWorkspacePath, systemNavActiveEntryKey, systemNavEntryKey, systemNavGroups } from "@/components/system-navigation";
+import { createEventHrefFor, isSystemWorkspacePath } from "@/components/system-navigation";
 import { alwaysOnModuleKeys, disabledModuleCardKeys, isEventModuleKey } from "@/modules/event-modules/catalog";
-import { MoreLauncher } from "@/components/more-launcher";
 import { AdminAttentionBell } from "@/components/admin-attention-bell";
-import { AdminRoleSwitcher } from "@/components/admin-role-switcher";
-import { adminRoleSidebarKind, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
-import { StaffWorkspaceSwitcher } from "@/components/staff-workspace-switcher";
-import { staffWorkspaceFor, staffWorkspaceRoles } from "@/components/staff-workspace-model";
 import { StaffCreateMenu } from "@/components/staff-create-menu";
-import workspaceStyles from "@/components/staff-workspace-switcher.module.css";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
+import { StaffRail } from "@/components/staff-rail";
+import { StaffTabRow } from "@/components/staff-tab-row";
+import { StaffViewStrip } from "@/components/staff-view-strip";
+import { StaffPhoneBar } from "@/components/staff-phone-bar";
+import { phoneBarItems } from "@/components/staff-phone-bar-model";
+import type { LauncherSection } from "@/components/more-launcher";
+import {
+  areaLandingHref,
+  areaTabs,
+  markCurrentTab,
+  railItems,
+  staffAreaMeta,
+  staffPlaceFor,
+  type AreaTab,
+  type StaffAreaViewer,
+} from "@/components/staff-areas";
+import { buildEventTabs, currentEventPlace, markCurrentEventTab } from "@/components/staff-event-tabs";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
-import { otherWorkspaceContextsForStaff } from "@/modules/access/workspace-contexts";
+import { staffWorkspaceOptions } from "@/modules/access/workspace-contexts";
+import { adminRoleLanding, heldAdminRoles, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import {
   buildMoreDirectoryCards,
   canShowMoreLauncher,
-  mobileActiveTabHref,
-  eventFeaturesItem,
-  isEventFeaturesPath,
-  mobileNavigationLabels,
-  navigation,
-  orderedMobileTabs,
-  orderedSidebarItems,
-  sidebarActiveHref,
-  sidebarSections,
-  clubsAdminActiveHref,
-  clubsAdminGroups,
-  clubsAdminHealthImportHref,
-  clubsAdminHomeItem,
-  clubsAdminHrefForYear,
-  clubsAdminNavigation,
   eventsAdminHomeItem,
   helpPageTitle,
+  isEventFeaturesPath,
+  navigation,
   staffSubpageTitle,
   systemNavigation,
   withCurrentEvent,
   type NavigationItem,
 } from "@/components/staff-navigation";
+import styles from "@/components/staff-shell.module.css";
 
 type ShellEvent = {
   id: string;
@@ -112,6 +84,13 @@ type ShellUser = { id?: string; displayName: string; email: string; globalRole?:
 
 const destinationSearchInputId = "destination-search-input";
 
+/**
+ * The staff shell (#1565): a branded header (logo, "Find a page or task", Help, Create, notifications, the account menu
+ * with the workspace switcher), an icon rail of the areas this person can reach, and below it the page column with that
+ * area's one row of tabs, or inside an event the event's tabs. There is no sidebar. Below 1024px, and whenever a row would
+ * not fit, a row becomes a menu line. On a phone the bottom bar is Home, Events, Check-in, Clubs and More. Everything here
+ * only decides which links to draw; every page and route keeps its own server-side authorization.
+ */
 export function AppShell({
   attendeeAccountAvailable = false,
   autoSelected = false,
@@ -135,54 +114,15 @@ export function AppShell({
   events: ShellEvent[];
   user: ShellUser;
   /**
-   * The admin roles this account holds and the one showing (#1225), computed server-side. The switcher changes the
-   * sidebar and home only; no server gate reads it.
+   * The admin roles this account holds and the one showing (#1225), computed server-side. Only the roles held decide which
+   * rail areas and tabs show, and which dashboard Home opens; no server gate reads it.
    */
   adminRoleView?: { held: AdminRole[]; active: AdminRole | null; counts: AdminRoleCounts; healthImport?: boolean } | null;
-  /** An active Site content editor who is not a system administrator (#111): adds a link to Homepage & site content. System administrators have it in their System sidebar. */
+  /** An active Site content editor who is not a system administrator (#111): adds Homepage & site content to the Admin area. */
   siteContentEditor?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  // Icons-only sidebar (#446). Starts expanded so the server and first client
-  // render match; the saved choice is applied after mount.
-  const collapsed = useSyncExternalStore(subscribeSidebarCollapsed, getSidebarCollapsedSnapshot, getSidebarCollapsedServerSnapshot);
-  const [tooltip, setTooltip] = useState<{ label: string; top: number; left: number } | null>(null);
-  // Keep <html> in step with the choice, for the stylesheet (and when the inline script did not run).
-  useEffect(() => { applySidebarAttribute(collapsed); }, [collapsed]);
-  function openSearch() {
-    setTooltip(null);
-    setSidebarCollapsed(false);
-    // The field is shown again on the next frame; focus it then.
-    window.requestAnimationFrame(() => document.getElementById(destinationSearchInputId)?.focus());
-  }
-  function toggleCollapsed() {
-    setTooltip(null);
-    setSidebarCollapsed(!collapsed);
-  }
-  // A tooltip for the icon-only sidebar, on hover and keyboard focus. It is
-  // drawn outside the sidebar, whose overflow would clip it.
-  function showTip(element: HTMLElement, label: string) {
-    const rect = element.getBoundingClientRect();
-    setTooltip({ label, top: rect.top + rect.height / 2, left: rect.right + 10 });
-  }
-  const tipProps = (label: string) => collapsed ? {
-    onMouseEnter: (event: { currentTarget: HTMLElement }) => showTip(event.currentTarget, label),
-    onFocus: (event: { currentTarget: HTMLElement }) => showTip(event.currentTarget, label),
-    onMouseLeave: () => setTooltip(null),
-    onBlur: () => setTooltip(null),
-  } : {};
-  // Set up and Reports open and close (#964). Saved per browser; the server
-  // always renders with nothing saved, and the pages inside a group open it.
-  const savedGroups = useSyncExternalStore(subscribeSidebarGroups, getSidebarGroupsSnapshot, getSidebarGroupsServerSnapshot);
-  const [dismissedGroup, setDismissedGroup] = useState<{ section: SidebarGroupKey; pathname: string } | null>(null);
-  // Closing a group lasts for that page only: any navigation forgets it. Reset
-  // while rendering, not in an effect, so the very render after navigating is right.
-  const [lastPathname, setLastPathname] = useState(pathname);
-  if (lastPathname !== pathname) {
-    setLastPathname(pathname);
-    setDismissedGroup(dismissalAfterNavigation(dismissedGroup, lastPathname, pathname));
-  }
   const searchParams = useSearchParams();
   // The staff-only profile page (#623) lives inside the shell but is no nav item.
   const isProfileRoute = pathname === "/profile" || pathname.startsWith("/profile/");
@@ -195,11 +135,8 @@ export function AppShell({
     : navigation.reduce<NavigationItem | null>((best, item) => (
       pathname.startsWith(item.href) && (!best || item.href.length > best.href.length) ? item : best
     ), null) ?? navigation[0];
-  // The header names the page the staff member is on (#685): a `/more/*`
-  // page that isn't a nav item names itself instead of reading "More".
-  // The Event features page (#965) is a Set up item, not More, whatever `current` says.
-  const onEventFeatures = isEventFeaturesPath(pathname);
-  const pageTitle = isProfileRoute ? "Your account" : staffSubpageTitle(pathname) ?? current.label;
+  // The header names the page the staff member is on (#685): a `/more/*` page that isn't a nav item names itself instead of reading "More".
+  const pageTitle = isProfileRoute ? "Your account" : staffSubpageTitle(pathname) ?? (isEventFeaturesPath(pathname) ? "Event features" : current.label);
   const requestedEventId = searchParams.get("event");
   const defaultEvent = defaultEventId
     ? events.find((event) => event.id === defaultEventId)
@@ -215,119 +152,50 @@ export function AppShell({
   }
   const selectedEvent = resolveShellEvent({ requestedEventId, events, seenEventId, defaultEventId });
   const selectedEventId = selectedEvent?.id ?? "";
-  // Same rule as the page (#465): no `?event=` and an automatic choice. Not on
-  // pages that aren't event-scoped (/admin, the global duplicate review).
-  const showAutoSelectNotice = !requestedEventId && !seenEventId && autoSelected && Boolean(defaultEvent)
-    && !isSystemRoute && !pathname.startsWith("/people/matches")
-    && !isProfileRoute;
   const selectedPermissions = new Set(
     events.find((event) => event.id === selectedEventId)?.permissions ?? [],
   );
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
   // What the pages below need to decide which Help links and Set up links this viewer may follow (#1435).
   const staffViewer: HelpViewer = { isSystemAdmin, selectedEventId, permissions: isSystemAdmin ? [...eventPermissions] : [...selectedPermissions] };
-  // The route owns the workspace; the selected role resolves shared destinations.
-  const sidebarKind = adminRoleView ? adminRoleSidebarKind(adminRoleView.active) : "default";
-  const workspaceKind = staffWorkspaceFor({ pathname, activeRole: adminRoleView?.active ?? null, isSystemAdmin });
-  const clubsView = adminRoleView ? workspaceKind === "clubs" : sidebarKind === "clubs";
-  const onPortfolio = pathname === eventsAdminHomeItem.href;
-  const eventWorkspaceVisible = !clubsView && workspaceKind === "events" && !onPortfolio;
-  // Clubs navigation does not require an event membership or selected event.
-  const clubsOnly = clubsView && events.length === 0;
-  const activeClubsHref = clubsView ? clubsAdminActiveHref(pathname, searchParams.get("view")) : null;
-  // The health record import page only exists while the Health Record feature is on (#1232).
-  const showClubsItem = (item: NavigationItem) => item.href !== clubsAdminHealthImportHref || adminRoleView?.healthImport !== false;
-  const clubsNavItems = clubsAdminNavigation.filter(showClubsItem);
-  // The phone bar has no Points or Events items (they carry a #), so on those views it keeps the page's own item lit (#1304).
-  const phoneClubsHref = clubsView && activeClubsHref && !clubsNavItems.some((item) => item.href === activeClubsHref) ? (clubsNavItems.some((item) => item.href === clubsAdminActiveHref(pathname)) ? clubsAdminActiveHref(pathname) : "/admin/clubs/summary") : activeClubsHref;
-  // The year-aware Clubs links keep the club year the URL has (#1245).
-  const clubsLinkYear = clubsView ? requestedClubYear(searchParams.get("year")) : null;
-  const onEventsAdminHome = pathname === eventsAdminHomeItem.href;
-  // The phone Clubs bar scrolls sideways (#1232): bring the page's own item into view when the page changes.
-  const clubsMobileNavRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (!phoneClubsHref) return;
-    clubsMobileNavRef.current?.querySelector<HTMLElement>('a[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "center" });
-  }, [phoneClubsHref]);
-  // Event Admins can ask for a module (#741 slice 3); system administrators turn modules on directly.
-  const canRequestFeature = !isSystemAdmin && selectedPermissions.has("CONFIGURE_EVENT");
-  // The other workspaces this staff identity may switch into (#108): the
-  // account popover's System management link and both attendee switch
-  // buttons read this, so they always agree with each other.
-  const workspaceContexts = otherWorkspaceContextsForStaff({ isSystemAdmin, attendeeAccountAvailable });
-  const systemAdminContext = workspaceContexts.find((context) => context.kind === "system_admin");
-  const canSwitchToAttendee = workspaceContexts.some((context) => context.kind === "attendee");
-  // Staff with no events can still open their profile (#623); every event
-  // control and event-scoped nav item would dead-end for them, so hide them.
+
+  // Which area the page is in, and its one row of tabs. The route owns the place; the roles held decide what is listed.
+  const place = staffPlaceFor(pathname, searchParams);
+  const held = adminRoleView?.held ?? (isSystemAdmin ? heldAdminRoles({ systemAdmin: true, clubsAdministrator: true, eventAdminEventIds: [] }) : []);
+  const activeRole = adminRoleView?.active ?? (held.includes("SYSTEM_ADMIN") ? "SYSTEM_ADMIN" : null);
+  const viewer: StaffAreaViewer = {
+    isSystemAdmin,
+    held,
+    activeRole,
+    hasEvents: events.length > 0,
+    siteContentEditor,
+    healthImport: adminRoleView?.healthImport !== false,
+    clubYear: requestedClubYear(searchParams.get("year")),
+    counts: adminRoleView?.counts ?? {},
+  };
+  // Staff with no events can still open their profile (#623); every event control and event-scoped tab would dead-end for them.
   const eventlessProfile = (isProfileRoute || isHelpRoute) && events.length === 0 && !isSystemAdmin;
   const eventQuery = selectedEventId ? `?event=${encodeURIComponent(selectedEventId)}` : "";
-  const moreNavItem = navigation.find((item) => item.href === "/more");
-  // More shows when any of its destinations is permitted (#737), not only for
-  // the broad permissions it used to require; each page still checks access.
-  // Module cards the launcher leaves out. An event the server did not load module
-  // state for (an ended event) lists the universal tools only; the Event modules
-  // page has the rest.
+  const clubOnlyArea = place.area === "clubs";
+  // Links keep the selected event (#616), so moving between areas never replaces the remembered event. The Clubs pages never carried one.
+  const carry = (href: string) => (clubOnlyArea ? href : withCurrentEvent(href, selectedEventId));
+
+  // Module cards the launcher leaves out. An event the server did not load module state for lists the universal tools only.
   const selectedHiddenCardKeys: ReadonlySet<string> = selectedEvent?.hiddenCardKeys
     ? new Set(selectedEvent.hiddenCardKeys)
     : disabledModuleCardKeys(new Set(alwaysOnModuleKeys));
-  const showMore = Boolean(moreNavItem) && canShowMoreLauncher({
-    item: moreNavItem!,
+  const moreContext = {
     permissions: [...selectedPermissions],
     clubOversight: Boolean(selectedEvent?.clubOversight),
     clubEvent: Boolean(selectedEvent?.clubEvent),
-    isSystemAdmin: user.globalRole === "SYSTEM_ADMIN",
+    isSystemAdmin,
     clubFormsAccess: Boolean(selectedEvent?.clubFormsAccess),
     hiddenCardKeys: selectedHiddenCardKeys,
-  });
-  // The More launcher (#741): everything this staff member may open for the
-  // selected event, the universal tools plus the enabled modules. Built here from
-  // the same function the Event modules page and the parity test use.
-  const launcherCards = selectedEvent ? buildMoreDirectoryCards({
-    permissions: [...selectedPermissions],
-    clubOversight: Boolean(selectedEvent.clubOversight),
-    clubEvent: Boolean(selectedEvent.clubEvent),
-    isSystemAdmin,
-    clubFormsAccess: Boolean(selectedEvent.clubFormsAccess),
-    eventQuery,
-    hiddenCardKeys: selectedHiddenCardKeys,
-  }) : [];
-  // The fixed order lives in `sidebarSections` (#964) and `orderedSidebarItems`.
-  // System management is not here: it is drawn once, above the event picker.
-  const visibleNavigation: NavigationItem[] = eventlessProfile || clubsOnly || !eventWorkspaceVisible
-    ? []
-    : orderedSidebarItems(selectedPermissions, showMore);
-  const visibleSections = eventlessProfile || clubsOnly || !eventWorkspaceVisible ? [] : sidebarSections(selectedPermissions);
-  const moreItemVisible = visibleNavigation.find((item) => item.href === "/more");
-  // A page that is no sidebar item lights its parent, or More when the viewer can't see it (#964).
-  const visibleHrefs = new Set([...visibleSections.flatMap((view) => view.items.map((item) => item.href)), ...visibleNavigation.map((item) => item.href)]);
-  // The hrefs of the sidebar links actually drawn for this viewer (not the More trigger, which opens the launcher).
-  // The launcher drops cards and footer links that repeat one of these, so this must stay exactly what is drawn (#967).
-  const drawnSidebarHrefs = new Set(visibleSections.flatMap((view) => view.items.map((item) => item.href)));
-  const activeHref = onEventFeatures || onPortfolio ? null : sidebarActiveHref(current, visibleHrefs);
-  const isItemActive = (item: NavigationItem) => {
-    if (isProfileRoute || isHelpRoute) return false;
-    // Event features lights on its own page, which is under /more but must not light More (#965).
-    if (item.href === eventFeaturesItem.href) return onEventFeatures;
-    return item.href.startsWith("/admin") ? pathname.startsWith(item.href) : activeHref === item.href;
   };
-  function toggleGroup(section: SidebarGroupKey, open: boolean) {
-    setSidebarGroupOpen(section, !open);
-    setDismissedGroup(open ? { section, pathname } : null);
-  }
-  // On /admin pages a system administrator's sidebar lists the system groups (#966), not the event workspace's.
-  const showSystemNav = !clubsView && (showsSystemChrome({ isSystemAdmin, pathname }) || (workspaceKind === "system" && (isHelpRoute || isProfileRoute)));
-  const activeSystemEntry = showSystemNav ? systemNavActiveEntryKey(pathname) : null;
-  // Which work context the page is in (#1180): System, the selected event or the account page. A label only; it grants nothing.
-  const workContext = onPortfolio
-    ? { kind: "event" as const, kindLabel: "Events", label: "Event administration", detail: "All assigned events" }
-    : clubsView
-    ? { kind: "system" as const, kindLabel: "Clubs", label: "Clubs administration", detail: "All clubs" }
-    : showSystemNav && !isProfileRoute
-    ? { kind: "system" as const, kindLabel: "System", label: "System administration", detail: "All events" }
-    : activeWorkContext({ pathname, isSystemAdmin, eventName: selectedEvent?.name });
-  const contextSwitches = workContextSwitches({ isSystemAdmin, attendeeAccountAvailable, selectedEventId, active: workContext.kind });
-  // The phone System menu lists the same destinations as the desktop System sidebar, and nothing without the role.
-  const systemMenu = showSystemNav ? systemMenuGroups({ isSystemAdmin, pathname, selectedEventId }) : [];
+  const moreNavItem = navigation.find((item) => item.href === "/more");
+  const showMore = Boolean(selectedEvent) && Boolean(moreNavItem) && canShowMoreLauncher({ item: moreNavItem!, ...moreContext });
+  // The More launcher (#741): everything this staff member may open for the selected event, the universal tools plus the enabled modules.
+  const launcherCards = selectedEvent ? buildMoreDirectoryCards({ ...moreContext, eventQuery }) : [];
   // Module states (#741 rules) for the selected event, only where the server loaded them.
   const moduleStates = selectedEvent?.hiddenCardKeys
     ? moduleDestinationStates({
@@ -339,8 +207,30 @@ export function AppShell({
       eventQuery,
     })
     : [];
-  // The mobile tab bar keeps its own, shorter order (see `mobileNavigationOrder`).
-  const mobileNavigation = orderedMobileTabs(visibleNavigation);
+  // Event pages: the event's tabs (a viewer sees only the tabs they can open; kitchen staff see only the kitchen counts).
+  const eventTabs = selectedEvent && !eventlessProfile
+    ? buildEventTabs({ permissions: [...selectedPermissions], eventId: selectedEvent.id, isSystemAdmin, more: moreContext })
+    : [];
+  const eventPlace = currentEventPlace(pathname, searchParams);
+  const markedEventTabs = markCurrentEventTab(eventTabs, eventPlace);
+
+  const rail = railItems(viewer, eventTabs[0]?.href ?? null).map((item) => ({
+    ...item,
+    // Events opens the selected event for staff with no Events row; Home and the rest keep the event they were in.
+    href: item.area === "clubs" ? item.href : carry(item.href),
+  }));
+  const areaRow: AreaTab[] = place.inEvent
+    ? []
+    : markCurrentTab(areaTabs(place.area, viewer), place).map((tab) => ({
+      ...tab,
+      href: carry(tab.href),
+      views: tab.views?.map((view) => ({ ...view, href: carry(view.href) })),
+    }));
+  const rowTabs = place.inEvent ? markedEventTabs : areaRow;
+  const currentTab = rowTabs.find((tab) => tab.current);
+  const pickerEvents = events.filter((event) => !event.archived || event.id === selectedEventId);
+  const eventsLanding = areaLandingHref("events", viewer);
+
   // Find a page (#1177): the destinations this viewer may open, from the same registry and rules as the menus. No event data is searched.
   const searchDestinations = buildSearchDestinations({
     isSystemAdmin,
@@ -350,19 +240,56 @@ export function AppShell({
     clubEvent: Boolean(selectedEvent?.clubEvent),
     clubFormsAccess: Boolean(selectedEvent?.clubFormsAccess),
     hiddenCardKeys: selectedHiddenCardKeys,
-    clubsAdmin: clubsView ? { healthImport: adminRoleView?.healthImport !== false } : undefined,
+    clubsAdmin: held.includes("CLUBS_ADMIN") ? { healthImport: viewer.healthImport } : undefined,
     siteContentEditor,
   });
   const attendeePreviewHref = selectedEvent
     ? `/account/events/${encodeURIComponent(selectedEvent.slug)}?preview=staff`
     : "/account";
+  const canRequestFeature = !isSystemAdmin && selectedPermissions.has("CONFIGURE_EVENT");
+  // The account menu's workspace switcher (#108): only the workspaces this person holds, with no second sign-in.
+  const workspaces = staffWorkspaceOptions({
+    isSystemAdmin,
+    attendeeAccountAvailable,
+    staffHref: eventTabs[0]?.href ?? withCurrentEvent(adminRoleLanding(activeRole), selectedEventId),
+    onSystemPage: isSystemAdmin && isSystemRoute,
+  });
+
+  // Which work context the page is in (#1180). A label only; it grants nothing. The Event administration badge stays.
+  const workContext = place.tab === "event-administration" && place.area === "events"
+    ? { kind: "event" as const, kindLabel: "Events", label: eventsAdminHomeItem.label, detail: "All assigned events" }
+    : place.area === "clubs" || (place.area === "reports" && pathname.startsWith("/admin/clubs"))
+    ? { kind: "system" as const, kindLabel: "Clubs", label: "Clubs administration", detail: "All clubs" }
+    : isProfileRoute
+    ? { kind: "profile" as const, kindLabel: "Account", label: "Your account", detail: "Not tied to an event" }
+    : place.inEvent
+    ? { kind: "event" as const, kindLabel: "Event", label: selectedEvent?.name?.trim() || "No event selected", detail: "Event workspace" }
+    : isSystemRoute && isSystemAdmin
+    ? { kind: "system" as const, kindLabel: "System", label: "System administration", detail: "All events" }
+    : { kind: "event" as const, kindLabel: selectedEvent ? "Event" : "Staff", label: selectedEvent?.name?.trim() || "Staff workspace", detail: "" };
+
+  // The phone: Home, Events, Check-in, Clubs and More. More lists "This event" first inside an event, then the other areas.
+  const phoneItemsBase = phoneBarItems({ rail, eventTabs: markedEventTabs, moreHref: "/help" });
+  const onBar = new Set(phoneItemsBase.map((item) => item.href));
+  const launcherSections: LauncherSection[] = [
+    ...(place.inEvent && markedEventTabs.length > 0
+      ? [{ key: "this-event", label: "This event", items: markedEventTabs.map((tab) => ({ key: tab.key, label: tab.label, href: tab.href, current: tab.current })) }]
+      : []),
+    ...(rail.filter((item) => !onBar.has(item.href)).length > 0
+      ? [{ key: "areas", label: "Areas", items: rail.filter((item) => !onBar.has(item.href)).map((item) => ({ key: item.area, label: item.label, href: item.href, current: item.area === place.area })) }]
+      : []),
+  ];
+  const moreHasContent = launcherSections.length > 0 || launcherCards.some((card) => card.allowed);
+  const phoneItems = phoneBarItems({
+    rail,
+    eventTabs: markedEventTabs,
+    moreHref: moreHasContent ? (showMore && selectedEventId ? `/more${eventQuery}` : withCurrentEvent("/help", selectedEventId)) : null,
+  });
 
   // An event named in the URL becomes the remembered selection (#616), so the
   // next page without `?event=` keeps it instead of falling back to the default.
   const lastRememberedId = useRef<string | null>(defaultEventId);
   const knownEventIds = events.filter((event) => !event.archived).map((event) => event.id).join("|");
-  // The pickers list live events only (#635); an archived event being viewed by link stays listed, marked, so the picker is not blank.
-  const pickerEvents = events.filter((event) => !event.archived || event.id === selectedEventId);
   useEffect(() => {
     const toRemember = eventToRemember({
       requestedEventId,
@@ -394,359 +321,122 @@ export function AppShell({
     });
   }
 
+  // Opening an event from an area page (the Events row): the event's own first page, guarded like every move.
+  function openEvent(eventId: string) {
+    void guardedNavigate(() => {
+      lastRememberedId.current = eventId;
+      setSeenEventId(eventId);
+      void rememberLastUsedEvent(eventId).then(() => router.refresh());
+      router.push(`/overview?event=${encodeURIComponent(eventId)}`);
+    });
+  }
+
+  const picker = (
+    <span className={styles.pickerShell}>
+      <select
+        id="event-picker"
+        aria-label="Switch event"
+        value={selectedEventId}
+        onChange={(event) => selectEvent(event.target.value)}
+      >
+        {!selectedEventId && <option value="" disabled>Choose an event</option>}
+        {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
+      </select>
+      <ChevronDown aria-hidden="true" size={16} />
+    </span>
+  );
+  const openPicker = pickerEvents.length > 0 && place.area === "events" && !place.inEvent ? (
+    <span className={styles.pickerShell}>
+      <select id="event-opener" aria-label="Open an event" value="" onChange={(event) => { if (event.target.value) openEvent(event.target.value); }}>
+        <option value="" disabled>Open an event</option>
+        {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
+      </select>
+      <ChevronDown aria-hidden="true" size={16} />
+    </span>
+  ) : null;
+
   return (
-    <div className="app-shell" 
-      onKeyDown={(event) => { if (event.key === "Escape" && tooltip) setTooltip(null); }}>
+    <div className={`app-shell ${styles.shell}`}>
       <a className="skip-link" href="#workspace-content">Skip to main content</a>
-      <aside className="sidebar" aria-label="Application navigation" onScrollCapture={() => setTooltip(null)}>
-        <BrandLink guarded className="brand" wordmark={<span className="sidebar-link-label"><strong>{PRODUCT_NAME}</strong><small>Events</small></span>} {...tipProps(BRAND_CALENDAR_LABEL)} />
-
-        <SidebarToggle collapsed={collapsed} onToggle={toggleCollapsed} tipProps={tipProps("Expand sidebar")} />
-
-        {adminRoleView && <StaffWorkspaceSwitcher held={adminRoleView.held} counts={adminRoleView.counts} active={workspaceKind} eventId={selectedEventId} hasEvents={events.length > 0} />}
-
-        {user.globalRole === "SYSTEM_ADMIN" && sidebarKind === "default" && !adminRoleView && (
-          <div className="system-navigation">
-            <span className="system-navigation-label">Global administration</span>
-            <GuardedLink
-              className={isSystemRoute ? "system-navigation-link active" : "system-navigation-link"}
-              href={returnToSystemHref(selectedEventId)}
-              aria-current={isSystemRoute ? "page" : undefined}
-              {...tipProps("System management")}
-            >
-              <span className="system-navigation-icon">
-                <ShieldCheck aria-hidden="true" size={19} strokeWidth={1.9} />
-              </span>
-              <span className="sidebar-link-label">
-                <strong>System management</strong>
-                <small>All events and integrations</small>
-              </span>
-            </GuardedLink>
-          </div>
-        )}
-
-        {!eventlessProfile && !clubsOnly && eventWorkspaceVisible && <span className="event-workspace-label">Event workspace</span>}
-        {!eventlessProfile && !clubsOnly && eventWorkspaceVisible && <div className="event-picker-wrap">
-          <label className="sr-only" htmlFor="event-picker">Event workspace</label>
-          <div className="select-shell">
-            <select
-              id="event-picker"
-              value={selectedEventId}
-              onChange={(event) => selectEvent(event.target.value)}
-            >
-              {!selectedEventId && <option value="" disabled>Choose an event</option>}
-              {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
-            </select>
-            <ChevronDown aria-hidden="true" size={16} />
-          </div>
-          {!showSystemNav && <GuardedLink className="event-picker-archived-link" href="/archived-events">Archived events</GuardedLink>}
-        </div>}
-
-        <div className="sidebar-destination-search">
+      <header className={styles.topbar} data-shell-region>
+        <BrandLink guarded className={styles.brand} wordmark={<span className={styles.brandText}><strong>{PRODUCT_NAME}</strong><small>Events</small></span>} />
+        <div className={styles.search}>
           <DestinationSearch destinations={searchDestinations} inputId={destinationSearchInputId} />
-          {/* The collapsed sidebar has no room for the field: this button opens it and moves focus into the field. */}
-          <button
-            type="button"
-            className="sidebar-search-button"
-            aria-label="Find a page or task"
-            onClick={openSearch}
-            {...tipProps("Find a page or task")}
-          >
-            <Search aria-hidden="true" size={19} strokeWidth={1.9} />
-          </button>
         </div>
-
-        {clubsView && <ClubsYearSelector />}
-
-        <nav className="primary-nav" id="primary-navigation" aria-label="Primary navigation">
-          {workspaceKind === "events" && adminRoleView?.held.includes("EVENTS_ADMIN") && (
-            <GuardedLink className={onEventsAdminHome ? "nav-item active" : "nav-item"} href={eventsAdminHomeItem.href} aria-current={onEventsAdminHome ? "page" : undefined} {...tipProps(eventsAdminHomeItem.label)}>
-              <eventsAdminHomeItem.icon aria-hidden="true" size={19} strokeWidth={1.9} />
-              <span>{eventsAdminHomeItem.label}</span>
-            </GuardedLink>
-          )}
-          {clubsView && (
-            <>
-              <GuardedLink className={activeClubsHref === clubsAdminHomeItem.href ? "nav-item active" : "nav-item"} href={clubsAdminHrefForYear(clubsAdminHomeItem.href, clubsLinkYear)} aria-current={activeClubsHref === clubsAdminHomeItem.href ? "page" : undefined} {...tipProps(clubsAdminHomeItem.label)}>
-                <clubsAdminHomeItem.icon aria-hidden="true" size={19} strokeWidth={1.9} />
-                <span>{clubsAdminHomeItem.label}</span>
-              </GuardedLink>
-              {clubsAdminGroups.map((group) => {
-                const items = group.items.filter(showClubsItem);
-                // Points and Events open a view of the Club summary; they light on that view (#1304), as the section tabs do.
-                const isActive = (item: NavigationItem) => activeClubsHref === item.href;
-                const open = resolveSidebarGroupOpen({
-                  saved: savedGroups[group.key],
-                  containsCurrentPage: items.some(isActive),
-                  dismissedOnThisPage: dismissedGroup?.section === group.key && dismissedGroup.pathname === pathname,
-                });
-                return (
-                  <div className="nav-group" key={group.key} data-open={open ? "true" : "false"}>
-                    <button
-                      type="button"
-                      className="nav-group-toggle"
-                      id={`nav-group-${group.key}-toggle`}
-                      aria-expanded={open}
-                      aria-controls={`nav-group-${group.key}`}
-                      onClick={() => toggleGroup(group.key, open)}
-                    >
-                      <span>{group.label}</span>
-                      <ChevronDown aria-hidden="true" size={14} />
-                    </button>
-                    <div className="nav-group-items" id={`nav-group-${group.key}`} role="group" aria-labelledby={`nav-group-${group.key}-toggle`} hidden={!open}>
-                      {items.map((item) => (
-                        <GuardedLink key={item.href} className={isActive(item) ? "nav-item active" : "nav-item"} href={clubsAdminHrefForYear(item.href, clubsLinkYear)} aria-current={isActive(item) ? "page" : undefined} {...tipProps(item.label)}>
-                          <item.icon aria-hidden="true" size={19} strokeWidth={1.9} />
-                          <span>{item.label}</span>
-                        </GuardedLink>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-          {showSystemNav && (
-            <>
-              {adminRoleView && <GuardedLink className={pathname === "/admin" ? "nav-item active" : "nav-item"} href={returnToSystemHref(selectedEventId)} aria-current={pathname === "/admin" ? "page" : undefined} {...tipProps("System overview")}><LayoutDashboard size={19} aria-hidden="true" /><span>Overview</span></GuardedLink>}
-              {!adminRoleView && <GuardedLink className="nav-item" href={withCurrentEvent("/overview", selectedEventId)} {...tipProps("Event workspace")}>
-                <LayoutDashboard aria-hidden="true" size={19} strokeWidth={1.9} />
-                <span>Event workspace</span>
-              </GuardedLink>}
-              {systemNavGroups.map((group) => {
-                const links = group.items.map((item) => {
-                  const { href, icon: Icon, label } = item;
-                  const isActive = activeSystemEntry === systemNavEntryKey(group, item);
-                  return (
-                    <GuardedLink key={href} className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
-                      <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
-                      <span>{label}</span>
-                    </GuardedLink>
-                  );
-                });
-                const open = resolveSidebarGroupOpen({
-                  saved: savedGroups[group.key],
-                  containsCurrentPage: group.items.some((item) => activeSystemEntry === systemNavEntryKey(group, item)),
-                  dismissedOnThisPage: dismissedGroup?.section === group.key && dismissedGroup.pathname === pathname,
-                });
-                return (
-                  <div className="nav-group" key={group.key} data-open={open ? "true" : "false"}>
-                    <button
-                      type="button"
-                      className="nav-group-toggle"
-                      id={`nav-group-${group.key}-toggle`}
-                      aria-expanded={open}
-                      aria-controls={`nav-group-${group.key}`}
-                      onClick={() => toggleGroup(group.key, open)}
-                    >
-                      <span>{group.label}</span>
-                      <ChevronDown aria-hidden="true" size={14} />
-                    </button>
-                    <div className="nav-group-items" id={`nav-group-${group.key}`} role="group" aria-labelledby={`nav-group-${group.key}-toggle`} hidden={!open}>
-                      {links}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-          {!showSystemNav && visibleSections.map(({ section, label: sectionLabel, collapsible, items }) => {
-            const links = items.map((item) => {
-              const { href, icon: Icon, label } = item;
-              const isActive = isItemActive(item);
-              return (
-                <GuardedLink key={label} className={isActive ? "nav-item active" : "nav-item"} href={withCurrentEvent(href, selectedEventId)} aria-current={isActive ? "page" : undefined} {...tipProps(label)}>
-                  <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
-                  <span>{label}</span>
-                </GuardedLink>
-              );
-            });
-            // The daily items: no heading, always visible.
-            if (!collapsible || !sectionLabel) return <Fragment key={section}>{links}</Fragment>;
-            const open = resolveSidebarGroupOpen({
-              saved: savedGroups[section],
-              containsCurrentPage: items.some(isItemActive),
-              dismissedOnThisPage: dismissedGroup?.section === section && dismissedGroup.pathname === pathname,
-            });
-            return (
-              <div className="nav-group" key={section} data-open={open ? "true" : "false"}>
-                <button
-                  type="button"
-                  className="nav-group-toggle"
-                  id={`nav-group-${section}-toggle`}
-                  aria-expanded={open}
-                  aria-controls={`nav-group-${section}`}
-                  onClick={() => toggleGroup(section, open)}
-                >
-                  <span>{sectionLabel}</span>
-                  <ChevronDown aria-hidden="true" size={14} />
-                </button>
-                <div className="nav-group-items" id={`nav-group-${section}`} role="group" aria-labelledby={`nav-group-${section}-toggle`} hidden={!open}>
-                  {links}
-                </div>
+        <div className={styles.topActions}>
+          <GuardedLink className={styles.topLink} href={withCurrentEvent("/help", selectedEventId)} aria-label={helpPageTitle} aria-current={isHelpRoute ? "page" : undefined}>
+            <LifeBuoy aria-hidden="true" size={18} /><span>{helpPageTitle}</span>
+          </GuardedLink>
+          <StaffCreateMenu isSystemAdmin={isSystemAdmin} clubFormsAccess={isSystemAdmin || held.includes("CLUBS_ADMIN")} canManageForms={selectedPermissions.has("MANAGE_FORMS")} eventId={place.inEvent ? selectedEventId : ""} />
+          {isSystemAdmin && <AdminAttentionBell />}
+          <StaffAccountMenu
+            attendeePreviewHref={attendeePreviewHref}
+            createEventHref={createEventHrefFor(isSystemAdmin)}
+            displayName={user.displayName}
+            email={user.email}
+            workspaces={workspaces}
+          />
+        </div>
+      </header>
+      <div className={styles.body} data-shell-region>
+        {rail.length > 0 && <StaffRail items={rail} current={place.area} />}
+        <main className={`workspace ${styles.page}`}>
+          {place.inEvent && selectedEvent && !eventlessProfile && (
+            <div className={styles.eventBar}>
+              {eventsLanding && <GuardedLink className={styles.crumb} href={carry(eventsLanding)}>‹ Events</GuardedLink>}
+              <span className={styles.eventName}>{selectedEvent.name}</span>
+              <div className={styles.eventTools}>
+                <span className={styles.picker}>{picker}</span>
+                <GuardedLink className={styles.archivedLink} href="/archived-events">Archived events</GuardedLink>
               </div>
-            );
-          })}
-          {!showSystemNav && eventWorkspaceVisible && moreItemVisible && (() => {
-            const { href, icon: Icon, label } = moreItemVisible;
-            const isActive = isItemActive(moreItemVisible);
-            return (
-              <MoreLauncher
-                key={href}
-                variant="sidebar"
-                className={isActive ? "nav-item active" : "nav-item"}
-                href={withCurrentEvent(href, selectedEventId)}
-                isActive={isActive}
-                cards={launcherCards}
-                moduleStates={moduleStates}
-                sidebarHrefs={drawnSidebarHrefs}
-                isSystemAdmin={isSystemAdmin}
-                canRequestFeature={canRequestFeature}
-                eventQuery={eventQuery}
-                eventId={selectedEventId || undefined}
-                removableModules={isSystemAdmin ? selectedEvent?.removableModules : undefined}
-                userId={user.id ?? ""}
-                tipProps={tipProps(label)}
-              >
-                <Icon aria-hidden="true" size={19} strokeWidth={1.9} />
-                <span>{label}</span>
-              </MoreLauncher>
-            );
-          })()}
-          {siteContentEditor && (
-            <GuardedLink className={pathname.startsWith("/admin/site-content") ? "nav-item active" : "nav-item"} href="/admin/site-content" aria-current={pathname.startsWith("/admin/site-content") ? "page" : undefined} {...tipProps("Homepage & site content")}>
-              <Megaphone aria-hidden="true" size={19} strokeWidth={1.9} />
-              <span>Homepage &amp; site content</span>
-            </GuardedLink>
+            </div>
           )}
-          <GuardedLink className={isHelpRoute ? "nav-item active" : "nav-item"} href={withCurrentEvent("/help", selectedEventId)} aria-current={isHelpRoute ? "page" : undefined} {...tipProps("Help & learning")}>
-            <LifeBuoy aria-hidden="true" size={19} strokeWidth={1.9} />
-            <span>{helpPageTitle}</span>
-          </GuardedLink>
-        </nav>
-
-        <div className="sidebar-foot">
-          <span className="sync-dot" aria-hidden="true" />
-          <span><strong>Event database</strong><small>Access controlled</small></span>
-        </div>
-      </aside>
-      {collapsed && tooltip && <div className="sidebar-tooltip" aria-hidden="true" style={{ top: tooltip.top, left: tooltip.left }}>{tooltip.label}</div>}
-
-      <main className="workspace">
-        {adminRoleView && <div className={workspaceStyles.phoneSwitcher}><AdminRoleSwitcher active={adminRoleView.held.includes(staffWorkspaceRoles[workspaceKind]) ? staffWorkspaceRoles[workspaceKind] : null} counts={adminRoleView.counts} held={adminRoleView.held} /></div>}
-        <header className="workspace-header">
-          <div>
-            <p className="eyebrow">Staff workspace</p>
-            <h1>{pageTitle}</h1>
-            <p className="work-context" data-context={workContext.kind}>
-              <span className="work-context-kind">{workContext.kindLabel}</span>
-              <span className="work-context-name" title={workContext.label}>{workContext.label}</span>
-              {workContext.kind === "system" && <span className="work-context-detail">{workContext.detail}</span>}
-              {isSystemAdmin && workContext.kind === "event" && (
-                <GuardedLink className="work-context-return" href={returnToSystemHref(selectedEventId)}>Back to System</GuardedLink>
-              )}
-            </p>
-          </div>
-          <div className="header-actions">
-            <StaffCreateMenu isSystemAdmin={isSystemAdmin} clubFormsAccess={isSystemAdmin || Boolean(adminRoleView?.held.includes("CLUBS_ADMIN"))} canManageForms={selectedPermissions.has("MANAGE_FORMS")} eventId={eventWorkspaceVisible ? selectedEventId : ""} />
-            {canSwitchToAttendee
-              ? (
-                <form action="/api/auth/switch-to-attendee" method="post">
-                  <button
-                    aria-label="My attendee account"
-                    className="attendee-preview-switch"
-                    title="Switch to your matching attendee account"
-                    type="submit"
-                  >
-                    <ArrowRightLeft aria-hidden="true" size={16} />
-                    <span>My attendee account</span>
-                  </button>
-                </form>
-              )
-              : !eventlessProfile && (
-                <GuardedLink
-                  aria-label="Attendee experience"
-                  className="attendee-preview-switch"
-                  href={attendeePreviewHref}
-                  title={`Preview ${selectedEvent?.name ?? "this event"} as an attendee`}
-                >
-                  <Eye aria-hidden="true" size={16} />
-                  <span>Attendee experience</span>
-                </GuardedLink>
-              )}
-            <span className="count-badge staff-pill">Staff mode</span>
-            {isSystemAdmin && <AdminAttentionBell />}
-            <StaffAccountMenu
-              attendeePreviewHref={attendeePreviewHref}
-              canSwitchToAttendee={canSwitchToAttendee}
-              createEventHref={createEventHrefFor(isSystemAdmin)}
-              displayName={user.displayName}
-              email={user.email}
-              systemAdminContext={systemAdminContext ? { ...systemAdminContext, href: withCurrentEvent(systemAdminContext.href, selectedEventId) } : systemAdminContext}
-            />
-          </div>
-          {!isSystemRoute && !eventlessProfile && !clubsOnly && eventWorkspaceVisible && (
-            <label className="mobile-event-picker">
-              <span className="sr-only">Current event</span>
-              <select value={selectedEventId} onChange={(event) => selectEvent(event.target.value)}>
-                {!selectedEventId && <option value="" disabled>Choose an event</option>}
-                {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
-              </select>
-              <ChevronDown aria-hidden="true" size={15} />
-            </label>
-          )}
-        </header>
-        <WorkspaceContent pageKey={workspacePageKey(pathname, searchParams)}>
-          {showAutoSelectNotice && eventWorkspaceVisible && defaultEvent && (
-            <EventAutoSelectNotice
-              eventName={defaultEvent.name}
-              switchHref={isSystemAdmin ? "/admin" : "/select-event"}
-            />
-          )}
-          <StaffViewerProvider value={staffViewer}>{children}</StaffViewerProvider>
-        </WorkspaceContent>
-      </main>
-
-      {showSystemNav && <SystemPhoneMenu isSystemAdmin={isSystemAdmin} groups={systemMenu} switches={contextSwitches} destinations={searchDestinations} />}
-      {clubsView && <nav className="mobile-nav mobile-nav-scroll" aria-label="Mobile navigation" ref={clubsMobileNavRef}>
-        {clubsNavItems.map(({ href, icon: Icon, label }) => (
-          <GuardedLink className={phoneClubsHref === href ? "active" : undefined} href={clubsAdminHrefForYear(href, clubsLinkYear)} key={href} aria-current={phoneClubsHref === href ? "page" : undefined}>
-            <Icon aria-hidden="true" size={22} /><span>{label}</span>
-          </GuardedLink>
-        ))}
-      </nav>}
-      {!showSystemNav && !clubsView && mobileNavigation.length > 0 && <nav className="mobile-nav" aria-label="Mobile navigation">
-        {mobileNavigation.map(({ href, icon: Icon, label }) => {
-          const isActive = !isProfileRoute && !isHelpRoute && !isSystemRoute && mobileActiveTabHref(current.href, pathname) === href;
-          if (href === "/more") {
-            return (
-              <MoreLauncher
-                key={href}
-                variant="tab"
-                className={isActive ? "active" : undefined}
-                href={`${href}${eventQuery}`}
-                isActive={isActive}
-                cards={launcherCards}
-                moduleStates={moduleStates}
-                destinations={searchDestinations}
-                isSystemAdmin={isSystemAdmin}
-                canRequestFeature={canRequestFeature}
-                eventQuery={eventQuery}
-                eventId={selectedEventId || undefined}
-                removableModules={isSystemAdmin ? selectedEvent?.removableModules : undefined}
-                userId={user.id ?? ""}
-              >
-                <Icon aria-hidden="true" size={22} /><span>{mobileNavigationLabels[href] ?? label}</span>
-              </MoreLauncher>
-            );
-          }
-          return (
-            <GuardedLink className={isActive ? "active" : undefined} href={`${href}${eventQuery}`} key={href} aria-current={isActive ? "page" : undefined} {...(mobileNavigationLabels[href] && mobileNavigationLabels[href] !== label ? { "aria-label": label, title: label } : {})}>
-              <Icon aria-hidden="true" size={22} /><span>{mobileNavigationLabels[href] ?? label}</span>
-            </GuardedLink>
-          );
-        })}
-      </nav>}
+          <StaffTabRow
+            label={place.inEvent ? (selectedEvent?.name ?? "Event") : staffAreaMeta[place.area].label}
+            menuLabel={place.inEvent ? "Event menu" : staffAreaMeta[place.area].menuLabel}
+            title={place.inEvent ? "Event menu" : staffAreaMeta[place.area].menuLabel}
+            tabs={rowTabs}
+            trailing={place.area === "clubs" && !place.inEvent ? <ClubsYearSelector /> : openPicker}
+          />
+          {currentTab?.views && currentTab.views.length > 1 && <StaffViewStrip label={`${currentTab.label} views`} views={currentTab.views} />}
+          <header className={styles.pageHeader}>
+            <div>
+              <h1>{pageTitle}</h1>
+              <p className="work-context" data-context={workContext.kind}>
+                <span className="work-context-kind">{workContext.kindLabel}</span>
+                <span className="work-context-name" title={workContext.label}>{workContext.label}</span>
+                {workContext.kind === "system" && workContext.detail && <span className="work-context-detail">{workContext.detail}</span>}
+              </p>
+            </div>
+          </header>
+          <WorkspaceContent pageKey={workspacePageKey(pathname, searchParams)}>
+            {!requestedEventId && !seenEventId && autoSelected && Boolean(defaultEvent) && place.inEvent && !pathname.startsWith("/people/matches") && !isProfileRoute && defaultEvent && (
+              <EventAutoSelectNotice
+                eventName={defaultEvent.name}
+                switchHref={isSystemAdmin ? "/admin" : "/select-event"}
+              />
+            )}
+            <StaffViewerProvider value={staffViewer}>{children}</StaffViewerProvider>
+          </WorkspaceContent>
+        </main>
+      </div>
+      <StaffPhoneBar
+        items={phoneItems}
+        place={place}
+        eventTab={place.inEvent ? eventPlace.tab : null}
+        launcher={{
+          cards: launcherCards,
+          sections: launcherSections,
+          moduleStates,
+          destinations: searchDestinations,
+          isSystemAdmin,
+          canRequestFeature,
+          eventQuery,
+          eventId: selectedEventId || undefined,
+          removableModules: isSystemAdmin ? selectedEvent?.removableModules : undefined,
+          userId: user.id ?? "",
+        }}
+      />
     </div>
   );
 }
