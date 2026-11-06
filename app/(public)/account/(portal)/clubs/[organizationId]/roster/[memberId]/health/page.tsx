@@ -4,12 +4,14 @@ import { ClubSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { HealthRecordActions } from "@/components/health-record-actions";
+import { HealthBreakGlassForm } from "@/components/health-break-glass-form";
 import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { HealthRecordForm } from "@/components/health-record-form";
 import { HealthRecordView, HealthStatusChip } from "@/components/health-record-view";
 import { getRosterAccessStateForPage, RosterAccessError } from "@/modules/club-rosters/access";
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
 import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-glass";
+import { canStartBreakGlassInline, rosterMemberPersonId } from "@/modules/health-records/break-glass-form";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { listHealthRecordLinks, viewHealthEntryStatus, viewHealthRecord } from "@/modules/health-records/repository";
@@ -91,7 +93,20 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
     if (error instanceof HealthRecordError) notFound();
     throw error;
   });
-  if (health === "BREAK_GLASS") return <p className="public-manage-empty">{BREAK_GLASS_REQUIRED_MESSAGE}</p>;
+  if (health === "BREAK_GLASS") {
+    // A system administrator or Clubs Administrator acting as the director (any viewer the break-glass route accepts) can start break-glass here (#1617).
+    const personId = canStartBreakGlassInline(viewer) ? await rosterMemberPersonId(organizationId, memberId) : null;
+    if (personId) {
+      return (
+        <section className="page-stack club-form-page">
+          <BackLink href={rosterHref}>Back to roster</BackLink>
+          <header><h2>Break-glass access is required</h2></header>
+          <HealthBreakGlassForm message={BREAK_GLASS_REQUIRED_MESSAGE} personId={personId} />
+        </section>
+      );
+    }
+    return <p className="public-manage-empty">{BREAK_GLASS_REQUIRED_MESSAGE}</p>;
+  }
   if (!health) return <HealthPrivacyAcknowledgment as={viewer.kind === "SYSTEM_ADMIN" ? "STAFF" : "ATTENDEE"} />;
   const links = viewer.kind === "CLUB_LEADER" ? await listHealthRecordLinks(viewer, organizationId, memberId) : [];
   const memberName = `${health.member.firstName} ${health.member.lastName}`.trim();
