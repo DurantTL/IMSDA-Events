@@ -37,6 +37,7 @@ vi.mock("@/modules/account-merge/staff-timeout", () => ({
 }));
 
 import SignInPage from "@/app/sign-in/page";
+import { STAFF_SIGN_IN_HREF } from "@/components/public-header-links";
 
 const NOTICE = "Your staff sign-in has ended";
 
@@ -94,12 +95,34 @@ describe("/sign-in with a linked attendee whose staff side ended", () => {
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
+  it("the header Staff sign-in link shows the form: notice when linked, none when unlinked", async () => {
+    const params = new URLSearchParams(STAFF_SIGN_IN_HREF.split("?")[1]);
+    const next = params.get("next") ?? undefined;
+    expect(await visit(next, params.get("staff") ?? undefined)).toContain(NOTICE);
+    mocks.timedOut.mockResolvedValue(false);
+    const html = await visit(next, params.get("staff") ?? undefined);
+    expect(html).not.toBeNull();
+    expect(html).not.toContain(NOTICE);
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("an old /select-event next counts as staff intent", async () => {
+    mocks.timedOut.mockResolvedValue(false);
+    expect(await visit("/select-event")).not.toBeNull();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it.each(["/overview", "/people/x?y=1", "/admin", "/event-setup", "/archived-events"])("a staff page next (%s) shows the form", async (next) => {
+    expect(await visit(next)).not.toBeNull();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
   it("only staff=1 counts as intent", async () => {
     expect(await visit(undefined, "yes")).toBeNull();
     expect(mocks.redirect).toHaveBeenCalledWith("/account");
   });
 
-  it.each(["//evil.com", "https://evil.example/x", "/api/auth/login", "/\\evil.com", "/login", "/sign-in", "/no-access", "/select-event"])(
+  it.each(["//evil.com", "https://evil.example/x", "/api/auth/login", "/\\evil.com", "/login", "/sign-in", "/no-access", "/", "/events/spring-camporee", "/register/abc"])(
     "an unsafe or non-staff next (%s) keeps the redirect to /account",
     async (next) => {
       expect(await visit(next)).toBeNull();

@@ -3,9 +3,9 @@ import { KeyRound, LayoutDashboard, LogIn, UserRound } from "lucide-react";
 
 // Kept here (not imported from the server-only module) so this stays presentational.
 // `/select-event` is the role-aware staff landing: a system administrator goes on to /admin,
-// no events to /no-access, one event to its workspace, several to the picker. A `next` is
-// needed so /sign-in does not send an attendee session on to /account.
-export const STAFF_SIGN_IN_HREF = "/sign-in?next=%2Fselect-event";
+// no events to /no-access, one event to its workspace, several to the picker. The `staff=1` intent is
+// needed so /sign-in shows the form to an attendee session instead of sending it on to /account.
+export const STAFF_SIGN_IN_HREF = "/sign-in?staff=1";
 export const PUBLIC_SIGN_IN_UNIFIED_HREF = "/sign-in";
 export const PUBLIC_SIGN_IN_ATTENDEE_HREF = "/account/sign-in";
 

@@ -16,7 +16,7 @@ import { isStaffSessionTimedOutForLinkedAttendee, STAFF_TIMED_OUT_NOTICE } from 
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { passkeysConfigured as attendeePasskeysConfigured } from "@/modules/attendee-accounts/passkeys";
 import { safeReturnTo } from "@/lib/return-to";
-import { staffReturnTarget } from "@/modules/access/login-routing";
+import { isStaffLandingTarget, isStaffSideTarget } from "@/modules/access/login-routing";
 import { attendeeReturnDestination } from "@/modules/attendee-accounts/return-destination";
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
@@ -59,8 +59,8 @@ export default async function SignInPage({
   // /account, linked or not: there is no other way to a staff sign-in short of signing out. An attendee destination
   // or no hint keeps the old redirect. Neither value becomes a return target beyond `next` itself, so role routing
   // after sign-in is untouched.
-  const staffIntent = staff === "1";
-  const staffTarget = Boolean(next && staffReturnTarget(next) && !attendeeReturnDestination(next, ""));
+  const staffIntent = staff === "1" || isStaffLandingTarget(next);
+  const staffTarget = isStaffSideTarget(next) && !attendeeReturnDestination(next, "");
   const wantsStaff = staffTarget || staffIntent;
   if (!wantsStaff && (await getCurrentAttendee()).account) redirect(attendeeReturnDestination(next, "/account"));
   // The notice reads only this browser's own attendee session and its link, never a typed email, so it reveals
