@@ -3,7 +3,7 @@ import "server-only";
 import type { AccountTokenPurpose, GlobalRole } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { hashPassword, spendPasswordCheck, verifyPassword } from "@/modules/access/passwords";
-import { createDatabaseSession } from "@/modules/access/session-store";
+import { createDatabaseSession, revokeDatabaseSession } from "@/modules/access/session-store";
 import { mfaGateFor, mfaSubjectFromUser } from "@/modules/access/mfa-rules";
 import { createOpaqueToken, hashOpaqueToken } from "@/modules/access/tokens";
 import { linkAttendeeSideAtActivation } from "@/modules/account-merge/staff-attendee-link";
@@ -104,27 +104,36 @@ type SignInFacts = {
  * way `passkeys.ts` re-reads before minting. A password-only session is never
  * created for an account that has become two-step-required.
  */
-async function finishPasswordSignIn(earlier: SignInFacts, userAgent: string | null): Promise<PasswordAuthentication> {
+async function finishPasswordSignIn(earlier: SignInFacts, userAgent: string | null): Promise<PasswordAuthentication | null> {
   const gateFor = (facts: SignInFacts) => mfaGateFor(mfaSubjectFromUser(facts), facts.mfaEnrollment);
   const earlierGate = gateFor(earlier);
-  // Only a "not required" decision can lead to a session; the others never mint one, so no re-read is needed.
-  const user = earlierGate.kind === "not_required" ? await readSignInFacts(earlier.id) ?? earlier : earlier;
-  const gate = earlierGate.kind === "not_required" ? gateFor(user) : earlierGate;
-  // A passkey is this account's second factor: sign in with it, not by
-  // enrolling a new authenticator on the strength of the password (#429).
-  if (gate.kind === "enrol" && user.passkeys.length > 0) {
-    return { outcome: "passkey_required", userId: user.id };
-  }
-  if (gate.kind !== "not_required") {
-    return { outcome: "mfa", userId: user.id, gate: gate.kind };
-  }
-
-  return {
-    outcome: "session",
-    userId: user.id,
-    globalRole: user.globalRole,
-    session: await createDatabaseSession(user.id, userAgent),
+  const gateResult = (facts: SignInFacts, gate: ReturnType<typeof gateFor>): PasswordAuthentication | null => {
+    // A passkey is this account's second factor: sign in with it, not by
+    // enrolling a new authenticator on the strength of the password (#429).
+    if (gate.kind === "enrol" && facts.passkeys.length > 0) return { outcome: "passkey_required", userId: facts.id };
+    if (gate.kind !== "not_required") return { outcome: "mfa", userId: facts.id, gate: gate.kind };
+    return null;
   };
+  // Only a "not required" decision can lead to a session; the others never mint one, so no re-read is needed.
+  const gated = gateResult(earlier, earlierGate);
+  if (gated) return gated;
+
+  // Fail closed: an account that vanished mid sign-in gets no session.
+  const user = await readSignInFacts(earlier.id);
+  if (!user) return null;
+  const fresh = gateResult(user, gateFor(user));
+  if (fresh) return fresh;
+
+  const session = await createDatabaseSession(user.id, userAgent);
+  // A grant can still commit between that read and the insert. Check once more; if the account has become
+  // two-step-required, end the session just made and hand back the gate, so no password-only session escapes.
+  const after = await readSignInFacts(user.id);
+  const afterGate = after ? gateResult(after, gateFor(after)) : null;
+  if (!after || afterGate) {
+    await revokeDatabaseSession(session.token);
+    return after ? afterGate : null;
+  }
+  return { outcome: "session", userId: user.id, globalRole: after.globalRole, session };
 }
 
 async function readSignInFacts(userId: string): Promise<SignInFacts | null> {
@@ -223,7 +232,8 @@ async function countPasswordMiss(credential: LockableCredential, userId: string)
 export type StaffPasswordCheck =
   | { kind: "unavailable" }
   | { kind: "wrong"; countMiss: () => Promise<void> }
-  | { kind: "ok"; complete: (userAgent: string | null) => Promise<PasswordAuthentication> };
+  /** `complete` is null when the account vanished mid sign-in: refused, never a session. */
+  | { kind: "ok"; complete: (userAgent: string | null) => Promise<PasswordAuthentication | null> };
 
 /**
  * The staff password check for the single sign-in (#554 slice c): the same
