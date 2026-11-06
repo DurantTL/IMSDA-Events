@@ -135,6 +135,52 @@ Two open implementation questions this ADR should settle before #190 starts:
   the old key to decrypt and the new key to re-encrypt — plan for both being
   available during a rotation window).
 
+**Key versioning and rotation (decided 2026-11-05, #1516; Caleb asked the build to choose):**
+
+1. Every sealed value records the key version that sealed it. While the key
+   version is 1, values keep the original `v1.…` format, with version 1 implied,
+   so an older image can still read them (rollback safety). From version 2 a
+   value is `v2.<keyVersion>.<nonce>.<tag>.<ciphertext>`, with the version also
+   checked by the cipher so it can't be edited. A `v1` value counts as version 1.
+   After a rotation to version 2 or higher, an image from before this change
+   cannot read the new values; `SECRET_ENCRYPTION_KEY_VERSION` must then stay set.
+2. The server loads the current key with `SECRET_ENCRYPTION_KEY_VERSION`
+   (default 1). During a rotation it can also load the previous key,
+   read-only, with its own version (`SECRET_ENCRYPTION_PREVIOUS_KEY` or
+   `_FILE`, and `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION`). It refuses to start if
+   the previous key has no version, its version is not lower than the current
+   one, it equals the current key, or it is shorter than the production minimum.
+3. A value is opened with the key whose version matches the value. A value from
+   a version that isn't loaded is refused with a fixed message that names only
+   the version number. Writes, and the calendar address fingerprints, use the
+   current key. While a previous key is loaded, a duplicate-calendar check also
+   matches the previous key's fingerprint.
+4. One list of every sealed column (`modules/security/sealed-columns.ts`) drives
+   both tools, and a test fails if a new sealing call or `sealed*` column isn't
+   on it. `npm run key:rotate` is a dry run unless given `--apply`; it re-seals
+   values not yet on the current version, in id order and batches, so it can be
+   stopped and rerun, and it never overwrites a value that changed meanwhile.
+   `npm run key:check` is read-only and exits 1 if the key is missing, any value
+   is unreadable or any value is on an older version. Both print counts only.
+5. `/api/health` (authorized callers) reports whether a key is configured, its
+   source, the current version, whether a previous key is loaded and its
+   version. It never scans the database and never shows key text.
+6. Sealed health copies are immutable by a database trigger. Migration
+   `20270102100000_health_snapshot_key_rotation` allows exactly one update on
+   them: a copy field's sealed value alone, inside the rotation command's own
+   transaction (`imsda.key_rotation`). Every other update, and every change to a
+   copy itself, is still refused, and the delete rules are unchanged.
+7. Accepted limitation: a calendar item left behind by a deleted feed keeps the
+   address fingerprint it was given, and rotation can't recompute it (the
+   address is gone). Once the previous key is removed it won't relink to an
+   identical re-added feed. `npm run key:check` counts these (informational).
+8. Running a rotation in production is a human step; the procedure is in
+   `docs/DEPLOY-DOCKER.md`, "Rotating the encryption key", and is a draft for
+   the custodian to review (checklist item 9). On the server each key version
+   has its own file (`/etc/imsda/secret-encryption-key`, then `…-v2` and so on),
+   and a key file is never overwritten, so a container restarted or rolled back
+   with old settings always gets the old key for its old version.
+
 ### 3. Access authority: subject, guardian, staff, disclosure, break-glass
 
 **Recommended**, consistent with ADR 0003's existing precedent and #191's
@@ -409,7 +455,10 @@ birth dates need their own protection.
    - The key copy is kept apart from the database dumps. A single machine that
      holds both would let anyone who took it read everything.
    - Rotation follows §2 above: re-seal while both keys are available. The
-     custodian writes the step-by-step procedure as part of the checklist.
+     custodian writes the step-by-step procedure as part of the checklist; the
+     build provides versioned keys and `npm run key:rotate` / `key:check`
+     (§2, "Key versioning and rotation", #1516), with a draft procedure in
+     `docs/DEPLOY-DOCKER.md` for the custodian to review.
 8. **Around the database.** The items on `docs/SERVER-SECURITY-CHECKLIST.md`
    must be complete before real directors enter birth dates. H2 may be built,
    tested, and merged with synthetic data before then.
