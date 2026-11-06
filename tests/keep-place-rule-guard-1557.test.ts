@@ -74,7 +74,7 @@ describe("keep the reader's place (B17, #1557)", () => {
     for (const file of USES_GET_FILTER_FORM) {
       const source = read(file);
       expect(source, file).toContain("<GetFilterForm");
-      expect(source, file).not.toMatch(/<form[^>]*method="get"/);
+      expect(source, file).not.toMatch(/<form\b(?:[^>]|=>)*?\bmethod=(?:"get"|'get'|\{\s*["'`]get["'`]\s*\})/i);
     }
   });
 
@@ -92,7 +92,7 @@ describe("keep the reader's place (B17, #1557)", () => {
       if (file === "components/get-filter-form.tsx") continue;
       // Comment lines are left out, so a doc comment that mentions a form is not counted as one.
       const source = read(file).split("\n").filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join("\n");
-      const forms = (source.match(/<(?:form|AutoSubmitForm)\b[^>]*?\bmethod="get"/g) ?? []).length;
+      const forms = (source.match(/<(?:form|AutoSubmitForm)\b(?:[^>]|=>)*?\bmethod=(?:"get"|'get'|\{\s*["'`]get["'`]\s*\})/gi) ?? []).length;
       if (forms > 0) found.set(file, forms);
     }
     const unexpected = [...found].filter(([file, count]) => (RAW_GET_FORMS[file]?.forms ?? 0) < count).map(([file]) => file);

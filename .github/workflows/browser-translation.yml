@@ -24,7 +24,10 @@ on:
       - "scripts/verify-translation-simulation.ts"
       - "scripts/verify-live-roster.ts"
       - "scripts/verify-keep-place.ts"
+      - "scripts/support/**"
       - "scripts/support/browser-journeys.ts"
+      - "modules/**"
+      - "lib/**"
       - ".github/workflows/browser-translation.yml"
   workflow_dispatch:
 

@@ -2,7 +2,7 @@
  * Site rule B17 (#1557): "Changing a filter, tab, sort or month keeps you where you are, and nothing on the page jumps
  * while it loads." This is its real-browser check, in Chromium at 1280 and 390 px wide.
  *
- *  1. LOAD SHIFT. Each page below is opened cold three times and its layout shift is added up with a buffered `layout-shift`
+ *  1. LOAD SHIFT. Each page below is loaded three times, each in a fresh browser context (same sign-in, empty cache), and its layout shift is added up with a buffered `layout-shift`
  *     observer (shifts right after the person's own input are left out, as the browser's CLS does). The middle of the three totals must be
  *     at most 0.05.
  *  2. KEEP YOUR PLACE. On a page that scrolls, the check scrolls about 600 px down and then changes a filter, a year, a
@@ -40,7 +40,6 @@ const SYSTEM_ADMIN = "system@imsda-events.test";
 type Role = "director" | "staff" | "coordinator";
 type Contexts = Record<Role, J.BrowserContext>;
 const problems: string[] = [];
-const lines: string[] = [];
 
 const CLS_SCRIPT = `
 window.__cls = 0; window.__clsParts = [];
@@ -54,6 +53,11 @@ try {
   }).observe({ type: 'layout-shift', buffered: true });
 } catch (error) {}
 `;
+
+/** Prints a result as it happens. */
+function report(line: string) {
+  console.log(line);
+}
 
 function fail(message: string) {
   console.error(`  FAIL ${message}`);
@@ -78,30 +82,31 @@ async function settleLoad(page: J.Page) {
   await page.waitForTimeout(1_000);
 }
 
-/** Cold loads of one page, so one slow font or network moment does not decide the result: the middle value is used. */
+/** Loads of one page, each in its own fresh browser context (same sign-in, empty cache), so one slow font or network moment does not decide the result: the middle value is used. */
 const LOADS = 3;
 
-async function loadShift(world: JourneyWorld, contexts: Contexts, width: number) {
+async function loadShift(world: JourneyWorld, fresh: (role: Role) => Promise<J.BrowserContext>, width: number) {
   for (const item of SHIFT_PAGES) {
     const path = item.path(world);
     const runs: Array<{ cls: number; parts: Array<{ value: number; nodes: string[] }> }> = [];
     try {
       for (let load = 0; load < LOADS; load += 1) {
-        const page = await contexts[item.role].newPage();
+        const context = await fresh(item.role);
         try {
+          const page = await context.newPage();
           await page.goto(`${J.baseUrl}${path}`, { waitUntil: "load" });
           await settleLoad(page);
           const landed = new URL(page.url()).pathname;
           if (landed !== path.split("?")[0]) throw new Error(`opened ${landed} instead (no access?)`);
           runs.push(JSON.parse(await page.evaluate("JSON.stringify({ cls: window.__cls, parts: window.__clsParts })")));
         } finally {
-          await page.close();
+          await context.close();
         }
       }
       runs.sort((a, b) => a.cls - b.cls);
       const middle = runs[Math.floor(runs.length / 2)]!;
       const ok = middle.cls <= CLS_MAX;
-      lines.push(`  ${ok ? "ok  " : "FAIL"} ${width}px load shift ${middle.cls.toFixed(3)} (max ${CLS_MAX}; ${LOADS} loads: ${runs.map((run) => run.cls.toFixed(3)).join(", ")})  ${path}`);
+      report(`  ${ok ? "ok  " : "FAIL"} ${width}px load shift ${middle.cls.toFixed(3)} (max ${CLS_MAX}; ${LOADS} loads: ${runs.map((run) => run.cls.toFixed(3)).join(", ")})  ${path}`);
       if (!ok) fail(`${width}px: ${path}: load layout shift ${middle.cls.toFixed(3)} is over ${CLS_MAX}; biggest shifts: ${JSON.stringify([...middle.parts].sort((a, b) => b.value - a.value).slice(0, 3))}`);
     } catch (error) {
       fail(`${width}px: ${path}: ${(error as Error).message.split("\n")[0]}`);
@@ -213,7 +218,7 @@ async function keepPlace(world: JourneyWorld, contexts: Contexts, width: number)
       // other change must leave the page where it was.
       const stayed = change.anchor ? after.anchor !== null && after.anchor >= -10 && after.anchor <= 300 && after.y > 0 : after.y >= before - PLACE_TOLERANCE;
       const ok = !reloaded && stayed && after.spacer;
-      lines.push(`  ${ok ? "ok  " : "FAIL"} ${width}px ${change.kind.padEnd(6)} ${change.name}: scrolled ${before}px, after ${after.y}px${change.anchor ? ` (section #${change.anchor} at ${after.anchor}px)` : ""}${reloaded ? ", FULL RELOAD" : ""}`);
+      report(`  ${ok ? "ok  " : "FAIL"} ${width}px ${change.kind.padEnd(6)} ${change.name}: scrolled ${before}px, after ${after.y}px${change.anchor ? ` (section #${change.anchor} at ${after.anchor}px)` : ""}${reloaded ? ", FULL RELOAD" : ""}`);
       if (reloaded) fail(`${label}: the whole page reloaded instead of updating in place (${path})`);
       else if (!after.spacer) fail(`${label}: the check's spacer was removed, so the page was rebuilt (${path})`);
       else if (!stayed) fail(`${label}: the page jumped from ${before}px to ${after.y}px${change.anchor ? ` and #${change.anchor} is at ${after.anchor}px` : ""} (${path})`);
@@ -232,32 +237,34 @@ async function main() {
   const playwright = await J.loadPlaywright();
   const prisma = new PrismaClient();
   const tokens: string[] = [];
-  let world: JourneyWorld | undefined;
+  let world = undefined as JourneyWorld | undefined;
   const browser = await J.launch(playwright, "chromium");
   try {
-    world = await seedJourneyWorld(prisma, "keepplace");
-    await seedCoordinatorWorld(prisma, world);
+    await seedJourneyWorld(prisma, "keepplace", (made) => { world = made; });
+    await seedCoordinatorWorld(prisma, world!);
     const cookies = {
-      director: await J.mintDirectorSession(tokens, world.main.accountId),
+      director: await J.mintDirectorSession(tokens, world!.main.accountId),
       staff: await J.mintStaffSession(tokens, SYSTEM_ADMIN),
-      coordinator: await J.mintDirectorSession(tokens, world.coordinator!.accountId),
+      coordinator: await J.mintDirectorSession(tokens, world!.coordinator!.accountId),
     };
     for (const width of WIDTHS) {
       console.log(`\n== ${width}px wide`);
       const opened: J.BrowserContext[] = [];
       const contexts = {} as Contexts;
-      for (const role of Object.keys(cookies) as Role[]) {
+      const fresh = async (role: Role) => {
         const context = await J.newContext(browser, { translate: false, cookie: cookies[role], width });
         context.setDefaultTimeout(20_000);
         await context.addInitScript(CLS_SCRIPT);
+        return context;
+      };
+      for (const role of Object.keys(cookies) as Role[]) {
+        const context = await fresh(role);
         opened.push(context);
         contexts[role] = context;
       }
       try {
-        lines.length = 0;
-        await loadShift(world, contexts, width);
-        await keepPlace(world, contexts, width);
-        for (const line of lines) console.log(line);
+        await loadShift(world!, fresh, width);
+        await keepPlace(world!, contexts, width);
       } finally {
         for (const context of opened) await context.close();
       }
