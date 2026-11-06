@@ -9,7 +9,8 @@ const portal = "app/(public)/account/(portal)";
 describe("portal labels (#742)", () => {
   it("calls the account tab and its page My registrations", () => {
     expect(read("components/account-portal-nav.ts")).toContain('label: "My registrations"');
-    expect(read(`${portal}/registrations/page.tsx`)).toContain("<h1>My registrations</h1>");
+    expect(read(`${portal}/registrations/page.tsx`)).toContain('<AccountPageBanner title="My registrations">');
+    expect(read("components/account-page-banner.tsx")).toContain("<h1>{title}</h1>");
   });
 
   it("keeps the account tab order: Overview, My registrations, Profile, then any club tab, Club coordination and Help (#1111, #1551)", () => {

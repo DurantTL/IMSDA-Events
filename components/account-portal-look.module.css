@@ -6,7 +6,7 @@
 
 .content:not(:has(:global(.club-shell))):not(:has(:global(.coordinator-shell))) :is(:global(.public-manage-card), :global(.attendee-ov-card), :global(.attendee-ov-empty), :global(.attendee-ov-notice)) {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   box-shadow: none;
 }
 
