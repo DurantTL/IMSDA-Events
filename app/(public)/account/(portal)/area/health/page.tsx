@@ -7,6 +7,8 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { requireSecondStepForAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { resolveAreaHealthViewer } from "@/modules/coordinator-health/access";
 import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventHealth } from "@/modules/coordinator-health/repository";
+import { healthRecordsEnabled } from "@/modules/health-records/flag";
+import { areaAttendeeHealthHref } from "@/modules/coordinator-health/domain";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { AccountPageBanner } from "@/components/account-page-banner";
 
@@ -83,6 +85,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
           : <a className="secondary-button" href={`/account/area/health?event=${encodeURIComponent(data.event.id)}${query.club ? `&club=${encodeURIComponent(query.club)}` : ""}&sheet=1`}>Open printable sheet</a>}
         <EventHealthSheet
           clubs={data.clubs}
+          attendeeHref={healthRecordsEnabled() && !sheet ? (organizationId, memberId) => areaAttendeeHealthHref(data.event.id, organizationId, memberId) : undefined}
           clubLinks={query.club ? undefined : (organizationId) => {
             const base = `/account/area/health?event=${encodeURIComponent(data.event.id)}&club=${encodeURIComponent(organizationId)}`;
             return { view: base, sheet: `${base}&sheet=1` };

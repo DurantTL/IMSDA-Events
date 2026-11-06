@@ -1,0 +1,11 @@
+/* Attendee name as a link to their Health Record (#1618): reads as a link and is a 44px tap target. */
+.attendeeLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

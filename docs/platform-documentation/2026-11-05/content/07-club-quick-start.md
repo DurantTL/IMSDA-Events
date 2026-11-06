@@ -30,6 +30,9 @@ The emailed code confirms your email address. Two-step sign-in protects club rec
 | Correct or remove a member | **Edit** beside the name, then **Save**. **Actions** holds Deactivate and Remove. Remove erases roster details and cannot be undone. |
 | Send a roster to an outside event | **Roster → Export builder.** Pick and order columns, **Preview**, **Download CSV**. Save the layout with a name for next time. |
 | Complete a club form | **Forms.** **Fill in** yourself, or **Send link** so a parent fills it in. A saved draft is not a submitted form. |
+| Enter a member's health record | **Roster → Actions → Health record.** The first time, read the privacy notice, tick **I have read this and I agree** and choose **Continue**. Enter the record from the paper form, or **Send link** so a parent fills it in (the link works once). The status shows **No record yet**, **Needs update** or **Current for this club year**. |
+| Keep a health record current | When the status says **Needs update** and nothing has changed, choose **Confirm this record is still correct for this club year**. Otherwise choose **Edit this record**. |
+| See health information for an event | **Health.** Choose the event to see your club's attendees: dietary notes as entered, a yes/no medical-need flag and emergency contacts. **Open printable sheet** to print it. Each event is open through its last day. |
 | Record honors | **Honors.** **Add** beside a name, or **Add honors to several members**. |
 | Record a meeting | **Monthly Records → Add meeting note.** Enter the date, counts and what you did. |
 | Submit the month's report | **Monthly Records → Open** or **Continue report.** Check the counts, type your full name and the date under **Signature**, then **Submit report**. **Save draft** does not file it. Reports are due the 10th of the next month. |
@@ -39,6 +42,8 @@ The emailed code confirms your email address. Two-step sign-in protects club rec
 | File the Year-End Report | **Monthly Records → Year-End Report → Open report.** Most counts fill in from your roster, honors and classes. **Save draft** until ready. It covers May 1 to April 30 and is due April 1. Submitting locks it until conference staff reopen it. |
 
 A deputy has the director's tools. A registrar or reporter has fewer, so some tabs may be missing for them.
+
+**Health information is confidential.** Only the director and deputy can open it. A registrar can enter a record when none exists yet, but can't read it back. Every time you open, enter, change or print health information, the app records your name and the time. Health records are never emailed or exported. Don't copy, photograph or share them.
 
 ## Area Coordinator: review and follow up
 
