@@ -3,10 +3,11 @@ import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), pathname: "/admin/clubs", busy: false, linkProps: [] as Record<string, unknown>[] }));
+const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), pathname: "/admin/clubs", search: "year=2026-27&page=3", busy: false, linkProps: [] as Record<string, unknown>[] }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: nav.push, replace: nav.replace }),
   usePathname: () => nav.pathname,
+  useSearchParams: () => new URLSearchParams(nav.search),
 }));
 vi.mock("next/link", () => ({
   default: (props: Record<string, unknown> & { children?: ReactNode }) => {
@@ -24,13 +25,15 @@ import { GetFilterForm, filterFormHref } from "@/components/get-filter-form";
 import { GuardedLink } from "@/components/guarded-link";
 import { resolveLinkScroll } from "@/components/link-guard";
 import { PhoneHiddenSortLink } from "@/components/phone-hidden-sort-link";
-import { click, mount, type Mounted } from "./helpers/dom-render";
+import { registerUnsavedChanges, setLeaveConfirmer } from "@/components/unsaved-changes-registry";
+import { click, flush, mount, type Mounted } from "./helpers/dom-render";
 
 let mounted: Mounted | undefined;
 beforeEach(() => {
   nav.push.mockReset();
   nav.replace.mockReset();
   nav.pathname = "/admin/clubs";
+  nav.search = "year=2026-27&page=3";
   nav.busy = false;
   nav.linkProps.length = 0;
   window.history.replaceState(null, "", "/admin/clubs?year=2026-27&page=3");
@@ -51,6 +54,12 @@ describe("resolveLinkScroll (#1557)", () => {
     expect(resolveLinkScroll("https://example.org/admin/clubs", "/admin/clubs")).toBeUndefined();
     expect(resolveLinkScroll("/admin/clubs?sort=name#records", "/admin/clubs")).toBeUndefined();
     expect(resolveLinkScroll("/admin/clubs", null)).toBeUndefined();
+  });
+  it("scrolls to the top when the target is the exact address already shown", () => {
+    expect(resolveLinkScroll("/admin/clubs?year=2026-27&page=3", "/admin/clubs", undefined, "?page=3&year=2026-27")).toBeUndefined();
+    expect(resolveLinkScroll("/admin/clubs", "/admin/clubs", undefined, "")).toBeUndefined();
+    expect(resolveLinkScroll("/admin/clubs?sort=name", "/admin/clubs", undefined, "?year=2026-27")).toBe(false);
+    expect(resolveLinkScroll("/admin/clubs", "/admin/clubs", true, "")).toBe(true);
   });
   it("lets an explicit scroll prop win", () => {
     expect(resolveLinkScroll("/admin/clubs?sort=name", "/admin/clubs", true)).toBe(true);
@@ -122,6 +131,38 @@ describe("GetFilterForm (#1557)", () => {
     expect(nav.push).not.toHaveBeenCalled();
   });
 
+  it("resets the controls to the address when Back changes the search params (rule B2)", async () => {
+    mounted = await mount(form());
+    const select = mounted.container.querySelector("select") as HTMLSelectElement;
+    select.value = "2026-27";
+    expect(select.value).toBe("2026-27");
+    nav.search = "year=2025-26";
+    await mounted.root.render(form());
+    await flush();
+    expect(select.value).toBe("2025-26");
+  });
+
+  it("asks before pushing when a form has unsaved changes, and Cancel changes nothing (rule B6)", async () => {
+    const stop = registerUnsavedChanges("Leave this page?");
+    let answer = false;
+    const asked: string[] = [];
+    const restore = setLeaveConfirmer(async (message) => { asked.push(message); return answer; });
+    try {
+      mounted = await mount(form());
+      await click(mounted.container.querySelector("button")!);
+      await flush();
+      expect(asked).toEqual(["Leave this page?"]);
+      expect(nav.push).not.toHaveBeenCalled();
+      answer = true;
+      await click(mounted.container.querySelector("button")!);
+      await flush();
+      expect(nav.push).toHaveBeenCalledWith("/admin/clubs?year=2025-26", { scroll: false });
+    } finally {
+      restore();
+      stop();
+    }
+  });
+
   it("shows a busy state while the list is loading", () => {
     nav.busy = true;
     const html = renderToStaticMarkup(form());
@@ -135,7 +176,7 @@ describe("GetFilterForm (#1557)", () => {
 });
 
 describe("people list status row (#1557)", () => {
-  it("puts the count and the active chips in one row, with no reserved blank row", async () => {
+  it("puts the count and the active chips in one row, in a row that is always one chip tall", async () => {
     const { readFileSync } = await import("node:fs");
     const directory = readFileSync("components/people-directory.tsx", "utf8");
     const row = directory.slice(directory.indexOf("styles.statusRow"), directory.indexOf("</div>", directory.indexOf("styles.statusRow")));
@@ -143,6 +184,10 @@ describe("people list status row (#1557)", () => {
     expect(row).toContain('aria-live="polite"');
     expect(row).toContain("<PeopleActiveFilters");
     expect(readFileSync("components/people-active-filters.tsx", "utf8")).toContain("if (chips.length === 0) return null;");
-    expect(readFileSync("components/people-directory.module.css", "utf8")).not.toMatch(/\.activeBar \{[^}]*min-height/);
+    const css = readFileSync("components/people-directory.module.css", "utf8");
+    // The row is always one chip tall, and on a phone the chips scroll sideways instead of wrapping to a new row.
+    expect(css).toMatch(/\.statusRow \{[^}]*min-height: 44px/);
+    expect(css).toMatch(/@media \(max-width: 640px\) \{[\s\S]*?\.statusRow \.activeBar \{[^}]*overflow-x: auto/);
+    expect(css).toMatch(/\.statusRow \.activeList \{ flex-wrap: nowrap/);
   });
 });

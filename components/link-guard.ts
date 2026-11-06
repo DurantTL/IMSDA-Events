@@ -222,13 +222,15 @@ export function createBackGuard(deps: {
   };
 }
 
+const canonicalQuery = (search: string) => [...new URLSearchParams(search).entries()].map(([k, v]) => `${k}=${v}`).sort().join("&");
+
 /**
  * Whether a link should scroll to the top (#1557). An explicit `scroll` always wins. Otherwise a link to the same page
  * that only changes the query (sort, filter, tab, month, page) keeps the reader's place (`false`), and a link to another
  * page keeps the router's default (`undefined`, scroll to the top). A link with a `#hash` also keeps the default, so
- * it still scrolls to its target.
+ * it still scrolls to its target. So does a link to the exact address already shown (`currentSearch` given).
  */
-export function resolveLinkScroll(href: string, currentPathname: string | null | undefined, scroll?: boolean): boolean | undefined {
+export function resolveLinkScroll(href: string, currentPathname: string | null | undefined, scroll?: boolean, currentSearch?: string): boolean | undefined {
   if (scroll !== undefined) return scroll;
   if (!currentPathname) return undefined;
   try {
@@ -236,7 +238,10 @@ export function resolveLinkScroll(href: string, currentPathname: string | null |
     const target = new URL(href, base);
     if (target.origin !== base.origin || target.hash) return undefined;
     const clean = (path: string) => (path.length > 1 ? path.replace(/\/+$/, "") : path);
-    return clean(target.pathname) === clean(base.pathname) ? false : undefined;
+    if (clean(target.pathname) !== clean(base.pathname)) return undefined;
+    // Clicking the page you are already on (same path and same query) scrolls to the top as before.
+    if (currentSearch !== undefined && canonicalQuery(target.search) === canonicalQuery(currentSearch)) return undefined;
+    return false;
   } catch {
     return undefined;
   }

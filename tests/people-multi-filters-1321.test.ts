@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({ userFindMany: vi.fn(), accountFindMany: vi.fn(
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({ user: { findMany: mocks.userFindMany }, attendeeAccount: { findMany: mocks.accountFindMany } }),
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/", useSearchParams: () => new URLSearchParams() }));
 
 import { PeopleDirectory } from "@/components/people-directory";
 import { findPeopleByRole, searchPeople } from "@/modules/system-admin/people-directory";

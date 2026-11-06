@@ -1,6 +1,8 @@
 "use client";
 
-import { type ComponentProps, type SubmitEvent } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useRef, type ComponentProps, type SubmitEvent } from "react";
+import { guardedNavigate } from "@/components/unsaved-changes-registry";
 import { isCurrentAddress, searchAsYouTypeHref, useListNavigation } from "@/components/search-as-you-type";
 import styles from "./get-filter-form.module.css";
 
@@ -18,6 +20,19 @@ export function filterFormHref(action: string, fields: Iterable<[string, FormDat
  */
 export function GetFilterForm({ children, className, onSubmit, resetParams, ...props }: Omit<ComponentProps<"form">, "method"> & { resetParams?: string[] }) {
   const { go, pending } = useListNavigation();
+  const formRef = useRef<HTMLFormElement>(null);
+  const pathname = usePathname();
+  const search = useSearchParams()?.toString() ?? "";
+  // Back, Forward or a link changes the address: put the controls back to what it says (rule B2). The server has
+  // already sent the new defaults, so a reset keeps focus where it is, unlike a remount.
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    formRef.current?.reset();
+  }, [pathname, search]);
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     onSubmit?.(event);
     if (event.defaultPrevented) return;
@@ -29,10 +44,11 @@ export function GetFilterForm({ children, className, onSubmit, resetParams, ...p
     const href = filterFormHref(path, new FormData(form).entries() as Iterable<[string, FormDataEntryValue]>, resetParams);
     // Applying the same filters again must not stack an entry or reload.
     if (isCurrentAddress(href)) return;
-    go(href, "push");
+    // A page with unsaved edits asks first (rule B6); Cancel changes nothing.
+    void guardedNavigate(() => go(href, "push"));
   };
   return (
-    <form {...props} aria-busy={pending || undefined} className={[className, pending ? styles.busy : ""].filter(Boolean).join(" ") || undefined} method="get" onSubmit={handleSubmit}>
+    <form {...props} aria-busy={pending || undefined} className={[className, pending ? styles.busy : ""].filter(Boolean).join(" ") || undefined} method="get" onSubmit={handleSubmit} ref={formRef}>
       {children}
     </form>
   );

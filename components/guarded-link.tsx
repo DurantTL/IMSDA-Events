@@ -48,9 +48,10 @@ export function GuardedLink({
           download: (rest as { download?: unknown }).download,
           run: () => {
             onNavigate?.();
+            const scrollNow = resolveLinkScroll(href, pathname, scroll, window.location.search);
             startNavigation(() => {
-              if (replace) router.replace(href, { scroll: scrollTo });
-              else router.push(href, { scroll: scrollTo });
+              if (replace) router.replace(href, { scroll: scrollNow });
+              else router.push(href, { scroll: scrollNow });
             });
           },
         });
