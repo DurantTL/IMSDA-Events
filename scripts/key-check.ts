@@ -14,6 +14,13 @@
 import { loadEnvConfig } from "@next/env";
 import { getEncryptionKeyStatus, validateServerEnv } from "../lib/env";
 
+/** The error class (and a Prisma error code) only: never message text, which could include a value. */
+export function describeError(error: unknown) {
+  const code = (error as { code?: unknown } | null)?.code;
+  const name = error instanceof Error ? error.name : "unknown error";
+  return typeof code === "string" ? `${name} ${code}` : name;
+}
+
 export type KeyLog = { log: (line: string) => void; error: (line: string) => void };
 
 /**
@@ -39,7 +46,7 @@ export async function runKeyCheck(options: KeyLog & { env: Record<string, string
     return 1;
   }
   const { scanSealedColumns } = await import("../modules/security/key-rotation");
-  const { createPrismaSealedColumnStore } = await import("../modules/security/sealed-column-store");
+  const { createPrismaSealedColumnStore, countDetachedCalendarFingerprints } = await import("../modules/security/sealed-column-store");
   const { currentSecretKeyVersion, previousSecretKeyVersion } = await import("../lib/secret-box");
 
   const previous = previousSecretKeyVersion();
@@ -56,6 +63,12 @@ export async function runKeyCheck(options: KeyLog & { env: Record<string, string
       `[key-check] ${scan.label}: ${scan.total} total, ${scan.current} current, ${scan.older} older, ${scan.unreadable} unreadable`,
     );
   }
+  const detached = await countDetachedCalendarFingerprints();
+  if (detached > 0) {
+    options.log(
+      `[key-check] note: ${detached} calendar item(s) left by deleted feeds carry a fingerprint no current feed has. They can't be re-fingerprinted; they will not relink to an identical re-added feed once the previous key is removed. Not a failure.`,
+    );
+  }
   if (unreadable > 0) options.error(`[key-check] FAILED: ${unreadable} value(s) cannot be opened with the loaded keys.`);
   if (older > 0) options.error(`[key-check] FAILED: ${older} value(s) are still sealed with an older key version. Run npm run key:rotate.`);
   if (unreadable > 0 || older > 0) return 1;
@@ -70,8 +83,8 @@ if (process.argv[1]?.endsWith("key-check.ts")) {
     log: (line) => console.log(line),
     error: (line) => console.error(line),
   })
-    .catch(() => {
-      console.error("[key-check] FAILED: unexpected error (details withheld)");
+    .catch((error: unknown) => {
+      console.error(`[key-check] FAILED: unexpected error (${describeError(error)}; details withheld)`);
       return 1;
     })
     .then((code) => process.exit(code));

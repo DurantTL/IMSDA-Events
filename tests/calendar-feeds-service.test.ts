@@ -19,11 +19,11 @@ vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/secret-box", () => ({
   SecretBoxError: class SecretBoxError extends Error {},
   isSecretEncryptionConfigured: () => true,
-  sealSecret: (value: string) => `v2.1.${Buffer.from(value).toString("base64url")}`,
+  sealSecret: (value: string) => `v1.${Buffer.from(value).toString("base64url")}`,
   fingerprintSecret: (value: string, purpose: string) => `fp.${purpose}.${Buffer.from(value).toString("base64url")}`,
   fingerprintSecretCandidates: (value: string, purpose: string) => [`fp.${purpose}.${Buffer.from(value).toString("base64url")}`, ...state.previousFingerprints],
-  previousSecretKeyVersion: () => null,
-  openSecret: (sealed: string) => Buffer.from(String(sealed).slice(5), "base64url").toString("utf8"),
+  previousSecretKeyVersion: () => (state.previousFingerprints.length > 0 ? 1 : null),
+  openSecret: (sealed: string) => Buffer.from(String(sealed).slice(3), "base64url").toString("utf8"),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: async (entry: Record<string, unknown>) => { state.audits.push(entry); } }));
 vi.mock("@/lib/prisma", () => {
@@ -124,15 +124,15 @@ describe("imported calendar feeds", () => {
     const feeds = await createCalendarFeed(input, "admin-1");
     const stored = JSON.stringify(state.feeds);
     expect(stored).not.toContain("private-abc123SECRET");
-    expect(state.feeds[0].sealedUrl).toMatch(/^v2\.1\./);
-    expect(JSON.stringify(feeds)).not.toMatch(/SECRET|sealedUrl|v[12]\./);
+    expect(state.feeds[0].sealedUrl).toMatch(/^v1\./);
+    expect(JSON.stringify(feeds)).not.toMatch(/SECRET|sealedUrl|v1\./);
     expect(feeds[0]).toMatchObject({ urlHint: "calendar.example.test….ics", imported: false });
     expect(JSON.stringify(state.audits)).not.toContain("SECRET");
   });
 
   it("rewrites webcal:// and refuses unsafe addresses", async () => {
     await createCalendarFeed({ ...input, url: "webcal://calendar.example.test/ical/x/basic.ics" }, "admin-1");
-    expect(Buffer.from(String(state.feeds[0].sealedUrl).slice(5), "base64url").toString()).toMatch(/^https:\/\//);
+    expect(Buffer.from(String(state.feeds[0].sealedUrl).slice(3), "base64url").toString()).toMatch(/^https:\/\//);
     for (const url of ["http://calendar.example.test/a.ics", "https://127.0.0.1/a.ics", "https://u:p@calendar.example.test/a.ics"]) {
       await expect(createCalendarFeed({ ...input, url }, "admin-1")).rejects.toMatchObject({ code: "INVALID_FEED" });
     }
@@ -237,7 +237,7 @@ describe("imported calendar feeds", () => {
     const now = new Date("2026-10-03T12:00:00Z");
     const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
     const make = (id: string, extra: Record<string, unknown>) => state.feeds.push({
-      id, name: id, sealedUrl: `v2.1.${Buffer.from(privateUrl).toString("base64url")}`, urlHint: "x", urlFingerprint: `fp-${id}`, isEnabled: true, refreshMinutes: 60,
+      id, name: id, sealedUrl: `v1.${Buffer.from(privateUrl).toString("base64url")}`, urlHint: "x", urlFingerprint: `fp-${id}`, isEnabled: true, refreshMinutes: 60,
       lastSucceededAt: minutesAgo(500), lastFetchedAt: minutesAgo(500), defaultCategory: "", defaultEntryType: "STANDARD", publishNewItems: false, updatedByUserId: "admin-1", ...extra,
     });
     make("due-1", { lastFetchedAt: minutesAgo(400) });
@@ -371,6 +371,23 @@ describe("imported calendar feeds", () => {
     state.entryWrites = 0;
     await syncCalendarFeed(second, deps);
     expect(state.entryWrites).toBe(0);
+  });
+
+  it("re-links items that carry the previous key's fingerprint while a rotation has the previous key loaded (#1516)", async () => {
+    const feedId = await addFeed();
+    await syncCalendarFeed(feedId, deps);
+    await deleteCalendarFeed(feedId, "admin-1");
+    const total = state.entries.length;
+    // The deleted feed's items were given a fingerprint under the previous key and have not been rotated.
+    for (const entry of state.entries) entry.sourceUrlFingerprint = "fp.previous-key.of-the-address";
+
+    const second = await createCalendarFeed({ ...input }, "admin-1").then(() => state.feeds[0].id);
+    expect((await previewCalendarFeed(second, deps)).counts).toMatchObject({ relink: 0, create: total });
+
+    state.previousFingerprints = ["fp.previous-key.of-the-address"];
+    const preview = await previewCalendarFeed(second, deps);
+    expect(preview.counts).toMatchObject({ relink: total, create: 0 });
+    expect(await syncCalendarFeed(second, deps)).toMatchObject({ relink: total, create: 0 });
   });
 
   it("only a feed with the same address hint can re-link a deleted feed's items", async () => {

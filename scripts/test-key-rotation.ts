@@ -11,10 +11,18 @@
  *   a calendar feed's address fingerprint and the fingerprint copied onto an
  *   item it left behind were recomputed together;
  * - a value sealed under a key that is not loaded is counted as unreadable and
- *   does not stop the run.
+ *   does not stop the run;
+ * - every registered sealed column (all 11) has a synthetic row that is sealed under the old key and
+ *   rotated, so a column missing from the rotation fails this script;
+ * - rotation keeps each row's `updatedAt`, and a concurrent edit makes a write skip instead of being
+ *   rolled back;
+ * - the sealed health copy trigger still refuses every UPDATE except rotation's own (only "sealedValue",
+ *   only with the rotation setting on, only on a copy's field row).
  *
  * Uses fictitious rows with a reserved id prefix, created and removed here, and
- * synthetic keys. Reads and writes nothing else.
+ * synthetic keys. Reads and writes nothing else. Seeding the rows (which have parents this check does not
+ * create) switches foreign key and trigger checks off for that one transaction, so it needs a database
+ * user allowed to do that (a superuser, as in local development and CI).
  *
  *   npm run test:key-rotation
  */
@@ -54,10 +62,41 @@ function setKeys(keys: { current: string; version: number; previous?: { key: str
 
 let resetServerEnvCache: () => void;
 
+const OWN = { id: { startsWith: P } };
+
+/** Runs `work` with foreign key and trigger checks off for that transaction only. */
+async function withoutChecks(work: (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => Promise<void>) {
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SET LOCAL session_replication_role = replica`;
+    await work(tx);
+  });
+}
+
 async function cleanup() {
-  await prisma.calendarEntry.deleteMany({ where: { id: { startsWith: P } } });
-  await prisma.calendarFeed.deleteMany({ where: { id: { startsWith: P } } });
-  await prisma.securityCheckCode.deleteMany({ where: { id: { startsWith: P } } });
+  await withoutChecks(async (tx) => {
+    await tx.calendarEntry.deleteMany({ where: OWN });
+    await tx.calendarFeed.deleteMany({ where: OWN });
+    await tx.securityCheckCode.deleteMany({ where: OWN });
+    await tx.userMfaEnrollment.deleteMany({ where: OWN });
+    await tx.attendeeMfaEnrollment.deleteMany({ where: OWN });
+    await tx.attendeeAccountToken.deleteMany({ where: OWN });
+    await tx.attendeeStepUpCode.deleteMany({ where: OWN });
+    await tx.clubRosterMember.deleteMany({ where: OWN });
+    await tx.backgroundCheckEntry.deleteMany({ where: OWN });
+    await tx.clubFormSubmission.deleteMany({ where: OWN });
+    await tx.healthRecordField.deleteMany({ where: OWN });
+    await tx.healthRecordSnapshotField.deleteMany({ where: OWN });
+    await tx.healthRecordSnapshot.deleteMany({ where: OWN });
+  });
+}
+
+async function refused(work: () => Promise<unknown>) {
+  try {
+    await work();
+  } catch (error) {
+    return /immutable/i.test(error instanceof Error ? error.message : "");
+  }
+  return false;
 }
 
 async function main() {
@@ -122,6 +161,88 @@ async function main() {
         updatedByUserId: "rotation-check",
       },
     });
+    // One synthetic row in every other registered column, sealed under the old key with the owning module's own helper.
+    const { sealBirthDate } = await import("../modules/club-rosters/birth-dates");
+    const { sealSensitiveAnswers } = await import("../modules/club-forms/sealed-answers");
+    const { sealHealthField, sealSnapshotField } = await import("../modules/health-records/crypto");
+    const soon = new Date(Date.now() + 86_400_000);
+    await withoutChecks(async (tx) => {
+      await tx.userMfaEnrollment.create({
+        data: { id: `${P}user_mfa`, userId: `${P}user`, sealedSecret: secretBox.sealSecret("JBSWY3DPEHPK3PXP", "mfa-totp-secret") },
+      });
+      await tx.attendeeMfaEnrollment.create({
+        data: { id: `${P}att_mfa`, accountId: `${P}acct`, sealedSecret: secretBox.sealSecret("JBSWY3DPEHPK3PXP", "attendee-mfa-totp-secret") },
+      });
+      await tx.attendeeAccountToken.create({
+        data: {
+          id: `${P}token`, accountId: `${P}acct`, tokenHash: `${P}token-hash`, purpose: "EMAIL_VERIFICATION", expiresAt: soon,
+          sealedCode: secretBox.sealSecret("246810", "attendee-email-code"),
+        },
+      });
+      const stepUps = [
+        ["REGISTRATION_EDIT", "attendee-step-up-code"],
+        ["SIGN_IN", "attendee-sign-in-code"],
+        ["TWO_STEP_RECOVERY", "attendee-two-step-recovery"],
+      ] as const;
+      for (const [purpose, sealPurpose] of stepUps) {
+        await tx.attendeeStepUpCode.create({
+          data: { id: `${P}step_${purpose}`, accountId: `${P}acct`, sessionId: `${P}session`, purpose, expiresAt: soon, sealedCode: secretBox.sealSecret("135790", sealPurpose) },
+        });
+      }
+      await tx.clubRosterMember.create({
+        data: { id: `${P}roster`, organizationId: `${P}club`, clubYear: "2026-2027", attendeeType: "YOUTH", source: "DIRECTOR", sealedBirthDate: sealBirthDate("2012-05-17") },
+      });
+      await tx.backgroundCheckEntry.create({
+        data: {
+          id: `${P}bgc`, uploadId: `${P}upload`, line: 1, firstName: "Sample", lastName: "Person", identityKey: `${P}identity`,
+          sealedBirthDate: sealBirthDate("1980-01-02"),
+        },
+      });
+      await tx.clubFormSubmission.create({
+        data: {
+          id: `${P}form`, templateId: `${P}template`, clubYear: "2026-2027", templateVersion: 1, enteredVia: "STAFF_ACTING", hasSensitiveAnswers: true,
+          sealedSensitiveAnswers: sealSensitiveAnswers(`${P}form`, { note: "synthetic" }),
+        },
+      });
+      await tx.healthRecordField.create({
+        data: { id: `${P}hfield`, recordId: `${P}record`, fieldKey: "allergies", sealedValue: sealHealthField(`${P}record`, "allergies", "synthetic") },
+      });
+      await tx.healthRecordSnapshot.create({
+        data: {
+          id: `${P}snap`, personId: `${P}person`, eventId: `${P}event`, trigger: "CHECK_IN", eventDate: "2027-01-10", ageBasis: "ADULT",
+          expiresAt: soon, fieldCount: 1,
+        },
+      });
+      await tx.healthRecordSnapshotField.create({
+        data: { id: `${P}sfield`, snapshotId: `${P}snap`, fieldKey: "allergies", sealedValue: sealSnapshotField(`${P}snap`, "allergies", "synthetic") },
+      });
+    });
+    const feedBefore = await prisma.calendarFeed.findMany({ where: OWN, select: { id: true, updatedAt: true }, orderBy: { id: "asc" } });
+    const entryBefore = await prisma.calendarEntry.findUniqueOrThrow({ where: { id: `${P}entry_0` }, select: { updatedAt: true } });
+    const formBefore = await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: `${P}form` }, select: { updatedAt: true } });
+
+    // The sealed health copy trigger: nothing but rotation's own write gets through.
+    const fieldValue = (await prisma.healthRecordSnapshotField.findUniqueOrThrow({ where: { id: `${P}sfield` } })).sealedValue;
+    assert.ok(
+      await refused(() => prisma.$executeRaw`UPDATE "HealthRecordSnapshotField" SET "sealedValue" = 'x' WHERE "id" = ${`${P}sfield`}`),
+      "a plain UPDATE of a sealed copy is still refused",
+    );
+    assert.ok(
+      await refused(() => prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT set_config('imsda.key_rotation', 'on', true)`;
+        await tx.$executeRaw`UPDATE "HealthRecordSnapshotField" SET "fieldKey" = 'other', "sealedValue" = 'x' WHERE "id" = ${`${P}sfield`}`;
+      })),
+      "with the rotation setting on, changing another column is refused",
+    );
+    assert.ok(
+      await refused(() => prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT set_config('imsda.key_rotation', 'on', true)`;
+        await tx.$executeRaw`UPDATE "HealthRecordSnapshot" SET "eventDate" = '2027-02-02' WHERE "id" = ${`${P}snap`}`;
+      })),
+      "the copy itself stays fully immutable",
+    );
+    assert.equal((await prisma.healthRecordSnapshotField.findUniqueOrThrow({ where: { id: `${P}sfield` } })).sealedValue, fieldValue);
+
     // One value sealed under a key that will not be loaded: unreadable, never fatal.
     setKeys({ current: OTHER_KEY, version: 7 });
     await prisma.securityCheckCode.create({
@@ -144,6 +265,11 @@ async function main() {
     );
     assert.deepEqual([counts[feeds.label].current, counts[feeds.label].older, counts[feeds.label].unreadable], [0, 3, 0]);
 
+    // Every registered column has a row that is readable and still on the old key.
+    const everyColumn = await scanSealedColumns(store, { batchSize: 2 });
+    assert.equal(everyColumn.length, 11);
+    for (const scan of everyColumn) assert.ok(scan.older >= 1, `${scan.label} has a synthetic row on the old key`);
+
     const dry = await rotateSealedColumns(store, { apply: false, columns: both, batchSize: 2 });
     assert.equal(dry.reduce((sum, row) => sum + row.rotated, 0), 0, "a dry run rotates nothing");
     assert.equal(dry.reduce((sum, row) => sum + row.wouldRotate, 0), 8);
@@ -159,6 +285,7 @@ async function main() {
 
     // A change that lands between the read and the write is left alone (compare-and-set).
     let interfered = false;
+    let editedName = false;
     const interfering = {
       readBatch: store.readBatch.bind(store),
       async replace(col: typeof feeds, row: Parameters<typeof store.replace>[1], next: Parameters<typeof store.replace>[2]) {
@@ -169,14 +296,29 @@ async function main() {
             data: { sealedUrl: secretBox.sealSecret(feedUrls[1], "calendar-feed-url") },
           });
         }
+        if (!editedName && row.id === `${P}feed_2`) {
+          editedName = true;
+          // An edit to another column moves updatedAt, so the stale write must not roll it back.
+          await prisma.calendarFeed.update({ where: { id: row.id }, data: { name: "Renamed meanwhile" } });
+        }
         return store.replace(col, row, next);
       },
     };
     const raced = await rotateSealedColumns(interfering, { apply: true, columns: [feeds], batchSize: 2 });
     // The concurrent write was sealed with the current key, so it is already current; the stale write was refused.
-    assert.deepEqual([raced[0].rotated, raced[0].skipped], [2, 1]);
+    assert.deepEqual([raced[0].rotated, raced[0].skipped], [1, 2]);
+    counts = await totals();
+    assert.deepEqual([counts[feeds.label].current, counts[feeds.label].older, counts[feeds.label].unreadable], [2, 1, 0]);
+    const renamed = await prisma.calendarFeed.findUniqueOrThrow({ where: { id: `${P}feed_2` } });
+    assert.equal(renamed.name, "Renamed meanwhile", "the concurrent edit survives");
+    const renamedStamp = renamed.updatedAt.getTime();
+
+    // The next run picks up what was skipped.
+    const finishing = await rotateSealedColumns(store, { apply: true, columns: both, batchSize: 2 });
+    assert.deepEqual([finishing[1].rotated, finishing[1].skipped], [1, 0]);
     counts = await totals();
     assert.deepEqual([counts[feeds.label].current, counts[feeds.label].older, counts[feeds.label].unreadable], [3, 0, 0]);
+    assert.equal((await prisma.calendarFeed.findUniqueOrThrow({ where: { id: `${P}feed_2` } })).updatedAt.getTime(), renamedStamp);
 
     // The rest: a rerun is a no-op.
     const rerun = await rotateSealedColumns(store, { apply: true, columns: both, batchSize: 2 });
@@ -190,9 +332,36 @@ async function main() {
     assert.notEqual(newFingerprint0, oldFingerprint0);
     const entry0 = await prisma.calendarEntry.findUniqueOrThrow({ where: { id: `${P}entry_0` } });
     assert.equal(entry0.sourceUrlFingerprint, newFingerprint0);
+    assert.equal(entry0.updatedAt.getTime(), entryBefore.updatedAt.getTime(), "the left-behind item's updatedAt is unchanged");
+    const feedsAfter = await prisma.calendarFeed.findMany({ where: OWN, select: { id: true, updatedAt: true }, orderBy: { id: "asc" } });
+    for (const [index, feed] of feedsAfter.entries()) {
+      // feed_1 and feed_2 were edited by the concurrent writes; feed_0 keeps its updatedAt through rotation.
+      if (feed.id === `${P}feed_0`) assert.equal(feed.updatedAt.getTime(), feedBefore[index].updatedAt.getTime(), `${feed.id} updatedAt is unchanged`);
+    }
+
+    // Everything else rotates in one run, including the sealed health copy through the trigger's one exception.
+    const all = await rotateSealedColumns(store, { apply: true, batchSize: 2 });
+    for (const result of all) {
+      assert.equal(result.skipped, 0, `${result.label}: nothing skipped`);
+      assert.equal(result.unreadable, result.label === codes.label ? 1 : 0, `${result.label}: unreadable`);
+    }
+    assert.equal(all.find((result) => result.label === "HealthRecordSnapshotField.sealedValue")?.alreadyCurrent, 0);
+    assert.equal(all.find((result) => result.label === "HealthRecordSnapshotField.sealedValue")?.rotated, 1);
+    assert.equal(
+      (await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: `${P}form` } })).updatedAt.getTime(),
+      formBefore.updatedAt.getTime(),
+      "a form submission's updatedAt is unchanged",
+    );
+    assert.notEqual((await prisma.healthRecordSnapshotField.findUniqueOrThrow({ where: { id: `${P}sfield` } })).sealedValue, fieldValue);
 
     // With the previous key removed, everything still opens with the new key alone.
     setKeys({ current: NEW_KEY, version: 2 });
+    const everything = await scanSealedColumns(store, { batchSize: 2 });
+    for (const scan of everything) {
+      assert.equal(scan.older, 0, `${scan.label}: nothing left on the old key`);
+      assert.equal(scan.unreadable, scan.label === codes.label ? 1 : 0, `${scan.label}: unreadable`);
+      assert.ok(scan.current >= 1, `${scan.label}: rotated rows open with the new key alone`);
+    }
     const after = await scanSealedColumns(store, { columns: both, batchSize: 2 });
     const byLabel = Object.fromEntries(after.map((scan) => [scan.label, scan]));
     assert.deepEqual(

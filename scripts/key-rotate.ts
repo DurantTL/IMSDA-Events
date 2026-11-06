@@ -21,7 +21,7 @@
  */
 import { loadEnvConfig } from "@next/env";
 import { getEncryptionKeyStatus } from "../lib/env";
-import { environmentProblems, type KeyLog } from "./key-check";
+import { describeError, environmentProblems, type KeyLog } from "./key-check";
 
 export async function runKeyRotate(
   options: KeyLog & { env: Record<string, string | undefined>; apply: boolean },
@@ -83,8 +83,8 @@ if (process.argv[1]?.endsWith("key-rotate.ts")) {
     log: (line) => console.log(line),
     error: (line) => console.error(line),
   })
-    .catch(() => {
-      console.error("[key-rotate] FAILED: unexpected error (details withheld)");
+    .catch((error: unknown) => {
+      console.error(`[key-rotate] FAILED: unexpected error (${describeError(error)}; details withheld)`);
       return 1;
     })
     .then((code) => process.exit(code));
