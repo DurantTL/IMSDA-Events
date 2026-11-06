@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatCents } from "@/modules/payments/format-cents";
 
 /**
  * Lodging inventory rules (#198, slice 1): pure and free of server-only
@@ -46,7 +47,7 @@ export const lodgingRateBasisLabels: Record<LodgingRateBasis, string> = {
 
 /** A rate in words, for the staff screens, the registration form and the private page. */
 export function describeRate(rate: { amountCents: number; basis: LodgingRateBasis; minimumNights: number | null }) {
-  return `$${(rate.amountCents / 100).toFixed(2)} ${lodgingRateBasisLabels[rate.basis]}${rate.minimumNights ? `, ${rate.minimumNights}+ nights` : ""}`;
+  return `${formatCents(rate.amountCents, { grouping: false })} ${lodgingRateBasisLabels[rate.basis]}${rate.minimumNights ? `, ${rate.minimumNights}+ nights` : ""}`;
 }
 
 /** SAFETY and DAMAGE (#214) are facility blocks: like any hold they close the room or site for the nights and never touch assignments. */

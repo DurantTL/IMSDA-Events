@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatCents } from "@/modules/payments/format-cents";
 import {
   calendarDay,
   isNight,
@@ -653,7 +654,7 @@ function pairKey(a: string, b: string) {
  * Items that disclose an accessibility flag are marked `sensitive`; the caller drops them for staff who may not see them.
  */
 function signedDollars(cents: number) {
-  return `${cents < 0 ? "-" : "+"}$${(Math.abs(cents) / 100).toFixed(2)}`;
+  return `${cents < 0 ? "-" : "+"}${formatCents(Math.abs(cents), { grouping: false })}`;
 }
 
 /**
@@ -666,6 +667,7 @@ function signedDollars(cents: number) {
  * never the figure to record.
  */
 export function chargeChangeSentence(result: { chargeDeltaCents?: number; registrantDeltaCents?: number; sponsorDeltaCents?: number; belowMinimumAfter?: boolean; churchShare?: ChurchShareFact; churchCorrectionCents?: number; originallyChargedCents?: number; requestNowCostsCents?: number; promo?: { code: string; coversLodging: boolean; sponsored: boolean } | null }) {
+  // Not folded into formatCents: these amounts are typed `number`, so a negative would print "$-5.00" here but "-$5.00" there.
   const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   const list = signedDollars(result.chargeDeltaCents ?? 0);
   const promo = result.promo;
@@ -869,6 +871,7 @@ export function buildReviewItems(facts: ReviewFacts): ReviewItem[] {
   // --- Lodging charge against the request ---------------------------------------
   for (const charge of facts.lodgingCharges ?? []) {
     if (!active(charge.registrationId) || charge.chargedCents === charge.currentCents) continue;
+    // Not folded into formatCents: a negative amount would print "$-5.00" here but "-$5.00" there.
     const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
     push({
       key: `price:${charge.registrationId}`, kind: "PRICE_DIFFERS", fingerprint: `${charge.chargedCents}:${charge.currentCents}:${charge.impact?.registrantDeltaCents ?? ""}`, registrationIds: [charge.registrationId],
