@@ -4,12 +4,25 @@ const mocks = vi.hoisted(() => ({
   getCurrentSession: vi.fn(),
   membershipFindMany: vi.fn(),
   currentAreaCoordinator: vi.fn(),
+  currentStaffActingContext: vi.fn(),
+  getCurrentAttendee: vi.fn(async () => ({ account: null as { id: string } | null, via: "staff" as string | null, sessionId: null as string | null })),
+  useRealCoordinator: false,
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ eventMembership: { findMany: mocks.membershipFindMany } }) }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
-vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: mocks.currentAreaCoordinator }));
+// `currentAreaCoordinator` is the stub, except in the act-as test below, which runs the real one over a staff-only session.
+vi.mock("@/modules/organizations/area-coordinators", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/modules/organizations/area-coordinators")>();
+  return { currentAreaCoordinator: (...args: []) => (mocks.useRealCoordinator ? actual.currentAreaCoordinator(...args) : mocks.currentAreaCoordinator(...args)) };
+});
+vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
+vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
+vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ requireAttendeeSecondStep: vi.fn() }));
+vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: vi.fn() }));
+vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
+vi.mock("@/modules/access/admin-roles", () => ({ resolveClubsActor: vi.fn() }));
 
 import {
   clubLeaderHealthViewerFromAccess,
@@ -100,6 +113,22 @@ describe("club leader health access (#658)", () => {
   it("refuses a registrar and a reporter", () => {
     for (const role of ["REGISTRAR", "REPORTER"]) {
       expect(clubLeaderHealthViewerFromAccess(access(role, { kind: "ATTENDEE", accountId: "acct-1", sessionId: "s" }))).toBeNull();
+    }
+  });
+});
+
+describe("a Clubs Administrator's Area Coordinator act-as (2026-11-06)", () => {
+  it("gets no health viewer: only a real Area Coordinator account does, never a staff act-as", async () => {
+    mocks.useRealCoordinator = true;
+    mocks.getCurrentSession.mockResolvedValue(staff("clubs-admin"));
+    mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", organizationId: null, viaClubsAdministrator: true });
+    // The staff user also has a linked attendee account, reached through the staff session: only the "signed in as the
+    // attendee" check stands between this and a health viewer, so loosening that check would fail this test.
+    mocks.getCurrentAttendee.mockResolvedValueOnce({ account: { id: "acct-linked-coordinator" }, via: "staff", sessionId: "staff-session" });
+    try {
+      expect(await resolveAreaHealthViewer()).toBeNull();
+    } finally {
+      mocks.useRealCoordinator = false;
     }
   });
 });

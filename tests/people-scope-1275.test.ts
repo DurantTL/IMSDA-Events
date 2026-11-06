@@ -103,11 +103,12 @@ describe("the person page by viewer scope", () => {
     expect(html.match(/aria-label="Revoke /g)).toHaveLength(2);
   });
 
-  it("puts the act-as button on the list page, for a system administrator only", async () => {
+  it("puts the act-as button on the list page, for every scope that passes the gate (system administrator and Clubs Administrator)", async () => {
     const { readFileSync } = await import("node:fs");
     const list = readFileSync("app/(workspace)/admin/people/page.tsx", "utf8");
     const detail = readFileSync("app/(workspace)/admin/people/[kind]/[id]/page.tsx", "utf8");
-    expect(list).toMatch(/viewer\.scope === "full" \?\s*\(?\s*<ActAsButton/);
+    expect(list).toContain("<ActAsButton");
+    expect(list).not.toMatch(/viewer\.scope === "full" \?\s*\(?\s*<ActAsButton/);
     expect(detail).not.toContain("ActAsButton");
   });
 });

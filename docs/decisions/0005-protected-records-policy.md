@@ -409,10 +409,11 @@ birth dates need their own protection.
    Clubs Administrator is not assigned to. Everything that serves clubs and churches alike is
    open to a Clubs Administrator **for club organizations only**; the server
    reads the organization type (`requireClubOrganizationAdministration`) and
-   refuses a church, school or the conference. Acting as a Director is valid
+   refuses a church, school or the conference. Acting as a club role is valid
    for a Clubs Administrator only while the grant is active, re-checked on
-   every request, and only as a club's Director: acting as an Area Coordinator
-   stays with system administrators. Generic organization management (list,
+   every request, as a club's Director and, since 2026-11-06, as an Area
+   Coordinator (view only, apart from sending a club form link; see
+   Addendum D). Generic organization management (list,
    create, billing, pastor, location, status, deletion, external identities,
    directory import), Master Award rules, seat overrides, settings, accounts,
    the Team, events, sealed-copy holds, club-form alert emails and template
@@ -1148,7 +1149,10 @@ issue #787, from the Communication Director's decision of 2026-10-05.
   `VIEW_SENSITIVE_DATA` or `VIEW_HEALTH_INFORMATION`, and Area Coordinators on
   published club-audience events. Attendees and club directors cannot open it.
   The Addendum C rows for the coordinator health view are unchanged and still
-  apply to that view.
+  apply to that view. Clubs Administrators acting as an Area Coordinator
+  (Caleb, Nov 6, 2026) may also open the area kitchen report: the same
+  anonymous grouped counts, with nothing else widened. System administrators
+  acting as an Area Coordinator already could.
 - **Not audited.** Opening or downloading it is not written to the audit log,
   because the report contains no names.
 - **Accepted risk.** Free text can still identify someone at a small event
