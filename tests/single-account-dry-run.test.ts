@@ -20,6 +20,7 @@ function staff(over: Partial<StaffAccountRow> & { id: string; email: string }): 
   return {
     accountStatus: "ACTIVE",
     globalRole: null,
+    clubsAdministrator: false,
     credential: { disabledAt: null, lockedUntil: null },
     mfa: "ACTIVE",
     mfaLockedUntil: null,
@@ -171,6 +172,8 @@ describe("detectConflicts", () => {
     expect(codes(staff({ ...bare, counts: { ...bare.counts, passkeys: 1 } }), a)).not.toContain("STAFF_NO_SECOND_FACTOR");
     expect(codes(staff({ ...bare, counts: { ...bare.counts, activeMemberships: 0 } }), a)).not.toContain("STAFF_NO_SECOND_FACTOR");
     expect(codes(staff({ ...bare, globalRole: "SYSTEM_ADMIN", counts: { ...bare.counts, activeMemberships: 0 } }), a)).toContain("STAFF_NO_SECOND_FACTOR");
+    // An active Clubs Administrator with no membership is a staff role too (Caleb, Nov 6, 2026).
+    expect(codes(staff({ ...bare, clubsAdministrator: true, counts: { ...bare.counts, activeMemberships: 0 } }), a)).toContain("STAFF_NO_SECOND_FACTOR");
   });
 
   it("blocks a disabled attendee account", () => {

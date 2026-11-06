@@ -432,7 +432,7 @@ birth dates need their own protection.
    that a club the person does not direct answers 404.
 5. **MFA.** An account must have MFA turned on before it can open a club roster
    (the account page already tells attendees this). System administrators
-   already require MFA.
+   and Clubs Administrators (Caleb, Nov 6, 2026) already require MFA.
 6. **Retention is the club's decision, not the conference's.** Club members
    often stay on as staff for many years, so there is **no automatic deletion or
    expiry**. The roster keeps a person, active or inactive, until that club's
@@ -1091,6 +1091,10 @@ only.
   club forms "has not ended" rule is unchanged.
 - **MFA.** Staff accounts with any active event membership, and system
   administrators, already require two-step sign-in (decision of 2026-09-25).
+  An active Clubs Administrator (no event membership needed) requires it too
+  (Caleb, Nov 6, 2026). Granting the role ends the person's open sessions (not
+  the granting administrator's own), so their next sign-in enrols; revoking it, with no other qualifying role, goes
+  back to the password alone.
   Granting or removing `VIEW_HEALTH_INFORMATION` ends all of that user's
   sessions in the same transaction, so their next sign-in has to pass two-step
   before the new access works. Area Coordinators and club leaders pass the same

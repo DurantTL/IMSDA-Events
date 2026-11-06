@@ -22,6 +22,7 @@ import {
   completeMfaChallenge,
   confirmMfaEnrollment,
   disableMfa,
+  getMfaStatus,
   issueMfaChallenge,
   MAX_LIVE_CHALLENGES,
 } from "@/modules/access/mfa-service";
@@ -35,6 +36,7 @@ type Fixture = {
   user?: {
     globalRole?: "SYSTEM_ADMIN" | null;
     memberships?: Array<{ role: string }>;
+    clubsAdministratorGrant?: { revokedAt: Date | null } | null;
   };
   enrollment?: {
     id?: string;
@@ -82,6 +84,7 @@ function prismaFixture(fixture: Fixture = {}) {
         displayName: "Alex Staff",
         globalRole: fixture.user?.globalRole ?? null,
         memberships: fixture.user?.memberships ?? [],
+        clubsAdministratorGrant: fixture.user?.clubsAdministratorGrant ?? null,
         mfaEnrollment: enrollment ? { id: enrollment.id, status: enrollment.status } : null,
       })),
     },
@@ -339,7 +342,20 @@ describe("the sign-in challenge", () => {
   });
 });
 
+describe("the account settings status", () => {
+  it("says two-step is required for an active Clubs Administrator with no event membership (Nov 6, 2026)", async () => {
+    prismaFixture({ user: { clubsAdministratorGrant: { revokedAt: null } } });
+    await expect(getMfaStatus("user-1")).resolves.toMatchObject({ required: true });
+  });
+
+  it("says it is not required once the grant is revoked and nothing else qualifies", async () => {
+    prismaFixture({ user: { clubsAdministratorGrant: { revokedAt: new Date("2026-11-06T12:00:00Z") } } });
+    await expect(getMfaStatus("user-1")).resolves.toMatchObject({ required: false });
+  });
+});
+
 describe("removing a second factor", () => {
+
   it("is refused for an account whose role requires one", async () => {
     prismaFixture({ user: { globalRole: "SYSTEM_ADMIN" } });
 

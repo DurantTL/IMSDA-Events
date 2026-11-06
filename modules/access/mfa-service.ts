@@ -9,7 +9,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import { scheduleLockoutEmails } from "@/modules/communications/lockout-email";
 import { createDatabaseSession } from "@/modules/access/session-store";
 import { createOpaqueToken, hashOpaqueToken } from "@/modules/access/tokens";
-import { mfaGateFor, requiresMfa, type MfaGate } from "@/modules/access/mfa-rules";
+import { mfaGateFor, mfaSubjectFromUser, requiresMfa, type MfaGate } from "@/modules/access/mfa-rules";
 import {
   generateTotpSecret,
   otpauthUri,
@@ -74,15 +74,13 @@ async function subjectFor(userId: string) {
       displayName: true,
       globalRole: true,
       memberships: { where: { status: "ACTIVE" }, select: { role: true } },
+      clubsAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { id: true, status: true } },
     },
   });
   return {
     user,
-    subject: {
-      globalRole: user.globalRole,
-      activeEventRoles: user.memberships.map((membership) => membership.role),
-    },
+    subject: mfaSubjectFromUser(user),
   };
 }
 

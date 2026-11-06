@@ -82,7 +82,7 @@ async function main() {
 Removed the authenticator for ${user.displayName} <${email}>.
 Every session for that account was signed out.
 
-If the account administers events it will be asked to enrol a new authenticator
+If the account's role requires two-step sign-in it will be asked to enrol a new authenticator
 on its next sign-in, before any session is issued.
 `);
   } finally {

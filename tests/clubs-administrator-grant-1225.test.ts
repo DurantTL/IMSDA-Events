@@ -26,9 +26,13 @@ import { DELETE, PUT } from "@/app/api/admin/users/[userId]/clubs-administrator/
 type Grant = { userId: string; grantedByUserId: string | null; grantedAt: Date; revokedAt: Date | null; revokedByUserId: string | null };
 let grants: Map<string, Grant>;
 let users: Set<string>;
+let sessionRevokes: Array<{ userId: string; revokedAt: Date }>;
 
 function fakeDb() {
   const tx = {
+    userSession: {
+      updateMany: async ({ where, data }: any) => { sessionRevokes.push({ userId: where.userId, revokedAt: data.revokedAt }); return { count: 1 }; },
+    },
     user: { findUnique: async ({ where }: any) => (users.has(where.id) ? { id: where.id } : null) },
     clubsAdministratorGrant: {
       findUnique: async ({ where }: any) => grants.get(where.userId) ?? null,
@@ -49,6 +53,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   grants = new Map();
   users = new Set(["target", "admin"]);
+  sessionRevokes = [];
   mocks.getPrisma.mockReturnValue(fakeDb());
 });
 
@@ -64,6 +69,22 @@ describe("setClubsAdministrator", () => {
       entityId: "target",
       metadata: { targetUserId: "target", at: NOW.toISOString() },
     }), expect.anything());
+  });
+
+  it("ends the person's open sessions on a grant, so the next sign-in enrols in two-step (Nov 6, 2026)", async () => {
+    await setClubsAdministrator("target", true, "admin", NOW);
+    expect(sessionRevokes).toEqual([{ userId: "target", revokedAt: NOW }]);
+  });
+
+  it("keeps the granting administrator's own sessions and ends none on a revoke or a no-op", async () => {
+    users.add("admin");
+    await setClubsAdministrator("admin", true, "admin", NOW);
+    expect(sessionRevokes).toEqual([]);
+    await setClubsAdministrator("target", true, "admin", NOW);
+    sessionRevokes = [];
+    await setClubsAdministrator("target", true, "admin", LATER);
+    await setClubsAdministrator("target", false, "admin", LATER);
+    expect(sessionRevokes).toEqual([]);
   });
 
   it("revokes, keeps the row for the record, and audits who and when", async () => {

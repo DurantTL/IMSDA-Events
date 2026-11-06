@@ -220,8 +220,8 @@ export class PlatformSettingsError extends Error {
 
 /**
  * Staff who could sign in only with a passkey: an active account that has to
- * pass a second step (a system administrator, or anyone with an ACTIVE event
- * membership — the rule in modules/access/mfa-rules.ts), at least one live
+ * pass a second step (a system administrator, an active Clubs Administrator,
+ * or anyone with an ACTIVE event membership — the rule in modules/access/mfa-rules.ts), at least one live
  * passkey, and no active authenticator to fall back on. Changing or clearing
  * the passkey domain invalidates every existing passkey, which would strand
  * exactly these people. Staff with no second-step requirement still sign in
@@ -236,6 +236,7 @@ async function countPasskeyOnlyStaff(tx: Pick<ReturnType<typeof getPrisma>, "use
       OR: [
         { globalRole: "SYSTEM_ADMIN" },
         { memberships: { some: { status: "ACTIVE" } } },
+        { clubsAdministratorGrant: { is: { revokedAt: null } } },
       ],
     },
   });
