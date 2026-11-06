@@ -11,7 +11,6 @@ import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
 import { ClubsYearSelector } from "@/components/clubs-year-selector";
-import { requestedClubYear } from "@/components/clubs-year-selector-model";
 import { DestinationSearch } from "@/components/destination-search";
 import { GuardedLink } from "@/components/guarded-link";
 import { WorkspaceContent, workspacePageKey } from "@/components/workspace-content";
@@ -19,7 +18,7 @@ import { moduleDestinationStates } from "@/components/module-destination-states"
 import { buildSearchDestinations } from "@/components/destination-search-model";
 import { eventToRemember, resolveShellEvent, switchEvent } from "@/components/shell-event-selection";
 import { createEventHrefFor, isSystemWorkspacePath } from "@/components/system-navigation";
-import { alwaysOnModuleKeys, disabledModuleCardKeys, isEventModuleKey } from "@/modules/event-modules/catalog";
+import { isEventModuleKey } from "@/modules/event-modules/catalog";
 import { AdminAttentionBell } from "@/components/admin-attention-bell";
 import { StaffCreateMenu } from "@/components/staff-create-menu";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
@@ -27,25 +26,12 @@ import { StaffRail } from "@/components/staff-rail";
 import { StaffTabRow } from "@/components/staff-tab-row";
 import { StaffViewStrip } from "@/components/staff-view-strip";
 import { StaffPhoneBar } from "@/components/staff-phone-bar";
-import { phoneBarItems } from "@/components/staff-phone-bar-model";
-import type { LauncherSection } from "@/components/more-launcher";
-import {
-  areaLandingHref,
-  areaTabs,
-  markCurrentTab,
-  railItems,
-  staffAreaMeta,
-  staffPlaceFor,
-  type AreaTab,
-  type StaffAreaViewer,
-} from "@/components/staff-areas";
-import { buildEventTabs, currentEventPlace, markCurrentEventTab } from "@/components/staff-event-tabs";
+import { buildStaffNavigation } from "@/components/staff-navigation-model";
+import { staffAreaMeta } from "@/components/staff-areas";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
 import { staffWorkspaceOptions } from "@/modules/access/workspace-contexts";
-import { adminRoleLanding, heldAdminRoles, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
+import { adminRoleLanding, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import {
-  buildMoreDirectoryCards,
-  canShowMoreLauncher,
   eventsAdminHomeItem,
   helpPageTitle,
   isEventFeaturesPath,
@@ -159,43 +145,23 @@ export function AppShell({
   // What the pages below need to decide which Help links and Set up links this viewer may follow (#1435).
   const staffViewer: HelpViewer = { isSystemAdmin, selectedEventId, permissions: isSystemAdmin ? [...eventPermissions] : [...selectedPermissions] };
 
-  // Which area the page is in, and its one row of tabs. The route owns the place; the roles held decide what is listed.
-  const place = staffPlaceFor(pathname, searchParams);
-  const held = adminRoleView?.held ?? (isSystemAdmin ? heldAdminRoles({ systemAdmin: true, clubsAdministrator: true, eventAdminEventIds: [] }) : []);
-  const activeRole = adminRoleView?.active ?? (held.includes("SYSTEM_ADMIN") ? "SYSTEM_ADMIN" : null);
-  const viewer: StaffAreaViewer = {
-    isSystemAdmin,
-    held,
-    activeRole,
-    hasEvents: events.length > 0,
-    siteContentEditor,
-    healthImport: adminRoleView?.healthImport !== false,
-    clubYear: requestedClubYear(searchParams.get("year")),
-    counts: adminRoleView?.counts ?? {},
-  };
   // Staff with no events can still open their profile (#623); every event control and event-scoped tab would dead-end for them.
   const eventlessProfile = (isProfileRoute || isHelpRoute) && events.length === 0 && !isSystemAdmin;
-  const eventQuery = selectedEventId ? `?event=${encodeURIComponent(selectedEventId)}` : "";
-  const clubOnlyArea = place.area === "clubs";
-  // Links keep the selected event (#616), so moving between areas never replaces the remembered event. The Clubs pages never carried one.
-  const carry = (href: string) => (clubOnlyArea ? href : withCurrentEvent(href, selectedEventId));
-
-  // Module cards the launcher leaves out. An event the server did not load module state for lists the universal tools only.
-  const selectedHiddenCardKeys: ReadonlySet<string> = selectedEvent?.hiddenCardKeys
-    ? new Set(selectedEvent.hiddenCardKeys)
-    : disabledModuleCardKeys(new Set(alwaysOnModuleKeys));
-  const moreContext = {
-    permissions: [...selectedPermissions],
-    clubOversight: Boolean(selectedEvent?.clubOversight),
-    clubEvent: Boolean(selectedEvent?.clubEvent),
+  // Everything navigation draws, decided once (`buildStaffNavigation`): the rail, the one row of tabs, the phone bar and More.
+  const nav = buildStaffNavigation({
+    pathname,
+    search: searchParams,
     isSystemAdmin,
-    clubFormsAccess: Boolean(selectedEvent?.clubFormsAccess),
-    hiddenCardKeys: selectedHiddenCardKeys,
-  };
-  const moreNavItem = navigation.find((item) => item.href === "/more");
-  const showMore = Boolean(selectedEvent) && Boolean(moreNavItem) && canShowMoreLauncher({ item: moreNavItem!, ...moreContext });
-  // The More launcher (#741): everything this staff member may open for the selected event, the universal tools plus the enabled modules.
-  const launcherCards = selectedEvent ? buildMoreDirectoryCards({ ...moreContext, eventQuery }) : [];
+    adminRoleView,
+    siteContentEditor,
+    hasEvents: events.length > 0,
+    selectedEvent: selectedEvent ? { ...selectedEvent, clubFormsAccess: selectedEvent.clubFormsAccess } : undefined,
+    eventlessProfile,
+  });
+  const { place, viewer, eventTabs, eventPlace, rail, rowTabs, currentTab, eventQuery, carry, launcherCards, launcherSections, phoneItems, eventsLanding, moreContext } = nav;
+  const held = viewer.held;
+  const activeRole = viewer.activeRole;
+  const selectedHiddenCardKeys = moreContext.hiddenCardKeys;
   // Module states (#741 rules) for the selected event, only where the server loaded them.
   const moduleStates = selectedEvent?.hiddenCardKeys
     ? moduleDestinationStates({
@@ -207,29 +173,7 @@ export function AppShell({
       eventQuery,
     })
     : [];
-  // Event pages: the event's tabs (a viewer sees only the tabs they can open; kitchen staff see only the kitchen counts).
-  const eventTabs = selectedEvent && !eventlessProfile
-    ? buildEventTabs({ permissions: [...selectedPermissions], eventId: selectedEvent.id, isSystemAdmin, more: moreContext })
-    : [];
-  const eventPlace = currentEventPlace(pathname, searchParams);
-  const markedEventTabs = markCurrentEventTab(eventTabs, eventPlace);
-
-  const rail = railItems(viewer, eventTabs[0]?.href ?? null).map((item) => ({
-    ...item,
-    // Events opens the selected event for staff with no Events row; Home and the rest keep the event they were in.
-    href: item.area === "clubs" ? item.href : carry(item.href),
-  }));
-  const areaRow: AreaTab[] = place.inEvent
-    ? []
-    : markCurrentTab(areaTabs(place.area, viewer), place).map((tab) => ({
-      ...tab,
-      href: carry(tab.href),
-      views: tab.views?.map((view) => ({ ...view, href: carry(view.href) })),
-    }));
-  const rowTabs = place.inEvent ? markedEventTabs : areaRow;
-  const currentTab = rowTabs.find((tab) => tab.current);
   const pickerEvents = events.filter((event) => !event.archived || event.id === selectedEventId);
-  const eventsLanding = areaLandingHref("events", viewer);
 
   // Find a page (#1177): the destinations this viewer may open, from the same registry and rules as the menus. No event data is searched.
   const searchDestinations = buildSearchDestinations({
@@ -267,24 +211,6 @@ export function AppShell({
     : isSystemRoute && isSystemAdmin
     ? { kind: "system" as const, kindLabel: "System", label: "System administration", detail: "All events" }
     : { kind: "event" as const, kindLabel: selectedEvent ? "Event" : "Staff", label: selectedEvent?.name?.trim() || "Staff workspace", detail: "" };
-
-  // The phone: Home, Events, Check-in, Clubs and More. More lists "This event" first inside an event, then the other areas.
-  const phoneItemsBase = phoneBarItems({ rail, eventTabs: markedEventTabs, moreHref: "/help" });
-  const onBar = new Set(phoneItemsBase.map((item) => item.href));
-  const launcherSections: LauncherSection[] = [
-    ...(place.inEvent && markedEventTabs.length > 0
-      ? [{ key: "this-event", label: "This event", items: markedEventTabs.map((tab) => ({ key: tab.key, label: tab.label, href: tab.href, current: tab.current })) }]
-      : []),
-    ...(rail.filter((item) => !onBar.has(item.href)).length > 0
-      ? [{ key: "areas", label: "Areas", items: rail.filter((item) => !onBar.has(item.href)).map((item) => ({ key: item.area, label: item.label, href: item.href, current: item.area === place.area })) }]
-      : []),
-  ];
-  const moreHasContent = launcherSections.length > 0 || launcherCards.some((card) => card.allowed);
-  const phoneItems = phoneBarItems({
-    rail,
-    eventTabs: markedEventTabs,
-    moreHref: moreHasContent ? (showMore && selectedEventId ? `/more${eventQuery}` : withCurrentEvent("/help", selectedEventId)) : null,
-  });
 
   // An event named in the URL becomes the remembered selection (#616), so the
   // next page without `?event=` keeps it instead of falling back to the default.
@@ -424,7 +350,7 @@ export function AppShell({
         items={phoneItems}
         place={place}
         eventTab={place.inEvent ? eventPlace.tab : null}
-        firstEventTab={markedEventTabs[0]?.key ?? null}
+        firstEventTab={eventTabs[0]?.key ?? null}
         launcher={{
           cards: launcherCards,
           sections: launcherSections,

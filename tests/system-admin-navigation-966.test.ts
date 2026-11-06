@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/** System admin home cards and sidebar groups (#966). Synthetic data only. */
+/** System admin home cards and the groups behind the Admin tabs (#966, #1565). Synthetic data only. */
 
 const navigation = vi.hoisted(() => ({ pathname: "/admin", search: "" }));
 
@@ -22,7 +22,6 @@ vi.mock("@/components/sign-out-button", () => ({
 import { AppShell } from "@/components/app-shell";
 import { clubsAdminRecordsHref, eventFeaturesItem } from "@/components/staff-navigation";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
-import { resolveSidebarGroupOpen } from "@/components/sidebar-groups";
 import {
   createEventHrefFor,
   systemNavActiveEntryKey,
@@ -44,9 +43,15 @@ function render(user: typeof staff | typeof admin) {
   );
 }
 
-function sidebarOf(markup: string) {
-  const start = markup.indexOf('<nav class="primary-nav"');
+/** The rail, then the row of tabs and the view strip. */
+function railOf(markup: string) {
+  const start = markup.indexOf('id="primary-navigation"');
   return markup.slice(start, markup.indexOf("</nav>", start));
+}
+function tabsOf(markup: string) {
+  const start = markup.indexOf('data-staff-tabs="true"');
+  const strip = markup.indexOf("data-staff-views");
+  return markup.slice(start, strip > start ? markup.indexOf("</div>", strip) : markup.indexOf("</nav>", start));
 }
 
 beforeEach(() => {
@@ -100,65 +105,67 @@ describe("system navigation groups", () => {
     expect(systemNavActiveEntryKey("/admin/calendar")).toBe("system-events:/admin/calendar");
   });
 
-  it("opens a group by default only when a caller asks, and keeps the saved choice; the sidebar never asks (#1245)", () => {
+  it("keeps the dashboard's collapse rule out of the shell: no group opens or closes there any more (#1565)", () => {
     expect(readFileSync(join(process.cwd(), "components/app-shell.tsx"), "utf8")).not.toContain("group.collapsedByDefault");
-    const base = { containsCurrentPage: false, dismissedOnThisPage: false };
-    expect(resolveSidebarGroupOpen({ ...base, saved: undefined, defaultOpen: true })).toBe(true);
-    expect(resolveSidebarGroupOpen({ ...base, saved: undefined, defaultOpen: false })).toBe(false);
-    expect(resolveSidebarGroupOpen({ ...base, saved: false, defaultOpen: true })).toBe(false);
-    expect(resolveSidebarGroupOpen({ ...base, saved: undefined })).toBe(false);
-    expect(resolveSidebarGroupOpen({ ...base, saved: undefined, containsCurrentPage: true })).toBe(true);
   });
 });
 
-describe("sidebar on /admin pages", () => {
-  it("shows the system groups to a system admin, collapsible, all closed until opened", () => {
-    const nav = sidebarOf(render(admin));
-    for (const label of ["Events", "Clubs", "People", "Forms", "Catalogs and settings"]) expect(nav).toContain(`<span>${label}</span>`);
-    expect(nav).toContain('href="/admin/clubs/summary?view=records&amp;event=evt_one#monthly-records"');
-    expect(nav).toContain('href="/event-setup/copy?event=evt_one"');
-    expect(nav).toMatch(/id="nav-group-system-catalogs-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*id="nav-group-system-catalogs-toggle"/);
-    // Every group starts closed (#1245); only the one holding the current page opens.
-    for (const group of systemNavGroups) {
-      expect(nav).toMatch(new RegExp(`id="nav-group-${group.key}-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*id="nav-group-${group.key}-toggle"`));
-    }
-    // The event workspace sections are not drawn on system pages.
-    expect(nav).not.toContain("Registrations");
-  });
-
-  it("highlights the current page and opens its group", () => {
-    navigation.pathname = "/admin/honors";
-    const nav = sidebarOf(render(admin));
-    expect(nav).toContain('class="nav-item active" aria-current="page" href="/admin/honors?event=evt_one"');
-    expect(nav).toMatch(/aria-expanded="true"[^>]*id="nav-group-system-catalogs-toggle"|id="nav-group-system-catalogs-toggle"[^>]*aria-expanded="true"/);
-  });
-
-  it("keeps the current event on system links and lists Archived events once", () => {
-    navigation.search = "event=evt_one";
+describe("the Admin area on /admin pages", () => {
+  it("shows a system admin the rail's Admin area with its six tabs, and no sidebar groups", () => {
     const markup = render(admin);
-    expect(sidebarOf(markup)).toContain('href="/admin/clubs/summary?view=records&amp;event=evt_one#monthly-records"');
-    expect(markup.match(/>Archived events</g)).toHaveLength(1);
+    const row = tabsOf(markup);
+    for (const label of ["System administration", "Events", "Clubs", "People", "Forms", "Catalogs and settings"]) expect(row).toContain(`>${label}`);
+    expect(row.match(/<li>/g)).toHaveLength(6);
+    expect(railOf(markup)).toContain("<span>Admin</span>");
+    expect(markup).not.toContain("nav-group-toggle");
+    // The event workspace tabs are not drawn on System pages.
+    expect(row).not.toContain("Registrations");
+  });
+
+  it("opens each hub tab on the group's first page, and every group's pages stay on the System administration dashboard until the hubs exist (#1569)", () => {
+    const row = tabsOf(render(admin));
+    expect(row).toContain('href="/event-setup?event=evt_one">Events');
+    expect(row).toContain('href="/admin/organizations?event=evt_one">Clubs');
+    expect(row).toContain('href="/admin/people?event=evt_one">People');
+    expect(row).toContain('href="/admin/forms?event=evt_one">Forms');
+    expect(row).toContain('href="/admin/honors?event=evt_one">Catalogs and settings');
+    expect(row).toContain('aria-current="page" href="/admin?event=evt_one">System administration');
+  });
+
+  it("highlights the current page's tab and its view", () => {
+    navigation.pathname = "/admin/honors";
+    const markup = render(admin);
+    expect(markup).toContain('aria-current="true" href="/admin/honors?event=evt_one">Catalogs and settings');
+    expect(markup).toContain('<a aria-current="page" href="/admin/honors?event=evt_one">Honor catalog');
+  });
+
+  it("keeps the current event on system links and lists Archived events once per page", () => {
+    navigation.search = "event=evt_one";
+    navigation.pathname = "/admin/calendar";
+    const events = render(admin);
+    expect(tabsOf(events)).toContain('href="/archived-events?event=evt_one">Archived events');
+    expect(events.match(/>Archived events</g)).toHaveLength(1);
     navigation.pathname = "/overview";
     expect(render(admin).match(/>Archived events</g)).toHaveLength(1);
   });
 
-  it("leaves the event workspace sidebar unchanged off /admin, and never shows system groups to non-admins", () => {
+  it("leaves the event tabs unchanged off /admin, and never shows system pages to non-admins", () => {
     navigation.pathname = "/overview";
-    const eventNav = sidebarOf(render(admin));
-    expect(eventNav).toContain("Registrations");
-    expect(eventNav).not.toContain("Catalogs and settings");
+    const eventRow = tabsOf(render(admin));
+    expect(eventRow).toContain("Registrations");
+    expect(eventRow).not.toContain("Catalogs and settings");
     navigation.pathname = "/admin";
-    const nonAdmin = sidebarOf(render(staff));
-    expect(nonAdmin).not.toContain("Catalogs and settings");
+    const nonAdmin = render(staff);
+    expect(railOf(nonAdmin)).not.toContain("Admin");
     expect(nonAdmin).not.toContain('href="/admin/clubs/summary?view=records&amp;event=evt_one#monthly-records"');
     expect(nonAdmin).not.toContain('href="/event-setup"');
+    expect(nonAdmin).not.toContain("Catalogs and settings");
   });
 });
 
 describe("account menu Create event", () => {
   const menu = (createEventHref?: string) => renderToStaticMarkup(createElement(StaffAccountMenu, {
     attendeePreviewHref: "/account",
-    canSwitchToAttendee: false,
     createEventHref,
     defaultOpen: true,
     displayName: "Synthetic Staff",
@@ -241,6 +248,6 @@ describe("/admin dashboard page", () => {
   });
 
   it("keeps the event operations, health and version panels", () => {
-    for (const text of ["Upcoming events", "System health", "System version", "Feature requests"]) expect(source).toContain(text);
+    for (const text of ["Upcoming events", "System health", "System version", "Event module requests"]) expect(source).toContain(text);
   });
 });

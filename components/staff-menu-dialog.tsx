@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { GuardedLink } from "@/components/guarded-link";
@@ -26,10 +26,16 @@ export function StaffMenuDialog({
   onClose: () => void;
   returnTo?: RefObject<HTMLElement | null>;
 }) {
+  // Following a link leaves the page to its new content; every other close gives focus back to the menu button.
+  const followed = useRef(false);
   const dialogRef: RefObject<HTMLDivElement | null> = useAccessibleDialog<HTMLDivElement>(true, onClose, {
     initialFocus: () => dialogRef.current?.querySelector<HTMLElement>("[aria-current]") ?? null,
-    returnFocus: (opener) => returnTo?.current ?? opener,
+    returnFocus: (opener) => (followed.current ? null : returnTo?.current ?? opener),
   });
+  const follow = () => {
+    followed.current = true;
+    onClose();
+  };
   // A navigation that does not come through a link here (browser Back) leaves the dialog behind; close it with the page.
   useEffect(() => {
     window.addEventListener("popstate", onClose);
@@ -47,7 +53,7 @@ export function StaffMenuDialog({
           <ul>
             {tabs.map((tab) => (
               <li key={tab.key} className={styles.group}>
-                <GuardedLink className={styles.item} href={tab.href} aria-current={tabCurrent(tab)} onNavigate={onClose}>
+                <GuardedLink className={styles.item} href={tab.href} aria-current={tabCurrent(tab)} onNavigate={follow}>
                   <span>{tab.label}</span>
                   {tab.count ? <span className={styles.count}>{tab.count}</span> : null}
                 </GuardedLink>
@@ -55,7 +61,7 @@ export function StaffMenuDialog({
                   <ul className={styles.subItems} aria-label={`${tab.label} views`}>
                     {tab.views.map((view) => (
                       <li key={view.key}>
-                        <GuardedLink className={styles.item} href={view.href} aria-current={view.current ? "page" : undefined} onNavigate={onClose}>{view.label}</GuardedLink>
+                        <GuardedLink className={styles.item} href={view.href} aria-current={view.current ? "page" : undefined} onNavigate={follow}>{view.label}</GuardedLink>
                       </li>
                     ))}
                   </ul>

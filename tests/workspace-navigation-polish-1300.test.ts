@@ -14,6 +14,7 @@ vi.mock("next/link", () => ({
   },
   useLinkStatus: () => ({ pending: mocks.linkPending }),
 }));
+vi.mock("@/components/sign-out-button", () => ({ SignOutButton: () => h("button", { type: "button" }, "Sign out") }));
 import { GuardedLink } from "@/components/guarded-link";
 import { NavigationLink } from "@/components/navigation-link";
 
@@ -165,19 +166,25 @@ describe("real pending navigation", () => {
   });
 });
 
-// Workspace changes are full-page GETs (no prefetch) but must use the same dirty-form guard.
+// The account menu's workspace switcher (#1565) uses the same dirty-form guard as every other staff move.
 describe("workspace selection protects unsaved edits", () => {
   it("asks once and keeps the current workspace when the person cancels", async () => {
-    const { StaffWorkspaceSwitcher } = await import("@/components/staff-workspace-switcher");
-    await render(h(StaffWorkspaceSwitcher, { held: ["EVENTS_ADMIN", "CLUBS_ADMIN"], counts: {}, active: "events", eventId: "synthetic-event", hasEvents: true }));
+    const { StaffAccountMenu } = await import("@/components/staff-account-menu");
+    const { staffWorkspaceOptions } = await import("@/modules/access/workspace-contexts");
+    await render(h(StaffAccountMenu, {
+      attendeePreviewHref: "/account",
+      defaultOpen: true,
+      displayName: "Synthetic Staff",
+      email: "staff@imsda-events.test",
+      workspaces: staffWorkspaceOptions({ isSystemAdmin: true, attendeeAccountAvailable: false, staffHref: "/overview?event=synthetic-event", onSystemPage: false }),
+    }));
     const unregister = registerUnsavedChanges("Keep this synthetic draft?");
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    const href = window.location.href;
     try {
-      await act(async () => container.querySelector<HTMLAnchorElement>('a[href="/admin-role/CLUBS_ADMIN"]')!.click());
+      await act(async () => container.querySelector<HTMLAnchorElement>('a[href="/admin"]')!.click());
       expect(confirm).toHaveBeenCalledOnce();
-      expect(window.location.href).toBe(href);
-      expect(container.querySelector('a[aria-current="true"]')?.getAttribute("href")).toBe("/admin-role/EVENTS_ADMIN");
+      expect(mocks.push).not.toHaveBeenCalled();
+      expect(container.querySelector('a[aria-current="true"]')?.getAttribute("href")).toBe("/overview?event=synthetic-event");
     } finally { unregister(); confirm.mockRestore(); }
   });
 });

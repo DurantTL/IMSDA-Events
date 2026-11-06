@@ -46,7 +46,7 @@ describe("Help & learning in the shell", () => {
     expect(topbar(markup).match(/Help &amp; learning/g)?.length).toBeGreaterThanOrEqual(1);
     expect(topbar(markup)).toContain('href="/help?event=event_1"');
     expect(rail(markup)).not.toContain("Help &amp; learning");
-    expect(markup.match(/href="\/help\?event=event_1"/g)).toHaveLength(2);
+    expect(markup.match(/href="\/help\?event=event_1"/g)).toHaveLength(1);
   });
 
   it("lights only Help & learning on /help and below, and no tab, never the Dashboard", () => {

@@ -7,7 +7,8 @@ import type { EventTab, EventTabKey } from "@/components/staff-event-tabs";
  * tabs, so a phone cannot reach a page a desktop cannot, nor the other way round (`tests/mobile-directory-parity.test.ts`).
  */
 export type PhoneBarKey = "home" | "events" | "check-in" | "clubs" | "more";
-export type PhoneBarItem = { key: PhoneBarKey; label: string; href: string };
+/** `also` names the items dropped because they open the same page (a Clubs Administrator's Home is the Clubs landing). */
+export type PhoneBarItem = { key: PhoneBarKey; label: string; href: string; also?: PhoneBarKey[] };
 
 export const phoneBarLabels: Record<PhoneBarKey, string> = { home: "Home", events: "Events", "check-in": "Check-in", clubs: "Clubs", more: "More" };
 
@@ -28,13 +29,15 @@ export function phoneBarItems(input: {
     ["clubs", railHref("clubs")],
     ["more", moreHref ?? undefined],
   ];
-  const seen = new Set<string>();
   const items: PhoneBarItem[] = [];
   for (const [key, href] of candidates) {
     if (!href) continue;
-    // Two items for one page would both light; the first keeps it.
-    if (key !== "more" && seen.has(href)) continue;
-    seen.add(href);
+    // Two items for one page would both light; the first keeps it, and lights for the other's pages too.
+    const twin = key === "more" ? undefined : items.find((item) => item.key !== "more" && item.href === href);
+    if (twin) {
+      twin.also = [...(twin.also ?? []), key];
+      continue;
+    }
     items.push({ key, label: phoneBarLabels[key], href });
   }
   return items;
@@ -48,13 +51,19 @@ export function phoneBarCurrent(
   /** The event tab Home opens for staff with no Home area (their first tab). */
   firstEventTab: EventTabKey | null = null,
 ): PhoneBarKey | null {
-  const has = (key: PhoneBarKey) => items.some((item) => item.key === key);
+  const has = (key: PhoneBarKey) => items.some((item) => item.key === key || item.also?.includes(key));
+  const owner = (key: PhoneBarKey) => items.find((item) => item.key === key || item.also?.includes(key))?.key ?? null;
   let key: PhoneBarKey;
   if (place.area === "home") key = "home";
   else if (place.inEvent && eventTab === "check-in") key = "check-in";
-  else if (place.area === "events") key = has("events") ? "events" : place.inEvent && eventTab === firstEventTab ? "home" : "more";
+  else if (place.area === "events") {
+    // Staff whose Events item is the same page as Home (their event's first tab) light it only on that tab; the event's
+    // other tabs are "This event" in More. With an Events item of its own, every event page lights it.
+    const eventsIsHomeTwin = items.some((item) => item.also?.includes("events"));
+    key = !has("events") || (eventsIsHomeTwin && place.inEvent && eventTab !== firstEventTab) ? "more" : "events";
+  }
   else if (place.area === "clubs") key = "clubs";
   else key = "more";
-  if (has(key)) return key;
+  if (has(key)) return owner(key);
   return has("more") ? "more" : null;
 }

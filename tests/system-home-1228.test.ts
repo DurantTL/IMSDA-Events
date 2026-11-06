@@ -233,7 +233,7 @@ describe("the refreshed page", () => {
     mocks.listPendingModuleRequests.mockResolvedValue([{ id: "r1", eventId: "event-one", eventName: "Synthetic", moduleKey: "x", moduleTitle: "Lodging", requesterName: "Synthetic Director", reason: "Needed", createdAt: now }]);
     const html = await renderHome();
     expect(html).toContain("1 feature request waiting");
-    expect(html).toMatch(/href="\/admin\/feature-requests">Review feature requests/);
+    expect(html).toMatch(/href="\/admin\/feature-requests">Review event module requests/);
     expect(html).not.toContain("in queue");
     expect(html).not.toMatch(/<form|<button/);
     const source = readFileSync(join(process.cwd(), "app/(workspace)/admin/page.tsx"), "utf8");
@@ -246,7 +246,7 @@ describe("the refreshed page", () => {
 
   it("keeps the work list, the Catalogs and settings group, the roadmap and the version", async () => {
     const html = await renderHome();
-    for (const text of ["Feature requests", "Work across the platform", "Catalogs and settings", "Honor catalog", "Build roadmap", "issues/98", "System version"]) expect(html).toContain(text);
+    for (const text of ["Event module requests", "Work across the platform", "Catalogs and settings", "Honor catalog", "Build roadmap", "issues/98", "System version"]) expect(html).toContain(text);
   });
 
   it("links only to real pages: a navigation destination, a same-page jump or a known event page", async () => {

@@ -63,33 +63,23 @@ function render({ permissions, systemAdmin = false, pathname = "/overview" }: Vi
   );
 }
 
-const navMarkup = (viewer: Viewer) => {
+const tabRow = (viewer: Viewer) => {
   const markup = render(viewer);
-  return markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf('class="sidebar-foot"'));
+  return markup.slice(markup.indexOf('data-staff-tabs="true"'), markup.indexOf("</nav>", markup.indexOf('data-staff-tabs="true"')));
 };
-
-/** Closed groups keep their links in the markup, inside a `hidden` container. */
-const withoutClosedGroups = (nav: string) => nav.replace(/<div class="nav-group-items"[^>]*\shidden=""[^>]*>.*?<\/div>/g, "");
-
-function tokensOf(nav: string): string[] {
-  const tokens: string[] = [];
-  for (const match of nav.matchAll(/<button [^>]*class="nav-group-toggle"[^>]*><span>([^<]+)<\/span>|<a [^>]*class="nav-item[^"]*"[^>]*>.*?<span>([^<]+)<\/span>/g)) {
-    // The pinned Help & learning link (#1077) follows More for everyone; tests/help-learning-1077.test.ts covers it.
-    if (match[2] === "Help &amp; learning") continue;
-    tokens.push(match[1] ? `# ${match[1]}` : match[2]);
-  }
-  return tokens;
-}
-
-/** The sidebar as `# Group` headings and items, in document order, More last. Items in a closed group are included. */
-function sidebar(viewer: Viewer): string[] {
-  return tokensOf(navMarkup(viewer));
-}
-
-/** Only what is visible without expanding anything. */
-function visibleSidebar(viewer: Viewer): string[] {
-  return tokensOf(withoutClosedGroups(navMarkup(viewer)));
-}
+/** The event tabs, in document order. */
+const tabs = (viewer: Viewer) => [...tabRow(viewer).matchAll(/<li><a [^>]*href="[^"]*">([^<]+)</g)].map((match) => match[1]);
+const railLabels = (viewer: Viewer) => {
+  const markup = render(viewer);
+  const nav = markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf("</nav>", markup.indexOf('id="primary-navigation"')));
+  return [...nav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]);
+};
+/** The view strip under the current tab, if any. */
+const views = (viewer: Viewer) => {
+  const markup = render(viewer);
+  const start = markup.indexOf("data-staff-views");
+  return start < 0 ? [] : [...markup.slice(start, markup.indexOf("</div>", start)).matchAll(/<a [^>]*>([^<]+)</g)].map((match) => match[1]);
+};
 
 function phoneTabs(viewer: Viewer): { labels: string[]; active: string[] } {
   const markup = render(viewer);
@@ -105,214 +95,126 @@ function phoneTabs(viewer: Viewer): { labels: string[]; active: string[] } {
 
 const systemAdmin: Viewer = { permissions: eventPermissions, systemAdmin: true };
 const eventAdmin: Viewer = { permissions: rolePermissions.EVENT_ADMIN };
-const fullOrder = [
+const fullTabs = ["Event home", "Registrations", "Check-in", "Communications", "Money", "Reports", "Event setup"];
+/** The registry's sidebar items, still the source of the search order and the More directory (#964). */
+const registryOrder = [
   "Dashboard", "Check-in", "Registrations", "Payments", "Emails",
-  "# Set up", "Event settings", "Event features", "Registration forms", "Attendee setup", "Tags",
-  "# Reports", "Operational reports", "Operational health",
-  "More",
+  "Event settings", "Event features", "Registration forms", "Attendee setup", "Tags",
+  "Operational reports", "Operational health",
 ];
 
-describe("sidebar order (#964)", () => {
-  it("declares the daily items, then Set up and Reports, with their names", () => {
+describe("event tab order (#1565, from the sidebar order of #964)", () => {
+  it("lists the seven tabs in the fixed order for a system admin and for an event admin", () => {
+    expect(tabs(systemAdmin)).toEqual(fullTabs);
+    expect(tabs(eventAdmin)).toEqual(fullTabs);
+  });
+
+  it("keeps navigation's items in the table's order, with the moved items out and More last", () => {
+    const listed = navigation.filter((item) => item.sidebar).map((item) => item.label).filter((label) => label !== "Kitchen counts");
+    // Kitchen counts (#1029) is the one item for staff without the event view, so no admin sees it: it follows the dashboard.
+    expect(navigation.filter((item) => item.sidebar).slice(0, 2).map((item) => item.label)).toEqual(["Dashboard", "Kitchen counts"]);
+    expect(listed).toEqual(registryOrder.filter((entry) => entry !== "Event features"));
+    expect(navigation.filter((item) => !item.sidebar && item.href !== "/more").map((item) => item.label)).toEqual(["Attendee list", "Imports", "Team", "Promo codes"]);
+    expect(navigation.at(-1)?.href).toBe("/more");
+    expect(orderedSidebarItems(new Set(eventPermissions), true).map((item) => item.label)).toEqual(registryOrder.filter((entry) => entry !== "Event features").concat("More"));
     expect([...sidebarSectionOrder]).toEqual(["daily", "setup", "reports"]);
     expect(sidebarSectionOrder.map((section) => sidebarSectionLabels[section])).toEqual([null, "Set up", "Reports"]);
   });
 
-  it("lists every item in the fixed order for a system admin", () => {
-    expect(sidebar(systemAdmin)).toEqual(fullOrder);
-  });
-
-  it("lists the same order for an event admin", () => {
-    expect(sidebar(eventAdmin)).toEqual(fullOrder);
-  });
-
-  it("shows a system admin at most nine links without expanding a group", () => {
-    const visible = visibleSidebar(systemAdmin);
-    expect(visible).toEqual(["Dashboard", "Check-in", "Registrations", "Payments", "Emails", "# Set up", "# Reports", "More"]);
-    expect(visible.filter((entry) => !entry.startsWith("# ")).length).toBeLessThanOrEqual(9);
-  });
-
-  it("keeps navigation's sidebar items in the table's order, with the moved items out and More last", () => {
-    const listed = navigation.filter((item) => item.sidebar).map((item) => item.label).filter((label) => label !== "Kitchen counts");
-    // Kitchen counts (#1029) is the one sidebar item for staff without the event view, so no admin sees it: it follows the dashboard.
-    expect(navigation.filter((item) => item.sidebar).slice(0, 2).map((item) => item.label)).toEqual(["Dashboard", "Kitchen counts"]);
-    expect(listed).toEqual(fullOrder.filter((entry) => !entry.startsWith("# ") && entry !== "More" && entry !== "Event features"));
-    expect(navigation.filter((item) => !item.sidebar && item.href !== "/more").map((item) => item.label)).toEqual(["Attendee list", "Imports", "Team", "Promo codes"]);
-    expect(navigation.at(-1)?.href).toBe("/more");
-    expect(orderedSidebarItems(new Set(eventPermissions), true).map((item) => item.label)).toEqual(
-      fullOrder.filter((entry) => !entry.startsWith("# ") && entry !== "Event features"),
-    );
-  });
-
-  it("puts Event features in Set up, behind CONFIGURE_EVENT, after Event settings (#965)", () => {
+  it("puts Event features in Event setup, behind CONFIGURE_EVENT, after Event settings (#965)", () => {
     const setup = sidebarSections(new Set(["CONFIGURE_EVENT"])).find((view) => view.section === "setup");
     expect(setup?.items.map((item) => item.label)).toEqual(["Event settings", "Event features", "Attendee setup", "Tags"]);
     expect(setup?.items[1]).toMatchObject({ href: eventFeaturesRoute, requiredPermission: "CONFIGURE_EVENT" });
     expect(eventFeaturesRoute).toBe("/more/features");
-    expect(sidebar({ permissions: eventPermissions.filter((permission) => permission !== "CONFIGURE_EVENT") })).not.toContain("Event features");
-    expect(render(eventAdmin)).toContain(`href="${eventFeaturesRoute}?event=event_1"`);
+    const withFeatures = render({ ...eventAdmin, pathname: eventFeaturesRoute });
+    expect(withFeatures).toContain(`href="${eventFeaturesRoute}?event=event_1"`);
+    expect(views({ ...eventAdmin, pathname: eventFeaturesRoute })).toEqual(["Event settings", "Registration forms", "Attendee setup", "Event features", "All event tools"]);
+    expect(views({ permissions: eventPermissions.filter((permission) => permission !== "CONFIGURE_EVENT"), pathname: "/registration-builder" })).not.toContain("Event features");
   });
 
-  it("shows a check-in-only role Dashboard, Check-in and Registrations, with no groups", () => {
-    expect(sidebar({ permissions: rolePermissions.CHECK_IN_STAFF })).toEqual([
-      "Dashboard", "Check-in", "Registrations",
-      "More",
-    ]);
-    expect(sidebar({ permissions: ["MANAGE_CHECK_IN"] })).toEqual(["Dashboard", "Check-in"]);
+  it("shows a check-in-only role Event home, Registrations and Check-in, and no empty tab", () => {
+    expect(tabs({ permissions: rolePermissions.CHECK_IN_STAFF })).toEqual(["Event home", "Registrations", "Check-in", "Event setup"]);
+    expect(tabs({ permissions: ["MANAGE_CHECK_IN"] })).toEqual(["Check-in"]);
   });
 
-  it("shows a finance-only role Payments and the Reports group, with the empty Set up group hidden", () => {
-    expect(sidebar({ permissions: rolePermissions.FINANCE_MANAGER })).toEqual([
-      "Dashboard", "Registrations", "Payments",
-      "# Reports", "Operational reports", "Operational health",
-      "More",
-    ]);
+  it("shows a finance-only role Money, with Reports and the directory", () => {
+    expect(tabs({ permissions: rolePermissions.FINANCE_MANAGER })).toEqual(["Event home", "Registrations", "Money", "Reports", "Event setup"]);
+    expect(views({ permissions: rolePermissions.FINANCE_MANAGER, pathname: "/finance" })).toEqual(["Payments", "Balances due", "Promo codes"]);
   });
 
-  it("shows a communications role Emails and Operational health, with no Set up group", () => {
-    expect(sidebar({ permissions: rolePermissions.COMMUNICATIONS_MANAGER })).toEqual([
-      "Dashboard", "Emails",
-      "# Reports", "Operational health",
-      "More",
-    ]);
+  it("shows a communications role Communications, and Operational health only where its permissions allow", () => {
+    expect(tabs({ permissions: rolePermissions.COMMUNICATIONS_MANAGER })).toEqual(["Event home", "Communications", "Reports", "Event setup"]);
+    expect(views({ permissions: rolePermissions.COMMUNICATIONS_MANAGER, pathname: "/more/health" })).toEqual([]);
   });
 
-  it("shows a read-only role only the Dashboard", () => {
-    expect(sidebar({ permissions: rolePermissions.READ_ONLY_STAFF })).toEqual(["Dashboard"]);
+  it("shows a read-only role only the dashboard", () => {
+    expect(tabs({ permissions: rolePermissions.READ_ONLY_STAFF })).toEqual(["Event home"]);
   });
 
   it("hides every item whose permission the viewer lacks", () => {
     for (const item of navigation) {
-      if (!item.requiredPermission) continue;
+      // Kitchen counts is also open to VIEW_REPORTS (its page admits either), so it is not hidden by lacking its own permission.
+      if (!item.requiredPermission || item.href === "/more/kitchen-report/counts") continue;
       const others = eventPermissions.filter((permission) => permission !== item.requiredPermission);
-      expect(sidebar({ permissions: others }), item.label).not.toContain(item.label);
+      const markup = render({ permissions: others, pathname: item.href });
+      const chrome = markup.slice(markup.indexOf('data-staff-tabs="true"'), markup.indexOf("<header", markup.indexOf('data-staff-tabs="true"')));
+      expect(chrome, item.label).not.toContain(`href="${item.href}?event=event_1"`);
     }
   });
 
-  it("never lists the moved items, Clubs and churches or a System group in the sidebar", () => {
-    const entries = sidebar({ ...systemAdmin, permissions: eventPermissions });
-    for (const moved of ["Attendee list", "Imports", "Team", "Promo codes"]) expect(entries).not.toContain(moved);
-    expect(entries.join("|")).not.toMatch(/Clubs and churches|# System/);
+  it("never lists the moved items, Clubs and churches or a System group in the event tabs", () => {
+    const entries = tabs({ ...systemAdmin, permissions: eventPermissions });
+    for (const moved of ["Attendee list", "Imports", "Team", "Promo codes", "Clubs and churches", "System management", "Payments", "Refunds"]) expect(entries).not.toContain(moved);
   });
 });
 
-describe("collapsible groups (#964)", () => {
-  const toggle = (viewer: Viewer, section: string) => {
-    const nav = navMarkup(viewer);
-    return nav.match(new RegExp(`<button [^>]*id="nav-group-${section}-toggle"[^>]*>`))?.[0] ?? "";
-  };
-
-  it("renders each group heading as a real button with aria-expanded and aria-controls, closed by default", () => {
-    for (const section of ["setup", "reports"]) {
-      const button = toggle(systemAdmin, section);
-      expect(button, section).toContain('type="button"');
-      expect(button).toContain('aria-expanded="false"');
-      expect(button).toContain(`aria-controls="nav-group-${section}"`);
-      const nav = navMarkup(systemAdmin);
-      expect(nav).toMatch(new RegExp(`<div class="nav-group-items" id="nav-group-${section}"[^>]*aria-labelledby="nav-group-${section}-toggle"[^>]*hidden=""`));
-    }
-  });
-
-  it("has no button for the daily items, which are always visible", () => {
-    expect(navMarkup(systemAdmin).match(/class="nav-group-toggle"/g)).toHaveLength(2);
-    expect(navMarkup({ permissions: rolePermissions.CHECK_IN_STAFF })).not.toContain("nav-group-toggle");
-  });
-
-  it("opens the group the current page is in, and only that group", () => {
-    const setupOpen = { ...eventAdmin, pathname: "/more/tags" };
-    expect(toggle(setupOpen, "setup")).toContain('aria-expanded="true"');
-    expect(toggle(setupOpen, "reports")).toContain('aria-expanded="false"');
-    expect(visibleSidebar(setupOpen)).toEqual([
-      "Dashboard", "Check-in", "Registrations", "Payments", "Emails",
-      "# Set up", "Event settings", "Event features", "Registration forms", "Attendee setup", "Tags",
-      "# Reports", "More",
-    ]);
-    const reportsOpen = { ...eventAdmin, pathname: "/more/health" };
-    expect(toggle(reportsOpen, "reports")).toContain('aria-expanded="true"');
-    expect(toggle(reportsOpen, "setup")).toContain('aria-expanded="false"');
-    // The daily items are not groups: nothing opens on the dashboard.
-    expect(toggle(eventAdmin, "setup")).toContain('aria-expanded="false"');
-    expect(toggle(eventAdmin, "reports")).toContain('aria-expanded="false"');
-  });
-
-  it("opens Set up on the Event features page, lights that item, and leaves More alone (#965)", () => {
-    const viewer = { ...eventAdmin, pathname: `${eventFeaturesRoute}` };
-    expect(toggle(viewer, "setup")).toContain('aria-expanded="true"');
-    const active = [...navMarkup(viewer).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
-    expect(active).toEqual(["Event features"]);
-    // A page below it lights the same item.
-    const below = [...navMarkup({ ...viewer, pathname: `${eventFeaturesRoute}/anything` }).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
-    expect(below).toEqual(["Event features"]);
-  });
-
-  it("lights More, not Event features, on the Event modules page at /more (#965)", () => {
-    const viewer = { ...eventAdmin, pathname: "/more" };
-    const active = [...navMarkup(viewer).matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
-    expect(active).toEqual(["More"]);
-  });
-
-  it("renders correctly with no browser storage: closed groups, every link still in the document", () => {
-    // renderToStaticMarkup has no window or localStorage, like a private window.
-    const nav = navMarkup(systemAdmin);
-    for (const label of ["Event settings", "Event features", "Tags", "Operational reports", "Operational health"]) expect(nav).toContain(`<span>${label}</span>`);
-  });
-
-  it("keeps links in a closed group out of the tab order by hiding the container, not the links", () => {
-    expect(navMarkup(systemAdmin)).not.toMatch(/<a [^>]*tabindex/);
-  });
-});
-
-describe("System management and the event picker (#741 slice 4)", () => {
-  it("appears once, above the single Current event picker, for a system admin", () => {
+describe("the rail and the event picker (#1565, from #741 slice 4)", () => {
+  it("draws System management as the Admin area, once, for a system admin, and the event picker once in the event bar", () => {
     const markup = render(systemAdmin);
-    expect(markup.split("System management").length - 1).toBe(1);
-    expect(markup).toContain("All events and integrations");
-    expect(markup.indexOf("System management")).toBeLessThan(markup.indexOf('id="event-picker"'));
+    expect(railLabels(systemAdmin)).toContain("Admin");
     expect(markup.split('id="event-picker"').length - 1).toBe(1);
-    // Before the nav, which no longer carries it.
-    expect(markup.indexOf("System management")).toBeLessThan(markup.indexOf('id="primary-navigation"'));
+    expect(markup.indexOf('id="primary-navigation"')).toBeLessThan(markup.indexOf('id="event-picker"'));
+    expect(markup).not.toContain("Global administration");
   });
 
   it("is hidden from every role that is not a system admin", () => {
     for (const permissions of [eventAdmin.permissions, rolePermissions.FINANCE_MANAGER, rolePermissions.CHECK_IN_STAFF]) {
       expect(render({ permissions })).not.toContain("System management");
+      expect(railLabels({ permissions })).not.toContain("Admin");
     }
   });
 
-  it("keeps the Event database footer", () => {
-    const markup = render(eventAdmin);
-    expect(markup).toContain("Event database");
-    expect(markup).toContain("Access controlled");
+  it("has no Event database footer, because there is no sidebar", () => {
+    expect(render(eventAdmin)).not.toContain("Event database");
   });
 });
 
-describe("phone tabs (#741 slice 4)", () => {
-  it("is Home, People, Check-in, Payments (finance only), Emails, More; People is the Registrations page", () => {
-    expect([...mobileNavigationOrder]).toEqual(["/overview", "/more/kitchen-report/counts", "/people", "/check-in", "/finance", "/communications", "/more"]);
-    expect(mobileNavigationLabels["/people"]).toBe("People");
-    expect(navigation.find((item) => item.href === "/people")?.label).toBe("Registrations");
-    expect(phoneTabs(eventAdmin).labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
-    expect(phoneTabs(systemAdmin).labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
+describe("phone bar (#1565, from the phone tabs of #741 slice 4)", () => {
+  it("is Home, Check-in, More for an event admin with no admin role: Events is the same page as Home there", () => {
+    expect(phoneTabs(eventAdmin).labels).toEqual(["Home", "Check-in", "More"]);
   });
 
-  it("hides tabs the viewer may not open, keeping the order", () => {
-    expect(phoneTabs({ permissions: rolePermissions.CHECK_IN_STAFF }).labels).toEqual(["Home", "People", "Check-in", "More"]);
-    expect(phoneTabs({ permissions: rolePermissions.FINANCE_MANAGER }).labels).toEqual(["Home", "People", "Pay", "More"]);
-    expect(phoneTabs({ permissions: rolePermissions.COMMUNICATIONS_MANAGER }).labels).toEqual(["Home", "Emails", "More"]);
+  it("is Home, Events, Check-in, Clubs, More for a system admin", () => {
+    expect(phoneTabs(systemAdmin).labels).toEqual(["Home", "Events", "Check-in", "Clubs", "More"]);
+  });
+
+  it("hides items the viewer may not open, keeping the order", () => {
+    expect(phoneTabs({ permissions: rolePermissions.CHECK_IN_STAFF }).labels).toEqual(["Home", "Check-in", "More"]);
+    expect(phoneTabs({ permissions: rolePermissions.FINANCE_MANAGER }).labels).toEqual(["Home", "More"]);
     expect(phoneTabs({ permissions: rolePermissions.READ_ONLY_STAFF }).labels).toEqual(["Home"]);
+    expect(phoneTabs({ permissions: rolePermissions.KITCHEN_STAFF }).labels).toEqual(["Home"]);
   });
 
-  it("selects More on child routes, Team and the other desktop-only pages included", () => {
-    for (const pathname of ["/more/event-settings", "/more/tags", "/more/reports", "/more/health", "/more/promo-codes", "/staff", "/imports", "/registration-builder", "/community", "/more/clubs"]) {
-      expect(phoneTabs({ ...eventAdmin, pathname }).active, pathname).toEqual(["More"]);
-    }
-  });
-
-  it("keeps a real tab selected on its own page and children", () => {
-    expect(phoneTabs({ ...eventAdmin, pathname: "/people/abc" }).active).toEqual(["People"]);
+  it("selects More on a page no bar item owns, and the bar item on its own pages", () => {
+    expect(phoneTabs({ ...eventAdmin, pathname: "/finance" }).active).toEqual(["More"]);
+    expect(phoneTabs({ ...eventAdmin, pathname: "/staff" }).active).toEqual(["More"]);
     expect(phoneTabs({ ...eventAdmin, pathname: "/check-in" }).active).toEqual(["Check-in"]);
-    expect(phoneTabs({ ...eventAdmin, pathname: "/finance/invoices" }).active).toEqual(["Pay"]);
+    expect(phoneTabs({ ...eventAdmin, pathname: "/check-in/badges" }).active).toEqual(["Check-in"]);
+    expect(phoneTabs({ ...eventAdmin, pathname: "/overview" }).active).toEqual(["Home"]);
+    expect(phoneTabs({ ...systemAdmin, pathname: "/admin/clubs" }).active).toEqual(["Clubs"]);
     expect(mobileActiveTabHref("/more/health")).toBe("/more");
+    expect(mobileNavigationLabels["/overview"]).toBe("Home");
+    expect([...mobileNavigationOrder][0]).toBe("/overview");
   });
 });
 
@@ -354,46 +256,46 @@ describe("More directory position (#741 slice 4)", () => {
   });
 });
 
-describe("Operational health and desktop highlight (#741 slice 4)", () => {
+describe("Operational health and the current view (#1565, from #741 slice 4)", () => {
   it("is hidden when none of operationalHealthEntryPermissions is held", () => {
     const withoutEntry = eventPermissions.filter((permission) => !(operationalHealthEntryPermissions as readonly string[]).includes(permission));
     expect(withoutEntry).not.toContain("MANAGE_FINANCE");
-    const items = sidebar({ permissions: withoutEntry });
-    expect(items).not.toContain("Operational health");
-    // VIEW_REPORTS still shows Operational reports, so the group stays with that one item.
-    expect(items.slice(items.indexOf("# Reports"))).toEqual(["# Reports", "Operational reports", "More"]);
+    expect(views({ permissions: withoutEntry, pathname: "/more/reports" })).not.toContain("Operational health");
     for (const permission of operationalHealthEntryPermissions) {
-      expect(sidebar({ permissions: [permission] }), permission).toContain("Operational health");
+      expect(views({ permissions: [permission, "VIEW_REPORTS"], pathname: "/more/reports" }), permission).toContain("Operational health");
     }
   });
 
-  function activeItems(pathname: string) {
+  function current(pathname: string) {
     const markup = render({ ...eventAdmin, pathname });
-    const nav = markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf('class="sidebar-foot"'));
-    return [...nav.matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
+    const row = markup.slice(markup.indexOf('data-staff-tabs="true"'), markup.indexOf("</nav>", markup.indexOf('data-staff-tabs="true"')));
+    const strip = markup.indexOf("data-staff-views") < 0 ? "" : markup.slice(markup.indexOf("data-staff-views"), markup.indexOf("</div>", markup.indexOf("data-staff-views")));
+    return {
+      tab: [...row.matchAll(/<a aria-current="(?:page|true)"[^>]*>([^<]+)</g)].map((match) => match[1]),
+      view: [...strip.matchAll(/<a aria-current="page"[^>]*>([^<]+)</g)].map((match) => match[1]),
+    };
   }
 
-  it("highlights Operational reports and Operational health on their own pages, not More", () => {
-    expect(activeItems("/more/reports")).toEqual(["Operational reports"]);
-    expect(activeItems("/more/reports/packets")).toEqual(["Operational reports"]);
-    expect(activeItems("/more/health")).toEqual(["Operational health"]);
-    expect(activeItems("/more")).toEqual(["More"]);
+  it("marks one tab and one view on a page, never two", () => {
+    expect(current("/more/reports")).toEqual({ tab: ["Reports"], view: ["Operational reports"] });
+    expect(current("/more/reports/packets")).toEqual({ tab: ["Reports"], view: ["Printouts"] });
+    expect(current("/more/health")).toEqual({ tab: ["Reports"], view: ["Operational health"] });
+    expect(current("/more")).toEqual({ tab: ["Event setup"], view: ["All event tools"] });
+    expect(current("/overview")).toEqual({ tab: ["Event home"], view: [] });
   });
 
-  it("lights the parent item for a page that left the sidebar (#964)", () => {
-    expect(activeItems("/people/attendees")).toEqual(["Registrations"]);
-    expect(activeItems("/imports")).toEqual(["Registrations"]);
-    expect(activeItems("/more/promo-codes")).toEqual(["Payments"]);
-    expect(activeItems("/staff")).toEqual(["More"]);
+  it("keeps a page that left the sidebar under its parent tab (#964)", () => {
+    expect(current("/people/attendees")).toEqual({ tab: ["Registrations"], view: ["Attendee list"] });
+    expect(current("/imports")).toEqual({ tab: ["Registrations"], view: ["Imports"] });
+    expect(current("/more/promo-codes")).toEqual({ tab: ["Money"], view: ["Promo codes"] });
+    expect(current("/staff")).toEqual({ tab: ["Event setup"], view: ["All event tools"] });
   });
 
-  it("lights More for Imports when the viewer cannot see Registrations (#964)", () => {
-    const active = (permissions: readonly EventPermission[]) => {
-      const nav = navMarkup({ permissions, pathname: "/imports" });
-      return [...nav.matchAll(/<a [^>]*class="nav-item active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
-    };
-    expect(active(["MANAGE_IMPORTS"])).toEqual(["More"]);
-    expect(active(["MANAGE_IMPORTS", "VIEW_SENSITIVE_DATA"])).toEqual(["Registrations"]);
+  it("lights Event setup for Imports when the viewer cannot see Registrations", () => {
+    // Without VIEW_SENSITIVE_DATA the Registrations tab lists Imports alone, which is still its tab.
+    const markup = render({ permissions: ["MANAGE_IMPORTS"], pathname: "/imports" });
+    const row = markup.slice(markup.indexOf('data-staff-tabs="true"'), markup.indexOf("</nav>", markup.indexOf('data-staff-tabs="true"')));
+    expect([...row.matchAll(/<a aria-current="(?:page|true)"[^>]*>([^<]+)</g)].map((match) => match[1])).toEqual(["Registrations"]);
   });
 });
 

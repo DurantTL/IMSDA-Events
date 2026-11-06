@@ -226,7 +226,7 @@ export function buildWorkList(attention: AttentionSummary | null, featureRequest
     count: featureRequests,
     atLeast: featureRequests !== null && featureRequests >= FEATURE_REQUEST_READ_LIMIT,
     href: "/admin/feature-requests",
-    linkLabel: "Review feature requests",
+    linkLabel: "Review event module requests",
     reviewOnly: false,
   };
   if (featureRequests === null || featureRequests > 0) rows.push(requestRow);

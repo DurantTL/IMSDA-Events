@@ -272,11 +272,11 @@ export default async function SystemAdminPage({
 
       <section className="panel module-requests" id="module-requests" aria-labelledby="module-requests-heading">
         <div className={styles.sectionHeading}>
-          <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading">Feature requests</h2><p>Event admins asking for a feature to be turned on. This page only counts them; deciding a request happens on the review page.</p></div>
+          <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading">Event module requests</h2><p>Event admins asking for a feature to be turned on. This page only counts them; deciding a request happens on the review page.</p></div>
           <span>{moduleRequests ? (moduleRequests.length === 0 ? "Nothing waiting" : `${moduleRequests.length >= FEATURE_REQUEST_READ_LIMIT ? `${FEATURE_REQUEST_READ_LIMIT}+` : moduleRequests.length} feature ${moduleRequests.length === 1 ? "request" : "requests"} waiting`) : "Unavailable"}</span>
         </div>
         {moduleRequests === null && <Unavailable what="The feature-request list" />}
-        <p><Link className={styles.fullReport} href="/admin/feature-requests">Review feature requests <ArrowRight aria-hidden="true" size={14} /></Link></p>
+        <p><Link className={styles.fullReport} href="/admin/feature-requests">Review event module requests <ArrowRight aria-hidden="true" size={14} /></Link></p>
       </section>
 
       <section className={styles.primaryColumn} id="upcoming-events" aria-labelledby="upcoming-events-heading">
