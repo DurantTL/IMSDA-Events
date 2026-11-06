@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Staff sign in", robots: { index: fal
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string | string[] }>;
+  searchParams: Promise<{ next?: string | string[]; staff?: string | string[] }>;
 }) {
   const params = await searchParams;
   // With the one-sign-in switch on, /login is /sign-in (#554). With it off nothing changes.

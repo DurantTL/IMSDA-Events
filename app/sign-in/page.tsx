@@ -15,6 +15,8 @@ import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 import { isStaffSessionTimedOutForLinkedAttendee, STAFF_TIMED_OUT_NOTICE } from "@/modules/account-merge/staff-timeout";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { passkeysConfigured as attendeePasskeysConfigured } from "@/modules/attendee-accounts/passkeys";
+import { safeReturnTo } from "@/lib/return-to";
+import { isStaffLandingTarget, isStaffSideTarget } from "@/modules/access/login-routing";
 import { attendeeReturnDestination } from "@/modules/attendee-accounts/return-destination";
 import { securityCheckConfigForPage } from "@/modules/security/security-check-config";
 
@@ -35,7 +37,7 @@ export const metadata: Metadata = {
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string | string[]; next?: string | string[] }>;
+  searchParams: Promise<{ error?: string | string[]; next?: string | string[]; staff?: string | string[] }>;
 }) {
   // Fail closed: if the switch cannot be read, the old staff sign-in is the page.
   let enabled = false;
@@ -46,18 +48,24 @@ export default async function SignInPage({
   }
   if (!enabled) redirect("/login");
 
-  const { error, next: rawNext } = await searchParams;
-  const next = typeof rawNext === "string" ? rawNext : undefined;
+  const { error, next: rawNext, staff } = await searchParams;
+  // An unsafe `next` (off-site, `//host`, `/api/...`) is dropped here, before the redirects, the form or the buttons see it.
+  const next = typeof rawNext === "string" ? safeReturnTo(rawNext, "") || undefined : undefined;
   const session = await getCurrentSession();
   if (session.user) redirect(await resolvePostLoginDestination(session.user, { returnTo: next }));
-  // A linked person whose staff side idled out (#1092) arrives here from a staff page (or the
-  // header's "Staff sign-in" link) with a `next`, still holding a live attendee session. They stay
-  // on this page with a notice instead of being sent on to /account. The check reads only this
-  // browser's own attendee session and its link, never a typed email, so nothing about staff
-  // accounts is revealed; an anonymous visitor never sees the notice.
-  // Only for a staff-side target: an attendee or profile destination keeps the old redirect.
-  const staffTimedOut = next && !attendeeReturnDestination(next, "") ? await isStaffSessionTimedOutForLinkedAttendee() : false;
-  if (!staffTimedOut && (await getCurrentAttendee()).account) redirect(attendeeReturnDestination(next, "/account"));
+  // Someone whose staff side idled out (#1092, #1637) arrives here from a staff page, the header's "Staff sign-in"
+  // link, or /no-access, still holding a live attendee session (7 days against the staff hour). When the visit is
+  // clearly for staff (a staff-side `next`, or the explicit `staff=1` intent) the form shows instead of a bounce to
+  // /account, linked or not: there is no other way to a staff sign-in short of signing out. An attendee destination
+  // or no hint keeps the old redirect. Neither value becomes a return target beyond `next` itself, so role routing
+  // after sign-in is untouched.
+  const staffIntent = staff === "1" || isStaffLandingTarget(next);
+  const staffTarget = isStaffSideTarget(next) && !attendeeReturnDestination(next, "");
+  const wantsStaff = staffTarget || staffIntent;
+  if (!wantsStaff && (await getCurrentAttendee()).account) redirect(attendeeReturnDestination(next, "/account"));
+  // The notice reads only this browser's own attendee session and its link, never a typed email, so it reveals
+  // nothing about any address; an anonymous visitor never sees it.
+  const staffTimedOut = wantsStaff ? await isStaffSessionTimedOutForLinkedAttendee() : false;
 
   const errorMessage = attendeeSignInErrorMessage(typeof error === "string" ? error : undefined);
   const googleAvailable = isGoogleSignInConfigured();

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { STAFF_INTENT_PARAM } from "@/modules/access/login-routing";
 import { isUnifiedSignInEnabled } from "@/modules/account-merge/account-link";
 
 export const UNIFIED_SIGN_IN_PATH = "/sign-in";
@@ -16,6 +17,8 @@ export function unifiedSignInPathFor(params: Record<string, string | string[] | 
     const value = params[key];
     if (typeof value === "string" && value) query.set(key, value);
   }
+  // Staff intent (#1637) is a bare flag: only "1" is carried, and it is never a return target.
+  if (params[STAFF_INTENT_PARAM] === "1") query.set(STAFF_INTENT_PARAM, "1");
   const text = query.toString();
   return text ? `${UNIFIED_SIGN_IN_PATH}?${text}` : UNIFIED_SIGN_IN_PATH;
 }

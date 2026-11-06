@@ -23,6 +23,13 @@ describe("unifiedSignInPathFor", () => {
     expect(unifiedSignInPathFor({ error: "google-expired", next: "/account/profile" })).toBe("/sign-in?next=%2Faccount%2Fprofile&error=google-expired");
     expect(unifiedSignInPathFor({ next: ["/a", "/b"], other: "x" })).toBe("/sign-in");
   });
+
+  it("carries the staff intent flag only as staff=1 (#1637)", () => {
+    expect(unifiedSignInPathFor({ staff: "1" })).toBe("/sign-in?staff=1");
+    expect(unifiedSignInPathFor({ staff: "0" })).toBe("/sign-in");
+    expect(unifiedSignInPathFor({ staff: ["1", "1"] })).toBe("/sign-in");
+    expect(unifiedSignInPathFor({ next: "/overview", staff: "1" })).toBe("/sign-in?next=%2Foverview&staff=1");
+  });
 });
 
 describe("redirectToUnifiedSignInWhenEnabled", () => {
@@ -35,6 +42,16 @@ describe("redirectToUnifiedSignInWhenEnabled", () => {
   it("does nothing with the switch off", async () => {
     mocks.enabled.mockResolvedValue(false);
     await redirectToUnifiedSignInWhenEnabled({ next: "/overview" });
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+
+  it("carries the staff intent with the switch on and ignores it with the switch off (#1637)", async () => {
+    mocks.enabled.mockResolvedValue(true);
+    await redirectToUnifiedSignInWhenEnabled({ staff: "1" });
+    expect(mocks.redirect).toHaveBeenCalledWith("/sign-in?staff=1");
+    vi.clearAllMocks();
+    mocks.enabled.mockResolvedValue(false);
+    await redirectToUnifiedSignInWhenEnabled({ staff: "1" });
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 

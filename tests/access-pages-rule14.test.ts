@@ -12,11 +12,14 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.attendee }));
+vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("@/modules/account-merge/account-link", () => ({ isUnifiedSignInEnabled: vi.fn() }));
 
 import { AccessRestricted } from "@/components/access-restricted";
 import { clubAccessClosed } from "@/components/club-access-closed";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
-import { NO_STAFF_ACCESS_PATH } from "@/modules/access/login-routing";
+import { NO_STAFF_ACCESS_PATH, staffSignInLinkFor } from "@/modules/access/login-routing";
+import { unifiedSignInPathFor } from "@/modules/account-merge/sign-in-redirect";
 
 const root = process.cwd();
 
@@ -136,7 +139,27 @@ describe("a signed-in attendee on a staff page (rule 14, break 3)", () => {
 
   it("goes to the access page, not Staff sign in", async () => {
     mocks.attendee.mockResolvedValue({ account: { id: "acct", verifiedEmail: "leader@example.test" }, via: "attendee", sessionId: "s1" });
-    expect(await staffLoginRedirectPath()).toBe(NO_STAFF_ACCESS_PATH);
+    expect(await staffLoginRedirectPath()).toBe(`${NO_STAFF_ACCESS_PATH}&next=%2Fpeople`);
+  });
+
+  it("carries the requested staff page to the access page, and drops unsafe or sign-in targets (#1637)", async () => {
+    mocks.attendee.mockResolvedValue({ account: { id: "acct", verifiedEmail: "leader@example.test" }, via: "attendee", sessionId: "s1" });
+    expect(await staffLoginRedirectPath()).toBe("/no-access?from=attendee&next=%2Fpeople");
+    for (const target of ["//evil.com", "https://evil.example", "/api/x", "/login", "/login?next=/people", "/no-access", "/select-event", ""]) {
+      mocks.headers.mockResolvedValue(new Headers(target ? { "x-imsda-request-target": target } : {}));
+      expect(await staffLoginRedirectPath()).toBe(NO_STAFF_ACCESS_PATH);
+    }
+  });
+
+  it("the staff link on the access page carries the target, or the staff intent, and never loops (#1637)", () => {
+    expect(staffSignInLinkFor("/people")).toBe("/login?next=%2Fpeople");
+    expect(staffSignInLinkFor(null)).toBe("/login?staff=1");
+    expect(staffSignInLinkFor("//evil.com")).toBe("/login?staff=1");
+    expect(staffSignInLinkFor("/no-access?from=attendee")).toBe("/login?staff=1");
+    // /no-access link -> /login -> /sign-in keeps what it needs, so the form renders (no bounce to /account).
+    expect(unifiedSignInPathFor({ next: "/people" })).toBe("/sign-in?next=%2Fpeople");
+    expect(unifiedSignInPathFor({ staff: "1" })).toBe("/sign-in?staff=1");
+    expect(readFileSync(join(root, "app/no-access/page.tsx"), "utf8")).toContain("href={staffLink}");
   });
 
   it("keeps signed-out visitors, and staff acting through their attendee side, on the staff sign-in", async () => {

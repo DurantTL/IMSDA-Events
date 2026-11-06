@@ -1,4 +1,5 @@
 import { safeReturnTo } from "@/lib/return-to";
+import { requestTargetPrefixes } from "@/modules/access/request-target";
 
 export type LoginRoutingEvent = { id: string };
 
@@ -103,6 +104,55 @@ export function staffLoginPathFor(target: string | null | undefined): string {
     return STAFF_LOGIN_PATH;
   }
   return `${STAFF_LOGIN_PATH}?next=${encodeURIComponent(safe)}`;
+}
+
+/**
+ * `target` when it is a page the staff sign-in would carry (`staffLoginPathFor` accepts it), otherwise "". Never a
+ * sign-in or role-routing page, never an unsafe value.
+ */
+export function staffReturnTarget(target: string | null | undefined): string {
+  if (staffLoginPathFor(target) === STAFF_LOGIN_PATH) return "";
+  const safe = safeReturnTo(target, "");
+  // The one-sign-in page is a sign-in screen too: never a place to come back to.
+  const pathname = safe.split(/[?#]/, 1)[0].replace(/\/+$/, "");
+  return pathname === "/sign-in" || pathname.startsWith("/sign-in/") ? "" : safe;
+}
+
+/** `/no-access?from=attendee`, carrying the requested staff page as `&next=` only when the staff sign-in would carry it. */
+export function noStaffAccessPathFor(target: string | null | undefined): string {
+  const safe = staffReturnTarget(target);
+  return safe ? `${NO_STAFF_ACCESS_PATH}&next=${encodeURIComponent(safe)}` : NO_STAFF_ACCESS_PATH;
+}
+
+/**
+ * Whether `target` is a staff-side page the staff sign-in could return to: a staff pathname from the request-target
+ * list (never the attendee `/account` or `/profile` areas) that `staffReturnTarget` accepts.
+ */
+export function isStaffSideTarget(target: string | null | undefined): boolean {
+  const safe = staffReturnTarget(target);
+  if (!safe) return false;
+  const pathname = safe.split(/[?#]/, 1)[0].replace(/\/+$/, "");
+  if (pathname === "/archived-events") return true;
+  return requestTargetPrefixes
+    .filter((prefix) => prefix !== "/account" && prefix !== "/profile")
+    .some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+/** `/select-event` is the role-aware staff landing the header link used to carry: old links count as staff intent. */
+export function isStaffLandingTarget(target: string | null | undefined): boolean {
+  return typeof target === "string" && target.split(/[?#]/, 1)[0].replace(/\/+$/, "") === EVENT_PICKER_PATH;
+}
+
+/** Query parameter that says "I want the staff sign-in" without naming a page; it is never a return target. */
+export const STAFF_INTENT_PARAM = "staff";
+
+/**
+ * The staff sign-in link on the attendee "no access" page: back to the requested page when there is one, otherwise
+ * `/login?staff=1` so the one-sign-in form still shows for someone holding an attendee session.
+ */
+export function staffSignInLinkFor(target: string | null | undefined): string {
+  const path = staffLoginPathFor(target);
+  return path === STAFF_LOGIN_PATH ? `${STAFF_LOGIN_PATH}?${STAFF_INTENT_PARAM}=1` : path;
 }
 
 function eventWorkspacePath(eventId: string): string {
