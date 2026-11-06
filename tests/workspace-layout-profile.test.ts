@@ -108,7 +108,7 @@ describe("(workspace) layout for /profile without a staff session", () => {
     mocks.getCurrentAttendee.mockResolvedValue(nobody);
     expect(await redirectedTo("/overview")).toBe("/login?next=%2Foverview");
     mocks.getCurrentAttendee.mockResolvedValue(attendeeOnly);
-    expect(await redirectedTo("/overview")).toBe("/no-access?from=attendee");
+    expect(await redirectedTo("/overview")).toBe("/no-access?from=attendee&next=%2Foverview");
   });
 
   it("lets staff with no events through to the page for /profile only", async () => {
@@ -136,7 +136,7 @@ describe("(workspace) layout for /profile without a staff session", () => {
     expect(await redirectedTo("/help/invite-staff")).toBe("/login?next=%2Fhelp%2Finvite-staff");
     // A signed-in attendee is told the page is for staff, not asked to sign in as if signed out.
     mocks.getCurrentAttendee.mockResolvedValue(attendeeOnly);
-    expect(await redirectedTo("/help")).toBe("/no-access?from=attendee");
+    expect(await redirectedTo("/help")).toBe("/no-access?from=attendee&next=%2Fhelp");
   });
 
   it("lets staff with no events through to Homepage & site content (#111), and nothing that only starts with it", async () => {

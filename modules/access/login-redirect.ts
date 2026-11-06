@@ -2,7 +2,7 @@ import "server-only";
 
 import { headers } from "next/headers";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
-import { NO_STAFF_ACCESS_PATH, REQUEST_TARGET_HEADER, staffLoginPathFor } from "@/modules/access/login-routing";
+import { noStaffAccessPathFor, REQUEST_TARGET_HEADER, staffLoginPathFor } from "@/modules/access/login-routing";
 
 /**
  * Where a signed-out staff request should go: `/login?next=<the page they
@@ -16,16 +16,18 @@ import { NO_STAFF_ACCESS_PATH, REQUEST_TARGET_HEADER, staffLoginPathFor } from "
  * there is no sign-in loop. A staff account acting as its own attendee side does not count: that is a staff session.
  */
 export async function staffLoginRedirectPath(): Promise<string> {
+  let target: string | null = null;
+  try {
+    target = (await headers()).get(REQUEST_TARGET_HEADER);
+  } catch {
+    target = null;
+  }
   try {
     const attendee = await getCurrentAttendee();
-    if (attendee.account && attendee.via === "attendee") return NO_STAFF_ACCESS_PATH;
+    // The requested page rides along so the staff sign-in link on /no-access can return to it.
+    if (attendee.account && attendee.via === "attendee") return noStaffAccessPathFor(target);
   } catch {
     // No attendee lookup (outside a request, or the database is unreachable): fall through to sign in.
   }
-  try {
-    const requestHeaders = await headers();
-    return staffLoginPathFor(requestHeaders.get(REQUEST_TARGET_HEADER));
-  } catch {
-    return staffLoginPathFor(null);
-  }
+  return staffLoginPathFor(target);
 }
