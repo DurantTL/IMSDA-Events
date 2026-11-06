@@ -24,9 +24,7 @@ function sourceFiles(dir: string): string[] {
 const RAW_GET_FORMS: Record<string, { forms: number; why: string }> = {
   "app/(public)/account/(portal)/clubs/[organizationId]/exports/class-tracking/page.tsx": { forms: 1, why: "report options; the Download buttons need a real GET" },
   "app/(public)/account/(portal)/clubs/[organizationId]/exports/honors/page.tsx": { forms: 1, why: "report options (AutoSubmitForm); the Download buttons need a real GET" },
-  "app/(public)/account/(portal)/clubs/[organizationId]/forms/page.tsx": { forms: 1, why: "old plain filter form on a short list" },
   "app/(workspace)/check-in/badges/page.tsx": { forms: 1, why: "badge print controls; the print buttons need a real GET" },
-  "app/(workspace)/more/club-forms/page.tsx": { forms: 1, why: "old plain filter form on a short list" },
   "app/(workspace)/more/reports/clubs/check-in-book/page.tsx": { forms: 1, why: "report options; the print buttons need a real GET" },
   "components/area-club-search-form.tsx": { forms: 1, why: "search as you type (useListNavigation)" },
   "components/choice-answer-filter.tsx": { forms: 1, why: "filter that goes to /people on purpose" },
@@ -40,6 +38,8 @@ const RAW_GET_FORMS: Record<string, { forms: number; why: string }> = {
 // Pages and components that were moved to GetFilterForm in #1557 and must keep using it.
 const USES_GET_FILTER_FORM = [
   "app/(workspace)/admin/clubs/page.tsx",
+  "app/(public)/account/(portal)/clubs/[organizationId]/forms/page.tsx",
+  "app/(workspace)/more/club-forms/page.tsx",
   "components/clubs-year-selector.tsx",
   "components/club-leaders-list.tsx",
   "components/people-directory.tsx",

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FileText } from "lucide-react";
 import styles from "@/components/club-forms-lists.module.css";
 import { CopyApplicationLink } from "@/components/copy-application-link";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { EmptyState } from "@/components/empty-state";
 import { ClubFormsStatus } from "@/components/club-forms-status";
 import { SendClubFormLink, StartClubFormsYearButton } from "@/components/club-forms-actions";
@@ -236,7 +237,7 @@ export default async function ClubFormsPage({
 
       <section className="public-manage-card">
         <FilledFormsList base={base} empty={<EmptyState className="empty-state panel" headingLevel={4} icon={<FileText aria-hidden="true" size={26} />} title="No forms filled in yet">Forms you fill in or receive by private link will be listed here.</EmptyState>} filter={rosterMembers.length > 0 && (
-          <form action={base} className="club-form-filter" method="get">
+          <GetFilterForm action={base} className="club-form-filter">
             <label>
               Show forms for
               <select defaultValue={member ?? ""} name="member">
@@ -245,7 +246,7 @@ export default async function ClubFormsPage({
               </select>
             </label>
             <button className="secondary-button" type="submit">Show</button>
-          </form>
+          </GetFilterForm>
         )} submissions={submissions} />
       </section>
 

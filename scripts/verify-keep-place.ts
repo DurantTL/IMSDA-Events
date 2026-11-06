@@ -163,6 +163,8 @@ const CHANGES: Change[] = [
   },
   { name: "clubs: club year", kind: "year", role: "staff", path: () => "/admin/clubs", act: selectAndSubmit('form[action="/admin/clubs"] select[name="year"]', true) },
   { name: "club leaders: role", kind: "filter", role: "staff", path: () => "/admin/clubs/leaders", act: selectAndSubmit('form[action="/admin/clubs/leaders"] select[name="role"]', true) },
+  { name: "director forms: Show forms for", kind: "filter", role: "director", path: (world) => `/account/clubs/${world.clubId}/forms`, act: selectAndSubmit('form.club-form-filter select[name="member"]', true) },
+  { name: "staff club forms: Form", kind: "filter", role: "staff", path: () => "/more/club-forms", act: selectAndSubmit('form.club-form-filter select[name="form"]', true) },
   { name: "club summary: sort", kind: "sort", role: "staff", path: () => "/admin/clubs/summary?view=records", act: clickLink('a.table-sort-button[href*="sort=record"]') },
   { name: "club summary: Points tab", kind: "tab", role: "staff", path: () => "/admin/clubs/summary?view=records", anchor: "points", act: clickLink('a[href*="view=points"]:not(.table-sort-button)') },
   { name: "club summary: month link", kind: "month", role: "staff", path: () => "/admin/clubs/summary?view=records", anchor: "monthly-records", act: clickLink('a[href*="view=records"][href*="month="]:not(.table-sort-button)') },
@@ -243,6 +245,8 @@ async function main() {
   try {
     await seedJourneyWorld(prisma, "keepplace", (made) => { world = made; });
     await seedCoordinatorWorld(prisma, world!);
+    // The forms pages hold health and contact details, so the director needs a two-step enrollment (a placeholder, as for the coordinator; sign-in itself is covered by the journeys).
+    await prisma.attendeeMfaEnrollment.create({ data: { accountId: world!.main.accountId, method: "TOTP", status: "ACTIVE", sealedSecret: "keep-place-placeholder-not-a-secret", confirmedAt: new Date() } });
     const cookies = {
       director: await J.mintDirectorSession(tokens, world!.main.accountId),
       staff: await J.mintStaffSession(tokens, SYSTEM_ADMIN),

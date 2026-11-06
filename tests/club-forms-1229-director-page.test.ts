@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), redirect: vi.fn(), notFound: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), redirect: vi.fn(), notFound: vi.fn(), usePathname: () => "/", useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ APP_BASE_URL: "https://events.imsda.test" }) }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getAccess }));
 vi.mock("@/modules/club-forms/access", () => ({ clubLeaderViewerFromAccess: () => ({ kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } }) }));
