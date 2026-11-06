@@ -38,7 +38,7 @@ export function accountPortalNavItems(input: AccountPortalNavInput): AccountNavI
       ? [{ href: "/account/clubs", label: input.directedClubCount === 1 || actingAsDirector ? "My club" : "My clubs", matchChildren: true }]
       : []),
     ...(input.areaCoordinator || actingAsAreaCoordinator
-      ? [{ href: "/account/area-clubs/overview", label: "Club coordination", alsoMatchPrefix: ["/account/area-clubs/", "/account/area/", "/account/waitlists"] }]
+      ? [{ href: "/account/area-clubs/overview", label: "Club coordination", alsoMatchPrefix: ["/account/area-clubs/", "/account/area/", "/account/area/health", "/account/waitlists"] }]
       : []),
     // Portal help (#1259): last, for anyone using the portal. Which guides it lists is decided on its own pages.
     { href: "/account/help", label: "Help", matchChildren: true },
