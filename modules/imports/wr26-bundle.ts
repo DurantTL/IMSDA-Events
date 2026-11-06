@@ -1,4 +1,5 @@
-import { createImportSnapshotIdentity, CsvImportError, parseCsvMatrix, type NormalizedImportData, type ParsedImportRow } from "@/modules/imports/csv-parser";
+import { formatCents } from "@/modules/payments/format-cents";
+import { createImportSnapshotIdentity,CsvImportError, parseCsvMatrix, type NormalizedImportData, type ParsedImportRow } from "@/modules/imports/csv-parser";
 
 export type Wr26BundleFile = {
   name: string;
@@ -91,8 +92,9 @@ function nonNegativeNumber(value: string) {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
+// Plain form (no thousands separator). Every caller passes cents from `cents()` above, which is never negative.
 function money(centsValue: number) {
-  return `$${(centsValue / 100).toFixed(2)}`;
+  return formatCents(centsValue, { grouping: false });
 }
 
 function isoDate(value: string) {
