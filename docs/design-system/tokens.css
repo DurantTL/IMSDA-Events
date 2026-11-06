@@ -1,4 +1,4 @@
-/* IMSDA Events — generated from tokens.json */
+/* IMAdventist (IMSDA Events) — generated from tokens.json */
 :root, [data-theme="light"] {
   --imsda-navy: #003b5c;
   --imsda-navy-deep: #002c45;
@@ -7,6 +7,7 @@
   --imsda-purple-soft: #f1eaf7;
   --imsda-gold: #f0b323;
   --imsda-gold-soft: #fff5d7;
+  --home-green: #557334;
   --focus-ring: var(--imsda-navy);
   --focus-ring-on-dark: var(--imsda-gold);
   --ink: #243640;
@@ -136,7 +137,7 @@
   --z-tabbar: 40;
   --z-modal: 100;
   --font-sans: "Noto Sans", Arial, sans-serif;
-  --font-serif: Georgia, serif;
+  --font-logo: AdventSansLogo, "Noto Sans", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .public-title { font-family: var(--font-sans); font-size: 1.5rem; line-height: 1.25; font-weight: 800; }
@@ -153,6 +154,7 @@
 .button-cta { font-family: var(--font-sans); font-size: 1rem; line-height: 1.25; font-weight: 700; }
 .badge { font-family: var(--font-sans); font-size: 0.75rem; line-height: 1.2; font-weight: 700; }
 .metric { font-family: var(--font-sans); font-size: 1.75rem; line-height: 1; font-weight: 800; }
-.brand-flame { font-family: var(--font-serif); font-size: 1.35rem; line-height: 1; font-weight: 700; font-style: italic; }
+.brand-wordmark { font-family: var(--font-logo); font-size: 1.65rem; line-height: 1.1; font-weight: 400; }
 @font-face { font-family: "Noto Sans"; src: url("fonts/NotoSans-Regular.ttf"); font-weight: 400; font-style: normal; font-display: swap; }
 @font-face { font-family: "Noto Sans"; src: url("fonts/NotoSans-Bold.ttf"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: AdventSansLogo; src: url("fonts/AdventSans-Logo.otf") format("opentype"); font-display: swap; }

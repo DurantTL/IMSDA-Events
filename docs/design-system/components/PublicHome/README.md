@@ -1,0 +1,6 @@
+Mockup of the public home page header and hero: the 54px symbol with the AdventSans Logo wordmark, the main links, and the navy hero with a gold call to action.
+
+- Header on `--card` with a `--line` bottom rule; links are 44px navy text.
+- Hero on `--imsda-navy` with `--radius-modal`; the main action is `--imsda-gold` with navy text (6.3:1), the second is a white outline.
+- `--home-green` is for this page only: the descriptor, section kickers and place-card edges.
+- Static rendition with fictional content, not the live page.

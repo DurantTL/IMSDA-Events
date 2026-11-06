@@ -33,7 +33,7 @@ Both are defined once in `lib/brand.ts` (`PRODUCT_NAME`, `PRODUCT_DESCRIPTOR`, `
 | Email sending addresses and domains | `ACCOUNT_EMAIL_SENDER_ADDRESS`, provider identities, domains | Need separate explicit review if ever changed. Only display names changed. |
 | `modules/*/README.md` (communications, payments, organizations) | prose | Developer docs. Update when those READMEs are next edited. |
 | `scripts/install-xcloud-runtime-guard.sh` | systemd unit descriptions | Operations tooling, not user-facing. |
-| `docs/design-system/**`, `docs/platform-documentation/**`, `docs/ui-audit-*`, `docs/BUILD-STATUS-*` | historical or generated documents | Historical evidence and exports. A refresh of the design-system `BrandMark` page and the briefing exports is a separate task. |
+| `docs/platform-documentation/**`, `docs/ui-audit-*`, `docs/BUILD-STATUS-*` | historical or generated documents | Historical evidence and exports. A refresh of the briefing exports is a separate task. The design system (`docs/design-system/`) was refreshed for IMAdventist on November 6, 2026: the `BrandMark` page became `Logo`. |
 | Event-specific content | event names, custom sender names, custom logos, authored templates | Authored content is never rewritten. |
 
 ## Saved settings and templates that need a separate, human-reviewed update

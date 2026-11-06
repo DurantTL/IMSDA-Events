@@ -1,5 +1,5 @@
-/* IMSDA Events component styles, recreated from app/globals.css and the component CSS modules
-   (DurantTL/IMSDA-Events main@81f03c93). Values are copied exactly; type floors are resolved to their
+/* IMAdventist (IMSDA Events) component styles, recreated from app/globals.css and the component CSS modules
+   (DurantTL/IMSDA-Events main@d6d783c7). Values are copied exactly; type floors are resolved to their
    on-screen values in the club and account portal: body and labels 14px (--type-body-floor),
    helper text and chips 12px (--type-floor). Staff workspaces raise every floor to 14px. */
 
@@ -13,13 +13,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .ds-row { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
 .ds-caption { margin: 0; color: var(--muted); font-size: 0.75rem; }
 
-/* Brand mark */
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand-mark { position: relative; display: grid; width: 42px; height: 42px; flex: 0 0 42px; place-items: center; overflow: hidden; border-radius: 12px; background: var(--imsda-gold); color: var(--imsda-navy-deep); box-shadow: inset 0 -8px 20px rgba(88, 44, 131, 0.12); }
-.brand-mark::after { position: absolute; right: -9px; bottom: -10px; width: 29px; height: 29px; border-radius: 50%; background: var(--imsda-purple); content: ""; opacity: 0.9; }
-.brand-flame { position: relative; z-index: 1; font-family: Georgia, serif; font-size: 1.35rem; font-style: italic; font-weight: 700; }
-.brand-words strong { display: block; font-size: 1.05rem; line-height: 1.1; }
-.brand-words small { display: block; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+/* IMAdventist symbol and wordmark (components/brand-link.module.css, app/globals.css, components/public-home-page.module.css) */
+.brand { display: inline-flex; min-height: 44px; align-items: center; gap: 12px; color: var(--imsda-navy); text-decoration: none; }
+.brand-symbol { width: 42px; height: 42px; flex: 0 0 42px; object-fit: contain; }
+.brand-words { display: grid; line-height: 1.2; }
+.brand-words small { display: block; color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.brand-words strong { display: block; font-size: 1.05rem; }
+.public-brand { gap: 10px; }
+.public-brand .brand-symbol { width: 54px; height: 54px; flex-basis: 54px; }
+.public-brand strong { font-family: var(--font-logo); font-size: 1.65rem; font-weight: 400; line-height: 1.1; color: var(--imsda-navy); }
+.public-brand small { color: var(--home-green); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.04em; text-transform: none; }
+.sidebar .brand { color: #fff; }
+.sidebar .brand-words small { color: #a9c0ca; }
 
 /* Buttons */
 .primary-button, .secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 10px; cursor: pointer; padding: 9px 12px; font-size: 0.875rem; font-weight: 700; text-decoration: none; }
@@ -38,7 +43,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .form-stack label { display: grid; gap: 6px; color: var(--ink); font-size: 0.875rem; font-weight: 700; }
 .form-stack input, .form-stack select, .form-stack textarea { width: 100%; border: 1px solid var(--field-border); border-radius: 10px; background: #fbfcfd; color: var(--ink); padding: 10px 11px; font-size: 0.875rem; outline: 0; }
 .form-stack input:hover, .form-stack select:hover { border-color: var(--field-border-hover); }
-.form-stack input:focus, .form-stack select:focus, .form-stack textarea:focus, .form-stack .is-focus { border-color: var(--imsda-purple); box-shadow: 0 0 0 3px rgba(88, 44, 131, 0.1); }
+.form-stack input:focus, .form-stack select:focus, .form-stack textarea:focus, .form-stack .is-focus, .search-field:focus-within { border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 2px; }
+.on-dark :is(input, select, textarea):focus, .on-dark .search-field:focus-within { outline-color: var(--focus-ring-on-dark); }
 .field-help { margin: 4px 0 0; color: var(--muted); font-size: 0.875rem; font-weight: 400; }
 .form-error { margin: 0; border-radius: 9px; background: var(--coral-soft); color: var(--coral); padding: 9px 11px; font-size: 0.75rem; font-weight: 600; }
 .check-label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.875rem; font-weight: 500; }
@@ -101,17 +107,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Club portal masthead, banner and flat tab row (club-portal-nav.module.css) */
 .club-masthead { border-bottom: 1px solid var(--line); background: #fff; }
 .club-masthead-inner, .club-banner-inner, .club-nav-strip { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
-.club-masthead-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
-.club-masthead-brand { display: flex; min-height: 44px; align-items: center; gap: 10px; }
-.club-masthead-brand small { display: block; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
-.club-masthead-brand strong { display: block; font-size: 1.05rem; color: var(--imsda-navy); }
-.club-masthead-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.masthead-action { display: inline-flex; min-height: 44px; align-items: center; padding: 8px 14px; border: 1px solid var(--imsda-navy); border-radius: 10px; background: #fff; color: var(--imsda-navy); font-size: 0.9rem; font-weight: 800; text-decoration: none; }
-.masthead-action:hover { background: var(--imsda-navy-soft); }
+.club-masthead-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; padding: 8px 0; }
 .club-banner { background: var(--imsda-navy); color: #fff; }
-.club-banner-inner { padding: 16px 0; }
-.club-banner small { color: var(--hero-text-soft); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-.club-banner h1 { margin: 2px 0 0; font-size: 1.7rem; line-height: 1.2; }
+.club-banner-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 20px 0; }
+.club-banner-identity { min-width: 0; flex: 1 1 16rem; }
+.club-banner h1 { margin: 0; color: #fff; font-size: 1.7rem; line-height: 1.2; }
+.club-banner-identity p { margin: 6px 0 0; color: #dbe9ef; font-size: 0.95rem; }
+.club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; }
+.club-banner-year span { color: #dbe9ef; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.club-banner-year strong { font-size: 1.05rem; }
+.club-masthead-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; }
+.club-masthead-identity { color: var(--muted); font-size: 0.9rem; }
+.club-masthead-identity strong { color: var(--ink); font-weight: 700; }
+.masthead-action { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--imsda-navy); border-radius: 10px; background: var(--card); color: var(--imsda-navy); font-size: 0.9rem; font-weight: 800; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.masthead-action:hover { background: var(--imsda-navy-soft); }
 .club-nav { border-bottom: 1px solid var(--line); background: #fff; }
 .club-nav-strip { display: flex; overflow-x: auto; scrollbar-width: none; }
 .club-nav-link { display: flex; flex: none; min-height: 48px; align-items: center; padding: 8px 14px 5px; border-bottom: 3px solid transparent; color: var(--muted); font-size: 0.95rem; font-weight: 800; text-decoration: none; white-space: nowrap; transition: color 150ms ease, border-color 150ms ease; }
@@ -129,7 +138,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* Staff shell */
 .sidebar { display: grid; align-content: start; gap: 18px; width: 260px; padding: 25px 18px 20px; background: linear-gradient(180deg, var(--imsda-navy) 0%, var(--imsda-navy-deep) 100%); color: #fff; }
-.sidebar .brand-words small { color: #a9c0ca; }
 .sidebar nav { display: grid; gap: 4px; }
 .sidebar a { display: flex; min-height: 40px; align-items: center; gap: 10px; border-radius: 10px; padding: 8px 12px; color: #fff; font-size: 0.875rem; font-weight: 700; text-decoration: none; }
 .sidebar a:hover { background: rgba(255, 255, 255, 0.08); }
@@ -213,3 +221,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .records-cell.not-submitted { background: repeating-linear-gradient(45deg, #ffffff 0 3px, #8a949a 3px 4px); color: #1f2a30; border: 1px solid #c9d3d8; }
 .records-cell.not-due { background: var(--imsda-navy-soft); color: #1f2a30; }
 .records-cell small { font-weight: 600; }
+
+/* Public home (components/public-home-page.module.css) */
+.public-header { border-bottom: 1px solid var(--line); background: var(--card); }
+.public-header-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; width: min(1240px, calc(100% - 32px)); margin: 0 auto; padding: 10px 0; }
+.public-primary-nav { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.public-primary-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; color: var(--imsda-navy); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.home-hero { margin: 24px auto 0; width: min(1180px, calc(100% - 32px)); padding: 38px 44px; border-radius: var(--radius-modal); background: var(--imsda-navy); color: #fff; }
+.home-hero h1 { max-width: 12ch; margin: 0; font-size: clamp(2.3rem, 4vw, 3.7rem); line-height: 1.05; letter-spacing: -0.025em; }
+.home-hero p { max-width: 48ch; margin: 12px 0 0; color: var(--hero-text-soft); font-size: 1.08rem; }
+.home-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.home-hero-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 10px 18px; border-radius: var(--radius-field); font-weight: 800; text-decoration: none; }
+.home-hero-actions .home-hero-primary { background: var(--imsda-gold); color: var(--imsda-navy); }
+.home-hero-actions .home-hero-secondary { border: 1px solid var(--card); color: var(--card); }
+.home-kicker { margin: 0 0 5px; color: var(--home-green); font-size: 0.875rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; }
