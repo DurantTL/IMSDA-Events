@@ -162,6 +162,8 @@ describe("L9: the attendee account uses the club portal's shared pieces (#1555)"
       { file: "registrations/page.tsx", marker: "attendee-reg-actions", why: "a helper component inside a registration card, not the page" },
       { file: "profile/page.tsx", marker: "<ProfileView", why: "ProfileView draws the banner in its portal variant (asserted below)" },
     ];
+    // Only `return (` and `return <` trees are scanned: write a conditional page return as `return (cond ? <A/> : <B/>)`
+    // or as separate returns, never as a bare ternary or a helper imported from another file, so this check can see it.
     const returns = (source: string) => {
       const found: string[] = [];
       for (const match of source.matchAll(/return (\(|<)/g)) {

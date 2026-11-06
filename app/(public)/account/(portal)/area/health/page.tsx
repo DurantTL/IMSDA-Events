@@ -15,12 +15,6 @@ import { AccountPageBanner } from "@/components/account-page-banner";
 export const metadata: Metadata = { title: "Event health information", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
 
-/**
- * Health information for club events (#658), read only, for active Area
- * Coordinators who passed the second step (checked in `resolveAreaHealthViewer`,
- * not by the portal layout). Opening an event is audited as a view; `?sheet=1`
- * is the printable sheet and is audited as an export.
- */
 /** The one-time privacy notice, under the same banner as the page it guards, so the heading and tabs stay (#1555). */
 function healthAcknowledgmentPage() {
   return (
@@ -31,6 +25,12 @@ function healthAcknowledgmentPage() {
   );
 }
 
+/**
+ * Health information for club events (#658), read only, for active Area
+ * Coordinators who passed the second step (checked in `resolveAreaHealthViewer`,
+ * not by the portal layout). Opening an event is audited as a view; `?sheet=1`
+ * is the printable sheet and is audited as an export.
+ */
 export default async function AreaHealthPage({ searchParams }: { searchParams: Promise<{ event?: string; club?: string; sheet?: string }> }) {
   const viewer = await resolveAreaHealthViewer();
   if (!viewer) {
