@@ -216,7 +216,6 @@ export function CalendarAdminWorkspace({
   const requestRef = useRef(0);
   const selectedRef = useRef(selected);
   useEffect(() => { selectedRef.current = selected; }, [selected]);
-  const mounted = useRef(false);
 
   /** Reads the page for the current address from the server. A newer read wins; the page is clamped to the real total. */
   async function loadEntries(key: string, afterChange = false) {
@@ -254,9 +253,13 @@ export function CalendarAdminWorkspace({
   const loadEntriesRef = useRef(loadEntries);
   useEffect(() => { loadEntriesRef.current = loadEntries; });
   useEffect(() => {
-    // The first pass has only the defaults; the address is read right after it, and the server page already matches it.
-    if (!mounted.current) { mounted.current = true; return; }
-    if (queryKey !== loadedKey.current) void loadEntriesRef.current(queryKey);
+    if (queryKey === loadedKey.current) return;
+    // Until the address is read (an effect after the first render, run twice by React in development) `queryKey` is only the
+    // defaults. When the address already asks for the list on screen, there is nothing to fetch (#1612).
+    let addressKey = "";
+    try { addressKey = entryQueryParams(parseEntryQuery(new URLSearchParams(window.location.search))).toString(); } catch { /* no usable address: compare the state */ }
+    if (addressKey === loadedKey.current) return;
+    void loadEntriesRef.current(queryKey);
   }, [queryKey]);
 
   // A changed search term starts a new view: nothing ticked, back to page 1. Only a term the person typed does: a term put
@@ -463,7 +466,7 @@ export function CalendarAdminWorkspace({
 
       {/* Kept mounted so the list of feeds survives switching tabs. */}
       <TabPanel id={calendarPanelId("imports")} tabId={calendarTabId("imports")} stack={false} hidden={tab !== "imports"}>
-        <CalendarFeedsPanel initialFeeds={initialFeeds} onEntriesChange={() => void loadEntries(queryKey, true)} />
+        <CalendarFeedsPanel choices={publicFilters} initialFeeds={initialFeeds} onEntriesChange={() => void loadEntries(queryKey, true)} />
       </TabPanel>
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
