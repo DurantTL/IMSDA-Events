@@ -47,11 +47,11 @@ export function EventHealthSheet({ clubs, clubLinks, attendeeHref }: { clubs: He
                 <tbody>
                   {club.attendees.map((attendee) => (
                     <tr key={attendee.attendeeId}>
-                      <th scope="row" translate="no">
-                        {attendeeHref && attendee.rosterMemberId
-                          ? <a className={styles.attendeeLink} href={attendeeHref(club.organizationId, attendee.rosterMemberId)}>{attendee.name}<span className="sr-only">: Health Record</span></a>
-                          : attendee.name}
-                      </th>
+                      {attendeeHref && attendee.rosterMemberId ? (
+                        <th scope="row">
+                          <a className={styles.attendeeLink} href={attendeeHref(club.organizationId, attendee.rosterMemberId)}><span translate="no">{attendee.name}</span><span className="sr-only">: Health Record</span></a>
+                        </th>
+                      ) : <th scope="row" translate="no">{attendee.name}</th>}
                       <td translate={attendee.dietary ? "no" : undefined}>{attendee.dietary ?? "None entered"}</td>
                       <td>{attendee.medicalFlag ?? "Not answered"}</td>
                       <td>{HEALTH_TEXT.medicationsValue}</td>
