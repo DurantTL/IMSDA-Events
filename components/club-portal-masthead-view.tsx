@@ -56,7 +56,7 @@ export function ClubPortalMastheadView({ model, role, formsHelpContact }: { mode
             {model.identity && (
               <span className="club-masthead-identity">
                 <span className="club-masthead-name" translate="no">{model.identity}</span>
-                <span className="club-masthead-role"> · {clubDirectorRoleLabels[role]}</span>
+                <span className="club-masthead-role"><span className="club-masthead-sep"> · </span>{clubDirectorRoleLabels[role]}</span>
               </span>
             )}
           </>}

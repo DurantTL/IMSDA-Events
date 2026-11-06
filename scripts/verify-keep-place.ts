@@ -48,7 +48,8 @@ try {
     for (const entry of list.getEntries()) {
       if (entry.hadRecentInput) continue;
       window.__cls += entry.value;
-      window.__clsParts.push({ value: Math.round(entry.value * 1000) / 1000, nodes: (entry.sources || []).map(function (source) { return source.node ? source.node.nodeName.toLowerCase() + (source.node.className && typeof source.node.className === 'string' ? '.' + source.node.className.split(' ')[0] : '') : '?'; }).slice(0, 3) });
+      const rect = function (r) { return r ? [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)] : null; };
+      window.__clsParts.push({ value: Math.round(entry.value * 1000) / 1000, at: Math.round(entry.startTime), nodes: (entry.sources || []).map(function (source) { return (source.node ? source.node.nodeName.toLowerCase() + (source.node.className && typeof source.node.className === 'string' ? '.' + source.node.className.split(' ')[0] : '') : '?') + ' ' + JSON.stringify(rect(source.previousRect)) + '>' + JSON.stringify(rect(source.currentRect)); }).slice(0, 4) });
     }
   }).observe({ type: 'layout-shift', buffered: true });
 } catch (error) {}

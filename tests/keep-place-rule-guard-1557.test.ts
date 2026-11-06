@@ -106,4 +106,16 @@ describe("keep the reader's place (B17, #1557)", () => {
     expect(JSON.parse(read("package.json")).scripts["test:keep-place"]).toContain("scripts/verify-keep-place.ts");
     expect(read(".github/workflows/browser-translation.yml")).toContain("npm run test:keep-place");
   });
+
+  it("keeps the banner year box and the masthead role from re-wrapping when the web font swaps in (load shift, B17)", () => {
+    const css = read("app/globals.css");
+    // The year box is wide enough for "CURRENT CLUB YEAR" in either font, so its width does not change at the swap.
+    expect(css).toMatch(/\.club-banner-year \{[^}]*min-width: 11\.5rem/);
+    // On a phone the role is its own line under the name, so where the name ends cannot move it (the 0.05 load shift on
+    // the coordinator Monthly Records page came from the role re-wrapping after the name, depending on the name's letters).
+    expect(css).toMatch(/@media \(max-width: 640px\) \{\s*\.club-masthead-role \{ display: block; \}\s*\.club-masthead-sep \{ display: none; \}/);
+    for (const file of ["components/coordinator-masthead-view.tsx", "components/club-portal-masthead-view.tsx"]) {
+      expect(read(file), file).toMatch(/className="club-masthead-role"><span className="club-masthead-sep"> · <\/span>/);
+    }
+  });
 });
