@@ -23,12 +23,15 @@ export function StaffPhoneBar({
   place,
   eventTab,
   firstEventTab = null,
+  pageMarkedAbove = false,
   launcher,
 }: {
   items: readonly PhoneBarItem[];
   place: Pick<StaffPlace, "area" | "inEvent">;
   eventTab: EventTabKey | null;
   firstEventTab?: EventTabKey | null;
+  /** The tab row or view strip already marks this page "page", so the bar only says "true": one "page" per document. */
+  pageMarkedAbove?: boolean;
   launcher: {
     cards: readonly MoreDirectoryCard[];
     sections: readonly LauncherSection[];
@@ -45,7 +48,7 @@ export function StaffPhoneBar({
   const pathname = usePathname();
   if (items.length === 0) return null;
   const current = phoneBarCurrent(items, place, eventTab, firstEventTab, pathname);
-  const currentFor = (href: string) => (new URL(href, "https://events.example.test").pathname === pathname ? "page" : "true");
+  const currentFor = (href: string) => (!pageMarkedAbove && new URL(href, "https://events.example.test").pathname === pathname ? "page" : "true");
   return (
     <nav className="mobile-nav" aria-label="Mobile navigation">
       {items.map((item): ReactNode => {
@@ -59,6 +62,7 @@ export function StaffPhoneBar({
               className={isActive ? "active" : undefined}
               href={item.href}
               isActive={isActive}
+              currentMark={currentFor(item.href)}
               cards={launcher.cards}
               sections={launcher.sections}
               moduleStates={launcher.moduleStates}

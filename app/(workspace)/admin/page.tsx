@@ -45,7 +45,7 @@ import { getReleaseIdentity } from "@/lib/release";
 import packageInfo from "@/package.json";
 import styles from "./system-admin.module.css";
 import { eventFeaturesItem, staffPageTitles } from "@/components/staff-navigation";
-import { systemNavGroups } from "@/components/system-navigation";
+import { adminDirectoryGroups, systemNavGroups } from "@/components/system-navigation";
 
 export const metadata: Metadata = { title: staffPageTitles.systemManagement };
 
@@ -149,7 +149,7 @@ export default async function SystemAdminPage({
   });
   const release = getReleaseIdentity();
   // Only the Catalogs and settings group stays as a directory: every other group is a Common tasks group above it.
-  const catalogGroups = systemNavGroups.filter((group) => group.key === "system-catalogs");
+  const catalogGroups = adminDirectoryGroups;
 
   const healthReadAt = new Date().toISOString();
   const healthSignals = buildHealthSignals({

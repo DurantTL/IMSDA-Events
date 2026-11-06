@@ -33,8 +33,19 @@ export function phoneBarItems(input: {
     ["more", moreHref ?? undefined],
   ];
   const items: PhoneBarItem[] = [];
+  // Home from a role's main dashboard (not the event's first tab) is its own slot: it never absorbs Events, and it gives way to
+  // the Clubs item when both open the same page (a Clubs Administrator's Home and Clubs are both /admin/clubs).
+  const dashboardHome = input.homeHref !== undefined;
   for (const [key, href] of candidates) {
     if (!href) continue;
+    if (dashboardHome && key === "clubs") {
+      const same = items.findIndex((item) => item.key === "home" && item.href === href);
+      if (same >= 0) items.splice(same, 1);
+    }
+    if (dashboardHome && key === "events") {
+      items.push({ key, label: phoneBarLabels[key], href });
+      continue;
+    }
     // Two items for one page would both light; the first keeps it, and lights for the other's pages too.
     const twin = key === "more" || key === "clubs" ? undefined : items.find((item) => item.key !== "more" && item.href === href);
     if (twin) {

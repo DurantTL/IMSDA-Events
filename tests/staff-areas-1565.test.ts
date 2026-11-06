@@ -13,7 +13,7 @@ import {
 } from "@/components/staff-areas";
 import { buildEventTabs, currentEventPlace, eventTabSpecs, markCurrentEventTab, maxTabsPerRow, maxViewsPerTab, reservedTabWouldShow, type EventTabsContext } from "@/components/staff-event-tabs";
 import { commonTaskHrefs } from "@/modules/system-admin/home-model";
-import { systemNavGroups } from "@/components/system-navigation";
+import { adminDirectoryGroups, systemNavGroups } from "@/components/system-navigation";
 import { eventPermissions, kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
 
 const base: StaffAreaViewer = { isSystemAdmin: false, held: [], activeRole: null, hasEvents: true, siteContentEditor: false, healthImport: true, clubYear: null, counts: {} };
@@ -158,8 +158,8 @@ describe("System destinations stay on screen (#1565, #1569)", () => {
     const onScreen = new Set([
       ...staffAreaOrder.flatMap((area) => areaTabs(area, viewers.system).flatMap((tab) => [tab.href, ...(tab.views ?? []).map((view) => view.href)])),
       ...commonTaskHrefs.map((task) => task.href),
-      // The /admin dashboard draws the whole system-catalogs group as its task directory (app/(workspace)/admin/page.tsx).
-      ...systemNavGroups.filter((group) => group.key === "system-catalogs").flatMap((group) => group.items.map((item) => item.href)),
+      // The list the /admin dashboard draws as its task directory: the page uses this same export, so removing it breaks this test.
+      ...adminDirectoryGroups.flatMap((group) => group.items.map((item) => item.href)),
     ]);
     const missing = systemNavGroups.flatMap((group) => group.items.map((item) => item.href)).filter((href) => !onScreen.has(href));
     expect(missing).toEqual([]);

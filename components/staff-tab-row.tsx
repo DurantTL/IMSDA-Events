@@ -74,14 +74,14 @@ export function StaffTabRow({
             <li key={tab.key}>
               <GuardedLink href={tab.href} aria-current={tabCurrent(tab, pathname)}>
                 {tab.label}
-                {tab.count ? <span className="count-badge"><span aria-hidden="true">{tab.count > 99 ? "99+" : tab.count}</span><span className="sr-only"> {tab.count} waiting</span></span> : null}
+                {tab.count ? <span className={`count-badge ${styles.countText}`}><span aria-hidden="true">{tab.count > 99 ? "99+" : tab.count}</span><span className="sr-only"> {tab.count} waiting</span></span> : null}
               </GuardedLink>
             </li>
           ))}
         </ul>
       </nav>
       <div className={styles.menuline} data-staff-menu-line>
-        <span className={styles.current}>{current.label}{current.count ? <span className="count-badge">{current.count}</span> : null}</span>
+        <span className={styles.current}>{current.label}{current.count ? <span className={`count-badge ${styles.countText}`}>{current.count}</span> : null}</span>
         <button
           ref={buttonRef}
           type="button"

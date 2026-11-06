@@ -172,6 +172,9 @@
 .tabline[data-fit="tight"] .tabs { position: absolute; left: 0; height: 0; visibility: hidden; pointer-events: none; }
 .tabline[data-fit="tight"] .menuline { display: flex; }
 
+/* The shared count badge, with staff text at least 14px where the shell uses it. */
+:is(.tabs, .current, .item) .countText { font-size: max(var(--type-staff-floor, 0px), 0.875rem); padding: 1px 9px; line-height: 1.4; }
+
 /* ---------- views inside a tab: a bordered strip, current filled navy ---------- */
 .views { display: flex; width: fit-content; max-width: 100%; flex-wrap: wrap; gap: 4px; margin: 14px 0 4px; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); padding: 4px; }
 .views a {
@@ -269,6 +272,11 @@
 .subItems { margin-left: 18px !important; }
 .subItems .item { font-weight: 600; }
 .subItems .item[aria-current] { font-weight: 800; }
+
+@media (max-width: 1000px) {
+  .topbar { gap: 8px 10px; padding-inline: 14px; }
+  .search { margin-left: 4px; flex-basis: 160px; }
+}
 
 @media (max-width: 800px) {
   .topbar { min-height: 56px; gap: 8px; padding: 6px 16px; }

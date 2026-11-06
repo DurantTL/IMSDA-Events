@@ -100,8 +100,9 @@ describe("what it shows", () => {
     expect(html).toContain("Club administration");
     expect(html).toContain("All clubs and applications");
     expect(html).toContain("Signed in as <strong>Synthetic Admin</strong> (admin@example.test)");
-    expect(html).toMatch(/<a aria-current="page" href="\/admin\/clubs\?year=[\d-]+">Overview</);
-    expect(html).toContain("New clubs (2)");
+    // The section's tab row (Overview, New clubs (2) ...) is the shell's since #1565; the page header no longer draws it.
+    expect(html).not.toMatch(/<a aria-current="page" href="\/admin\/clubs\?year=[\d-]+">Overview</);
+    expect(html).not.toContain('aria-label="Club administration sections"');
     expect(html).toContain("1 of 2");
     expect(html).toContain("<strong>20</strong> roster members");
     expect(html).toContain("<strong>14</strong> people registered");

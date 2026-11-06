@@ -67,7 +67,7 @@ export function StaffAccountMenu({
         aria-controls="staff-account-menu"
         aria-expanded={open}
         aria-label="Staff account"
-        className="avatar"
+        className={`avatar ${styles.trigger}`}
         onClick={() => setOpen(!open)}
         ref={triggerRef}
         type="button"

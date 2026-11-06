@@ -22,7 +22,7 @@ import { eventSwitchHref } from "@/components/shell-event-selection";
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 const held: AdminRole[] = ["EVENTS_ADMIN", "CLUBS_ADMIN", "SYSTEM_ADMIN"];
 
-function shell(path: string, options: { active?: AdminRole; withEvents?: boolean; permissions?: readonly string[]; admin?: boolean; query?: string } = {}) {
+function shell(path: string, options: { active?: AdminRole; withEvents?: boolean; permissions?: readonly string[]; admin?: boolean; query?: string; roles?: AdminRole[] } = {}) {
   const { active = "SYSTEM_ADMIN", withEvents = true, permissions = eventPermissions, admin = true, query = "event=synthetic_event" } = options;
   state.path = path;
   state.query = query;
@@ -30,7 +30,7 @@ function shell(path: string, options: { active?: AdminRole; withEvents?: boolean
     children: h("p", {}, "Synthetic content"),
     events: withEvents ? [{ id: "synthetic_event", slug: "synthetic-event", name: "Synthetic Event", permissions: permissions as never }] : [],
     user: { id: "synthetic_admin", displayName: "Synthetic Admin", email: "synthetic@imsda-events.test", globalRole: admin ? "SYSTEM_ADMIN" : null },
-    adminRoleView: admin ? { held, active, counts: {} } : null,
+    adminRoleView: options.roles ? { held: options.roles, active: options.roles.at(-1)!, counts: {} } : admin ? { held, active, counts: {} } : null,
   }));
 }
 const slice = (html: string, from: string, to: string) => html.slice(html.indexOf(from), html.indexOf(to, html.indexOf(from)));
@@ -102,19 +102,45 @@ describe("canonical staff workspace navigation (#1565)", () => {
 });
 
 describe("aria-current (#1565)", () => {
-  it("marks at most one link 'page' at each width, and only the one that opens exactly this page", () => {
-    for (const path of ["/people", "/help", "/admin/clubs", "/admin/feature-requests", "/admin/clubs/invites", "/more/promo-codes"]) {
-      const html = shell(path);
-      const desktop = html.slice(0, html.indexOf('<nav class="mobile-nav"'));
-      const phone = html.slice(html.indexOf('<nav class="mobile-nav"'));
-      expect(pageMarks(desktop), `${path} desktop`).toBeLessThanOrEqual(1);
-      expect(pageMarks(phone), `${path} phone`).toBeLessThanOrEqual(1);
-      for (const mark of html.matchAll(/<a [^>]*aria-current="page"[^>]*href="([^"?#]*)/g)) expect(mark[1], path).toBe(path);
+  it("marks one link 'page' in the whole document, and only the one that opens exactly this page", () => {
+    for (const path of ["/people", "/help", "/admin/clubs", "/admin/feature-requests", "/admin/clubs/invites", "/more/promo-codes", "/admin/clubs/summary"]) {
+      for (const role of ["SYSTEM_ADMIN", "CLUBS_ADMIN"] as const) {
+        const html = shell(path, { active: role });
+        expect(pageMarks(html), `${path} ${role}`).toBeLessThanOrEqual(1);
+        for (const mark of html.matchAll(/<a [^>]*aria-current="page"[^>]*href="([^"?#]*)/g)) expect(mark[1], path).toBe(path);
+      }
     }
+    // On a page whose tab row or view strip says "page", the phone bar only says "true" (390px shows the bar, 1280px the row).
+    const clubs = shell("/admin/clubs", { active: "CLUBS_ADMIN" });
+    expect(pageMarks(clubs.slice(clubs.indexOf('<nav class="mobile-nav"')))).toBe(0);
+    expect(pageMarks(clubs.slice(0, clubs.indexOf('<nav class="mobile-nav"')))).toBe(1);
     // The tab links elsewhere than the page (Catalogs and settings opens the honor catalog): "true", not "page".
     const requests = shell("/admin/feature-requests");
     expect(row(requests)).toContain('aria-current="true" href="/admin/honors?event=synthetic_event">Catalogs and settings');
-    expect(pageMarks(shell("/admin/clubs", { active: "CLUBS_ADMIN" }).slice(0, 4000))).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("the phone bar's where-you-are (#1565)", () => {
+  const phone = (html: string) => html.slice(html.indexOf('<nav class="mobile-nav"'));
+  const lit = (html: string) => [...phone(html).matchAll(/<a class="active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]);
+  const events = { roles: ["EVENTS_ADMIN"] as AdminRole[], admin: false };
+
+  it("keeps Events its own slot for an Events Administrator, lit on event pages and Events pages, never Home", () => {
+    for (const path of ["/overview", "/finance", "/archived-events"]) {
+      const html = shell(path, events);
+      expect([...phone(html).matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]).slice(0, 2), path).toEqual(["Home", "Events"]);
+      expect(lit(html), path).toEqual(["Events"]);
+    }
+    // Home is lit only on exactly its own page, and not when Events owns that page.
+    expect(lit(shell("/events-admin", events))).toEqual(["Events"]);
+  });
+
+  it("drops Home for a Clubs Administrator, whose Home and Clubs open the same page: one /admin/clubs item", () => {
+    const html = shell("/admin/clubs", { roles: ["CLUBS_ADMIN"], admin: false, withEvents: false });
+    const hrefs = [...phone(html).matchAll(/<a [^>]*href="([^"?]+)/g)].map((match) => match[1]);
+    expect(hrefs.filter((href) => href === "/admin/clubs")).toHaveLength(1);
+    expect([...phone(html).matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1])).toContain("Clubs");
+    expect(lit(html)).toEqual(["Clubs"]);
   });
 });
 
@@ -154,6 +180,14 @@ describe("tab rows and the menu line (#1565)", () => {
     expect(css).not.toContain("var(--imsda-purple)); }");
     const globals = read("app/globals.css");
     expect(globals).toMatch(/\.mobile-nav a\.active::before \{[^}]*height: 4px;[^}]*var\(--imsda-gold\)/);
+  });
+
+  it("keeps the account button at 44px and the shell's count text at 14px without touching the global badge", () => {
+    expect(read("components/staff-account-menu.module.css")).toMatch(/button\.trigger \{ width: 44px; height: 44px; \}/);
+    expect(read("components/staff-shell.module.css")).toMatch(/\.countText \{ font-size: max\(var\(--type-staff-floor, 0px\), 0\.875rem\)/);
+    expect(read("components/staff-tab-row.tsx")).toContain("count-badge ${styles.countText}");
+    expect(read("components/staff-menu-dialog.tsx")).toContain("count-badge ${styles.countText}");
+    expect(read("components/staff-rail.tsx")).not.toContain("badges");
   });
 
   it("keeps the rail at 88px with navy gradient and 44px or larger targets", () => {

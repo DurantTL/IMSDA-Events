@@ -57,7 +57,7 @@ export function StaffMenuDialog({
               <li key={tab.key} className={styles.group}>
                 <GuardedLink className={styles.item} href={tab.href} aria-current={tabCurrent(tab, pathname)} onNavigate={follow}>
                   <span>{tab.label}</span>
-                  {tab.count ? <span className="count-badge">{tab.count}</span> : null}
+                  {tab.count ? <span className={`count-badge ${styles.countText}`}>{tab.count}</span> : null}
                 </GuardedLink>
                 {tab.views && tab.views.length > 0 && (
                   <ul className={styles.subItems} aria-label={`${tab.label} views`}>

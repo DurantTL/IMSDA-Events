@@ -351,6 +351,7 @@ export function AppShell({
         place={place}
         eventTab={place.inEvent ? eventPlace.tab : null}
         firstEventTab={eventTabs[0]?.key ?? null}
+        pageMarkedAbove={Boolean(currentTab)}
         launcher={{
           cards: launcherCards,
           sections: launcherSections,

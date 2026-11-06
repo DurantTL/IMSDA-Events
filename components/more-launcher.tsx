@@ -360,6 +360,7 @@ export function MoreLauncher({
   href,
   className,
   isActive,
+  currentMark,
   cards,
   sections,
   moduleStates,
@@ -379,6 +380,8 @@ export function MoreLauncher({
   href: string;
   className?: string;
   isActive: boolean;
+  /** Overrides the "page" or "true" the trigger says when lit (the phone bar passes "true" when the row above says "page"). */
+  currentMark?: "page" | "true";
   cards: readonly MoreDirectoryCard[];
   /** "This event" and the other areas, above the cards (#1565). */
   sections?: readonly LauncherSection[];
@@ -498,7 +501,7 @@ export function MoreLauncher({
         ref={triggerRef}
         className={className}
         href={href}
-        aria-current={isActive ? (pathname === href.split(/[?#]/)[0] ? "page" : "true") : undefined}
+        aria-current={isActive ? (currentMark ?? (pathname === href.split(/[?#]/)[0] ? "page" : "true")) : undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
