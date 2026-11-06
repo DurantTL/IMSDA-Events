@@ -2,7 +2,7 @@ import type { DashboardTab } from "@/components/dashboard-tabs";
 import { clubsAdminActiveHref, clubsAdminGroups, type ClubsNavGroupKey } from "@/components/staff-navigation";
 import { systemNavActiveItem, systemNavGroups, type SystemNavGroupKey } from "@/components/system-navigation";
 import type { AdminRole } from "@/modules/access/admin-roles-domain";
-import { clubsAdminTabs } from "@/modules/club-reports/clubs-admin-home-model";
+import { clubsAdminHrefs, clubsAdminTabs } from "@/modules/club-reports/clubs-admin-home-model";
 import type { ClubSummaryView } from "@/modules/club-reports/club-directory-domain";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { eventsAdminTabs } from "@/modules/events/events-admin-home-model";
@@ -154,6 +154,13 @@ export function adminSectionTabs(
   return markCurrent(tabs, pathname, eventsAreaKey(pathname));
 }
 
+const reviewListLabel = "Back to Review monthly records";
+
+/** The Club summary's Monthly Records tab, which the review list's back link returns to (#1552). */
+function recordsTabHref(clubYear?: string): string {
+  return clubsAdminHrefs(clubYear ?? clubYearFor(new Date())).records;
+}
+
 /**
  * The back link of a page deeper than its section's main pages, or null on a main page. It stays inside the active
  * section: in the Clubs view a club page goes back to the Club summary, never to the System-only Clubs and churches list.
@@ -182,9 +189,10 @@ export function adminBackLink(
   if (/^\/admin\/organizations\/map-locations(\/|$)/.test(pathname)) return { href: "/admin/organizations/directory", label: "Back to Organization directory" };
   if (/^\/admin\/organizations\/(directory|import)(\/|$)/.test(pathname)) return { href: "/admin/organizations", label: "Back to Clubs and churches" };
   if (/^\/admin\/clubs\/(import|invites|health-import)(\/|$)/.test(pathname)) return clubList;
-  if (/^\/admin\/clubs\/reports\/year-end(\/|$)/.test(pathname)) return { href: "/admin/clubs/reports", label: "Back to Monthly Records" };
+  if (/^\/admin\/clubs\/reports\/?$/.test(pathname)) return { href: recordsTabHref(options.clubYear), label: "Back to Monthly Records" };
+  if (/^\/admin\/clubs\/reports\/year-end(\/|$)/.test(pathname)) return { href: "/admin/clubs/reports", label: reviewListLabel };
   match = /^\/admin\/clubs\/reports\/([^/]+)\/[^/]+(\/|$)/.exec(pathname);
-  if (match) return options.viaParent ? clubPage(match[1]) : { href: "/admin/clubs/reports", label: "Back to Monthly Records" };
+  if (match) return options.viaParent ? clubPage(match[1]) : { href: "/admin/clubs/reports", label: reviewListLabel };
   if (/^\/admin\/club-forms\/public-page\/preview(\/|$)/.test(pathname)) return { href: "/admin/club-forms/public-page", label: "Back to editing" };
   if (/^\/admin\/club-forms\/[^/]+(\/|$)/.test(pathname)) return { href: "/admin/club-forms", label: "Back to club forms" };
   if (/^\/admin\/form-templates\/[^/]+(\/|$)/.test(pathname)) return { href: "/admin/form-templates", label: "Back to form templates" };

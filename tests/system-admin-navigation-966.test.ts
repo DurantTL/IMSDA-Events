@@ -20,7 +20,7 @@ vi.mock("@/components/sign-out-button", () => ({
 }));
 
 import { AppShell } from "@/components/app-shell";
-import { eventFeaturesItem } from "@/components/staff-navigation";
+import { clubsAdminRecordsHref, eventFeaturesItem } from "@/components/staff-navigation";
 import { StaffAccountMenu } from "@/components/staff-account-menu";
 import { resolveSidebarGroupOpen } from "@/components/sidebar-groups";
 import {
@@ -73,7 +73,7 @@ describe("system navigation groups", () => {
       "/event-setup",
       "/admin/calendar",
       "/event-setup/copy",
-      "/admin/clubs/reports",
+      clubsAdminRecordsHref,
       "/admin/clubs/summary",
       "/admin/clubs/applications",
       "/admin/clubs/transfers",
@@ -92,7 +92,7 @@ describe("system navigation groups", () => {
     expect(systemNavActiveItem("/admin/organizations")?.label).toBe("Clubs and churches");
     expect(systemNavActiveItem("/admin/organizations/org_1/profile")?.label).toBe("Clubs and churches");
     expect(systemNavActiveItem("/admin/organizations/background-checks")?.label).toBe("Sterling Volunteers");
-    expect(systemNavActiveItem("/admin/clubs/reports/org_1/2026-09")?.label).toBe("Club Monthly Records");
+    expect(systemNavActiveItem("/admin/clubs/reports/org_1/2026-09")?.label).toBe("Monthly Records");
     expect(systemNavActiveItem("/admin/clubs/invites")?.label).toBe("New club applications");
     expect(systemNavActiveItem("/admin/organizationsx")).toBeNull();
     expect(systemNavActiveItem("/admin")).toBeNull();
@@ -115,7 +115,7 @@ describe("sidebar on /admin pages", () => {
   it("shows the system groups to a system admin, collapsible, all closed until opened", () => {
     const nav = sidebarOf(render(admin));
     for (const label of ["Events", "Clubs", "People", "Forms", "Catalogs and settings"]) expect(nav).toContain(`<span>${label}</span>`);
-    expect(nav).toContain('href="/admin/clubs/reports?event=evt_one"');
+    expect(nav).toContain('href="/admin/clubs/summary?view=records&amp;event=evt_one#monthly-records"');
     expect(nav).toContain('href="/event-setup/copy?event=evt_one"');
     expect(nav).toMatch(/id="nav-group-system-catalogs-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*id="nav-group-system-catalogs-toggle"/);
     // Every group starts closed (#1245); only the one holding the current page opens.
@@ -136,7 +136,7 @@ describe("sidebar on /admin pages", () => {
   it("keeps the current event on system links and lists Archived events once", () => {
     navigation.search = "event=evt_one";
     const markup = render(admin);
-    expect(sidebarOf(markup)).toContain('href="/admin/clubs/reports?event=evt_one"');
+    expect(sidebarOf(markup)).toContain('href="/admin/clubs/summary?view=records&amp;event=evt_one#monthly-records"');
     expect(markup.match(/>Archived events</g)).toHaveLength(1);
     navigation.pathname = "/overview";
     expect(render(admin).match(/>Archived events</g)).toHaveLength(1);
@@ -150,7 +150,7 @@ describe("sidebar on /admin pages", () => {
     navigation.pathname = "/admin";
     const nonAdmin = sidebarOf(render(staff));
     expect(nonAdmin).not.toContain("Catalogs and settings");
-    expect(nonAdmin).not.toContain('href="/admin/clubs/reports?event=evt_one"');
+    expect(nonAdmin).not.toContain('href="/admin/clubs/summary?view=records&amp;event=evt_one#monthly-records"');
     expect(nonAdmin).not.toContain('href="/event-setup"');
   });
 });

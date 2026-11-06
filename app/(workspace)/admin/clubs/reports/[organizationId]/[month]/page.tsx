@@ -47,7 +47,7 @@ export default async function StaffClubReportPage({
   const viaParent = allowedReturnTo(from, [clubHref], "") === clubHref;
   return (
     <section className="page-stack">
-      <AdminPageHeader path={`/admin/clubs/reports/${organizationId}/${month}`} year={clubYear} parentName={club.name} viaParent={viaParent} back={viaParent ? undefined : { href: `/admin/clubs/reports?year=${clubYear}`, label: "Back to Monthly Records" }} />
+      <AdminPageHeader path={`/admin/clubs/reports/${organizationId}/${month}`} year={clubYear} parentName={club.name} viaParent={viaParent} back={viaParent ? undefined : { href: `/admin/clubs/reports?year=${clubYear}`, label: "Back to Review monthly records" }} />
       <div className="page-intro"><div><p className="eyebrow">Monthly Record</p><h2 translate="no">{club.name}</h2></div></div>
       {report?.status === "SUBMITTED" && (
         <section className="panel club-report-review-panel" aria-labelledby="club-report-review-heading">

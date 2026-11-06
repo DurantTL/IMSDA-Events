@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { buildMoreDirectoryCards, navigation } from "@/components/staff-navigation";
-import { systemNavGroups } from "@/components/system-navigation";
+import { clubsAdminRecordsHref, systemNavGroups } from "@/components/system-navigation";
 
 // Issue #981 batch 2: one page header, no copied back buttons, no chip bars that copy the sidebar or More.
 // Synthetic data only. Source checks guard the markup a server page would draw; the rendered check is the mobile audit.
@@ -99,10 +99,13 @@ describe("link-chip bars became one Tools menu without losing a destination", ()
       // Not a sidebar item (Club invites is reached through "New club applications and invites" only for its highlight).
       expect(sidebar.has(href), href).toBe(false);
     }
-    for (const href of ["/admin/clubs/applications", "/admin/clubs/reports", "/admin/clubs/summary", "/admin/clubs/transfers", "/admin/organizations/background-checks"]) {
+    for (const href of ["/admin/clubs/applications", "/admin/clubs/summary", "/admin/clubs/transfers", "/admin/organizations/background-checks"]) {
       expect(source, href).not.toContain(`"${href}"`);
       expect(sidebar.has(href), href).toBe(true);
     }
+    // Monthly Records is a sidebar item that opens the Club summary tab; the review list is not a Tools link (#1552).
+    expect(source).not.toContain('"/admin/clubs/reports"');
+    expect(sidebar.has(clubsAdminRecordsHref)).toBe(true);
     expect(source).not.toContain("club-admin-links");
   });
 
