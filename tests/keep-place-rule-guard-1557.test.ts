@@ -119,3 +119,10 @@ describe("keep the reader's place (B17, #1557)", () => {
     }
   });
 });
+
+describe("staff role pills never re-wrap on a phone (#1557, B17)", () => {
+  it("gives each admin role pill its own row at phone width", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    expect(css).toMatch(/@media \(max-width: 520px\) \{[^}]*\.admin-role-pills \{[^}]*flex-direction: column/);
+  });
+});

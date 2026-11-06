@@ -13042,7 +13042,12 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   font-weight: 800;
 }
 .admin-role-note { margin: 0; color: var(--muted, #5b6b73); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-@media (max-width: 520px) { .admin-role-pills { width: 100%; } .admin-role-link { flex: 1 1 auto; justify-content: center; } }
+/* On a phone each pill has its own full-width row, always (#1557, rule B17). With two pills side by side, a small change
+   in text width (such as the web font loading) moved the second pill onto a new row and pushed the page down. */
+@media (max-width: 520px) {
+  .admin-role-pills { width: 100%; flex-direction: column; }
+  .admin-role-link { justify-content: center; }
+}
 
 /* Club form groups and open applications (#1229) */
 .club-form-group { display: grid; gap: 10px; }
