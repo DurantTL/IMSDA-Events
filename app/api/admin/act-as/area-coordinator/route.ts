@@ -13,8 +13,9 @@ async function postHandler(request: Request) {
   if (originError) return originError;
   try {
     const actor = await requireClubsAdministration();
-    // `requireClubsAdministration` already required an authenticated staff session, and a
-    // system administrator or Clubs Administrator session cannot exist without its second factor.
+    // `requireClubsAdministration` already required an authenticated staff session. A system administrator's
+    // session has completed its second factor (mfa-rules.ts); a Clubs Administrator's does not necessarily,
+    // because `requiresMfa` covers only system administrators and event members. This route adds no MFA check of its own.
     const { sessionId } = await getCurrentSession();
     if (!sessionId) throw new Error("A staff session is missing its session id.");
     await actAsAreaCoordinator(actAsActor(actor), sessionId);

@@ -48,7 +48,7 @@ export async function requireClubLeaderViewer(organizationId: string, now = new 
   return clubLeaderViewerFromAccess(access);
 }
 
-/** An Area Coordinator (their own account, or a system administrator acting as one), or null. */
+/** An Area Coordinator (their own account, or a system administrator or Clubs Administrator acting as one), or null. */
 export async function resolveAreaCoordinatorViewer(): Promise<Extract<ClubFormsViewer, { kind: "AREA_COORDINATOR" }> | null> {
   const account = await currentAreaCoordinator();
   if (account) return { kind: "AREA_COORDINATOR", actor: { kind: "ATTENDEE", accountId: account.id } };

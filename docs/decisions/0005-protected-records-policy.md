@@ -409,10 +409,11 @@ birth dates need their own protection.
    Clubs Administrator is not assigned to. Everything that serves clubs and churches alike is
    open to a Clubs Administrator **for club organizations only**; the server
    reads the organization type (`requireClubOrganizationAdministration`) and
-   refuses a church, school or the conference. Acting as a Director is valid
+   refuses a church, school or the conference. Acting as a club role is valid
    for a Clubs Administrator only while the grant is active, re-checked on
    every request, as a club's Director and, since 2026-11-06, as an Area
-   Coordinator (view only; see Addendum D). Generic organization management (list,
+   Coordinator (view only, apart from sending a club form link; see
+   Addendum D). Generic organization management (list,
    create, billing, pastor, location, status, deletion, external identities,
    directory import), Master Award rules, seat overrides, settings, accounts,
    the Team, events, sealed-copy holds, club-form alert emails and template

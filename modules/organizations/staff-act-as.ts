@@ -48,7 +48,7 @@ export type ActiveStaffActAs = {
 
 /**
  * The staff session's own validity (and that its user is the act-as's user
- * and still a system administrator, or, for a club-director act-as, still an active Clubs Administrator), independent of whether it is expired,
+ * and still a system administrator or an active Clubs Administrator), independent of whether it is expired,
  * revoked, or idle right now — the same rules `getCurrentSession` checks.
  * An act-as is never active once its staff session itself is dead, even
  * before anything writes `endedAt`. Returns who is acting, or null when the session no longer counts.
@@ -56,7 +56,6 @@ export type ActiveStaffActAs = {
 async function staffSessionIsValid(
   staffSessionId: string,
   actingUserId: string,
-  role: StaffActAsRole,
   now: Date,
 ): Promise<{ viaClubsAdministrator: boolean } | null> {
   const session = await getPrisma().userSession.findUnique({
@@ -102,7 +101,7 @@ export async function resolveActiveActAs(staffSessionId: string, now = new Date(
     }).catch(() => {});
     return null;
   }
-  const valid = await staffSessionIsValid(staffSessionId, row.userId, row.role, now);
+  const valid = await staffSessionIsValid(staffSessionId, row.userId, now);
   if (!valid) return null;
   return valid.viaClubsAdministrator ? { ...row, viaClubsAdministrator: true } : row;
 }
@@ -121,7 +120,7 @@ export type StaffActingContext = {
 /**
  * The signed-in staff member's active act-as, from the staff session alone.
  * Only the own act-as on this very session of a still-active system administrator, or of an active Clubs Administrator
- * acting as a club director, counts: a row for another user or another session is never used.
+ * (as a club director or an Area Coordinator), counts: a row for another user or another session is never used.
  */
 export async function currentStaffActingContext(): Promise<StaffActingContext | null> {
   const { user, sessionId } = await getCurrentSession();

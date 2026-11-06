@@ -55,7 +55,7 @@ export async function rosterGuardiansForAccess(
   return viewer ? listGuardiansByMember(viewer, organizationId, clubYear) : undefined;
 }
 
-/** An Area Coordinator (their own account, or a system administrator acting as one), or null. */
+/** An Area Coordinator (their own account, or a system administrator or Clubs Administrator acting as one), or null. */
 export async function resolveAreaGuardianViewer(): Promise<Extract<GuardianViewer, { kind: "AREA_COORDINATOR" }> | null> {
   const viewer = await resolveAreaCoordinatorViewer();
   if (!viewer) return null;
