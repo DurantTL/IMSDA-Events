@@ -255,7 +255,8 @@ export function CalendarAdminWorkspace({
   useEffect(() => {
     if (queryKey === loadedKey.current) return;
     // Until the address is read (an effect after the first render, run twice by React in development) `queryKey` is only the
-    // defaults. When the address already asks for the list on screen, there is nothing to fetch (#1612).
+    // defaults. When the address already asks for the list on screen, there is nothing to fetch (#1612). This relies on
+    // `useAddressParams` writing the address before the next render, so a real change never matches the loaded list.
     let addressKey = "";
     try { addressKey = entryQueryParams(parseEntryQuery(new URLSearchParams(window.location.search))).toString(); } catch { /* no usable address: compare the state */ }
     if (addressKey === loadedKey.current) return;
