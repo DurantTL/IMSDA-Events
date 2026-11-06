@@ -252,7 +252,7 @@ describe("clearing the passkey domain", () => {
     await expect(attempt).rejects.toThrow("2 staff sign in only with a passkey; they'd be locked out.");
 
     // Counted as: active accounts that must pass a second step (system admins
-    // and anyone with an active event membership), with a live passkey and no
+    // active Clubs Administrators, and anyone with an active event membership), with a live passkey and no
     // active authenticator.
     expect(tx.user.count).toHaveBeenCalledWith({
       where: {
@@ -262,6 +262,7 @@ describe("clearing the passkey domain", () => {
         OR: [
           { globalRole: "SYSTEM_ADMIN" },
           { memberships: { some: { status: "ACTIVE" } } },
+          { clubsAdministratorGrant: { is: { revokedAt: null } } },
         ],
       },
     });

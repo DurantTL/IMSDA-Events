@@ -4,7 +4,7 @@ import type { AccountTokenPurpose, GlobalRole } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { hashPassword, spendPasswordCheck, verifyPassword } from "@/modules/access/passwords";
 import { createDatabaseSession } from "@/modules/access/session-store";
-import { mfaGateFor } from "@/modules/access/mfa-rules";
+import { mfaGateFor, mfaSubjectFromUser } from "@/modules/access/mfa-rules";
 import { createOpaqueToken, hashOpaqueToken } from "@/modules/access/tokens";
 import { linkAttendeeSideAtActivation } from "@/modules/account-merge/staff-attendee-link";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -60,6 +60,7 @@ export async function authenticateWithPassword(
       accountStatus: true,
       globalRole: true,
       memberships: { where: { status: "ACTIVE" }, select: { role: true } },
+      clubsAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { status: true } },
       passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
       credential: {
@@ -82,11 +83,7 @@ export async function authenticateWithPassword(
 
   if (!(await checkPasswordWithLockout(user.credential, user.id, password))) return null;
 
-  const subject = {
-    globalRole: user.globalRole,
-    activeEventRoles: user.memberships.map((membership) => membership.role),
-  };
-  const gate = mfaGateFor(subject, user.mfaEnrollment);
+  const gate = mfaGateFor(mfaSubjectFromUser(user), user.mfaEnrollment);
   // A passkey is this account's second factor: sign in with it, not by
   // enrolling a new authenticator on the strength of the password (#429).
   if (gate.kind === "enrol" && user.passkeys.length > 0) {
@@ -205,6 +202,7 @@ export async function checkStaffPasswordNoCount(email: string, password: string)
       accountStatus: true,
       globalRole: true,
       memberships: { where: { status: "ACTIVE" }, select: { role: true } },
+      clubsAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { status: true } },
       passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
       credential: {
@@ -223,10 +221,7 @@ export async function checkStaffPasswordNoCount(email: string, password: string)
   return {
     kind: "ok",
     complete: async (userAgent) => {
-      const gate = mfaGateFor(
-        { globalRole: user.globalRole, activeEventRoles: user.memberships.map((membership) => membership.role) },
-        user.mfaEnrollment,
-      );
+      const gate = mfaGateFor(mfaSubjectFromUser(user), user.mfaEnrollment);
       if (gate.kind === "enrol" && user.passkeys.length > 0) return { outcome: "passkey_required", userId: user.id };
       if (gate.kind !== "not_required") return { outcome: "mfa", userId: user.id, gate: gate.kind };
       return {

@@ -44,6 +44,7 @@ function credentialFixture(user: {
   globalRole: "SYSTEM_ADMIN" | null;
   memberships: Array<{ role: string }>;
   mfaEnrollment: { status: "PENDING" | "ACTIVE" } | null;
+  clubsAdministratorGrant?: { revokedAt: Date | null } | null;
 }) {
   const prisma = {
     user: {
@@ -52,6 +53,7 @@ function credentialFixture(user: {
         accountStatus: "ACTIVE",
         globalRole: user.globalRole,
         memberships: user.memberships,
+        clubsAdministratorGrant: user.clubsAdministratorGrant ?? null,
         mfaEnrollment: user.mfaEnrollment,
         passkeys: [],
         credential: {
@@ -94,5 +96,35 @@ describe("a correct password for a staff account with no active membership", () 
 
     expect(result?.outcome).toBe("session");
     expect(dependencies.createDatabaseSession).toHaveBeenCalledOnce();
+  });
+});
+
+describe("a correct password for a Clubs Administrator with no event membership (Nov 6, 2026)", () => {
+  const clubsAdmin = { globalRole: null, memberships: [] as Array<{ role: string }>, clubsAdministratorGrant: { revokedAt: null } };
+
+  it("is sent to enrol, with no session, when no second factor exists yet", async () => {
+    credentialFixture({ ...clubsAdmin, mfaEnrollment: null });
+
+    const result = await authenticateWithPassword("staff@imsda.org", "correct password", null);
+
+    expect(result).toMatchObject({ outcome: "mfa", gate: "enrol" });
+    expect(dependencies.createDatabaseSession).not.toHaveBeenCalled();
+  });
+
+  it("is asked for a code, with no session, once enrolled", async () => {
+    credentialFixture({ ...clubsAdmin, mfaEnrollment: { status: "ACTIVE" } });
+
+    const result = await authenticateWithPassword("staff@imsda.org", "correct password", null);
+
+    expect(result).toMatchObject({ outcome: "mfa", gate: "challenge" });
+    expect(dependencies.createDatabaseSession).not.toHaveBeenCalled();
+  });
+
+  it("goes back to the password alone once the grant is revoked and nothing else qualifies", async () => {
+    credentialFixture({ globalRole: null, memberships: [], clubsAdministratorGrant: { revokedAt: new Date("2026-11-06T12:00:00Z") }, mfaEnrollment: null });
+
+    const result = await authenticateWithPassword("staff@imsda.org", "correct password", null);
+
+    expect(result?.outcome).toBe("session");
   });
 });

@@ -35,6 +35,7 @@ type Fixture = {
   user?: {
     globalRole?: "SYSTEM_ADMIN" | null;
     memberships?: Array<{ role: string }>;
+    clubsAdministratorGrant?: { revokedAt: Date | null } | null;
   };
   enrollment?: {
     id?: string;
@@ -82,6 +83,7 @@ function prismaFixture(fixture: Fixture = {}) {
         displayName: "Alex Staff",
         globalRole: fixture.user?.globalRole ?? null,
         memberships: fixture.user?.memberships ?? [],
+        clubsAdministratorGrant: fixture.user?.clubsAdministratorGrant ?? null,
         mfaEnrollment: enrollment ? { id: enrollment.id, status: enrollment.status } : null,
       })),
     },
@@ -340,6 +342,14 @@ describe("the sign-in challenge", () => {
 });
 
 describe("removing a second factor", () => {
+  it("is refused for an active Clubs Administrator with no event membership (Nov 6, 2026)", async () => {
+    const { state } = prismaFixture({ user: { clubsAdministratorGrant: { revokedAt: null } } });
+
+    await expect(disableMfa("user-1", totpCode(SECRET, now), { now }))
+      .rejects.toMatchObject({ code: "MFA_REQUIRED_BY_ROLE" });
+    expect(state.deletedEnrollments).toEqual([]);
+  });
+
   it("is refused for an account whose role requires one", async () => {
     prismaFixture({ user: { globalRole: "SYSTEM_ADMIN" } });
 

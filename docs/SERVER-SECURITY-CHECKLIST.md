@@ -109,10 +109,12 @@ Ticking only records that someone did the work. This sheet remains the full inst
 ### 8. Confirm MFA for everyone who can see club data
 - **Why:** full birth dates are visible only to that club's directors and system
   administrators (ADR 0005 Addendum A). Both must use MFA.
-- **How:** system administrators already need MFA. H2 makes a director turn on
-  MFA before the roster opens. Before launch, check that every system
-  administrator account has MFA set up.
-- **Proof:** the list of system administrators, each with MFA on.
+- **How:** system administrators and Clubs Administrators (Caleb, Nov 6, 2026)
+  already need MFA at sign-in, even with no event membership. H2 makes a
+  director turn on MFA before the roster opens. Before launch, check that every
+  system administrator and every Clubs Administrator account has MFA set up.
+- **Proof:** the list of system administrators and Clubs Administrators, each
+  with MFA on.
 
 ### 9. Write the key rotation procedure
 - **Draft for the custodian to review (Jonathan Swena).** The procedure below is
