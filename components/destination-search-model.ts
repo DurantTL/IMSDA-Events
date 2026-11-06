@@ -105,6 +105,7 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/admin/clubs/applications": ["invite club", "new club", "club invite", "application"],
   "/admin/clubs/transfers": ["move member", "transfer member"],
   "/admin/people": ["invite staff", "add staff", "staff access", "permissions", "roles", "who can", "sign in", "login", "password", "user accounts", "team", "accounts"],
+  "/admin/health-access": ["break glass", "legal hold", "hold", "health access", "grants", "monthly review", "medical"],
   "/admin/forms": ["questions", "survey"],
   "/admin/club-forms": ["membership", "permission slip"],
   "/admin/form-templates": ["registration form", "form template"],

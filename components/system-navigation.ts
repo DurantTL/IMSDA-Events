@@ -17,6 +17,7 @@ import {
   ArrowRightLeft,
   Package,
   ShieldCheck,
+  ShieldAlert,
   Trophy,
   UserPlus,
   Users,
@@ -95,6 +96,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     collapsedByDefault: false,
     items: [
       { href: "/admin/people", label: "People & access", description: "Staff logins and website accounts: who they are and what they can reach.", icon: UsersRound },
+      { href: "/admin/health-access", label: "Break-glass and legal holds", description: "Review break-glass grants and place or lift legal holds on sealed health copies.", icon: ShieldAlert },
     ],
   },
   {
@@ -221,6 +223,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/honors(\/|$)/, "Honor catalog"],
   [/^\/admin\/master-award-rules(\/|$)/, "Master Award rules"],
   [/^\/admin\/(people|team|accounts)(\/|$)/, "People & access"],
+  [/^\/admin\/health-access(\/|$)/, "Break-glass and legal holds"],
   [/^\/admin\/calendar(\/|$)/, "Conference calendar"],
   [/^\/admin\/event-templates\/from-event(\/|$)/, "Save an event as a template"],
   [/^\/admin\/event-templates\/[^/]+(\/|$)/, "Edit event template"],
