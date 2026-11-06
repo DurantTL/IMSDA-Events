@@ -99,6 +99,8 @@ describe("health data stays out of exports, the check-in book, communications an
       // Event deletion counts and removes copies with the table, not through the module (no health code imported).
       .sort();
     expect(users).toEqual([
+      // The break-glass and legal holds page (#1617) lists grants and holds through the same functions as the GET routes.
+      "app/(workspace)/admin/health-access/page.tsx",
       "app/api/staff/health-snapshots/break-glass-grants/route.ts",
       "app/api/staff/health-snapshots/break-glass/route.ts",
       "app/api/staff/health-snapshots/holds/[holdId]/lift/route.ts",

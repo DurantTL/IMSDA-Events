@@ -66,7 +66,9 @@ export function HealthAccessHolds({ holds }: { holds: readonly HoldRow[] }) {
     const result = await postJson("/api/staff/health-snapshots/holds", payload, "The hold could not be placed.");
     setBusy(false);
     if (!result.ok) {
-      showSummary([{ targetId: `${id}-reason`, message: failure(result.body, "The hold could not be placed.") }]);
+      // A missing person or event is about the id field; anything else is about the reason.
+      const targetField = result.body.error === "MEMBER_NOT_FOUND" || result.body.error === "NOT_FOUND" ? `${id}-target` : `${id}-reason`;
+      showSummary([{ targetId: targetField, message: failure(result.body, "The hold could not be placed.") }]);
       return;
     }
     setTarget("");
@@ -101,7 +103,7 @@ export function HealthAccessHolds({ holds }: { holds: readonly HoldRow[] }) {
     <section aria-labelledby="legal-holds" className={styles.card}>
       <div className="section-heading"><h2 id="legal-holds">Legal holds</h2></div>
       <p className={styles.copy}>A hold keeps a person&apos;s or an event&apos;s sealed health copies from being deleted. Placing and lifting a hold work even when health records are switched off.</p>
-      {summaryItems.length > 0 && <FormErrorSummary action="finishing" items={summaryItems} ref={summaryRef} />}
+      {summaryItems.length > 0 && <FormErrorSummary action="placing or lifting a hold" items={summaryItems} ref={summaryRef} />}
       <form className="form-stack" onSubmit={(event) => void place(event)}>
         <div className={styles.row}>
           <label className={styles.field} htmlFor={`${id}-scope`}>

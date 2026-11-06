@@ -1,8 +1,21 @@
-import type { listSnapshotBreakGlassGrants } from "@/modules/health-records/snapshot-access-repository";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import styles from "@/components/health-access.module.css";
 
-export type BreakGlassGrantRow = Awaited<ReturnType<typeof listSnapshotBreakGlassGrants>>[number];
+/**
+ * One grant as the review list returns it (ids, dates, counts and the typed reason; never a health value). Declared
+ * here so this component does not reach the sealed-copy module; the page passes the repository's rows, and the
+ * compiler checks they fit.
+ */
+export type BreakGlassGrantRow = {
+  id: string;
+  userId: string | null;
+  userDisplayName: string | null;
+  personId: string | null;
+  reason: string;
+  grantedAt: Date | string;
+  expiresAt: Date | string;
+  uses: { total: number; lastUsedAt: Date | string | null; byKind: Partial<Record<string, number>> };
+};
 
 /** The repository returns at most this many grants or holds; a list that reaches it may be cut short. */
 export const HEALTH_ACCESS_LIST_CAP = 200;
