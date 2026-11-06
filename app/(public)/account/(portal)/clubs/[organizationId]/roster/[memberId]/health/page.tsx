@@ -94,9 +94,17 @@ export default async function ClubMemberHealthPage({ params }: { params: Promise
     throw error;
   });
   if (health === "BREAK_GLASS") {
-    // A real system administrator acting as the director (not a Clubs Administrator) can start break-glass here (#1617).
+    // A system administrator or Clubs Administrator acting as the director (any viewer the break-glass route accepts) can start break-glass here (#1617).
     const personId = canStartBreakGlassInline(viewer) ? await rosterMemberPersonId(organizationId, memberId) : null;
-    if (personId) return <HealthBreakGlassForm message={BREAK_GLASS_REQUIRED_MESSAGE} personId={personId} />;
+    if (personId) {
+      return (
+        <section className="page-stack club-form-page">
+          <BackLink href={rosterHref}>Back to roster</BackLink>
+          <header><h2>Break-glass access is required</h2></header>
+          <HealthBreakGlassForm message={BREAK_GLASS_REQUIRED_MESSAGE} personId={personId} />
+        </section>
+      );
+    }
     return <p className="public-manage-empty">{BREAK_GLASS_REQUIRED_MESSAGE}</p>;
   }
   if (!health) return <HealthPrivacyAcknowledgment as={viewer.kind === "SYSTEM_ADMIN" ? "STAFF" : "ATTENDEE"} />;

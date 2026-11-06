@@ -49,7 +49,7 @@ export default async function StaffHealthRecordPage({
     throw error;
   });
   if (health === "BREAK_GLASS") {
-    // A real system administrator (not a Clubs Administrator) can start break-glass right here (#1617).
+    // A system administrator or Clubs Administrator (any viewer the break-glass route accepts) can start break-glass right here (#1617).
     const personId = canStartBreakGlassInline(viewer) ? await rosterMemberPersonId(organizationId, memberId) : null;
     if (personId) {
       return (

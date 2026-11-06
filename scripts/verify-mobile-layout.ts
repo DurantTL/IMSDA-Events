@@ -407,6 +407,9 @@ const pages: PageSpec[] = [
   staff("registration-builder", "/registration-builder"),
   // Staff, as a system administrator.
   staff("system-home", "/admin", "system-admin"),
+  // Break-glass and legal holds (#1617). The audit server runs with HEALTH_RECORDS_ENABLED off, so the page skips the
+  // acknowledgment gate and shows the real grants and holds.
+  { ...staff("health-access", "/admin/health-access", "system-admin"), expectText: /Legal holds/ },
   staff("system-feature-requests", "/admin/feature-requests", "system-admin"),
   // The Clubs Administrator dashboard (#1226), opened as a system administrator.
   { name: "clubs-admin-dashboard", path: "/admin/clubs", role: "system-admin", expectText: /Club administration/, flow: "workspace-navigation" },

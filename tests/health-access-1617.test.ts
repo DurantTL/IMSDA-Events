@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   hasAcknowledged: vi.fn(async () => true),
   listGrants: vi.fn(),
   listHolds: vi.fn(),
+  requireViewer: vi.fn(),
   redirect: vi.fn((path: string) => { throw new Error(`REDIRECT:${path}`); }),
 }));
 
@@ -24,9 +25,12 @@ vi.mock("@/modules/health-records/acknowledgment", () => ({ hasAcknowledgedHealt
 vi.mock("@/modules/health-records/snapshot-access-repository", () => ({
   listSnapshotBreakGlassGrants: mocks.listGrants,
   listSnapshotHolds: mocks.listHolds,
+  requireSnapshotAdminViewer: mocks.requireViewer,
 }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({}) }));
 
+import { AccessDeniedError } from "@/modules/access/authorization";
+import { HealthRecordError } from "@/modules/health-records/errors";
 import HealthAccessPage from "@/app/(workspace)/admin/health-access/page";
 import { HealthBreakGlassForm } from "@/components/health-break-glass-form";
 import { systemNavGroups, systemSubpageTitle } from "@/components/system-navigation";
@@ -56,6 +60,7 @@ beforeEach(() => {
   mocks.listGrants.mockReset().mockResolvedValue([grant("g1", "2026-11-10T20:00:00Z"), grant("g2", "2026-11-09T20:00:00Z")]);
   mocks.listHolds.mockReset().mockResolvedValue([hold("h1", null), hold("h2", new Date("2026-11-05T12:00:00Z"))]);
   mocks.redirect.mockClear();
+  mocks.requireViewer.mockReset().mockResolvedValue({ kind: "SYSTEM_ADMIN", userId: "admin-1" });
 });
 
 describe("who sees the page", () => {
@@ -67,19 +72,31 @@ describe("who sees the page", () => {
     expect(mocks.listHolds).toHaveBeenCalledWith({ kind: "SYSTEM_ADMIN", userId: "admin-1" });
   });
 
+  it("asks for the routes' own check, with no Clubs Administrator allowance and the switch optional", async () => {
+    await renderPage();
+    expect(mocks.requireViewer).toHaveBeenCalledWith("LIST_BREAK_GLASS", null, { flagOptional: true });
+  });
+
   it.each([
-    ["a Clubs Administrator or event staff member", { id: "u2", globalRole: "STAFF" }],
-    ["a club director", { id: "u3", globalRole: "USER" }],
-  ])("sends %s to no-access and reads nothing", async (_label, user) => {
-    mocks.getCurrentSession.mockResolvedValue({ user });
+    ["a Clubs Administrator, event staff or a director (refused, audited by the check)", new HealthRecordError("FORBIDDEN", "Sealed health copies can be opened only by a system administrator, with break-glass.")],
+    ["a non-administrator with the switch off (unknown-route answer)", new HealthRecordError("NOT_FOUND", "Not found.")],
+  ])("sends %s to no-access and reads nothing", async (_label, refusal) => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "u2", globalRole: "STAFF" } });
+    mocks.requireViewer.mockRejectedValue(refusal);
     await expect(HealthAccessPage()).rejects.toThrow("REDIRECT:/no-access");
     expect(mocks.listGrants).not.toHaveBeenCalled();
     expect(mocks.listHolds).not.toHaveBeenCalled();
   });
 
+  it("sends an authentication failure to staff sign in", async () => {
+    mocks.requireViewer.mockRejectedValue(new AccessDeniedError("Authentication is required.", 401, "AUTHENTICATION_REQUIRED"));
+    await expect(HealthAccessPage()).rejects.toThrow("REDIRECT:/login");
+  });
+
   it("sends a signed-out visitor to staff sign in", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: null });
     await expect(HealthAccessPage()).rejects.toThrow("REDIRECT:/login");
+    expect(mocks.requireViewer).not.toHaveBeenCalled();
   });
 });
 
@@ -89,10 +106,11 @@ describe("the page content", () => {
     expect(html).toContain("Active now");
     expect(html).toContain("Review history");
     expect(html).toContain("Synthetic Admin");
-    expect(html).toContain("2026-11-10 20:00 UTC");
+    expect(html).toContain("Nov 10, 2026, 2:00 PM CST");
     expect(html).toContain("person-1");
     expect(html).toContain("Synthetic review reason");
-    expect(html).toContain("2 times (2 live record)");
+    expect(html).toContain("2 times (2 live record), last Nov 9, 2026, 7:00 AM CST");
+    expect(html).not.toContain("UTC");
   });
 
   it("lists holds with a Lift button only on the active one", async () => {
@@ -130,14 +148,15 @@ describe("the privacy acknowledgment", () => {
 });
 
 describe("the inline break-glass form", () => {
-  it("is allowed for a system administrator, including one acting as a director", () => {
+  it("follows the break-glass route: a system administrator, acting as a director or not, and a Clubs Administrator", () => {
     expect(canStartBreakGlassInline({ kind: "SYSTEM_ADMIN", userId: "a1" })).toBe(true);
     expect(canStartBreakGlassInline({ kind: "SYSTEM_ADMIN", userId: "a1", actAsId: "d1" })).toBe(true);
+    expect(canStartBreakGlassInline({ kind: "SYSTEM_ADMIN", userId: "c1", viaClubsAdministrator: true })).toBe(true);
   });
 
-  it("is not allowed for a Clubs Administrator, a director or a health role", () => {
-    expect(canStartBreakGlassInline({ kind: "SYSTEM_ADMIN", userId: "c1", viaClubsAdministrator: true })).toBe(false);
+  it("is not allowed for a director, deputy, registrar or health role", () => {
     expect(canStartBreakGlassInline({ kind: "CLUB_LEADER", organizationId: "o1", accountId: "acc1" })).toBe(false);
+    expect(canStartBreakGlassInline({ kind: "CLUB_REGISTRAR", organizationId: "o1", accountId: "acc1" })).toBe(false);
     expect(canStartBreakGlassInline({ kind: "HEALTH_ROLE", userId: "u1", eventIds: ["e1"] })).toBe(false);
   });
 

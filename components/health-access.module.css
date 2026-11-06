@@ -1,8 +1,4 @@
 /* Break-glass and legal holds (#1617): the admin page and the inline break-glass form. No health value appears here. */
-.stack {
-  display: grid;
-  gap: 20px;
-}
 
 .card {
   display: grid;
@@ -96,25 +92,6 @@
   .item dl {
     grid-template-columns: max-content minmax(0, 1fr);
   }
-}
-
-.status {
-  justify-self: start;
-  border-radius: 999px;
-  background: var(--imsda-gold-soft, #fdf3d4);
-  padding: 2px 10px;
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  font-weight: 700;
-}
-
-.statusLifted {
-  background: var(--line);
-  color: var(--muted);
-}
-
-.liftButton {
-  justify-self: start;
-  min-height: 44px;
 }
 
 .actions {

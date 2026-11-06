@@ -858,12 +858,12 @@ placed before a deletion. Routes: `POST /api/staff/health-snapshots/break-glass`
 `GET /api/staff/health-snapshots/break-glass-grants`,
 `GET|POST /api/staff/health-snapshots/holds`,
 `POST /api/staff/health-snapshots/holds/<holdId>/lift`. The page is
-`/admin/health-access` ("Break-glass and legal holds", #1617), in System management > People. It is for system
-administrators only: a Clubs Administrator gets neither the page nor the inline form, even though two routes accept
-one. It reads through the same functions as the GET routes and every change posts to the routes above. The privacy
-acknowledgment comes first while the switch is on; with the switch off it cannot be recorded (its route answers 404)
-and the hold and review routes do not require it, so the page skips that step and still shows holds and the grant
-review. Where the Health tab says break-glass is needed, a system administrator also sees a reason form.
+`/admin/health-access` ("Break-glass and legal holds", #1617), in System management > People. The page itself is for
+system administrators only, because holds are system-only and it sits in the System navigation; a Clubs Administrator
+can still use the grants-list route. It reads through the same functions as the GET routes and every change posts to
+the routes above. The privacy acknowledgment comes first while the switch is on; with the switch off it cannot be
+recorded (its route answers 404) and the hold and review routes do not require it, so the page skips that step and
+still shows holds and the grant review. Where the Health tab says break-glass is needed, the inline reason form follows the break-glass route: it is shown to a system administrator and to a Clubs Administrator (when the member has a person id), and to no director, deputy, registrar or health-role viewer.
 
 ### Break-glass for the live record (#929)
 
@@ -970,7 +970,7 @@ questions this build raised.
   defaults to 14 days).
 - **Break-glass screen.** #924 and #929 add the routes only (one grant now covers the live record and the sealed
   copies); the page for a system administrator to start break-glass and place or lift holds is `/admin/health-access`
-  (#1617), and the Health tab shows a reason form to a system administrator (not a Clubs Administrator).
+  (#1617), and the Health tab shows a reason form to whoever the break-glass route accepts (system administrators and Clubs Administrators).
 - **Acknowledgment wording.** The notice text in
   `modules/health-records/acknowledgment-domain.ts` is a draft for the
   Communication Director to confirm. A change to it needs a new version.

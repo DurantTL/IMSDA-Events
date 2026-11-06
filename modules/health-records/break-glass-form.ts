@@ -4,15 +4,13 @@ import { getPrisma } from "@/lib/prisma";
 import type { HealthViewer } from "@/modules/health-records/domain";
 
 /**
- * The inline break-glass form on the two pages that show BREAK_GLASS_REQUIRED_MESSAGE (#1617).
- *
- * Only a real system administrator gets the form. A Clubs Administrator's viewer is also `kind: "SYSTEM_ADMIN"`
- * but carries `viaClubsAdministrator: true`, and the issue keeps this form for system administrators only, so that
- * flag is checked here. A system administrator acting as a club director is still a system administrator and does
- * get it. The server stays the authority: the break-glass route checks again.
+ * The inline break-glass form on the two pages that show BREAK_GLASS_REQUIRED_MESSAGE (#1617). It follows the break-glass
+ * route: any viewer the route accepts, which is a system administrator (acting as a director or not) and a Clubs
+ * Administrator (`viaClubsAdministrator`, ADR 0005 Decided 2026-10-26, #1225). A director, deputy, registrar or
+ * health-role viewer gets no form. The server stays the authority: the route checks again.
  */
 export function canStartBreakGlassInline(viewer: HealthViewer): boolean {
-  return viewer.kind === "SYSTEM_ADMIN" && !viewer.viaClubsAdministrator;
+  return viewer.kind === "SYSTEM_ADMIN";
 }
 
 /**
