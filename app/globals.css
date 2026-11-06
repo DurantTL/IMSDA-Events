@@ -10433,13 +10433,18 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-masthead-brand small { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-masthead-brand strong { font-size: 1.05rem; }
 .club-masthead-identity { min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--muted); font-size: 0.9rem; }
+/* On a phone the role sits on its own line under the name, so the web font swapping in cannot move where the name ends and the role starts (#1557). */
+@media (max-width: 640px) {
+  .club-masthead-role { display: block; }
+  .club-masthead-sep { display: none; }
+}
 .account-portal .account-nav a { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
 .club-banner { background: var(--imsda-navy); color: #fff; }
 .club-banner-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0; }
 .club-banner-identity { min-width: 0; flex: 1 1 16rem; }
 .club-banner h1 { margin: 0; color: #fff; font-size: 1.7rem; line-height: 1.2; overflow-wrap: anywhere; }
 .club-banner-identity p { margin: 6px 0 0; color: #dbe9ef; font-size: 0.95rem; overflow-wrap: anywhere; }
-.club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; }
+.club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; /* Wide enough for "CURRENT CLUB YEAR" in the web font and in its fallback, so the swap does not resize the box and re-wrap the banner (#1557). */ min-width: 11.5rem; box-sizing: border-box; }
 .club-banner-year span { color: #dbe9ef; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-banner-year strong { font-size: 1.05rem; }
 @media (max-width: 640px) {
@@ -13037,7 +13042,12 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   font-weight: 800;
 }
 .admin-role-note { margin: 0; color: var(--muted, #5b6b73); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-@media (max-width: 520px) { .admin-role-pills { width: 100%; } .admin-role-link { flex: 1 1 auto; justify-content: center; } }
+/* On a phone each pill has its own full-width row, always (#1557, rule B17). With two pills side by side, a small change
+   in text width (such as the web font loading) moved the second pill onto a new row and pushed the page down. */
+@media (max-width: 520px) {
+  .admin-role-pills { width: 100%; flex-direction: column; }
+  .admin-role-link { justify-content: center; }
+}
 
 /* Club form groups and open applications (#1229) */
 .club-form-group { display: grid; gap: 10px; }

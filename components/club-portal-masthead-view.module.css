@@ -53,4 +53,10 @@
     justify-content: flex-start;
     width: 100%;
   }
+
+  /* The name (and role) has its own line and the buttons always start on the next one, so the name getting a little
+     wider as the web font loads never pushes a button onto a new row (#1557, rule B17). */
+  .account > :global(.club-masthead-identity) {
+    flex-basis: 100%;
+  }
 }

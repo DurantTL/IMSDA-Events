@@ -62,7 +62,7 @@ export function CoordinatorMastheadView({ model, formsHelpContact }: { model: Co
             {model.identity && (
               <span className="club-masthead-identity">
                 <span className="club-masthead-name" translate="no">{model.identity}</span>
-                <span className="club-masthead-role"> · {COORDINATOR_ROLE_LABEL}</span>
+                <span className="club-masthead-role"><span className="club-masthead-sep"> · </span>{COORDINATOR_ROLE_LABEL}</span>
               </span>
             )}
           </>}
