@@ -1841,7 +1841,9 @@ under 32 characters in production.
 
 Where the keys live. **Key files are named by version and never overwritten or
 edited:** version 1 is `/etc/imsda/secret-encryption-key` (the file you already
-have), version N is `/etc/imsda/secret-encryption-key-vN`. A container keeps the
+have), version N is `/etc/imsda/secret-encryption-key-vN`. After a rotation,
+read every other mention of `/etc/imsda/secret-encryption-key` in this guide
+(checksums, ownership, backups) as the current version's file. A container keeps the
 host path it was created with, and it reads that path again whenever it starts
 (a crash restart, a reboot, a rollback). Because the old key's file is never
 touched, a container that still has the old settings always finds the old key,
@@ -1879,7 +1881,10 @@ Steps:
       restart is not enough: a container keeps the settings it was created with.
    If the new container fails and the deploy rolls back, the old container comes
    back with its old settings and the untouched old key, which is consistent;
-   fix the cause and redeploy. `/api/health` (with a token) now reports
+   fix the cause and redeploy. Anything the failed container already re-sealed
+   (its startup syncs run before the health check) is on the new version and
+   opens again once the redeploy succeeds; nothing is lost, because the new key's
+   file stays. `/api/health` (with a token) now reports
    `"version": 2`, `"previousKeyLoaded": true` and `"previousVersion": 1`. Check it
    before going on.
 4. **Dry run.** Inside the app container (`docker exec <app> npm run key:rotate`): It writes

@@ -60,8 +60,9 @@ CHECKOUT="${IMSDA_CHECKOUT:-/var/www/events.imsda.org}"
 [ -r "$ENV_FILE" ] || fail "missing or unreadable $ENV_FILE"
 
 has_var() { grep -Eq "^$1=[^[:space:]]" "$2" 2>/dev/null; }
-# The last NAME=value line of the env file, without quotes, spaces or a CR.
-env_value() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d "\"' \r" || true; }
+# The last NAME=value line of the env file, without spaces or a CR. docker --env-file passes quotes through, and
+# the app would refuse a quoted version, so is_version below refuses one too.
+env_value() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d " \r" || true; }
 key_path_for() {
   if [ "$1" = 1 ]; then echo "$KEY_DIR/secret-encryption-key"; else echo "$KEY_DIR/secret-encryption-key-v$1"; fi
 }
@@ -69,11 +70,13 @@ is_version() { printf '%s' "$1" | grep -Eq '^[1-9][0-9]*$'; }
 
 KEY_VERSION="$(env_value SECRET_ENCRYPTION_KEY_VERSION)"
 [ -n "$KEY_VERSION" ] || KEY_VERSION=1
-is_version "$KEY_VERSION" || fail "SECRET_ENCRYPTION_KEY_VERSION in $ENV_FILE must be a whole number from 1"
+is_version "$KEY_VERSION" || fail "SECRET_ENCRYPTION_KEY_VERSION in $ENV_FILE must be a whole number from 1, without quotes"
 KEY_FILE="${IMSDA_KEY_FILE:-$(key_path_for "$KEY_VERSION")}"
+[ -n "${IMSDA_KEY_FILE:-}" ] && [ "$KEY_VERSION" != 1 ] \
+  && log "WARNING: IMSDA_KEY_FILE overrides the key file for version $KEY_VERSION; make sure it holds that version's key"
 PREVIOUS_VERSION="$(env_value SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION)"
 if [ -n "$PREVIOUS_VERSION" ]; then
-  is_version "$PREVIOUS_VERSION" || fail "SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION in $ENV_FILE must be a whole number from 1"
+  is_version "$PREVIOUS_VERSION" || fail "SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION in $ENV_FILE must be a whole number from 1, without quotes"
   KEY_FILE_PREVIOUS="${IMSDA_PREVIOUS_KEY_FILE:-$(key_path_for "$PREVIOUS_VERSION")}"
 fi
 

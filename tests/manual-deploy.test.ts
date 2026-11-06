@@ -140,7 +140,7 @@ describe("manual-deploy.sh", () => {
   it("picks the version-named key files from the versions in .env (key rotation, #1516)", () => {
     const dir = keyDir({ "secret-encryption-key": "old-key", "secret-encryption-key-v2": "new-key" });
     const { run } = setup(
-      `${envWithoutKey}SECRET_ENCRYPTION_KEY_VERSION="2"\r\nSECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=1 \n`,
+      `${envWithoutKey}SECRET_ENCRYPTION_KEY_VERSION=2\r\nSECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=1 \n`,
     );
     const result = run([sha], { IMSDA_KEY_FILE: "", IMSDA_KEY_DIR: dir });
     expect(result.stderr).toBe("");
@@ -175,11 +175,13 @@ describe("manual-deploy.sh", () => {
     expect(result.calls).not.toMatch(/^stop /m);
   });
 
-  it("refuses a key version that is not a whole number from 1", () => {
-    const { run } = setup(`${envWithoutKey}SECRET_ENCRYPTION_KEY_VERSION=0\n`, "k");
-    const result = run([sha]);
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("must be a whole number from 1");
+  it("refuses a key version that is not a whole number from 1, or is quoted", () => {
+    for (const value of ["0", '"2"']) {
+      const { run } = setup(`${envWithoutKey}SECRET_ENCRYPTION_KEY_VERSION=${value}\n`, "k");
+      const result = run([sha]);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("must be a whole number from 1");
+    }
   });
 
   it("still rolls back to the old container during a rotation, since its key file is untouched", () => {

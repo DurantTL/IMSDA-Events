@@ -148,7 +148,8 @@ Ticking only records that someone did the work. This sheet remains the full inst
   production secret (`docs/DEPLOY-DOCKER.md`). So anyone who can log in as the
   site user, or reveal environment variables in the hosting panel, can read it,
   and it shows in `docker inspect`. #876 moves it to a root-only file,
-  `/etc/imsda/secret-encryption-key` (root, mode 0400), mounted read-only into the
+  `/etc/imsda/secret-encryption-key` (after a key rotation, the current version's
+  file `/etc/imsda/secret-encryption-key-vN`; root, mode 0400), mounted read-only into the
   app container and named by `SECRET_ENCRYPTION_KEY_FILE`. The exact steps are in
   "Loading the encryption key from a protected file" in `docs/DEPLOY-DOCKER.md`;
   once done, the env file and the panel no longer hold the key. The app container
@@ -187,7 +188,8 @@ Ticking only records that someone did the work. This sheet remains the full inst
   - password login is off;
   - the panel either doesn't hold the key or requires MFA;
   - the master copy's account is separate from the backup account;
-  - `/etc/imsda/secret-encryption-key` is `root:root` mode 0400, the env file and
+  - `/etc/imsda/secret-encryption-key` (or the current `-vN` file after a
+    rotation) is `root:root` mode 0400, the env file and
     panel have no `SECRET_ENCRYPTION_KEY`, and `/api/health` (read with the token-from-the-container command next to `APP_RELEASE_SHA` in `docs/DEPLOY-DOCKER.md`) shows
     `"encryptionKey":{"configured":true,"source":"file",...}` (with the key version fields).
 
