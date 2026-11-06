@@ -2,10 +2,12 @@ import { ExactValue } from "@/components/exact-value";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
+import { HealthBreakGlassForm } from "@/components/health-break-glass-form";
 import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
 import { HealthRecordView, HealthStatusChip } from "@/components/health-record-view";
 import { requireStaffHealthViewer } from "@/modules/health-records/access";
 import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-glass";
+import { canStartBreakGlassInline, rosterMemberPersonId } from "@/modules/health-records/break-glass-form";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { viewHealthRecord } from "@/modules/health-records/repository";
@@ -47,6 +49,16 @@ export default async function StaffHealthRecordPage({
     throw error;
   });
   if (health === "BREAK_GLASS") {
+    // A system administrator or Clubs Administrator (any viewer the break-glass route accepts) can start break-glass right here (#1617).
+    const personId = canStartBreakGlassInline(viewer) ? await rosterMemberPersonId(organizationId, memberId) : null;
+    if (personId) {
+      return (
+        <section className="page-stack club-form-page">
+          <header><h2>Break-glass access is required</h2></header>
+          <HealthBreakGlassForm message={BREAK_GLASS_REQUIRED_MESSAGE} personId={personId} />
+        </section>
+      );
+    }
     return <AccessRestricted detail={BREAK_GLASS_REQUIRED_MESSAGE} title="Break-glass access is required" whoToAsk="a system administrator" />;
   }
   if (!health) return <HealthPrivacyAcknowledgment as="STAFF" />;

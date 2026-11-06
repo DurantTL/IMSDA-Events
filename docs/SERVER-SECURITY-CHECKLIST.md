@@ -115,12 +115,21 @@ Ticking only records that someone did the work. This sheet remains the full inst
 - **Proof:** the list of system administrators, each with MFA on.
 
 ### 9. Write the key rotation procedure
+- **Draft for the custodian to review (Jonathan Swena).** The procedure below is
+  built and written; it is not signed off until the custodian has read it and,
+  ideally, rehearsed it. This box stays unticked until then.
 - **Why:** if the key is ever exposed, it must be replaced without losing data.
-- **How:** a short written procedure: keep the old and new keys available, run
-  the re-seal step, confirm, then retire the old key and update the backup copy
-  (item 2). The engineering side of the re-seal step is built when it's first
-  needed.
-- **Proof:** the procedure is written and kept with the key copy.
+- **How:** the full steps are in `docs/DEPLOY-DOCKER.md`, "Rotating the
+  encryption key" (#1516). In short: back up the database and the current key;
+  make a new key and write it to its own version-named file (never over the old
+  key's file); set `SECRET_ENCRYPTION_KEY_VERSION` (version + 1) and
+  `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` (the old version) so both keys load;
+  redeploy; run `npm run key:rotate` (dry run), then `npm run key:rotate -- --apply`
+  until nothing is left; `npm run key:check` must exit 0; update the off-site
+  copy of the key (item 2) and test-restore it (item 3); then remove the old key
+  and run `key:check` again; delete the old key's file last. Running a rotation in production is a human step.
+- **Proof:** the custodian has reviewed the procedure, and the procedure is kept
+  with the key copy.
 
 ### 10. Tell club directors how removal works
 - **Why:** retention is each club's decision. Nothing is deleted automatically.
@@ -139,7 +148,8 @@ Ticking only records that someone did the work. This sheet remains the full inst
   production secret (`docs/DEPLOY-DOCKER.md`). So anyone who can log in as the
   site user, or reveal environment variables in the hosting panel, can read it,
   and it shows in `docker inspect`. #876 moves it to a root-only file,
-  `/etc/imsda/secret-encryption-key` (root, mode 0400), mounted read-only into the
+  `/etc/imsda/secret-encryption-key` (after a key rotation, the current version's
+  file `/etc/imsda/secret-encryption-key-vN`; root, mode 0400), mounted read-only into the
   app container and named by `SECRET_ENCRYPTION_KEY_FILE`. The exact steps are in
   "Loading the encryption key from a protected file" in `docs/DEPLOY-DOCKER.md`;
   once done, the env file and the panel no longer hold the key. The app container
@@ -178,9 +188,10 @@ Ticking only records that someone did the work. This sheet remains the full inst
   - password login is off;
   - the panel either doesn't hold the key or requires MFA;
   - the master copy's account is separate from the backup account;
-  - `/etc/imsda/secret-encryption-key` is `root:root` mode 0400, the env file and
+  - `/etc/imsda/secret-encryption-key` (or the current `-vN` file after a
+    rotation) is `root:root` mode 0400, the env file and
     panel have no `SECRET_ENCRYPTION_KEY`, and `/api/health` (read with the token-from-the-container command next to `APP_RELEASE_SHA` in `docs/DEPLOY-DOCKER.md`) shows
-    `"encryptionKey":{"configured":true,"source":"file"}`.
+    `"encryptionKey":{"configured":true,"source":"file",...}` (with the key version fields).
 
 ## Behind Cloudflare
 

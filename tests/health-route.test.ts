@@ -261,22 +261,22 @@ describe("health endpoint, full detail", () => {
     vi.stubEnv("SECRET_ENCRYPTION_KEY", syntheticKey);
     const response = await GET(healthRequest());
     const text = await response.text();
-    expect(JSON.parse(text).encryptionKey).toEqual({ configured: true, source: "env" });
+    expect(JSON.parse(text).encryptionKey).toEqual({ configured: true, source: "env", version: 1, previousKeyLoaded: false, previousVersion: null });
     expect(text).not.toContain(syntheticKey);
 
     // Resolved once at startup: a later change is not re-read per request.
     vi.stubEnv("SECRET_ENCRYPTION_KEY", "");
-    expect((await (await GET(healthRequest())).json()).encryptionKey).toEqual({ configured: true, source: "env" });
+    expect((await (await GET(healthRequest())).json()).encryptionKey).toEqual({ configured: true, source: "env", version: 1, previousKeyLoaded: false, previousVersion: null });
 
     resetServerEnvCache();
     vi.stubEnv("SECRET_ENCRYPTION_KEY_FILE", "/nonexistent/imsda-test-key");
     const missing = await (await GET(healthRequest())).json();
-    expect(missing.encryptionKey).toEqual({ configured: false, source: "file" });
+    expect(missing.encryptionKey).toEqual({ configured: false, source: "file", version: 1, previousKeyLoaded: false, previousVersion: null });
 
     resetServerEnvCache();
     vi.stubEnv("SECRET_ENCRYPTION_KEY_FILE", "");
     const none = await (await GET(healthRequest())).json();
-    expect(none.encryptionKey).toEqual({ configured: false, source: null });
+    expect(none.encryptionKey).toEqual({ configured: false, source: null, version: 1, previousKeyLoaded: false, previousVersion: null });
   });
 
   it("reports ok when the database and the outbox are both healthy", async () => {
