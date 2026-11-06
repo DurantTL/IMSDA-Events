@@ -13,6 +13,7 @@
 - **Fact check:** an independent read-only review compared the deck text and the quick-start handout with the current application source. Its findings were fixed before publishing; see the pull request for the list.
 
 - **Print edition (added November 6):** 16 US Letter portrait pages with two slides each (slide 31 alone), built from the screen deck's text and speaker notes and the original screenshots by `print/build-print-edition.py`. Every page was looked at by eye. Each crop keeps the pink numbered marker its caption names. Both slides on a page share one screenshot scale where the layout allows.
+- **TV edition (added November 6):** 47 16:9 slides covering the 31 deck slides, built by `print/build-tv-edition.py` from the same text, speaker notes and screenshots. Body text is 22 point, captions 18 point, titles 34 point. Every slide was looked at by eye. Each crop keeps the pink numbered marker its caption names. Not tried on a physical 32-inch TV.
 
 ## What was not checked
 
