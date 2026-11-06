@@ -27,10 +27,11 @@ vi.mock("next/navigation", () => ({
     throw new Error(`REDIRECT ${path}`);
   },
 }));
-vi.mock("@/components/account-section-nav", () => ({
-  AccountSectionNav: (props: { items: Array<{ href: string; label: string }> }) => {
+vi.mock("@/components/account-portal-tabs", () => ({
+  AccountPortalTabs: () => null,
+  AccountPortalTabsProvider: (props: { items: Array<{ href: string; label: string }>; children: unknown }) => {
     mocks.navItems = props.items;
-    return createElement("nav", null, props.items.map((item) => item.label).join("|"));
+    return createElement("nav", null, props.items.map((item) => item.label).join("|"), props.children as never);
   },
 }));
 vi.mock("@/components/act-as-banner", () => ({ ActAsBanner: () => null }));
@@ -327,7 +328,7 @@ describe("account header and tabs (#1175)", () => {
     mocks.acting = { role: "CLUB_DIRECTOR" };
     const html = renderToStaticMarkup(await AccountPortalLayout({ children: null }));
     expect(html).not.toContain("Taylor Lane");
-    expect(html).not.toContain("account-header-identity");
+    expect(html).not.toContain("club-masthead-identity");
   });
 
   it("shows no attendee name while the sign-in step is still pending", async () => {

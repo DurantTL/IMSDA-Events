@@ -27,6 +27,8 @@ import {
 } from "@/modules/attendee-accounts/registrations-repository";
 import { logError } from "@/lib/logger";
 import { getRequestNonce } from "@/modules/security/request-nonce";
+import { AccountPageBanner } from "@/components/account-page-banner";
+import { PortalSectionHeading } from "@/components/portal-section-heading";
 
 export const dynamic = "force-dynamic";
 
@@ -200,14 +202,11 @@ export default async function AttendeeRegistrationsPage({
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <h1>My registrations</h1>
-          <p>
-            Everything registered with <strong translate="no">{account.verifiedEmail}</strong>
-          </p>
-        </div>
-      </section>
+      <AccountPageBanner title="My registrations">
+        <p>
+          Everything registered with <strong translate="no">{account.verifiedEmail}</strong>
+        </p>
+      </AccountPageBanner>
 
       <div className="attendee-ov-layout">
         <div className="attendee-ov-main">
@@ -268,9 +267,11 @@ export default async function AttendeeRegistrationsPage({
 
               {showUpcoming && !filteredEmpty && (
                 <section aria-labelledby="attendee-reg-upcoming">
-                  <h2 className="attendee-ov-heading" id="attendee-reg-upcoming">
-                    Upcoming and active <span className="attendee-reg-count">({upcoming.length})</span>
-                  </h2>
+                  <PortalSectionHeading
+                    eyebrow="Registrations"
+                    id="attendee-reg-upcoming"
+                    title={<>Upcoming and active <span className="attendee-reg-count">({upcoming.length})</span></>}
+                  />
                   {upcoming.length > 0 ? (
                     <ul className="attendee-ov-cards">{upcoming.map((registration) => card(registration, 3))}</ul>
                   ) : (

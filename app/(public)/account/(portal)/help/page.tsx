@@ -6,6 +6,7 @@ import { loadPortalHelpViewer } from "@/modules/help/portal-viewer";
 import { visiblePortalGuides } from "@/modules/help/portal-visibility";
 import styles from "@/app/(workspace)/help/help.module.css";
 import { PortalHelpSearch } from "./portal-help-search";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -26,13 +27,9 @@ export default async function PortalHelpPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Your account</p>
-          <h1>Help</h1>
-          <p>Short guides for the things you can do with your account.</p>
-        </div>
-      </section>
+      <AccountPageBanner title="Help">
+        <p>Short guides for the things you can do with your account.</p>
+      </AccountPageBanner>
       <div className="account-page-body">
         <div className={styles.page}>
           <HelpBackLink fallbackHref="/account/clubs" fallbackLabel="" from={from} hideWithoutTarget useRemembered />

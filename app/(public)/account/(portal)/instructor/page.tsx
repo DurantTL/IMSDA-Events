@@ -8,6 +8,7 @@ import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-se
 import { STERLING_WARNING_MESSAGE } from "@/modules/honors/instructor-domain";
 import { listInstructorClasses, listInstructorEmailPreferences, listInstructorInvitesForAccount } from "@/modules/honors/instructor-repository";
 import { InstructorClassEmailChoice } from "@/components/instructor-class-email-choice";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const metadata: Metadata = { title: "Your classes", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -31,12 +32,7 @@ export default async function InstructorClassesPage() {
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Honors Weekend</p>
-          <h1>Your classes</h1>
-        </div>
-      </section>
+      <AccountPageBanner title="Your classes" context="Honors Weekend" />
       <div className="account-page-body">
         {invites.length > 0 && <InstructorInviteAccept invites={invites} />}
         <section className="public-manage-card">
