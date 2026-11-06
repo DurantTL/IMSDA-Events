@@ -1,7 +1,7 @@
 import { formatCents } from "@/modules/payments/format-cents";
 import type { Metadata } from "next";
 import { NavigationLink as Link } from "@/components/navigation-link";
-import { Suspense } from "react";
+import { Suspense, type CSSProperties } from "react";
 import { redirect } from "next/navigation";
 import { ArrowRight, CircleAlert, CircleDollarSign, CircleHelp, GraduationCap, Inbox, ShieldAlert, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { AccountRegistrationCard } from "@/components/account-registration-card";
@@ -23,6 +23,7 @@ import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-
 import { logError } from "@/lib/logger";
 import { AccountPageBanner } from "@/components/account-page-banner";
 import { PortalSectionHeading } from "@/components/portal-section-heading";
+import styles from "./overview.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,11 @@ export const metadata: Metadata = {
 /** An email address with a break opportunity before "@" and each ".", so a long one wraps at a natural place. */
 function emailWithBreaks(email: string) {
   return email.split(/(?=[@.])/).map((part, index) => (index === 0 ? part : <span key={index}><wbr />{part}</span>));
+}
+
+/** How many lines a side-card paragraph takes in the web font at the side column's width (about 33 characters a line, measured in the web font). */
+function reservedHelp(text: string) {
+  return { className: `field-help ${styles.reserveHelp}`, style: { "--help-lines": Math.ceil(text.length / 33) } as CSSProperties };
 }
 
 /**
@@ -100,6 +106,14 @@ export default async function AttendeeAccountOverviewPage() {
     </p>
   );
   const helpSlug = upcoming[0]?.event.slug;
+  const helpText = helpSlug
+    ? "Open a registration to find its event team, arrangements and anything that needs a change."
+    : "Registered with a different email, or not sure where your registration is? We can help you find it.";
+  const accountSecurityNote = authenticatorOn
+    ? "Two-step sign-in is on."
+    : clubs.length > 0
+      ? "Club rosters hold young people's birth dates, so they need an authenticator. Set one up to open your club."
+      : "Two-step sign-in is off. Add an authenticator app for extra protection.";
 
   return (
     <>
@@ -214,13 +228,9 @@ export default async function AttendeeAccountOverviewPage() {
               {authenticatorOn ? <ShieldCheck size={15} aria-hidden="true" /> : <ShieldAlert size={15} aria-hidden="true" />} Your registration account
             </p>
             <p className="attendee-ov-email" translate="no">{emailWithBreaks(account.verifiedEmail)}</p>
-            <p className="field-help">
+            <p {...reservedHelp(`Registrations connected to this verified email appear here. ${accountSecurityNote}`)}>
               Registrations connected to this verified email appear here.{" "}
-              {authenticatorOn
-                ? "Two-step sign-in is on."
-                : clubs.length > 0
-                  ? "Club rosters hold young people's birth dates, so they need an authenticator. Set one up to open your club."
-                  : "Two-step sign-in is off. Add an authenticator app for extra protection."}
+              {accountSecurityNote}
             </p>
             <Link className={`${authenticatorPrimary ? "primary-button" : "secondary-button"} account-overview-link`} href="/account/profile">
               <UserRound size={14} aria-hidden="true" /> {needsAuthenticator ? "Set up an authenticator" : "Profile and security"} <ArrowRight size={14} aria-hidden="true" />
@@ -230,10 +240,8 @@ export default async function AttendeeAccountOverviewPage() {
           <section className="public-manage-card account-overview-card">
             <p className="public-registration-eyebrow"><CircleHelp size={15} aria-hidden="true" /> Help</p>
             <h2>A question about your event?</h2>
-            <p className="field-help">
-              {helpSlug
-                ? "Open a registration to find its event team, arrangements and anything that needs a change."
-                : "Registered with a different email, or not sure where your registration is? We can help you find it."}
+            <p {...reservedHelp(helpText)}>
+              {helpText}
             </p>
             <Link
               className="secondary-button account-overview-link"
