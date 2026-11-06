@@ -5,7 +5,8 @@ import Link from "next/link";
  * `table-cards` table was hidden under its cards. Since #1457 a card-mode table shows its sortable headers as a
  * visible "Sort by" row above the cards (at every width where it is cards), so the link is always visible and
  * always a Tab stop. The name is kept so the server-sorted list and its tests keep one import.
+ * It keeps the reader's place (#1557): re-sorting the same list does not scroll to the top.
  */
 export function PhoneHiddenSortLink({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
-  return <Link className={className} href={href}>{children}</Link>;
+  return <Link className={className} href={href} scroll={false}>{children}</Link>;
 }

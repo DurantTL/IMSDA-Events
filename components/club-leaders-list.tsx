@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { CLUB_ROLE_LABELS, CLUB_ROLE_VALUES } from "@/modules/system-admin/people-directory-model";
 import { ListPager } from "@/components/list-pager";
 import { sliceFromCount, type PageSlice } from "@/lib/pagination";
@@ -32,7 +33,7 @@ export function ClubLeadersList({
         <Link className="secondary-button" href={addHref}>Add a leader</Link>
       </p>
       {/* Keyed by the address's filters: Clear filters or Back remounts the uncontrolled selects at what the address says. There is no text box here to lose. */}
-      <form action="/admin/clubs/leaders" className={styles.search} key={`${filters.clubId ?? ""}|${filters.role ?? ""}`} method="get">
+      <GetFilterForm action="/admin/clubs/leaders" className={styles.search} key={`${filters.clubId ?? ""}|${filters.role ?? ""}`}>
         <label className={styles.searchField}>
           Club
           <select defaultValue={filters.clubId ?? ""} name="club">
@@ -49,7 +50,7 @@ export function ClubLeadersList({
         </label>
         <button className="primary-button" type="submit">Show</button>
         {filtered ? <Link className="secondary-button" href="/admin/clubs/leaders">Clear filters</Link> : null}
-      </form>
+      </GetFilterForm>
       {leaders.length === 0
         ? <p className={styles.count} role="status">No current club leaders found.</p>
         : <ListPager hrefFor={hrefFor} label="Club leader pages" noun="current roles" nounOne="current role" part="count" slice={position} />}

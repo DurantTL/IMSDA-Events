@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { ListPager } from "@/components/list-pager";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
@@ -47,7 +48,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
             </li>
           ))}
         </ul>
-        <form action="/admin/clubs/summary" className={styles.phoneMonth} method="get">
+        <GetFilterForm action="/admin/clubs/summary" className={styles.phoneMonth}>
           <input name="year" type="hidden" value={clubYear} /><input name="view" type="hidden" value="records" />
           {view.query && <input name="q" type="hidden" value={view.query} />}
           {view.showAllClubs && <input name="show" type="hidden" value="all" />}
@@ -59,7 +60,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
           </label>
           {view.nextMonth ? <Link aria-label={`Next month, ${view.picker.find((item) => item.month === view.nextMonth)!.label}`} className={styles.step} href={here({ month: view.nextMonth })} prefetch={false}>›</Link> : <span aria-hidden="true" className={styles.stepOff}>›</span>}
           <button className={`secondary-button ${styles.go}`} type="submit">Go</button>
-        </form>
+        </GetFilterForm>
       </nav>
 
       <ReportSummaryBand label={`${view.monthLabel} at a glance`} tiles={view.tiles} />

@@ -472,7 +472,7 @@ describe("unsaved-changes guard", () => {
   it("runs the guard before the URL changes, passes replace and scroll on, and covers the shell's context links", () => {
     const guarded = read("components/guarded-link.tsx");
     expect(guarded.indexOf("handleGuardedLinkClick")).toBeLessThan(guarded.indexOf("router.push(href"));
-    expect(guarded).toMatch(/router\.replace\(href, \{ scroll \}\)/);
+    expect(guarded).toMatch(/router\.replace\(href, \{ scroll: scrollNow \}\)/);
     expect(guarded).toContain("replace={replace}");
     expect(read("components/use-unsaved-changes-guard.ts")).toContain("createLinkNavigationListener");
     const menu = read("components/system-phone-menu.tsx");

@@ -23,6 +23,7 @@ import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { ClubDirectoryCards } from "@/components/club-directory";
 import { clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 import { countLabel, pluralize } from "@/lib/pluralize";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
 import styles from "./admin-clubs.module.css";
 
@@ -83,7 +84,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
         </div>
       ) : null}
 
-      <form className={styles.yearForm} method="get" action="/admin/clubs">
+      <GetFilterForm className={styles.yearForm} action="/admin/clubs">
         <label>
           Club year
           <select name="year" defaultValue={clubYear}>
@@ -91,7 +92,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
           </select>
         </label>
         <button className="secondary-button" type="submit">Show</button>
-      </form>
+      </GetFilterForm>
 
       <section aria-labelledby="clubs-admin-summary-heading">
         <h2 id="clubs-admin-summary-heading" className="sr-only">Summary</h2>
