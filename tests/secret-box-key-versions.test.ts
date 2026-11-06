@@ -47,8 +47,12 @@ describe("key versions", () => {
     expect(openSecret(legacy, purpose)).toBe("synthetic-secret");
   });
 
-  it("writes v2 with the current version, also when the current version is 1", () => {
-    expect(sealSecret("x", purpose).startsWith("v2.1.")).toBe(true);
+  it("writes the legacy v1 format while the current version is 1, v2 from version 2", () => {
+    const first = sealSecret("x", purpose);
+    expect(first.startsWith("v1.")).toBe(true);
+    expect(sealedKeyVersion(first)).toBe(1);
+    env({ SECRET_ENCRYPTION_KEY: newKey, SECRET_ENCRYPTION_KEY_VERSION: 2 });
+    expect(sealSecret("x", purpose).startsWith("v2.2.")).toBe(true);
     env({ SECRET_ENCRYPTION_KEY: newKey, SECRET_ENCRYPTION_KEY_VERSION: 3 });
     const sealed = sealSecret("x", purpose);
     expect(sealed.startsWith("v2.3.")).toBe(true);
@@ -59,7 +63,7 @@ describe("key versions", () => {
 
   it("opens each value with the key of its version during a rotation", () => {
     const oldV1 = legacyV1(oldKey, "from-legacy", purpose);
-    const oldV2 = sealSecret("from-v2-version-1", purpose);
+    const oldV1Written = sealSecret("from-v2-version-1", purpose);
     env({
       SECRET_ENCRYPTION_KEY: newKey,
       SECRET_ENCRYPTION_KEY_VERSION: 2,
@@ -69,7 +73,7 @@ describe("key versions", () => {
     const current = sealSecret("from-current", purpose);
     expect(previousSecretKeyVersion()).toBe(1);
     expect(openSecret(oldV1, purpose)).toBe("from-legacy");
-    expect(openSecret(oldV2, purpose)).toBe("from-v2-version-1");
+    expect(openSecret(oldV1Written, purpose)).toBe("from-v2-version-1");
     expect(openSecret(current, purpose)).toBe("from-current");
     expect(sealedKeyVersion(current)).toBe(2);
   });
@@ -111,6 +115,7 @@ describe("key versions", () => {
   });
 
   it("rejects malformed versions and formats", () => {
+    env({ SECRET_ENCRYPTION_KEY: oldKey, SECRET_ENCRYPTION_KEY_VERSION: 2 });
     const parts = sealSecret("x", purpose).split(".");
     for (const bad of [
       ["v2", "0", ...parts.slice(2)],
@@ -142,6 +147,7 @@ describe("key versions", () => {
     const key = "synthetic-backup-key-0123456789-abcdefghijklmn";
     const v2 = sealSecretWithKey("restore", purpose, key, 4);
     expect(v2.startsWith("v2.4.")).toBe(true);
+    expect(sealSecretWithKey("one", purpose, key).startsWith("v1.")).toBe(true);
     expect(openSecretWithKey(v2, purpose, key)).toBe("restore");
     expect(openSecretWithKey(legacyV1(key, "legacy-restore", purpose), purpose, key)).toBe("legacy-restore");
     expect(openSecretWithKey(sealSecretWithKey("default", purpose, key), purpose, key)).toBe("default");

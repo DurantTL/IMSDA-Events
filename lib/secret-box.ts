@@ -14,9 +14,11 @@ import { getServerEnv } from "@/lib/env";
  * kinds of ciphertext are never encrypted under the same key and a value cannot
  * be moved from one column to another.
  *
- * Key versions (#1516): a value is `v2.<keyVersion>.<nonce>.<tag>.<ct>` and the
- * version is authenticated as additional data, so it cannot be edited. A `v1`
- * value (written before versioning) counts as key version 1. Writes always use
+ * Key versions (#1516): while the key version is 1, values are written in the
+ * original `v1.<nonce>.<tag>.<ct>` format (version 1 is implied), so an older
+ * image can still read them. From version 2 a value is
+ * `v2.<keyVersion>.<nonce>.<tag>.<ct>` and the version is authenticated as
+ * additional data, so it cannot be edited. Writes always use
  * the current key. Reads use the loaded key whose version matches the value:
  * the current one, or during a rotation the previous one
  * (`SECRET_ENCRYPTION_PREVIOUS_KEY*`). `npm run key:rotate` moves values to
@@ -73,11 +75,12 @@ function additionalData(version: number) {
 function sealWith(key: Buffer, plaintext: string, version: number) {
   const nonce = randomBytes(NONCE_BYTES);
   const cipher = createCipheriv("aes-256-gcm", key, nonce);
-  cipher.setAAD(additionalData(version));
+  // Key version 1 keeps the legacy format, so an image from before versioning can still read it (rollback).
+  // Version 2 and up use the format that authenticates the version.
+  if (version > 1) cipher.setAAD(additionalData(version));
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   return [
-    FORMAT,
-    String(version),
+    ...(version > 1 ? [FORMAT, String(version)] : [LEGACY_FORMAT]),
     nonce.toString("base64url"),
     cipher.getAuthTag().toString("base64url"),
     ciphertext.toString("base64url"),
@@ -141,7 +144,10 @@ function keyForVersion(version: number, purpose: string) {
   throw notLoaded(version);
 }
 
-/** Returns `v2.<keyVersion>.<nonce>.<tag>.<ciphertext>`, all base64url, sealed with the current key. */
+/**
+ * Sealed with the current key, all base64url: `v1.<nonce>.<tag>.<ciphertext>` while the current key version is 1,
+ * `v2.<keyVersion>.<nonce>.<tag>.<ciphertext>` from version 2.
+ */
 export function sealSecret(plaintext: string, purpose: string) {
   const { current } = loadedKeys();
   if (!current) throw new SecretBoxError(NO_KEY_MESSAGE);

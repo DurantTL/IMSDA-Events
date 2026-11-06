@@ -253,6 +253,13 @@ export const serverEnvSchema = z
     }
 
     // Key rotation (#1516). Messages name the variable and the rule, never a key.
+    if (!value.SECRET_ENCRYPTION_PREVIOUS_KEY && value.SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION"],
+        message: "is set but no previous encryption key is set; remove it, or set SECRET_ENCRYPTION_PREVIOUS_KEY (or _FILE)",
+      });
+    }
     if (value.SECRET_ENCRYPTION_PREVIOUS_KEY) {
       const previousVersion = value.SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION;
       if (previousVersion === undefined) {

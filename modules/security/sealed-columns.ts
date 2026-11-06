@@ -43,6 +43,11 @@ export type SealedColumn = {
    * row's own value back so re-sealing does not change "last modified".
    */
   preserve: readonly string[];
+  /**
+   * The table has an immutability trigger (sealed health copies). Rotation writes its rows inside a transaction
+   * that sets `imsda.key_rotation`, the one UPDATE the trigger allows (migration 20270102100000).
+   */
+  keyRotationGuard?: boolean;
   /** The key purpose the row's value was sealed under, exactly as the owning module spells it. */
   purpose: (row: SealedRowFields) => string;
   /**
@@ -202,6 +207,7 @@ export const SEALED_COLUMNS: readonly SealedColumn[] = [
     nullable: false,
     purposeColumns: ["snapshotId", "fieldKey"],
     purpose: (row) => `health-snapshot:${text(row, "snapshotId")}:${text(row, "fieldKey")}`,
+    keyRotationGuard: true,
     sourceFiles: ["modules/health-records/crypto.ts"],
   },
 ];

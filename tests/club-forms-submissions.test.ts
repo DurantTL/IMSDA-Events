@@ -201,7 +201,7 @@ describe("saving a club form (#610)", () => {
       enteredByAccountId: "acct-1",
       enteredByUserId: null,
     });
-    expect(data.sealedSensitiveAnswers).toMatch(/^v2\.1\./);
+    expect(data.sealedSensitiveAnswers).toMatch(/^v1\./);
     expect(data.answers).toMatchObject({ activity: "Canoe trip", child_name: "Riley Sample" });
     expect(data.answers).not.toHaveProperty("physician_name");
     expect(data.answers).not.toHaveProperty("emergency_contact_phone");

@@ -45,7 +45,7 @@ describe("sealed secrets", () => {
   it("stores no trace of the plaintext", () => {
     const sealed = sealSecret("JBSWY3DPEHPK3PXP", "mfa-totp-secret");
     expect(sealed).not.toContain("JBSWY3DPEHPK3PXP");
-    expect(sealed.startsWith("v2.1.")).toBe(true);
+    expect(sealed.startsWith("v1.")).toBe(true);
   });
 
   it("produces a different ciphertext every time", () => {
@@ -64,10 +64,10 @@ describe("sealed secrets", () => {
 
   it("refuses a tampered ciphertext", () => {
     const sealed = sealSecret("JBSWY3DPEHPK3PXP", "mfa-totp-secret");
-    const [format, version, nonce, tag, ciphertext] = sealed.split(".");
+    const [format, nonce, tag, ciphertext] = sealed.split(".");
     const flipped = Buffer.from(ciphertext, "base64url");
     flipped[0] ^= 0x01;
-    const tampered = [format, version, nonce, tag, flipped.toString("base64url")].join(".");
+    const tampered = [format, nonce, tag, flipped.toString("base64url")].join(".");
 
     expect(() => openSecret(tampered, "mfa-totp-secret")).toThrowError(/could not be decrypted/);
   });

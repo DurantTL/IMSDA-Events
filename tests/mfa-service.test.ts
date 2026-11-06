@@ -175,7 +175,7 @@ describe("enrolment", () => {
     };
     expect(written.create.status).toBe("PENDING");
     expect(written.create.sealedSecret).not.toContain(offer.secret);
-    expect(written.create.sealedSecret.startsWith("v2.1.")).toBe(true);
+    expect(written.create.sealedSecret.startsWith("v1.")).toBe(true);
   });
 
   it("will not replace an authenticator that is already in use", async () => {

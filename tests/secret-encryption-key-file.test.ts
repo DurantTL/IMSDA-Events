@@ -250,6 +250,14 @@ describe("encryption key versions and the previous key (#1516)", () => {
     expect(issuesOf(rest)).toContain("SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: is required when a previous encryption key is set");
   });
 
+  it("rejects a previous version with no previous key, naming no key", () => {
+    const { SECRET_ENCRYPTION_PREVIOUS_KEY: _plain, ...rest } = rotating;
+    void _plain;
+    const issues = issuesOf(rest);
+    expect(issues.join("\n")).toMatch(/SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: is set but no previous encryption key is set/);
+    expect(issues.join("\n")).not.toContain(syntheticKey);
+  });
+
   it("rejects a previous version that is not lower than the current one", () => {
     for (const version of ["2", "3"]) {
       expect(issuesOf({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: version })).toContain(
