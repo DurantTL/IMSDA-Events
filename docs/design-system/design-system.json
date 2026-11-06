@@ -5,11 +5,12 @@
     "v": 1,
     "at": "2026-10-30T15:26:27Z"
   },
-  "title": "IMSDA Events",
+  "title": "IMAdventist",
   "namespace": "IMSDAEvents",
   "libraries": [],
   "sections": {},
   "groups": [
+    "Brand",
     "Map"
   ],
   "assetGroups": {
@@ -31,8 +32,8 @@
   },
   "lastChange": {
     "by": "Caleb Durant",
-    "at": "2026-10-30T15:26:27Z",
-    "via": "Claude Code \u00b7 DurantTL/IMSDA-Events@81f03c93",
-    "note": "Tokens, 20 components and tool mockups recreated from app/globals.css and component CSS."
+    "at": "2026-11-06T05:08:40Z",
+    "via": "Claude Code \u00b7 DurantTL/IMSDA-Events@d6d783c7",
+    "note": "IMAdventist rebrand: symbol logo and AdventSans Logo wordmark replace the gold i mark; home-green token; club, coordinator and account headers match main; PublicHome mockup."
   }
 }

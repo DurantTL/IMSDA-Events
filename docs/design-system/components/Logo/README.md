@@ -1,0 +1,7 @@
+The IMAdventist symbol beside the product name: the one logo on every page, email and printout.
+
+- The symbol is the approved image `public/brand/imadventist-symbol.png` (the Iowa and Missouri map with the Adventist flame). It is drawn only by `BrandLink`; there is no other logo.
+- Sizes: 42px in app and portal headers and the staff sidebar, 54px in the public header, 68px in email headers (`imadventist-symbol-email.png`), 180px as the home-screen icon.
+- Wordmark: "IMAdventist" with the descriptor "Events & Club Ministry". The public header sets the name in AdventSans Logo (`--font-logo`) in `--imsda-navy` with the descriptor in `--home-green`; app headers use Noto Sans, with a small uppercase "IMAdventist" over the area name ("Club portal", "Club coordination").
+- The logo links to the public calendar (to Home on public discovery pages), with a 44px tap target. The image has empty alt text; the link's label names the destination ("IMAdventist calendar").
+- Don't recolor, crop, outline or put the symbol on a busy photo. Conference names (IMSDA, Iowa-Missouri Conference) name the organization, not the product.

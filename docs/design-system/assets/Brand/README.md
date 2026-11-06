@@ -1,0 +1,1 @@
+The IMAdventist symbol (256px copy of `public/brand/imadventist-symbol.png`), the only product logo. Show it at 42px in app headers, 54px in the public header; keep it on a plain light or navy background and never recolor, crop or outline it.
