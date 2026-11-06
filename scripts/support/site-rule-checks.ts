@@ -749,7 +749,9 @@ export async function checkChipsAndBadges(page: Page, rec: Recorder, name: strin
   }
 }
 
-const REVIEWED_OWN_LOOK = /retryButton|resetButton|skip|linkButton|productSelect|undo|chipRemove/;
+// Reviewed own looks. The portal masthead's outlined action (Sign out and friends, `club-portal-masthead-view.module.css`
+// `.action`, #1319) is the club portal's approved header button, the reference look for every portal masthead (L9, #1555).
+const REVIEWED_OWN_LOOK = /retryButton|resetButton|skip|linkButton|productSelect|undo|chipRemove|masthead-view-module__\w+__action/;
 
 /** L5: buttons use the shared classes (no button styled by a module class alone), main and light buttons have a hover look, a disabled button shows the not-allowed cursor. */
 export async function checkButtons(page: Page, rec: Recorder, name: string) {
