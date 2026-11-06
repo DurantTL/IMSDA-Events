@@ -12,7 +12,7 @@
 - **Screenshots:** 44, each recorded in `screenshot-capture.json` with route, state, pixel size, SHA-256 and the slides that use it. The full contact sheet and each deck page were looked at by eye.
 - **Fact check:** an independent read-only review compared the deck text and the quick-start handout with the current application source. Its findings were fixed before publishing; see the pull request for the list.
 
-- **Print edition (added November 6):** 31 US Letter portrait pages, one per slide, built from the screen deck's text and speaker notes and the original screenshots by `print/build-print-edition.py`. Every page was looked at by eye. Each crop keeps the pink numbered marker its caption names. Screenshot text prints about twice as large as the screen deck printed on landscape Letter.
+- **Print edition (added November 6):** 16 US Letter portrait pages with two slides each (slide 31 alone), built from the screen deck's text and speaker notes and the original screenshots by `print/build-print-edition.py`. Every page was looked at by eye. Each crop keeps the pink numbered marker its caption names. Both slides on a page share one screenshot scale where the layout allows.
 
 ## What was not checked
 

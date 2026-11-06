@@ -13,7 +13,7 @@ Prepared November 5, 2026 from [main `ad9237d`](https://github.com/DurantTL/IMSD
 ## Start with the user orientation
 
 - [Getting started PowerPoint, 31 slides with speaker notes](exports/IMAdventist-getting-started.pptx) · [PDF](exports/IMAdventist-getting-started.pdf)
-- **Print edition** for paper handouts: [PDF](exports/IMAdventist-getting-started-print.pdf) · [PowerPoint](exports/IMAdventist-getting-started-print.pptx). Same 31 slides, one portrait US Letter page each, white background, screenshots cropped so their text is readable on paper, and lined space for notes. Page numbers match the slide numbers. Rebuild it with `python3 print/build-print-edition.py` after the screen deck changes.
+- **Print edition** for paper handouts: [PDF](exports/IMAdventist-getting-started-print.pdf) · [PowerPoint](exports/IMAdventist-getting-started-print.pptx). All 31 slides on 16 portrait US Letter pages, two slides per page in screen order, with a white background and screenshots cropped to the part each slide teaches. Each slide is labeled with its slide number. Rebuild it with `python3 print/build-print-edition.py` after the screen deck changes.
 - Presenter notes: [PDF](exports/06-presenter-notes.pdf) · [Word](exports/06-presenter-notes.docx) · [Web page](exports/06-presenter-notes.html) · [Markdown](content/06-presenter-notes.md)
 - Quick-start handout (5 pages): [PDF](exports/07-club-quick-start.pdf) · [Word](exports/07-club-quick-start.docx) · [Web page](exports/07-club-quick-start.html) · [Markdown](content/07-club-quick-start.md)
 - [Screenshot gallery, 44 fictional training screenshots](exports/IMAdventist-training-screenshot-gallery.html)
