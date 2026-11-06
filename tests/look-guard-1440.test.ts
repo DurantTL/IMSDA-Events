@@ -244,7 +244,6 @@ describe("G1: one shared version of each building block", () => {
   it("prints dollar amounts through formatCents, not a local `$${(x / 100).toFixed(2)}`", () => {
     /** Older copies inside modules/, each to fold into formatCents (modules/payments/format-cents.ts) in a later pass. */
     const olderCopies = new Set([
-      "modules/imports/wr26-bundle.ts",
       "modules/lodging/domain.ts",
       "modules/lodging/preferences-domain.ts",
     ]);
