@@ -63,7 +63,8 @@ export async function runKeyCheck(options: KeyLog & { env: Record<string, string
       `[key-check] ${scan.label}: ${scan.total} total, ${scan.current} current, ${scan.older} older, ${scan.unreadable} unreadable`,
     );
   }
-  const detached = await countDetachedCalendarFingerprints();
+  // Only meaningful (and only actionable) while a rotation has the previous key loaded.
+  const detached = previous === null ? 0 : await countDetachedCalendarFingerprints();
   if (detached > 0) {
     options.log(
       `[key-check] note: ${detached} calendar item(s) left by deleted feeds carry a fingerprint no current feed has. They can't be re-fingerprinted; they will not relink to an identical re-added feed once the previous key is removed. Not a failure.`,

@@ -172,9 +172,23 @@ if container_exists "$APP"; then
   HAD_OLD=true
 fi
 
+# Key rotation (#1516): the old container was started with the old key settings. If the key file has since been
+# replaced (or a previous key is mounted), bringing it back would run the new key as the old version.
+key_settings_differ() {
+  [ -f "$KEY_FILE_PREVIOUS" ] && [ -s "$KEY_FILE_PREVIOUS" ] && return 0
+  new_version="$(grep -E '^SECRET_ENCRYPTION_KEY_VERSION=' "$ENV_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2 | tr -d "\"' ")"
+  [ -n "$new_version" ] && [ "$new_version" -gt 1 ] 2>/dev/null || return 1
+  old_version="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$OLD" 2>/dev/null | grep -E '^SECRET_ENCRYPTION_KEY_VERSION=' | cut -d= -f2)"
+  [ "$new_version" != "$old_version" ]
+}
+
 rollback() {
   echo "[manual-deploy] New container failed; last log lines:" >&2
   docker logs --tail 60 "$APP" >&2 2>&1 || true
+  if [ "$HAD_OLD" = true ] && key_settings_differ; then
+    docker stop "$APP" >/dev/null 2>&1 || true
+    fail "the new container failed while the encryption key is being rotated, so it was NOT rolled back: the previous container ($OLD, left stopped) would run with the old key settings against the new key file. Check /api/health encryptionKey.version and follow 'Rotating the encryption key' in docs/DEPLOY-DOCKER.md before starting anything."
+  fi
   docker rm -f "$APP" >/dev/null 2>&1 || true
   if [ "$HAD_OLD" = true ]; then
     docker rename "$OLD" "$APP"

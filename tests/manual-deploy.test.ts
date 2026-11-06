@@ -22,7 +22,7 @@ case "$1" in
       *) case " $FAKE_EXISTING " in *" $2 "*) exit 0 ;; *) exit 1 ;; esac ;;
     esac ;;
   run)
-    case "$*" in *"--rm"*) exit "\${FAKE_PREFLIGHT_EXIT:-0}" ;; esac ;;
+    case "$*" in *"--rm"*) exit "\${FAKE_PREFLIGHT_EXIT:-0}" ;; *) exit "\${FAKE_RUN_EXIT:-0}" ;; esac ;;
 esac
 exit 0
 `;
@@ -143,6 +143,16 @@ describe("manual-deploy.sh", () => {
       /run -d .*source=.*previous,target=\/run\/secrets\/encryption-key-previous,readonly -e SECRET_ENCRYPTION_PREVIOUS_KEY_FILE=\/run\/secrets\/encryption-key-previous/,
     );
     expect(result.calls).not.toContain("old-key");
+  });
+
+  it("does not roll back to the old container while the key is being rotated", () => {
+    const previousFile = path.join(mkdtempSync(path.join(tmpdir(), "imsda-prev-key-")), "previous");
+    writeFileSync(previousFile, "old-key");
+    const { run } = setup(envWithoutKey, "k");
+    const result = run([sha], { IMSDA_PREVIOUS_KEY_FILE: previousFile, FAKE_RUN_EXIT: "1" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("NOT rolled back");
+    expect(result.calls).not.toMatch(/^start /m);
   });
 
   it("refuses a previous key in both .env and its file", () => {

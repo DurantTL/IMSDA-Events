@@ -1859,11 +1859,26 @@ Steps:
 3. **Load both keys.** As root on the server, with the table above:
    1. Copy the current key file to the previous-key file and set its mode:
       `install -m 0400 -o root -g root /etc/imsda/secret-encryption-key /etc/imsda/secret-encryption-key-previous`.
-   2. Write the new key over the current file (`0400`, `root:root`), from the
-      password manager, never typed on a command line.
+   2. Replace the current key file with the new key as a **new file**, never by
+      editing it in place: write the new key (from the password manager, never
+      typed on a command line) to a temporary file, then
+      `install -m 0400 -o root -g root <tmp> /etc/imsda/secret-encryption-key`
+      (or `mv` it over). A file bind mount keeps the inode it was created with, so
+      a container still running keeps seeing the old key, and an in-place edit
+      would hand the new key to any container that restarts with old settings.
    3. Set the versions: `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=<old version>` and
       `SECRET_ENCRYPTION_KEY_VERSION=<old version + 1>`. Compose path: edit
       `docker-compose.env.yml` as the table says.
+   Do 3.1 to 3.4 back to back, with the autodeploy timer stopped
+   (`systemctl stop imsda-autodeploy.timer`; start it again afterwards), so no
+   restart or deploy lands between replacing the file and the redeploy.
+   `manual-deploy.sh` will not roll back automatically while a previous key file
+   is present or the key version is above 1 and differs from the old
+   container's: it leaves the failed container stopped and says so. If that
+   happens, check `/api/health` `encryptionKey.version` before starting anything.
+   **xCloud path:** after step 3 do not use the `imsda-events:previous` rollback
+   until the rotation is finished, and after any rollback during a rotation
+   check `/api/health` `encryptionKey.version` before letting anyone sign in.
    4. Redeploy so the container is recreated with both mounts (manual path:
       `/root/manual-deploy.sh <sha>`; compose path: the usual redeploy). A plain
       restart is not enough on the manual path.
