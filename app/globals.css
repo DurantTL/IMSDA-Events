@@ -8894,6 +8894,7 @@ a.calendar-year-day:hover { background: #eef3f6; }
 .club-form-send { display: grid; gap: 10px; }
 .club-form-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 12px; }
 .club-form-filter label { display: grid; gap: 4px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
+.club-form-filter select { min-height: 44px; }
 /* #719: the form column takes the hero's width and gutters (it is also a .public-manage-layout, which
    is two columns wide for the other private pages, so it is made one column here). The field grid
    inside each card stays at a comfortable reading width and only pairs fields when there is room. */
