@@ -1,0 +1,31 @@
+# Automated page-check flags, mock run 2026-11-06 (baseline for the next run)
+# page | rule | check | widths | detail. Not findings: see docs/MOCK-RUN-QA-2026-11-06.md, 'Checker flags'.
+checkin /check-in/badges | L4 | chips and badges use the shared classes | 1280+390 | own chip look instead of .status-chip / .count-badge: div.badge-label-name "Mariade la Cruz-Montenegro"; div.badge-label-name "Ngde la Cruz-Montenegro"; div.bad
+clubsadmin /admin/clubs/applications | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Not used yet", "Sterling Volunteers: No record", "Came from a private link" (all chips: Not used yet, Pending approval,
+clubsadmin /admin/clubs/invites | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Sent Nov 6, 2026" (all chips: Director, Draft, Deputy, Sent Nov 6, 2026)
+clubsadmin /admin/clubs/leaders | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Two-step not set up", "Two-step on" (all chips: Two-step not set up, Two-step on)
+clubsadmin /admin/clubs/reports | H3 | not-set-up states show help | 1280+390 | dead end: "Missing"
+clubsadmin /admin/honors | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Active" (all chips: Active)
+communications /communications | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Published" (all chips: Published)
+communications /communications | L4 | filter counts use the count badge | 1280+390 | the count in "Delivery log0" is a plain span (.no class), not .count-badge
+coordinator /account/area-clubs | S1 | search box "area-club-search" (empty shows full list) | 1280 | emptying the box did not bring back the full list (missing: "11 clubs have not filed.")
+coordinator /account/area-clubs/applications | B12 | status chip words | 390 | chip word(s) outside the approved list: "Sterling Volunteers: No record", "Came from a private link" (all chips: Pending approval, Sterling Volunteers: No recor
+finance /finance/square-payments | H3 | not-set-up states show help | 1280+390 | dead end: "Square stopped responding partway through, so this list may be incomplete."
+public /calendar | L4 | chips and badges use the shared classes | 390 | own chip look instead of .status-chip / .count-badge: li.calendar-chip "Mobilecheck Womens Retreat"; li.calendar-chip "Mobilecheck Club Weekend"
+public /calendar?view=upcoming | L4 | chips and badges use the shared classes | 390 | own chip look instead of .status-chip / .count-badge: li.calendar-chip "Mobilecheck Womens Retreat"; li.calendar-chip "Mobilecheck Club Weekend"
+public /clubs | L5 | buttons use the shared classes | 1280+390 | styled by a module class alone: public-club-directory-module__ehR2Qa__clubButton "Maple Grove Pathfinders (synth"
+registration /people | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "No charge", "$350 due", "Paid in full" (all chips: Confirmed, No charge, Pending payment, $350 due, Paid in full)
+registration /registration-builder | B13 | times show CT | 1280 | time without "CT": "Friday 4:00–5:00 PM — rank both choices", "Sabbath 2:00–3:15 PM — rank two choices", "Sabbath 4:15–5:30 PM — rank two choices"
+sysadmin /admin | L4 | chips and badges use the shared classes | 1280+390 | own chip look instead of .status-chip / .count-badge: span.system-admin-module__ktrLJG__adminBadge "System administrator"
+sysadmin /admin/accounts | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Staff login", "Active", "Website account" (all chips: Staff login, Active, Website account)
+sysadmin /admin/calendar | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "On calendar", "Deadline", "Possible match", "Linked to an event" (all chips: On calendar, Deadline, Possible match, Lin
+sysadmin /admin/calendar | L4 | filter counts use the count badge | 1280+390 | the count in "Calendar entries 6" is a plain span (.no class), not .count-badge
+sysadmin /admin/clubs/leaders | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Two-step not set up", "Two-step on" (all chips: Two-step not set up, Two-step on)
+sysadmin /admin/people | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Staff login", "Active", "Website account" (all chips: Staff login, Active, Website account)
+sysadmin /admin/readiness | L4 | chips and badges use the shared classes | 1280+390 | own chip look instead of .status-chip / .count-badge: span.system-readiness-workspace-module__uy2PZW__badge "Needs attention"; span.system-readiness-workspace-m
+sysadmin /admin/settings | H3 | not-set-up states show help | 1280+390 | dead end: "Not configured"; "Not configured"
+sysadmin /admin/settings | L4 | chips and badges use the shared classes | 1280+390 | own chip look instead of .status-chip / .count-badge: span.environment-status-badge "Configured"; span.environment-status-badge "Not configured"
+sysadmin /admin/site-content | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Published Nov 6, 2026, 3:36 PM CST", "No unpublished changes" (all chips: Published Nov 6, 2026, 3:36 PM CST, No unpubl
+sysadmin /admin/system-report | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "3 need attention", "8 check soon", "9 unavailable", "48 OK", "20 count only", "Needs attention", "Unavailable", "Check 
+sysadmin /admin/system-report | B13 | times show CT | 1280+390 | time without "CT": "Friday, November 6, 2026 at 9:36 PM UTC", "9:36 PM UTC today", "9:36 PM UTC today"
+sysadmin /admin/team | B12 | status chip words | 1280+390 | chip word(s) outside the approved list: "Staff login", "Active", "Website account" (all chips: Staff login, Active, Website account)
