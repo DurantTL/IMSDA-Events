@@ -121,12 +121,13 @@ Ticking only records that someone did the work. This sheet remains the full inst
 - **Why:** if the key is ever exposed, it must be replaced without losing data.
 - **How:** the full steps are in `docs/DEPLOY-DOCKER.md`, "Rotating the
   encryption key" (#1516). In short: back up the database and the current key;
-  make a new key; load the old key as `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE` (with
-  its version) and the new one as `SECRET_ENCRYPTION_KEY_FILE` (version + 1);
-  restart; run `npm run key:rotate` (dry run), then `npm run key:rotate -- --apply`
+  make a new key and write it to its own version-named file (never over the old
+  key's file); set `SECRET_ENCRYPTION_KEY_VERSION` (version + 1) and
+  `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` (the old version) so both keys load;
+  redeploy; run `npm run key:rotate` (dry run), then `npm run key:rotate -- --apply`
   until nothing is left; `npm run key:check` must exit 0; update the off-site
   copy of the key (item 2) and test-restore it (item 3); then remove the old key
-  and run `key:check` again. Running a rotation in production is a human step.
+  and run `key:check` again; delete the old key's file last. Running a rotation in production is a human step.
 - **Proof:** the custodian has reviewed the procedure, and the procedure is kept
   with the key copy.
 

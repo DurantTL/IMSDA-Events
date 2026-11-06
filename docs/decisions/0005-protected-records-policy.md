@@ -175,7 +175,10 @@ Two open implementation questions this ADR should settle before #190 starts:
    identical re-added feed. `npm run key:check` counts these (informational).
 8. Running a rotation in production is a human step; the procedure is in
    `docs/DEPLOY-DOCKER.md`, "Rotating the encryption key", and is a draft for
-   the custodian to review (checklist item 9).
+   the custodian to review (checklist item 9). On the server each key version
+   has its own file (`/etc/imsda/secret-encryption-key`, then `…-v2` and so on),
+   and a key file is never overwritten, so a container restarted or rolled back
+   with old settings always gets the old key for its old version.
 
 ### 3. Access authority: subject, guardian, staff, disclosure, break-glass
 

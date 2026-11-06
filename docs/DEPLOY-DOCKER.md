@@ -1839,12 +1839,20 @@ version, a previous version is set with no previous key, its version is not
 lower than the current one, it is the same key as the current one, or it is
 under 32 characters in production.
 
-Where the keys live, on each deploy path (use the one this server uses):
+Where the keys live. **Key files are named by version and never overwritten or
+edited:** version 1 is `/etc/imsda/secret-encryption-key` (the file you already
+have), version N is `/etc/imsda/secret-encryption-key-vN`. A container keeps the
+host path it was created with, and it reads that path again whenever it starts
+(a crash restart, a reboot, a rollback). Because the old key's file is never
+touched, a container that still has the old settings always finds the old key,
+which matches its version. Writing a new key over the old file would let such a
+container start with the new key under the old version number, and anything it
+sealed would be lost once the old key is removed.
 
 | | Manual deploy (`scripts/manual-deploy.sh`) | xCloud compose (`deploy/xcloud/docker-compose.env.yml`) |
 | --- | --- | --- |
-| Current (new) key | host file `/etc/imsda/secret-encryption-key`, mounted at `/run/secrets/encryption-key` (the script sets `SECRET_ENCRYPTION_KEY_FILE`) | same host file; `SECRET_ENCRYPTION_KEY_FILE: /run/secrets/encryption-key` |
-| Previous (old) key | host file `/etc/imsda/secret-encryption-key-previous` (or `IMSDA_PREVIOUS_KEY_FILE`), mounted read-only at `/run/secrets/encryption-key-previous`; the script sets `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE` only when the file exists | same host file; uncomment the second bind mount and `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: /run/secrets/encryption-key-previous` |
+| Current (new) key | the file for `SECRET_ENCRYPTION_KEY_VERSION`, mounted at `/run/secrets/encryption-key`; the script picks it from the version in `.env` and sets `SECRET_ENCRYPTION_KEY_FILE` | change the key bind mount's `source` to the new version's file; `SECRET_ENCRYPTION_KEY_FILE: /run/secrets/encryption-key` stays |
+| Previous (old) key | the file for `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION`, mounted read-only at `/run/secrets/encryption-key-previous`; mounted (and `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE` set) only while that line is in `.env`, and the deploy stops if its file is missing | uncomment the second bind mount (its `source` is the old version's file) and `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: /run/secrets/encryption-key-previous` |
 | Versions | `SECRET_ENCRYPTION_KEY_VERSION` and `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` as lines in `.env` | uncomment the two `*_VERSION` lines, or put them in `.env` |
 | Never | do not put `SECRET_ENCRYPTION_PREVIOUS_KEY` or either `_FILE` variable in `.env` (the script refuses) | do not set `SECRET_ENCRYPTION_PREVIOUS_KEY` and its `_FILE` together |
 
@@ -1856,34 +1864,24 @@ Steps:
 2. **Make the new key.** At least 32 random characters, for example
    `openssl rand -base64 48`. Put it in the password manager as the new key and
    keep the old entry; label each with its version.
-3. **Load both keys.** As root on the server, with the table above:
-   1. Copy the current key file to the previous-key file and set its mode:
-      `install -m 0400 -o root -g root /etc/imsda/secret-encryption-key /etc/imsda/secret-encryption-key-previous`.
-   2. Replace the current key file with the new key as a **new file**, never by
-      editing it in place: write the new key (from the password manager, never
-      typed on a command line) to a temporary file, then
-      `install -m 0400 -o root -g root <tmp> /etc/imsda/secret-encryption-key`
-      (or `mv` it over). A file bind mount keeps the inode it was created with, so
-      a container still running keeps seeing the old key, and an in-place edit
-      would hand the new key to any container that restarts with old settings.
-   3. Set the versions: `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=<old version>` and
-      `SECRET_ENCRYPTION_KEY_VERSION=<old version + 1>`. Compose path: edit
+3. **Load both keys.** As root on the server (here the old version is 1 and the
+   new one 2; use your own numbers):
+   1. Write the new key (from the password manager, never typed on a command
+      line) to its **own new file**, `/etc/imsda/secret-encryption-key-v2`, with
+      `install -m 0400 -o root -g root <tmp file> /etc/imsda/secret-encryption-key-v2`,
+      then delete the temporary file. **Leave `/etc/imsda/secret-encryption-key`
+      exactly as it is.**
+   2. Set the versions. Manual path: add `SECRET_ENCRYPTION_KEY_VERSION=2` and
+      `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=1` to `.env`. Compose path: edit
       `docker-compose.env.yml` as the table says.
-   Do 3.1 to 3.4 back to back, with the autodeploy timer stopped
-   (`systemctl stop imsda-autodeploy.timer`; start it again afterwards), so no
-   restart or deploy lands between replacing the file and the redeploy.
-   `manual-deploy.sh` will not roll back automatically while a previous key file
-   is present or the key version is above 1 and differs from the old
-   container's: it leaves the failed container stopped and says so. If that
-   happens, check `/api/health` `encryptionKey.version` before starting anything.
-   **xCloud path:** after step 3 do not use the `imsda-events:previous` rollback
-   until the rotation is finished, and after any rollback during a rotation
-   check `/api/health` `encryptionKey.version` before letting anyone sign in.
-   4. Redeploy so the container is recreated with both mounts (manual path:
+   3. Redeploy so the container is recreated with both keys (manual path:
       `/root/manual-deploy.sh <sha>`; compose path: the usual redeploy). A plain
-      restart is not enough on the manual path.
- `/api/health` (with a token) now reports
-   `"version"`, `"previousKeyLoaded": true` and `"previousVersion"`.
+      restart is not enough: a container keeps the settings it was created with.
+   If the new container fails and the deploy rolls back, the old container comes
+   back with its old settings and the untouched old key, which is consistent;
+   fix the cause and redeploy. `/api/health` (with a token) now reports
+   `"version": 2`, `"previousKeyLoaded": true` and `"previousVersion": 1`. Check it
+   before going on.
 4. **Dry run.** Inside the app container (`docker exec <app> npm run key:rotate`): It writes
    nothing and prints, per column, how many values it would re-seal, how many
    are already current and how many are unreadable. Unreadable must be 0; if
@@ -1898,14 +1896,19 @@ Steps:
 7. **Back up the new key and test it.** Add the new key to both offline copies,
    then run the restore test above with the new key (`npm run key:restore-check`
    on a restored dump taken **after** step 5). Do not go on until it passes.
-8. **Remove the old key.** Only after step 7 has passed. Delete the previous-key
-   file `/etc/imsda/secret-encryption-key-previous`, the
-   `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` line and (compose path) the previous-key
-   mount and variable; redeploy; and run `npm run key:check` once more.
-   **Leave `SECRET_ENCRYPTION_KEY_VERSION` set to the new version.** Keep the old key in the password manager,
-   marked retired, until the next restore test of an older backup is no longer
-   needed: a database backup taken before step 5 can only be opened with the old
-   key.
+8. **Remove the old key.** Only after step 7 has passed.
+   1. Remove the `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` line (compose path:
+      also the previous-key mount and variable) and redeploy. **Leave
+      `SECRET_ENCRYPTION_KEY_VERSION` set to the new version.**
+   2. Run `docker exec <app> npm run key:check` once more; it must exit 0, and
+      `/api/health` must show `"previousKeyLoaded": false`.
+   3. Manual path: remove the rollback copy, `docker rm <app>-old`. It was
+      created during the rotation and still mounts the old key file, so it could
+      not start once that file is gone.
+   4. Only then delete the old key file, `/etc/imsda/secret-encryption-key`.
+      Keep the old key in the password manager, marked retired, until the next
+      restore test of an older backup is no longer needed: a database backup
+      taken before step 5 can only be opened with the old key.
 
 Things to know:
 
