@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { ListPager } from "@/components/list-pager";
 import { SortOrderNote } from "@/components/list-sort";
 import { serverSort, sortOrderText } from "@/lib/list-sort";
@@ -81,7 +82,7 @@ export default async function StaffClubFormsPage({
         </div>
       </div>
       <section className="panel">
-        <form action="/more/club-forms" className="club-form-filter" method="get">
+        <GetFilterForm action="/more/club-forms" className="club-form-filter">
           {event && <input name="event" type="hidden" value={event} />}
           {sorting.order.key && <><input name="sort" type="hidden" value={sorting.order.key} /><input name="dir" type="hidden" value={sorting.order.dir} /></>}
           <label>Form
@@ -100,7 +101,7 @@ export default async function StaffClubFormsPage({
           {exportHref
             ? <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={14} /> Download CSV (non-sensitive columns)</ExportLink>
             : <small className="field-help">Choose one form to download its CSV.</small>}
-        </form>
+        </GetFilterForm>
         {list.total === 0 ? (
           <p className="quiet-copy">No submitted forms match.</p>
         ) : (
