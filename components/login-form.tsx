@@ -288,7 +288,7 @@ export function LoginForm({
           <div className="auth-success">
             <strong>Set up two-factor authentication</strong>
             <p>
-              This account administers events, so it needs a second factor. Scan this with an
+              Your role requires a second factor. Scan this with an
               authenticator app or password manager, then enter the six-digit code it shows.
             </p>
             {qrDataUrl && (

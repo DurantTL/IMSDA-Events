@@ -98,12 +98,14 @@ function database(options: { switchOn?: boolean; staff?: StaffRow | null; attend
     user: {
       findUnique: vi.fn(async (args: { select: Record<string, unknown> }) => {
         if (!staff) return null;
-        if ("credential" in args.select) {
+        // The first read (with the credential) and the re-read just before the session is minted (roles and enrolment only).
+        if ("credential" in args.select || "mfaEnrollment" in args.select) {
           return {
             id: "user-1",
             accountStatus: staff.pending ? "PENDING_ACTIVATION" : "ACTIVE",
             globalRole: staff.globalRole ?? null,
             memberships: [],
+            clubsAdministratorGrant: null,
             mfaEnrollment: staff.mfa ? { status: "ACTIVE" } : null,
             passkeys: [],
             credential: {

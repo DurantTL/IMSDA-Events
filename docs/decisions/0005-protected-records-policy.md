@@ -1091,8 +1091,8 @@ only.
 - **MFA.** Staff accounts with any active event membership, and system
   administrators, already require two-step sign-in (decision of 2026-09-25).
   An active Clubs Administrator (no event membership needed) requires it too
-  (Caleb, Nov 6, 2026). Granting the role ends the person's open sessions, so
-  their next sign-in enrols; revoking it, with no other qualifying role, goes
+  (Caleb, Nov 6, 2026). Granting the role ends the person's open sessions (not
+  the granting administrator's own), so their next sign-in enrols; revoking it, with no other qualifying role, goes
   back to the password alone.
   Granting or removing `VIEW_HEALTH_INFORMATION` ends all of that user's
   sessions in the same transaction, so their next sign-in has to pass two-step
