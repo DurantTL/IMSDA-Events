@@ -161,7 +161,6 @@ describe("L9: the attendee account uses the club portal's shared pieces (#1555)"
       { file: "registrations/page.tsx", marker: "attendee-reg-readonly", why: "a helper component inside a registration card, not the page" },
       { file: "registrations/page.tsx", marker: "attendee-reg-actions", why: "a helper component inside a registration card, not the page" },
       { file: "profile/page.tsx", marker: "<ProfileView", why: "ProfileView draws the banner in its portal variant (asserted below)" },
-      { file: "area/health/page.tsx", marker: "<HealthAcknowledgmentPage", why: "a component in the same file that wraps the notice in the banner (asserted below)" },
     ];
     const returns = (source: string) => {
       const found: string[] = [];
@@ -194,7 +193,9 @@ describe("L9: the attendee account uses the club portal's shared pieces (#1555)"
     expect(offenders).toEqual([]);
     // The allowlisted pieces really do carry the banner.
     const health = read(`${root}/area/health/page.tsx`);
-    expect(health).toMatch(/function HealthAcknowledgmentPage\(\) \{[\s\S]*<AccountPageBanner[\s\S]*<HealthPrivacyAcknowledgment/);
+    expect(health).toMatch(/function healthAcknowledgmentPage\(\) \{[\s\S]*<AccountPageBanner[\s\S]*<HealthPrivacyAcknowledgment/);
+    // Both acknowledgment paths return that tree (called, not rendered as a component, so the page test can see the notice).
+    expect(health.match(/return healthAcknowledgmentPage\(\);/g)).toHaveLength(2);
     expect(health).not.toMatch(/return <HealthPrivacyAcknowledgment/);
     expect(read(`${root}/error.tsx`)).toContain("<AccountPortalTabs />");
     expect(read(`${root}/clubs/[organizationId]/layout.tsx`)).toContain("<ClubPortalNav");

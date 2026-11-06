@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
  * is the printable sheet and is audited as an export.
  */
 /** The one-time privacy notice, under the same banner as the page it guards, so the heading and tabs stay (#1555). */
-function HealthAcknowledgmentPage() {
+function healthAcknowledgmentPage() {
   return (
     <>
       <AccountPageBanner title="Event health information" context="Area Coordinator · confidential · view only" />
@@ -40,7 +40,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   }
   const query = await searchParams;
   // The one-time privacy notice (#923) comes before anything is listed or opened.
-  if (await healthAcknowledgmentOwed(viewer)) return <HealthAcknowledgmentPage />;
+  if (await healthAcknowledgmentOwed(viewer)) return healthAcknowledgmentPage();
 
   if (!query.event) {
     const events = await listHealthEvents(viewer);
@@ -70,7 +70,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   try {
     data = await loadEventHealth(viewer, query.event, { organizationId: query.club || undefined, purpose: sheet ? "EXPORT" : "VIEW" });
   } catch (error) {
-    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthAcknowledgmentPage />;
+    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return healthAcknowledgmentPage();
     if (error instanceof HealthViewError) notFound();
     throw error;
   }
