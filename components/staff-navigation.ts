@@ -40,7 +40,9 @@ import { kitchenCountsPath, type EventPermission } from "@/modules/access/permis
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
 import { canAccessOperationalHealth, operationalHealthEntryPermissions } from "@/modules/operations/access";
 import { canManageProgramAssignments } from "@/modules/program-assignments/access";
-import { isSystemWorkspacePath, systemSubpageTitle } from "@/components/system-navigation";
+import { clubsAdminRecordsHref, isSystemWorkspacePath, systemSubpageTitle } from "@/components/system-navigation";
+
+export { clubsAdminRecordsHref };
 
 /**
  * The single source of the destinations a signed-in staff member may reach:
@@ -145,7 +147,7 @@ export const staffPageTitles = {
   groupedPackets: "Grouped event packets",
   operationalReports: "Operational reports",
   clubMonthlyReport: "Club Monthly Record",
-  clubMonthlyReports: "Club Monthly Records",
+  clubMonthlyReports: "Review monthly records",
   clubs: "Clubs",
   club: "Club",
   clubForm: "Club form",
@@ -286,7 +288,7 @@ export const clubsAdminGroups: readonly ClubsNavGroup[] = [
     key: "clubs-records",
     label: "Records and points",
     items: [
-      { href: "/admin/clubs/reports", label: "Club Monthly Records", icon: FileText },
+      { href: clubsAdminRecordsHref, label: "Monthly Records", icon: FileText },
       { href: "/admin/clubs/reports/year-end", label: "Club Year-End Reports", icon: Trophy },
       { href: "/admin/clubs/summary?view=points#points", label: "Points", icon: Star },
     ],
@@ -345,16 +347,18 @@ export function clubsAdminHrefForYear(href: string, year: string | null): string
 /**
  * The Clubs sidebar item a page lights: the longest item path that is the page or a parent of it. The dashboard,
  * "/admin/clubs", is the parent of every club page, so it lights only on exactly that path. On the Club summary,
- * `summaryView` ("points" or "events") lights that view's own item, as the section tabs do.
+ * `summaryView` ("records", "points" or "events") lights that view's own item, as the section tabs do. The Monthly
+ * Records review list and a club's record under it light the Monthly Records item too (#1552).
  */
 export function clubsAdminActiveHref(pathname: string, summaryView?: string | null): string | null {
   // The Club summary's Points and Events views have their own sidebar items (#1304); light the one the section tabs light.
   if (pathname === "/admin/clubs/summary") {
-    const viewItem = summaryView === "points" || summaryView === "events"
+    const viewItem = summaryView === "records" || summaryView === "points" || summaryView === "events"
       ? clubsAdminGroups.flatMap((group) => group.items).find((item) => item.href.startsWith(`/admin/clubs/summary?view=${summaryView}#`))
       : null;
     if (viewItem) return viewItem.href;
   }
+  if (pathname === "/admin/clubs/reports" || (pathname.startsWith("/admin/clubs/reports/") && !pathname.startsWith("/admin/clubs/reports/year-end"))) return clubsAdminRecordsHref;
   return clubsAdminNavigation.reduce<string | null>((best, item) => (
     (pathname === item.href || (item.href !== "/admin/clubs" && pathname.startsWith(`${item.href}/`))) && (!best || item.href.length > best.length) ? item.href : best
   ), null);

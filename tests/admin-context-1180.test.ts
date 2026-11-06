@@ -135,7 +135,7 @@ describe("the selected event is kept", () => {
     const markup = render("admin", "/admin", { events: false, search: "" });
     expect(markup).toContain("System administration");
     expect(markup).toContain("System menu");
-    expect(buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false }).filter((entry) => entry.scope === "System")).toHaveLength(systemNavGroups.flatMap((group) => group.items).length);
+    expect(buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false }).filter((entry) => entry.scope === "System")).toHaveLength(systemNavGroups.flatMap((group) => group.items).length + 1);
   });
 });
 

@@ -29,7 +29,7 @@ import {
 import { clubYearOptions } from "@/modules/club-rosters/domain";
 import { clubsWithFormsMissing, clubsFormsMissingHref, type ClubRequiredForms } from "@/modules/club-forms/required-domain";
 import { recordsToReview, recordsToReviewHref } from "@/modules/club-reports/review-domain";
-import { buildClubDirectory, chooseReportMonth, clubSummaryHref, type ClubDirectoryRow } from "@/modules/club-reports/club-directory-domain";
+import { buildClubDirectory, chooseReportMonth, clubSummaryAnchors, clubSummaryHref, type ClubDirectoryRow } from "@/modules/club-reports/club-directory-domain";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 export { chooseReportMonth, recordStatusLabel } from "@/modules/club-reports/club-directory-domain";
 
@@ -139,6 +139,7 @@ export function clubsAdminHrefs(clubYear: string) {
     formsMissing: clubsFormsMissingHref(clubYear),
     summary: `/admin/clubs/summary?${year}`,
     reports: `/admin/clubs/reports?${year}`,
+    records: `${clubSummaryHref({ clubYear, view: "records" })}#${clubSummaryAnchors.records}`,
     recordsToReview: (month: string) => recordsToReviewHref(clubYear, month),
     points: `${clubSummaryHref({ clubYear, view: "points" })}#points`,
     clubEvents: `${clubSummaryHref({ clubYear, view: "events" })}#club-events`,
@@ -154,7 +155,7 @@ export function clubsAdminTabs(clubYear: string, waitingApplications?: number): 
   return [
     { key: "overview", label: "Overview", href: href.overview },
     { key: "all-clubs", label: "All clubs", href: href.summary },
-    { key: "monthly-records", label: "Monthly Records", href: href.reports },
+    { key: "monthly-records", label: "Monthly Records", href: href.records },
     { key: "points", label: "Points", href: href.points },
     { key: "club-events", label: "Club events", href: href.clubEvents },
     { key: "forms", label: "Forms", href: href.forms },

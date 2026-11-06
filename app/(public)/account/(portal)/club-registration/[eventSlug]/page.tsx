@@ -10,6 +10,8 @@ import { accountNeedsSecondStep } from "@/modules/attendee-accounts/sign-in-gate
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 import { clubCapabilities, clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
+import { AccountPageBanner } from "@/components/account-page-banner";
+import { PortalSectionHeading } from "@/components/portal-section-heading";
 
 export const metadata: Metadata = {
   title: "Register your club",
@@ -57,11 +59,11 @@ export default async function ClubRegistrationEntryPage({
   }
 
   return (
+    <>
+    <AccountPageBanner title={event.name} context="Register your club" />
+    <div className="account-page-body">
     <section className="public-manage-card" aria-labelledby="club-entry-heading">
-      <div className="public-manage-card-heading">
-        <p className="public-registration-eyebrow">Register your club</p>
-        <h1 id="club-entry-heading">{event.name}</h1>
-      </div>
+      <PortalSectionHeading eyebrow="Your clubs" id="club-entry-heading" title={clubs.length === 0 ? "No club to register" : "Choose your club"} />
       {clubs.length === 0 ? (
         <>
           <p className="public-manage-empty">{CLUB_REGISTRATION_NOT_A_DIRECTOR_MESSAGE}</p>
@@ -89,5 +91,7 @@ export default async function ClubRegistrationEntryPage({
         </>
       )}
     </section>
+    </div>
+    </>
   );
 }

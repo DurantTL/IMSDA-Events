@@ -98,7 +98,7 @@ follows the same pattern: `area/[organizationId]` → "All clubs";
 - `admin/organizations/[organizationId]/club` (a club as its director sees
   it) → "Back to Clubs and churches"; its own links to Club admins, Club
   profile, and each monthly report pass `from` back to itself
-- `admin/clubs/import`, `admin/clubs/invites`, `admin/clubs/reports`,
+- `admin/clubs/import`, `admin/clubs/invites`, `admin/clubs/reports` (back link: the Monthly Records tab),
   `admin/organizations/background-checks` → "Back to Clubs and churches"
 - `more/clubs` (a Pathfinder event's club oversight) → "Back to More"
 - `more/clubs/[organizationId]` → "Back to clubs"; its links to each monthly
@@ -180,7 +180,7 @@ visibility condition is exactly what gated that destination before.
 - **Admin sidebars (#1245):** every collapsible sidebar group starts closed; only the group holding the current page
   opens, and a viewer's open/closed choices are remembered per browser. Item labels are the pages' own titles.
   - **System** (`systemNavGroups`): Events (Create an event, Conference calendar, Copy from a past event, Event
-    templates, Archived events), Clubs (Clubs and churches, Club Monthly Records, Club summary, New club
+    templates, Archived events), Clubs (Clubs and churches, Monthly Records, Club summary, New club
     applications, Club member transfers), People, Forms, Catalogs and settings. `/admin/calendar` is listed once, as
     "Conference calendar" (it creates events from calendar items and manages the public calendar; this replaced the
     #1180 pair "Create event from calendar item" and "Manage public calendar"). The `/admin` dashboard's Common tasks
@@ -188,8 +188,8 @@ visibility condition is exactly what gated that destination before.
     (`components/route-mapping.ts`) are described in `tests/admin-context-1180.test.ts`.
   - **Clubs** (`clubsAdminGroups`): one ungrouped Club administration link, then Clubs (Club summary, Club member
     transfers, Sterling Volunteers, Honor catalog, Club supply catalog, Import clubs, Import health records), Records
-    and points (Club Monthly Records, Club Year-End Reports, Points), Club events, Forms and Applications (New club
-    applications, Club invites). Points and Club events link to sections of the Club summary and never light. A club
+    and points (Monthly Records, Club Year-End Reports, Points), Club events, Forms and Applications (New club
+    applications, Club invites). Monthly Records, Points and Club events link to tabs of the Club summary (Monthly Records lights, with the review list under it, #1552; the review list is opened from that tab's "Review monthly records" button). A club
     year picker (a plain GET form with a Show button) sits under the search; the year-aware links keep `?year=`. The
     search finds these pages in the Clubs view only. The phone bar stays a flat list of pages.
   - **Events:** an Event administration link tops the sidebar and lights on `/events-admin`; the role pill's badge is

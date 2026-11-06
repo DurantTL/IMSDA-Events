@@ -11,6 +11,7 @@ import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-se
 import { isAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -54,12 +55,7 @@ export default async function MyClubsPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Club ministries</p>
-          <h1>My clubs</h1>
-        </div>
-      </section>
+      <AccountPageBanner title="My clubs" context="Club ministries" />
       <div className="account-page-body">
         <section className="public-manage-card">
           {clubs.length === 0 ? (

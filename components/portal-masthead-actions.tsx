@@ -11,17 +11,19 @@ import type { FormsHelpContact } from "@/modules/system-admin/forms-help-contact
  * portals: the "Your account" drop-down (it replaces a separate My account button), Forms help and Sign out. `leading`
  * is for what only one portal has, such as the club's Switch club.
  */
-export function PortalMastheadActions({ identity, leading, formsHelpContact, signOut }: {
+export function PortalMastheadActions({ identity, leading, formsHelpContact, signOut, accountMenu = true }: {
   identity: ReactNode;
   leading?: ReactNode;
   formsHelpContact?: FormsHelpContact;
   signOut: AccountSignOutMode;
+  /** The "Your account" drop-down. Off on the attendee account, whose tab row lists the same destinations. */
+  accountMenu?: boolean;
 }) {
   return (
     <div className={styles.account}>
       {identity}
       {leading}
-      <AccountWorkspaceMenu />
+      {accountMenu && <AccountWorkspaceMenu />}
       {formsHelpContact && <FormsHelp className={styles.action} contact={formsHelpContact} />}
       {signOut !== "none" && <AttendeeSignOutButton className={styles.action} endStaffSession={signOut === "both"} />}
     </div>

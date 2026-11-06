@@ -1,13 +1,12 @@
 import { AccountContent } from "@/components/account-content";
 import { AccountWorkspaceMenuProvider } from "@/components/account-workspace-menu-context";
 import { redirect } from "next/navigation";
-import { AccountHeaderActions } from "@/components/account-header-actions";
+import { AccountPortalMasthead } from "@/components/account-portal-masthead";
 import { AccountAnnouncementBanner } from "@/components/account-announcement-banner";
 import { accountPortalNavItems, workspaceMenuNavItems } from "@/components/account-portal-nav";
-import { AccountSectionNav } from "@/components/account-section-nav";
+import { AccountPortalTabsProvider } from "@/components/account-portal-tabs";
 import { ActAsBanner } from "@/components/act-as-banner";
 import { AttendeeAuthReturn } from "@/components/attendee-sign-in-form";
-import { BrandLink } from "@/components/brand-link";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { accountSignOutMode, otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
@@ -21,7 +20,7 @@ import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /**
- * The signed-in attendee area: one header and one row of tabs, with each
+ * The signed-in attendee area: one header (the club portal's masthead look) and one row of tabs (drawn under each page's banner), with each
  * job (registrations, clubs, profile, sign-in security) on its own page.
  * Every page still checks the session itself; this layout is only chrome,
  * except that it sends a session that owes the sign-in step (#1410) on: the
@@ -84,23 +83,20 @@ export default async function AccountPortalLayout({ children }: { children: Reac
     <main className="public-registration-page public-manage-page account-portal">
       <AttendeeAuthReturn />
       <HelpReturnTracker />
-      <header className="public-registration-header">
-        <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
-          <AccountHeaderActions
-            identity={acting ? undefined : chromeAccount?.displayName}
-            contexts={workspaceContexts}
-            signOut={accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) })}
-          />
-        </div>
-      </header>
+      <AccountPortalMasthead
+        identity={acting ? undefined : chromeAccount?.displayName}
+        contexts={workspaceContexts}
+        signOut={accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) })}
+      />
       <ActAsBanner acting={acting} inAccount />
-      <AccountSectionNav items={items} label="Your account" />
       {chromeAccount && <AccountAnnouncementBanner accountId={chromeAccount.id} announcements={bannerAnnouncements} />}
       {/* The club and coordinator mastheads show this list as their "Your account" drop-down (#1555); it is worked out once, here. */}
-      <AccountWorkspaceMenuProvider items={workspaceMenuItems}>
-        <AccountContent>{children}</AccountContent>
-      </AccountWorkspaceMenuProvider>
+      {/* The tab row is drawn by each page's banner, right under its navy band (AccountPageBanner, #1555); the list is worked out once, here. */}
+      <AccountPortalTabsProvider items={items}>
+        <AccountWorkspaceMenuProvider items={workspaceMenuItems}>
+          <AccountContent>{children}</AccountContent>
+        </AccountWorkspaceMenuProvider>
+      </AccountPortalTabsProvider>
     </main>
   );
 }

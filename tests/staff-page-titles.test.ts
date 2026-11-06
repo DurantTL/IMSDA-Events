@@ -60,7 +60,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/reports/packets")).toBe("Grouped event packets");
     expect(staffSubpageTitle("/more/clubs")).toBe("Clubs");
     expect(staffSubpageTitle("/more/clubs/org_1")).toBe("Club");
-    expect(staffSubpageTitle("/more/clubs/reports")).toBe("Club Monthly Records");
+    expect(staffSubpageTitle("/more/clubs/reports")).toBe("Review monthly records");
     expect(staffSubpageTitle("/more/clubs/reports/org_1/2028-08")).toBe("Club Monthly Record");
     expect(staffSubpageTitle("/more/club-forms")).toBe("Club forms");
     expect(staffSubpageTitle("/more/club-forms/sub_1")).toBe("Club form");
@@ -90,7 +90,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/admin/organizations")).toBe("Clubs and churches");
     expect(staffSubpageTitle("/admin/organizations/background-checks")).toBe("Sterling Volunteers");
     expect(staffSubpageTitle("/admin/organizations/org_1/directors")).toBe("Club directors");
-    expect(staffSubpageTitle("/admin/clubs/reports")).toBe("Club Monthly Records");
+    expect(staffSubpageTitle("/admin/clubs/reports")).toBe("Review monthly records");
     expect(staffSubpageTitle("/admin/clubs/reports/org_1/2028-08")).toBe("Club Monthly Record");
     expect(staffSubpageTitle("/admin/clubs/reports/year-end")).toBe("Club Year-End Reports");
     expect(staffSubpageTitle("/admin/club-forms/membership")).toBe("Club form builder");

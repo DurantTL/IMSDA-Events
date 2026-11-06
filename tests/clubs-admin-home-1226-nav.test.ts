@@ -13,7 +13,7 @@ describe("Clubs navigation", () => {
     expect(clubsAdminActiveHref("/admin/clubs")).toBe("/admin/clubs");
     expect(clubsAdminActiveHref("/admin/clubs/summary")).toBe("/admin/clubs/summary");
     expect(clubsAdminActiveHref("/admin/clubs/applications")).toBe("/admin/clubs/applications");
-    expect(clubsAdminActiveHref("/admin/clubs/reports/club-1/2026-10")).toBe("/admin/clubs/reports");
+    expect(clubsAdminActiveHref("/admin/clubs/reports/club-1/2026-10")).toBe("/admin/clubs/summary?view=records#monthly-records");
     expect(clubsAdminActiveHref("/admin/clubs/reports/year-end")).toBe("/admin/clubs/reports/year-end");
     expect(clubsAdminActiveHref("/admin/club-forms/some_form")).toBe("/admin/club-forms");
     // Pages the sidebar does not list light nothing, as before.

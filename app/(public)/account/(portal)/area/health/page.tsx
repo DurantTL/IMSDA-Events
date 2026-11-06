@@ -10,9 +10,20 @@ import { HealthViewError, healthAcknowledgmentOwed, listHealthEvents, loadEventH
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { areaAttendeeHealthHref } from "@/modules/coordinator-health/domain";
 import { formatCalendarDate } from "@/modules/club-registrations/domain";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const metadata: Metadata = { title: "Event health information", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
+
+/** The one-time privacy notice, under the same banner as the page it guards, so the heading and tabs stay (#1555). */
+function healthAcknowledgmentPage() {
+  return (
+    <>
+      <AccountPageBanner title="Event health information" context="Area Coordinator · confidential · view only" />
+      <HealthPrivacyAcknowledgment as="ATTENDEE" />
+    </>
+  );
+}
 
 /**
  * Health information for club events (#658), read only, for active Area
@@ -29,18 +40,13 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   }
   const query = await searchParams;
   // The one-time privacy notice (#923) comes before anything is listed or opened.
-  if (await healthAcknowledgmentOwed(viewer)) return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
+  if (await healthAcknowledgmentOwed(viewer)) return healthAcknowledgmentPage();
 
   if (!query.event) {
     const events = await listHealthEvents(viewer);
     return (
       <>
-        <section className="public-registration-hero public-manage-hero account-page-hero">
-          <div>
-            <p className="public-registration-eyebrow">Area Coordinator · confidential · view only</p>
-            <h1>Event health information</h1>
-          </div>
-        </section>
+        <AccountPageBanner title="Event health information" context="Area Coordinator · confidential · view only" />
         <div className="account-page-body club-roster-stack">
           <BackLink href="/account/area-clubs/overview#clubs-at-a-glance">Back to clubs at a glance</BackLink>
           <p className="inline-notice" role="status">Dietary notes as entered, the medical-need flag, and emergency contacts for club events. Each event is available through its last day. Every time you open or print one it is recorded.</p>
@@ -64,18 +70,13 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   try {
     data = await loadEventHealth(viewer, query.event, { organizationId: query.club || undefined, purpose: sheet ? "EXPORT" : "VIEW" });
   } catch (error) {
-    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
+    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return healthAcknowledgmentPage();
     if (error instanceof HealthViewError) notFound();
     throw error;
   }
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Area Coordinator · confidential · view only</p>
-          <h1>{data.event.name}</h1>
-        </div>
-      </section>
+      <AccountPageBanner title={data.event.name} context="Area Coordinator · confidential · view only" />
       <div className="account-page-body club-roster-stack">
         <BackLink href="/account/area/health">Back to events</BackLink>
         <p className="inline-notice" role="status">Available through {formatCalendarDate(data.event.availableThrough)}, the last day of the event. This view is recorded.</p>
