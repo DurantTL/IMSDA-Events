@@ -12763,8 +12763,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .attendee-ov-heading { margin: 0 0 12px; color: var(--imsda-navy); font-size: 1.35rem; line-height: 1.25; }
 .attendee-ov-cards { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
 .attendee-ov-card {
-  min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #fff;
-  padding: 0 0 18px;
+  min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 36px rgba(0, 59, 92, 0.06); padding: 0 0 18px;
 }
 .attendee-ov-card-top {
   display: flex; align-items: center; gap: 14px; background: var(--imsda-navy); color: #fff; padding: 16px 20px;
@@ -12799,9 +12799,14 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .attendee-ov-all { margin: 14px 0 0; }
 .attendee-ov-all .text-button { display: inline-flex; min-height: 44px; align-items: center; gap: 4px; }
 .attendee-ov-empty, .attendee-ov-notice {
-  display: flex; align-items: flex-start; gap: 14px; border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 20px;
+  display: flex; align-items: flex-start; gap: 14px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 36px rgba(0, 59, 92, 0.06); padding: 20px;
 }
 .attendee-ov-notice { border-color: #f0c9c2; background: #fff8f6; }
+/* The same phone radius the shared .public-manage-card takes (17px). */
+@media (max-width: 580px) {
+  .attendee-ov-card, .attendee-ov-empty, .attendee-ov-notice { border-radius: 17px; }
+}
 .attendee-ov-empty > svg, .attendee-ov-notice > svg { flex: none; margin-top: 2px; color: var(--imsda-navy); }
 .attendee-ov-empty > div, .attendee-ov-notice > div { min-width: 0; }
 .attendee-ov-empty h3 { margin: 0 0 4px; font-size: 1.15rem; }

@@ -63,7 +63,7 @@ export default async function ClubRegistrationEntryPage({
     <AccountPageBanner title={event.name} context="Register your club" />
     <div className="account-page-body">
     <section className="public-manage-card" aria-labelledby="club-entry-heading">
-      <PortalSectionHeading eyebrow="Register your club" id="club-entry-heading" title="Choose your club" />
+      <PortalSectionHeading eyebrow="Your clubs" id="club-entry-heading" title={clubs.length === 0 ? "No club to register" : "Choose your club"} />
       {clubs.length === 0 ? (
         <>
           <p className="public-manage-empty">{CLUB_REGISTRATION_NOT_A_DIRECTOR_MESSAGE}</p>

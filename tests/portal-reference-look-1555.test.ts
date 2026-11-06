@@ -151,22 +151,64 @@ describe("L9: the attendee account uses the club portal's shared pieces (#1555)"
     expect(profile).toContain("<AccountPageBanner");
   });
 
-  it("every page under the portal layout has a banner, a shell of its own, or a redirect, so the tabs never go missing", () => {
+  it("every JSX tree a non-shell portal page returns has the banner (or an allowlisted reason), so tabs and the h1 never go missing", () => {
     const root = "app/(public)/account/(portal)";
     const files = listFiles(root).filter((file) => /(^|\/)(page|not-found)\.tsx$/.test(file));
+    // Club and Area Coordinator pages sit inside a shell layout that draws its own masthead, band and tabs.
     const ownShell = (file: string) => /^(clubs\/\[organizationId\]|area\/\[organizationId\]|area-clubs)\//.test(file);
-    const offenders = files.filter((file) => {
-      if (ownShell(file)) return false;
-      const source = read(`${root}/${file}`);
-      if (source.includes("<AccountPageBanner") || source.includes("<CoordinatorBanner") || source.includes("<ProfileView")) return false;
-      return !/^\s*redirect\(/m.test(source) || /return \(\s*</.test(source);
-    });
+    // Returned JSX that is not a page's own tree. Each entry says why it is allowed.
+    const allowlist: Array<{ file: string; marker: string; why: string }> = [
+      { file: "registrations/page.tsx", marker: "attendee-reg-readonly", why: "a helper component inside a registration card, not the page" },
+      { file: "registrations/page.tsx", marker: "attendee-reg-actions", why: "a helper component inside a registration card, not the page" },
+      { file: "profile/page.tsx", marker: "<ProfileView", why: "ProfileView draws the banner in its portal variant (asserted below)" },
+      { file: "area/health/page.tsx", marker: "<HealthAcknowledgmentPage", why: "a component in the same file that wraps the notice in the banner (asserted below)" },
+    ];
+    const returns = (source: string) => {
+      const found: string[] = [];
+      for (const match of source.matchAll(/return (\(|<)/g)) {
+        const start = match.index! + match[0].length - 1;
+        let end = start;
+        if (match[1] === "(") {
+          let depth = 0;
+          for (end = start; end < source.length; end += 1) {
+            if (source[end] === "(") depth += 1;
+            if (source[end] === ")" && (depth -= 1) === 0) break;
+          }
+        } else {
+          end = source.indexOf(";\n", start);
+        }
+        const body = source.slice(start, end);
+        if (/^\(?\s*</.test(body)) found.push(body);
+      }
+      return found;
+    };
+    const offenders: string[] = [];
+    for (const file of files) {
+      if (ownShell(file)) continue;
+      for (const body of returns(read(`${root}/${file}`))) {
+        const banner = body.includes("<AccountPageBanner") || body.includes("<CoordinatorBanner");
+        const allowed = allowlist.some((entry) => entry.file === file && body.includes(entry.marker));
+        if (!banner && !allowed) offenders.push(`${file}: ${body.replace(/\s+/g, " ").slice(0, 80)}`);
+      }
+    }
     expect(offenders).toEqual([]);
+    // The allowlisted pieces really do carry the banner.
+    const health = read(`${root}/area/health/page.tsx`);
+    expect(health).toMatch(/function HealthAcknowledgmentPage\(\) \{[\s\S]*<AccountPageBanner[\s\S]*<HealthPrivacyAcknowledgment/);
+    expect(health).not.toMatch(/return <HealthPrivacyAcknowledgment/);
     expect(read(`${root}/error.tsx`)).toContain("<AccountPortalTabs />");
     expect(read(`${root}/clubs/[organizationId]/layout.tsx`)).toContain("<ClubPortalNav");
     expect(read(`${root}/area/[organizationId]/layout.tsx`)).toContain("<ClubPortalNav");
     expect(read(`${root}/area-clubs/layout.tsx`)).toContain("<CoordinatorBanner />");
     expect(read("components/profile-view.tsx")).toContain("<AccountPageBanner");
+  });
+
+  it("keeps the shared card look: no radius or shadow override in the attendee CSS module", () => {
+    const css = read("components/account-portal-look.module.css");
+    expect(css).not.toMatch(/box-shadow|border-radius/);
+    const globals = read("app/globals.css");
+    expect(globals).toMatch(/\.attendee-ov-card \{[^}]*border-radius: 20px;[^}]*box-shadow: 0 12px 36px rgba\(0, 59, 92, 0\.06\)/);
+    expect(globals).toMatch(/\.attendee-ov-empty, \.attendee-ov-notice \{[^}]*border-radius: 20px;[^}]*box-shadow: 0 12px 36px rgba\(0, 59, 92, 0\.06\)/);
   });
 
   it("titles the Overview sections with the shared eyebrow-and-heading markup", () => {
@@ -178,9 +220,8 @@ describe("L9: the attendee account uses the club portal's shared pieces (#1555)"
     expect(read("components/coordinator-section-heading.tsx")).toContain("PortalSectionHeading");
   });
 
-  it("flattens cards and drops link underlines in a CSS module, not on the club or coordinator shells", () => {
+  it("styles links like the club portal in a CSS module, not on the club or coordinator shells", () => {
     const css = read("components/account-portal-look.module.css");
-    expect(css).toMatch(/box-shadow: none/);
     expect(css).toMatch(/text-decoration: none/);
     expect(css).toMatch(/\.field-help\) > a/);
     expect(css).toContain("color: var(--imsda-purple)");

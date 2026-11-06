@@ -1,13 +1,6 @@
-/* The attendee account's look (#1555, site rule L9): flatter cards with a thin border and links without underlines, as in
-   the club portal. The club and coordinator shells draw their own pages, so those are left as they are. */
+/* The attendee account's look (#1555, site rule L9): links styled as in the club portal (cards keep the shared `.public-manage-card` look). The club and coordinator shells draw their own pages, so those are left as they are. */
 .content :global(.account-portal-tabs) {
   margin-bottom: 20px;
-}
-
-.content:not(:has(:global(.club-shell))):not(:has(:global(.coordinator-shell))) :is(:global(.public-manage-card), :global(.attendee-ov-card), :global(.attendee-ov-empty), :global(.attendee-ov-notice)) {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: none;
 }
 
 /* Text links read as the club portal's do (its "Set up two-step sign-in" and "Help guide" links): bold purple, no underline

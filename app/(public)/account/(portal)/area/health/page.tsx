@@ -19,6 +19,16 @@ export const dynamic = "force-dynamic";
  * not by the portal layout). Opening an event is audited as a view; `?sheet=1`
  * is the printable sheet and is audited as an export.
  */
+/** The one-time privacy notice, under the same banner as the page it guards, so the heading and tabs stay (#1555). */
+function HealthAcknowledgmentPage() {
+  return (
+    <>
+      <AccountPageBanner title="Event health information" context="Area Coordinator · confidential · view only" />
+      <HealthPrivacyAcknowledgment as="ATTENDEE" />
+    </>
+  );
+}
+
 export default async function AreaHealthPage({ searchParams }: { searchParams: Promise<{ event?: string; club?: string; sheet?: string }> }) {
   const viewer = await resolveAreaHealthViewer();
   if (!viewer) {
@@ -28,7 +38,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   }
   const query = await searchParams;
   // The one-time privacy notice (#923) comes before anything is listed or opened.
-  if (await healthAcknowledgmentOwed(viewer)) return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
+  if (await healthAcknowledgmentOwed(viewer)) return <HealthAcknowledgmentPage />;
 
   if (!query.event) {
     const events = await listHealthEvents(viewer);
@@ -58,7 +68,7 @@ export default async function AreaHealthPage({ searchParams }: { searchParams: P
   try {
     data = await loadEventHealth(viewer, query.event, { organizationId: query.club || undefined, purpose: sheet ? "EXPORT" : "VIEW" });
   } catch (error) {
-    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthPrivacyAcknowledgment as="ATTENDEE" />;
+    if (error instanceof HealthViewError && error.code === "ACKNOWLEDGMENT_REQUIRED") return <HealthAcknowledgmentPage />;
     if (error instanceof HealthViewError) notFound();
     throw error;
   }

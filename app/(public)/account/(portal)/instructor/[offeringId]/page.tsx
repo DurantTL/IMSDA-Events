@@ -30,10 +30,13 @@ export default async function InstructorRosterPage({ params }: { params: Promise
     if (error instanceof HonorInstructorError && error.code === "NOT_ASSIGNED") notFound();
     if (error instanceof HonorInstructorError && error.code === "ROSTER_CLOSED") {
       return (
-        <div className="account-page-body">
-          <p><Link href="/account/instructor">Back to your classes</Link></p>
-          <section className="public-manage-card"><p className="public-manage-empty">{error.message}</p></section>
-        </div>
+        <>
+          <AccountPageBanner title="Class roster" context="Honors Weekend" />
+          <div className="account-page-body">
+            <p><Link href="/account/instructor">Back to your classes</Link></p>
+            <section className="public-manage-card"><p className="public-manage-empty">{error.message}</p></section>
+          </div>
+        </>
       );
     }
     throw error;
