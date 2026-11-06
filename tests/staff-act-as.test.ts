@@ -241,12 +241,28 @@ describe("currentStaffActingContext (#442)", () => {
       expect(mocks.grantFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "admin-1", revokedAt: null } }));
     });
 
-    it("never counts an Area Coordinator act-as, even with an active grant", async () => {
+    it("counts an Area Coordinator act-as while the grant is active, marked as a Clubs Administrator's, and ends it on revoke (2026-11-06)", async () => {
       asClubsAdmin();
       mocks.findFirst.mockResolvedValue({ ...activeRow(), role: "AREA_COORDINATOR", organizationId: null });
       mocks.sessionFindUnique.mockResolvedValue(clubsAdminSession());
       mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
+      await expect(currentStaffActingContext()).resolves.toMatchObject({ role: "AREA_COORDINATOR", organizationId: null, viaClubsAdministrator: true });
+      mocks.grantFindFirst.mockResolvedValue(null);
       await expect(currentStaffActingContext()).resolves.toBeNull();
+    });
+
+    it("records an Area Coordinator act-as as a Clubs Administrator's in the audit entry, and the system administrator's without the marker", async () => {
+      await actAsAreaCoordinator({ id: "admin-1", viaClubsAdministrator: true }, "staff-session-1", now);
+      expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({
+        action: "ACT_AS_AREA_COORDINATOR",
+        actorUserId: "admin-1",
+        summary: "A Clubs Administrator is acting as an Area Coordinator for a limited time.",
+        metadata: { actorRole: "CLUBS_ADMINISTRATOR" },
+      });
+      mocks.writeAuditLog.mockClear();
+      await actAsAreaCoordinator({ id: "admin-1" }, "staff-session-1", now);
+      expect(mocks.writeAuditLog.mock.calls[0]![0].metadata).not.toHaveProperty("actorRole");
+      expect(mocks.writeAuditLog.mock.calls[0]![0].summary).toBe("A system administrator is acting as an Area Coordinator for a limited time.");
     });
 
     it("records the act-as as a Clubs Administrator's in the audit entry, with the actor as for a system administrator", async () => {

@@ -71,18 +71,16 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
         <p className={styles.identity} data-testid="signed-in-identity">Signed in as <strong>{user.displayName}</strong> ({user.email})</p>
       </section>
 
-      {/* Area Coordinator act-as is for system administrators only (#442), here as under People; a Clubs Administrator never sees it (#1556). */}
-      {viewer === "SYSTEM_ADMIN" ? (
-        <div className="intro-actions">
-          <ActAsButton
-            access="View only"
-            endpoint="/api/admin/act-as/area-coordinator"
-            label="Act as Area Coordinator (2 hours)"
-            resultAction="Open the Area Coordinator portal"
-            role="Area Coordinator"
-          />
-        </div>
-      ) : null}
+      {/* Area Coordinator act-as is for system administrators and Clubs Administrators (Caleb, 2026-11-06): everyone who gets past this page's `hasClubsAdministration` check, which is the same check the start route makes (`requireClubsAdministration`). */}
+      <div className="intro-actions">
+        <ActAsButton
+          access="View only"
+          endpoint="/api/admin/act-as/area-coordinator"
+          label="Act as Area Coordinator (2 hours)"
+          resultAction="Open the Area Coordinator portal"
+          role="Area Coordinator"
+        />
+      </div>
 
       <GetFilterForm className={styles.yearForm} action="/admin/clubs">
         <label>
