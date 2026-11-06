@@ -1,12 +1,12 @@
 # Fictional training data
 
-Captured November 5, 2026 from main `ad9237d` on a local development server with a freshly migrated and seeded local PostgreSQL database. It is not a copy of production. The seed's own clubs were hidden so the coordinator screens show only the training clubs. Every training row uses the `training_` id prefix. Emails use `example.test`; phone numbers use the (515) 555-01xx range.
+Screenshots retaken November 6, 2026 from main `9c676ff` on a local development server with a freshly migrated and seeded local PostgreSQL database. It is not a copy of production. The seed's own clubs were hidden so the coordinator screens show only the training clubs. Every training row uses the `training_` id prefix. Emails use `example.test`; phone numbers use the (515) 555-01xx range.
 
 ## People, clubs and events
 
 - **Director:** Jordan Ellis, Riverton Pathfinders, Riverton Community Church. Club year 2026–27. Two-step sign-in is on (a placeholder enrolment; the capture session is minted already verified).
 - **Area Coordinator:** Alex Morgan.
-- **Other clubs and directors:** Pine Grove Pathfinders (Casey Nguyen), Lakeview Pathfinders (Sam Okafor), Cedar Hill Pathfinders (Robin Alvarez).
+- **Other clubs and directors:** Pine Grove Pathfinders (Casey Nguyen), Lakeview Pathfinders (Sam Okafor), Cedar Hill Pathfinders (Robin Alvarez). Their rosters have 7, 5 and 8 youth.
 - **Riverton roster:** 8 youth (Avery Chen, Drew Patel, Harper Lewis, Jesse Kim, Logan Rivera, Mia Santos, Noah Brooks, Zoe Turner) plus Jordan as staff. **Morgan Reed** is added through the real Add to roster dialog, making 10.
 - **Monthly Records:** Riverton September submitted October 8; October starts as a draft and is submitted through the real form (385 points each, 770 for the year). Cedar Hill September submitted late October 14 and October submitted November 3. Pine Grove has a September draft. Lakeview has none.
 - **Meeting notes:** Riverton, October 4, 11, 18 and 25.
@@ -19,6 +19,6 @@ Captured November 5, 2026 from main `ad9237d` on a local development server with
 
 ## Method
 
-Chromium (Playwright) at 1280 × 900 CSS pixels, device scale 2. The Next.js development overlay is hidden. Pink numbered outlines are drawn in the page just before the screenshot and removed after; they are training annotations, not app controls. Each screenshot's route, state and SHA-256 are in `screenshot-capture.json`.
+Chromium (Playwright) at 1280 × 900 CSS pixels, device scale 2. Passkey sign-in is switched on for the local site, so the sign-in page shows its passkey button. Class tracking is captured before the Good Conduct Bar hand-out; the insignia suggestions after it. The Next.js development overlay is hidden. Pink numbered outlines are drawn in the page just before the screenshot and removed after; they are training annotations, not app controls. Each screenshot's route, state and SHA-256 are in `screenshot-capture.json`.
 
-The fixture and capture scripts were run locally and are not part of the repository, the same as for the October pack. No real person, club, password, authenticator secret, recovery code, private link or production record was used or appears in any screenshot.
+The first capture was taken November 5 from main `ad9237d`. For the November 6 refresh the fixture and capture scripts were recreated from this description, the database was migrated and seeded fresh, and all 44 screenshots were retaken with the same names, framing and markers. The scripts were run locally and are not part of the repository, the same as for the October pack. No real person, club, password, authenticator secret, recovery code, private link or production record was used or appears in any screenshot.

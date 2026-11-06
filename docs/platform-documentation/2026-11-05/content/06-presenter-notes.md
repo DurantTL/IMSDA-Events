@@ -8,11 +8,11 @@ This orientation follows fictional Riverton Pathfinders through ordinary tasks, 
 
 **How to present:** show the screenshot, point to the numbered outline, then use the Say paragraph in your own words. The numbered pink outlines are added for training; they are not part of the app.
 
-**The fictional story:** Jordan Ellis directs Riverton Pathfinders at Riverton Community Church. Morgan Reed joins the roster. Alex Morgan is an Area Coordinator. The other clubs are Pine Grove, Lakeview and Cedar Hill Pathfinders. The club year is 2026–27 and the scenario date is November 5, 2026. Winter Camporee runs December 4–6; club registration closes November 25. All names, contacts, counts and registrations are invented.
+**The fictional story:** Jordan Ellis directs Riverton Pathfinders at Riverton Community Church. Morgan Reed joins the roster. Alex Morgan is an Area Coordinator. The other clubs are Pine Grove, Lakeview and Cedar Hill Pathfinders. The club year is 2026–27 and the scenario date is November 6, 2026. Winter Camporee runs December 4–6; club registration closes November 25. All names, contacts, counts and registrations are invented.
 
 **Training setup:** screenshots were taken on a local copy with synthetic data. No real email, invitation, registration or approval was sent. No usable password, code or private link appears.
 
-**Source version:** main [ad9237d](https://github.com/DurantTL/IMSDA-Events/commit/ad9237d). The capture register (`evidence/screenshot-capture.json`) lists each route and state.
+**Source version:** text checked against main [ad9237d](https://github.com/DurantTL/IMSDA-Events/commit/ad9237d). Screenshots retaken November 6, 2026 from main [9c676ff](https://github.com/DurantTL/IMSDA-Events/commit/9c676ff). The capture register (`evidence/screenshot-capture.json`) lists each route and state.
 
 **Shorter sessions:** directors only: slides 1–21 and 31. Coordinators only: slides 1–6 and 22–31.
 
@@ -159,7 +159,7 @@ Read the yellow 'Why this is needed' box aloud.
 
 ### Say
 
-After you sign in you land on your account page. The top menu reads Overview, My registrations, Profile, My club and Help. Jordan's club appears under Your other roles. Choose the club name to open the Club portal. If you help more than one club, the menu says My clubs and you pick the right one.
+After you sign in you land on your account page. The tabs under the banner read Overview, My registrations, Profile, My club and Help. Jordan's club appears under Your other roles. Choose the club name to open the Club portal. If you help more than one club, the menu says My clubs and you pick the right one.
 
 ### Point to
 
@@ -171,7 +171,7 @@ Point to the Riverton Pathfinders card (1).
 
 ### Key points
 
-- Account menu: Overview, My registrations, Profile, My club, Help.
+- Account tabs: Overview, My registrations, Profile, My club, Help.
 - Under Your other roles, open your club.
 - Coordinators see Club coordination instead of My club.
 
@@ -545,7 +545,7 @@ Point to Club coordination (1).
 
 ### Key points
 
-- Account menu: Overview, My registrations, Profile, Club coordination, Help.
+- Account tabs: Overview, My registrations, Profile, Club coordination, Help.
 - The Area Coordinator card shows upcoming club events and clubs needing attention.
 
 ### Preparation references (not spoken)

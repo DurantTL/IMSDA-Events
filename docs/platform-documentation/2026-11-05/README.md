@@ -1,6 +1,18 @@
 # IMAdventist: documentation and training pack
 
-Prepared November 5, 2026 from [main `ad9237d`](https://github.com/DurantTL/IMSDA-Events/commit/ad9237d). This pack replaces the [October 21 pack](../2026-10-21/README.md), which stays as a historical record.
+Prepared November 5, 2026 from [main `ad9237d`](https://github.com/DurantTL/IMSDA-Events/commit/ad9237d). Screenshots retaken November 6, 2026 from [main `9c676ff`](https://github.com/DurantTL/IMSDA-Events/commit/9c676ff). This pack replaces the [October 21 pack](../2026-10-21/README.md), which stays as a historical record.
+
+## What changed on November 6: screenshots retaken
+
+All 44 screenshots were retaken from main `9c676ff` with the same fictional story, file names, framing and pink markers, and the screen, print and TV decks were rebuilt with them. Later app changes had made the November 5 pictures out of date:
+
+- **Club pages:** the separate My account button is gone. **Your account** is now a drop-down in the top row, next to Forms help and Sign out.
+- **Account pages** (Overview, Profile): a navy banner with the tabs underneath.
+- **Club coordination:** a Current club year box, a "Club year" label over each section, icons on the summary tiles, a labeled **Search clubs** box with no Search button, and one tab row on a club's view-only page.
+- **Calendar:** the filter chips now match the homepage tiles.
+- **Coordinator club events:** a **Health information** button.
+
+Two wording fixes follow the new layout: slides 6 and 22 and their notes say "Account tabs" instead of "Account menu" (the Your account drop-down labels its first item Account overview), and the slide 6 notes say the tabs sit under the banner instead of in a "top menu". The rest of the slide text was already correct. The print and TV crops were adjusted where the layout moved.
 
 ## What changed from the October 21 pack
 
