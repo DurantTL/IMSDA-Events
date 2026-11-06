@@ -17,6 +17,7 @@ import {
   clubYearOptions,
   clubsAdminHrefs,
 } from "@/modules/club-reports/clubs-admin-home-model";
+import { ActAsButton } from "@/components/act-as-button";
 import { ClubApplicationApprove, NewClubsRegion } from "@/components/club-application-approve";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { ClubDirectoryCards } from "@/components/club-directory";
@@ -68,6 +69,19 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
         <p>What is waiting for someone across every club, then the clubs themselves.</p>
         <p className={styles.identity} data-testid="signed-in-identity">Signed in as <strong>{user.displayName}</strong> ({user.email})</p>
       </section>
+
+      {/* Area Coordinator act-as is for system administrators only (#442), here as under People; a Clubs Administrator never sees it (#1556). */}
+      {viewer === "SYSTEM_ADMIN" ? (
+        <div className="intro-actions">
+          <ActAsButton
+            access="View only"
+            endpoint="/api/admin/act-as/area-coordinator"
+            label="Act as Area Coordinator (2 hours)"
+            resultAction="Open the Area Coordinator portal"
+            role="Area Coordinator"
+          />
+        </div>
+      ) : null}
 
       <form className={styles.yearForm} method="get" action="/admin/clubs">
         <label>

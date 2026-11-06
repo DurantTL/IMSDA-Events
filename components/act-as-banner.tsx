@@ -1,7 +1,8 @@
-import { UserRoundCog } from "lucide-react";
+import { ArrowRight, UserRoundCog } from "lucide-react";
 import { StopActingButton } from "@/components/stop-acting-button";
 import { getPrisma } from "@/lib/prisma";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { actAsPortalHref, actAsPortalLabel } from "@/modules/organizations/act-as-portal";
 import type { StaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /** The act-as end time, in the conference's time zone (never the server's). */
@@ -43,6 +44,12 @@ export async function ActAsBanner({ acting, inShell = false, inAccount = false }
     <div className={actAsBannerClassName({ inShell, inAccount })} role="status">
       <UserRoundCog aria-hidden="true" size={14} />
       <span>{label}</span>
+      {/* In the staff workspace the banner links straight to the portal (#1556); inside the portal it is already there. */}
+      {!inAccount && (
+        <a className="secondary-button" href={actAsPortalHref(acting.role, acting.organizationId)}>
+          {actAsPortalLabel(acting.role)} <ArrowRight aria-hidden="true" size={14} />
+        </a>
+      )}
       <StopActingButton />
     </div>
   );
