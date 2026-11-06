@@ -341,10 +341,10 @@ describe("print and placement", () => {
   });
 
   it("keeps the staff shell's header hidden in print and its search out of the phone header (#1565)", () => {
-    const module = readFileSync(join(process.cwd(), "components/staff-shell.module.css"), "utf8");
-    expect(module).toMatch(/@media print \{[^}]*\.topbar[^}]*display: none !important/);
+    const shellCss = readFileSync(join(process.cwd(), "components/staff-shell.module.css"), "utf8");
+    expect(shellCss).toMatch(/@media print \{[^}]*\.topbar[^}]*display: none !important/);
     // On a phone the search lives in the More sheet, so the header hides it.
-    expect(module).toMatch(/@media \(max-width: 800px\) \{[\s\S]*\.search \{ display: none; \}/);
+    expect(shellCss).toMatch(/@media \(max-width: 800px\) \{[\s\S]*\.search \{ display: none; \}/);
   });
 });
 

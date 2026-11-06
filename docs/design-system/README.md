@@ -12,13 +12,13 @@ IMAdventist (Events & Club Ministry) is the Iowa-Missouri Conference's event and
 ## Logo
 
 - The one logo is the IMAdventist symbol, `assets/Brand/imadventist-symbol.png` (from `public/brand/imadventist-symbol.png`), drawn by the app's `BrandLink`. The old gold "i" tile is retired.
-- 42px in app and portal headers and the staff sidebar, 54px in the public header, 68px in email headers, 180px as the home-screen icon. Always at least a 44px tap target, linking to the calendar (Home on public discovery pages).
+- 42px in app and portal headers and the staff header, 54px in the public header, 68px in email headers, 180px as the home-screen icon. Always at least a 44px tap target, linking to the calendar (Home on public discovery pages).
 - Name beside it: "IMAdventist", with "Events & Club Ministry" in the public header, or a small uppercase "IMAdventist" over the area name ("Club portal", "Club coordination") in portal headers.
 - Empty alt text on the image; the link's label names where it goes ("IMAdventist calendar"). Never recolor, crop or outline the symbol.
 
 ## Color
 
-- Brand: `imsda-navy` for primary actions, headers and links; `imsda-purple` for focus on fields, current-tab underlines and eyebrows; `imsda-gold` for the public home call to action (navy text on gold) and the sidebar's current-link edge. `home-green` belongs to the public home page only: the descriptor under the wordmark, section kickers and place-card edges. The `-soft` tints are backgrounds only.
+- Brand: `imsda-navy` for primary actions, headers and links; `imsda-purple` for focus on fields, eyebrows and the club portal's current-tab underline (staff tabs no longer use it); `imsda-gold` for the public home call to action (navy text on gold) and for "where you are" in the staff screens: the rail's current edge, the 4px tab underline, the menu line, the current item in a list and the phone bar's 4px top bar. `home-green` belongs to the public home page only: the descriptor under the wordmark, section kickers and place-card edges. The `-soft` tints are backgrounds only.
 - Text: `ink` for body, `muted` for secondary (4.5:1 or better on `card` and `paper`). Lines use `line`; fields use `field-border` (3:1 on white).
 - Status: `green` / `green-soft` done, `imsda-gold-soft` with `gold-text` in progress, `coral` / `coral-soft` needs attention, `danger` for destructive actions.
 - Calendar chips use `cal-tone-1`…`6` and `cal-closure-*`; event info cards use `info-card-*`.
@@ -36,6 +36,7 @@ IMAdventist (Events & Club Ministry) is the Iowa-Missouri Conference's event and
 - Radii: `radius-field` 10px for fields and buttons, `radius-card` for panels, `radius-modal` for dialogs, `radius-pill` for chips.
 - App tokens (#1350): `--secondary-bg`, `--table-head`, `--touch-target` and the radii `--radius-sm`, `--radius-card`, `--radius-info`, `--radius-panel`, `--radius-modal`, `--radius-pill` now exist in `app/globals.css`, with the same values as in `tokens.css`.
 - Shadows are soft and navy-tinted: `shadow-metric` on cards, `shadow` on menus and heroes, `shadow-modal` on dialogs, `shadow-tabbar` on the phone tab bar.
+- Staff shell (#1565): a branded header (the image symbol, "Find a page or task", Help & learning, Create, notifications, the account menu with the workspace switcher), an 88px navy icon rail of at most six areas (Home, Events, Clubs, People, Reports, Admin, filtered by role), and below it the page column with that area's one row of tabs, or inside an event the event's tabs. No sidebar, no second list. A tab row holds at most eight tabs and never scrolls sideways: below 1024px, or when it would not fit, it becomes a menu line (the current tab with its 4px gold underline and an "<Area> menu" or "Event menu" button that opens the full list as a sheet or dialog). Views inside a tab are a bordered button strip of at most five, the current one filled navy. The phone bar is Home, Events, Check-in, Clubs and More.
 - Club portal: masthead (symbol, "Club portal", the signed-in name and role, Your account, Forms help, Sign out), a navy banner with the club, church, role and club-year box, and one flat tab row of ten tools (no "More" menu). The coordinator and attendee account pages use the same masthead and banner. Staff: 260px navy sidebar on desktop, five-slot bottom tab bar on phones.
 
 ## Focus and motion

@@ -310,8 +310,8 @@ const pages: PageSpec[] = [
   staff("overview", "/overview"),
   // The Events Administrator dashboard (#1227): the event-admin test user holds an EVENT_ADMIN membership. It takes no ?event=.
   { name: "staff-events-admin", path: "/events-admin", role: "event-admin", expectText: /Event administration/ },
-  // The section header (#1274) on an event page: the event-admin test user administers this event, so its tabs show.
-  { name: "staff-events-admin-people-header", path: `/people?event=${eventId}`, role: "event-admin", expectText: /Event administration/i },
+  // The event tabs (#1565) on an event page: the event-admin test user administers this event, so its Registrations tab shows and the "Events" crumb leads back to Event administration.
+  { name: "staff-events-admin-people-header", path: `/people?event=${eventId}`, role: "event-admin", expectText: /Registrations/i },
   staff("people-registrations", "/people"),
   // Email selected (#850): the dialog with Custom message (unpublished, so its notice and link show) and the announcement hint.
   staff("people-email-selected", "/people"),
@@ -3777,21 +3777,18 @@ async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: n
     });
     // Two genuine links in the same browser turn: the last destination must win,
     // even when the first route has not finished fetching. No router mocks or fake product delays.
-    const sidebar = page.locator("#primary-navigation");
-    const useSidebar = await sidebar.isVisible();
-    if (useSidebar) {
-      const group = sidebar.locator('button[aria-controls^="nav-group-clubs"][aria-expanded="false"]').first();
-      if (await group.count()) await group.click();
-    }
-    const destination = await page.evaluate((useSidebar: boolean) => {
-      const selector = useSidebar ? '#primary-navigation a[href]' : '[data-testid="admin-section-header"] nav a[href]';
+    // The icon rail (#1565) at desktop widths, the phone bottom bar below it. Both are plain links through the unsaved-changes guard.
+    const rail = page.locator("#primary-navigation");
+    const useRail = await rail.isVisible();
+    const destination = await page.evaluate((useRail: boolean) => {
+      const selector = useRail ? '#primary-navigation a[href]' : '.mobile-nav a[href]:not([aria-haspopup])';
       const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(selector))
         .filter((link) => link.getClientRects().length > 0 && new URL(link.href).pathname !== location.pathname && !link.hash);
       if (links.length < 2) throw new Error("The dashboard needs two navigation destinations for the rapid-click check");
       links[0]!.click();
       links[1]!.click();
       return links[1]!.href;
-    }, useSidebar);
+    }, useRail);
     await page.waitForURL(destination, { timeout: 30_000 });
     await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading], .shell-loading'), undefined, { timeout: 30_000 });
     await page.waitForFunction(() => Number(document.getElementById("workspace-content")?.dataset.navigationAudit) > 0, undefined, { timeout: 5000 });
@@ -3874,12 +3871,45 @@ async function waitForShell(page: Page) {
 }
 
 /** The #996 rules: squeezed text, an action bar over text when the page opens (scroll 0), and the loading screen. */
+/**
+ * The staff shell's one row of tabs (#1565): it shows either the tabs or the menu line, never both and never neither; below
+ * 1024px it is always the menu line; the tabs never run past their line and never scroll sideways; and the menu button
+ * stays inside the window. Runs in the page.
+ */
+function staffTabRowInPage(): string[] {
+  const problems: string[] = [];
+  for (const line of Array.from(document.querySelectorAll<HTMLElement>("[data-staff-tabs]"))) {
+    const tabs = line.querySelector<HTMLElement>(":scope > nav");
+    const menu = line.querySelector<HTMLElement>("[data-staff-menu-line]");
+    if (!tabs || !menu) { problems.push("a tab row has no tabs or no menu line"); continue; }
+    const tabsStyle = getComputedStyle(tabs);
+    const tabsShown = tabsStyle.display !== "none" && tabsStyle.visibility !== "hidden";
+    const menuShown = getComputedStyle(menu).display !== "none";
+    if (tabsShown && menuShown) problems.push("the tabs and the menu line both show");
+    if (!tabsShown && !menuShown) problems.push("neither the tabs nor the menu line show");
+    if (window.innerWidth < 1024 && tabsShown) problems.push(`the tab row shows below 1024px (${window.innerWidth}px)`);
+    if (tabsShown) {
+      const list = tabs.querySelector<HTMLElement>("ul");
+      if (list && list.getBoundingClientRect().width > line.clientWidth + 1) problems.push(`the tab row is ${Math.round(list.getBoundingClientRect().width)}px in a ${line.clientWidth}px line`);
+      if (tabs.scrollWidth > tabs.clientWidth + 1) problems.push("the tab row scrolls sideways or is cut off");
+    }
+    if (menuShown) {
+      const button = menu.querySelector<HTMLElement>("button");
+      const box = button?.getBoundingClientRect();
+      if (!button || !box || box.right > window.innerWidth + 1 || box.left < -1) problems.push("the menu button is outside the window");
+      else if (!/ menu/i.test(button.textContent ?? "")) problems.push(`the menu button is named "${(button.textContent ?? "").trim()}", not "<Area> menu" or "Event menu"`);
+    }
+  }
+  return problems;
+}
+
 async function auditSqueezeAndBars(page: Page, name: string, width: number) {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(60);
   if (await page.evaluate(shellLoadingInPage)) record("loading-screen", name, width, 'the page still shows "Loading IMAdventist…" when it is measured');
   for (const problem of await page.evaluate(squeezedTextInPage)) record("squeezed-text", name, width, problem);
   for (const problem of await page.evaluate(barOverTextInPage)) record("bar-over-text", name, width, problem);
+  for (const problem of await page.evaluate(staffTabRowInPage)) record("staff-tab-row", name, width, problem);
 }
 
 async function auditPage(page: Page, spec: PageSpec, width: number, prefix: string) {
