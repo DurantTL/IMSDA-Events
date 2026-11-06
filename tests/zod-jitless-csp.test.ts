@@ -19,7 +19,7 @@ describe("Zod jitless init script (#1401)", () => {
 
   it("runs first in the root layout's nonce'd head script", () => {
     const layout = readFileSync("app/layout.tsx", "utf8");
-    expect(layout).toMatch(/<script nonce=\{nonce\}[^>]*__html: zodJitlessInitScript \+ sidebarCollapseInitScript/);
+    expect(layout).toMatch(/<script nonce=\{nonce\}[^>]*__html: zodJitlessInitScript\b/);
   });
 
   it("matches the global name Zod reads", () => {

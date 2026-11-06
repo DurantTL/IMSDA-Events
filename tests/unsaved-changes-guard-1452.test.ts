@@ -19,7 +19,6 @@ const allowlist: Record<string, string> = {
   "app/(workspace)/check-in/badges/page.tsx": "search or filter",
   "app/(workspace)/more/club-forms/page.tsx": "search or filter",
   "app/(workspace)/more/reports/clubs/check-in-book/page.tsx": "search or filter",
-  "components/app-shell.tsx": "action button only, no typed fields",
   "components/attendee-pass-grid.tsx": "action button only, no typed fields",
   "components/attendee-password-reset-form.tsx": "sign-in",
   "components/attendee-sign-in-form.tsx": "sign-in",
@@ -56,7 +55,6 @@ const allowlist: Record<string, string> = {
   "components/sign-in-code-form.tsx": "sign-in",
   "components/staff-account-menu.tsx": "action button only, no typed fields",
   "components/staff-passkey-manager.tsx": "sign-in",
-  "components/system-phone-menu.tsx": "action button only, no typed fields",
   "components/system-readiness-workspace.tsx": "action button only, no typed fields",
   "components/two-step-recovery-form.tsx": "sign-in",
 };

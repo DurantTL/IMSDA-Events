@@ -297,8 +297,10 @@ describe("the Platform settings unsaved guard covers the event switcher and cont
     expect(read("components/platform-settings-workspace.tsx")).toMatch(/useUnsavedChangesGuard\(dirty, "These platform settings have not been saved/);
     const shell = read("components/app-shell.tsx");
     expect(shell).toContain("guard: guardedNavigate");
-    expect(shell.match(/onChange=\{\(event\) => selectEvent\(event\.target\.value\)\}/g)).toHaveLength(2);
-    expect(shell).toContain('<GuardedLink className="work-context-return"');
+    // The event picker and the "Open an event" picker both go through the guard; every rail, tab, bar and header link is a GuardedLink.
+    expect(shell).toContain("onChange={(event) => selectEvent(event.target.value)}");
+    expect(shell).toContain("void guardedNavigate(() => {");
+    expect(shell).not.toMatch(/<a href=|<Link /);
     // The admin role pills are plain anchors, so the form hook's document-level click listener is what covers them.
     expect(read("components/admin-role-switcher.tsx")).toContain("<a");
     expect(read("components/use-unsaved-changes-guard.ts")).toContain('document.addEventListener("click", beforeLinkNavigation, true)');

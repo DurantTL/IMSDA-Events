@@ -82,7 +82,7 @@ export function StaffTabRow({
         <button
           ref={buttonRef}
           type="button"
-          className={styles.menuButton}
+          className={`secondary-button ${styles.menuButton}`}
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-label={`${menuLabel}, now on ${current.label}`}

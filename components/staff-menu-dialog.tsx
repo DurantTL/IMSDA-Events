@@ -41,7 +41,7 @@ export function StaffMenuDialog({
       <div ref={dialogRef} className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} data-staff-menu>
         <div className={styles.dialogHead}>
           <h2 id={titleId}>{title}</h2>
-          <button type="button" className={styles.close} onClick={onClose}><X aria-hidden="true" size={18} /><span>Close</span></button>
+          <button type="button" className={`secondary-button ${styles.close}`} onClick={onClose}><X aria-hidden="true" size={18} /><span>Close</span></button>
         </div>
         <div className={styles.dialogBody}>
           <ul>

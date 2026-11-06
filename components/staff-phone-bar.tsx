@@ -21,11 +21,13 @@ export function StaffPhoneBar({
   items,
   place,
   eventTab,
+  firstEventTab = null,
   launcher,
 }: {
   items: readonly PhoneBarItem[];
   place: Pick<StaffPlace, "area" | "inEvent">;
   eventTab: EventTabKey | null;
+  firstEventTab?: EventTabKey | null;
   launcher: {
     cards: readonly MoreDirectoryCard[];
     sections: readonly LauncherSection[];
@@ -40,7 +42,7 @@ export function StaffPhoneBar({
   };
 }) {
   if (items.length === 0) return null;
-  const current = phoneBarCurrent(items, place, eventTab);
+  const current = phoneBarCurrent(items, place, eventTab, firstEventTab);
   return (
     <nav className="mobile-nav" aria-label="Mobile navigation">
       {items.map((item): ReactNode => {

@@ -424,6 +424,7 @@ export function AppShell({
         items={phoneItems}
         place={place}
         eventTab={place.inEvent ? eventPlace.tab : null}
+        firstEventTab={markedEventTabs[0]?.key ?? null}
         launcher={{
           cards: launcherCards,
           sections: launcherSections,

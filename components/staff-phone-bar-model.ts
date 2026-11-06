@@ -41,12 +41,18 @@ export function phoneBarItems(input: {
 }
 
 /** The one bar item the page lights: its own, else More. */
-export function phoneBarCurrent(items: readonly PhoneBarItem[], place: Pick<StaffPlace, "area" | "inEvent">, eventTab: EventTabKey | null): PhoneBarKey | null {
+export function phoneBarCurrent(
+  items: readonly PhoneBarItem[],
+  place: Pick<StaffPlace, "area" | "inEvent">,
+  eventTab: EventTabKey | null,
+  /** The event tab Home opens for staff with no Home area (their first tab). */
+  firstEventTab: EventTabKey | null = null,
+): PhoneBarKey | null {
   const has = (key: PhoneBarKey) => items.some((item) => item.key === key);
   let key: PhoneBarKey;
   if (place.area === "home") key = "home";
   else if (place.inEvent && eventTab === "check-in") key = "check-in";
-  else if (place.area === "events") key = has("events") ? "events" : "home";
+  else if (place.area === "events") key = has("events") ? "events" : place.inEvent && eventTab === firstEventTab ? "home" : "more";
   else if (place.area === "clubs") key = "clubs";
   else key = "more";
   if (has(key)) return key;

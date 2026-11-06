@@ -3,7 +3,7 @@ import type { ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-/** #1565: event access stays reachable through workspace selection, outside Clubs navigation. */
+/** #1565: event access stays reachable through the rail's Events item, outside the Clubs tab row. */
 vi.mock("next/navigation", () => ({
   usePathname: () => "/admin/clubs/summary",
   useRouter: () => ({ push: vi.fn() }),
@@ -25,9 +25,13 @@ describe("the Clubs view and event access", () => {
     const html = shell([{ id: "evt_a", slug: "a", name: "Event A", permissions: ["VIEW_SENSITIVE_DATA"] }]);
     expect(html).not.toContain('id="event-picker"');
     expect(html).toContain("Club summary");
-    expect(html).not.toContain('href="/people?event=evt_a"');
-    expect(html).toContain('href="/overview?event=evt_a"');
-    expect(html).toContain('title="Events workspace"');
+    // The rail's Events item opens the first tab this person can open in the event (no event view, so Registrations)...
+    const rail = html.split('id="primary-navigation"')[1]?.split("</nav>")[0] ?? "";
+    expect(rail).toContain('href="/people?event=evt_a"');
+    expect(rail).toContain("<span>Events</span>");
+    // ...and the Clubs row never lists event pages.
+    const tabs = html.split('data-staff-tabs="true"')[1]?.split("</nav>")[0] ?? "";
+    expect(tabs).not.toContain("/people");
   });
 
   it("does not offer Events when there is no event membership or Events role", () => {
@@ -35,6 +39,6 @@ describe("the Clubs view and event access", () => {
     expect(html).not.toContain('id="event-picker"');
     expect(html).toContain("Club summary");
     expect(html).not.toContain('href="/people');
-    expect(html).not.toContain('title="Events workspace"');
+    expect(html).not.toContain("<span>Events</span>");
   });
 });

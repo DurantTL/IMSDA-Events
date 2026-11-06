@@ -16,20 +16,20 @@ vi.mock("@/components/sign-out-button", () => ({
 
 import { StaffAccountMenu } from "@/components/staff-account-menu";
 import { AppShell } from "@/components/app-shell";
-import { otherWorkspaceContextsForStaff } from "@/modules/access/workspace-contexts";
+import { staffWorkspaceOptions } from "@/modules/access/workspace-contexts";
 
 function renderMenu(input: { isSystemAdmin: boolean; attendeeAccountAvailable?: boolean; defaultOpen?: boolean }) {
-  const contexts = otherWorkspaceContextsForStaff({
-    isSystemAdmin: input.isSystemAdmin,
-    attendeeAccountAvailable: input.attendeeAccountAvailable ?? false,
-  });
   return renderToStaticMarkup(createElement(StaffAccountMenu, {
     attendeePreviewHref: "/account",
-    canSwitchToAttendee: contexts.some((context) => context.kind === "attendee"),
     defaultOpen: input.defaultOpen ?? true,
     displayName: "Riley Staff",
     email: "riley@imsda-events.test",
-    systemAdminContext: contexts.find((context) => context.kind === "system_admin"),
+    workspaces: staffWorkspaceOptions({
+      isSystemAdmin: input.isSystemAdmin,
+      attendeeAccountAvailable: input.attendeeAccountAvailable ?? false,
+      staffHref: "/overview?event=event_1",
+      onSystemPage: false,
+    }),
   }));
 }
 
@@ -42,7 +42,9 @@ describe("staff account menu (#543)", () => {
     expect(markup).toContain("Edit profile");
     expect(markup).toContain("Sign out");
     expect(markup).not.toContain("System management");
-    expect(markup).not.toContain("Switch to my attendee account");
+    // Only one workspace is held, so there is nothing to switch to and no switcher.
+    expect(markup).not.toContain("Switch workspace");
+    expect(markup).not.toContain("My registrations");
     expect(markup).not.toContain("Passkeys");
     expect(markup).not.toContain("Two-step");
   });
@@ -51,10 +53,15 @@ describe("staff account menu (#543)", () => {
     const admin = renderMenu({ isSystemAdmin: true });
     expect(admin).toContain('href="/admin"');
     expect(admin).toContain("System management");
+    expect(admin).toContain("Switch workspace");
+    expect(admin).toContain("Staff workspace");
     expect(admin).toContain('href="/profile"');
     expect(admin).toContain("Edit profile");
     expect(admin).toContain("Sign out");
-    expect(renderMenu({ isSystemAdmin: false, attendeeAccountAvailable: true })).toContain("Switch to my attendee account");
+    const attendee = renderMenu({ isSystemAdmin: false, attendeeAccountAvailable: true });
+    expect(attendee).toContain("My registrations");
+    expect(attendee).toContain('action="/api/auth/switch-to-attendee"');
+    expect(attendee).not.toContain("System management");
   });
 
   it("is a closed disclosure until opened, without a menu role or aria-haspopup", () => {
