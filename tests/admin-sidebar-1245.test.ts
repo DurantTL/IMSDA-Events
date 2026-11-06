@@ -113,7 +113,7 @@ describe("the Clubs sidebar groups", () => {
     ]);
     expect(clubsAdminGroups.map((group) => group.items.map((item) => item.href))).toEqual([
       ["/admin/clubs/summary", "/admin/clubs/transfers", "/admin/organizations/background-checks", "/admin/honors", "/admin/club-supplies", "/admin/clubs/import", "/admin/clubs/health-import"],
-      ["/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary?view=points#points"],
+      ["/admin/clubs/summary?view=records#monthly-records", "/admin/clubs/reports/year-end", "/admin/clubs/summary?view=points#points"],
       ["/admin/clubs/summary?view=events#club-events"],
       ["/admin/club-forms", "/admin/club-forms/public-page"],
       ["/admin/clubs/applications", "/admin/clubs/invites"],
@@ -129,15 +129,16 @@ describe("the Clubs sidebar groups", () => {
     expect(clubsAdminNavigation.some((item) => item.href.includes("#"))).toBe(false);
     expect(clubsAdminActiveHref("/admin/clubs/summary")).toBe("/admin/clubs/summary");
     expect(clubsAdminActiveHref("/admin/clubs")).toBe("/admin/clubs");
-    expect(clubsAdminActiveHref("/admin/clubs/reports/club-1/2026-10")).toBe("/admin/clubs/reports");
+    expect(clubsAdminActiveHref("/admin/clubs/reports/club-1/2026-10")).toBe("/admin/clubs/summary?view=records#monthly-records");
   });
 
   it("lights Points and Events on those Club summary views, as the section tabs do (#1304)", () => {
     expect(clubsAdminActiveHref("/admin/clubs/summary", "points")).toBe("/admin/clubs/summary?view=points#points");
     expect(clubsAdminActiveHref("/admin/clubs/summary", "events")).toBe("/admin/clubs/summary?view=events#club-events");
     expect(clubsAdminActiveHref("/admin/clubs/summary", "directory")).toBe("/admin/clubs/summary");
-    expect(clubsAdminActiveHref("/admin/clubs/summary", "records")).toBe("/admin/clubs/summary");
-    expect(clubsAdminActiveHref("/admin/clubs/reports", "points")).toBe("/admin/clubs/reports");
+    expect(clubsAdminActiveHref("/admin/clubs/summary", "records")).toBe("/admin/clubs/summary?view=records#monthly-records");
+    expect(clubsAdminActiveHref("/admin/clubs/reports")).toBe("/admin/clubs/summary?view=records#monthly-records");
+    expect(clubsAdminActiveHref("/admin/clubs/reports", "points")).toBe("/admin/clubs/summary?view=records#monthly-records");
   });
 
   it("keeps the phone Clubs bar lit on the Points and Events views (#1304)", () => {

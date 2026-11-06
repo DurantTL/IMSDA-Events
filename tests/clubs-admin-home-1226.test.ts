@@ -197,7 +197,7 @@ describe("tabs, links and years", () => {
     expect(clubsAdminTabs(clubYear, 3).map((tab) => [tab.label, tab.href])).toEqual([
       ["Overview", "/admin/clubs?year=2026-27"],
       ["All clubs", "/admin/clubs/summary?year=2026-27"],
-      ["Monthly Records", "/admin/clubs/reports?year=2026-27"],
+      ["Monthly Records", "/admin/clubs/summary?year=2026-27&view=records#monthly-records"],
       ["Points", "/admin/clubs/summary?year=2026-27&view=points#points"],
       ["Club events", "/admin/clubs/summary?year=2026-27&view=events#club-events"],
       ["Forms", "/admin/club-forms"],

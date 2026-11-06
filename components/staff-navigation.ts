@@ -258,6 +258,12 @@ export type ClubsNavGroupKey = "clubs-clubs" | "clubs-records" | "clubs-events" 
 
 export type ClubsNavGroup = { key: ClubsNavGroupKey; label: string; items: readonly NavigationItem[] };
 
+/**
+ * The Club summary's Monthly Records tab: the same destination as the tab itself (#1552). The review list,
+ * `/admin/clubs/reports`, is reached from that tab's "Review monthly records" button.
+ */
+export const clubsAdminRecordsHref = "/admin/clubs/summary?view=records#monthly-records";
+
 /** The one ungrouped Clubs link, above the groups. Its label is its page title. */
 export const clubsAdminHomeItem: NavigationItem = { href: "/admin/clubs", label: "Club administration", icon: LayoutDashboard };
 
@@ -286,7 +292,7 @@ export const clubsAdminGroups: readonly ClubsNavGroup[] = [
     key: "clubs-records",
     label: "Records and points",
     items: [
-      { href: "/admin/clubs/reports", label: "Club Monthly Records", icon: FileText },
+      { href: clubsAdminRecordsHref, label: "Monthly Records", icon: FileText },
       { href: "/admin/clubs/reports/year-end", label: "Club Year-End Reports", icon: Trophy },
       { href: "/admin/clubs/summary?view=points#points", label: "Points", icon: Star },
     ],
@@ -345,16 +351,18 @@ export function clubsAdminHrefForYear(href: string, year: string | null): string
 /**
  * The Clubs sidebar item a page lights: the longest item path that is the page or a parent of it. The dashboard,
  * "/admin/clubs", is the parent of every club page, so it lights only on exactly that path. On the Club summary,
- * `summaryView` ("points" or "events") lights that view's own item, as the section tabs do.
+ * `summaryView` ("records", "points" or "events") lights that view's own item, as the section tabs do. The Monthly
+ * Records review list and a club's record under it light the Monthly Records item too (#1552).
  */
 export function clubsAdminActiveHref(pathname: string, summaryView?: string | null): string | null {
   // The Club summary's Points and Events views have their own sidebar items (#1304); light the one the section tabs light.
   if (pathname === "/admin/clubs/summary") {
-    const viewItem = summaryView === "points" || summaryView === "events"
+    const viewItem = summaryView === "records" || summaryView === "points" || summaryView === "events"
       ? clubsAdminGroups.flatMap((group) => group.items).find((item) => item.href.startsWith(`/admin/clubs/summary?view=${summaryView}#`))
       : null;
     if (viewItem) return viewItem.href;
   }
+  if (pathname === "/admin/clubs/reports" || (pathname.startsWith("/admin/clubs/reports/") && !pathname.startsWith("/admin/clubs/reports/year-end"))) return clubsAdminRecordsHref;
   return clubsAdminNavigation.reduce<string | null>((best, item) => (
     (pathname === item.href || (item.href !== "/admin/clubs" && pathname.startsWith(`${item.href}/`))) && (!best || item.href.length > best.length) ? item.href : best
   ), null);

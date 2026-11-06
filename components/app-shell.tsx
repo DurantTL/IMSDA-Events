@@ -233,7 +233,7 @@ export function AppShell({
   const showClubsItem = (item: NavigationItem) => item.href !== clubsAdminHealthImportHref || adminRoleView?.healthImport !== false;
   const clubsNavItems = clubsAdminNavigation.filter(showClubsItem);
   // The phone bar has no Points or Events items (they carry a #), so on those views it keeps the page's own item lit (#1304).
-  const phoneClubsHref = clubsView && activeClubsHref && !clubsNavItems.some((item) => item.href === activeClubsHref) ? clubsAdminActiveHref(pathname) : activeClubsHref;
+  const phoneClubsHref = clubsView && activeClubsHref && !clubsNavItems.some((item) => item.href === activeClubsHref) ? (clubsNavItems.some((item) => item.href === clubsAdminActiveHref(pathname)) ? clubsAdminActiveHref(pathname) : "/admin/clubs/summary") : activeClubsHref;
   // The year-aware Clubs links keep the club year the URL has (#1245).
   const clubsLinkYear = clubsView ? requestedClubYear(searchParams.get("year")) : null;
   const onEventsAdminHome = pathname === eventsAdminHomeItem.href;
