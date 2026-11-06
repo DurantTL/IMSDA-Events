@@ -605,14 +605,14 @@ async function coordinatorVisited(ctx: Ctx, page: J.Page, name: string) {
 /** 1. Their clubs: every active club is listed (an area coordinator sees all clubs by design, #387), and one opens view only. */
 async function coordinatorClubsJourney(ctx: Ctx, page: J.Page) {
   const { clubs } = ctx.world.coordinator!;
-  await coordinatorVisit(ctx, page, "All clubs", "/account/clubs");
+  await coordinatorVisit(ctx, page, "Clubs at a glance", "/account/area-clubs/overview");
   for (const club of [ctx.world.main, clubs.missing, clubs.complete, clubs.outside]) {
     assert(await page.getByText(club.clubName).first().isVisible(), `the club list does not show ${club.clubName}`);
   }
   // Decision (not a bug): the role sees every active club, with the ones it does not run marked "View only". The
   // coordinator's brief asked for "only their area's clubs", but no area exists in the data model; the club stands for
   // "a club outside the area" and is expected to be listed.
-  ctx.rec.record("Coordinator: All clubs", "Scope", "every active club is listed (#387), including one outside any area", "pass", "the outside club is listed with View only, as the role is defined");
+  ctx.rec.record("Coordinator: Clubs at a glance", "Scope", "every active club is listed (#387), including one outside any area", "pass", "the outside club is listed with View only, as the role is defined");
   assert(await page.getByText(/Showing 1.\d+ of \d+ clubs/).count(), "the list does not say how many clubs it shows");
   await page.locator(`a[href$="/account/area/${clubs.complete.clubId}"]`).first().click();
   await page.waitForURL(new RegExp(`/account/area/${clubs.complete.clubId}$`), { timeout: 20_000 });

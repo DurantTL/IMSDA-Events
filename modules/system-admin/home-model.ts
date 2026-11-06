@@ -12,6 +12,7 @@
  */
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import type { AttentionItemKey, AttentionSummary } from "@/modules/system-admin/attention-model";
+import { clubsAdminRecordsHref } from "@/components/system-navigation";
 
 /** The most feature requests the review queue reads (`listPendingModuleRequests` takes 100), so a count at the cap is "at least". */
 export const FEATURE_REQUEST_READ_LIMIT = 100;
@@ -286,7 +287,7 @@ export const commonTaskHrefs: ReadonlyArray<{ href: string; heading: string; lab
   { href: "/admin/event-templates", heading: "Events" },
   { href: "/archived-events", heading: "Events" },
   { href: "/admin/organizations", heading: "Clubs" },
-  { href: "/admin/clubs/reports", heading: "Clubs" },
+  { href: clubsAdminRecordsHref, heading: "Clubs" },
   { href: "/admin/clubs/summary", heading: "Clubs" },
   { href: "/admin/clubs/applications", heading: "Clubs" },
   { href: "/admin/clubs/transfers", heading: "Clubs" },

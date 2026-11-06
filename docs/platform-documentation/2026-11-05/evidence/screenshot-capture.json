@@ -1,0 +1,847 @@
+{
+ "source_commit": "9c676ff",
+ "captured_on": "2026-11-06",
+ "environment": "Local development server (npm run dev) on a freshly migrated and seeded local PostgreSQL database. Seeded clubs were hidden; fictional training rows use the training_ id prefix.",
+ "fictional_story": "Jordan Ellis directs Riverton Pathfinders (Riverton Community Church). Morgan Reed is added through the real Add to roster dialog. Alex Morgan is an Area Coordinator. Other fictional clubs: Pine Grove, Lakeview and Cedar Hill Pathfinders. Winter Camporee, December 4-6, 2026; club registration closes November 25.",
+ "interpretation": "Screenshots show the app's behavior at the source commit with fictional data. They do not show production configuration or production records.",
+ "security": "Sessions were minted for fictional local accounts only. No password, authenticator secret, recovery code, private link or production record appears. The development tool overlay was hidden.",
+ "annotations": "Pink numbered outlines were drawn in the page for training. They are not app controls.",
+ "screens": {
+  "account-sign-out": {
+   "path": "assets/training/account-sign-out.png",
+   "route": "/account/profile",
+   "state": "Profile page with Sign out",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    31
+   ],
+   "sha256": "4e4088974ab639e5693d182a2fdd1857919df08e20efd9e179eb7993a3da47c9"
+  },
+  "club-class-suggestions": {
+   "path": "assets/training/club-class-suggestions.png",
+   "route": "/account/clubs/training_club_riverton/class-tracking",
+   "state": "Suggested Friend insignia for Avery Chen, before Add to order list",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    17
+   ],
+   "sha256": "24986ce9f6379aa8c560b5f47c621a4073d7005edfaa2dbaa334eef90f8b1cee"
+  },
+  "club-class-tracking": {
+   "path": "assets/training/club-class-tracking.png",
+   "route": "/account/clubs/training_club_riverton/class-tracking",
+   "state": "Class tracking before the hand-out: Avery's Friend completion and insignia suggestions",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    17
+   ],
+   "sha256": "e16d986b511e2c8de791cab64066a8d5f875cdee8611bdc6f69e361c18c441e9"
+  },
+  "club-orders-handout": {
+   "path": "assets/training/club-orders-handout.png",
+   "route": "/account/clubs/training_club_riverton/orders",
+   "state": "Mark handed out for Drew's Good Conduct Bar",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    19
+   ],
+   "sha256": "34a3826ae14dbeb9b0f055a5e9b727fb29c1a768b41749415f231aa31c952210"
+  },
+  "club-orders-list": {
+   "path": "assets/training/club-orders-list.png",
+   "route": "/account/clubs/training_club_riverton/orders",
+   "state": "Ready to hand out: Drew's Good Conduct Bar, 3 on hand",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    18
+   ],
+   "sha256": "6a8f9e7f0fbd1b27d7fb52fe8f8be495dc767366ffb3e32703a6fcdbeaa0aaf2"
+  },
+  "club-orders-stock-after": {
+   "path": "assets/training/club-orders-stock-after.png",
+   "route": "/account/clubs/training_club_riverton/orders",
+   "state": "After hand-out: Good Conduct Bar stock 2",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    19
+   ],
+   "sha256": "143107ef983a9849948173504d7d93f7af350aae2d902bf71277d12c35da0a58"
+  },
+  "club-orders-top": {
+   "path": "assets/training/club-orders-top.png",
+   "route": "/account/clubs/training_club_riverton/orders",
+   "state": "Orders page: order list, supplies, ready to hand out and uniforms",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    18
+   ],
+   "sha256": "a6234a4d01796d2016213409b3e15b4f1f02d16d35a55f170c1f9e34738fb627"
+  },
+  "club-year-end-header": {
+   "path": "assets/training/club-year-end-header.png",
+   "route": "/account/clubs/training_club_riverton/reports/year-end/2026-27",
+   "state": "Year-End Report 2026-27 draft, top of page",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    20
+   ],
+   "sha256": "bdfa97b8fa437ad1f616e1cf9e6fe9d853194abdfcac5be3d9b5c2974a277a07"
+  },
+  "club-year-end-save": {
+   "path": "assets/training/club-year-end-save.png",
+   "route": "/account/clubs/training_club_riverton/reports/year-end/2026-27",
+   "state": "Year-End Report after Save draft",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    20
+   ],
+   "sha256": "871fbdaf07905ba2db56765a91f978a5f40b7b910096847329c0a5bb7f2ebfa3"
+  },
+  "club-year-end": {
+   "path": "assets/training/club-year-end.png",
+   "route": "/account/clubs/training_club_riverton/reports/year-end/2026-27",
+   "state": "Year-End Report counts",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    20
+   ],
+   "sha256": "8d0963e27b5d7878633c9b31e6bbaf5ea49675ce25b5056f11c250558087d6db"
+  },
+  "coordinator-account": {
+   "path": "assets/training/coordinator-account.png",
+   "route": "/account",
+   "state": "Alex Morgan's account page",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    22
+   ],
+   "sha256": "4b04b883968fdf97e0ccfef31839500d3bf79fa1bb8e83941c16613ca3e8ea55"
+  },
+  "coordinator-all-clubs": {
+   "path": "assets/training/coordinator-all-clubs.png",
+   "route": "/account/area-clubs/overview",
+   "state": "Club overview table: every active club",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    23
+   ],
+   "sha256": "ecf92eb15fa68e8e17bac7e791342eb19c8bd9a7de687c1925cb41a605973bf2"
+  },
+  "coordinator-club-view": {
+   "path": "assets/training/coordinator-club-view.png",
+   "route": "/account/area/training_club_riverton",
+   "state": "Riverton, read-only coordinator view",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    24
+   ],
+   "sha256": "aea738340f3425f9cd9ea38ae940f04392f61c2f1c3e0da45f8e3e59720f3393"
+  },
+  "coordinator-events": {
+   "path": "assets/training/coordinator-events.png",
+   "route": "/account/area-clubs/events",
+   "state": "Winter Camporee: Riverton registered with 10 people; other clubs not registered",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    27
+   ],
+   "sha256": "e059303fa024763df5c9c9c87bd24f8fb8197fc129c5b3472a0fc847ec9f3346"
+  },
+  "coordinator-glance": {
+   "path": "assets/training/coordinator-glance.png",
+   "route": "/account/area-clubs/overview",
+   "state": "Clubs at a glance: four fictional clubs, view only",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    24
+   ],
+   "sha256": "53034eb997226a7639922980fc4fbb1510e6c16e9ae5831e4f58919d4f7d9639"
+  },
+  "coordinator-overview": {
+   "path": "assets/training/coordinator-overview.png",
+   "route": "/account/area-clubs/overview",
+   "state": "Club coordination overview",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    1,
+    23
+   ],
+   "sha256": "1ed2945c050a64756a8537b144d29680fcc3b7e64ef0a0fc282e65ef0dc8c3a8"
+  },
+  "coordinator-points": {
+   "path": "assets/training/coordinator-points.png",
+   "route": "/account/area-clubs/points",
+   "state": "Points across clubs",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    26
+   ],
+   "sha256": "c978f3eda2030a044463a935d750909d937a02d939ca0d2ab5422cb10211b745"
+  },
+  "coordinator-report-detail": {
+   "path": "assets/training/coordinator-report-detail.png",
+   "route": "/account/area/training_club_riverton/reports/2026-10",
+   "state": "Riverton October record, read only",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    25
+   ],
+   "sha256": "3fcf5651de5d02e93a09233d16a69e47b73a56c908acbf2f2f292de0d814d26d"
+  },
+  "coordinator-reports": {
+   "path": "assets/training/coordinator-reports.png",
+   "route": "/account/area-clubs/reports",
+   "state": "Monthly Records across clubs",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    25
+   ],
+   "sha256": "dfa6acfa3c8f8f36ecbe1d3bf6a7d5437a6dea51c612ed03ffc6a30a8f6b87ef"
+  },
+  "director-account": {
+   "path": "assets/training/director-account.png",
+   "route": "/account",
+   "state": "Jordan's account page lists Riverton Pathfinders",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    6
+   ],
+   "sha256": "3b5b805b7f75073a610f3303a26f867e33dd20c828b921bc7c28d4a5fcce8fb3"
+  },
+  "director-home": {
+   "path": "assets/training/director-home.png",
+   "route": "/account/clubs/training_club_riverton",
+   "state": "Riverton club home: year summary and Getting started",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    1,
+    7
+   ],
+   "sha256": "9eb5e1678fc13fa0d5e489525910e9be2e7d555a8ac304f1c064ff9ac6cdfc0d"
+  },
+  "event-attendees": {
+   "path": "assets/training/event-attendees.png",
+   "route": "/account/clubs/training_club_riverton/events/training_winter_camporee",
+   "state": "Choose who is going: everyone selected",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    15
+   ],
+   "sha256": "50b9c37206147e47921239ccd09ad2af186fd339ecf0e9259cc9e318aceafa3b"
+  },
+  "event-review": {
+   "path": "assets/training/event-review.png",
+   "route": "/account/clubs/training_club_riverton/events/training_winter_camporee",
+   "state": "Review before submitting the club registration",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    16
+   ],
+   "sha256": "75cbf34986322d83bb7967980c3718d4113980f426fce5d2dd354f8b943c9463"
+  },
+  "event-saved": {
+   "path": "assets/training/event-saved.png",
+   "route": "/account/clubs/training_club_riverton/events/training_winter_camporee",
+   "state": "Winter Camporee after registering: Registered",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    16
+   ],
+   "sha256": "d1f07043298fdba9d33f5bb1f8dbf2dd26663ad9e7618353942d8e112c08ff6b"
+  },
+  "events-list": {
+   "path": "assets/training/events-list.png",
+   "route": "/account/clubs/training_club_riverton/events",
+   "state": "Club events list: Winter Camporee open",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    15
+   ],
+   "sha256": "d543af0a565fb2f03c500c858d9d743af02ee0e0cb3464285007369e381205fd"
+  },
+  "forms-help": {
+   "path": "assets/training/forms-help.png",
+   "route": "/account/clubs/training_club_riverton",
+   "state": "Forms help panel from the club portal",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    21
+   ],
+   "sha256": "875d9ee46da61012985b84c840894a3d8f7b9b3c75e69befa9858bbd0fb3ec8b"
+  },
+  "forms": {
+   "path": "assets/training/forms.png",
+   "route": "/account/clubs/training_club_riverton/forms",
+   "state": "Club forms for 2026-27",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    11
+   ],
+   "sha256": "ff57d4b8ad47d6fa5ba68d438f632dc93cc1edb0577d6b2cdf801005e55d8ba6"
+  },
+  "help-walkthroughs": {
+   "path": "assets/training/help-walkthroughs.png",
+   "route": "/account/help",
+   "state": "Help page, Step by step guides for directors",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    21
+   ],
+   "sha256": "2775898de8cc008a95e69fd59899068758c1a6ed2389260f4366699a6e12f6be"
+  },
+  "honors": {
+   "path": "assets/training/honors.png",
+   "route": "/account/clubs/training_club_riverton/honors",
+   "state": "Honor records: 4 completed, 4 in progress",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    12
+   ],
+   "sha256": "1635b0883e4ee6986bd6d11f0c18df6efc329bd7128304d42cc0b43cc9bbd78c"
+  },
+  "meeting-note": {
+   "path": "assets/training/meeting-note.png",
+   "route": "/account/clubs/training_club_riverton/records?month=2026-10",
+   "state": "October meeting notes on the Monthly Records page",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    13
+   ],
+   "sha256": "55ba81dbb5b96900895a582b1bfc011dcaed4c8d1d155a9e9b7ad04b24de1fa6"
+  },
+  "new-clubs": {
+   "path": "assets/training/new-clubs.png",
+   "route": "/account/area-clubs/applications",
+   "state": "New club applications: one pending, view only",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    28
+   ],
+   "sha256": "8d4e91866bd0f1cd81326018d3d869d1787149005a2505e7a88643131da5dff7"
+  },
+  "public-calendar": {
+   "path": "assets/training/public-calendar.png",
+   "route": "/calendar?view=list",
+   "state": "Signed-out visitor, calendar list",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    3
+   ],
+   "sha256": "374e07b70926f7303a8e2144da75f8617d687501aac85e9464aac87652b1f21d"
+  },
+  "public-home": {
+   "path": "assets/training/public-home.png",
+   "route": "/",
+   "state": "Signed-out visitor, public home",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    3
+   ],
+   "sha256": "0d5a7585ebaf0fea828c3ab66a75ea8ca7c34ba82e94c3cb5d8a5d5fc8b0aa91"
+  },
+  "records-list": {
+   "path": "assets/training/records-list.png",
+   "route": "/account/clubs/training_club_riverton/records",
+   "state": "Monthly Records list: September submitted, October draft",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    13
+   ],
+   "sha256": "1fcc7777169167f37d830f579442fbeffebd0026005ac92ce5f56fd605204938"
+  },
+  "report-draft": {
+   "path": "assets/training/report-draft.png",
+   "route": "/account/clubs/training_club_riverton/records?month=2026-10",
+   "state": "October Monthly Record draft, ready to submit",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [],
+   "sha256": "9bbe8533d49e34b7d39b3dd0b986c82a26eae6c5e0af185f08b415eaf983069c"
+  },
+  "report-sign": {
+   "path": "assets/training/report-sign.png",
+   "route": "/account/clubs/training_club_riverton/records?month=2026-10",
+   "state": "Signature filled; Submit report is ready",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    14
+   ],
+   "sha256": "0a1d2bded470de8b759db12b6abe5f053cb6b74aa0e032ce402d9ab713c43932"
+  },
+  "report-submitted": {
+   "path": "assets/training/report-submitted.png",
+   "route": "/account/clubs/training_club_riverton/records?month=2026-10",
+   "state": "October Monthly Record after Submit report",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    14
+   ],
+   "sha256": "0200b7f67667a6c0a06f3a0a034fd238dd39b65b56fcda07a4547b4bc48aea8b"
+  },
+  "roster-add-save": {
+   "path": "assets/training/roster-add-save.png",
+   "route": "/account/clubs/training_club_riverton/roster",
+   "state": "Add to roster dialog, save button",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    9
+   ],
+   "sha256": "d1b85e41fd82bebdb3cd2b63a89d9ba7b71e6d539e4e590b7b31f0822887bc3f"
+  },
+  "roster-add": {
+   "path": "assets/training/roster-add.png",
+   "route": "/account/clubs/training_club_riverton/roster",
+   "state": "Add to roster dialog with Morgan Reed's details",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    8
+   ],
+   "sha256": "09225799ae76cc51e2efbf00376f558ff5920a4f2fe05f6ef9b8e5e1fba027e9"
+  },
+  "roster-added": {
+   "path": "assets/training/roster-added.png",
+   "route": "/account/clubs/training_club_riverton/roster",
+   "state": "Morgan Reed now on the roster (10 people)",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    9
+   ],
+   "sha256": "71889ea19b4bff32f6522bf29d98ef70657db136ba7cfd4f71e757e6c8f10e18"
+  },
+  "roster-edit-top": {
+   "path": "assets/training/roster-edit-top.png",
+   "route": "/account/clubs/training_club_riverton/roster",
+   "state": "Roster before adding Morgan Reed (9 people)",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    8
+   ],
+   "sha256": "9ef42d0f9e9fea9706c16ea92b7e622398fb164d07b6881ebbe5ff8ba1bdcec0"
+  },
+  "roster-export": {
+   "path": "assets/training/roster-export.png",
+   "route": "/account/clubs/training_club_riverton/roster/export",
+   "state": "Roster export choices",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    10
+   ],
+   "sha256": "f2a029ec130ac80cb024a7f5ee70d6448559c2ed75e4949574fccd71647b5114"
+  },
+  "sign-in": {
+   "path": "assets/training/sign-in.png",
+   "route": "/account/sign-in",
+   "state": "Account sign-in page",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": true,
+   "slides": [
+    4
+   ],
+   "sha256": "d787bd54b7c43d1c4d1d80f33f5fa63a41edd5f9bfeae2e4f4223a596b14123b"
+  },
+  "two-step": {
+   "path": "assets/training/two-step.png",
+   "route": "/account/two-step?next=%2Faccount",
+   "state": "Signed in with the first step only; the app asks for the second step",
+   "viewport_css_px": [
+    1280,
+    900
+   ],
+   "device_scale_factor": 2,
+   "image_pixels": [
+    2560,
+    1800
+   ],
+   "training_mark": false,
+   "slides": [
+    5
+   ],
+   "sha256": "4bd95cfb2c196e3a48647913ffdaf996213ecea186a0ff3873efaf9ee44e600c"
+  }
+ }
+}

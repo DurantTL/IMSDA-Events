@@ -3,13 +3,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuideScreenshotFigure } from "@/components/guide-screenshot";
 import { WalkthroughSteps } from "@/components/walkthrough-steps";
-import { BackLink } from "@/components/back-link";
+import { HelpBackLink } from "@/components/help-return";
+import { clubHelpReturnPath } from "@/lib/help-return";
+import { firstParam } from "@/lib/search-params";
 import { docLabel, docUrl } from "@/modules/help/guides";
 import { walkthroughCapturedFor } from "@/modules/help/walkthrough-check";
 import { walkthroughManifest } from "@/modules/help/walkthrough-manifest-data";
 import { loadPortalHelpViewer } from "@/modules/help/portal-viewer";
 import { portalGuideForViewer, portalGuideLinksForViewer, portalUnavailableText } from "@/modules/help/portal-visibility";
 import styles from "@/app/(workspace)/help/help.module.css";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +33,9 @@ export async function generateMetadata({ params }: { params: Promise<{ guideId: 
  * One portal guide (#1259). A guide this viewer may not see answers exactly like an id that does not exist.
  * Links go only to pages the viewer can open, and a club page resolves to their own club only when they direct one.
  */
-export default async function PortalGuidePage({ params }: { params: Promise<{ guideId: string }> }) {
-  const { guideId } = await params;
+export default async function PortalGuidePage({ params, searchParams }: { params: Promise<{ guideId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const [{ guideId }, query] = await Promise.all([params, searchParams]);
+  const from = clubHelpReturnPath(firstParam(query.from));
   const viewer = await loadPortalHelpViewer();
   const guide = portalGuideForViewer(guideId, viewer);
   if (!guide) notFound();
@@ -44,14 +48,9 @@ export default async function PortalGuidePage({ params }: { params: Promise<{ gu
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Help</p>
-          <h1>{guide.title}</h1>
-        </div>
-      </section>
+      <AccountPageBanner title={guide.title} context="Help" />
       <div className="account-page-body">
-        <BackLink href="/account/help">Back to Help</BackLink>
+        <HelpBackLink fallbackHref="/account/help" fallbackLabel="Back to Help" from={from} />
         <article className={styles.page}>
           <div className={styles.badges}>
             <span className={styles.badge}>{audienceLabels[guide.audience]}</span>

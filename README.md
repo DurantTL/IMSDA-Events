@@ -1,8 +1,105 @@
-# IMSDA Events
+<div align="center">
 
-IMSDA Events is the new multi-event operations platform for the Iowa-Missouri Conference. The current workspace includes seven no-code registration templates, modular fields, repeatable household/group rosters, conditional visibility, capacity and ranked-interest tracking, scheduled pricing, bounded promo codes, auditable lifecycle/waitlist actions, staff-only registration transfer and attendee substitution, public all-attendee event updates, private self-service links, a moderated attendee community, retreat packet printing, durable email delivery, and Square Sandbox checkout alongside the authenticated staff workspace.
+<img src="docs/readme/imadventist-symbol.png" alt="IMAdventist symbol" width="120" height="120">
 
-> Foundation safety boundary: all included names, emails, phone numbers, confirmations, and payment references are fictitious `.test` data. This application does not write to WR26 Google Apps Script, Google Sheets, WordPress, FluentCRM, UltraCamp, eAdventist, Sterling Volunteers, SMS, or push services. Optional external email and Square integrations remain disabled until their credentials are supplied; Square defaults to Sandbox and production additionally requires an explicit safety unlock.
+# IMAdventist
+
+**Events & Club Ministry for the Iowa-Missouri Conference of Seventh-day Adventists**
+
+One place to find events, register a family or a whole club, run check-in, and keep Pathfinder and Adventurer club records up to date.
+
+[![CI](https://github.com/DurantTL/IMSDA-Events/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/DurantTL/IMSDA-Events/actions/workflows/ci.yml)
+![Next.js](https://img.shields.io/badge/Next.js-App_Router-003B5C?logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-582C83?logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-003B5C?logo=postgresql&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-6-582C83?logo=prisma&logoColor=white)
+
+[**Live site**](https://events.imsda.org) · [**Training pack**](docs/platform-documentation/2026-11-05/README.md) · [**Site rules**](docs/SITE-RULES.md) · [**Roadmap**](https://github.com/DurantTL/IMSDA-Events/issues/98)
+
+</div>
+
+<br>
+
+<p align="center">
+  <img src="docs/readme/public-home.jpg" alt="IMAdventist public home page: Find your next gathering, with Explore events and Find a club buttons" width="32%">
+  <img src="docs/readme/club-portal.jpg" alt="Club portal home for a fictional club, with the year summary and Getting started list" width="32%">
+  <img src="docs/readme/club-coordination.jpg" alt="Club coordination overview for an Area Coordinator, with upcoming deadlines and a Getting started list" width="32%">
+</p>
+<p align="center"><sub>Public home · Club portal · Club coordination. All screenshots use fictional training data.</sub></p>
+
+---
+
+## Built for everyone in the conference
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🗓️ Members and families
+- Browse **events**, a filterable **calendar** and the **Club ministry** directory
+- Register one person or a whole household, with live pricing, promo codes and waitlists
+- Pay by card, Apple Pay or Google Pay through Square, or choose pay later
+- **My registrations**: every registration in one account, with private change links and QR check-in passes
+- Two-step sign-in with passkeys or an authenticator app
+
+</td>
+<td width="50%" valign="top">
+
+### ⛺ Club directors and deputies
+- **Roster** with encrypted birth dates, emergency contacts and an export builder
+- **Forms**: fill in yourself or send a private link to a parent
+- **Monthly Records** with meeting notes, points and on-time tracking
+- **Club events**: choose who is going and register the whole club
+- **Honors**, **Class tracking**, **Orders** and the **Year-End Report**
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🧭 Area Coordinators
+- **Club coordination**: every club at a glance, view only
+- **Who's missing what**, with one next step per club
+- Monthly Records across clubs, a **Points** ranking and club event headcounts
+- Team approvals, new club applications and waitlists
+
+</td>
+<td width="50%" valign="top">
+
+### 🛠️ Event staff and administrators
+- No-code **registration form builder** with templates, a question library and show-when rules
+- Lodging, meals, honors weekends, capacity and ranked-interest assignments
+- **Check-in** with signed QR passes and an offline-safe queue
+- Email outbox with versioned templates, announcements and an attendee community
+- Payments, refunds, invoices, CSV imports and audit history
+
+</td>
+</tr>
+</table>
+
+## Designed to be safe with young people's records
+
+- **Permissions on the server.** Every page and API checks the event or club role before reading or writing.
+- **Two-step sign-in** is required for administrators and for club pages that hold youth records.
+- **Sensitive data is sealed.** Secrets and birth dates are encrypted; passwords, session tokens and private links are stored only as digests.
+- **Careful by default.** Unsaved changes prompt before you leave a form, deletes and cancels ask for confirmation, and payments default to Square Sandbox until an explicit production unlock.
+- **Accessible.** 44 px tap targets, visible focus rings, readable text sizes and mobile layouts are checked by tests and a browser audit. See [`docs/SITE-RULES.md`](docs/SITE-RULES.md).
+
+## Documentation
+
+| | |
+|---|---|
+| 🎓 **[Training pack (November 2026)](docs/platform-documentation/2026-11-05/README.md)** | Getting-started deck, presenter notes, quick-start handout and screenshot gallery |
+| 📏 **[Site rules](docs/SITE-RULES.md)** | Every approved look, behavior and sign-in rule, each with its test |
+| 🎨 **[Design system](docs/DESIGN-SYSTEM.md)** | Colors, type, components and layout |
+| 🚀 **[Deploy with Docker](docs/DEPLOY-DOCKER.md)** | Production setup, backups and the uptime monitor |
+| 🧱 **[Architecture decisions](docs/decisions/)** | Why the system is built the way it is |
+| 🗺️ **[Roadmap (#98)](https://github.com/DurantTL/IMSDA-Events/issues/98)** | The ordered build queue |
+| 🤝 **[Contributor and agent guide](AGENTS.md)** | Repository map, checks and workflow rules |
+
+---
+
+# Developer guide
 
 ## Technology
 
@@ -50,7 +147,7 @@ IMSDA Events is the new multi-event operations platform for the Iowa-Missouri Co
    npm run dev
    ```
 
-   Open [http://localhost:3000](http://localhost:3000). The root route redirects to staff sign-in.
+   Open [http://localhost:3000](http://localhost:3000). The root route is the public home page; choose **Sign in** to reach the staff workspace or an account.
 
    Local seeded credentials:
 
@@ -75,7 +172,10 @@ IMSDA Events is the new multi-event operations platform for the Iowa-Missouri Co
 
 To stop the local database without deleting its volume, run `docker compose down`.
 
-### Square Sandbox checkout
+## Configuration and feature notes
+
+<details>
+<summary><strong>Square Sandbox checkout</strong></summary>
 
 Leave the Square values blank for a friendly pay-later/unconfigured experience.
 To test card checkout, copy Sandbox-only values into `.env` for
@@ -103,7 +203,10 @@ ID or extra application environment variable is required.
 See [`modules/payments/README.md`](modules/payments/README.md) for the
 idempotency, webhook, refund, and production-safety boundary.
 
-### Two-factor authentication
+</details>
+
+<details>
+<summary><strong>Two-factor authentication</strong></summary>
 
 `SYSTEM_ADMIN` and `EVENT_ADMIN` accounts must carry a TOTP second factor.
 Enforcement happens at sign-in rather than in permission checks: a correct
@@ -121,7 +224,10 @@ is the operator's way back for an account that has lost both.
 
 Other roles may enrol voluntarily from **More → Two-factor authentication**.
 
-### Account email
+</details>
+
+<details>
+<summary><strong>Account email</strong></summary>
 
 Activation, password-reset, attendee verification, and attendee edit-code email
 travel the same outbox as registration messages — with backoff, attempt history,
@@ -140,7 +246,10 @@ minted when the message is actually sent, so its short lifetime starts on
 delivery rather than in the queue. A retry reuses the same encrypted credential
 instead of invalidating the first message while the recipient is typing it.
 
-### Attendee accounts
+</details>
+
+<details>
+<summary><strong>Attendee accounts</strong></summary>
 
 Attendee identity stays separate from staff identity. A verified attendee
 account claims registrations only by the normalized registration contact email;
@@ -167,7 +276,10 @@ kept on `TIERED`.
 See [the attendee-account release checklist](docs/ATTENDEE-ACCOUNT-RELEASE.md)
 before enabling these paths against production providers.
 
-### Registration embeds
+</details>
+
+<details>
+<summary><strong>Registration embeds</strong></summary>
 
 Event settings generates one complete iframe-and-script block for each
 published form. The embed-only layout reports its content height as fields,
@@ -181,7 +293,10 @@ embed flow is anonymous and stateless: registration submission does not depend
 on a third-party session or CSRF cookie, and payment continues from the private
 top-level registration page.
 
-### Attendee community
+</details>
+
+<details>
+<summary><strong>Attendee community</strong></summary>
 
 Each event may opt in to a community for attendee accounts with an active
 registration. An attendee accepts the event’s current conduct version before
@@ -193,6 +308,8 @@ post-event retention, hide/restore/remove content, and resolve reports. Staff
 preview is intentionally read-only; it cannot create an attendee-authored
 action. The scheduled outbox sweep also performs event-end retention cleanup.
 See [ADR 0004](docs/decisions/0004-attendee-community.md).
+
+</details>
 
 ## Verification
 
@@ -231,6 +348,9 @@ Each one creates its own throwaway event with dates relative to today, so none d
 Never place real attendee exports, medical details, production identifiers, or credentials in migrations, seeds, tests, issues, screenshots, or commits.
 
 ## Current API
+
+<details>
+<summary>Show the current API (route reference)</summary>
 
 - `POST /api/auth/login` validates a staff credential and creates an eight-hour database session.
 - `POST /api/auth/logout` revokes the current session and expires its HttpOnly cookie.
@@ -291,6 +411,8 @@ Never place real attendee exports, medical details, production identifiers, or c
 
 The browser receives only a random opaque session token in an HttpOnly, SameSite cookie. The database stores its SHA-256 digest, expiry, and revocation state. Staff passwords use salted scrypt hashes; reset tokens are also stored only as digests. Mutation routes require a same-origin request in addition to authentication and event authorization.
 
+</details>
+
 ## Architecture
 
 ```text
@@ -321,7 +443,7 @@ See [ADR 0001](docs/decisions/0001-foundation-architecture.md) for the decision 
 
 ## Design direction
 
-The workspace preserves the calm operational structure of WR26 App V2 while using the public IMSDA identity:
+The product name, descriptor and symbol are defined once in [`lib/brand.ts`](lib/brand.ts) (**IMAdventist**, *Events & Club Ministry*, `public/brand/imadventist-symbol.png`); see the [branding inventory](docs/BRANDING-IMADVENTIST-INVENTORY.md). The workspace preserves the calm operational structure of WR26 App V2 with the conference palette:
 
 - IMSDA navy `#003B5C`
 - IMSDA purple `#582C83`
@@ -331,9 +453,12 @@ The workspace preserves the calm operational structure of WR26 App V2 while usin
 - event selector plus Overview, People, Check-in, Communications, and More routes
 - working event selection that follows staff between pages
 
-The current UI writes authoritative operational state to the configured IMSDA Events PostgreSQL database. Staff sign-in/out, local recovery, event role/status management, registration create/edit, reviewed whole-registration transfer, in-place attendee substitution, party attendees, manual payments, partial offline refunds, signed attendee passes, camera/manual pass resolution, partial-party check-in/online undo, recoverable device-local offline check-in, CSV export, audit history, announcement draft/publish with a filtered public all-attendee feed, reviewed CSV imports, registration-form draft/test/publish, and message-template/outbox workflows are functional. A published form is available at `/register/{event-slug}/{form-slug}` and through an allow-listed, automatically resizing `/embed/{event-slug}/{form-slug}` iframe. It can save either one attendee or an ordered household/group roster locally. It records attendee-scoped answers, pricing, capacity claims, and the exact confirmation after commit. A private management link can collect the remaining card balance through Square Sandbox when configured; no real payment is possible with the default configuration.
+The current UI writes authoritative operational state to the configured IMAdventist PostgreSQL database. Staff sign-in/out, local recovery, event role/status management, registration create/edit, reviewed whole-registration transfer, in-place attendee substitution, party attendees, manual payments, partial offline refunds, signed attendee passes, camera/manual pass resolution, partial-party check-in/online undo, recoverable device-local offline check-in, CSV export, audit history, announcement draft/publish with a filtered public all-attendee feed, reviewed CSV imports, registration-form draft/test/publish, and message-template/outbox workflows are functional. A published form is available at `/register/{event-slug}/{form-slug}` and through an allow-listed, automatically resizing `/embed/{event-slug}/{form-slug}` iframe. It can save either one attendee or an ordered household/group roster locally. It records attendee-scoped answers, pricing, capacity claims, and the exact confirmation after commit. A private management link can collect the remaining card balance through Square Sandbox when configured; no real payment is possible with the default configuration.
 
 ## Registration builder workflow
+
+<details>
+<summary>Show the registration builder workflow</summary>
 
 1. Sign in as an event administrator or registration manager and open **Registration form**.
 2. Create a form from Simple RSVP, Retreat registration, Household interest, Women’s Retreat 2026, Man Camp 2026, Spring Camporee 2026, or Camp Meeting 2026, or edit a saved event draft.
@@ -344,7 +469,12 @@ The current UI writes authoritative operational state to the configured IMSDA Ev
 
 The builder supports short and long text, email, phone, dropdown, radio, multiselect, ranked choice, checkbox, date, number, and automatic-fee fields. Conditional logic, scheduled late pricing, card-fee gross-up, bounded promo-code rules, repeatable attendee modules, public rendering, server-side validation and pricing, immutable answer snapshots, duplicate-submit idempotency, serializable capacity reservations, automatic waitlists, private links, external email delivery, and Square payment collection are implemented. File uploads remain separate work.
 
+</details>
+
 ## Staging import workflow
+
+<details>
+<summary>Show the staging import workflow</summary>
 
 1. Sign in as an event administrator and open **Imports**.
 2. Download the template or sample CSV, or choose a compatible `.csv` file up to 2 MB and 2,000 data rows.
@@ -355,6 +485,8 @@ The builder supports short and long text, email, phone, dropdown, radio, multise
 
 The format template is available at `/fixtures/wr26-import-template.csv`; a wholly fictitious walkthrough file is available at `/fixtures/wr26-import-sample.csv`. See [`scripts/imports/README.md`](scripts/imports/README.md) for the exact field contract and matching rules.
 
+</details>
+
 ## Build status and next review gate
 
 The detailed built-versus-remaining matrix and the behavior comparison with `DurantTL/WR26-IMSDA` are in [the build status and WR26 gap audit](docs/BUILD-STATUS-AND-WR26-GAP-AUDIT.md).
@@ -364,3 +496,7 @@ Before this workspace holds real attendee, medical, or payment data, read [the p
 [The production readiness progress log](docs/PRODUCTION-READINESS-PROGRESS.md) tracks that sequence: what has been implemented, what is deliberately deferred, and why. The review's three blocking findings — no path to a real administrator account, a single bad environment variable silently 403ing every write, and no backups — are addressed. MFA is complete; medical-data encryption remains a platform backlog item outside the Women’s Retreat release scope, and the deployment/Square Sandbox rehearsal remains in progress.
 
 Signed attendee QR passes, camera/manual staff resolution, the recoverable offline check-in conflict queue, reviewed balance reminders, corrected-address confirmation copies, bounded promo-code administration, whole-registration transfer, in-place attendee substitution, printable pass sheets, grouped retreat packets, and the moderated attendee community are complete. Scheduled/targeted announcements remain later work. Production Square activation remains gated behind approved credentials, an exact public webhook URL, operational refund testing, and the explicit production unlock.
+
+---
+
+<p align="center"><sub>IMAdventist is built for the Iowa-Missouri Conference of Seventh-day Adventists. Questions: <a href="mailto:support@imsda.org">support@imsda.org</a></sub></p>

@@ -4,7 +4,7 @@ import { summarizeClub } from "@/modules/club-reports/area-summary-domain";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), allowed: vi.fn(), clubs: vi.fn(), events: vi.fn(), newYear: vi.fn() }));
 vi.mock("server-only", () => ({}));
-vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`redirect:${path}`); }, useRouter: () => ({ replace: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`redirect:${path}`); }, useRouter: () => ({ replace: vi.fn(), push: vi.fn() }), usePathname: () => "/admin/clubs/summary", useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.session }));
 vi.mock("@/modules/access/admin-roles", () => ({ hasClubsAdministration: mocks.allowed }));

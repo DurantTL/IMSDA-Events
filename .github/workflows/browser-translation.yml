@@ -9,7 +9,10 @@ name: Browser translation and live lists
 #  - test:live-roster: a club director adds a member and sees it at once; a
 #    second browser context sees it after a reload; the same with the translator
 #    on (rule P2).
-# Both run on Chromium, Firefox and WebKit.
+# Both run on Chromium, Firefox and WebKit. A third check shares the same build and app:
+#  - test:keep-place (#1557, rule B17): Chromium at 1280 and 390 px. Layout shift on load stays
+#    at or under 0.05 on six account and staff pages, and after scrolling down, changing a
+#    filter, year, sort, tab or month updates in place and keeps the scroll position.
 on:
   pull_request:
     paths:
@@ -20,7 +23,11 @@ on:
       - "instrumentation-client.ts"
       - "scripts/verify-translation-simulation.ts"
       - "scripts/verify-live-roster.ts"
+      - "scripts/verify-keep-place.ts"
+      - "scripts/support/**"
       - "scripts/support/browser-journeys.ts"
+      - "modules/**"
+      - "lib/**"
       - ".github/workflows/browser-translation.yml"
   workflow_dispatch:
 
@@ -93,6 +100,8 @@ jobs:
         run: npm run test:translation-sim
       - name: Live roster
         run: npm run test:live-roster
+      - name: Keep your place (load shift, filter, sort, tab and month)
+        run: npm run test:keep-place
       - name: Show the app log when a check failed
         if: failure()
         run: cat app.log || true

@@ -1,17 +1,18 @@
 import { AccountContent } from "@/components/account-content";
-import { AccountWorkspaceMenu } from "@/components/account-workspace-menu";
+import { AccountWorkspaceMenuProvider } from "@/components/account-workspace-menu-context";
 import { redirect } from "next/navigation";
-import { AccountHeaderActions } from "@/components/account-header-actions";
+import { AccountPortalMasthead } from "@/components/account-portal-masthead";
 import { AccountAnnouncementBanner } from "@/components/account-announcement-banner";
-import { AccountSectionNav, type AccountNavItem } from "@/components/account-section-nav";
+import { accountPortalNavItems, workspaceMenuNavItems } from "@/components/account-portal-nav";
+import { AccountPortalTabsProvider } from "@/components/account-portal-tabs";
 import { ActAsBanner } from "@/components/act-as-banner";
 import { AttendeeAuthReturn } from "@/components/attendee-sign-in-form";
-import { BrandLink } from "@/components/brand-link";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { accountSignOutMode, otherWorkspaceContextsForAttendee } from "@/modules/access/workspace-contexts";
 import { listAccountBannerAnnouncements } from "@/modules/communications/account-banner";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { signInStepRedirectPath } from "@/modules/attendee-accounts/portal-second-step";
+import { HelpReturnTracker } from "@/components/help-return";
 import { attendeeSignInRedirectPath } from "@/modules/attendee-accounts/return-redirect";
 import { accountNeedsSignInStep } from "@/modules/attendee-accounts/sign-in-gate";
 import { isAreaCoordinator } from "@/modules/organizations/area-coordinators";
@@ -19,7 +20,7 @@ import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /**
- * The signed-in attendee area: one header and one row of tabs, with each
+ * The signed-in attendee area: one header (the club portal's masthead look) and one row of tabs (drawn under each page's banner), with each
  * job (registrations, clubs, profile, sign-in security) on its own page.
  * Every page still checks the session itself; this layout is only chrome,
  * except that it sends a session that owes the sign-in step (#1410) on: the
@@ -70,57 +71,32 @@ export default async function AccountPortalLayout({ children }: { children: Reac
     ])
     : [[], false, []];
 
-  const actingAsAreaCoordinator = acting?.role === "AREA_COORDINATOR";
-  const actingAsDirector = acting?.role === "CLUB_DIRECTOR";
-
-  // The attendee's own tabs come first and in the same order for everyone (#1175); a workspace tab follows only
-  // when the existing grant (director, Area Coordinator) is real, so an ordinary attendee sees just these three.
-  const items: AccountNavItem[] = [
-    ...(chromeAccount
-      ? [
-        { href: "/account", label: "Overview" },
-        { href: "/account/registrations", label: "My registrations" },
-        { href: "/account/profile", label: "Profile" },
-      ]
-      : []),
-    // Area Coordinators see every club (#387), so the tab is just "Clubs".
-    ...(areaCoordinator || actingAsAreaCoordinator
-      ? [{ href: "/account/clubs", label: "Clubs", matchChildren: true, alsoMatchPrefix: "/account/area/" }]
-      : clubs.length > 0 || actingAsDirector
-        ? [{ href: "/account/clubs", label: clubs.length === 1 || actingAsDirector ? "My club" : "My clubs", matchChildren: true }]
-        : []),
-    ...(areaCoordinator || actingAsAreaCoordinator
-      ? [{ href: "/account/area-clubs/overview", label: "Club coordination", alsoMatchPrefix: "/account/area-clubs/" }]
-      : []),
-    // An Area Coordinator sees the clubs waitlisted at the locations they coordinate (#599).
-    ...(areaCoordinator ? [{ href: "/account/waitlists", label: "Waitlists" }] : []),
-    // Portal help (#1259): last, for anyone using the portal. Which guides it lists is decided on its own pages.
-    { href: "/account/help", label: "Help", matchChildren: true },
-  ];
-  // A separate attendee cookie must not add personal or coordinator destinations to a director act-as menu.
-  const workspaceMenuItems = acting
-    ? items.filter((item) => item.href === "/account/clubs" || item.href === "/account/help"
-      || (actingAsAreaCoordinator && item.href === "/account/area-clubs/overview"))
-    : items;
+  const items = accountPortalNavItems({
+    hasAccount: Boolean(chromeAccount),
+    directedClubCount: clubs.length,
+    areaCoordinator,
+    actingRole: acting?.role ?? null,
+  });
+  const workspaceMenuItems = workspaceMenuNavItems(items, acting?.role ?? null);
 
   return (
     <main className="public-registration-page public-manage-page account-portal">
       <AttendeeAuthReturn />
-      <header className="public-registration-header">
-        <div className="public-registration-header-inner">
-          <BrandLink className="public-registration-brand public-event-brand-link" wordmark />
-          <AccountHeaderActions
-            identity={acting ? undefined : chromeAccount?.displayName}
-            contexts={workspaceContexts}
-            signOut={accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) })}
-          />
-        </div>
-      </header>
+      <HelpReturnTracker />
+      <AccountPortalMasthead
+        identity={acting ? undefined : chromeAccount?.displayName}
+        contexts={workspaceContexts}
+        signOut={accountSignOutMode({ hasAttendeeAccount: Boolean(account), hasStaffSession: Boolean(staffSession.user), actingAsClubRole: Boolean(acting) })}
+      />
       <ActAsBanner acting={acting} inAccount />
-      <AccountSectionNav items={items} label="Your account" />
       {chromeAccount && <AccountAnnouncementBanner accountId={chromeAccount.id} announcements={bannerAnnouncements} />}
-      <AccountWorkspaceMenu items={workspaceMenuItems} />
-      <AccountContent>{children}</AccountContent>
+      {/* The club and coordinator mastheads show this list as their "Your account" drop-down (#1555); it is worked out once, here. */}
+      {/* The tab row is drawn by each page's banner, right under its navy band (AccountPageBanner, #1555); the list is worked out once, here. */}
+      <AccountPortalTabsProvider items={items}>
+        <AccountWorkspaceMenuProvider items={workspaceMenuItems}>
+          <AccountContent>{children}</AccountContent>
+        </AccountWorkspaceMenuProvider>
+      </AccountPortalTabsProvider>
     </main>
   );
 }

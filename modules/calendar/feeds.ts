@@ -3,7 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
-import { fingerprintSecret, isSecretEncryptionConfigured, openSecret, SecretBoxError, sealSecret } from "@/lib/secret-box";
+import { fingerprintSecret, fingerprintSecretCandidates, isSecretEncryptionConfigured, openSecret, previousSecretKeyVersion, SecretBoxError, sealSecret } from "@/lib/secret-box";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { FeedFetchError, feedUrlHint, fetchFeedText, normalizeFeedUrl, type FeedTransport, type HostResolver } from "@/modules/calendar/feed-fetch";
 import { entryTypeEditMark } from "@/modules/calendar/deadlines";
@@ -52,8 +52,8 @@ export async function listCalendarFeeds() {
 }
 
 /** The same calendar can't be connected twice: look the keyed fingerprint of the normalized address up, opening no sealed address. */
-async function assertNotConnected(fingerprint: string, exceptFeedId?: string) {
-  const others = await getPrisma().calendarFeed.findMany({ where: { urlFingerprint: fingerprint }, select: { id: true, name: true } });
+async function assertNotConnected(fingerprints: string[], exceptFeedId?: string) {
+  const others = await getPrisma().calendarFeed.findMany({ where: { urlFingerprint: { in: fingerprints } }, select: { id: true, name: true } });
   const other = others.find((candidate) => candidate.id !== exceptFeedId);
   if (other) throw new CalendarError("INVALID_FEED", alreadyConnected(other.name));
 }
@@ -82,7 +82,8 @@ async function sealedAddress(rawUrl: string, exceptFeedId?: string) {
     throw new CalendarError("FEED_SECRET_MISSING", "Saving calendar addresses needs the encryption key (SECRET_ENCRYPTION_KEY, or SECRET_ENCRYPTION_KEY_FILE) to be set on the server.");
   }
   const urlFingerprint = fingerprintSecret(url.toString(), feedSecretPurpose);
-  await assertNotConnected(urlFingerprint, exceptFeedId);
+  // While a key rotation has the previous key loaded, a feed not yet re-fingerprinted still counts as a duplicate (#1516).
+  await assertNotConnected(fingerprintSecretCandidates(url.toString(), feedSecretPurpose), exceptFeedId);
   return { sealedUrl: sealSecret(url.toString(), feedSecretPurpose), urlHint: feedUrlHint(url), urlFingerprint };
 }
 
@@ -181,13 +182,26 @@ async function findFeed(feedId: string) {
   return feed;
 }
 
+/**
+ * The fingerprints this feed's address has under every key loaded: the saved one, and while a key rotation has the previous key loaded
+ * also the previous key's, because an item a deleted feed left behind keeps the fingerprint it was given until it is rotated (#1516).
+ */
+function feedFingerprints(feed: { sealedUrl: string; urlFingerprint: string }) {
+  if (previousSecretKeyVersion() === null) return [feed.urlFingerprint];
+  try {
+    return [...new Set([feed.urlFingerprint, ...fingerprintSecretCandidates(openSecret(feed.sealedUrl, feedSecretPurpose), feedSecretPurpose)])];
+  } catch {
+    return [feed.urlFingerprint];
+  }
+}
+
 /** Items left behind by a deleted feed that this feed's items would re-link to rather than duplicate. */
-async function loadDetached(client: { calendarEntry: Pick<ReturnType<typeof getPrisma>["calendarEntry"], "findMany"> }, parsed: ParsedIcsFeed, urlFingerprint: string) {
+async function loadDetached(client: { calendarEntry: Pick<ReturnType<typeof getPrisma>["calendarEntry"], "findMany"> }, parsed: ParsedIcsFeed, urlFingerprints: string[]) {
   const uids = [...new Set(parsed.entries.map((entry) => entry.uid))];
   if (uids.length === 0) return [];
   const rows = await client.calendarEntry.findMany({
     // Only items that came from a feed with this very address, never another calendar's.
-    where: { sourceFeedId: null, sourceUrlFingerprint: urlFingerprint, sourceUid: { in: uids } },
+    where: { sourceFeedId: null, sourceUrlFingerprint: { in: urlFingerprints }, sourceUid: { in: uids } },
     select: storedSelect,
     orderBy: { createdAt: "asc" },
   });
@@ -207,7 +221,7 @@ export async function previewCalendarFeed(feedId: string, deps: Deps = {}): Prom
   }
   const rows = await getPrisma().calendarEntry.findMany({ where: { sourceFeedId: feedId }, select: storedSelect });
   const existing = rows.map(toStored);
-  const detached = await loadDetached(getPrisma(), parsed, feed.urlFingerprint);
+  const detached = await loadDetached(getPrisma(), parsed, feedFingerprints(feed));
   const warnings = [...parsed.warnings];
   const active = existing.filter((row) => !row.sourceRemovedAt).length;
   if (parsed.entries.length === 0 && active > 0) {
@@ -257,7 +271,7 @@ export async function syncCalendarFeed(
       if (parsed.entries.length === 0 && !options.allowEmpty && stored.some((row) => !row.sourceRemovedAt)) {
         throw new FeedFetchError(emptyMessage);
       }
-      const detached = await loadDetached(tx, parsed, feed.urlFingerprint);
+      const detached = await loadDetached(tx, parsed, feedFingerprints(feed));
       const planned = planFeedSync(stored, parsed.entries, feed, detached);
       const actor = options.actorUserId ?? feed.updatedByUserId;
 

@@ -60,13 +60,12 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
     steps: {
       "open-clubs": async (ctx) => {
         await overview(ctx);
-        return tab(ctx, "All clubs");
+        return ctx.page.getByRole("heading", { name: "Clubs at a glance" });
       },
       search: async (ctx) => {
-        await tab(ctx, "All clubs").click();
-        await ctx.page.waitForURL(/\/account\/clubs/, slow);
+        await overview(ctx);
         await settle(ctx);
-        return ctx.page.getByPlaceholder("Search by club, church or city");
+        return ctx.page.getByPlaceholder("Club, church or city");
       },
       "open-club": async (ctx) => ctx.page.getByRole("link", { name: /Open club/ }).first(),
       "whos-missing": async (ctx) => {

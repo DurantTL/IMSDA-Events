@@ -97,7 +97,7 @@ describe("PublicHeaderSessionLinks (#1009)", () => {
     const out = await html();
     expect(out).toContain("My account");
     expect(out).toContain("Staff sign-in");
-    expect(out).toContain('href="/sign-in?next=%2Fselect-event"');
+    expect(out).toContain('href="/sign-in?staff=1"');
   });
 
   it("an attendee not linked to staff, an anonymous visitor and a staff session get no Staff sign-in link (#1092)", async () => {

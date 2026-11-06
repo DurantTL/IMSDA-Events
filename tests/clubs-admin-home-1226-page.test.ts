@@ -20,6 +20,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   redirect: (path: string) => { throw new Error(`redirect:${path}`); },
   useRouter: () => ({ refresh: vi.fn() }),
+  usePathname: () => "/", useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));

@@ -36,6 +36,8 @@ vi.mock("@/components/use-confirm", () => ({ useConfirm: () => ({ confirm: async
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), notFound: vi.fn(), redirect: vi.fn() }));
 
 import { ClubEarnedAwardsWorkspace, emptyEarnedAwardsData } from "@/components/club-earned-awards-workspace";
+import { HonorCombobox } from "@/components/honor-combobox";
+import { filterHonorsByWordPrefix } from "@/modules/honors/honor-search";
 import { ClubOrderWorkspace, type ClubOrderWorkspaceData } from "@/components/club-order-workspace";
 import { ClubFormRosterAdd } from "@/components/club-form-roster-add";
 import { ClubRosterWorkspace } from "@/components/club-roster-workspace";
@@ -265,36 +267,31 @@ describe("4 and 5. the item searches visibly narrow what they search", () => {
     return ClubOrderWorkspace({ organizationId: "club-1", initial, stock }) as ReactElement<Props>;
   };
 
-  it("Orders, Search the catalog: typing narrows the list by name or item number, and says so", () => {
-    let tree = orders();
-    expect(optionLabels(byId(tree, "club-order-picker-item"))).toHaveLength(4);
-    typeSearch(byId(tree, "club-order-picker-search"), "polo");
-    tree = orders();
-    expect(optionLabels(byId(tree, "club-order-picker-item"))).toHaveLength(3);
-    expect(text(byId(tree, "club-order-picker-results"))).toBe("2 items match “polo”.");
-    expect(byId(tree, "club-order-picker-item").props.size).toBeUndefined();
-    expect(byId(tree, "club-order-picker-search").props["aria-describedby"]).toBe("club-order-picker-results");
-    typeSearch(byId(tree, "club-order-picker-search"), "nk 1");
-    tree = orders();
-    expect(optionLabels(byId(tree, "club-order-picker-item"))).toEqual(["Choose an item", "Neckerchief · NK-1"]);
-    expect(byId(tree, "club-order-picker-item").props.value).toBe("c");
-    typeSearch(byId(tree, "club-order-picker-search"), "zzz");
-    tree = orders();
-    expect(text(byId(tree, "club-order-picker-results"))).toContain("No items match");
+  it("Orders, Add an item: one shared honor search box replaces the search box plus drop-down (#1553)", () => {
+    const tree = orders();
+    const picker = walk(tree).find((el) => el.props.label === "Search honors and items")!;
+    expect(picker.type).toBe(HonorCombobox);
+    const options = picker.props.options as { id: string; name: string }[];
+    expect(options).toHaveLength(3);
+    expect(options.map((option) => option.name)).toContain("Neckerchief \u00b7 NK-1");
+    expect(picker.props.placeholder).toBe("Honor or item name, or item number");
+    expect(walk(tree).some((el) => el.props.id === "club-order-picker-item")).toBe(false);
+    expect(walk(tree).some((el) => el.props.id === "club-order-picker-search")).toBe(false);
+    // The shared box narrows by the start of any word, including the item number.
+    expect(filterHonorsByWordPrefix(options, "polo")).toHaveLength(2);
+    expect(filterHonorsByWordPrefix(options, "nk")).toHaveLength(1);
+    expect(filterHonorsByWordPrefix(options, "zzz")).toHaveLength(0);
+    // The size is in the label too, so "polo m" finds the medium shirt only.
+    expect(options.map((option) => option.name)).toContain("Polo Shirt \u00b7 UN-204 \u00b7 M");
+    expect(filterHonorsByWordPrefix(options, "polo m").map((option) => option.id)).toEqual(["a"]);
   });
-  it("Orders: a long match list is paged (no \"type more\" cap), with the shared pager and the match count", () => {
+  it("Orders: a long catalog is not capped or paged, the search box narrows it", () => {
     const many: ClubStockRow[] = Array.from({ length: 250 }, (_, index) => ({ itemId: `i${index}`, section: "MISCELLANEOUS", name: `Patch ${index}`, catalogNumber: `P-${index}`, sizeLabel: null, isActive: true, quantityOnHand: 0 }));
-    const capped = () => { runtime.index = 0; return ClubOrderWorkspace({ organizationId: "club-1", initial, stock: many }) as ReactElement<Props>; };
-    typeSearch(byId(capped(), "club-order-picker-search"), "patch");
-    const tree = capped();
-    expect(optionLabels(byId(tree, "club-order-picker-item"))).toHaveLength(101);
-    expect(text(byId(tree, "club-order-picker-results"))).toContain("250 items match");
-    expect(text(byId(tree, "club-order-picker-results"))).not.toMatch(/type more|narrow/i);
-    const pager = walk(tree).find((el) => el.props.label === "Honor and item pages")!;
-    expect(pager.props.slice).toMatchObject({ page: 1, pageCount: 3, total: 250, from: 1, to: 100 });
-    (pager.props.onPage as (page: number) => void)(3);
-    const last = capped();
-    expect(optionLabels(byId(last, "club-order-picker-item"))).toHaveLength(51);
+    runtime.index = 0;
+    const tree = ClubOrderWorkspace({ organizationId: "club-1", initial, stock: many }) as ReactElement<Props>;
+    const picker = walk(tree).find((el) => el.props.label === "Search honors and items")!;
+    expect(picker.props.options).toHaveLength(250);
+    expect(walk(tree).some((el) => el.props.label === "Honor and item pages")).toBe(false);
   });
 });
 

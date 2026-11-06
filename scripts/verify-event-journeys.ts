@@ -1033,11 +1033,19 @@ async function attendeeListJourney(ctx: Ctx, page: J.Page) {
   rec.record(name, "B1", "a header sorts the list ascending and descending", sorted(ascending, 1) && sorted(descending, -1) && ascending[0] !== descending[0] && /PatA0/.test(ascending[0]!) && /PatZ1/.test(descending[0]!) ? "pass" : "fail", `first rows: ascending "${ascending[0]}", descending "${descending[0]}"`);
   // The second page keeps the order and says which rows it shows.
   await page.locator(".list-pager").getByRole("link", { name: "Next" }).click();
-  await page.waitForURL((url: URL) => url.searchParams.get("page") === "2", { timeout: 15_000 });
+  // Wait for page 2 of the descending list itself, not only the address: the client can show the new address a moment
+  // before the new rows. A page that never settles into page 2 in descending order still fails below, with its rows.
+  await page.waitForURL((url: URL) => url.searchParams.get("page") === "2" && url.searchParams.get("sort") === "name" && url.searchParams.get("dir") === "desc", { timeout: 15_000 });
   await settle(page);
-  const second = await attendeeNames(page);
-  const pagerText = clean(await page.locator(".list-pager").first().innerText());
-  rec.record(name, "B1", "the pager moves to page 2 with the sort kept", second.length === 5 && /Showing 51.55 of 55 attendees/.test(pagerText) && new URL(page.url()).searchParams.get("sort") === "name" && sorted(second, -1) && descending.at(-1)!.localeCompare(second[0]!, "en", { sensitivity: "base" }) >= 0 ? "pass" : "fail", `page 2 shows ${second.length} row(s); "${pagerText}"`);
+  let second = await attendeeNames(page);
+  let pagerText = clean(await page.locator(".list-pager").first().innerText());
+  const pageTwoDeadline = Date.now() + 15_000;
+  while (Date.now() < pageTwoDeadline && (second.length !== 5 || !sorted(second, -1) || !/Showing 51.55 of 55 attendees/.test(pagerText))) {
+    await page.waitForTimeout(250);
+    second = await attendeeNames(page);
+    pagerText = clean(await page.locator(".list-pager").first().innerText());
+  }
+  rec.record(name, "B1", "the pager moves to page 2 with the sort kept", second.length === 5 && /Showing 51.55 of 55 attendees/.test(pagerText) && new URL(page.url()).searchParams.get("sort") === "name" && sorted(second, -1) && descending.at(-1)!.localeCompare(second[0]!, "en", { sensitivity: "base" }) >= 0 ? "pass" : "fail", `page 2 shows ${second.length} row(s): ${second.join(", ")}; "${pagerText}"; address ${page.url()}; page 1 ended with ${descending.at(-1)}`);
 
   // B2: a filter lives in the address; open a row, go Back, and it is kept; Clear filters resets it.
   await S.openPage(page, `${base}&q=PatB`);

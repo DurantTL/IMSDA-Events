@@ -24,6 +24,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
+vi.mock("@/modules/organizations/own-directed-club-ids", () => ({ currentOwnDirectedClubIds: async () => [] }));
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 // Which clubs haven't started next year's roster (#414) has its own tests.
 vi.mock("@/modules/club-rosters/carry-forward", () => ({ listClubsNewYearStatus: mocks.listClubsNewYearStatus }));

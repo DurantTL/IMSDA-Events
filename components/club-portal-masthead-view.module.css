@@ -1,4 +1,4 @@
-/* Club masthead account actions (#1319): My account, Switch club and Sign out read as outlined buttons, icon and text on one line. */
+/* Club and coordinator masthead actions (#1319, #1555): Your account, Switch club, Forms help and Sign out read as outlined buttons, icon and text on one line. */
 .account {
   display: flex;
   flex-wrap: wrap;
@@ -6,6 +6,7 @@
   justify-content: flex-end;
   gap: 8px 12px;
   min-width: 0;
+  position: relative;
 }
 
 .action {
@@ -47,7 +48,15 @@
 }
 
 @media (max-width: 640px) {
+  /* The full-width row is also what the account drop-down's panel hangs from (account-workspace-menu.module.css). */
   .account {
     justify-content: flex-start;
+    width: 100%;
+  }
+
+  /* The name (and role) has its own line and the buttons always start on the next one, so the name getting a little
+     wider as the web font loads never pushes a button onto a new row (#1557, rule B17). */
+  .account > :global(.club-masthead-identity) {
+    flex-basis: 100%;
   }
 }

@@ -2,6 +2,7 @@ import {
   buildMoreDirectoryCards,
   clubsAdminGroups,
   clubsAdminHealthImportHref,
+  clubsAdminRecordsHref,
   clubsAdminHomeItem,
   eventFeaturesItem,
   matchesVisibility,
@@ -94,7 +95,8 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/archived-events": ["archive", "finished events", "old events", "past events", "put away"],
   "/admin/organizations": ["church", "churches", "club directory", "organizations", "directors"],
   "/admin/clubs": ["clubs dashboard", "what is waiting", "club year"],
-  "/admin/clubs/reports": ["monthly record", "club reports"],
+  "/admin/clubs/reports": ["review monthly records", "records to review", "review records", "club reports"],
+  [clubsAdminRecordsHref]: ["monthly record", "monthly records", "club reports", "records"],
   "/admin/clubs/reports/year-end": ["year end", "pathfinder year", "annual report"],
   "/admin/clubs/invites": ["invite club", "club invitation", "director invite"],
   "/admin/clubs/import": ["upload clubs", "csv", "bulk clubs"],
@@ -105,6 +107,7 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/admin/clubs/applications": ["invite club", "new club", "club invite", "application"],
   "/admin/clubs/transfers": ["move member", "transfer member"],
   "/admin/people": ["invite staff", "add staff", "staff access", "permissions", "roles", "who can", "sign in", "login", "password", "user accounts", "team", "accounts"],
+  "/admin/health-access": ["break glass", "legal hold", "hold", "health access", "grants", "monthly review", "medical"],
   "/admin/forms": ["questions", "survey"],
   "/admin/club-forms": ["membership", "permission slip"],
   "/admin/form-templates": ["registration form", "form template"],
@@ -165,6 +168,18 @@ function eventDescriptionFor(item: NavigationItem): string {
   return sidebarDescriptions[item.href] ?? `${item.label} for the selected event.`;
 }
 
+/** The review list behind the Monthly Records tab (#1552): its own entry, since no menu item opens it directly. */
+function reviewMonthlyRecordsDestination(scope: "System" | "Clubs", key: string, group: string, selectedEventId?: string | null): SearchDestination {
+  return {
+    key,
+    scope,
+    label: "Review monthly records",
+    description: `Submitted Monthly Records waiting for review, by club and month${scope === "Clubs" ? " in club administration" : ""}.`,
+    href: scope === "System" ? withCurrentEvent("/admin/clubs/reports", selectedEventId) : "/admin/clubs/reports",
+    keywords: [...(destinationKeywords["/admin/clubs/reports"] ?? []), group],
+  };
+}
+
 /**
  * Every destination this viewer may open, in menu order: System, then Clubs (in the Clubs view), then Event,
  * then Profile. Built from the same registry and rules as the menus.
@@ -194,6 +209,7 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
         });
       }
     }
+    add(reviewMonthlyRecordsDestination("System", "System:review-monthly-records", "Clubs", context.selectedEventId));
   }
 
   if (context.siteContentEditor && !context.isSystemAdmin) {
@@ -214,9 +230,10 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
       clubsHome,
       ...clubsAdminGroups.flatMap((group) => group.items.map((item) => ({ label: item.label, href: item.href, group: group.label }))),
     ].filter((item) => item.href !== clubsAdminHealthImportHref || context.clubsAdmin?.healthImport !== false);
+    add(reviewMonthlyRecordsDestination("Clubs", "Clubs:review-monthly-records", "Records and points"));
     for (const item of clubItems) {
       // A page the System groups already list (Club summary, Monthly Records) stays one result, in System scope.
-      if (!item.href.includes("#") && systemPaths.has(item.href)) continue;
+      if (systemPaths.has(item.href)) continue;
       add({
         key: `Clubs:${item.href}`,
         scope: "Clubs",

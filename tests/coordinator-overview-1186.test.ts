@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   listUpcomingDeadlines: vi.fn(),
   listClubsNewYearStatus: vi.fn(),
   getCurrentSession: vi.fn(),
+  ownClubIds: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -32,6 +33,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
+vi.mock("@/modules/organizations/own-directed-club-ids", () => ({ currentOwnDirectedClubIds: mocks.ownClubIds }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
 vi.mock("@/modules/club-rosters/carry-forward", () => ({ listClubsNewYearStatus: mocks.listClubsNewYearStatus }));
@@ -163,7 +165,7 @@ describe("overview numbers come from the clubs the owning query returned (#1186)
     expect(overview).toMatchObject({ month: "2027-09", monthNotDue: true, recordsText: "Not due yet" });
     expect(overview.followUp).toEqual([]);
     const out = render({ status: "ready", clubs: future, overview });
-    expect(out).toContain("<dd>Not due yet</dd>");
+    expect(out).toContain('<dd class="club-home-count-value">Not due yet</dd>');
     expect(out).not.toMatch(/0 of 1/);
     expect(out).toContain("not due yet");
   });
@@ -180,7 +182,7 @@ describe("overview markup (#1186)", () => {
   it("shows the heading, the queried year and the honest scope, and claims no ministry or area filter", () => {
     const out = renderToStaticMarkup(createElement(CoordinatorOverviewHeading, { clubYear }));
     expect(out).toContain("Club overview");
-    expect(out).toContain("2026-27");
+    expect(out).toContain("2026–27");
     expect(out).toContain("All active clubs available to this role");
     expect(out).not.toMatch(/ministry|area filter/i);
   });
@@ -202,6 +204,32 @@ describe("overview markup (#1186)", () => {
     expect(render(ready(six))).not.toMatch(/birth|DOB|medical|allerg|phone|email|@/i);
   });
 
+  it("searches club, church and city, and links the own club normally and every other club view only (#1551)", () => {
+    const harbor = club("h1", "Harbor Club", { church: "Seaside Community Church", city: "Port Sample" });
+    const other = club("o1", "Orchard Club", { church: "Hillside Church", city: "Sampleton" });
+    const data = ready([harbor, other]);
+    const find = (query: string) => renderToStaticMarkup(createElement(CoordinatorOverviewBody, { data, now, query, ownClubIds: ["h1"] }));
+    for (const query of ["seaside", "port"]) {
+      const out = find(query);
+      expect(out).toContain("Showing 1\u20131 of 1 club");
+      expect(out).toContain("Harbor Club");
+      expect(out).not.toContain("Orchard Club");
+    }
+    const all = find("");
+    expect(all).toContain("Showing 1\u20132 of 2 clubs");
+    expect(all).toContain('href="/account/clubs/h1"');
+    expect(all).toContain("Your club");
+    expect(all).toContain("Open my club");
+    expect(all).toContain('href="/account/area/o1"');
+    expect(all).not.toContain('href="/account/clubs/o1"');
+    expect(all).toContain("View only");
+    // The name links to the same place as the open button.
+    expect(all).toMatch(/<a[^>]*href="\/account\/area\/o1">Orchard Club<span/);
+    expect(all).toMatch(/<a[^>]*href="\/account\/clubs\/h1">Harbor Club<span/);
+    expect(all).toContain("Search clubs");
+    expect(all).toContain('placeholder="Club, church or city"');
+  });
+
   it("filters the table by search while the summary and follow-up stay whole, with N of M shown", () => {
     const out = render(ready(six), "bra");
     expect(out).toContain("Showing 1\u20131 of 1 club");
@@ -215,13 +243,13 @@ describe("overview markup (#1186)", () => {
 
   it("offers Clear filters for a search with no results, and says that differently from no clubs", () => {
     const none = render(ready(six), "zzz");
-    expect(none).toContain("No club name matches");
+    expect(none).toContain("No club name, church or city matches");
     expect(none).toContain("Clear filters");
     expect(none).toContain('href="/account/area-clubs/overview?year=2026-27"');
     expect(none).not.toContain("Showing");
     const empty = render(ready([]));
     expect(empty).toContain("No active clubs are available to this role yet.");
-    expect(empty).not.toContain("No club name matches");
+    expect(empty).not.toContain("No club name, church or city matches");
     expect(empty).not.toContain("Clear filters");
   });
 
@@ -270,6 +298,7 @@ describe("overview page (#1186)", () => {
     mocks.getAreaClubsSummary.mockResolvedValue(six);
     mocks.listUpcomingDeadlines.mockResolvedValue([]);
     mocks.listClubsNewYearStatus.mockResolvedValue(null);
+    mocks.ownClubIds.mockResolvedValue([]);
   });
 
   it("renders the summary for the queried year", async () => {
@@ -332,7 +361,8 @@ describe("coordinator masthead and navigation (#1186, #442)", () => {
     expect(out).toContain("Club coordination");
     expect(out).toContain("Sample Coordinator");
     expect(out).toContain("Area Coordinator");
-    expect(out).toContain('href="/account"');
+    expect(out).not.toContain("My account");
+    expect(out).toContain("Sign out");
   });
 
   it("shows no identity during a staff act-as, and says so", () => {
@@ -356,11 +386,11 @@ describe("coordinator masthead and navigation (#1186, #442)", () => {
     }
   });
 
-  it("lists the seven destinations with Overview first, keeping every route", () => {
+  it("lists the six destinations, with no All clubs tab (#1551), with Overview first, keeping every route", () => {
     const items = coordinatorNavItems();
-    expect(items.map((item) => item.label)).toEqual(["Overview", "All clubs", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
+    expect(items.map((item) => item.label)).toEqual(["Overview", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
     expect(items.map((item) => item.href)).toEqual([
-      "/account/area-clubs/overview", "/account/clubs", "/account/area-clubs/reports", "/account/area-clubs/points",
+      "/account/area-clubs/overview", "/account/area-clubs/reports", "/account/area-clubs/points",
       "/account/area-clubs/events", "/account/area-clubs/team-permissions", "/account/area-clubs/applications",
     ]);
   });
@@ -373,12 +403,12 @@ describe("coordinator masthead and navigation (#1186, #442)", () => {
     expect(coordinatorMastheadModel({ ...base, secondStepPending: true }).showWaitlists).toBe(false);
   });
 
-  it("shows the active destination, including a coordinator's club pages under All clubs", () => {
+  it("shows the active destination, including a coordinator's club pages under Overview", () => {
     const items = coordinatorNavItems();
     const active = (path: string) => items.filter((item) => isAccountNavItemActive(path, item)).map((item) => item.label);
     expect(active("/account/area-clubs/overview")).toEqual(["Overview"]);
-    expect(active("/account/area/club_1")).toEqual(["All clubs"]);
-    expect(active("/account/area/club_1/reports/2026-09")).toEqual(["All clubs"]);
+    expect(active("/account/area/club_1")).toEqual(["Overview"]);
+    expect(active("/account/area/club_1/reports/2026-09")).toEqual(["Overview"]);
     expect(active("/account/area-clubs/reports")).toEqual(["Monthly Records"]);
   });
 });
@@ -447,7 +477,7 @@ describe("coordinator shell header wiring (#1186, #442)", () => {
   it.each([
     ["Area Coordinator", { role: "AREA_COORDINATOR" }, "Acting as Area Coordinator"],
     ["club director", { role: "CLUB_DIRECTOR", organizationId: "club-1" }, "Acting as club director"],
-  ])("shows no identity, My account or Waitlists during a staff act-as as %s, and names that role", async (_label, acting, expectedLabel) => {
+  ])("shows no identity or Waitlists during a staff act-as as %s, and names that role", async (_label, acting, expectedLabel) => {
     mocks.currentStaffActingContext.mockResolvedValue(acting);
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", globalRole: "SYSTEM_ADMIN" } });
     const out = await html();

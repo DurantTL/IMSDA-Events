@@ -122,8 +122,10 @@ export function PeopleQuickFilters({
       {roleKeys.length > 1 ? roleKeys.map((key) => <input key={key} name="keepRole" type="hidden" value={key} />) : null}
       {shown.eventIds.length > 1 ? shown.eventIds.map((id) => <input key={id} name="keepEvent" type="hidden" value={id} />) : null}
       {shown.clubIds.length > 1 ? shown.clubIds.map((id) => <input key={id} name="keepClub" type="hidden" value={id} />) : null}
-      <button className="primary-button" type="submit">{active ? "Apply" : "Search"}</button>
-      {query || active ? <Link className="secondary-button" href={peopleHref({})} onClick={() => typing.cancel()}>Clear filters</Link> : null}
+      <div className={styles.searchActions}>
+        <button className="primary-button" type="submit">{active ? "Apply" : "Search"}</button>
+        {query || active ? <Link className="secondary-button" href={peopleHref({})} onClick={() => typing.cancel()}>Clear filters</Link> : null}
+      </div>
     </form>
   );
 }

@@ -74,7 +74,8 @@ describe("destination registry per role", () => {
   it("gives a system administrator every System destination, with the calendar listed once", () => {
     const destinations = buildSearchDestinations(admin);
     const system = destinations.filter((destination) => destination.scope === "System");
-    const expected = systemNavGroups.flatMap((group) => group.items.map((item) => item.label));
+    // Then the review list behind Monthly Records (#1552).
+    const expected = [...systemNavGroups.flatMap((group) => group.items.map((item) => item.label)), "Review monthly records"];
     expect(system.map((destination) => destination.label)).toEqual(expected);
     expect(system.filter((destination) => destination.href.startsWith("/admin/calendar")).map((destination) => destination.label))
       .toEqual(["Conference calendar"]);

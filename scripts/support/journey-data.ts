@@ -153,7 +153,8 @@ export async function seedSupplyItem(prisma: PrismaClient, world: JourneyWorld) 
   return { name };
 }
 
-export async function seedJourneyWorld(prisma: PrismaClient, shard: string): Promise<JourneyWorld> {
+/** `onWorld` is called as soon as the world exists (its lists fill as seeding goes on), so a caller can clean up if seeding stops partway. */
+export async function seedJourneyWorld(prisma: PrismaClient, shard: string, onWorld?: (world: JourneyWorld) => void): Promise<JourneyWorld> {
   const { clubYearFor } = await import("../../modules/club-rosters/domain");
   const { registrationFormDefinitionSchema } = await import("../../modules/forms/definition");
   const stamp = newStamp(shard);
@@ -167,6 +168,7 @@ export async function seedJourneyWorld(prisma: PrismaClient, shard: string): Pro
     accountIds: [], organizationIds: [], eventIds: [],
     rosterNames: rosterNamesFor(stamp),
   };
+  onWorld?.(world);
   const staff = await prisma.user.findUnique({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
   if (!staff) throw new Error("This is not a seeded dev database (admin@imsda-events.test is missing). Run `npm run db:seed` first.");
 

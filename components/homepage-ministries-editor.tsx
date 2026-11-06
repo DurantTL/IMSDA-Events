@@ -5,6 +5,7 @@ import { Save, Sparkles } from "lucide-react";
 import {
   homepageMinistryDescriptionMax,
   homepageMinistryIcons,
+  ministryLinkHref,
   type HomepageMinistry,
 } from "@/modules/system-admin/homepage-ministries-domain";
 import styles from "@/components/homepage-ministries-editor.module.css";
@@ -48,11 +49,14 @@ export function HomepageMinistriesEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The "needs a category" refusal, beside the tile's own field as well as in the summary above (rule B7), by tile position.
+  const [categoryProblems, setCategoryProblems] = useState<Record<number, string>>({});
   const dirty = JSON.stringify(tiles) !== JSON.stringify(saved);
   useUnsavedChangesGuard(dirty);
 
   function change(position: number, patch: Partial<TileDraft>) {
     setTiles((current) => current.map((tile) => (tile.position === position ? { ...tile, ...patch } : tile)));
+    if ("categories" in patch) setCategoryProblems((current) => { const next = { ...current }; delete next[position]; return next; });
   }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
@@ -60,6 +64,7 @@ export function HomepageMinistriesEditor({
     setSaving(true);
     setError("");
     setNotice("");
+    setCategoryProblems({});
     try {
       const response = await fetch("/api/admin/platform-settings/homepage-ministries", {
         method: "PATCH",
@@ -67,6 +72,14 @@ export function HomepageMinistriesEditor({
         body: JSON.stringify({ ministries: tiles.map(toPayload) }),
       });
       const result = await response.json().catch(() => ({}));
+      if (!response.ok && Array.isArray(result.issues)) {
+        const problems: Record<number, string> = {};
+        for (const issue of result.issues as Array<{ path?: unknown[]; message?: string }>) {
+          const index = issue.path?.[0] === "ministries" && issue.path[2] === "categories" ? Number(issue.path[1]) : NaN;
+          if (Number.isInteger(index) && tiles[index] && issue.message) problems[tiles[index].position] = issue.message;
+        }
+        setCategoryProblems(problems);
+      }
       if (!response.ok || !Array.isArray(result.ministries)) throw new Error(result.message ?? "The homepage ministries could not be saved.");
       const next = (result.ministries as HomepageMinistry[]).map(toDraft);
       setSaved(next);
@@ -90,9 +103,10 @@ export function HomepageMinistriesEditor({
           </div>
         </div>
         <p className="field-help platform-note">
-          The six &ldquo;Find your place&rdquo; tiles on the front page. Each shows its next upcoming calendar item from the categories you list
-          (separate them with commas, as they are spelled on the calendar). Leave the link blank to open the calendar filtered to the
-          category when a tile has exactly one, or the whole calendar when it has two or more. A link starts with / for a page on this site, or https:// for another site. Changes are recorded in the audit log.
+          The six &ldquo;Find your place&rdquo; tiles on the front page. Each is also a filter button on the public calendar, in this order,
+          so every tile needs at least one category. Each shows its next upcoming calendar item from the categories you list
+          (separate them with commas, as they are spelled on the calendar). Leave the link blank to open the calendar on the tile&apos;s button, which shows
+          all of its categories. A link starts with / for a page on this site, or https:// for another site. Changes are recorded in the audit log.
         </p>
         {error && <p className="form-error" role="alert">{error}</p>}
         {notice && <p className="inline-notice" role="status">{notice}</p>}
@@ -105,13 +119,25 @@ export function HomepageMinistriesEditor({
               <input maxLength={homepageMinistryDescriptionMax} value={tile.description} onChange={(event) => change(tile.position, { description: event.target.value })} />
               <small>Plain text, up to {homepageMinistryDescriptionMax} characters. Leave blank to show the name and upcoming event only.</small>
             </label>
+            <div className={styles.ministryCategoryField}>
             <label>
               Calendar categories
-              <input autoComplete="off" maxLength={400} value={tile.categories} onChange={(event) => change(tile.position, { categories: event.target.value })} />
+              <input
+                aria-describedby={categoryProblems[tile.position] ? `ministry-${tile.position}-categories-error` : undefined}
+                aria-invalid={categoryProblems[tile.position] ? true : undefined}
+                autoComplete="off"
+                maxLength={400}
+                required
+                value={tile.categories}
+                onChange={(event) => change(tile.position, { categories: event.target.value })}
+              />
             </label>
+            {/* Outside the label so it describes the field without becoming part of its name; the summary above is the one alert. */}
+            {categoryProblems[tile.position] && <small className="field-error-message" id={`ministry-${tile.position}-categories-error`}>{categoryProblems[tile.position]}</small>}
+            </div>
             <label>
               Link
-              <input autoComplete="off" maxLength={500} placeholder="/calendar?view=list" value={tile.linkHref} onChange={(event) => change(tile.position, { linkHref: event.target.value })} />
+              <input autoComplete="off" maxLength={500} placeholder={ministryLinkHref({ linkHref: null, position: tile.position })} value={tile.linkHref} onChange={(event) => change(tile.position, { linkHref: event.target.value })} />
             </label>
             <label>
               Icon

@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   audits: [] as Array<Record<string, unknown>>,
   nextId: 1,
   missFingerprintOnce: false,
+  previousFingerprints: [] as string[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -20,6 +21,8 @@ vi.mock("@/lib/secret-box", () => ({
   isSecretEncryptionConfigured: () => true,
   sealSecret: (value: string) => `v1.${Buffer.from(value).toString("base64url")}`,
   fingerprintSecret: (value: string, purpose: string) => `fp.${purpose}.${Buffer.from(value).toString("base64url")}`,
+  fingerprintSecretCandidates: (value: string, purpose: string) => [`fp.${purpose}.${Buffer.from(value).toString("base64url")}`, ...state.previousFingerprints],
+  previousSecretKeyVersion: () => (state.previousFingerprints.length > 0 ? 1 : null),
   openSecret: (sealed: string) => Buffer.from(String(sealed).slice(3), "base64url").toString("utf8"),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: async (entry: Record<string, unknown>) => { state.audits.push(entry); } }));
@@ -112,6 +115,7 @@ beforeEach(() => {
   state.entryWrites = 0;
   state.audits = [];
   state.nextId = 1;
+  state.previousFingerprints = [];
   body = ics;
 });
 
@@ -314,6 +318,21 @@ describe("imported calendar feeds", () => {
     await expect(updateCalendarFeed(state.feeds[1].id, { url: privateUrl }, "admin-1")).rejects.toMatchObject({ code: "INVALID_FEED" });
   });
 
+  it("also matches the previous key's fingerprint while a key rotation is under way (#1516)", async () => {
+    await addFeed();
+    // The saved feed has not been re-fingerprinted yet: its fingerprint is the previous key's.
+    state.feeds[0].urlFingerprint = "fp.previous-key.of-the-saved-address";
+    await expect(createCalendarFeed({ ...input, name: "Again" }, "admin-1")).resolves.toBeDefined();
+    expect(state.feeds).toHaveLength(2);
+    state.feeds.pop();
+    state.previousFingerprints = ["fp.previous-key.of-the-saved-address"];
+    await expect(createCalendarFeed({ ...input, name: "Again" }, "admin-1")).rejects.toMatchObject({
+      code: "INVALID_FEED",
+      message: "This calendar is already connected as Synthetic Google calendar.",
+    });
+    expect(state.feeds).toHaveLength(1);
+  });
+
   it("answers a save that loses the unique-constraint race with the same friendly message", async () => {
     await addFeed();
     state.missFingerprintOnce = true;
@@ -352,6 +371,23 @@ describe("imported calendar feeds", () => {
     state.entryWrites = 0;
     await syncCalendarFeed(second, deps);
     expect(state.entryWrites).toBe(0);
+  });
+
+  it("re-links items that carry the previous key's fingerprint while a rotation has the previous key loaded (#1516)", async () => {
+    const feedId = await addFeed();
+    await syncCalendarFeed(feedId, deps);
+    await deleteCalendarFeed(feedId, "admin-1");
+    const total = state.entries.length;
+    // The deleted feed's items were given a fingerprint under the previous key and have not been rotated.
+    for (const entry of state.entries) entry.sourceUrlFingerprint = "fp.previous-key.of-the-address";
+
+    const second = await createCalendarFeed({ ...input }, "admin-1").then(() => state.feeds[0].id);
+    expect((await previewCalendarFeed(second, deps)).counts).toMatchObject({ relink: 0, create: total });
+
+    state.previousFingerprints = ["fp.previous-key.of-the-address"];
+    const preview = await previewCalendarFeed(second, deps);
+    expect(preview.counts).toMatchObject({ relink: total, create: 0 });
+    expect(await syncCalendarFeed(second, deps)).toMatchObject({ relink: total, create: 0 });
   });
 
   it("only a feed with the same address hint can re-link a deleted feed's items", async () => {

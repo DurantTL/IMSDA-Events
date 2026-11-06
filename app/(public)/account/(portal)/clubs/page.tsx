@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { ClubSetupHelp } from "@/components/role-setup-help";
 import { redirect } from "next/navigation";
 import { UsersRound } from "lucide-react";
-import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
 import { PortalClubDirectory } from "@/components/portal-club-directory";
-import { portalClubDirectory } from "@/modules/club-rosters/portal-directory";
+import { coordinatorClubsPath, portalClubDirectory } from "@/modules/club-rosters/portal-directory";
 import { parseClubQuery } from "@/modules/club-reports/area-summary-domain";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { attendeeSignInRedirectPath, twoStepRedirectPath } from "@/modules/attendee-accounts/return-redirect";
 import { attendeeSecondStepPending } from "@/modules/attendee-accounts/portal-second-step";
-import { isAreaCoordinator, listClubsForArea } from "@/modules/organizations/area-coordinators";
+import { isAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
+import { AccountPageBanner } from "@/components/account-page-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -43,43 +43,19 @@ export default async function MyClubsPage({ searchParams }: { searchParams: Prom
     : [[], false];
   const params = await searchParams;
   const query = parseClubQuery(params.q);
+  // The coordinator's club list is Club coordination > Overview > Clubs at a glance (#1551). Old links to this page carry
+  // a search over; a coordinator who directs clubs gets the same My club pages as any director.
+  if (acting?.role === "AREA_COORDINATOR" || (areaCoordinator && clubs.length === 0)) {
+    redirect(coordinatorClubsPath(query));
+  }
   const page = Number(Array.isArray(params.page) ? params.page[0] : params.page ?? 1);
   const own = new Map(clubs.map((club) => [club.organizationId, club.role]));
-  if (areaCoordinator || acting?.role === "AREA_COORDINATOR") {
-    // An Area Coordinator sees every club (#387): their own open as usual;
-    // the rest open view only.
-    const everyClub = await listClubsForArea();
-    const directory = portalClubDirectory(everyClub, own, query, page);
-    return (
-      <>
-        <CoordinatorShellHeader>
-          <section className="public-registration-hero public-manage-hero account-page-hero">
-            <div>
-              <p className="public-registration-eyebrow">Area Coordinator</p>
-              <h1>Clubs</h1>
-            </div>
-          </section>
-        </CoordinatorShellHeader>
-        <div className="account-page-body">
-          <section className="public-manage-card">
-            <p className="field-help">Every active club. Clubs you don&apos;t run open view only, with ages instead of birth dates.</p>
-            <PortalClubDirectory slice={directory} query={query} total={everyClub.length} />
-          </section>
-        </div>
-      </>
-    );
-  }
   // Most directors run one club: take them straight to it.
   if (clubs.length === 1) redirect(`/account/clubs/${clubs[0].organizationId}`);
 
   return (
     <>
-      <section className="public-registration-hero public-manage-hero account-page-hero">
-        <div>
-          <p className="public-registration-eyebrow">Club ministries</p>
-          <h1>My clubs</h1>
-        </div>
-      </section>
+      <AccountPageBanner title="My clubs" context="Club ministries" />
       <div className="account-page-body">
         <section className="public-manage-card">
           {clubs.length === 0 ? (

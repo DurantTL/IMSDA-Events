@@ -1,11 +1,13 @@
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CHURCH_AGREEMENT,
+  COORDINATOR_CANCELLED_VISIBLE_DAYS,
   MAX_OTHER_BOARD_MEMBERS,
   MIN_FILL_SECONDS,
   PHILOSOPHY_STATEMENT,
   directorBackgroundLabels,
+  isVisibleToCoordinator,
   newClubApplicationInputSchema,
   newClubDecisionSchema,
   newClubInviteInputSchema,
@@ -156,5 +158,32 @@ describe("the migration", () => {
       expect(statement).not.toMatch(/^(DELETE|UPDATE|TRUNCATE|DROP)\b/i);
       expect(statement).not.toMatch(/^ALTER TABLE "(?!NewClubApplication|PlatformSettings")/);
     }
+  });
+});
+
+describe("cancelled applications on the coordinator list (#1554)", () => {
+  afterEach(() => vi.useRealTimers());
+  const DAY = 24 * 60 * 60 * 1000;
+  const NOW = new Date("2026-11-04T12:00:00Z");
+  const cancelledAgo = (days: number) => ({ status: "DECLINED" as const, decidedAt: new Date(NOW.getTime() - days * DAY).toISOString() });
+
+  it("keeps a cancelled application for 30 days and drops it after", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+    expect(COORDINATOR_CANCELLED_VISIBLE_DAYS).toBe(30);
+    expect(isVisibleToCoordinator(cancelledAgo(0), new Date())).toBe(true);
+    expect(isVisibleToCoordinator(cancelledAgo(29), new Date())).toBe(true);
+    expect(isVisibleToCoordinator(cancelledAgo(30), new Date())).toBe(false);
+    expect(isVisibleToCoordinator(cancelledAgo(31), new Date())).toBe(false);
+  });
+
+  it("never hides waiting or confirmed applications, however old", () => {
+    const old = new Date(NOW.getTime() - 400 * DAY).toISOString();
+    expect(isVisibleToCoordinator({ status: "PENDING", decidedAt: null }, NOW)).toBe(true);
+    expect(isVisibleToCoordinator({ status: "APPROVED", decidedAt: old }, NOW)).toBe(true);
+  });
+
+  it("keeps a cancelled application whose cancellation time is unknown", () => {
+    expect(isVisibleToCoordinator({ status: "DECLINED", decidedAt: null }, NOW)).toBe(true);
   });
 });

@@ -1,12 +1,13 @@
 # Design system
 
-`docs/design-system/` is a snapshot of the IMSDA Events visual language: color,
-type, spacing, radius and shadow tokens, 20 components with usage rules, and
-static mockups of the club Home, Roster, event registration, month calendar and
-check-in screens.
+`docs/design-system/` is a snapshot of the IMAdventist (Events & Club Ministry) visual language: color,
+type, spacing, radius and shadow tokens, 21 components with usage rules, and
+static mockups of the public home, club Home, Roster, event registration, month
+calendar and check-in screens.
 
 It was recreated from `app/globals.css` and the component CSS modules at
-main@81f03c93 (October 30, 2026). It is documentation, not code: nothing in the
+main@d6d783c7 (November 6, 2026), after the IMAdventist rebrand
+(`docs/BRANDING-IMADVENTIST-INVENTORY.md`). It is documentation, not code: nothing in the
 app imports it, and the app's own CSS stays the source of truth.
 
 ## What is in the folder
@@ -20,7 +21,7 @@ app imports it, and the app's own CSS stays the source of truth.
 | `components/bundle.css` | Component classes copied from the app's CSS, with type floors resolved.                                                                                     |
 | `components/<Name>/`    | `README.md` (usage rules) and `preview.html` (a static rendition) for each component.                                                                       |
 | `design-system.json`    | Index for the Claude Design System artifact the folder was published from.                                                                                  |
-| `fonts/`                | Noto Sans Regular and Bold (SIL Open Font License).                                                                                                         |
+| `fonts/`                | Noto Sans Regular and Bold (SIL Open Font License) and AdventSans Logo for the IMAdventist wordmark (copy of `public/brand/AdventSans-Logo.otf`).           |
 
 Mockups use fictional clubs and people only (for example "Riverton
 Pathfinders" and "Morgan Reed").
@@ -31,6 +32,8 @@ Pathfinders" and "Morgan Reed").
 - Noto Sans 500 and 600 weights are not included, so previews show those as
   400 or 700.
 - Not every CSS module was copied; page-specific styles are left out.
+- `assets/Brand/` holds a 256px copy of the IMAdventist symbol for the previews;
+  the app uses the 1024px original in `public/brand/`.
 - The map pin asset stays at `public/pathfinder-logo-pin.png`; `assets/Map/`
   only describes it.
 

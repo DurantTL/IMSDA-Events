@@ -3,9 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CalendarItem } from "@/modules/calendar/domain";
 import { formatDateRange } from "@/modules/calendar/domain";
+import { buildCalendarFilterGroups } from "@/modules/calendar/filter-groups";
 import { buildCalendarWidgetEmbedCode, parseWidgetLimit, selectWidgetItems } from "@/modules/calendar/widget";
 
+// The widget reads the same chips as the calendar (#1611): the homepage tiles plus the fixed ones.
+const groups = buildCalendarFilterGroups([{ position: 1, name: "Camp Heritage", categories: ["Camps"] }]);
 const listPublicCalendarItems = vi.fn();
+vi.mock("@/modules/calendar/public-filters", async () => ({ loadCalendarFilterGroups: async () => groups }));
 vi.mock("@/modules/calendar/repository", async () => ({
   listPublicCalendarItems: (...args: unknown[]) => listPublicCalendarItems(...args),
   conferenceToday: () => "2026-11-10",
@@ -54,8 +58,8 @@ describe("widget selection (#107)", () => {
       item({ key: "underway", startsOn: "2026-11-08", endsOn: "2026-11-11" }),
       item({ key: "a", startsOn: "2026-11-15", endsOn: "2026-11-15" }),
     ];
-    expect(selectWidgetItems(items, { today, filter: "everything" }).map((i) => i.key)).toEqual(["underway", "a", "c"]);
-    expect(selectWidgetItems(items, { today, filter: "everything", limit: 2 }).map((i) => i.key)).toEqual(["underway", "a"]);
+    expect(selectWidgetItems(items, { today, groups, filter: "everything" }).map((i) => i.key)).toEqual(["underway", "a", "c"]);
+    expect(selectWidgetItems(items, { today, groups, filter: "everything", limit: 2 }).map((i) => i.key)).toEqual(["underway", "a"]);
   });
 
   it("shows a repeating series once", () => {
@@ -64,7 +68,7 @@ describe("widget selection (#107)", () => {
       item({ key: "r2", seriesId: "s", startsOn: "2026-11-19", endsOn: "2026-11-19" }),
       item({ key: "one", startsOn: "2026-11-14", endsOn: "2026-11-14" }),
     ];
-    expect(selectWidgetItems(items, { today, filter: "everything" }).map((i) => i.key)).toEqual(["r1", "one"]);
+    expect(selectWidgetItems(items, { today, groups, filter: "everything" }).map((i) => i.key)).toEqual(["r1", "one"]);
   });
 
   it("filters by group and category", () => {
@@ -73,9 +77,9 @@ describe("widget selection (#107)", () => {
       item({ key: "school", category: "Schools" }),
       item({ key: "other", category: "Retreat" }),
     ];
-    expect(selectWidgetItems(items, { today, filter: "camps" }).map((i) => i.key)).toEqual(["camp"]);
-    expect(selectWidgetItems(items, { today, filter: "main" }).map((i) => i.key).sort()).toEqual(["camp", "other"]);
-    expect(selectWidgetItems(items, { today, category: "retreat" }).map((i) => i.key)).toEqual(["other"]);
+    expect(selectWidgetItems(items, { today, groups, filter: "ministry-1" }).map((i) => i.key)).toEqual(["camp"]);
+    expect(selectWidgetItems(items, { today, groups, filter: "main" }).map((i) => i.key).sort()).toEqual(["camp", "other"]);
+    expect(selectWidgetItems(items, { today, groups, category: "retreat" }).map((i) => i.key)).toEqual(["other"]);
   });
 });
 
@@ -89,17 +93,17 @@ describe("widget selection edge cases (#107)", () => {
       item({ key: "link-a", ...linked, startsOn: "2026-11-14", endsOn: "2026-11-14" }),
       item({ key: "other", startsOn: "2026-11-12", endsOn: "2026-11-12" }),
     ];
-    expect(selectWidgetItems(items, { today, filter: "everything" }).map((i) => i.key)).toEqual(["other", "link-a"]);
+    expect(selectWidgetItems(items, { today, groups, filter: "everything" }).map((i) => i.key)).toEqual(["other", "link-a"]);
   });
 
   it("uses the event's dates to decide an item is over", () => {
     const items = [item({ key: "late", kind: "EVENT", href: "/events/x", startsOn: "2026-11-01", endsOn: "2026-11-01", eventStartsOn: "2026-11-01", eventEndsOn: "2026-11-12" })];
-    expect(selectWidgetItems(items, { today, filter: "everything" })).toHaveLength(1);
+    expect(selectWidgetItems(items, { today, groups, filter: "everything" })).toHaveLength(1);
   });
 
   it("takes the first value of a repeated filter or category instead of throwing", () => {
     const items = [item({ key: "camp", category: "Camps" }), item({ key: "retreat", category: "Retreat" })];
-    expect(selectWidgetItems(items, { today, category: ["retreat", "camps"] }).map((i) => i.key)).toEqual(["retreat"]);
+    expect(selectWidgetItems(items, { today, groups, category: ["retreat", "camps"] }).map((i) => i.key)).toEqual(["retreat"]);
     expect(parseWidgetLimit(["3", "9"])).toBe(3);
   });
 });

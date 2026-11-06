@@ -223,7 +223,7 @@ describe("calendar page wiring (#1202, #1203)", () => {
   it("keeps the phone dots decorative and still reads items only through the existing public set", () => {
     expect(page).toContain("CalendarMonthChip");
     expect(page).toContain("listPublicCalendarItems(from, to)");
-    expect(page).toContain("filterByGroup(allItems, filter)");
+    expect(page).toContain("filterByGroup(allItems, filter, calendarFilterGroups)");
     const chip = read("components/calendar-month-chip.tsx");
     expect(chip).toContain('"aria-hidden": true');
     expect(chip).toContain("tabIndex: -1");

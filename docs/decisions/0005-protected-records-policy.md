@@ -9,8 +9,9 @@ Date: 2026-08-09
 
 **Addendum A (club roster birth dates) is Accepted** as of 2026-09-22; see the end
 of this document. It covers only roster birth dates. **Addendum B (Pathfinder Health Record) is Accepted (interim)** as
-of 2026-10-14 (see its status line); the feature stays switched off in production
-until the prerequisites listed there are met.
+of 2026-10-14 and finally on 2026-11-05 (see its status line); the feature stays
+switched off in production until the encryption key is moved out of the env file
+(server checklist item 11).
 
 ## Context
 
@@ -133,6 +134,52 @@ Two open implementation questions this ADR should settle before #190 starts:
 - Rotation cadence and the re-seal procedure when it happens (re-sealing requires
   the old key to decrypt and the new key to re-encrypt — plan for both being
   available during a rotation window).
+
+**Key versioning and rotation (decided 2026-11-05, #1516; Caleb asked the build to choose):**
+
+1. Every sealed value records the key version that sealed it. While the key
+   version is 1, values keep the original `v1.…` format, with version 1 implied,
+   so an older image can still read them (rollback safety). From version 2 a
+   value is `v2.<keyVersion>.<nonce>.<tag>.<ciphertext>`, with the version also
+   checked by the cipher so it can't be edited. A `v1` value counts as version 1.
+   After a rotation to version 2 or higher, an image from before this change
+   cannot read the new values; `SECRET_ENCRYPTION_KEY_VERSION` must then stay set.
+2. The server loads the current key with `SECRET_ENCRYPTION_KEY_VERSION`
+   (default 1). During a rotation it can also load the previous key,
+   read-only, with its own version (`SECRET_ENCRYPTION_PREVIOUS_KEY` or
+   `_FILE`, and `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION`). It refuses to start if
+   the previous key has no version, its version is not lower than the current
+   one, it equals the current key, or it is shorter than the production minimum.
+3. A value is opened with the key whose version matches the value. A value from
+   a version that isn't loaded is refused with a fixed message that names only
+   the version number. Writes, and the calendar address fingerprints, use the
+   current key. While a previous key is loaded, a duplicate-calendar check also
+   matches the previous key's fingerprint.
+4. One list of every sealed column (`modules/security/sealed-columns.ts`) drives
+   both tools, and a test fails if a new sealing call or `sealed*` column isn't
+   on it. `npm run key:rotate` is a dry run unless given `--apply`; it re-seals
+   values not yet on the current version, in id order and batches, so it can be
+   stopped and rerun, and it never overwrites a value that changed meanwhile.
+   `npm run key:check` is read-only and exits 1 if the key is missing, any value
+   is unreadable or any value is on an older version. Both print counts only.
+5. `/api/health` (authorized callers) reports whether a key is configured, its
+   source, the current version, whether a previous key is loaded and its
+   version. It never scans the database and never shows key text.
+6. Sealed health copies are immutable by a database trigger. Migration
+   `20270102100000_health_snapshot_key_rotation` allows exactly one update on
+   them: a copy field's sealed value alone, inside the rotation command's own
+   transaction (`imsda.key_rotation`). Every other update, and every change to a
+   copy itself, is still refused, and the delete rules are unchanged.
+7. Accepted limitation: a calendar item left behind by a deleted feed keeps the
+   address fingerprint it was given, and rotation can't recompute it (the
+   address is gone). Once the previous key is removed it won't relink to an
+   identical re-added feed. `npm run key:check` counts these (informational).
+8. Running a rotation in production is a human step; the procedure is in
+   `docs/DEPLOY-DOCKER.md`, "Rotating the encryption key", and is a draft for
+   the custodian to review (checklist item 9). On the server each key version
+   has its own file (`/etc/imsda/secret-encryption-key`, then `…-v2` and so on),
+   and a key file is never overwritten, so a container restarted or rolled back
+   with old settings always gets the old key for its old version.
 
 ### 3. Access authority: subject, guardian, staff, disclosure, break-glass
 
@@ -408,7 +455,10 @@ birth dates need their own protection.
    - The key copy is kept apart from the database dumps. A single machine that
      holds both would let anyone who took it read everything.
    - Rotation follows §2 above: re-seal while both keys are available. The
-     custodian writes the step-by-step procedure as part of the checklist.
+     custodian writes the step-by-step procedure as part of the checklist; the
+     build provides versioned keys and `npm run key:rotate` / `key:check`
+     (§2, "Key versioning and rotation", #1516), with a draft procedure in
+     `docs/DEPLOY-DOCKER.md` for the custodian to review.
 8. **Around the database.** The items on `docs/SERVER-SECURITY-CHECKLIST.md`
    must be complete before real directors enter birth dates. H2 may be built,
    tested, and merged with synthetic data before then.
@@ -426,8 +476,9 @@ birth dates need their own protection.
 
 ## Addendum B: Pathfinder Health Record
 
-Status: **Accepted (interim), 2026-10-14, Communication Director and IT
-Director.** Approved as written by the two of them as an interim measure
+Status: **Accepted, 2026-11-05, Communication Director and IT Director**
+(final; see "Decided 2026-11-05" below). First accepted as interim on 2026-10-14
+by the same two people. Approved as written by the two of them as an interim measure
 (issue #923). The reason given: health information currently has no security at
 all (paper forms and Cognito), so this design is better than the status quo
 now. The full sign-off list under "Sign-off" still applies for final
@@ -806,8 +857,13 @@ placed before a deletion. Routes: `POST /api/staff/health-snapshots/break-glass`
 `GET /api/staff/health-snapshots/person/<personId>`,
 `GET /api/staff/health-snapshots/break-glass-grants`,
 `GET|POST /api/staff/health-snapshots/holds`,
-`POST /api/staff/health-snapshots/holds/<holdId>/lift`. There is no page yet;
-a break-glass screen is a follow-up.
+`POST /api/staff/health-snapshots/holds/<holdId>/lift`. The page is
+`/admin/health-access` ("Break-glass and legal holds", #1617), in System management > People. The page itself is for
+system administrators only, because holds are system-only and it sits in the System navigation; a Clubs Administrator
+can still use the grants-list route. It reads through the same functions as the GET routes and every change posts to
+the routes above. The privacy acknowledgment comes first while the switch is on; with the switch off it cannot be
+recorded (its route answers 404) and the hold and review routes do not require it, so the page skips that step and
+still shows holds and the grant review. Where the Health tab says break-glass is needed, the inline reason form follows the break-glass route: it is shown to a system administrator and to a Clubs Administrator (when the member has a person id), and to no director, deputy, registrar or health-role viewer.
 
 ### Break-glass for the live record (#929)
 
@@ -866,7 +922,37 @@ list shows a null person.
 **Migration.** `20261025200000_health_break_glass_uses` adds one enum and one table (`HealthBreakGlassUse`), and
 makes `HealthSnapshotBreakGlass.personId` nullable with `ON DELETE SET NULL` (it was `CASCADE`).
 
+### Decided 2026-11-05 (Communication Director)
+
+Answers from Caleb Durant, Communication Director, on 2026-11-05 to the open
+items that blocked production use. Where they differ from "Still open" or
+"Sign-off" below, these are the current rule.
+
+1. **Key backup restore test: done** (#1521, reported by Caleb).
+2. **Server checklist:** every item is done except item 11. The encryption key
+   is still a plain value in the server's env file and the xCloud environment
+   page. It must move to the root-only key file before health records are
+   switched on (`docs/DEPLOY-DOCKER.md`, "Loading the encryption key from a
+   protected file").
+3. **Sign-off:** final acceptance needs only the IT Director and the
+   Communication Director. Both have accepted. No other owners are required.
+4. **Retention periods** do not block use. Counsel's review, if any, is a change
+   made as it comes, not a gate.
+5. **Acknowledgment wording:** confirmed as written in
+   `modules/health-records/acknowledgment-domain.ts`. The version is unchanged.
+6. **Coordinator window start:** no start bound is needed. Access follows the
+   event's dates only (it ends at the end of the event's last day).
+7. **After the site is retired** (#1550): decided later. Not a gate.
+8. **Key versioning, rotation and key health check** (#1516): build it now,
+   before real records exist, because adding a key version is simplest while
+   nothing is sealed. Not a gate for switching on.
+9. **Break-glass screen:** added to the build queue (#98) as its own issue. Built in #1617 at `/admin/health-access`.
+10. **Coordinator entry point:** to be built (a link to the coordinator health
+    page from Club coordination).
+
 ### Still open (blocking production use)
+
+Answered on 2026-11-05 (above). Kept for the record.
 
 These are the remaining decisions from section 6 of the options report plus
 questions this build raised.
@@ -883,8 +969,8 @@ questions this build raised.
   retention to 30 nightly copies is still an operations change (Compose
   defaults to 14 days).
 - **Break-glass screen.** #924 and #929 add the routes only (one grant now covers the live record and the sealed
-  copies); a page for a system administrator to start break-glass and place holds is a follow-up. Until it exists
-  the Health tab explains that break-glass is needed.
+  copies); the page for a system administrator to start break-glass and place or lift holds is `/admin/health-access`
+  (#1617), and the Health tab shows a reason form to whoever the break-glass route accepts (system administrators and Clubs Administrators).
 - **Acknowledgment wording.** The notice text in
   `modules/health-records/acknowledgment-domain.ts` is a draft for the
   Communication Director to confirm. A change to it needs a new version.
@@ -895,6 +981,9 @@ questions this build raised.
   no links to them; #658's event sheet is the natural place to link from.
 
 ### Prerequisites before real records
+
+Status 2026-11-05: 1, 2 and 3 are met. 4 is met except checklist item 11 (move
+the key out of the env file), which is the last step before switching on.
 
 1. This addendum Accepted (done, interim, 2026-10-14; final acceptance needs
    the full sign-off list).

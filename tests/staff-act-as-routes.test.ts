@@ -112,6 +112,11 @@ describe("act-as routes for a system administrator (#442)", () => {
     expect(mocks.updateMany).toHaveBeenLastCalledWith({ where: { id: "act-1", endedAt: null }, data: expect.objectContaining({ endedReason: "STOPPED" }) });
   });
 
+  it("answers the portal each role lands on, with no My account detour (#1556)", async () => {
+    expect(await (await routes[0][1]()).json()).toMatchObject({ href: "/account/area-clubs/overview" });
+    expect(await (await routes[1][1]()).json()).toMatchObject({ href: "/account/clubs/club-1" });
+  });
+
   it("stops acting as an Area Coordinator to the clubs list, not a club page (#466)", async () => {
     mocks.findFirst.mockResolvedValueOnce({ id: "act-2", role: "AREA_COORDINATOR", organizationId: null });
     mocks.updateMany.mockResolvedValueOnce({ count: 1 });

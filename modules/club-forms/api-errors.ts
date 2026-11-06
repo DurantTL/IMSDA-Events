@@ -32,6 +32,7 @@ const statusByCode: Record<ClubFormError["code"], number> = {
   DUPLICATE_ON_ROSTER: 409,
   APPLICATION_OFF: 409,
   APPLICATION_CLOSED: 409,
+  DRAFT_CHANGED: 409,
 };
 
 /**

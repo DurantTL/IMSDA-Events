@@ -1,4 +1,4 @@
-IMSDA Events is the Iowa-Missouri Conference's event and club system: public event pages and registration, the club director portal, the Area Coordinator workspace and the staff workspace. These rules describe how its screens look and read, using the tokens in `tokens.json`.
+IMAdventist (Events & Club Ministry) is the Iowa-Missouri Conference's event and club system: public event pages and registration, the club director portal, the Area Coordinator workspace and the staff workspace. These rules describe how its screens look and read, using the tokens in `tokens.json`.
 
 ## Content fundamentals
 
@@ -7,10 +7,18 @@ IMSDA Events is the Iowa-Missouri Conference's event and club system: public eve
 - Status is a real word in a `StatusChip` or records cell (Submitted, Not submitted, Draft, Waitlisted, Not due yet), never color alone.
 - Say what was saved and what to do next. Warn before anything that can't be undone, and name the person or record.
 - Examples and mockups use fictional clubs and people only (e.g. "Riverton Pathfinders", "Morgan Reed").
+- The product is **IMAdventist**. IMSDA and Iowa-Missouri Conference name the organization and stay as written; don't call the product "IMSDA Events" in new copy.
+
+## Logo
+
+- The one logo is the IMAdventist symbol, `assets/Brand/imadventist-symbol.png` (from `public/brand/imadventist-symbol.png`), drawn by the app's `BrandLink`. The old gold "i" tile is retired.
+- 42px in app and portal headers and the staff sidebar, 54px in the public header, 68px in email headers, 180px as the home-screen icon. Always at least a 44px tap target, linking to the calendar (Home on public discovery pages).
+- Name beside it: "IMAdventist", with "Events & Club Ministry" in the public header, or a small uppercase "IMAdventist" over the area name ("Club portal", "Club coordination") in portal headers.
+- Empty alt text on the image; the link's label names where it goes ("IMAdventist calendar"). Never recolor, crop or outline the symbol.
 
 ## Color
 
-- Brand: `imsda-navy` for primary actions, headers and links; `imsda-purple` for focus on fields, current-tab underlines and eyebrows; `imsda-gold` for the brand mark and the sidebar's current-link edge. The `-soft` tints are backgrounds only.
+- Brand: `imsda-navy` for primary actions, headers and links; `imsda-purple` for focus on fields, current-tab underlines and eyebrows; `imsda-gold` for the public home call to action (navy text on gold) and the sidebar's current-link edge. `home-green` belongs to the public home page only: the descriptor under the wordmark, section kickers and place-card edges. The `-soft` tints are backgrounds only.
 - Text: `ink` for body, `muted` for secondary (4.5:1 or better on `card` and `paper`). Lines use `line`; fields use `field-border` (3:1 on white).
 - Status: `green` / `green-soft` done, `imsda-gold-soft` with `gold-text` in progress, `coral` / `coral-soft` needs attention, `danger` for destructive actions.
 - Calendar chips use `cal-tone-1`…`6` and `cal-closure-*`; event info cards use `info-card-*`.
@@ -18,7 +26,7 @@ IMSDA Events is the Iowa-Missouri Conference's event and club system: public eve
 
 ## Type
 
-- Noto Sans throughout (`--font-sans`); Georgia appears only in the brand mark's italic "i".
+- Noto Sans throughout (`--font-sans`). AdventSans Logo (`--font-logo`, `fonts/AdventSans-Logo.otf`) sets only the "IMAdventist" wordmark in the public header.
 - Floors: public body 16px; staff and portal body 14px; helper text and chips 12px in the club and account portal, raised to 14px in staff workspaces. Don't set text below these.
 - Weights: 400 body, 700 labels and buttons, 800 for tabs and uppercase eyebrows.
 
@@ -28,7 +36,7 @@ IMSDA Events is the Iowa-Missouri Conference's event and club system: public eve
 - Radii: `radius-field` 10px for fields and buttons, `radius-card` for panels, `radius-modal` for dialogs, `radius-pill` for chips.
 - App tokens (#1350): `--secondary-bg`, `--table-head`, `--touch-target` and the radii `--radius-sm`, `--radius-card`, `--radius-info`, `--radius-panel`, `--radius-modal`, `--radius-pill` now exist in `app/globals.css`, with the same values as in `tokens.css`.
 - Shadows are soft and navy-tinted: `shadow-metric` on cards, `shadow` on menus and heroes, `shadow-modal` on dialogs, `shadow-tabbar` on the phone tab bar.
-- Club portal: masthead, navy banner and one flat tab row of ten tools (no "More" menu). Staff: 260px navy sidebar on desktop, five-slot bottom tab bar on phones.
+- Club portal: masthead (symbol, "Club portal", the signed-in name and role, Your account, Forms help, Sign out), a navy banner with the club, church, role and club-year box, and one flat tab row of ten tools (no "More" menu). The coordinator and attendee account pages use the same masthead and banner. Staff: 260px navy sidebar on desktop, five-slot bottom tab bar on phones.
 
 ## Focus and motion
 
@@ -37,6 +45,6 @@ IMSDA Events is the Iowa-Missouri Conference's event and club system: public eve
 
 ## Iconography
 
-- lucide-react line icons, 14–20px, `aria-hidden="true"`, always beside a text label. The brand mark is CSS, not an image; there is no SVG logo. The map pin in `assets/Map` marks clubs on the club finder.
+- lucide-react line icons, 14–20px, `aria-hidden="true"`, always beside a text label. The logo is the IMAdventist symbol image (see Logo); there is no SVG logo. The map pin in `assets/Map` marks clubs on the club finder.
 
-> **Not synced:** this system has no React bundle or live components; previews are static HTML recreations of `app/globals.css` and component CSS at main@81f03c93. Noto Sans 500/600 weights, page-specific CSS modules and the favicon were not copied. Rebuild from the repository when the interface changes.
+> **Not synced:** this system has no React bundle or live components; previews are static HTML recreations of `app/globals.css` and component CSS at main@d6d783c7. Noto Sans 500/600 weights, page-specific CSS modules and the favicon were not copied; the symbol in `assets/Brand` is a 256px copy of the 1024px original. Rebuild from the repository when the interface changes.

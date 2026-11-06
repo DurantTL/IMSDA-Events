@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { EmptyState, NoMatchesState } from "./empty-state";
 import { ListPager } from "@/components/list-pager";
 import type { ReactNode } from "react";
@@ -39,7 +40,7 @@ function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }:
       <summary className={styles.panelSummary}>
         Filters{count > 0 ? <span className="count-badge">{count} active</span> : null}
       </summary>
-      <form action="/admin/people" className={styles.panelForm} method="get">
+      <GetFilterForm action="/admin/people" className={styles.panelForm}>
         {query ? <input name="q" type="hidden" value={query} /> : null}
         <fieldset className={styles.panelSet}>
           <legend>Roles (anyone with any of these)</legend>
@@ -85,7 +86,7 @@ function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }:
           <button className="primary-button" type="submit">Apply filters</button>
           {count > 0 ? <Link className="secondary-button" href={peopleHref({})}>Clear filters</Link> : null}
         </div>
-      </form>
+      </GetFilterForm>
     </details>
   );
 }
@@ -143,8 +144,9 @@ export function PeopleDirectory({
     <div className={styles.wrap}>
       <PeopleQuickFilters clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
       <PeopleFilterPanel clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
-      <PeopleActiveFilters chips={chips} clearHref={peopleHref({})} />
       {peopleFilterCount(filters) === 0 && !pendingOnly ? pendingBlock : null}
+      {/* The count and the active chips share one row (#1557), so the first chip does not add a row above the list. */}
+      <div className={styles.statusRow}>
       <p aria-live="polite" className={styles.count} id={PEOPLE_STATUS_ID} role="status" tabIndex={-1}>
         {pickEvent
           ? "Pick an event to see who has this role."
@@ -157,6 +159,8 @@ export function PeopleDirectory({
               : `${total} ${total === 1 ? "person" : "people"}${summary ? ` with ${summary}` : ""}${query ? ` matching "${query}"` : ""}.`}
         {eventRolesNeedEvent(filters) ? " Event roles need an event. Pick one to include them." : ""}
       </p>
+      <PeopleActiveFilters chips={chips} clearHref={peopleHref({})} />
+      </div>
       {pickEvent ? (
         <p className={styles.empty}>Pick an event to see who has this role. Event roles belong to one event at a time.</p>
       ) : pendingOnly ? (

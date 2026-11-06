@@ -75,7 +75,7 @@ export function ActAsButton({
       {result ? (
         <p className="inline-notice success" role="status">
           {result.message}{" "}
-          <a href={result.href} ref={resultLinkRef}>{resultAction} <ArrowRight aria-hidden="true" size={13} /></a>.
+          <a className="primary-button" href={result.href} ref={resultLinkRef}>{resultAction} <ArrowRight aria-hidden="true" size={14} /></a>
         </p>
       ) : (
         <button className="secondary-button" onClick={() => setOpen(true)} type="button">

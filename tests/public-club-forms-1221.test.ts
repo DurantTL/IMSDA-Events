@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   listEnabled: vi.fn(),
   listFillModes: vi.fn(),
   listClosed: vi.fn(),
+  publishedSettings: vi.fn(async (): Promise<unknown> => null),
   getCurrentAttendee: vi.fn(),
   currentStaffActingContext: vi.fn(),
   attendeeSecondStepPending: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/components/public-header-session-links", () => ({ PublicHeaderSessionLinks: ({ navLinks }: { navLinks?: unknown }) => { mocks.headerLinks(navLinks); return null; } }));
 vi.mock("@/modules/club-forms/public-index", () => ({ listEnabledPublicClubFormKeys: mocks.listEnabled, listPublicClubFormFillModes: mocks.listFillModes, listPublicClubFormClosedKeys: mocks.listClosed }));
+vi.mock("@/modules/club-forms/public-index-settings", () => ({ getPublishedPublicClubFormsSettings: mocks.publishedSettings }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/portal-second-step", () => ({ attendeeSecondStepPending: mocks.attendeeSecondStepPending }));
 vi.mock("@/modules/attendee-accounts/return-redirect", () => ({
@@ -62,6 +64,7 @@ async function renderIndex(enabled: string[], fillModes: Map<string, "FAMILY" | 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.publishedSettings.mockResolvedValue(null);
   mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-1" } });
   mocks.currentStaffActingContext.mockResolvedValue(null);
   mocks.attendeeSecondStepPending.mockResolvedValue(false);
@@ -144,14 +147,41 @@ describe("the Club forms page (#1221)", () => {
   });
 });
 
+describe("staff settings on the Club forms page (#1562)", () => {
+  it("does not list a hidden form or its link, and shows the edited intro and line", async () => {
+    const { defaultPublicClubFormsSettings } = await import("@/modules/club-forms/public-index-settings-domain");
+    const settings = defaultPublicClubFormsSettings();
+    settings.intro = "Synthetic staff intro.";
+    settings.items.find((i) => i.id === "can-collecting")!.shown = false;
+    settings.items.find((i) => i.id === "transportation-list")!.description = "Synthetic edited line.";
+    mocks.publishedSettings.mockResolvedValue(settings);
+    const html = await renderIndex(publicClubFormTemplateKeys as string[]);
+    expect(html).not.toContain("Can Collecting Report");
+    expect(html).not.toContain("to=can-collecting-report");
+    expect(html).toContain("Synthetic staff intro.");
+    expect(html).toContain("Synthetic edited line.");
+    expect(html).toContain("to=transportation-list");
+  });
+
+  it("keeps closed and off forms without a link when the settings show them", async () => {
+    const { defaultPublicClubFormsSettings } = await import("@/modules/club-forms/public-index-settings-domain");
+    mocks.publishedSettings.mockResolvedValue(defaultPublicClubFormsSettings());
+    const html = await renderIndex(publicClubFormTemplateKeys.filter((key) => key !== "can_collecting_report"), tltOpen, ["club_tlt_application"]);
+    expect(html).not.toContain("to=can-collecting-report");
+    expect(html).not.toContain("/clubs/forms/apply/");
+    expect(html).toContain(NOT_AVAILABLE_LINE);
+  });
+});
+
 describe("an open application on the Club forms page (#1229)", () => {
-  it("links the TLT Application to its apply page and shows the copyable address", async () => {
+  it("links the TLT Application to its apply page without the staff copy tool", async () => {
     const view = publicClubFormView(item("tlt-application"), allKeys, tltOpen);
     expect(view).toMatchObject({ href: "/clubs/forms/apply/club_tlt_application", note: null, applicationPath: "/clubs/forms/apply/club_tlt_application" });
     const html = await renderIndex(publicClubFormTemplateKeys as string[]);
     expect(html).toContain('href="/clubs/forms/apply/club_tlt_application"');
-    expect(html).toContain("/clubs/forms/apply/club_tlt_application</code>");
-    expect(html).toContain("Copy link for your website");
+    // The copy-link tool is for directors and staff, never the public page (#1562).
+    expect(html).not.toContain("</code>");
+    expect(html).not.toContain("Copy link");
   });
 
   it("says Not available yet, with no link and no address, when the open form is off", async () => {
@@ -165,7 +195,7 @@ describe("an open application on the Club forms page (#1229)", () => {
     const html = await renderIndex(publicClubFormTemplateKeys as string[], tltOpen, ["club_tlt_application"]);
     expect(html).toContain("Applications are closed for this club year.");
     expect(html).not.toContain("/clubs/forms/apply/");
-    expect(html).not.toContain("Copy link for your website");
+    expect(html).not.toContain("Copy link");
   });
 
   it("falls back to the private-link line when staff move the form out of open application", () => {
@@ -238,5 +268,20 @@ describe("the club chooser (#1221)", () => {
       expect(clubChooseDestination("club-1", key)).toMatch(new RegExp(`^/account/clubs/club-1/${path}`));
     }
     expect(clubChooseDestination("a/../b?x=1", "orders")).toBe("/account/clubs/a%2F..%2Fb%3Fx%3D1/orders");
+  });
+});
+
+describe("the main landmark on the Club forms view (#1562)", () => {
+  it("keeps one <main> on the public page and uses a <div> for the staff preview", async () => {
+    const { renderPublicClubForms } = await import("@/components/public-club-forms-view");
+    mocks.listEnabled.mockResolvedValue(new Set());
+    mocks.listFillModes.mockResolvedValue(new Map());
+    mocks.listClosed.mockResolvedValue(new Set());
+    const count = (html: string) => (html.match(/<main[\s>]/g) ?? []).length;
+    expect(count(renderToStaticMarkup(await PublicClubFormsPage()))).toBe(1);
+    const preview = renderToStaticMarkup(await renderPublicClubForms(null, { as: "div" }));
+    expect(count(preview)).toBe(0);
+    expect(preview).toContain("<h1>Club forms</h1>");
+    expect(preview).toContain("public-registration-page");
   });
 });

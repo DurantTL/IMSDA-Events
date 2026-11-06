@@ -148,7 +148,7 @@ export default async function ClubRecordsPage({
                 {candidate === month
                   ? <span aria-current="page" className="count-badge">Viewing</span>
                   : (
-                    <Link aria-label={`${closed ? "View" : "Open"} ${reportMonthLabel(candidate)}`} className="secondary-button club-event-action" href={`${recordsBase}?month=${candidate}`}>
+                    <Link aria-label={`${closed ? "View" : "Open"} ${reportMonthLabel(candidate)}`} className="secondary-button club-event-action" href={`${recordsBase}?month=${candidate}`} scroll={false}>
                       {closed ? "View" : "Open"} <ArrowRight size={14} aria-hidden="true" />
                     </Link>
                   )}

@@ -7,7 +7,7 @@ import { CalendarSubscribe } from "@/components/calendar-subscribe";
 import { CalendarViewBar } from "@/components/calendar-view-bar";
 import { calendarGridRows, calendarMoreLabel, monthGrid, weekBarLayout, type CalendarItem } from "@/modules/calendar/domain";
 import {
-  calendarFilterGroups,
+  buildCalendarFilterGroups,
   defaultCalendarFilter,
   filterByGroup,
   resolveCalendarFilter,
@@ -33,12 +33,22 @@ const everyItem = [
   item("club-event", "", { kind: "EVENT", clubEvent: true }),
   item("club-flag-on-entry", "Youth", { clubEvent: true }),
 ];
-const keys = (slug: string) => filterByGroup(everyItem, slug).map((entry) => entry.key);
+// Synthetic homepage tiles (#1611): the six chips come from these.
+const tiles = [
+  { position: 1, name: "Pathfinders", categories: ["Pathfinders"] },
+  { position: 2, name: "Adventurers", categories: ["Adventurers"] },
+  { position: 3, name: "Women's Ministries", categories: ["Women's Ministries"] },
+  { position: 4, name: "Men's Ministries", categories: ["Men's Ministries"] },
+  { position: 5, name: "Camp Heritage", categories: ["Camps"] },
+  { position: 6, name: "Youth", categories: ["Youth", "Young Adults"] },
+];
+const calendarFilterGroups = buildCalendarFilterGroups(tiles);
+const keys = (slug: string) => filterByGroup(everyItem, slug, calendarFilterGroups).map((entry) => entry.key);
 
-describe("calendar filter groups (#1249)", () => {
+describe("calendar filter groups (#1249, #1611)", () => {
   it("lists the chips in order, with Main events as the default", () => {
     expect(calendarFilterGroups.map((group) => group.label)).toEqual([
-      "Main events", "Club events", "Pathfinders", "Adventurers", "Camps", "Ministries", "Schools", "Meetings", "Office closed & holidays", "Everything",
+      "Main events", "Pathfinders", "Adventurers", "Women's Ministries", "Men's Ministries", "Camp Heritage", "Youth", "Schools", "Meetings", "Office closed & holidays", "Everything",
     ]);
     expect(defaultCalendarFilter).toBe("main");
     expect(new Set(calendarFilterGroups.map((group) => group.slug)).size).toBe(calendarFilterGroups.length);
@@ -48,15 +58,10 @@ describe("calendar filter groups (#1249)", () => {
     expect(keys("main")).toEqual(["pf", "ad", "camp", "min", "other", "plain-event", "club-event", "club-flag-on-entry"]);
   });
 
-  it("makes Club events Pathfinders and Adventurers (any case) plus registration events for clubs only", () => {
-    expect(keys("club")).toEqual(["pf", "ad", "club-event"]);
-  });
-
-  it("gives each single-category chip exactly its own category", () => {
-    expect(keys("pathfinders")).toEqual(["pf"]);
-    expect(keys("adventurers")).toEqual(["ad"]);
-    expect(keys("camps")).toEqual(["camp"]);
-    expect(keys("ministries")).toEqual(["min"]);
+  it("gives each chip exactly its own categories, matched in any case", () => {
+    expect(keys("ministry-1")).toEqual(["pf"]);
+    expect(keys("ministry-2")).toEqual(["ad"]);
+    expect(keys("ministry-5")).toEqual(["camp"]);
     expect(keys("schools")).toEqual(["school"]);
     expect(keys("meetings")).toEqual(["meet"]);
     expect(keys("closed")).toEqual(["closed", "holiday"]);
@@ -73,13 +78,12 @@ describe("calendar filter groups (#1249)", () => {
   });
 
   it("resolves the URL: a filter wins, an old category link maps sensibly, and no param is the default", () => {
-    expect(resolveCalendarFilter(undefined, undefined)).toEqual({ slug: "main" });
-    expect(resolveCalendarFilter("club", undefined)).toEqual({ slug: "club" });
-    expect(resolveCalendarFilter("club", "Camps")).toEqual({ slug: "club" });
-    expect(resolveCalendarFilter("bogus", undefined)).toEqual({ slug: "main" });
-    expect(resolveCalendarFilter(undefined, "camps")).toEqual({ slug: "camps" });
-    expect(resolveCalendarFilter(undefined, "Office closure")).toEqual({ slug: "closed" });
-    expect(resolveCalendarFilter(undefined, "Youth")).toEqual({ slug: "everything", category: "Youth" });
+    expect(resolveCalendarFilter(undefined, undefined, calendarFilterGroups)).toEqual({ slug: "main" });
+    expect(resolveCalendarFilter("ministry-5", "Pathfinders", calendarFilterGroups)).toEqual({ slug: "ministry-5" });
+    expect(resolveCalendarFilter("bogus", undefined, calendarFilterGroups)).toEqual({ slug: "main" });
+    expect(resolveCalendarFilter(undefined, "camps", calendarFilterGroups)).toEqual({ slug: "ministry-5" });
+    expect(resolveCalendarFilter(undefined, "Office closure", calendarFilterGroups)).toEqual({ slug: "closed" });
+    expect(resolveCalendarFilter(undefined, "Retreats", calendarFilterGroups)).toEqual({ slug: "everything", category: "Retreats" });
   });
 });
 
@@ -110,11 +114,11 @@ describe("sticky view bar and compact subscribe (#1249)", () => {
       tabs: [{ key: "month", label: "Month", href: "/calendar" }, { key: "list", label: "Upcoming", href: "/calendar?view=list" }, { key: "year", label: "Year", href: "/calendar?view=year" }],
       currentView: "year",
       chips: calendarFilterGroups.map((group) => ({ slug: group.slug, label: group.label, href: `/calendar?filter=${group.slug}` })),
-      activeFilter: "club",
+      activeFilter: "ministry-1",
     }));
     expect(markup).toContain('aria-current="page" href="/calendar?view=year">');
     expect(markup).toMatch(/Year<\/a>/);
-    expect(markup).toContain('aria-current="page" href="/calendar?filter=club">Club events');
+    expect(markup).toContain('aria-current="page" href="/calendar?filter=ministry-1">Pathfinders');
     expect(markup).not.toContain("<button");
     expect(markup).not.toContain("calendar-month-nav");
   });

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Coordinator workspace B (#1187): Monthly Records, Points, Club events, Team
@@ -323,6 +323,9 @@ describe("Team approvals page (#1187)", () => {
 });
 
 describe("New clubs page (#1187)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   const application = {
     id: "app-1", clubName: "Sample Valley Pathfinders", clubType: "PATHFINDER", status: "PENDING",
     church: { name: "Sample Valley Church", type: "CHURCH", isOther: false, unavailable: false, needsChoice: false },
@@ -357,6 +360,34 @@ describe("New clubs page (#1187)", () => {
     expect(admin).toContain('href="/admin/organizations/club-9/profile"');
   });
 
+  it("shows a cancelled application as one collapsed line to coordinators and drops it after 30 days (#1554)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-04T12:00:00Z"));
+    const cancelled = (id: string, name: string, decidedAt: string) =>
+      ({ ...application, id, clubName: name, status: "DECLINED", decidedAt }) as NewClubApplicationRecord;
+    mocks.listNewClubApplications.mockResolvedValue([
+      application,
+      cancelled("app-2", "Recent Cancelled Club", "2026-10-06T12:00:00Z"),
+      cancelled("app-3", "Old Cancelled Club", "2026-10-04T12:00:00Z"),
+    ]);
+    const html = renderToStaticMarkup(await NewClubsPage());
+    expect(html).toContain("Sample Valley Pathfinders");
+    expect(html).toMatch(/<details[^>]*data-application-collapsed="app-2"[^>]*><summary/);
+    expect(html).toContain("Recent Cancelled Club");
+    expect(html).not.toContain("Old Cancelled Club");
+    // Staff view is unchanged: no collapsing.
+    const staff = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [cancelled("app-2", "Recent Cancelled Club", "2026-10-06T12:00:00Z")], canDecide: true, churches: [] }));
+    expect(staff).not.toContain("<details");
+  });
+
+  it("shows the empty state when every application has aged off (#1554)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-04T12:00:00Z"));
+    mocks.listNewClubApplications.mockResolvedValue([{ ...application, status: "DECLINED", decidedAt: "2026-09-01T12:00:00Z" }]);
+    const html = renderToStaticMarkup(await NewClubsPage());
+    expect(html).toContain("No new club applications yet");
+  });
+
   it("shows unavailable, never no applications, when the read fails", async () => {
     mocks.listNewClubApplications.mockRejectedValue(new Error("db down"));
     const html = renderToStaticMarkup(await NewClubsPage());
@@ -373,8 +404,10 @@ describe("New clubs page (#1187)", () => {
 
 describe("coordinator destination layout (#1187 phone audit)", () => {
   const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
-  it("keeps each event's date line below its heading, not pulled up under it", () => {
-    expect(css).toContain(".coordinator-event-head .field-help { margin: 4px 0 0; }");
+  it("keeps each event's date line in the summary, below its heading", () => {
+    const moduleCss = readFileSync(join(process.cwd(), "components/coordinator-destinations.module.css"), "utf8");
+    expect(moduleCss).toContain(".summaryMeta");
+    expect(css).not.toContain(".coordinator-event-head .field-help");
   });
   it("gives every record link a 44px by 44px target", () => {
     expect(css).toMatch(/\.coordinator-record-links a[^{]*\{[^}]*min-height: 44px; min-width: 44px;/);

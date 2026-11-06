@@ -194,10 +194,14 @@ describe("tabs, links and years", () => {
     const href = clubsAdminHrefs(clubYear);
     expect(href.summary).toBe("/admin/clubs/summary?year=2026-27");
     expect(href.points).toBe("/admin/clubs/summary?year=2026-27&view=points#points");
+    // The home card and quick action still open the review list; the tab opens the summary's records view (#1552).
+    expect(href.reports).toBe("/admin/clubs/reports?year=2026-27");
+    expect(href.recordsToReview("2026-10")).toBe("/admin/clubs/reports?year=2026-27&month=2026-10&review=to-review");
+    expect(href.records).toBe("/admin/clubs/summary?year=2026-27&view=records#monthly-records");
     expect(clubsAdminTabs(clubYear, 3).map((tab) => [tab.label, tab.href])).toEqual([
       ["Overview", "/admin/clubs?year=2026-27"],
       ["All clubs", "/admin/clubs/summary?year=2026-27"],
-      ["Monthly Records", "/admin/clubs/reports?year=2026-27"],
+      ["Monthly Records", "/admin/clubs/summary?year=2026-27&view=records#monthly-records"],
       ["Points", "/admin/clubs/summary?year=2026-27&view=points#points"],
       ["Club events", "/admin/clubs/summary?year=2026-27&view=events#club-events"],
       ["Forms", "/admin/club-forms"],

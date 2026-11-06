@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { Download, Eye, Plus, RefreshCw, Save, Trash2, X } from "lucide-react";
+import { CalendarCategorySelect } from "@/components/calendar-category-select";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { closureLabel, formatDateRange } from "@/modules/calendar/domain";
 import type { FeedPreview } from "@/modules/calendar/feed-plan";
 import type { CalendarAdminFeed } from "@/modules/calendar/feeds";
 import { describeRepeat, parseRepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry } from "@/modules/calendar/repository";
+import type { CalendarCategoryChoices } from "@/modules/calendar/filter-groups";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { savedMessage } from "@/components/form-message";
 import { EmptyState } from "@/components/empty-state";
@@ -47,9 +49,12 @@ export function syncBodyForPreview(preview: { totalInFeed: number }) {
  * saved, only its host and last four characters are ever shown.
  */
 export function CalendarFeedsPanel({
+  choices,
   initialFeeds,
   onEntriesChange,
 }: {
+  /** The category dropdown's choices (#1611). */
+  choices: CalendarCategoryChoices;
   initialFeeds: CalendarAdminFeed[];
   onEntriesChange: (entries: CalendarAdminEntry[]) => void;
 }) {
@@ -180,7 +185,7 @@ export function CalendarFeedsPanel({
           </label>
           <label>
             Category for new items (optional)
-            <input defaultValue={editing?.defaultCategory ?? ""} maxLength={40} name="defaultCategory" placeholder="e.g. Conference" />
+            <CalendarCategorySelect choices={choices} defaultValue={editing?.defaultCategory ?? ""} key={editing?.id ?? "new"} name="defaultCategory" />
           </label>
           <label>
             Show new items as

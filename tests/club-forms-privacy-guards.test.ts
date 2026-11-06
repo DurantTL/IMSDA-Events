@@ -40,13 +40,15 @@ describe("club forms stay apart from the places sensitive answers must never go 
       .filter((file) => read(file).includes("sealedSensitiveAnswers"))
       .sort();
     // The write paths (which only set it), the one audited read, the re-seal step a template version bump runs,
-    // and the coordinator health view (#658, ADR 0005 Addendum C), which audits before it opens two emergency fields.
+    // the coordinator health view (#658, ADR 0005 Addendum C), which audits before it opens two emergency fields,
+    // and the sealed-column registry (#1516), which only names the column so key rotation can re-seal it in place.
     expect(readers).toEqual([
       "modules/club-forms/links.ts",
       "modules/club-forms/open-applications.ts",
       "modules/club-forms/reseal.ts",
       "modules/club-forms/submissions.ts",
       "modules/coordinator-health/repository.ts",
+      "modules/security/sealed-columns.ts",
     ]);
   });
 

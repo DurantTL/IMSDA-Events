@@ -1,6 +1,6 @@
 import { withRequestContext } from "@/lib/request-context";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { attendanceExportCsv, attendanceExportFileName, attendanceGroupOf } from "@/modules/club-meeting-notes/attendance";
+import { attendanceExportCsv, attendanceExportFileName, attendanceGroupOf, monthlyReportFileName } from "@/modules/club-meeting-notes/attendance";
 import { clubMeetingNoteApiError } from "@/modules/club-meeting-notes/api-errors";
 import { clubYearDateBounds, isMeetingDate } from "@/modules/club-meeting-notes/domain";
 import { loadAttendanceExport } from "@/modules/club-meeting-notes/repository";
@@ -57,6 +57,9 @@ async function getHandler(request: Request, context: RouteContext) {
         ...("actAsId" in actor ? { actAsId: actor.actAsId } : {}),
       },
     });
+    // One whole month gets the short name a director expects (#1553); anything else keeps the dated name.
+    const monthName = monthlyReportFileName(data.clubName, { from, to });
+    if (monthName) return csvDownloadResponse(csv, monthName);
     return csvDownloadResponse(csv, exportFileName({ scope: organizationId, kind: attendanceExportFileName(clubYear, { from, to }).replace(/\.csv$/, "") }));
   } catch (error) {
     return clubMeetingNoteApiError(error, "Exporting meeting attendance");

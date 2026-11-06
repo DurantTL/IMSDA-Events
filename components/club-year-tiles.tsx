@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Award, CalendarDays, CheckCircle2, CircleAlert, FileText, ShieldCheck, UsersRound } from "lucide-react";
+import { Award, ArrowRight, CalendarDays, CheckCircle2, CircleAlert, FileText, ShieldCheck, UsersRound } from "lucide-react";
+import styles from "./club-year-home-card.module.css";
+import { yearLabel } from "@/modules/club-rosters/home-view";
 import { formatDueDate, type MonthlyReportProgress } from "@/modules/club-reports/domain";
 import type { RosterYearSummary } from "@/modules/club-rosters/domain";
 import type { HonorYearSummary } from "@/modules/honors/member-honor-domain";
@@ -119,5 +121,102 @@ export function ClubYearTiles({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The same five facts as `ClubYearTiles`, laid out like the club home's "Your club this year" card (#1555): one card,
+ * an eyebrow and bold heading, count tiles (`club-home-counts`) and an "Open ... →" link under each. Used for the
+ * Area Coordinator's view of a club. Same data, same links; nothing here adds access.
+ */
+export function ClubYearHomeCard({
+  clubYear,
+  roster,
+  rosterHref,
+  honors,
+  honorsHref,
+  compliance,
+  complianceHref,
+  events,
+  eventsHref,
+  reports,
+  reportsHref,
+}: {
+  clubYear: string;
+  roster: RosterYearSummary;
+  rosterHref: string;
+  honors: HonorYearSummary | null;
+  honorsHref?: string;
+  compliance: ComplianceTileSummary | null;
+  complianceHref: string;
+  events: EventsTileSummary;
+  eventsHref: string;
+  reports: MonthlyReportProgress | null;
+  reportsHref: string;
+}) {
+  const complianceTotal = compliance ? compliance.missing + compliance.notInCompliance + compliance.expiringSoon : 0;
+  const open = (href: string, label: string) => (
+    <dd className={styles.link}>
+      <Link className="secondary-button club-event-action club-home-link" href={href}>{label} <ArrowRight size={14} aria-hidden="true" /></Link>
+    </dd>
+  );
+  return (
+    <section aria-labelledby="club-year-home-heading" className="public-manage-card club-home-summary">
+      <div className="public-manage-card-heading">
+        <p className="public-registration-eyebrow">{`Club year ${yearLabel(clubYear)}`}</p>
+        <h2 id="club-year-home-heading">This club this year</h2>
+      </div>
+      <dl className="club-home-counts">
+        <div className="club-home-count">
+          <dt className={styles.term}><UsersRound size={16} aria-hidden="true" /> Roster</dt>
+          <dd className="club-home-count-value">{roster.active}</dd>
+          <dd className="club-home-count-definition">{`active this club year · ${roster.staff} staff · ${roster.members} members`}</dd>
+          {roster.byClass.length > 0 && (
+            <dd className="club-home-count-definition">{roster.byClass.map((entry) => `${entry.label} ${entry.count}`).join(" · ")}</dd>
+          )}
+          {open(rosterHref, "Open roster")}
+        </div>
+        {honors && (
+          <div className="club-home-count">
+            <dt className={styles.term}><Award size={16} aria-hidden="true" /> Honors</dt>
+            <dd className="club-home-count-value">{honors.inProgress + honors.completedThisYear}</dd>
+            <dd className="club-home-count-definition">
+              {honors.inProgress === 0 && honors.completedThisYear === 0
+                ? "None recorded yet this club year."
+                : [honors.inProgress > 0 ? `${honors.inProgress} in progress` : null, honors.completedThisYear > 0 ? `${honors.completedThisYear} completed this year` : null].filter(Boolean).join(" · ")}
+            </dd>
+            {honorsHref && open(honorsHref, "Open honors")}
+          </div>
+        )}
+        {compliance && (
+          <div className="club-home-count">
+            <dt className={styles.term}><ShieldCheck size={16} aria-hidden="true" /> Sterling Volunteers</dt>
+            <dd className="club-home-count-value">{complianceTotal === 0 ? "All current" : complianceTotal}</dd>
+            <dd className="club-home-count-definition">
+              {complianceTotal === 0
+                ? "No one is missing, out of compliance or expiring soon."
+                : [compliance.missing > 0 ? `${compliance.missing} missing` : null, compliance.notInCompliance > 0 ? `${compliance.notInCompliance} not in compliance` : null, compliance.expiringSoon > 0 ? `${compliance.expiringSoon} expiring soon` : null].filter(Boolean).join(" · ")}
+            </dd>
+            {open(complianceHref, "Review Sterling Volunteers")}
+          </div>
+        )}
+        <div className="club-home-count">
+          <dt className={styles.term}><CalendarDays size={16} aria-hidden="true" /> Events</dt>
+          <dd className="club-home-count-value">{events.open}</dd>
+          <dd className="club-home-count-definition">{`${events.open === 1 ? "event open to register" : "events open to register"} · ${events.registered} registered`}</dd>
+          {open(eventsHref, "Open events")}
+        </div>
+        {reports && (
+          <div className="club-home-count">
+            <dt className={styles.term}><FileText size={16} aria-hidden="true" /> Monthly Records</dt>
+            <dd className="club-home-count-value">{reports.filed}</dd>
+            <dd className="club-home-count-definition">
+              {`filed this club year${reports.missing > 0 ? ` · ${reports.missing} missing` : ""}${reports.dueSoon ? ` · ${reports.dueSoon.count} due ${formatDueDate(reports.dueSoon.dueDate)}` : ""}${reports.missing === 0 && !reports.dueSoon ? " · none missing" : ""}`}
+            </dd>
+            {open(reportsHref, "Open Monthly Records")}
+          </div>
+        )}
+      </dl>
+    </section>
   );
 }

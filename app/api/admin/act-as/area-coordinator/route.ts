@@ -4,6 +4,7 @@ import { requireSystemAdministrator } from "@/modules/organizations/access";
 import { ACT_AS_MINUTES, actAsAreaCoordinator } from "@/modules/organizations/staff-act-as";
 import { userAdminApiError } from "@/modules/system-admin/user-admin-api";
 import { systemRoleText } from "@/modules/access/role-descriptions";
+import { AREA_COORDINATOR_PORTAL_HREF } from "@/modules/organizations/act-as-portal";
 import { withRequestContext } from "@/lib/request-context";
 
 /** A system administrator acts as an Area Coordinator, inside their own staff session, for a while (#442). */
@@ -20,7 +21,7 @@ async function postHandler(request: Request) {
     if (!sessionId) throw new Error("A system administrator session is missing its session id.");
     await actAsAreaCoordinator(actor, sessionId);
     return Response.json({
-      href: "/account/clubs",
+      href: AREA_COORDINATOR_PORTAL_HREF,
       message: `You're acting as an ${systemRoleText.AREA_COORDINATOR.name} for the next ${ACT_AS_MINUTES / 60} hours, view only.`,
     });
   } catch (error) {

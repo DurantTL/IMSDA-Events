@@ -24,16 +24,16 @@ Ticking only records that someone did the work. This sheet remains the full inst
 
 | # | Item | Owner | Blocks | Done |
 | --- | --- | --- | --- | --- |
-| 1 | Build the external, on-premises backup server | Jonathan Swena | 2, 3, 4 | ☐ |
-| 2 | Keep a copy of the encryption key, apart from the database dumps | Jonathan Swena | Real birth dates | ☐ |
-| 3 | Test-restore the key copy | Jonathan Swena | Real birth dates | ☐ |
-| 4 | Send nightly database backups off the host | Server operator *(fill in)* | Real birth dates, WR26 | ☐ |
-| 5 | Confirm an unattended restore rehearsal passes | Server operator *(fill in)* | Real birth dates, WR26 | ☐ |
-| 6 | Confirm the database is reachable only from the app | Server operator *(fill in)* | Real birth dates | ☐ |
-| 7 | Confirm HTTPS end to end | Server operator *(fill in)* | Real birth dates | ☐ |
-| 8 | Confirm MFA for everyone who can see club data | Caleb Durant | Real birth dates | ☐ |
-| 9 | Write the key rotation procedure | Jonathan Swena | Before the first rotation | ☐ |
-| 10 | Tell club directors how removal works | Caleb Durant | Director onboarding | ☐ |
+| 1 | Build the external, on-premises backup server | Jonathan Swena | 2, 3, 4 | 2026-11-05 CD |
+| 2 | Keep a copy of the encryption key, apart from the database dumps | Jonathan Swena | Real birth dates | 2026-11-05 CD |
+| 3 | Test-restore the key copy | Jonathan Swena | Real birth dates | 2026-11-05 CD |
+| 4 | Send nightly database backups off the host | Server operator *(fill in)* | Real birth dates, WR26 | 2026-11-05 CD |
+| 5 | Confirm an unattended restore rehearsal passes | Server operator *(fill in)* | Real birth dates, WR26 | 2026-11-05 CD |
+| 6 | Confirm the database is reachable only from the app | Server operator *(fill in)* | Real birth dates | 2026-11-05 CD |
+| 7 | Confirm HTTPS end to end | Server operator *(fill in)* | Real birth dates | 2026-11-05 CD |
+| 8 | Confirm MFA for everyone who can see club data | Caleb Durant | Real birth dates | 2026-11-05 CD |
+| 9 | Write the key rotation procedure | Jonathan Swena | Before the first rotation | 2026-11-05 CD |
+| 10 | Tell club directors how removal works | Caleb Durant | Director onboarding | 2026-11-05 CD |
 | 11 | Lock down how the encryption key is reached | Jonathan Swena | Real birth dates | ☐ |
 
 ## The items
@@ -115,12 +115,21 @@ Ticking only records that someone did the work. This sheet remains the full inst
 - **Proof:** the list of system administrators, each with MFA on.
 
 ### 9. Write the key rotation procedure
+- **Draft for the custodian to review (Jonathan Swena).** The procedure below is
+  built and written; it is not signed off until the custodian has read it and,
+  ideally, rehearsed it. This box stays unticked until then.
 - **Why:** if the key is ever exposed, it must be replaced without losing data.
-- **How:** a short written procedure: keep the old and new keys available, run
-  the re-seal step, confirm, then retire the old key and update the backup copy
-  (item 2). The engineering side of the re-seal step is built when it's first
-  needed.
-- **Proof:** the procedure is written and kept with the key copy.
+- **How:** the full steps are in `docs/DEPLOY-DOCKER.md`, "Rotating the
+  encryption key" (#1516). In short: back up the database and the current key;
+  make a new key and write it to its own version-named file (never over the old
+  key's file); set `SECRET_ENCRYPTION_KEY_VERSION` (version + 1) and
+  `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` (the old version) so both keys load;
+  redeploy; run `npm run key:rotate` (dry run), then `npm run key:rotate -- --apply`
+  until nothing is left; `npm run key:check` must exit 0; update the off-site
+  copy of the key (item 2) and test-restore it (item 3); then remove the old key
+  and run `key:check` again; delete the old key's file last. Running a rotation in production is a human step.
+- **Proof:** the custodian has reviewed the procedure, and the procedure is kept
+  with the key copy.
 
 ### 10. Tell club directors how removal works
 - **Why:** retention is each club's decision. Nothing is deleted automatically.
@@ -139,7 +148,8 @@ Ticking only records that someone did the work. This sheet remains the full inst
   production secret (`docs/DEPLOY-DOCKER.md`). So anyone who can log in as the
   site user, or reveal environment variables in the hosting panel, can read it,
   and it shows in `docker inspect`. #876 moves it to a root-only file,
-  `/etc/imsda/secret-encryption-key` (root, mode 0400), mounted read-only into the
+  `/etc/imsda/secret-encryption-key` (after a key rotation, the current version's
+  file `/etc/imsda/secret-encryption-key-vN`; root, mode 0400), mounted read-only into the
   app container and named by `SECRET_ENCRYPTION_KEY_FILE`. The exact steps are in
   "Loading the encryption key from a protected file" in `docs/DEPLOY-DOCKER.md`;
   once done, the env file and the panel no longer hold the key. The app container
@@ -178,9 +188,10 @@ Ticking only records that someone did the work. This sheet remains the full inst
   - password login is off;
   - the panel either doesn't hold the key or requires MFA;
   - the master copy's account is separate from the backup account;
-  - `/etc/imsda/secret-encryption-key` is `root:root` mode 0400, the env file and
+  - `/etc/imsda/secret-encryption-key` (or the current `-vN` file after a
+    rotation) is `root:root` mode 0400, the env file and
     panel have no `SECRET_ENCRYPTION_KEY`, and `/api/health` (read with the token-from-the-container command next to `APP_RELEASE_SHA` in `docs/DEPLOY-DOCKER.md`) shows
-    `"encryptionKey":{"configured":true,"source":"file"}`.
+    `"encryptionKey":{"configured":true,"source":"file",...}` (with the key version fields).
 
 ## Behind Cloudflare
 
@@ -196,9 +207,9 @@ GitHub or chat.
 
 | Step | What | Done |
 | --- | --- | --- |
-| A | Only Cloudflare can reach the server | ☐ |
-| B | SSL/TLS mode is Full (strict) | ☐ |
-| C | Rate-limit settings match Cloudflare | ☐ |
+| A | Only Cloudflare can reach the server | 2026-11-05 CD |
+| B | SSL/TLS mode is Full (strict) | 2026-11-05 CD |
+| C | Rate-limit settings match Cloudflare | 2026-11-05 CD |
 
 ### A. Only Cloudflare can reach the server
 
@@ -310,4 +321,5 @@ every request, and Nginx refuses any request without it.
 
 | Date | Item | What was done | Evidence kept at | Initials |
 | --- | --- | --- | --- | --- |
-| | | | | |
+| 2026-11-05 | 1–10, A–C | Reported done by Caleb Durant | Caleb Durant | CD |
+| 2026-11-05 | 11 | Still open: the key is a plain value in the env file and on the xCloud environment page | — | CD |

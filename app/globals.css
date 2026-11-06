@@ -403,12 +403,34 @@
 
 html { background: var(--paper); }
 
+/* Noto Sans fallback (#1557): the web font swaps in a moment after first paint. Until then text sets in Arial resized to Noto Sans
+   widths, so rows of buttons and headings wrap the same way before and after the swap and the page below does not jump. */
+@font-face {
+  font-family: "Noto Sans Fallback";
+  font-weight: 100 599;
+  src: local("Arial"), local("Helvetica Neue"), local("Liberation Sans");
+  size-adjust: 104.7%;
+  ascent-override: 102%;
+  descent-override: 28%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Noto Sans Fallback";
+  font-weight: 600 900;
+  src: local("Arial Bold"), local("Liberation Sans Bold"), local("Arial"), local("Helvetica Neue"), local("Liberation Sans");
+  size-adjust: 103.5%;
+  ascent-override: 103%;
+  descent-override: 28%;
+  line-gap-override: 0%;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   background: var(--paper);
   color: var(--ink);
-  font-family: "Noto Sans", Arial, sans-serif;
+  font-family: "Noto Sans", "Noto Sans Fallback", Arial, sans-serif;
   font-size: 15px;
   line-height: 1.5;
 }
@@ -8103,8 +8125,6 @@ th[aria-sort="descending"] .table-sort-button { color: var(--imsda-navy); font-w
 .account-page-hero { min-height: 0; margin-top: 16px; padding: 26px 32px; }
 .account-page-hero h1 { font-size: 1.9rem; }
 .account-page-body { display: grid; gap: 16px; max-width: 1180px; margin: 0 auto 48px; }
-/* A tab row that opens a page body (#722): keep the column, shrink the bottom gap so the page below sits close. */
-.account-page-body.account-page-subnav { margin-bottom: 16px; }
 .account-page-body > * { min-width: 0; }
 .account-security-grid { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
 .account-overview-grid {
@@ -10311,7 +10331,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-roster-tools:has(.honor-combobox) > .honor-name-search { flex: 1 1 220px; }
 .club-roster-tools:has(.honor-combobox) > .honor-combobox { flex: 1 1 220px; }
 .honor-combobox-list li { padding: 8px 10px; border-radius: 8px; cursor: pointer; overflow-wrap: anywhere; }
-.honor-combobox-list li.active, .honor-combobox-list li:hover { background: var(--panel-tint, #eef4f6); }
+.honor-combobox-list li.active, .honor-combobox-list li:not([aria-disabled="true"]):hover { background: var(--panel-tint, #eef4f6); }
 .honor-combobox-list li[aria-selected="true"] { outline: 2px solid var(--imsda-purple, #5b3a8c); outline-offset: -2px; }
 .honor-combobox-list .honor-combobox-empty { cursor: default; color: var(--muted); }
 @media (max-width: 640px), (pointer: coarse) { .honor-combobox-list li { min-height: 44px; display: flex; align-items: center; } }
@@ -10351,7 +10371,9 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .honors-report-mode[aria-current="page"] { background: var(--imsda-purple, #5b3a8c); color: #fff; }
 .honors-report-panel .honors-report-controls { flex-direction: row; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
 .honors-report-controls > label { display: grid; gap: 4px; flex: 0 1 160px; min-width: 0; font-weight: 700; }
-.honors-report-controls > label.honors-report-member { flex: 1 1 240px; }
+.honors-report-controls > .honors-report-member { flex: 1 1 240px; }
+/* The nested Member label reads like the Club year label beside it. */
+.honors-report-controls > .honors-report-member label { font-size: inherit; font-weight: 700; }
 .honors-report-controls select { min-height: 44px; }
 /* With scripts, choosing a year or member shows the report; Show report is visually hidden but still reachable by keyboard. */
 .auto-submit-enhanced .auto-submit-go:not(:focus) {
@@ -10395,26 +10417,14 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 }
 
 
-/* Account context remains reachable when a club or coordinator masthead replaces the attendee tabs (#1302). */
+/* Account context remains reachable when a club or coordinator masthead replaces the attendee tabs (#1302). The "Your account"
+   drop-down now lives in that masthead row (components/account-workspace-menu.module.css, #1555). */
 .account-content { min-width: 0; }
-.account-workspace-menu { display: none; position: relative; z-index: 40; width: min(1180px, calc(100% - 24px)); margin: 8px auto; }
-.account-portal:has(.club-shell, .coordinator-shell) > .account-workspace-menu { display: flex; justify-content: flex-end; }
-.account-workspace-menu details { position: relative; }
-.account-workspace-menu summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; background: white; color: var(--imsda-navy); font-size: 0.95rem; font-weight: 700; cursor: pointer; list-style: none; }
-.account-workspace-menu summary::-webkit-details-marker { display: none; }
-.account-workspace-menu details[open] > summary { background: var(--imsda-navy-soft); }
-.account-workspace-menu nav { position: absolute; top: calc(100% + 4px); right: 0; width: 18rem; max-width: calc(100vw - 24px); padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: 0 12px 28px rgb(0 44 69 / 18%); }
-.account-workspace-menu ul { margin: 0; padding: 0; list-style: none; }
-.account-workspace-menu a { display: flex; align-items: center; min-height: 44px; padding: 10px 12px; border-radius: 8px; color: var(--imsda-navy); font-size: 1rem; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
-.account-workspace-menu a[aria-current] { background: var(--imsda-navy-soft); box-shadow: inset 3px 0 var(--imsda-purple); }
-.account-workspace-menu a:hover { background: var(--imsda-navy-soft); }
-.account-workspace-menu :is(a, summary):focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; }
-.account-portal :is(.account-nav a, .account-workspace-menu summary) { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
 @media print { .account-workspace-menu { display: none !important; } }
 
 /* Club shell (#1165): Club portal masthead, navy club banner and the tab row (club-portal-nav.module.css). On club
-   pages the shell's own masthead replaces the account header and the account tabs (My account stays a link in the masthead). */
-.account-portal:has(.club-shell) > :is(.public-registration-header, .account-nav-primary) { display: none; }
+   pages the shell's own masthead replaces the account header and the account tabs (the "Your account" drop-down sits in the masthead row). */
+.account-portal:has(.club-shell) > .account-masthead { display: none; }
 .club-shell { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; min-width: 0; }
 .club-masthead { border-bottom: 1px solid var(--line); background: #fff; }
 .club-masthead-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 8px 0; }
@@ -10422,15 +10432,19 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 .club-masthead-brand > span:not([data-navigation-pending]) { display: grid; line-height: 1.2; }
 .club-masthead-brand small { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-masthead-brand strong { font-size: 1.05rem; }
-.club-masthead-account { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 12px; min-width: 0; }
 .club-masthead-identity { min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--muted); font-size: 0.9rem; }
-.club-masthead-link { min-height: 44px; padding-inline: 4px; font-weight: 800; }
+/* On a phone the role sits on its own line under the name, so the web font swapping in cannot move where the name ends and the role starts (#1557). */
+@media (max-width: 640px) {
+  .club-masthead-role { display: block; }
+  .club-masthead-sep { display: none; }
+}
+.account-portal .account-nav a { transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
 .club-banner { background: var(--imsda-navy); color: #fff; }
 .club-banner-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0; }
 .club-banner-identity { min-width: 0; flex: 1 1 16rem; }
 .club-banner h1 { margin: 0; color: #fff; font-size: 1.7rem; line-height: 1.2; overflow-wrap: anywhere; }
 .club-banner-identity p { margin: 6px 0 0; color: #dbe9ef; font-size: 0.95rem; overflow-wrap: anywhere; }
-.club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; }
+.club-banner-year { display: grid; gap: 2px; margin: 0; border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 12px; padding: 8px 14px; text-align: right; /* Wide enough for "CURRENT CLUB YEAR" in the web font and in its fallback, so the swap does not resize the box and re-wrap the banner (#1557). */ min-width: 11.5rem; box-sizing: border-box; }
 .club-banner-year span { color: #dbe9ef; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .club-banner-year strong { font-size: 1.05rem; }
 @media (max-width: 640px) {
@@ -10438,7 +10452,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .club-banner-inner { padding: 14px 0; }
   .club-banner h1 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.25rem; }
   .club-banner-year { flex: 0 0 auto; padding: 6px 10px; }
-  .club-masthead-account { justify-content: flex-start; }
 }
 @media print {
   .club-masthead, .club-banner { display: none !important; }
@@ -11098,8 +11111,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 /* #918: the member's name is the most prominent thing in its row; "Class history" is a quiet secondary link under it. */
 .roster-card-name .roster-class-history-link { margin-top: 4px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8125rem); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .roster-card-name .roster-class-history-link:hover, .roster-card-name .roster-class-history-link:focus-visible { color: var(--imsda-purple); }
-.area-club-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.area-club-search .search-field { max-width: 360px; padding: 0 12px; }
 
 /* Lodging assignments (#200). Household colours come with a name in the text: colour is never the only cue. */
 .lodging-assign {
@@ -12779,8 +12790,8 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .attendee-ov-heading { margin: 0 0 12px; color: var(--imsda-navy); font-size: 1.35rem; line-height: 1.25; }
 .attendee-ov-cards { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
 .attendee-ov-card {
-  min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #fff;
-  padding: 0 0 18px;
+  min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 36px rgba(0, 59, 92, 0.06); padding: 0 0 18px;
 }
 .attendee-ov-card-top {
   display: flex; align-items: center; gap: 14px; background: var(--imsda-navy); color: #fff; padding: 16px 20px;
@@ -12815,9 +12826,14 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .attendee-ov-all { margin: 14px 0 0; }
 .attendee-ov-all .text-button { display: inline-flex; min-height: 44px; align-items: center; gap: 4px; }
 .attendee-ov-empty, .attendee-ov-notice {
-  display: flex; align-items: flex-start; gap: 14px; border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 20px;
+  display: flex; align-items: flex-start; gap: 14px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 36px rgba(0, 59, 92, 0.06); padding: 20px;
 }
 .attendee-ov-notice { border-color: #f0c9c2; background: #fff8f6; }
+/* The same phone radius the shared .public-manage-card takes (17px). */
+@media (max-width: 580px) {
+  .attendee-ov-card, .attendee-ov-empty, .attendee-ov-notice { border-radius: 17px; }
+}
 .attendee-ov-empty > svg, .attendee-ov-notice > svg { flex: none; margin-top: 2px; color: var(--imsda-navy); }
 .attendee-ov-empty > div, .attendee-ov-notice > div { min-width: 0; }
 .attendee-ov-empty h3 { margin: 0 0 4px; font-size: 1.15rem; }
@@ -12899,15 +12915,9 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 
 /* Coordinator workspace (#1186): "Club coordination" masthead (reuses the club masthead rules), the Overview summary, clubs table,
    follow-up and help panels. On these pages the shell's masthead replaces the account header and tabs, as on club pages. */
-.account-portal:has(.coordinator-shell) > :is(.public-registration-header, .account-nav-primary) { display: none; }
-.coordinator-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.account-portal:has(.coordinator-shell) > .account-masthead { display: none; }
+.coordinator-shell { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; margin-bottom: 16px; }
 .coordinator-overview { min-width: 0; }
-.coordinator-overview-heading h2 { margin: 0; font-size: 1.4rem; line-height: 1.25; }
-.coordinator-overview-scope { margin: 4px 0 0; color: var(--muted); font-size: 0.95rem; overflow-wrap: anywhere; }
-.coordinator-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
-.coordinator-summary dl > div { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 12px 14px; }
-.coordinator-summary dt { color: var(--muted); font-size: 0.875rem; font-weight: 700; }
-.coordinator-summary dd { margin: 4px 0 0; color: var(--imsda-navy); font-size: 1.4rem; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
 .coordinator-overview-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 20rem); gap: 20px; align-items: start; }
 .coordinator-overview-side { display: grid; gap: 16px; min-width: 0; }
 .coordinator-clubs, .coordinator-panel { min-width: 0; }
@@ -12928,10 +12938,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (max-width: 860px) {
   .coordinator-overview-layout { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 640px) {
-  .coordinator-summary dl { grid-template-columns: minmax(0, 1fr); }
-}
-
 /* Coordinator destination pages (#1187): Monthly Records, Points, Club events, Team approvals, New clubs. Wide grids sit in a
    labelled, keyboard-reachable scroll region; links and buttons keep 44px targets; small text stays at 0.875rem or larger. */
 .coordinator-destination { min-width: 0; }
@@ -12941,11 +12947,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .coordinator-record-link, .coordinator-record-links a, .coordinator-inline-link { display: inline-flex; min-height: 44px; min-width: 44px; align-items: center; justify-content: center; padding: 0 6px; font-weight: 700; }
 .coordinator-record-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; }
 .coordinator-scroll td .secondary-button { min-height: 44px; }
-.coordinator-event { display: grid; gap: 10px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 14px 16px; }
 .coordinator-event-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.coordinator-event-head h3 { margin: 0; font-size: 1.05rem; line-height: 1.3; overflow-wrap: anywhere; }
-/* The shared field-help pulls itself up 9px under a label; under this heading it must sit below it. */
-.coordinator-event-head .field-help { margin: 4px 0 0; }
 .coordinator-event-head .secondary-button { min-height: 44px; }
 
 /* Send check (#836): errors, warnings and suggestions for an event email, each with a jump to its field. */
@@ -13040,7 +13042,12 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   font-weight: 800;
 }
 .admin-role-note { margin: 0; color: var(--muted, #5b6b73); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-@media (max-width: 520px) { .admin-role-pills { width: 100%; } .admin-role-link { flex: 1 1 auto; justify-content: center; } }
+/* On a phone each pill has its own full-width row, always (#1557, rule B17). With two pills side by side, a small change
+   in text width (such as the web font loading) moved the second pill onto a new row and pushed the page down. */
+@media (max-width: 520px) {
+  .admin-role-pills { width: 100%; flex-direction: column; }
+  .admin-role-link { justify-content: center; }
+}
 
 /* Club form groups and open applications (#1229) */
 .club-form-group { display: grid; gap: 10px; }

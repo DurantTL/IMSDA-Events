@@ -7,6 +7,7 @@ import { listPendingReminderBatches } from "@/modules/calendar/deadline-reminder
 import { listCalendarFeeds } from "@/modules/calendar/feeds";
 import { entryQueryParams, parseEntryQuery } from "@/modules/calendar/admin-list";
 import { listCalendarEntryPage, listCalendarEvents } from "@/modules/calendar/repository";
+import { loadCalendarCategoryChoices } from "@/modules/calendar/public-filters";
 import { siteBaseUrl } from "@/modules/calendar/subscribe";
 import { buildCalendarWidgetEmbedCode } from "@/modules/calendar/widget";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
@@ -22,12 +23,12 @@ export default async function CalendarAdminPage({ searchParams }: { searchParams
   const address = new URLSearchParams();
   for (const [name, value] of Object.entries(await searchParams)) if (typeof value === "string") address.set(name, value);
   const entryQuery = parseEntryQuery(address);
-  const [{ entries, ...entryList }, events, feeds, reminders] = await Promise.all([listCalendarEntryPage(entryQuery), listCalendarEvents(), listCalendarFeeds(), listPendingReminderBatches()]);
+  const [{ entries, ...entryList }, events, feeds, reminders, publicFilters] = await Promise.all([listCalendarEntryPage(entryQuery), listCalendarEvents(), listCalendarFeeds(), listPendingReminderBatches(), loadCalendarCategoryChoices()]);
 
   return (
     <>
       <AdminSectionHeaderFor path="/admin/calendar" section="system" />
-      <CalendarAdminWorkspace initialEntries={entries} initialEntryList={entryList} initialQueryKey={entryQueryParams(entryQuery).toString()} initialEvents={events} initialFeeds={feeds} initialReminders={reminders} widgetEmbedCode={buildCalendarWidgetEmbedCode({ origin: siteBaseUrl() })} />
+      <CalendarAdminWorkspace initialEntries={entries} initialEntryList={entryList} initialQueryKey={entryQueryParams(entryQuery).toString()} initialEvents={events} initialFeeds={feeds} initialReminders={reminders} publicFilters={publicFilters} widgetEmbedCode={buildCalendarWidgetEmbedCode({ origin: siteBaseUrl() })} />
     </>
   );
 }

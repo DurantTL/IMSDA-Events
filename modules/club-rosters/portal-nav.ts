@@ -96,3 +96,12 @@ export function areaClubPortalNavItems({ organizationId }: { organizationId: str
     { href: `${base}/awards`, label: "Earned awards", group: "Records", hideGroupLabel: true },
   ];
 }
+
+/**
+ * The one tab row of a club an Area Coordinator is viewing (#1555), like the club home's: the club's own view-only tabs.
+ * There is no "All clubs" tab (#1551); the page's "Clubs at a glance" back link returns to the list, and from there to the
+ * other coordinator tabs. Each page below still checks access on the server.
+ */
+export function areaViewedClubNavItems({ organizationId }: { organizationId: string }): AccountNavItem[] {
+  return areaClubPortalNavItems({ organizationId });
+}

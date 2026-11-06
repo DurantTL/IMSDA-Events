@@ -16,7 +16,7 @@ import { REVIEW_FILTER, recordsToReview } from "@/modules/club-reports/review-do
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
-export const metadata: Metadata = { title: "Club Monthly Records" };
+export const metadata: Metadata = { title: "Review monthly records" };
 export const dynamic = "force-dynamic";
 
 export default async function ClubReportsAdminPage({ searchParams }: { searchParams: Promise<{ year?: string; month?: string; review?: string }> }) {

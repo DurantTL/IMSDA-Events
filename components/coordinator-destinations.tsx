@@ -1,8 +1,11 @@
 import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { areaHealthHref } from "@/modules/coordinator-health/domain";
 import { ColumnHeader } from "@/components/column-header";
+import { yearLabel } from "@/modules/club-rosters/home-view";
+import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
-import { Download } from "lucide-react";
+import { ChevronDown, Download } from "lucide-react";
 import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
@@ -16,6 +19,7 @@ import {
   monthlyRecordCells,
   monthlyRecordCounts,
 } from "@/modules/club-reports/coordinator-destinations-domain";
+import styles from "./coordinator-destinations.module.css";
 
 /**
  * The coordinator destination pages' shared pieces (#1187). Presentation only:
@@ -23,6 +27,9 @@ import {
  * grants, hides or decides anything. Submitted records open read only; there is
  * no approve control, no payment action and no director tool on these pages.
  */
+
+/** How many events start open on Club events; the rest start closed (#1554). */
+export const COORDINATOR_EVENTS_OPEN_BY_DEFAULT = 3;
 
 const formatNumber = (value: number) => value.toLocaleString("en-US");
 const EXPORT_PATH = "/api/attendee/area-clubs/export";
@@ -32,16 +39,12 @@ export function registeredClubsLabel(count: number): string {
   return `${count} ${count === 1 ? "club" : "clubs"} registered`;
 }
 
-/** Task heading, the club year actually queried, and the honest scope (no ministry or area filter is claimed). */
+/** Task heading in the club portal's eyebrow-and-heading pattern (#1555): the club year actually queried as the eyebrow, and the honest scope (no ministry or area filter is claimed). */
 export function CoordinatorDestinationHeading({ title, clubYear }: { title: string; clubYear?: string }) {
   return (
-    <header className="coordinator-overview-heading">
-      <h2>{title}</h2>
-      <p className="coordinator-overview-scope">
-        {clubYear && <><span>Club year <strong>{clubYear}</strong></span><span aria-hidden="true"> · </span></>}
-        <span>{COORDINATOR_SCOPE_TEXT}</span>
-      </p>
-    </header>
+    <CoordinatorSectionHeading eyebrow={clubYear ? `Club year ${yearLabel(clubYear)}` : "Club coordination"} title={title}>
+      <p>{COORDINATOR_SCOPE_TEXT}</p>
+    </CoordinatorSectionHeading>
   );
 }
 
@@ -172,11 +175,14 @@ export function CoordinatorMonthlyRecordsHelp() {
  */
 export function CoordinatorClubEvents({
   events,
+  healthEventIds,
   query,
   clearHref,
   sorting,
 }: {
   events: AreaClubEvent[];
+  /** Events that get a Health information link: already checked server side against the health page's own rules (#1618). */
+  healthEventIds?: readonly string[];
   query: string;
   clearHref: string;
   sorting?: ServerSort<EventClubSortColumn>;
@@ -188,48 +194,60 @@ export function CoordinatorClubEvents({
   return (
     <>
       {sorting?.order.key && <SortOrderNote>{sortOrderText({ club: "club name", status: "status", headcount: "headcount" }[sorting.order.key], sorting.order.dir, sorting.order.key === "headcount" ? "number" : "text")}</SortOrderNote>}
-      {shownEvents.map((event) => (
-        <section aria-labelledby={`coordinator-event-${event.id}`} className="coordinator-event" key={event.id}>
-          <div className="coordinator-event-head">
-            <div>
-              <h3 id={`coordinator-event-${event.id}`} translate="no">{event.name}</h3>
-              <p className="field-help">
+      {shownEvents.map((event, index) => (
+        // Native details: the first few events start open, the rest closed so the page is not one long list (#1554).
+        // A search opens every match, since the coordinator asked to see those clubs.
+        <details className={styles.event} key={event.id} open={Boolean(query) || index < COORDINATOR_EVENTS_OPEN_BY_DEFAULT}>
+          <summary className={styles.summary}>
+            <div className={styles.summaryText}>
+              <h3 translate="no">{event.name}</h3>
+              <span className={styles.summaryMeta}>
                 {new Date(event.startsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: event.timezone })}
                 {" · "}{registeredClubsLabel(event.clubs.filter((club) => club.status === "REGISTERED").length)} · {formatNumber(eventHeadcount(event.clubs))} people
-              </p>
+              </span>
             </div>
-            <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>
-              Kitchen report<span className="sr-only">: {event.name}</span>
-            </Link>
-          </div>
-          <CoordinatorScrollRegion label={`Club registrations for ${event.name}`}>
-            <table className="report-table table-cards" role="table">
-              <caption className="sr-only">Club registrations for {event.name}</caption>
-              <thead role="rowgroup">
-                <tr role="row">
-                  <ColumnHeader column="club" hiddenLabel={event.name} label="Club" sorting={sorting} />
-                  <ColumnHeader column="status" hiddenLabel={event.name} label="Status" sorting={sorting} />
-                  <ColumnHeader column="headcount" hiddenLabel={event.name} label="Headcount" sorting={sorting} />
-                  <th role="columnheader" scope="col">Open club</th>
-                </tr>
-              </thead>
-              <tbody role="rowgroup">
-                {(sorting?.order.key ? sortRows(filterClubsByName(event.clubs, query), sorting.order.key, sorting.order.dir, eventClubAccessors) : filterClubsByName(event.clubs, query)).map((club) => (
-                  <tr key={club.organizationId} role="row">
-                    <th role="rowheader" scope="row" translate="no">{club.name}</th>
-                    <td {...cardCell("Status")}>{eventStatusLabels[club.status]}</td>
-                    <td {...cardCell("Headcount")}>{club.headcount ?? "—"}</td>
-                    <td {...cardCell("Open club")}>
-                      <Link className="secondary-button" href={`/account/area/${encodeURIComponent(club.organizationId)}`}>
-                        Open club<span className="sr-only">: {club.name}</span>
-                      </Link>
-                    </td>
+            <ChevronDown aria-hidden="true" className={styles.chevron} size={20} />
+          </summary>
+          <div className={styles.body}>
+            <div className="coordinator-event-head">
+              <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>
+                Kitchen report<span className="sr-only">: {event.name}</span>
+              </Link>
+              {healthEventIds?.includes(event.id) && (
+                <Link className="secondary-button" href={areaHealthHref(event.id)}>
+                  Health information<span className="sr-only">: {event.name}</span>
+                </Link>
+              )}
+            </div>
+            <CoordinatorScrollRegion label={`Club registrations for ${event.name}`}>
+              <table className="report-table table-cards" role="table">
+                <caption className="sr-only">Club registrations for {event.name}</caption>
+                <thead role="rowgroup">
+                  <tr role="row">
+                    <ColumnHeader column="club" hiddenLabel={event.name} label="Club" sorting={sorting} />
+                    <ColumnHeader column="status" hiddenLabel={event.name} label="Status" sorting={sorting} />
+                    <ColumnHeader column="headcount" hiddenLabel={event.name} label="Headcount" sorting={sorting} />
+                    <th role="columnheader" scope="col">Open club</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </CoordinatorScrollRegion>
-        </section>
+                </thead>
+                <tbody role="rowgroup">
+                  {(sorting?.order.key ? sortRows(filterClubsByName(event.clubs, query), sorting.order.key, sorting.order.dir, eventClubAccessors) : filterClubsByName(event.clubs, query)).map((club) => (
+                    <tr key={club.organizationId} role="row">
+                      <th role="rowheader" scope="row" translate="no">{club.name}</th>
+                      <td {...cardCell("Status")}>{eventStatusLabels[club.status]}</td>
+                      <td {...cardCell("Headcount")}>{club.headcount ?? "—"}</td>
+                      <td {...cardCell("Open club")}>
+                        <Link className={`secondary-button ${styles.openClub}`} href={`/account/area/${encodeURIComponent(club.organizationId)}`}>
+                          Open club<span className="sr-only">: {club.name}</span>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CoordinatorScrollRegion>
+          </div>
+        </details>
       ))}
     </>
   );

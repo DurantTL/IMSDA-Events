@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTransition, type ComponentProps } from "react";
-import { handleGuardedLinkClick } from "@/components/link-guard";
+import { handleGuardedLinkClick, resolveLinkScroll } from "@/components/link-guard";
 import { NavigationPending } from "@/components/navigation-link";
 
 /**
@@ -14,7 +14,8 @@ import { NavigationPending } from "@/components/navigation-link";
  * uses `useUnsavedChangesGuard` has already asked on the same click, so the link
  * does not ask twice. A modified click, a link with a target window, or a
  * download keeps the browser's normal behavior, and without scripts it is still
- * an ordinary link. `replace` and `scroll` are passed on to the router.
+ * an ordinary link. `replace` is passed on to the router. A link to the same page that only changes the
+ * query keeps the reader's place; an explicit `scroll` always wins (#1557).
  */
 export function GuardedLink({
   href,
@@ -30,13 +31,15 @@ export function GuardedLink({
   onNavigate?: () => void;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const scrollTo = resolveLinkScroll(href, pathname, scroll);
   const [pending, startNavigation] = useTransition();
   return (
     <Link
       {...rest}
       href={href}
       replace={replace}
-      scroll={scroll}
+      scroll={scrollTo}
       onClick={(event) => {
         onClick?.(event);
         handleGuardedLinkClick({
@@ -45,9 +48,10 @@ export function GuardedLink({
           download: (rest as { download?: unknown }).download,
           run: () => {
             onNavigate?.();
+            const scrollNow = resolveLinkScroll(href, pathname, scroll, window.location.search);
             startNavigation(() => {
-              if (replace) router.replace(href, { scroll });
-              else router.push(href, { scroll });
+              if (replace) router.replace(href, { scroll: scrollNow });
+              else router.push(href, { scroll: scrollNow });
             });
           },
         });

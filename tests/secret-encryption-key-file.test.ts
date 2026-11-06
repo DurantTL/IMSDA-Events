@@ -13,6 +13,8 @@ import { fillBlankSyntheticEnv } from "../scripts/support/synthetic-env";
 const longSecret = "a-secret-that-is-at-least-thirty-two-characters";
 const syntheticKey = "synthetic-file-key-0123456789-abcdefghijklmnop";
 
+const noRotation = { version: 1, previousKeyLoaded: false, previousVersion: null };
+
 const productionEnv = {
   NODE_ENV: "production",
   DATABASE_URL: "postgresql://imsda:imsda@db:5432/imsda_events?schema=public",
@@ -133,16 +135,17 @@ describe("SECRET_ENCRYPTION_KEY_FILE", () => {
 describe("encryption key status", () => {
   it("reports file, env and none, never the value", () => {
     const file = keyFile(syntheticKey);
-    expect(getEncryptionKeyStatus({ SECRET_ENCRYPTION_KEY_FILE: file })).toEqual({ configured: true, source: "file" });
-    expect(getEncryptionKeyStatus({ SECRET_ENCRYPTION_KEY: syntheticKey })).toEqual({ configured: true, source: "env" });
-    expect(getEncryptionKeyStatus({})).toEqual({ configured: false, source: null });
+    expect(getEncryptionKeyStatus({ SECRET_ENCRYPTION_KEY_FILE: file })).toEqual({ configured: true, source: "file", ...noRotation });
+    expect(getEncryptionKeyStatus({ SECRET_ENCRYPTION_KEY: syntheticKey })).toEqual({ configured: true, source: "env", ...noRotation });
+    expect(getEncryptionKeyStatus({})).toEqual({ configured: false, source: null, ...noRotation });
     expect(getEncryptionKeyStatus({ SECRET_ENCRYPTION_KEY_FILE: path.join(directory, "absent") })).toEqual({
       configured: false,
       source: "file",
+      ...noRotation,
     });
     expect(
       getEncryptionKeyStatus({ SECRET_ENCRYPTION_KEY: syntheticKey, SECRET_ENCRYPTION_KEY_FILE: file }),
-    ).toEqual({ configured: false, source: "file" });
+    ).toEqual({ configured: false, source: "file", ...noRotation });
     expect(JSON.stringify(getEncryptionKeyStatus({ SECRET_ENCRYPTION_KEY_FILE: file }))).not.toContain(syntheticKey);
   });
 
@@ -185,5 +188,131 @@ describe("development startup warning (#1411 S1)", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe("encryption key versions and the previous key (#1516)", () => {
+  const previousKey = "synthetic-previous-key-0123456789-abcdefghijklm";
+  const rotating = {
+    ...productionEnv,
+    SECRET_ENCRYPTION_KEY: syntheticKey,
+    SECRET_ENCRYPTION_KEY_VERSION: "2",
+    SECRET_ENCRYPTION_PREVIOUS_KEY: previousKey,
+    SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: "1",
+  };
+
+  function issuesOf(source: Record<string, string | undefined>) {
+    const result = validateServerEnv(source);
+    expect(result.ok).toBe(false);
+    return result.ok ? [] : result.issues;
+  }
+
+  it("defaults the version to 1 and needs no previous key", () => {
+    const result = validateServerEnv({ ...productionEnv, SECRET_ENCRYPTION_KEY: syntheticKey });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.env.SECRET_ENCRYPTION_KEY_VERSION).toBe(1);
+      expect(result.env.SECRET_ENCRYPTION_PREVIOUS_KEY).toBeUndefined();
+    }
+  });
+
+  it("accepts a rotation: current key at 2, previous key at 1", () => {
+    const result = validateServerEnv(rotating);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.env.SECRET_ENCRYPTION_KEY_VERSION).toBe(2);
+      expect(result.env.SECRET_ENCRYPTION_PREVIOUS_KEY).toBe(previousKey);
+      expect(result.env.SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION).toBe(1);
+    }
+  });
+
+  it("loads the previous key from a file", () => {
+    const { SECRET_ENCRYPTION_PREVIOUS_KEY: _plain, ...rest } = rotating;
+    void _plain;
+    const result = validateServerEnv({ ...rest, SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: keyFile(`${previousKey}\n`) });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.env.SECRET_ENCRYPTION_PREVIOUS_KEY).toBe(previousKey);
+  });
+
+  it("rejects a previous key with both the variable and the file, a missing file and an empty file", () => {
+    const both = issuesOf({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: keyFile(previousKey) });
+    expect(both.join("\n")).toMatch(/SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: .* both set/);
+    const { SECRET_ENCRYPTION_PREVIOUS_KEY: _plain, ...rest } = rotating;
+    void _plain;
+    expect(issuesOf({ ...rest, SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: path.join(directory, "absent") }).join("\n"))
+      .toMatch(/SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: .*absent: the file does not exist/);
+    expect(issuesOf({ ...rest, SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: keyFile("  \n") }).join("\n")).toMatch(/the file is empty/);
+  });
+
+  it("rejects a previous key without a version", () => {
+    const { SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: _version, ...rest } = rotating;
+    void _version;
+    expect(issuesOf(rest)).toContain("SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: is required when a previous encryption key is set");
+  });
+
+  it("rejects a previous version with no previous key, naming no key", () => {
+    const { SECRET_ENCRYPTION_PREVIOUS_KEY: _plain, ...rest } = rotating;
+    void _plain;
+    const issues = issuesOf(rest);
+    expect(issues.join("\n")).toMatch(/SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: is set but no previous encryption key is set/);
+    expect(issues.join("\n")).not.toContain(syntheticKey);
+  });
+
+  it("rejects a previous version that is not lower than the current one", () => {
+    for (const version of ["2", "3"]) {
+      expect(issuesOf({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: version })).toContain(
+        "SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: must be lower than SECRET_ENCRYPTION_KEY_VERSION",
+      );
+    }
+  });
+
+  it("rejects a version that is not a positive whole number", () => {
+    for (const version of ["0", "-1", "1.5", "abc"]) {
+      expect(issuesOf({ ...rotating, SECRET_ENCRYPTION_KEY_VERSION: version }).join("\n"))
+        .toContain("SECRET_ENCRYPTION_KEY_VERSION: must be a positive whole number");
+    }
+  });
+
+  it("rejects a previous key identical to the current key", () => {
+    expect(issuesOf({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY: syntheticKey })).toContain(
+      "SECRET_ENCRYPTION_PREVIOUS_KEY: must not be the same key as the current encryption key",
+    );
+  });
+
+  it("rejects a previous key shorter than the production minimum, but only in production", () => {
+    const short = "too-short-previous";
+    expect(issuesOf({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY: short })).toContain(
+      "SECRET_ENCRYPTION_PREVIOUS_KEY: must contain at least 32 characters in production",
+    );
+    const development = validateServerEnv({
+      ...rotating,
+      NODE_ENV: "development",
+      SECRET_ENCRYPTION_PREVIOUS_KEY: short,
+    });
+    expect(development.ok).toBe(true);
+  });
+
+  it("never puts a key in a message", () => {
+    const messages = [
+      ...issuesOf({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION: "2" }),
+      ...issuesOf({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY: syntheticKey }),
+      ...issuesOf({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY: "short-previous-key" }),
+      ...issuesOf({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: keyFile(previousKey) }),
+    ].join("\n");
+    expect(messages).not.toContain(syntheticKey);
+    expect(messages).not.toContain(previousKey);
+    expect(messages).not.toContain("short-previous-key");
+  });
+
+  it("reports versions and whether the previous key is loaded, never a key", () => {
+    const status = getEncryptionKeyStatus(rotating);
+    expect(status).toEqual({ configured: true, source: "env", version: 2, previousKeyLoaded: true, previousVersion: 1 });
+    expect(JSON.stringify(status)).not.toContain(syntheticKey);
+    expect(JSON.stringify(status)).not.toContain(previousKey);
+    expect(getEncryptionKeyStatus({ ...rotating, SECRET_ENCRYPTION_PREVIOUS_KEY: undefined })).toMatchObject({
+      previousKeyLoaded: false,
+      previousVersion: 1,
+    });
+    expect(getEncryptionKeyStatus({ SECRET_ENCRYPTION_KEY: syntheticKey, SECRET_ENCRYPTION_KEY_VERSION: "x" }).version).toBeNull();
   });
 });

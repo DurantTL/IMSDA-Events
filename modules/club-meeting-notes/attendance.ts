@@ -1,5 +1,6 @@
 import { monthDateBounds } from "@/modules/club-meeting-notes/domain";
 import { toCsv } from "@/modules/reporting/csv";
+import { slugifyFilePart } from "@/modules/reporting/export-response";
 
 /**
  * Meeting attendance (#653). Pure rules: which group a roster member sits in,
@@ -162,4 +163,19 @@ export function attendanceExportFileName(clubYear: string, range: { from?: strin
     if (from === bounds.from && to === bounds.to) return `meeting-attendance-${from.slice(0, 7)}.csv`;
   }
   return `meeting-attendance-${clubYear}-${from ?? "start"}-to-${to ?? "end"}.csv`;
+}
+
+/**
+ * The short file name for a one-month attendance export (#1553), `<club>-<YYYY-MM>-monthly-report.csv`, such as
+ * `pathfinders-2026-10-monthly-report.csv`. Null when the range is not exactly one whole month, so the caller keeps the
+ * dated name. The club part is a slug capped at 30 characters (letters, digits and hyphens only), so it is safe in a
+ * download header and never holds an email address.
+ */
+export function monthlyReportFileName(clubName: string, range: { from?: string; to?: string }): string | null {
+  const { from, to } = range;
+  if (!from || !to || from.slice(0, 7) !== to.slice(0, 7)) return null;
+  const bounds = monthDateBounds(from.slice(0, 7));
+  if (from !== bounds.from || to !== bounds.to) return null;
+  const club = slugifyFilePart(clubName).slice(0, 30).replace(/-+$/g, "") || "club";
+  return `${club}-${from.slice(0, 7)}-monthly-report.csv`;
 }

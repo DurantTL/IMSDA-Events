@@ -43,8 +43,13 @@ PUBLISH="${IMSDA_PUBLISH:-127.0.0.1:8100:3100}"
 HEALTH_URL="${IMSDA_HEALTH_URL:-http://127.0.0.1:8100/api/health}"
 HEALTH_TIMEOUT="${IMSDA_HEALTH_TIMEOUT:-900}"
 ASSETS_VOLUME="${IMSDA_ASSETS_VOLUME:-imsda_events_assets}"
-KEY_FILE="${IMSDA_KEY_FILE:-/etc/imsda/secret-encryption-key}"
+# Key files are named by key version (#1516) and never overwritten: version 1 is
+# $KEY_DIR/secret-encryption-key, version N is $KEY_DIR/secret-encryption-key-vN.
+# A container keeps the host path it was created with, so a restart or a
+# rollback of an older container always finds the key that matches its version.
+KEY_DIR="${IMSDA_KEY_DIR:-/etc/imsda}"
 KEY_TARGET=/run/secrets/encryption-key
+KEY_TARGET_PREVIOUS=/run/secrets/encryption-key-previous
 REGISTRY="${IMSDA_IMAGE_REPO:-ghcr.io/duranttl/imsda-events}"
 SOURCE="${IMSDA_DEPLOY_SOURCE:-ghcr}"
 CHECKOUT="${IMSDA_CHECKOUT:-/var/www/events.imsda.org}"
@@ -55,6 +60,25 @@ CHECKOUT="${IMSDA_CHECKOUT:-/var/www/events.imsda.org}"
 [ -r "$ENV_FILE" ] || fail "missing or unreadable $ENV_FILE"
 
 has_var() { grep -Eq "^$1=[^[:space:]]" "$2" 2>/dev/null; }
+# The last NAME=value line of the env file, without spaces or a CR. docker --env-file passes quotes through, and
+# the app would refuse a quoted version, so is_version below refuses one too.
+env_value() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d " \r" || true; }
+key_path_for() {
+  if [ "$1" = 1 ]; then echo "$KEY_DIR/secret-encryption-key"; else echo "$KEY_DIR/secret-encryption-key-v$1"; fi
+}
+is_version() { printf '%s' "$1" | grep -Eq '^[1-9][0-9]*$'; }
+
+KEY_VERSION="$(env_value SECRET_ENCRYPTION_KEY_VERSION)"
+[ -n "$KEY_VERSION" ] || KEY_VERSION=1
+is_version "$KEY_VERSION" || fail "SECRET_ENCRYPTION_KEY_VERSION in $ENV_FILE must be a whole number from 1, without quotes"
+KEY_FILE="${IMSDA_KEY_FILE:-$(key_path_for "$KEY_VERSION")}"
+[ -n "${IMSDA_KEY_FILE:-}" ] && [ "$KEY_VERSION" != 1 ] \
+  && log "WARNING: IMSDA_KEY_FILE overrides the key file for version $KEY_VERSION; make sure it holds that version's key"
+PREVIOUS_VERSION="$(env_value SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION)"
+if [ -n "$PREVIOUS_VERSION" ]; then
+  is_version "$PREVIOUS_VERSION" || fail "SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION in $ENV_FILE must be a whole number from 1, without quotes"
+  KEY_FILE_PREVIOUS="${IMSDA_PREVIOUS_KEY_FILE:-$(key_path_for "$PREVIOUS_VERSION")}"
+fi
 
 container_exists() { docker inspect "$1" >/dev/null 2>&1; }
 container_running() {
@@ -101,6 +125,21 @@ else
 fi
 has_var SECRET_ENCRYPTION_KEY_FILE "$ENV_FILE" \
   && fail "remove SECRET_ENCRYPTION_KEY_FILE from $ENV_FILE; this script sets it when it mounts the key file"
+
+# Previous key (#1516), only while rotating: SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION in .env names it, and its
+# version-named file is mounted read-only. SECRET_ENCRYPTION_PREVIOUS_KEY_FILE is set only then.
+has_var SECRET_ENCRYPTION_PREVIOUS_KEY_FILE "$ENV_FILE" \
+  && fail "remove SECRET_ENCRYPTION_PREVIOUS_KEY_FILE from $ENV_FILE; this script sets it when it mounts the previous key file"
+if [ -n "$PREVIOUS_VERSION" ]; then
+  if [ -f "$KEY_FILE_PREVIOUS" ] && [ -s "$KEY_FILE_PREVIOUS" ]; then
+    has_var SECRET_ENCRYPTION_PREVIOUS_KEY "$ENV_FILE" \
+      && fail "SECRET_ENCRYPTION_PREVIOUS_KEY is in $ENV_FILE and $KEY_FILE_PREVIOUS also exists. The app refuses both; remove the line from $ENV_FILE."
+    KEY_ARGS="$KEY_ARGS --mount type=bind,source=$KEY_FILE_PREVIOUS,target=$KEY_TARGET_PREVIOUS,readonly -e SECRET_ENCRYPTION_PREVIOUS_KEY_FILE=$KEY_TARGET_PREVIOUS"
+    log "Previous encryption key: file $KEY_FILE_PREVIOUS, version $PREVIOUS_VERSION (key rotation in progress)"
+  elif ! has_var SECRET_ENCRYPTION_PREVIOUS_KEY "$ENV_FILE"; then
+    fail "SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=$PREVIOUS_VERSION is set but $KEY_FILE_PREVIOUS is missing or empty. Restore the old key file, or remove the line once the rotation is finished."
+  fi
+fi
 
 docker network inspect "$PG_NETWORK" >/dev/null 2>&1 || fail "database network $PG_NETWORK not found (docker network ls)"
 docker network inspect "$SITE_NETWORK" >/dev/null 2>&1 || {
@@ -164,7 +203,8 @@ rollback() {
   docker rm -f "$APP" >/dev/null 2>&1 || true
   if [ "$HAD_OLD" = true ]; then
     docker rename "$OLD" "$APP"
-    docker start "$APP" >/dev/null
+    docker start "$APP" >/dev/null \
+      || fail "the new container failed and the previous one ($APP) would not start either, so the site is down. If a key file it mounts was removed, restore that file from the password manager (docs/DEPLOY-DOCKER.md, 'Rotating the encryption key'), then run 'docker start $APP'."
     fail "rolled back to the previous container ($APP). Fix the error above and deploy again."
   fi
   fail "no previous container to roll back to."

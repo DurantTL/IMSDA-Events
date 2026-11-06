@@ -12,7 +12,7 @@ export type AccountNavItem = {
   /** Also active on pages below this one (e.g. every club screen for "My clubs"). */
   matchChildren?: boolean;
   /** Another section this tab owns, itself and anything below it (e.g. Area Coordinator club pages under "Clubs", or a club's export page under its tab). */
-  alsoMatchPrefix?: string;
+  alsoMatchPrefix?: string | readonly string[];
   /** A heading shown before the first item of each run of items sharing it (e.g. "People"). Items without one sit ungrouped. */
   group?: string;
   /**

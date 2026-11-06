@@ -105,6 +105,8 @@ const showingWords: Record<string, string> = {
   "components/site-content-workspace.tsx": "not a count: revision status",
   "components/merchandise-admin-workspace.tsx": "not a count: preview status",
   "components/event-activity-panel.tsx": "not a count: filter note",
+  "components/health-access-grants.tsx": "not a count: the repository's fixed 200-row cap note (#1617)",
+  "components/health-access-holds.tsx": "not a count: the repository's fixed 200-row cap note (#1617)",
   "components/attendance-reconciliation.tsx": "not a count: snapshot banner",
   "components/import-workspace.tsx": "not a count: import step heading",
   "components/staff-invitation-import.tsx": "set order: import preview in file order",

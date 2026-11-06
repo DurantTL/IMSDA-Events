@@ -10,6 +10,8 @@ vi.mock("@/modules/access/admin-roles", () => ({ resolveAdminRoleView: mocks.res
 
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { AdminSectionHeader } from "@/components/admin-section-header";
+import { clubsAdminActiveHref, clubsAdminGroups } from "@/components/staff-navigation";
+import { clubSummaryAnchors, clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 import {
   adminBackLink,
   adminSectionFor,
@@ -114,7 +116,8 @@ describe("Clubs tabs", () => {
   it("marks the tab's own page and its area's other pages", () => {
     expect(marked(nav("clubs", "/admin/clubs").tabs)).toEqual([["overview", "page"]]);
     expect(marked(nav("clubs", "/admin/clubs/summary").tabs)).toEqual([["all-clubs", "page"]]);
-    expect(marked(nav("clubs", "/admin/clubs/reports").tabs)).toEqual([["monthly-records", "page"]]);
+    expect(marked(nav("clubs", "/admin/clubs/reports").tabs)).toEqual([["monthly-records", "true"]]);
+    expect(marked(nav("clubs", "/admin/clubs/summary", { clubSummaryView: "records" }).tabs)).toEqual([["monthly-records", "true"]]);
     expect(marked(nav("clubs", "/admin/club-forms").tabs)).toEqual([["forms", "page"]]);
     expect(marked(nav("clubs", "/admin/clubs/applications").tabs)).toEqual([["new-clubs", "page"]]);
     expect(marked(nav("clubs", "/admin/clubs/transfers").tabs)).toEqual([["all-clubs", "true"]]);
@@ -186,9 +189,24 @@ describe("back links", () => {
   });
 
   it("goes back to the club from a Monthly Record only when the visitor came from it", () => {
-    expect(adminBackLink("clubs", `/admin/clubs/reports/${org}/2026-10`)).toEqual({ href: "/admin/clubs/reports", label: "Back to Monthly Records" });
+    expect(adminBackLink("clubs", `/admin/clubs/reports/${org}/2026-10`)).toEqual({ href: "/admin/clubs/reports", label: "Back to Review monthly records" });
     expect(adminBackLink("clubs", `/admin/clubs/reports/${org}/2026-10`, { viaParent: true, parentName: "Sample Club" })).toEqual({ href: `/admin/organizations/${org}/club`, label: "Back to Sample Club" });
     expect(adminBackLink("clubs", "/admin/clubs/reports/year-end")?.href).toBe("/admin/clubs/reports");
+  });
+
+  it("returns from the review list to the Monthly Records tab (#1552)", () => {
+    expect(adminBackLink("clubs", "/admin/clubs/reports", { clubYear: "2025-26" })).toEqual({ href: "/admin/clubs/summary?year=2025-26&view=records#monthly-records", label: "Back to Monthly Records" });
+  });
+
+  it("makes the menu link and the summary tab the same destination (#1552)", () => {
+    const menu = clubsAdminGroups.flatMap((group) => group.items).find((item) => item.label === "Monthly Records")!;
+    const tab = nav("clubs", "/admin/clubs").tabs.find((candidate) => candidate.key === "monthly-records")!;
+    const parts = (href: string) => { const url = new URL(href, "https://example.test"); return [url.pathname, url.searchParams.get("view"), url.hash]; };
+    expect(parts(menu.href)).toEqual(["/admin/clubs/summary", "records", "#monthly-records"]);
+    expect(parts(tab.href)).toEqual(parts(menu.href));
+    // The summary page's own Monthly Records tab link is `?year=…&view=records#monthly-records`.
+    expect(parts(clubSummaryHref({ clubYear: "2025-26", view: "records" }) + "#" + clubSummaryAnchors.records)).toEqual(parts(menu.href));
+    expect(clubsAdminActiveHref("/admin/clubs/summary", "records")).toBe(menu.href);
   });
 
   it("adds the missing System back links", () => {
@@ -200,7 +218,7 @@ describe("back links", () => {
   });
 
   it("draws none on a main page", () => {
-    for (const path of ["/admin", "/admin/people", "/admin/organizations", "/admin/clubs", "/admin/clubs/summary", "/admin/clubs/reports", "/admin/clubs/applications", "/admin/club-forms", "/admin/event-templates"]) {
+    for (const path of ["/admin", "/admin/people", "/admin/organizations", "/admin/clubs", "/admin/clubs/summary", "/admin/clubs/applications", "/admin/club-forms", "/admin/event-templates"]) {
       expect(adminBackLink("system", path), path).toBeNull();
     }
   });

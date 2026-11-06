@@ -22,7 +22,8 @@ case "$1" in
       *) case " $FAKE_EXISTING " in *" $2 "*) exit 0 ;; *) exit 1 ;; esac ;;
     esac ;;
   run)
-    case "$*" in *"--rm"*) exit "\${FAKE_PREFLIGHT_EXIT:-0}" ;; esac ;;
+    case "$*" in *"--rm"*) exit "\${FAKE_PREFLIGHT_EXIT:-0}" ;; *) exit "\${FAKE_RUN_EXIT:-0}" ;; esac ;;
+  start) exit "\${FAKE_START_EXIT:-0}" ;;
 esac
 exit 0
 `;
@@ -126,6 +127,87 @@ describe("manual-deploy.sh", () => {
     expect(result.calls).toMatch(/run -d --name xcloud-site-1-app-1 .*SECRET_ENCRYPTION_KEY_FILE=\/run\/secrets\/encryption-key/);
     expect(result.calls).toMatch(/run -d .*imsda_events_assets:\/app\/storage\/event-assets/);
     expect(result.calls).toContain(`network connect postgresql_9kgaw_239292_xcloud-network ${app}`);
+  });
+
+  // Key rotation (#1516): key files are named by version and never overwritten.
+  function keyDir(files: Record<string, string>) {
+    const dir = mkdtempSync(path.join(tmpdir(), "imsda-keys-"));
+    dirs.push(dir);
+    for (const [name, body] of Object.entries(files)) writeFileSync(path.join(dir, name), body);
+    return dir;
+  }
+
+  it("picks the version-named key files from the versions in .env (key rotation, #1516)", () => {
+    const dir = keyDir({ "secret-encryption-key": "old-key", "secret-encryption-key-v2": "new-key" });
+    const { run } = setup(
+      `${envWithoutKey}SECRET_ENCRYPTION_KEY_VERSION=2\r\nSECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=1 \n`,
+    );
+    const result = run([sha], { IMSDA_KEY_FILE: "", IMSDA_KEY_DIR: dir });
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+    expect(result.calls).toMatch(
+      new RegExp(`run -d .*source=${dir}/secret-encryption-key-v2,target=/run/secrets/encryption-key,readonly`),
+    );
+    expect(result.calls).toMatch(
+      new RegExp(
+        `run -d .*source=${dir}/secret-encryption-key,target=/run/secrets/encryption-key-previous,readonly -e SECRET_ENCRYPTION_PREVIOUS_KEY_FILE=/run/secrets/encryption-key-previous`,
+      ),
+    );
+    expect(result.calls).not.toContain("old-key");
+    expect(result.calls).not.toContain("new-key");
+  });
+
+  it("mounts no previous key without a previous version, and uses the version-1 file by default", () => {
+    const dir = keyDir({ "secret-encryption-key": "old-key", "secret-encryption-key-v2": "new-key" });
+    const { run } = setup(envWithoutKey);
+    const result = run([sha], { IMSDA_KEY_FILE: "", IMSDA_KEY_DIR: dir });
+    expect(result.status).toBe(0);
+    expect(result.calls).toMatch(new RegExp(`source=${dir}/secret-encryption-key,target=/run/secrets/encryption-key,`));
+    expect(result.calls).not.toContain("SECRET_ENCRYPTION_PREVIOUS_KEY_FILE");
+  });
+
+  it("refuses a previous version whose key file is missing, before touching the running app", () => {
+    const dir = keyDir({ "secret-encryption-key-v2": "new-key" });
+    const { run } = setup(`${envWithoutKey}SECRET_ENCRYPTION_KEY_VERSION=2\nSECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=1\n`);
+    const result = run([sha], { IMSDA_KEY_FILE: "", IMSDA_KEY_DIR: dir });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=1 is set but");
+    expect(result.calls).not.toMatch(/^stop /m);
+  });
+
+  it("refuses a key version that is not a whole number from 1, or is quoted", () => {
+    for (const value of ["0", '"2"']) {
+      const { run } = setup(`${envWithoutKey}SECRET_ENCRYPTION_KEY_VERSION=${value}\n`, "k");
+      const result = run([sha]);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("must be a whole number from 1");
+    }
+  });
+
+  it("still rolls back to the old container during a rotation, since its key file is untouched", () => {
+    const dir = keyDir({ "secret-encryption-key": "old-key", "secret-encryption-key-v2": "new-key" });
+    const { run } = setup(`${envWithoutKey}SECRET_ENCRYPTION_KEY_VERSION=2\nSECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=1\n`);
+    const result = run([sha], { IMSDA_KEY_FILE: "", IMSDA_KEY_DIR: dir, FAKE_RUN_EXIT: "1" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("rolled back to the previous container");
+    expect(result.calls).toMatch(new RegExp(`^start ${app}$`, "m"));
+  });
+
+  it("says the site is down when the rolled-back container will not start", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const result = run([sha], { FAKE_RUN_EXIT: "1", FAKE_START_EXIT: "1" });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("the site is down");
+  });
+
+  it("refuses a previous key in both .env and its file", () => {
+    const dir = keyDir({ "secret-encryption-key": "old-key", "secret-encryption-key-v2": "new-key" });
+    const { run } = setup(
+      `${envWithoutKey}SECRET_ENCRYPTION_KEY_VERSION=2\nSECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=1\nSECRET_ENCRYPTION_PREVIOUS_KEY=y\n`,
+    );
+    const result = run([sha], { IMSDA_KEY_FILE: "", IMSDA_KEY_DIR: dir });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("SECRET_ENCRYPTION_PREVIOUS_KEY is in");
   });
 
   it("sends the sweep token to the health URL on stdin, never on the command line", () => {

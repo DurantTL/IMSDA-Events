@@ -47,6 +47,7 @@ import { GET as EXPORT } from "@/app/api/attendee/clubs/[organizationId]/exports
 import {
   attendanceExportCsv,
   attendanceExportFileName,
+  monthlyReportFileName,
   attendanceGroupOf,
   attendanceMarkKey,
   countsFromAttendance,
@@ -355,11 +356,11 @@ describe("attendance needs roster access (ADR 0005)", () => {
     expect(mocks.noteFindMany.mock.calls[0][0].where).toMatchObject({ organizationId: "club-1" });
   });
 
-  it("exports the selected month with a month file name and the range in the audit row", async () => {
+  it("exports the selected month with a short monthly-report file name and the range in the audit row", async () => {
     role("DIRECTOR");
     const response = await EXPORT(request("?year=2026-27&from=2026-10-01&to=2026-10-31"), ctx);
     expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Disposition")).toMatch(/filename="club-1-meeting-attendance-2026-10-\d{4}-\d{2}-\d{2}\.csv"/);
+    expect(response.headers.get("Content-Disposition")).toMatch(/^attachment; filename="test-pathfinders-2026-10-monthly-report\.csv"$/);
     expect(mocks.noteFindMany.mock.calls[0][0].where.meetingDate).toEqual({ gte: "2026-10-01", lte: "2026-10-31" });
     expect(mocks.writeAuditLog.mock.calls[0][0].metadata).toMatchObject({ from: "2026-10-01", to: "2026-10-31" });
   });
@@ -529,5 +530,14 @@ describe("Monthly Records month handling", () => {
   it("starts a new meeting today when viewing this month, else on the 1st", () => {
     expect(defaultMeetingDate("2026-10", now)).toBe("2026-10-20");
     expect(defaultMeetingDate("2026-09", now)).toBe("2026-09-01");
+  });
+
+  it("names a whole-month export for the club, month and year, short and header-safe (#1553)", () => {
+    expect(monthlyReportFileName("Pathfinders", { from: "2026-10-01", to: "2026-10-31" })).toBe("pathfinders-2026-10-monthly-report.csv");
+    expect(monthlyReportFileName("Test Pathfinders!! \"x\"\r\n", { from: "2028-02-01", to: "2028-02-29" })).toBe("test-pathfinders-x-2028-02-monthly-report.csv");
+    expect(monthlyReportFileName("A".repeat(80), { from: "2026-10-01", to: "2026-10-31" })).toBe(`${"a".repeat(30)}-2026-10-monthly-report.csv`);
+    expect(monthlyReportFileName("avery.synthetic@example.org", { from: "2026-10-01", to: "2026-10-31" })).toBe("club-2026-10-monthly-report.csv");
+    expect(monthlyReportFileName("Pathfinders", { from: "2026-10-01", to: "2026-10-30" })).toBeNull();
+    expect(monthlyReportFileName("Pathfinders", {})).toBeNull();
   });
 });

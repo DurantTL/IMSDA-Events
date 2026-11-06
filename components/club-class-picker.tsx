@@ -1,5 +1,6 @@
 "use client";
 
+import { HonorCombobox, type HonorComboboxOption } from "@/components/honor-combobox";
 import { ClubSetupHelp } from "@/components/role-setup-help";
 import { useMemo, useRef, useState } from "react";
 import { usePinAfterScroll } from "@/components/use-pin-after-scroll";
@@ -168,15 +169,16 @@ export function ClubClassPicker({
     }
   }
 
-  const option = (offering: Offering, attendee: Attendee) => {
+  // The same availability rules as before; a class that can't be picked stays listed, greyed with its reason (#1600).
+  const choicesFor = (offerings: readonly Offering[], attendee: Attendee): HonorComboboxOption[] => offerings.map((offering) => {
     const heldHere = held(attendee.id, offering.id);
     const reason = unavailableReason(offering, heldHere, attendee, { canOverride: canOverrideRequirements, canConfirm: noun === "club" });
-    return (
-      <option disabled={Boolean(reason)} key={offering.id} value={offering.id}>
-        {offering.honorName} ({reason ?? seatsNote(offering, heldHere, attendee, noun)})
-      </option>
-    );
-  };
+    return {
+      id: offering.id,
+      name: offering.honorName,
+      ...(reason ? { unavailableReason: reason.charAt(0).toUpperCase() + reason.slice(1) } : { detail: seatsNote(offering, heldHere, attendee, noun) }),
+    };
+  });
 
   return (
     <section className="public-manage-card" aria-labelledby="class-picker-heading">
@@ -218,30 +220,34 @@ export function ClubClassPicker({
                 {readinessById.get(attendee.id) && <small><ClassStatus open={workspace.open} person={readinessById.get(attendee.id)!} /></small>}
               </legend>
               {allSessionOfferings.length > 0 && (
-                <label>
-                  All sessions
-                  <select onChange={(event) => setAllSessions(attendee.id, event.target.value)} value={chosenAll}>
-                    <option value="">Not an all-sessions class</option>
-                    {allSessionOfferings.map((offering) => option(offering, attendee))}
-                  </select>
-                </label>
+                <HonorCombobox
+                  allLabel="Not an all-sessions class"
+                  label="All sessions"
+                  noun="class"
+                  nounPlural="classes"
+                  onChange={(offeringId) => setAllSessions(attendee.id, offeringId)}
+                  options={choicesFor(allSessionOfferings, attendee)}
+                  placeholder="Search classes"
+                  value={chosenAll}
+                />
               )}
               {sessions.map((session) => {
                 const offerings = bySession.get(session.id) ?? [];
                 if (offerings.length === 0) return null;
                 const value = chosen.find((id) => offeringById.get(id)?.sessionId === session.id) ?? "";
                 return (
-                  <label key={session.id}>
-                    {session.name}
-                    <select
-                      disabled={Boolean(chosenAll)}
-                      onChange={(event) => setSession(attendee.id, session.id, event.target.value)}
-                      value={value}
-                    >
-                      <option value="">No class</option>
-                      {offerings.map((offering) => option(offering, attendee))}
-                    </select>
-                  </label>
+                  <HonorCombobox
+                    allLabel="No class"
+                    disabled={Boolean(chosenAll)}
+                    key={session.id}
+                    label={session.name}
+                    noun="class"
+                    nounPlural="classes"
+                    onChange={(offeringId) => setSession(attendee.id, session.id, offeringId)}
+                    options={choicesFor(offerings, attendee)}
+                    placeholder="Search classes"
+                    value={value}
+                  />
                 );
               })}
               <ClassRequirementNotes

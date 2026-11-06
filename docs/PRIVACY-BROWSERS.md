@@ -122,8 +122,6 @@ Pass means: every step either works or shows a plain message with a way forward.
 does nothing, a spinner that never ends, or a total that is not what the confirmation shows. Write down the browser, the
 setting and the page, and open an issue.
 
-## Rule T2 (for docs/SITE-RULES.md)
+## Site rule
 
-| ID | Rule | Guard test | Browser test | Issue |
-| --- | --- | --- | --- | --- |
-| T2 | Every page and action works in Brave (Shields on, standard and aggressive), Avast Secure Browser, Firefox (strict tracking protection) and Safari (tracking prevention). If a blocker stops something optional (analytics), nothing visible breaks. If it stops something needed (the card form, the Security check, passkeys), the person sees a clear message and another way through, never a silent failure. | `tests/safe-storage-1445.test.ts`, `tests/security-check-blocked-1445.test.ts` | `npm run test:privacy-browsers` (`scripts/verify-privacy-browsers.ts`, `.github/workflows/browser-privacy.yml`) | Caleb, Nov 1 (#1445) |
+This is rule T2 in `docs/SITE-RULES.md` (the translation rule is T1 there), with its guard tests and browser test listed.

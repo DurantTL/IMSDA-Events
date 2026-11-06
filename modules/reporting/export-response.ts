@@ -3,6 +3,8 @@
  * and a byte-order mark so Excel reads accents. Pure and free of server-only imports, so the guard and unit tests can
  * load it. Exports carry personal data, so a file name never holds a person's name or email: callers pass an event,
  * club or organization slug or id, a club year, or a fixed name, and nothing here accepts a free-text title.
+ * One approved exception (#1553): a club's one-month attendance export is named `<club>-<YYYY-MM>-monthly-report.csv`
+ * (`monthlyReportFileName`, club name slugified), still sent through `csvDownloadResponse`.
  */
 
 import { calendarDateIn } from "@/modules/calendar/domain";

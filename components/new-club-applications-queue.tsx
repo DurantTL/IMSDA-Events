@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { Paperclip, Send } from "lucide-react";
+import styles from "@/components/new-club-applications-queue.module.css";
 import { sponsorOptionLabel } from "@/modules/organizations/domain";
 import {
   DECLINE_REASON_MAX,
@@ -35,6 +36,8 @@ type Props = {
   churches: Array<{ id: string; name: string; type: string }>;
   invites?: NewClubInviteRecord[];
   emailConfigured?: boolean;
+  /** Area Coordinator view (#1554): a cancelled application shows as one line that opens to the full card. */
+  collapseCancelled?: boolean;
 };
 
 /**
@@ -43,7 +46,7 @@ type Props = {
  * Coordinator sees the same applications, view only. The server checks again on
  * every action.
  */
-export function NewClubApplicationsQueue({ applications, canDecide, churches, invites = [], emailConfigured = true }: Props) {
+export function NewClubApplicationsQueue({ applications, canDecide, churches, invites = [], emailConfigured = true, collapseCancelled = false }: Props) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [mode, setMode] = useState<{ id: string; kind: "approve" | "decline" } | null>(null);
@@ -273,6 +276,20 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
     );
   }
 
+  function renderDecided(application: NewClubApplicationRecord) {
+    if (!collapseCancelled || application.status !== "DECLINED") return renderApplication(application);
+    return (
+      <details className={styles.cancelled} data-application-collapsed={application.id} key={application.id}>
+        <summary className={styles.summary}>
+          <span className={styles.name} translate="no">{application.clubName}</span>
+          <span className={`status-chip ${statusTone.DECLINED}`}>{newClubApplicationStatusLabels.DECLINED}</span>
+          {application.decidedAt && <span className={styles.date}>{formatDate(application.decidedAt)}</span>}
+        </summary>
+        {renderApplication(application)}
+      </details>
+    );
+  }
+
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   return (
     <section className="page-stack nca-queue">
@@ -322,7 +339,7 @@ export function NewClubApplicationsQueue({ applications, canDecide, churches, in
       {decided.length > 0 && (
         <div className="panel">
           <div className="section-heading"><div><h2>Recently decided</h2></div></div>
-          <div className="nca-list">{decided.map(renderApplication)}</div>
+          <div className="nca-list">{decided.map(renderDecided)}</div>
         </div>
       )}
     </section>

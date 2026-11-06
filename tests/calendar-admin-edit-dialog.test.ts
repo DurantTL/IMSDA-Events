@@ -74,6 +74,6 @@ describe("calendar admin entries list and edit dialog (#869)", () => {
   it("keeps the imported-item notice and errors inside the edit form", () => {
     expect(source).toContain("Imported from {entry.sourceFeedName}. Fields you change here are kept when the calendar refreshes");
     expect(source).toMatch(/!removeTarget && !bulkTarget && !editing/);
-    expect(source).toMatch(/<EntryForm entry=\{entry\} error=\{error\}/);
+    expect(source).toMatch(/<EntryForm choices=\{choices\} entry=\{entry\} error=\{error\}/);
   });
 });

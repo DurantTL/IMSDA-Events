@@ -1,7 +1,8 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { ColumnHeader } from "@/components/column-header";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { RecordsByMonthChart, ReportSummaryBand, YearStrip, shortMonth } from "@/components/club-report-charts";
+import { ChevronLeft, ChevronRight, CircleAlert, CircleCheck, Clock } from "lucide-react";
+import { CoordinatorSummaryTiles } from "@/components/coordinator-summary-tiles";
+import { RecordsByMonthChart, YearStrip, shortMonth } from "@/components/club-report-charts";
 import { ListPager } from "@/components/list-pager";
 import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
@@ -27,6 +28,8 @@ import styles from "./coordinator-monthly-records.module.css";
  * full-year grid below shows, so the page tells one story.
  */
 
+const formatNumber = (value: number) => value.toLocaleString("en-US");
+
 const stateWords: Record<RecordState, { icon: string; word: string }> = {
   SUBMITTED: { icon: "✓", word: "Submitted" },
   NOT_SUBMITTED: { icon: "✕", word: "Not submitted" },
@@ -47,13 +50,13 @@ export function CoordinatorMonthPicker({ clubYear, month, query, clubs, now }: V
     <nav aria-label="Report month" className={styles.picker}>
       <div className={styles.stepper}>
         {previous ? (
-          <Link className={styles.step} href={href(previous)}><ChevronLeft aria-hidden="true" size={16} /> Previous<span className="sr-only"> month, {reportMonthLabel(previous)}</span></Link>
+          <Link className={styles.step} href={href(previous)} scroll={false}><ChevronLeft aria-hidden="true" size={16} /> Previous<span className="sr-only"> month, {reportMonthLabel(previous)}</span></Link>
         ) : (
           <span className={`${styles.step} ${styles.stepOff}`}><ChevronLeft aria-hidden="true" size={16} /> Previous<span className="sr-only"> month, none</span></span>
         )}
         <strong className={styles.current}>{reportMonthLabel(month)}</strong>
         {next ? (
-          <Link className={styles.step} href={href(next)}>Next<span className="sr-only"> month, {reportMonthLabel(next)}</span> <ChevronRight aria-hidden="true" size={16} /></Link>
+          <Link className={styles.step} href={href(next)} scroll={false}>Next<span className="sr-only"> month, {reportMonthLabel(next)}</span> <ChevronRight aria-hidden="true" size={16} /></Link>
         ) : (
           <span className={`${styles.step} ${styles.stepOff}`}>Next<span className="sr-only"> month, none</span> <ChevronRight aria-hidden="true" size={16} /></span>
         )}
@@ -65,6 +68,7 @@ export function CoordinatorMonthPicker({ clubYear, month, query, clubs, now }: V
               aria-current={total.month === month ? "date" : undefined}
               className={`${styles.monthLink}${total.month === month ? ` ${styles.monthSelected}` : ""}`}
               href={href(total.month)}
+              scroll={false}
             >
               <span aria-hidden="true" className={styles.monthName}>{shortMonth(total.month)}</span>
               <span className="sr-only">{reportMonthLabel(total.month)}</span>
@@ -85,12 +89,12 @@ export function CoordinatorMonthBand({ clubs, month, now }: { clubs: readonly Ar
     ? `${summary.drafts} ${summary.drafts === 1 ? "draft" : "drafts"} saved`
     : `Month not ended; due ${summary.dueText}`;
   return (
-    <ReportSummaryBand
+    <CoordinatorSummaryTiles
       label={`${reportMonthLabel(month)} records`}
       tiles={[
-        { label: "Submitted", value: summary.submitted, detail: submittedDetail },
-        { label: "Not submitted", value: summary.notSubmitted, detail: notSubmittedDetail },
-        { label: "Not due yet", value: summary.notDue, detail: summary.monthEnded ? undefined : `Due ${summary.dueText}` },
+        { label: "Submitted", value: formatNumber(summary.submitted), detail: submittedDetail, icon: <CircleCheck size={16} /> },
+        { label: "Not submitted", value: formatNumber(summary.notSubmitted), detail: notSubmittedDetail, icon: <CircleAlert size={16} /> },
+        { label: "Not due yet", value: formatNumber(summary.notDue), detail: summary.monthEnded ? undefined : `Due ${summary.dueText}`, icon: <Clock size={16} /> },
       ]}
     />
   );

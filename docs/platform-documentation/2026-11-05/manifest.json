@@ -1,0 +1,437 @@
+{
+  "source_commit": "ad9237d",
+  "prepared_on": "2026-11-05",
+  "presentation": "31-slide IMAdventist getting-started deck with fictional screenshots",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "bytes": 80,
+      "sha256": "e5c144fced484bdef5b8c2b6ecd3032743a0a90e45873889651def004112da01"
+    },
+    {
+      "path": "README.md",
+      "bytes": 7536,
+      "sha256": "ec10b9c9c1524ebc1a3c1b7267d10c6adf9e69731f5cf1799d03e490456b89e3"
+    },
+    {
+      "path": "assets/FONT-LICENSE.txt",
+      "bytes": 5208,
+      "sha256": "075f91382875da1c4b491f1facf2586f55448705133264d98ce15cab6211b125"
+    },
+    {
+      "path": "assets/NotoSans-Bold.ttf",
+      "bytes": 515752,
+      "sha256": "e83493c945848ecd4a9ad0f6d19164541a0d3e23a9c952304a00a46e00272ac5"
+    },
+    {
+      "path": "assets/NotoSans-Regular.ttf",
+      "bytes": 512672,
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d"
+    },
+    {
+      "path": "assets/imadventist-symbol.png",
+      "bytes": 1017557,
+      "sha256": "44c00a60a5c6de735ea2f2fe353b69526dba4f6f9cbb380b11c65b5020ca3bdf"
+    },
+    {
+      "path": "assets/training/account-sign-out.png",
+      "bytes": 391197,
+      "sha256": "4e4088974ab639e5693d182a2fdd1857919df08e20efd9e179eb7993a3da47c9"
+    },
+    {
+      "path": "assets/training/club-class-suggestions.png",
+      "bytes": 186456,
+      "sha256": "24986ce9f6379aa8c560b5f47c621a4073d7005edfaa2dbaa334eef90f8b1cee"
+    },
+    {
+      "path": "assets/training/club-class-tracking.png",
+      "bytes": 332528,
+      "sha256": "e16d986b511e2c8de791cab64066a8d5f875cdee8611bdc6f69e361c18c441e9"
+    },
+    {
+      "path": "assets/training/club-orders-handout.png",
+      "bytes": 167818,
+      "sha256": "34a3826ae14dbeb9b0f055a5e9b727fb29c1a768b41749415f231aa31c952210"
+    },
+    {
+      "path": "assets/training/club-orders-list.png",
+      "bytes": 148212,
+      "sha256": "6a8f9e7f0fbd1b27d7fb52fe8f8be495dc767366ffb3e32703a6fcdbeaa0aaf2"
+    },
+    {
+      "path": "assets/training/club-orders-stock-after.png",
+      "bytes": 222370,
+      "sha256": "143107ef983a9849948173504d7d93f7af350aae2d902bf71277d12c35da0a58"
+    },
+    {
+      "path": "assets/training/club-orders-top.png",
+      "bytes": 375132,
+      "sha256": "a6234a4d01796d2016213409b3e15b4f1f02d16d35a55f170c1f9e34738fb627"
+    },
+    {
+      "path": "assets/training/club-year-end-header.png",
+      "bytes": 302600,
+      "sha256": "bdfa97b8fa437ad1f616e1cf9e6fe9d853194abdfcac5be3d9b5c2974a277a07"
+    },
+    {
+      "path": "assets/training/club-year-end-save.png",
+      "bytes": 180248,
+      "sha256": "871fbdaf07905ba2db56765a91f978a5f40b7b910096847329c0a5bb7f2ebfa3"
+    },
+    {
+      "path": "assets/training/club-year-end.png",
+      "bytes": 230349,
+      "sha256": "8d0963e27b5d7878633c9b31e6bbaf5ea49675ce25b5056f11c250558087d6db"
+    },
+    {
+      "path": "assets/training/coordinator-account.png",
+      "bytes": 509555,
+      "sha256": "4b04b883968fdf97e0ccfef31839500d3bf79fa1bb8e83941c16613ca3e8ea55"
+    },
+    {
+      "path": "assets/training/coordinator-all-clubs.png",
+      "bytes": 288657,
+      "sha256": "ecf92eb15fa68e8e17bac7e791342eb19c8bd9a7de687c1925cb41a605973bf2"
+    },
+    {
+      "path": "assets/training/coordinator-club-view.png",
+      "bytes": 402685,
+      "sha256": "aea738340f3425f9cd9ea38ae940f04392f61c2f1c3e0da45f8e3e59720f3393"
+    },
+    {
+      "path": "assets/training/coordinator-events.png",
+      "bytes": 263963,
+      "sha256": "e059303fa024763df5c9c9c87bd24f8fb8197fc129c5b3472a0fc847ec9f3346"
+    },
+    {
+      "path": "assets/training/coordinator-glance.png",
+      "bytes": 373281,
+      "sha256": "53034eb997226a7639922980fc4fbb1510e6c16e9ae5831e4f58919d4f7d9639"
+    },
+    {
+      "path": "assets/training/coordinator-overview.png",
+      "bytes": 346796,
+      "sha256": "1ed2945c050a64756a8537b144d29680fcc3b7e64ef0a0fc282e65ef0dc8c3a8"
+    },
+    {
+      "path": "assets/training/coordinator-points.png",
+      "bytes": 346164,
+      "sha256": "c978f3eda2030a044463a935d750909d937a02d939ca0d2ab5422cb10211b745"
+    },
+    {
+      "path": "assets/training/coordinator-report-detail.png",
+      "bytes": 373005,
+      "sha256": "3fcf5651de5d02e93a09233d16a69e47b73a56c908acbf2f2f292de0d814d26d"
+    },
+    {
+      "path": "assets/training/coordinator-reports.png",
+      "bytes": 347620,
+      "sha256": "dfa6acfa3c8f8f36ecbe1d3bf6a7d5437a6dea51c612ed03ffc6a30a8f6b87ef"
+    },
+    {
+      "path": "assets/training/director-account.png",
+      "bytes": 403587,
+      "sha256": "3b5b805b7f75073a610f3303a26f867e33dd20c828b921bc7c28d4a5fcce8fb3"
+    },
+    {
+      "path": "assets/training/director-home.png",
+      "bytes": 362729,
+      "sha256": "9eb5e1678fc13fa0d5e489525910e9be2e7d555a8ac304f1c064ff9ac6cdfc0d"
+    },
+    {
+      "path": "assets/training/event-attendees.png",
+      "bytes": 194498,
+      "sha256": "50b9c37206147e47921239ccd09ad2af186fd339ecf0e9259cc9e318aceafa3b"
+    },
+    {
+      "path": "assets/training/event-review.png",
+      "bytes": 300971,
+      "sha256": "75cbf34986322d83bb7967980c3718d4113980f426fce5d2dd354f8b943c9463"
+    },
+    {
+      "path": "assets/training/event-saved.png",
+      "bytes": 306697,
+      "sha256": "d1f07043298fdba9d33f5bb1f8dbf2dd26663ad9e7618353942d8e112c08ff6b"
+    },
+    {
+      "path": "assets/training/events-list.png",
+      "bytes": 266278,
+      "sha256": "d543af0a565fb2f03c500c858d9d743af02ee0e0cb3464285007369e381205fd"
+    },
+    {
+      "path": "assets/training/forms-help.png",
+      "bytes": 473057,
+      "sha256": "875d9ee46da61012985b84c840894a3d8f7b9b3c75e69befa9858bbd0fb3ec8b"
+    },
+    {
+      "path": "assets/training/forms.png",
+      "bytes": 463585,
+      "sha256": "ff57d4b8ad47d6fa5ba68d438f632dc93cc1edb0577d6b2cdf801005e55d8ba6"
+    },
+    {
+      "path": "assets/training/help-walkthroughs.png",
+      "bytes": 288666,
+      "sha256": "2775898de8cc008a95e69fd59899068758c1a6ed2389260f4366699a6e12f6be"
+    },
+    {
+      "path": "assets/training/honors.png",
+      "bytes": 320848,
+      "sha256": "1635b0883e4ee6986bd6d11f0c18df6efc329bd7128304d42cc0b43cc9bbd78c"
+    },
+    {
+      "path": "assets/training/meeting-note.png",
+      "bytes": 413848,
+      "sha256": "55ba81dbb5b96900895a582b1bfc011dcaed4c8d1d155a9e9b7ad04b24de1fa6"
+    },
+    {
+      "path": "assets/training/new-clubs.png",
+      "bytes": 398130,
+      "sha256": "8d4e91866bd0f1cd81326018d3d869d1787149005a2505e7a88643131da5dff7"
+    },
+    {
+      "path": "assets/training/public-calendar.png",
+      "bytes": 219529,
+      "sha256": "374e07b70926f7303a8e2144da75f8617d687501aac85e9464aac87652b1f21d"
+    },
+    {
+      "path": "assets/training/public-home.png",
+      "bytes": 137268,
+      "sha256": "0d5a7585ebaf0fea828c3ab66a75ea8ca7c34ba82e94c3cb5d8a5d5fc8b0aa91"
+    },
+    {
+      "path": "assets/training/records-list.png",
+      "bytes": 380537,
+      "sha256": "1fcc7777169167f37d830f579442fbeffebd0026005ac92ce5f56fd605204938"
+    },
+    {
+      "path": "assets/training/report-draft.png",
+      "bytes": 454034,
+      "sha256": "9bbe8533d49e34b7d39b3dd0b986c82a26eae6c5e0af185f08b415eaf983069c"
+    },
+    {
+      "path": "assets/training/report-sign.png",
+      "bytes": 460303,
+      "sha256": "0a1d2bded470de8b759db12b6abe5f053cb6b74aa0e032ce402d9ab713c43932"
+    },
+    {
+      "path": "assets/training/report-submitted.png",
+      "bytes": 426342,
+      "sha256": "0200b7f67667a6c0a06f3a0a034fd238dd39b65b56fcda07a4547b4bc48aea8b"
+    },
+    {
+      "path": "assets/training/roster-add-save.png",
+      "bytes": 532609,
+      "sha256": "d1b85e41fd82bebdb3cd2b63a89d9ba7b71e6d539e4e590b7b31f0822887bc3f"
+    },
+    {
+      "path": "assets/training/roster-add.png",
+      "bytes": 567795,
+      "sha256": "09225799ae76cc51e2efbf00376f558ff5920a4f2fe05f6ef9b8e5e1fba027e9"
+    },
+    {
+      "path": "assets/training/roster-added.png",
+      "bytes": 220157,
+      "sha256": "71889ea19b4bff32f6522bf29d98ef70657db136ba7cfd4f71e757e6c8f10e18"
+    },
+    {
+      "path": "assets/training/roster-edit-top.png",
+      "bytes": 374204,
+      "sha256": "9ef42d0f9e9fea9706c16ea92b7e622398fb164d07b6881ebbe5ff8ba1bdcec0"
+    },
+    {
+      "path": "assets/training/roster-export.png",
+      "bytes": 348718,
+      "sha256": "f2a029ec130ac80cb024a7f5ee70d6448559c2ed75e4949574fccd71647b5114"
+    },
+    {
+      "path": "assets/training/sign-in.png",
+      "bytes": 1146249,
+      "sha256": "d787bd54b7c43d1c4d1d80f33f5fa63a41edd5f9bfeae2e4f4223a596b14123b"
+    },
+    {
+      "path": "assets/training/two-step.png",
+      "bytes": 612576,
+      "sha256": "4bd95cfb2c196e3a48647913ffdaf996213ecea186a0ff3873efaf9ee44e600c"
+    },
+    {
+      "path": "content/01-current-and-future-features.md",
+      "bytes": 38857,
+      "sha256": "2b352de9c95df016194f106e9b8eee76beb77c4edf6a2981562356c93f25b7ef"
+    },
+    {
+      "path": "content/02-accessibility-and-usability.md",
+      "bytes": 25921,
+      "sha256": "41afee5fb364d652832153d0f2be4c42edcdc45efd6c7ca7b80af6e8422af188"
+    },
+    {
+      "path": "content/03-help-and-communication-kit.md",
+      "bytes": 26480,
+      "sha256": "d0a1044e350e9ab93da832ca0f3e227da127ec9dfcc1201511c21e6d060a32c3"
+    },
+    {
+      "path": "content/04-camp-system-and-ultracamp.md",
+      "bytes": 26438,
+      "sha256": "9b7f4b43b3d7c829b3c07278057a664259f36a0068b24ed35e705812a3234cf2"
+    },
+    {
+      "path": "content/05-code-and-verification-evidence.md",
+      "bytes": 28165,
+      "sha256": "ad3726d2ddc5df1c76d2c3ae949dde18009b48268ba89acc19c04637efaa1633"
+    },
+    {
+      "path": "content/06-presenter-notes.md",
+      "bytes": 32840,
+      "sha256": "58c6293816eae996fb782da4ef1485ed2378982abf03e5827c3882e392223646"
+    },
+    {
+      "path": "content/07-club-quick-start.md",
+      "bytes": 8291,
+      "sha256": "7a945aae7ef78edbd446c400ff24d93fb48df54766153f809fbdb1d3f0d3c0e7"
+    },
+    {
+      "path": "evidence/export-verification.md",
+      "bytes": 3760,
+      "sha256": "85bc399d5e2fb5e53af63f8a82f7609348f559ac036b8bb8cc366c8475907643"
+    },
+    {
+      "path": "evidence/screenshot-capture.json",
+      "bytes": 20863,
+      "sha256": "d8fae86a760760c0a6715e9c5694c0c8809e128f257bbd0606be24e964c614ec"
+    },
+    {
+      "path": "evidence/synthetic-training-dataset.md",
+      "bytes": 3514,
+      "sha256": "6e59856fdaf5e372cfcef36e49a3f1622888381d5790496e128eca54386b6b23"
+    },
+    {
+      "path": "exports/01-current-and-future-features.docx",
+      "bytes": 26658,
+      "sha256": "b1ed1189fe00b3e305083cc7a9c2d0ed00e86d1dd26b5eabedf3d91c69723f16"
+    },
+    {
+      "path": "exports/01-current-and-future-features.html",
+      "bytes": 47426,
+      "sha256": "d66dde7d62d8977c81ebca4a81dc2ba1f6f15bc36e9bac04ded98c933b2ba54c"
+    },
+    {
+      "path": "exports/01-current-and-future-features.pdf",
+      "bytes": 1284700,
+      "sha256": "0b4b8fa7b088790f3ec53875f09ba2f9ee2ef87e27dca541387898461f832389"
+    },
+    {
+      "path": "exports/02-accessibility-and-usability.docx",
+      "bytes": 22514,
+      "sha256": "9ea773312fc64cea379adf84737a7c91742d0a7491c070bf08cfa94870c57c71"
+    },
+    {
+      "path": "exports/02-accessibility-and-usability.html",
+      "bytes": 32409,
+      "sha256": "100adc4690caf670a015acd836fcdc180b7060ce70faa1e4bdf92bd8af8cc1b8"
+    },
+    {
+      "path": "exports/02-accessibility-and-usability.pdf",
+      "bytes": 1131747,
+      "sha256": "1ec3c94d137bb646e2d7bdb699143fa7be4d0f11d85ca975f5f0e4364b1b99b4"
+    },
+    {
+      "path": "exports/03-help-and-communication-kit.docx",
+      "bytes": 23320,
+      "sha256": "6b30a86d60d4ce1f1fd18ec0e3ba10d7cb41d733230a6b6279ae63363f02be4e"
+    },
+    {
+      "path": "exports/03-help-and-communication-kit.html",
+      "bytes": 34912,
+      "sha256": "e2e6d334af79693b3d93c10e67fed5e98dc197185f385ae6b08d4fecf7ecc0b3"
+    },
+    {
+      "path": "exports/03-help-and-communication-kit.pdf",
+      "bytes": 1183386,
+      "sha256": "606304f7dbc3d32c2b441e3637cee873ad758dc9dd935c28d242c4ca430b6b64"
+    },
+    {
+      "path": "exports/04-camp-system-and-ultracamp.docx",
+      "bytes": 23038,
+      "sha256": "be5a3bcffe2b9defc8c32dff185077968d39a7110c25e668463117c6d93bb11e"
+    },
+    {
+      "path": "exports/04-camp-system-and-ultracamp.html",
+      "bytes": 32792,
+      "sha256": "770f008e8a54c633d1b2d0f9410612e9f20a4c2b136d08fd926800b524c8736c"
+    },
+    {
+      "path": "exports/04-camp-system-and-ultracamp.pdf",
+      "bytes": 1135114,
+      "sha256": "2ee00dc6aa0020f6bc91765fc8df3f8902e64adb2fd0853bf8d64f18b00ebbdb"
+    },
+    {
+      "path": "exports/05-code-and-verification-evidence.docx",
+      "bytes": 23822,
+      "sha256": "037ba04d47f500989189a984b002b92151b593f1006a1a039f51838daf482081"
+    },
+    {
+      "path": "exports/05-code-and-verification-evidence.html",
+      "bytes": 35285,
+      "sha256": "08e9f52a50d3d652920614865df0dd33baa3ccaf724f45e5add0fdca00bffa96"
+    },
+    {
+      "path": "exports/05-code-and-verification-evidence.pdf",
+      "bytes": 1189119,
+      "sha256": "ccb86e19a55aa51eda0ad4e5dd0bedffd3fe2be277641538236297d23a52d701"
+    },
+    {
+      "path": "exports/06-presenter-notes.docx",
+      "bytes": 25942,
+      "sha256": "2b14e287f20500445edad071da175aef912b2ad9c2e6ab6821250607ceb12370"
+    },
+    {
+      "path": "exports/06-presenter-notes.html",
+      "bytes": 45205,
+      "sha256": "7bcf3570f62bf750f7935b8b679db402094c733eef2be25c1fea2d400440a226"
+    },
+    {
+      "path": "exports/06-presenter-notes.pdf",
+      "bytes": 1300099,
+      "sha256": "d7321ef9624300c0f2f6ada1d59309b1b2baae07e5e4afe85b2b2be8f2b0b4fc"
+    },
+    {
+      "path": "exports/07-club-quick-start.docx",
+      "bytes": 14763,
+      "sha256": "a6a142a8a3f5685d7b4cefd24747f76babf3f4ab16b169b31cca684e40cffa4a"
+    },
+    {
+      "path": "exports/07-club-quick-start.html",
+      "bytes": 14060,
+      "sha256": "11cb5d7f5717f3b050597a01e25b362089b6059cd378a156db1ab29e3890ac69"
+    },
+    {
+      "path": "exports/07-club-quick-start.pdf",
+      "bytes": 1063548,
+      "sha256": "a072d73857432f8ec1ce61b199de5dacee573f38fb097861d4519d53551d11ef"
+    },
+    {
+      "path": "exports/IMAdventist-getting-started.pdf",
+      "bytes": 8034379,
+      "sha256": "ccd79c0c9fa9ded9df990e44575738d2b153d7e06859d69d6b88eafccfc1671f"
+    },
+    {
+      "path": "exports/IMAdventist-getting-started.pptx",
+      "bytes": 15817227,
+      "sha256": "b89d5f948bc39c4310b3c383ce40997af401ac85a222713da3831a96d223dec9"
+    },
+    {
+      "path": "exports/IMAdventist-training-screenshot-gallery.html",
+      "bytes": 21118,
+      "sha256": "66214cda876739350b994c3abf393754717de237f7936e72de53e74f6b866cdc"
+    },
+    {
+      "path": "previews/deck-overview.png",
+      "bytes": 811006,
+      "sha256": "508a660274f4ef95c097a0168e54c08d14fc4a5e36e7bebd7158de116d844fd8"
+    },
+    {
+      "path": "previews/title-slide.png",
+      "bytes": 129323,
+      "sha256": "2a5132b22ad194064c57d1cea3482d8add2f146fb31082e5c23c65751cda86b7"
+    }
+  ]
+}
