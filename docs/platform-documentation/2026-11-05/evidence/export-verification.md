@@ -12,8 +12,10 @@
 - **Screenshots:** 44, each recorded in `screenshot-capture.json` with route, state, pixel size, SHA-256 and the slides that use it. The full contact sheet and each deck page were looked at by eye.
 - **Fact check:** an independent read-only review compared the deck text and the quick-start handout with the current application source. Its findings were fixed before publishing; see the pull request for the list.
 
+- **Print edition (added November 6):** 31 US Letter portrait pages, one per slide, built from the screen deck's text and speaker notes and the original screenshots by `print/build-print-edition.py`. Every page was looked at by eye. Each crop keeps the pink numbered marker its caption names. Screenshot text prints about twice as large as the screen deck printed on landscape Letter.
+
 ## What was not checked
 
 - No new application test run. Reports 02–05 keep their October 21 evidence and were not re-audited.
 - No production check. The screenshots show the app at main `ad9237d` with fictional data on a local server, not the live site's settings.
-- No assistive-technology or printer test.
+- No assistive-technology test. The print edition was checked as a rendered PDF on screen, not on a physical printer.
