@@ -170,9 +170,11 @@ describe("common tasks", () => {
 describe("the refreshed page", () => {
   it("shows the tabs with Overview current, the header sentence and an Updated stamp", async () => {
     const html = await renderHome();
-    expect(html).toContain('aria-label="System administration sections"');
-    expect(html).toMatch(/<a aria-current="page" href="\/admin">Overview</);
-    for (const tab of systemHomeTabs) expect(html).toContain(`href="${tab.href}"`);
+    // The section's tab row is the shell's (#1565); the page header draws only the page's own anchors.
+    expect(html).not.toContain('aria-label="System administration sections"');
+    expect(html).not.toMatch(/<a aria-current="page" href="\/admin">Overview</);
+    expect(html).toContain('aria-label="System administration page views"');
+    for (const tab of systemHomeTabs.filter((entry) => entry.href.startsWith("#"))) expect(html).toContain(`href="${tab.href}"`);
     expect(html).toContain("Everything waiting across every event. Each link opens the page that can change the record");
     expect(html).toContain("Updated 1:00 PM CDT");
   });

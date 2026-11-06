@@ -272,7 +272,7 @@ describe("Operational health and the current view (#1565, from #741 slice 4)", (
     const strip = markup.indexOf("data-staff-views") < 0 ? "" : markup.slice(markup.indexOf("data-staff-views"), markup.indexOf("</div>", markup.indexOf("data-staff-views")));
     return {
       tab: [...row.matchAll(/<a aria-current="(?:page|true)"[^>]*>([^<]+)</g)].map((match) => match[1]),
-      view: [...strip.matchAll(/<a aria-current="page"[^>]*>([^<]+)</g)].map((match) => match[1]),
+      view: [...strip.matchAll(/<a aria-current="(?:page|true)"[^>]*>([^<]+)</g)].map((match) => match[1]),
     };
   }
 

@@ -24,6 +24,7 @@
 .topActions { display: flex; min-width: 0; align-items: center; gap: 8px; margin-left: auto; }
 .topLink {
   display: inline-flex;
+  white-space: nowrap;
   min-height: 44px;
   align-items: center;
   gap: 6px;
@@ -66,17 +67,6 @@
 .railItem:hover { background: rgba(255, 255, 255, 0.07); }
 .railItem[aria-current] { background: rgba(255, 255, 255, 0.1); box-shadow: inset 3px 0 var(--imsda-gold); }
 .railItem:focus-visible { outline: 3px solid var(--focus-ring-on-dark); outline-offset: -3px; }
-.railBadge {
-  min-width: 22px;
-  border-radius: var(--radius-pill);
-  background: var(--imsda-gold);
-  color: var(--imsda-navy-deep);
-  padding: 0 6px;
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  font-weight: 800;
-  line-height: 1.4;
-  text-align: center;
-}
 
 .page { flex: 1 1 auto; min-width: 0; padding: 0 38px 54px; }
 
@@ -135,18 +125,6 @@
 .tabs a:hover { color: var(--imsda-navy); }
 .tabs a[aria-current] { border-bottom-color: var(--imsda-gold); color: var(--imsda-navy); }
 .tabs a:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; }
-.count {
-  min-width: 22px;
-  border: 1px solid #cddde4;
-  border-radius: var(--radius-pill);
-  background: var(--imsda-navy-soft);
-  color: var(--imsda-navy);
-  padding: 0 8px;
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  font-weight: 700;
-  line-height: 1.5;
-  text-align: center;
-}
 .trailing { flex: none; padding-bottom: 4px; }
 
 .menuline { display: none; flex: 1 1 100%; align-items: flex-end; justify-content: space-between; gap: 8px; }
@@ -308,6 +286,6 @@
 }
 
 @media print {
-  .topbar, .rail, .tabline, .views, .eventBar { display: none !important; }
+  .topbar, .rail, .tabline, .views, .eventBar, .pageHeader, .scrim, .dialog { display: none !important; }
   .page { padding: 0; }
 }

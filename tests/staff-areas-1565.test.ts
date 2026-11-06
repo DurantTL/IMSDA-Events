@@ -12,6 +12,8 @@ import {
   type StaffAreaViewer,
 } from "@/components/staff-areas";
 import { buildEventTabs, currentEventPlace, eventTabSpecs, markCurrentEventTab, maxTabsPerRow, maxViewsPerTab, reservedTabWouldShow, type EventTabsContext } from "@/components/staff-event-tabs";
+import { commonTaskHrefs } from "@/modules/system-admin/home-model";
+import { systemNavGroups } from "@/components/system-navigation";
 import { eventPermissions, kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
 
 const base: StaffAreaViewer = { isSystemAdmin: false, held: [], activeRole: null, hasEvents: true, siteContentEditor: false, healthImport: true, clubYear: null, counts: {} };
@@ -48,22 +50,26 @@ describe("staff areas (#1565)", () => {
 
   it("counts the tabs a system administrator sees in each area", () => {
     const system = viewers.system;
-    expect(keys("home", system)).toEqual(["needs-you", "coming-up"]);
+    // Home has no pages until #1568, so no tabs and no rail item (menus never list planned work).
+    expect(keys("home", system)).toEqual([]);
     expect(keys("events", system)).toEqual(["calendar", "create", "copy", "templates", "archived"]);
     expect(keys("clubs", system)).toEqual(["club-administration", "club-summary", "clubs-and-churches", "applications", "leaders", "transfers", "monthly-records"]);
     expect(keys("people", system)).toEqual(["people-access", "break-glass"]);
     expect(keys("reports", system)).toEqual(["monthly-records", "year-end", "points", "analytics", "system-report"]);
     expect(keys("admin", system)).toEqual(["system-administration", "hub-events", "hub-clubs", "hub-people", "hub-forms", "hub-catalogs"]);
-    expect(visibleAreas(system)).toEqual(["home", "events", "clubs", "people", "reports", "admin"]);
+    expect(visibleAreas(system)).toEqual(["events", "clubs", "people", "reports", "admin"]);
   });
 
   it("filters the rail and the rows by role", () => {
-    expect(visibleAreas(viewers.clubs)).toEqual(["home", "events", "clubs", "people", "reports", "admin"].filter((area) => area !== "events" || viewers.clubs.hasEvents));
+    expect(visibleAreas(viewers.clubs)).toEqual(["events", "clubs", "people", "reports", "admin"]);
     expect(keys("clubs", viewers.clubs)).not.toContain("clubs-and-churches");
     expect(keys("people", viewers.clubs)).toEqual(["people-access"]);
     expect(keys("admin", viewers.clubs)).toEqual(["hub-forms", "hub-catalogs"]);
-    expect(keys("events", viewers.events)).toEqual(["archived", "event-administration"]);
-    expect(keys("reports", viewers.events)).toEqual(["event-administration"]);
+    expect(keys("events", viewers.events)).toEqual(["event-administration", "archived"]);
+    // Reports owns no page an Event Administrator can reach, so it is not on their rail; Events opens Event administration.
+    expect(keys("reports", viewers.events)).toEqual([]);
+    expect(visibleAreas(viewers.events)).toEqual(["events"]);
+    expect(railItems(viewers.events, null)[0]).toMatchObject({ area: "events", href: "/events-admin" });
     // Plain event staff: only their event tabs, so only the Events item.
     expect(visibleAreas(viewers.staff)).toEqual(["events"]);
     expect(railItems(viewers.staff, "/overview?event=e1")).toEqual([expect.objectContaining({ area: "events", href: "/overview?event=e1" })]);
@@ -72,10 +78,19 @@ describe("staff areas (#1565)", () => {
     expect(areaTabs("admin", viewers.editor)[0].href).toBe("/admin/site-content");
   });
 
-  it("shows the waiting count on Needs you and New club applications only when it is above zero", () => {
-    expect(areaTabs("home", viewers.system)[0].count).toBe(3);
+  it("shows the waiting count on New club applications only when it is above zero", () => {
     expect(areaTabs("clubs", viewers.system).find((tab) => tab.key === "applications")?.count).toBe(4);
     expect(areaTabs("clubs", { ...viewers.system, counts: { CLUBS_ADMIN: 0 } }).find((tab) => tab.key === "applications")?.count).toBeUndefined();
+  });
+
+  it("opens every rail item on a page where that same item is the current one", () => {
+    for (const [name, viewer] of Object.entries(viewers)) {
+      for (const item of railItems(viewer, "/overview?event=e1")) {
+        const url = new URL(item.href, "https://events.example.test");
+        const place = staffPlaceFor(url.pathname, url.searchParams);
+        expect([name, item.area, place.area]).toEqual([name, item.area, item.area]);
+      }
+    }
   });
 
   it("carries the club year on the club pages that read it", () => {
@@ -137,6 +152,19 @@ function context(permissions: readonly EventPermission[], more: Partial<EventTab
     ...extra,
   };
 }
+
+describe("System destinations stay on screen (#1565, #1569)", () => {
+  it("shows every systemNavGroups page in an area row or view, in the Common tasks, or in the Catalogs directory on /admin", () => {
+    const onScreen = new Set([
+      ...staffAreaOrder.flatMap((area) => areaTabs(area, viewers.system).flatMap((tab) => [tab.href, ...(tab.views ?? []).map((view) => view.href)])),
+      ...commonTaskHrefs.map((task) => task.href),
+      // The /admin dashboard draws the whole system-catalogs group as its task directory (app/(workspace)/admin/page.tsx).
+      ...systemNavGroups.filter((group) => group.key === "system-catalogs").flatMap((group) => group.items.map((item) => item.href)),
+    ]);
+    const missing = systemNavGroups.flatMap((group) => group.items.map((item) => item.href)).filter((href) => !onScreen.has(href));
+    expect(missing).toEqual([]);
+  });
+});
 
 describe("event tabs (#1565)", () => {
   it("lists the seven tabs, in order, for a viewer who can do everything", () => {

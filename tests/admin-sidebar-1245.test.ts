@@ -146,7 +146,7 @@ describe("the Clubs destination groups", () => {
       if (search === "view=points") expect(markup).toContain('aria-label="Reports"');
       else expect(currentOf(markup), search).toEqual(tab);
       // Exactly one phone item is lit: Clubs for the Clubs pages, More for Points (a Reports page, no bar item of its own).
-      expect(phone(markup).match(/aria-current="page"/g) ?? [], search).toHaveLength(1);
+      expect(phone(markup).match(/aria-current="(?:page|true)"/g) ?? [], search).toHaveLength(1);
     }
   });
 
@@ -236,25 +236,24 @@ describe("the club year selector", () => {
     navigation.pathname = "/admin/clubs/reports";
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {} };
     const html = render({ user: staff, adminRoleView: view });
-    expect(html).toContain('<form class="clubs-year-form" action="/admin/clubs/reports" method="get">');
+    expect(html).toContain('<form data-clubs-year-form="true"');
     expect(html).toContain('<label for="clubs-year-select">Club year</label>');
     expect(html).toMatch(/<select id="clubs-year-select" name="year">/);
     expect(html).toContain('<option value="2026-27" selected="">2026-27</option>');
     expect(html).toMatch(/<button type="submit">Show<\/button>/);
     navigation.pathname = "/admin/people";
-    expect(render({ user: admin })).not.toContain("clubs-year-form");
+    expect(render({ user: admin })).not.toContain("data-clubs-year-form");
   });
 
-  it("hides the dashboard's own year form only above 800px and keeps 44px targets", () => {
+  it("hides the dashboard's own year form wherever the shell has one, and keeps 44px targets", () => {
     const pageCss = readFileSync(join(process.cwd(), "app/(workspace)/admin/clubs/admin-clubs.module.css"), "utf8");
-    expect(pageCss).toMatch(/@media \(min-width: 801px\) \{[^}]*\.yearForm \{ display: none; \}/);
-    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
-    const block = css.slice(css.indexOf("The club year picker, on the Clubs tab line (#1245, #1565)"), css.indexOf("/* Registration form builder editor shell (#1132)"));
-    expect(block.length).toBeGreaterThan(100);
-    expect(block).toMatch(/\.clubs-year-controls select \{[^}]*min-height: 44px/);
-    expect(block).toMatch(/\.clubs-year-controls button \{[^}]*min-height: 44px/);
+    expect(pageCss).toMatch(/:global\(\.app-shell:has\(\[data-clubs-year-form\]\)\) \.yearForm \{ display: none; \}/);
+    const block = readFileSync(join(process.cwd(), "components/clubs-year-selector.module.css"), "utf8");
+    expect(block).toMatch(/\.controls select \{[^}]*min-height: 44px/);
+    expect(block).toMatch(/\.controls button \{[^}]*min-height: 44px/);
     expect(block).not.toContain(":hover");
   });
+
 });
 
 describe("Find a page or task in the Clubs view", () => {

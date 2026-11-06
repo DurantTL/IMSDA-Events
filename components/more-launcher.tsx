@@ -262,7 +262,7 @@ export function MoreLauncherPanel({
             <ul>
               {section.items.map((item) => (
                 <li key={item.key}>
-                  <GuardedLink className="more-launcher-item" href={item.href} aria-current={item.current ? "page" : undefined} onNavigate={() => onNavigate?.()} data-section-item={item.key}>
+                  <GuardedLink className="more-launcher-item" href={item.href} aria-current={item.current ? "true" : undefined} onNavigate={() => onNavigate?.()} data-section-item={item.key}>
                     <span>{item.label}</span>
                   </GuardedLink>
                 </li>
@@ -498,7 +498,7 @@ export function MoreLauncher({
         ref={triggerRef}
         className={className}
         href={href}
-        aria-current={isActive ? "page" : undefined}
+        aria-current={isActive ? (pathname === href.split(/[?#]/)[0] ? "page" : "true") : undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}

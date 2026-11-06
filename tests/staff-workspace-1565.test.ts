@@ -101,6 +101,23 @@ describe("canonical staff workspace navigation (#1565)", () => {
   });
 });
 
+describe("aria-current (#1565)", () => {
+  it("marks at most one link 'page' at each width, and only the one that opens exactly this page", () => {
+    for (const path of ["/people", "/help", "/admin/clubs", "/admin/feature-requests", "/admin/clubs/invites", "/more/promo-codes"]) {
+      const html = shell(path);
+      const desktop = html.slice(0, html.indexOf('<nav class="mobile-nav"'));
+      const phone = html.slice(html.indexOf('<nav class="mobile-nav"'));
+      expect(pageMarks(desktop), `${path} desktop`).toBeLessThanOrEqual(1);
+      expect(pageMarks(phone), `${path} phone`).toBeLessThanOrEqual(1);
+      for (const mark of html.matchAll(/<a [^>]*aria-current="page"[^>]*href="([^"?#]*)/g)) expect(mark[1], path).toBe(path);
+    }
+    // The tab links elsewhere than the page (Catalogs and settings opens the honor catalog): "true", not "page".
+    const requests = shell("/admin/feature-requests");
+    expect(row(requests)).toContain('aria-current="true" href="/admin/honors?event=synthetic_event">Catalogs and settings');
+    expect(pageMarks(shell("/admin/clubs", { active: "CLUBS_ADMIN" }).slice(0, 4000))).toBeLessThanOrEqual(1);
+  });
+});
+
 describe("tab rows and the menu line (#1565)", () => {
   it("renders the tabs and the menu line together, so the stylesheet alone decides which shows without a layout shift", () => {
     const html = shell("/admin/clubs", { active: "CLUBS_ADMIN" });
@@ -114,7 +131,7 @@ describe("tab rows and the menu line (#1565)", () => {
   });
 
   it("names the menu line's button for each area", () => {
-    const names: Array<[string, string]> = [["/admin/clubs", "Clubs menu"], ["/admin", "Admin menu"], ["/events-admin", "Events menu"], ["/admin/people", "People menu"], ["/admin/analytics", "Reports menu"], ["/help", "Home menu"]];
+    const names: Array<[string, string]> = [["/admin/clubs", "Clubs menu"], ["/admin", "Admin menu"], ["/events-admin", "Events menu"], ["/admin/people", "People menu"], ["/admin/analytics", "Reports menu"]];
     for (const [path, name] of names) expect(shell(path), path).toContain(`${name}, now on`.replace(", now on", ""));
   });
 

@@ -8,7 +8,7 @@ import {
   eventsAdminHomeItem,
 } from "@/components/staff-navigation";
 import { clubsAdminRecordsHref, systemNavGroups } from "@/components/system-navigation";
-import { adminRoleLanding, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
+import { type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import { maxTabsPerRow, maxViewsPerTab } from "@/components/staff-event-tabs";
 
 /**
@@ -102,27 +102,22 @@ type TabSpec = {
 
 const waitingClubApplications = (v: StaffAreaViewer) => v.counts.CLUBS_ADMIN;
 
-const homeLanding = (v: StaffAreaViewer) => adminRoleLanding(v.activeRole);
-
 /**
  * The tab rows. Registry destinations are named by href; a tab whose page does not exist yet is not here (#1559: menus never
  * list planned work). Left out for that reason: Events > "All events" (no in-shell all-events list yet).
  */
 export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
-  home: [
-    // "Needs you" opens the dashboard of the viewer's role, which already lists what is waiting. "Coming up" is that
-    // dashboard's upcoming-events section, so a role with no such section has no Coming up tab.
-    { key: "needs-you", label: "Needs you", href: homeLanding, visible: (v) => v.held.length > 0, count: (v) => (v.activeRole ? v.counts[v.activeRole] : undefined) },
-    { key: "coming-up", label: "Coming up", href: (v) => (v.isSystemAdmin ? "/admin#upcoming-events" : "/events-admin#your-events"), visible: (v) => v.isSystemAdmin || v.held.includes("EVENTS_ADMIN") },
-  ],
+  // Home waits for its own pages (#1568: Needs you, Coming up). Menus never list planned work, so it has no tabs and no rail item;
+  // the phone bar's Home slot opens the person's main dashboard instead.
+  home: [],
   events: [
+    { key: "event-administration", destination: eventsAdminHomeItem.href, visible: events },
     { key: "calendar", destination: "/admin/calendar", visible: sys },
     { key: "create", destination: "/event-setup", visible: sys },
     { key: "copy", destination: "/event-setup/copy", visible: sys },
     { key: "templates", destination: "/admin/event-templates", visible: sys },
     // Staff with only event tabs reach Archived events from the event bar; the tab is for the roles that manage events.
     { key: "archived", destination: "/archived-events", visible: (v) => v.isSystemAdmin || v.held.includes("EVENTS_ADMIN") },
-    { key: "event-administration", destination: eventsAdminHomeItem.href, visible: events },
   ],
   clubs: [
     {
@@ -169,7 +164,6 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
     { key: "monthly-records", destination: clubsAdminRecordsHref, visible: clubs },
     { key: "year-end", destination: "/admin/clubs/reports/year-end", visible: clubs },
     { key: "points", destination: "/admin/clubs/summary?view=points#points", visible: clubs },
-    { key: "event-administration", destination: eventsAdminHomeItem.href, visible: events },
     { key: "analytics", destination: "/admin/analytics", visible: sys },
     { key: "system-report", destination: "/admin/system-report", visible: sys },
   ],
@@ -245,9 +239,24 @@ export function areaTabs(area: StaffArea, viewer: StaffAreaViewer): AreaTab[] {
     .slice(0, maxTabsPerRow);
 }
 
-/** The rail: an area shows when the viewer can reach at least one tab in it. Events also shows for staff with events (their event tabs). */
+/** Whether a tab is a page its own area owns for the "where you are" marking (a hub tab that opens another area's page is not). */
+export function tabIsOwned(area: StaffArea, tab: Pick<AreaTab, "key" | "href">): boolean {
+  const url = new URL(tab.href, "https://events.example.test");
+  const place = staffPlaceFor(url.pathname, url.searchParams);
+  return place.area === area && !place.inEvent && place.tab === tab.key;
+}
+
+/** The tabs of an area that the area owns, so the rail item that opens it is the one that lights there. */
+function ownedTabs(area: StaffArea, viewer: StaffAreaViewer): AreaTab[] {
+  return areaTabs(area, viewer).filter((tab) => tabIsOwned(area, tab));
+}
+
+/**
+ * The rail: an area shows when at least one of its tabs is a page it owns. Home is not on the rail until its pages exist
+ * (#1568). Events also shows for staff with events (their event tabs).
+ */
 export function visibleAreas(viewer: StaffAreaViewer): StaffArea[] {
-  return staffAreaOrder.filter((area) => areaTabs(area, viewer).length > 0 || (area === "events" && viewer.hasEvents));
+  return staffAreaOrder.filter((area) => area !== "home" && (ownedTabs(area, viewer).length > 0 || (area === "events" && viewer.hasEvents)));
 }
 
 /** The pages inside an event: the event tabs, not the Events area's own row. */
@@ -336,9 +345,9 @@ function pathOfHrefEquals(viewKey: string, placeView: string | null) {
   return placeView !== null && viewKey === placeView;
 }
 
-/** Where an area opens: its first tab the viewer can reach. */
+/** Where an area opens: its first reachable tab that the area owns. */
 export function areaLandingHref(area: StaffArea, viewer: StaffAreaViewer): string | null {
-  return areaTabs(area, viewer)[0]?.href ?? null;
+  return ownedTabs(area, viewer)[0]?.href ?? null;
 }
 
 export type RailItem = { area: StaffArea; label: string; href: string; icon: LucideIcon };

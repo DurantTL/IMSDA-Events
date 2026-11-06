@@ -67,7 +67,7 @@ describe("application shell navigation (#1565)", () => {
   });
 
   it("gives a system administrator all six areas, and event-only staff just Events", () => {
-    expect(railLabels(render(["VIEW_EVENT"], admin))).toEqual(["Home", "Events", "Clubs", "People", "Reports", "Admin"]);
+    expect(railLabels(render(["VIEW_EVENT"], admin))).toEqual(["Events", "Clubs", "People", "Reports", "Admin"]);
     const eventOnly = render(["VIEW_EVENT"], staff);
     expect(railLabels(eventOnly)).toEqual(["Events"]);
     expect(eventOnly).not.toContain("System management");

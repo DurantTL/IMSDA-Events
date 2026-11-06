@@ -18,7 +18,7 @@ export function StaffRail({ items, current, badges = {} }: { items: readonly Rai
               <GuardedLink className={styles.railItem} href={href} aria-current={area === current ? "true" : undefined}>
                 <Icon aria-hidden="true" size={22} strokeWidth={1.9} />
                 <span>{label}</span>
-                {count ? <span className={styles.railBadge}><span aria-hidden="true">{count > 99 ? "99+" : count}</span><span className="sr-only"> {count} waiting</span></span> : null}
+                {count ? <span className="count-badge"><span aria-hidden="true">{count > 99 ? "99+" : count}</span><span className="sr-only"> {count} waiting</span></span> : null}
               </GuardedLink>
             </li>
           );

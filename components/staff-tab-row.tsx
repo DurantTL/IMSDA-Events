@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { GuardedLink } from "@/components/guarded-link";
 import { StaffMenuDialog } from "@/components/staff-menu-dialog";
+import { usePathname } from "next/navigation";
 import { tabCurrent, type RowTab } from "@/components/staff-tab-row-model";
 import styles from "./staff-shell.module.css";
 
@@ -31,9 +32,9 @@ export function StaffTabRow({
   tabs: readonly RowTab[];
   trailing?: ReactNode;
 }) {
+  const pathname = usePathname();
   const lineRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const trailingRef = useRef<HTMLDivElement>(null);
   const [tight, setTight] = useState(false);
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -49,7 +50,9 @@ export function StaffTabRow({
       if (!line || !list) return;
       // Below 1024px the stylesheet already shows the menu line; there is nothing to measure.
       if (!wide.matches) return;
-      const room = line.clientWidth - (trailingRef.current?.offsetWidth ?? 0) - 12;
+      // The trailing control (the club year, the event opener) wraps to its own line when it does not fit beside the tabs, so
+      // the tabs may use the whole line: only the row's own width decides between tabs and the menu line.
+      const room = line.clientWidth;
       setTight(list.getBoundingClientRect().width > room);
     }
     measure();
@@ -69,16 +72,16 @@ export function StaffTabRow({
         <ul ref={listRef}>
           {tabs.map((tab) => (
             <li key={tab.key}>
-              <GuardedLink href={tab.href} aria-current={tabCurrent(tab)}>
+              <GuardedLink href={tab.href} aria-current={tabCurrent(tab, pathname)}>
                 {tab.label}
-                {tab.count ? <span className={styles.count}><span aria-hidden="true">{tab.count > 99 ? "99+" : tab.count}</span><span className="sr-only"> {tab.count} waiting</span></span> : null}
+                {tab.count ? <span className="count-badge"><span aria-hidden="true">{tab.count > 99 ? "99+" : tab.count}</span><span className="sr-only"> {tab.count} waiting</span></span> : null}
               </GuardedLink>
             </li>
           ))}
         </ul>
       </nav>
       <div className={styles.menuline} data-staff-menu-line>
-        <span className={styles.current}>{current.label}{current.count ? <span className={styles.count}>{current.count}</span> : null}</span>
+        <span className={styles.current}>{current.label}{current.count ? <span className="count-badge">{current.count}</span> : null}</span>
         <button
           ref={buttonRef}
           type="button"
@@ -91,7 +94,7 @@ export function StaffTabRow({
           {menuLabel} <ChevronDown aria-hidden="true" size={16} />
         </button>
       </div>
-      {trailing ? <div className={styles.trailing} ref={trailingRef}>{trailing}</div> : null}
+      {trailing ? <div className={styles.trailing}>{trailing}</div> : null}
       {open && <StaffMenuDialog titleId={titleId} title={title} tabs={tabs} onClose={() => setOpen(false)} returnTo={buttonRef} />}
     </div>
   );

@@ -733,9 +733,6 @@ textarea:focus-visible {
   font-weight: 700;
 }
 
-.account-workspaces { display: grid; gap: 0; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
-.account-workspaces-heading { color: var(--muted) !important; font-size: max(var(--type-staff-floor, 0px), 0.875rem) !important; font-weight: 800 !important; letter-spacing: 0.04em; text-transform: uppercase; }
-.account-workspaces .account-system-link[aria-current="true"] { background: var(--imsda-navy-soft); box-shadow: inset 4px 0 var(--imsda-gold); color: var(--imsda-navy); font-weight: 800; }
 .account-switch-form { margin: 0; }
 .account-switch-button {
   width: 100%;
@@ -12914,13 +12911,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .settings-saved-detail { font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
 .settings-save-row :is(.primary-button, .secondary-button) { min-height: 44px; }
 .platform-settings-workspace .field-error { display: block; margin: 4px 0 0; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-/* The club year picker, on the Clubs tab line (#1245, #1565): a real GET form. */
-.clubs-year-form { flex-shrink: 0; display: flex; align-items: center; gap: 8px; margin: 0; }
-.clubs-year-form label { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.clubs-year-controls { display: flex; gap: 8px; }
-.clubs-year-controls select { min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: 10px; background: var(--card); color: var(--imsda-navy); cursor: pointer; padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.clubs-year-controls button { flex: 0 0 auto; min-height: 44px; min-width: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--secondary-bg, #f9fbfb); color: var(--imsda-navy); cursor: pointer; padding: 0 14px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-
 /* Reviewed monthly records and required club forms (#1246). */
 .club-report-review { display: grid; gap: 6px; justify-items: start; }
 .club-report-review button { min-height: 44px; }

@@ -33,16 +33,16 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/event-templates` | System management | Events | Event templates | - | bar: Events | Events menu | - | `app/(workspace)/admin/event-templates/page.tsx` |
 | `/admin/event-templates/[templateId]` | System management | Events | Event templates | - | bar: Events | Events menu | - | `app/(workspace)/admin/event-templates/[templateId]/page.tsx` |
 | `/admin/event-templates/from-event` | Page link | Events | Event templates | - | bar: Events | Events menu | - | `app/(workspace)/admin/event-templates/from-event/page.tsx` |
-| `/admin/feature-requests` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/feature-requests/page.tsx` |
+| `/admin/feature-requests` | System management | Admin | Catalogs and settings | - | via /admin | - | hub pending #1569; not in the row: linked from the System administration page (/admin) and Find a page or task | `app/(workspace)/admin/feature-requests/page.tsx` |
 | `/admin/form-templates` | System management | Admin | Forms | Form templates | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/form-templates/page.tsx` |
 | `/admin/form-templates/[templateKey]` | System management | Admin | Forms | Form templates | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/form-templates/[templateKey]/page.tsx` |
 | `/admin/forms` | System management | Admin | Forms | All forms | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/forms/page.tsx` |
 | `/admin/health-access` | System management | People | Break-glass and legal holds | - | More, Areas | People menu | - | `app/(workspace)/admin/health-access/page.tsx` |
 | `/admin/honors` | System management | Admin | Catalogs and settings | Honor catalog | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/honors/page.tsx` |
-| `/admin/information-forms` | System management | Admin | Forms | - | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/information-forms/page.tsx` |
-| `/admin/information-forms/[formId]` | System management | Admin | Forms | - | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/information-forms/[formId]/page.tsx` |
-| `/admin/information-forms/[formId]/responses` | System management | Admin | Forms | - | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/information-forms/[formId]/responses/page.tsx` |
-| `/admin/master-award-rules` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/master-award-rules/page.tsx` |
+| `/admin/information-forms` | System management | Admin | Forms | - | via /admin | - | hub pending #1569; not in the row: linked from the System administration page (/admin) and Find a page or task | `app/(workspace)/admin/information-forms/page.tsx` |
+| `/admin/information-forms/[formId]` | System management | Admin | Forms | - | via /admin | - | hub pending #1569; not in the row: linked from the System administration page (/admin) and Find a page or task | `app/(workspace)/admin/information-forms/[formId]/page.tsx` |
+| `/admin/information-forms/[formId]/responses` | System management | Admin | Forms | - | via /admin | - | hub pending #1569; not in the row: linked from the System administration page (/admin) and Find a page or task | `app/(workspace)/admin/information-forms/[formId]/responses/page.tsx` |
+| `/admin/master-award-rules` | System management | Admin | Catalogs and settings | - | via /admin | - | hub pending #1569; not in the row: linked from the System administration page (/admin) and Find a page or task | `app/(workspace)/admin/master-award-rules/page.tsx` |
 | `/admin/notifications` | System management | Admin | Catalogs and settings | Email | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/notifications/page.tsx` |
 | `/admin/organizations` | System management | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/page.tsx` |
 | `/admin/organizations/[organizationId]/billing` | System management | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/[organizationId]/billing/page.tsx` |
@@ -56,11 +56,11 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/organizations/directory` | Page link | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/directory/page.tsx` |
 | `/admin/organizations/import` | Page link | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/import/page.tsx` |
 | `/admin/organizations/map-locations` | Page link | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/map-locations/page.tsx` |
-| `/admin/pauses` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/pauses/page.tsx` |
+| `/admin/pauses` | System management | Admin | Catalogs and settings | - | via /admin | - | hub pending #1569; not in the row: linked from the System administration page (/admin) and Find a page or task | `app/(workspace)/admin/pauses/page.tsx` |
 | `/admin/people` | System management | People | People & access | - | More, Areas | People menu | - | `app/(workspace)/admin/people/page.tsx` |
 | `/admin/people/[kind]/[id]` | System management | People | People & access | - | More, Areas | People menu | - | `app/(workspace)/admin/people/[kind]/[id]/page.tsx` |
 | `/admin/question-library` | System management | Admin | Forms | Question library | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/question-library/page.tsx` |
-| `/admin/readiness` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/readiness/page.tsx` |
+| `/admin/readiness` | System management | Admin | Catalogs and settings | - | via /admin | - | hub pending #1569; not in the row: linked from the System administration page (/admin) and Find a page or task | `app/(workspace)/admin/readiness/page.tsx` |
 | `/admin/settings` | System management | Admin | Catalogs and settings | Platform settings | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/settings/page.tsx` |
 | `/admin/site-content` | System management | Admin | Catalogs and settings | Homepage & site content | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/site-content/page.tsx` |
 | `/admin/site-content/preview` | Page link | Admin | Catalogs and settings | Homepage & site content | More, Areas | Admin menu | hub pending #1569 | `app/(workspace)/admin/site-content/preview/page.tsx` |

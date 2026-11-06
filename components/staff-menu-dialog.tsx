@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { GuardedLink } from "@/components/guarded-link";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
-import { tabCurrent, type RowTab } from "@/components/staff-tab-row-model";
+import { usePathname } from "next/navigation";
+import { tabCurrent, viewCurrent, type RowTab } from "@/components/staff-tab-row-model";
 import styles from "./staff-shell.module.css";
 
 /**
@@ -27,6 +28,7 @@ export function StaffMenuDialog({
   returnTo?: RefObject<HTMLElement | null>;
 }) {
   // Following a link leaves the page to its new content; every other close gives focus back to the menu button.
+  const pathname = usePathname();
   const followed = useRef(false);
   const dialogRef: RefObject<HTMLDivElement | null> = useAccessibleDialog<HTMLDivElement>(true, onClose, {
     initialFocus: () => dialogRef.current?.querySelector<HTMLElement>("[aria-current]") ?? null,
@@ -53,15 +55,15 @@ export function StaffMenuDialog({
           <ul>
             {tabs.map((tab) => (
               <li key={tab.key} className={styles.group}>
-                <GuardedLink className={styles.item} href={tab.href} aria-current={tabCurrent(tab)} onNavigate={follow}>
+                <GuardedLink className={styles.item} href={tab.href} aria-current={tabCurrent(tab, pathname)} onNavigate={follow}>
                   <span>{tab.label}</span>
-                  {tab.count ? <span className={styles.count}>{tab.count}</span> : null}
+                  {tab.count ? <span className="count-badge">{tab.count}</span> : null}
                 </GuardedLink>
                 {tab.views && tab.views.length > 0 && (
                   <ul className={styles.subItems} aria-label={`${tab.label} views`}>
                     {tab.views.map((view) => (
                       <li key={view.key}>
-                        <GuardedLink className={styles.item} href={view.href} aria-current={view.current ? "page" : undefined} onNavigate={follow}>{view.label}</GuardedLink>
+                        <GuardedLink className={styles.item} href={view.href} aria-current={viewCurrent(view, pathname)} onNavigate={follow}>{view.label}</GuardedLink>
                       </li>
                     ))}
                   </ul>

@@ -271,9 +271,9 @@ describe("the page", () => {
 
   it("shows the tabs, header, four cards, the summary line, the event cards and the work rows", async () => {
     const html = await render();
-    expect(html).toContain('aria-label="Event administration sections"');
-    expect(html).toMatch(/<a aria-current="page" href="\/events-admin">Overview</);
-    for (const href of ["#your-events", "/people?event=event-one", "/more/event-content?event=event-one", "/more/kitchen-report?event=event-one", "/communications?event=event-one"]) expect(html).toContain(`href="${href}"`);
+    // The section's tab row is the shell's (#1565); the page header no longer draws it.
+    expect(html).not.toContain('aria-label="Event administration sections"');
+    expect(html).not.toMatch(/<a aria-current="page" href="\/events-admin">Overview</);
     expect(html).toContain("Event administration");
     expect(html).toContain("Your role: Events Administrator. Runs only the events where they are an Event administrator; club records and club events are not part of it.");
     expect(html).toContain("Upcoming events you administer. Archived events are not counted.");

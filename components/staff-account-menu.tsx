@@ -4,6 +4,7 @@ import { GuardedLink } from "@/components/guarded-link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRightLeft, CalendarPlus, CircleUserRound, Eye, ShieldCheck, Users, UserRound } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
+import styles from "./staff-account-menu.module.css";
 import type { WorkspaceSwitchOption } from "@/modules/access/workspace-contexts";
 
 /** The one profile page for every account (#543): profile, two-step and passkeys. */
@@ -81,8 +82,8 @@ export function StaffAccountMenu({
             Edit profile
           </GuardedLink>
           {workspaces.length > 1 && (
-            <div role="group" aria-label="Switch workspace" className="account-workspaces">
-              <small className="account-workspaces-heading">Switch workspace</small>
+            <div role="group" aria-label="Switch workspace" className={styles.workspaces}>
+              <small className={styles.heading}>Switch workspace</small>
               {workspaces.map((workspace) => workspace.method === "post" ? (
                 <form action={workspace.href} className="account-switch-form" key={workspace.kind} method="post">
                   <button className="account-system-link account-switch-button" type="submit">

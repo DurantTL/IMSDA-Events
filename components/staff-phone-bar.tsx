@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { CalendarDays, CheckCircle2, Home, MoreHorizontal, Tent } from "lucide-react";
 import { GuardedLink } from "@/components/guarded-link";
 import { MoreLauncher, type LauncherSection } from "@/components/more-launcher";
@@ -41,8 +42,10 @@ export function StaffPhoneBar({
     userId: string;
   };
 }) {
+  const pathname = usePathname();
   if (items.length === 0) return null;
-  const current = phoneBarCurrent(items, place, eventTab, firstEventTab);
+  const current = phoneBarCurrent(items, place, eventTab, firstEventTab, pathname);
+  const currentFor = (href: string) => (new URL(href, "https://events.example.test").pathname === pathname ? "page" : "true");
   return (
     <nav className="mobile-nav" aria-label="Mobile navigation">
       {items.map((item): ReactNode => {
@@ -72,7 +75,7 @@ export function StaffPhoneBar({
           );
         }
         return (
-          <GuardedLink className={isActive ? "active" : undefined} href={item.href} key={item.key} aria-current={isActive ? "page" : undefined}>
+          <GuardedLink className={isActive ? "active" : undefined} href={item.href} key={item.key} aria-current={isActive ? currentFor(item.href) : undefined}>
             <Icon aria-hidden="true" size={22} /><span>{item.label}</span>
           </GuardedLink>
         );

@@ -7,8 +7,10 @@ groupings work, so later pages follow the same pattern.
 
 The staff shell has no sidebar. A branded header (the IMAdventist symbol, "Find a
 page or task", Help & learning, Create, notifications and the account menu) sits
-over an 88px icon rail of at most six areas: Home, Events, Clubs, People, Reports
-and Admin. An area shows when the person can reach at least one of its tabs.
+over an 88px icon rail of at most five areas today: Events, Clubs, People, Reports and
+Admin (Home joins when #1568 builds its pages). An area shows when at least one
+of its tabs is a page that area owns, and its rail item opens its first such tab,
+so the item you click is the one that lights.
 Below the header the page column has that area's one row of tabs, or inside an
 event the event's seven tabs (Event home, Registrations, Check-in,
 Communications, Money, Reports, Event setup). Views inside a tab are a bordered
@@ -40,7 +42,7 @@ you are" is the rail's gold everywhere in staff (the rail edge, the 4px tab
 underline, the menu line, the current list item, the phone bar's top bar); the
 club portal keeps purple.
 
-The phone bar is Home, Events, Check-in, Clubs and More, filtered by access. More
+The phone bar is Home (the person's main dashboard, current only on exactly that page), Events, Check-in, Clubs and More, filtered by access. More
 lists "This event" first inside an event, then the other areas and the event's
 tools. The account menu is the workspace switcher: it lists only the workspaces
 the signed-in person holds (`staffWorkspaceOptions`) and needs no second

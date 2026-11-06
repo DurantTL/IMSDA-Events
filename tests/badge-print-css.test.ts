@@ -58,6 +58,14 @@ describe("badge print CSS (#717)", () => {
     }
   });
 
+  it("hides the staff shell's own chrome in print too (#1565): header, rail, tabs, views, event bar and page header", () => {
+    const shell = readFileSync(path.join(process.cwd(), "components/staff-shell.module.css"), "utf8");
+    const printBlock = shell.slice(shell.indexOf("@media print"));
+    for (const selector of [".topbar", ".rail", ".tabline", ".views", ".eventBar", ".pageHeader"]) expect(printBlock, selector).toContain(selector);
+    expect(printBlock).toMatch(/display: none !important/);
+    expect(readFileSync(path.join(process.cwd(), "scripts/verify-badge-print.ts"), "utf8")).toContain('"#primary-navigation", "[data-staff-tabs]", "[data-staff-views]"');
+  });
+
   it("hides every badge page child except the sheet stack (artwork panel, status and help text)", () => {
     expect(block).toContain(".badge-print-page > :not(.badge-sheet-stack)");
   });

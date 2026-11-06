@@ -7,7 +7,7 @@ import {
   navigation,
   resolveClubsAndChurchesEntry,
 } from "@/components/staff-navigation";
-import { areaTabs, staffAreaOrder, type StaffArea } from "@/components/staff-areas";
+import { areaTabs, staffAreaOrder, staffPlaceFor, type StaffArea } from "@/components/staff-areas";
 import { buildStaffNavigation, type StaffNavigation } from "@/components/staff-navigation-model";
 import { launcherFooterLinks } from "@/components/more-launcher-model";
 import { eventPermissions, eventRoles, rolePermissions, type EventPermission } from "@/modules/access/permissions";
@@ -477,6 +477,15 @@ describe("a phone reaches exactly the pages a desktop reaches (#475, #1565)", ()
     const without = navFor({ name: "reports", permissions: ["VIEW_REPORTS"], isSystemAdmin: false, clubOversight: false, clubEvent: false, clubFormsAccess: false });
     expect(without.launcherCards.filter((card) => card.allowed).map((card) => card.href)).not.toContain("/more/promo-codes?event=event_1");
     expect(footerKeys()).toContain("event-features");
+  });
+
+  it("opens every rail item on a page where that same item is current, for every role", () => {
+    for (const scenario of scenarios) {
+      for (const item of navFor(scenario).rail) {
+        const url = new URL(item.href, "https://events.example.test");
+        expect(staffPlaceFor(url.pathname, url.searchParams).area, `${scenario.name} ${item.label}`).toBe(item.area);
+      }
+    }
   });
 
   it("starts every phone bar with Home and ends it with More, whatever the role", () => {

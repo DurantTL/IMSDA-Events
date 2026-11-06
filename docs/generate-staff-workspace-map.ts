@@ -50,11 +50,17 @@ function placeOf(route: string, query = "") {
   const phone = place.area === "home" ? "bar: Home" : place.area === "events" ? "bar: Events" : place.area === "clubs" ? "bar: Clubs" : "More, Areas";
   return {
     area: staffAreaMeta[place.area].label,
-    tab: tab?.label ?? (place.tab ? place.tab : "none (Help, Profile and pages no tab lists keep Home lit)"),
+    tab: tab?.label ?? (place.tab ? place.tab : "none (Help, Profile and pages no tab lists light no rail item)"),
     view: view?.label ?? "",
     phone,
     menu,
-    note: tab?.hubPending ? "hub pending #1569" : "",
+    // A page under a hub-pending tab that is neither the tab's landing page nor one of its views has no link in the row or
+    // the menu line. Its home is the System administration page (/admin), which lists every System group, and search.
+    note: tab?.hubPending
+      ? (!view && sample !== tab.href.split(/[?#]/)[0]
+        ? "hub pending #1569; not in the row: linked from the System administration page (/admin) and Find a page or task"
+        : "hub pending #1569")
+      : "",
   };
 }
 
@@ -63,9 +69,9 @@ const text = [
   "",
   "Generated with `npx tsx docs/generate-staff-workspace-map.ts`. This is the staff-only subset for #1558, not a second runtime registry or a decision to build a whole-system site-map page.",
   "",
-  "The staff shell is a branded header, an icon rail of the areas a person can reach (Home, Events, Clubs, People, Reports, Admin), and below it that area's one row of tabs, or inside an event the event's tabs (Event home, Registrations, Check-in, Communications, Money, Reports, Event setup). Views inside a tab are a button strip. Below 1024px, or when a row would not fit, a row is a menu line (\"<Area> menu\" or \"Event menu\"). There is no sidebar. Each page belongs to exactly one place for the \"where you are\" marking; a page that two tabs list is the same page, and the area named here owns the marking.",
+  "The staff shell is a branded header, an icon rail of the areas a person can reach (Events, Clubs, People, Reports, Admin; Home waits for its own pages in #1568), and below it that area's one row of tabs, or inside an event the event's tabs (Event home, Registrations, Check-in, Communications, Money, Reports, Event setup). Views inside a tab are a button strip. Below 1024px, or when a row would not fit, a row is a menu line (\"<Area> menu\" or \"Event menu\"). There is no sidebar. Each page belongs to exactly one place for the \"where you are\" marking; a page that two tabs list is the same page, and the area named here owns the marking.",
   "",
-  "A role's tab row lists only the pages that role may open; every route keeps its server guard, and menu and search visibility keep their existing role, grant and module predicates. Record pages open through their existing parent links. Help and Profile keep Home lit. No URL changes: aliases and redirects stay as they were.",
+  "A role's tab row lists only the pages that role may open; every route keeps its server guard, and menu and search visibility keep their existing role, grant and module predicates. Record pages open through their existing parent links. Help and Profile light no rail item. No URL changes: aliases and redirects stay as they were.",
   "",
   "| Route | Previously reached from | Rail area | Tab | View | Phone | Menu line | Note | Source |",
   "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -74,7 +80,8 @@ for (const { route, file } of table) {
   const exact = rows.find((row) => row.route === route);
   const parent = exact ?? rows.filter((row) => route.startsWith(row.route + "/")).sort((a, b) => b.route.length - a.route.length)[0];
   const where = placeOf(route);
-  text.push(`| \`${route}\` | ${parent?.oldPlace ?? "Existing page link"} | ${where.area} | ${where.tab} | ${where.view || "-"} | ${where.phone} | ${where.menu} | ${where.note || "-"} | \`${file}\` |`);
+  const notInRow = where.note.includes("not in the row");
+  text.push(`| \`${route}\` | ${parent?.oldPlace ?? "Existing page link"} | ${where.area} | ${where.tab} | ${where.view || "-"} | ${notInRow ? "via /admin" : where.phone} | ${notInRow ? "-" : where.menu} | ${where.note || "-"} | \`${file}\` |`);
 }
 text.push("", `${table.length} staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.`, "");
 
@@ -113,6 +120,7 @@ text.push(
   "",
   "## Left out until built",
   "",
+  "- Home (Needs you, Coming up): #1568 builds the pages; until then the rail has no Home item and the phone bar's Home slot opens the person's main dashboard.",
   "- Events > All events: there is no in-shell list of all events yet. Staff open an event from the Events row's \"Open an event\" picker or the dashboards, and switch from the event bar.",
   "- Money > Refunds and More money tools (#1575), Registrations > Review queues (#1574), Event setup groups (#1571 and the setup issues), Admin hub pages (#1569), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).",
   "",

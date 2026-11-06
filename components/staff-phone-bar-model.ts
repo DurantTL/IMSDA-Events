@@ -17,11 +17,14 @@ export function phoneBarItems(input: {
   eventTabs: readonly EventTab[];
   /** Where More goes without scripts: the /more page, or Help when there is no event. `null` leaves More out. */
   moreHref: string | null;
+  /** The person's main dashboard (their role's landing page); staff with no admin role start in their event. */
+  homeHref?: string;
 }): PhoneBarItem[] {
   const { rail, eventTabs, moreHref } = input;
   const railHref = (area: RailItem["area"]) => rail.find((item) => item.area === area)?.href;
-  // Staff with no Home area (no admin role) start in their event: its first tab (the dashboard, or the kitchen counts).
-  const home = railHref("home") ?? eventTabs[0]?.href;
+  // Home is not on the rail (#1568 builds its pages); the bar's Home slot opens the main dashboard, or for staff with no admin
+  // role their event's first tab (the dashboard, or the kitchen counts).
+  const home = input.homeHref ?? eventTabs[0]?.href;
   const candidates: Array<[PhoneBarKey, string | undefined]> = [
     ["home", home],
     ["events", railHref("events")],
@@ -33,7 +36,7 @@ export function phoneBarItems(input: {
   for (const [key, href] of candidates) {
     if (!href) continue;
     // Two items for one page would both light; the first keeps it, and lights for the other's pages too.
-    const twin = key === "more" ? undefined : items.find((item) => item.key !== "more" && item.href === href);
+    const twin = key === "more" || key === "clubs" ? undefined : items.find((item) => item.key !== "more" && item.href === href);
     if (twin) {
       twin.also = [...(twin.also ?? []), key];
       continue;
@@ -50,11 +53,13 @@ export function phoneBarCurrent(
   eventTab: EventTabKey | null,
   /** The event tab Home opens for staff with no Home area (their first tab). */
   firstEventTab: EventTabKey | null = null,
+  /** The current path: Home lights only on exactly its own page, and only when no other item owns the page. */
+  pathname = "",
 ): PhoneBarKey | null {
   const has = (key: PhoneBarKey) => items.some((item) => item.key === key || item.also?.includes(key));
   const owner = (key: PhoneBarKey) => items.find((item) => item.key === key || item.also?.includes(key))?.key ?? null;
   let key: PhoneBarKey;
-  if (place.area === "home") key = "home";
+  if (place.area === "home") key = "more";
   else if (place.inEvent && eventTab === "check-in") key = "check-in";
   else if (place.area === "events") {
     // Staff whose Events item is the same page as Home (their event's first tab) light it only on that tab; the event's
@@ -64,6 +69,10 @@ export function phoneBarCurrent(
   }
   else if (place.area === "clubs") key = "clubs";
   else key = "more";
+  const home = items.find((item) => item.key === "home");
+  const homeIsExactPage = Boolean(home) && new URL(home!.href, "https://events.example.test").pathname === pathname;
+  // A page no other bar item owns that is exactly the Home page lights Home, not More.
+  if (homeIsExactPage && (key === "more" || !has(key))) return "home";
   if (has(key)) return owner(key);
   return has("more") ? "more" : null;
 }

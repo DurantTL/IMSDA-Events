@@ -510,6 +510,6 @@ describe("launcher search and sidebar duplicates (#967)", () => {
     }));
     expect(sections.indexOf("This event")).toBeGreaterThan(-1);
     expect(sections.indexOf("This event")).toBeLessThan(sections.indexOf("Areas"));
-    expect(sections).toContain('aria-current="page"');
+    expect(sections).toContain('aria-current="true"');
   });
 });
