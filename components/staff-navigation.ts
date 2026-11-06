@@ -40,7 +40,9 @@ import { kitchenCountsPath, type EventPermission } from "@/modules/access/permis
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
 import { canAccessOperationalHealth, operationalHealthEntryPermissions } from "@/modules/operations/access";
 import { canManageProgramAssignments } from "@/modules/program-assignments/access";
-import { isSystemWorkspacePath, systemSubpageTitle } from "@/components/system-navigation";
+import { clubsAdminRecordsHref, isSystemWorkspacePath, systemSubpageTitle } from "@/components/system-navigation";
+
+export { clubsAdminRecordsHref };
 
 /**
  * The single source of the destinations a signed-in staff member may reach:
@@ -145,7 +147,7 @@ export const staffPageTitles = {
   groupedPackets: "Grouped event packets",
   operationalReports: "Operational reports",
   clubMonthlyReport: "Club Monthly Record",
-  clubMonthlyReports: "Club Monthly Records",
+  clubMonthlyReports: "Review monthly records",
   clubs: "Clubs",
   club: "Club",
   clubForm: "Club form",
@@ -257,12 +259,6 @@ export const eventsAdminHomeItem: NavigationItem = { href: "/events-admin", labe
 export type ClubsNavGroupKey = "clubs-clubs" | "clubs-records" | "clubs-events" | "clubs-forms" | "clubs-applications" | "clubs-people";
 
 export type ClubsNavGroup = { key: ClubsNavGroupKey; label: string; items: readonly NavigationItem[] };
-
-/**
- * The Club summary's Monthly Records tab: the same destination as the tab itself (#1552). The review list,
- * `/admin/clubs/reports`, is reached from that tab's "Review monthly records" button.
- */
-export const clubsAdminRecordsHref = "/admin/clubs/summary?view=records#monthly-records";
 
 /** The one ungrouped Clubs link, above the groups. Its label is its page title. */
 export const clubsAdminHomeItem: NavigationItem = { href: "/admin/clubs", label: "Club administration", icon: LayoutDashboard };

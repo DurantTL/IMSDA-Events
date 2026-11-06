@@ -64,7 +64,7 @@ const menuRoutes: readonly Menu[] = [
   ["/admin/event-templates", "System", "System management", "Events", "Event templates"],
   ["/archived-events", "System", "System management", "Events", "Archived events"],
   ["/admin/organizations", "System", "System management", "Clubs", "Clubs and churches"],
-  ["/admin/clubs/reports", "System", "System management", "Clubs", "Club Monthly Records"],
+  ["/admin/clubs/reports", "System", "System management", "Clubs", "Monthly Records"],
   ["/admin/clubs/summary", "System", "System management", "Clubs", "Club summary"],
   ["/admin/clubs/applications", "System", "System management", "Clubs", "New club applications"],
   ["/admin/clubs/leaders", "System", "System management", "Clubs", "Club leaders"],
@@ -218,7 +218,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
 /** Dynamic detail pages: each is opened from a list or parent page, so none is a row above. A new dynamic page fails the page test until it is listed here with its reason. */
 export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/admin/club-forms/[templateKey]": "Club form builder, opened from Club forms.",
-  "/admin/clubs/reports/[organizationId]/[month]": "One club's Monthly Record, opened from Club Monthly Records.",
+  "/admin/clubs/reports/[organizationId]/[month]": "One club's Monthly Record, opened from Review monthly records.",
   "/admin/event-templates/[templateId]": "Edit one event template, opened from Event templates.",
   "/admin/form-templates/[templateKey]": "One form template, opened from Form templates.",
   "/admin/information-forms/[formId]": "One information form, opened from Information forms.",

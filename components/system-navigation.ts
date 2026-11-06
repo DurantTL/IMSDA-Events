@@ -53,6 +53,12 @@ export type SystemNavItem = {
   alsoActiveFor?: readonly string[];
 };
 
+/**
+ * The Club summary's Monthly Records tab (#1552): the one destination the Clubs menu, the System menu and the section
+ * tab share. The review list, `/admin/clubs/reports`, is reached from that tab's "Review monthly records" button.
+ */
+export const clubsAdminRecordsHref = "/admin/clubs/summary?view=records#monthly-records";
+
 export type SystemNavGroup = {
   key: SystemNavGroupKey;
   label: string;
@@ -83,7 +89,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     collapsedByDefault: false,
     items: [
       { href: "/admin/organizations", label: "Clubs and churches", description: "The directory of every club and church.", icon: Church },
-      { href: "/admin/clubs/reports", label: "Club Monthly Records", description: "Club Monthly Records, month by month.", icon: FileText },
+      { href: clubsAdminRecordsHref, label: "Monthly Records", description: "Monthly Records, club by club and month by month.", icon: FileText, alsoActiveFor: ["/admin/clubs/reports"] },
       { href: "/admin/clubs/summary", label: "Club summary", description: "How every club is doing at a glance.", icon: BarChart3 },
       { href: "/admin/clubs/applications", label: "New club applications", description: "Applications waiting for review and invites sent.", icon: UserPlus, alsoActiveFor: ["/admin/clubs/invites"] },
       { href: "/admin/clubs/leaders", label: "Club leaders", description: "Every current Director, Deputy, Registrar and Reporter across clubs.", icon: Users },
@@ -145,7 +151,8 @@ export function systemNavActiveItem(pathname: string): SystemNavItem | null {
   let best: { item: SystemNavItem; length: number } | null = null;
   for (const group of systemNavGroups) {
     for (const item of group.items) {
-      for (const path of [item.href, ...(item.alsoActiveFor ?? [])]) {
+      // An href with a query or hash opens a tab of a page another item owns, so it only lights through `alsoActiveFor`.
+      for (const path of [...(/[?#]/.test(item.href) ? [] : [item.href]), ...(item.alsoActiveFor ?? [])]) {
         if (!isAtOrBelow(pathname, path)) continue;
         if (!best || path.length > best.length) best = { item, length: path.length };
       }
@@ -206,7 +213,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/clubs\/leaders(\/|$)/, "Club leaders"],
   [/^\/admin\/clubs\/reports\/year-end(\/|$)/, "Club Year-End Reports"],
   [/^\/admin\/clubs\/reports\/[^/]+\/[^/]+(\/|$)/, "Club Monthly Record"],
-  [/^\/admin\/clubs\/reports(\/|$)/, "Club Monthly Records"],
+  [/^\/admin\/clubs\/reports(\/|$)/, "Review monthly records"],
   [/^\/admin\/clubs\/summary(\/|$)/, "Club summary"],
   [/^\/admin\/clubs\/transfers(\/|$)/, "Club member transfers"],
   [/^\/admin\/forms(\/|$)/, "All forms"],

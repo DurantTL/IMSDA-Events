@@ -180,7 +180,7 @@ visibility condition is exactly what gated that destination before.
 - **Admin sidebars (#1245):** every collapsible sidebar group starts closed; only the group holding the current page
   opens, and a viewer's open/closed choices are remembered per browser. Item labels are the pages' own titles.
   - **System** (`systemNavGroups`): Events (Create an event, Conference calendar, Copy from a past event, Event
-    templates, Archived events), Clubs (Clubs and churches, Club Monthly Records, Club summary, New club
+    templates, Archived events), Clubs (Clubs and churches, Monthly Records, Club summary, New club
     applications, Club member transfers), People, Forms, Catalogs and settings. `/admin/calendar` is listed once, as
     "Conference calendar" (it creates events from calendar items and manages the public calendar; this replaced the
     #1180 pair "Create event from calendar item" and "Manage public calendar"). The `/admin` dashboard's Common tasks

@@ -30,7 +30,7 @@ import {
   clubsAdminNavigation,
   staffSubpageTitle,
 } from "@/components/staff-navigation";
-import { systemNavActiveEntryKey, systemNavGroups, systemSubpageTitle } from "@/components/system-navigation";
+import { clubsAdminRecordsHref, systemNavActiveEntryKey, systemNavGroups, systemSubpageTitle } from "@/components/system-navigation";
 import { buildRouteMapping } from "@/components/route-mapping";
 import { clubYearOptions } from "@/modules/club-reports/clubs-admin-home-model";
 
@@ -71,10 +71,12 @@ describe("the System sidebar", () => {
       const title = systemSubpageTitle(item.href) ?? staffSubpageTitle(item.href);
       // Archived events is a staff page outside the System title rules.
       if (item.href === "/archived-events") continue;
+      // Monthly Records opens a tab of the Club summary (#1552); its title is the tab's name.
+      if (item.href === clubsAdminRecordsHref) { expect(item.label).toBe("Monthly Records"); continue; }
       expect(item.label, item.href).toBe(title);
     }
     const labels = items.map((item) => item.label);
-    for (const label of ["Create an event", "Copy from a past event", "Club Monthly Records", "New club applications", "Club member transfers"]) expect(labels).toContain(label);
+    for (const label of ["Create an event", "Copy from a past event", "Monthly Records", "New club applications", "Club member transfers"]) expect(labels).toContain(label);
   });
 
   it("feeds the phone menu and the route map with the same labels, and lights the calendar once", () => {
@@ -144,11 +146,24 @@ describe("the Clubs sidebar groups", () => {
   it("keeps the phone Clubs bar lit on the Points and Events views (#1304)", () => {
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
     const phone = (markup: string) => markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
-    for (const search of ["view=points", "view=events"]) {
+    for (const search of ["view=points", "view=events", "view=records"]) {
       navigation.pathname = "/admin/clubs/summary"; navigation.search = search;
       const bar = phone(render({ user: staff, adminRoleView: view }));
       expect(bar.match(/aria-current="page"/g), search).toHaveLength(1);
       expect(bar).toMatch(/aria-current="page"(?:(?!<\/a>)[^])*Club summary/);
+    }
+  });
+
+  it("lights Club summary on the phone bar and Monthly Records in the sidebar on the review pages (#1552)", () => {
+    const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
+    const phone = (markup: string) => markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
+    for (const path of ["/admin/clubs/reports", "/admin/clubs/reports/club-1/2026-10"]) {
+      navigation.pathname = path; navigation.search = "";
+      const markup = render({ user: staff, adminRoleView: view });
+      const bar = phone(markup);
+      expect(bar.match(/aria-current="page"/g), path).toHaveLength(1);
+      expect(bar, path).toMatch(/aria-current="page"(?:(?!<\/a>)[^])*Club summary/);
+      expect(sidebarOf(markup), path).toMatch(/aria-current="page"[^>]*href="\/admin\/clubs\/summary\?view=records#monthly-records"|href="\/admin\/clubs\/summary\?view=records#monthly-records"[^>]*aria-current="page"/);
     }
   });
 
@@ -265,7 +280,7 @@ describe("Find a page or task in the Clubs view", () => {
   it("searches the Clubs sidebar's destinations, with the group as context, only in the Clubs view", () => {
     const inView = clubDestinations({ ...base, clubsAdmin: { healthImport: true } });
     expect(inView.map((destination) => destination.label)).toEqual([
-      "Club administration", ...clubsAdminGroups.flatMap((group) => group.items.map((item) => item.label)),
+      "Review monthly records", "Club administration", ...clubsAdminGroups.flatMap((group) => group.items.map((item) => item.label)),
     ]);
     const points = searchDestinations(buildSearchDestinations({ ...base, clubsAdmin: { healthImport: true } }), "points")[0];
     expect(points).toMatchObject({ scope: "Clubs", label: "Points", href: "/admin/clubs/summary?view=points#points" });
