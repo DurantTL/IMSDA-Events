@@ -133,3 +133,16 @@ describe("GetFilterForm (#1557)", () => {
     expect(filterFormHref("/admin/people", [])).toBe("/admin/people");
   });
 });
+
+describe("people list status row (#1557)", () => {
+  it("puts the count and the active chips in one row, with no reserved blank row", async () => {
+    const { readFileSync } = await import("node:fs");
+    const directory = readFileSync("components/people-directory.tsx", "utf8");
+    const row = directory.slice(directory.indexOf("styles.statusRow"), directory.indexOf("</div>", directory.indexOf("styles.statusRow")));
+    expect(row).toContain("id={PEOPLE_STATUS_ID}");
+    expect(row).toContain('aria-live="polite"');
+    expect(row).toContain("<PeopleActiveFilters");
+    expect(readFileSync("components/people-active-filters.tsx", "utf8")).toContain("if (chips.length === 0) return null;");
+    expect(readFileSync("components/people-directory.module.css", "utf8")).not.toMatch(/\.activeBar \{[^}]*min-height/);
+  });
+});

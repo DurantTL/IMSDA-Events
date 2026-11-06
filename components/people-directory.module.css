@@ -79,7 +79,8 @@
 .panelCheck span { min-width: 0; overflow-wrap: anywhere; }
 .panelActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .panelActions :global(.primary-button), .panelActions :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.activeBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; min-height: 44px; }
+.statusRow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.activeBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .activeList { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
 .activeChip { display: inline-flex; align-items: center; gap: 2px; min-width: 0; max-width: 100%; border: 1px solid var(--line); border-radius: var(--radius-pill); background: var(--card); padding: 0 0 0 12px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
 .activeChip > span { min-width: 0; overflow-wrap: anywhere; }

@@ -144,8 +144,9 @@ export function PeopleDirectory({
     <div className={styles.wrap}>
       <PeopleQuickFilters clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
       <PeopleFilterPanel clubOptions={clubOptions} eventOptions={eventOptions} filters={filters} query={query} scope={scope} />
-      <PeopleActiveFilters chips={chips} clearHref={peopleHref({})} />
       {peopleFilterCount(filters) === 0 && !pendingOnly ? pendingBlock : null}
+      {/* The count and the active chips share one row (#1557), so the first chip does not add a row above the list. */}
+      <div className={styles.statusRow}>
       <p aria-live="polite" className={styles.count} id={PEOPLE_STATUS_ID} role="status" tabIndex={-1}>
         {pickEvent
           ? "Pick an event to see who has this role."
@@ -158,6 +159,8 @@ export function PeopleDirectory({
               : `${total} ${total === 1 ? "person" : "people"}${summary ? ` with ${summary}` : ""}${query ? ` matching "${query}"` : ""}.`}
         {eventRolesNeedEvent(filters) ? " Event roles need an event. Pick one to include them." : ""}
       </p>
+      <PeopleActiveFilters chips={chips} clearHref={peopleHref({})} />
+      </div>
       {pickEvent ? (
         <p className={styles.empty}>Pick an event to see who has this role. Event roles belong to one event at a time.</p>
       ) : pendingOnly ? (
