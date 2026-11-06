@@ -6,7 +6,6 @@ import "@fontsource/noto-sans/700.css";
 import "./globals.css";
 import { BRAND_APPLE_TOUCH_PATH, PRODUCT_NAME } from "@/lib/brand";
 import { PublicWebVitals } from "@/components/public-metrics-beacon";
-import { sidebarCollapseInitScript } from "@/components/sidebar-collapse";
 import { UnsavedChangesDialogHost } from "@/components/unsaved-changes-dialog-host";
 import { getRequestNonce } from "@/modules/security/request-nonce";
 import { zodJitlessInitScript } from "@/modules/security/zod-jitless";
@@ -29,7 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const nonce = await getRequestNonce();
   return (
     <html lang="en" suppressHydrationWarning>
-      <head><script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: zodJitlessInitScript + sidebarCollapseInitScript }} /></head>
+      <head><script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: zodJitlessInitScript }} /></head>
       <body>{children}<PublicWebVitals /><UnsavedChangesDialogHost /></body>
     </html>
   );

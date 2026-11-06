@@ -55,7 +55,6 @@
   --coral-soft: #fff1ef;
   --gold-text: #805807;
   --shadow: 0 14px 40px rgba(0, 59, 92, 0.08);
-  --sidebar-width: 260px;
   /* #1350: tokens from docs/design-system/tokens.css, same values as the literals they replace. */
   --secondary-bg: #f9fbfb;
   --table-head: #f6f9fa;
@@ -532,23 +531,6 @@ textarea:focus-visible {
 
 .skip-link:focus { transform: translateY(0); }
 
-.sidebar {
-  position: fixed;
-  inset: 0 auto 0 0;
-  z-index: 30;
-  display: flex;
-  width: var(--sidebar-width);
-  flex-direction: column;
-  padding: 25px 18px 20px;
-  /* #567 F-5: at short heights (1440x500) the brand, system link and event
-     picker leave the nav little room, so the whole sidebar scrolls as well. */
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-  scrollbar-width: thin;
-  background: linear-gradient(180deg, var(--imsda-navy) 0%, var(--imsda-navy-deep) 100%);
-  color: white;
-}
 
 .brand {
   display: flex;
@@ -575,100 +557,8 @@ textarea:focus-visible {
   text-transform: uppercase;
 }
 
-.brand,
-.system-navigation,
-.event-workspace-label,
-.event-picker-wrap { flex-shrink: 0; }
+.brand { flex-shrink: 0; }
 
-.system-navigation {
-  display: grid;
-  gap: 7px;
-  margin: 0 4px 22px;
-}
-
-.system-navigation-label,
-.event-workspace-label {
-  color: #b6cbd5;
-  font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.61rem);
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
-.system-navigation-label { padding-left: 5px; }
-
-.system-navigation-link {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.07);
-  color: white;
-  padding: 10px;
-  text-decoration: none;
-  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
-}
-
-.system-navigation-link:hover {
-  border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.11);
-  transform: translateY(-1px);
-}
-
-.system-navigation-link.active {
-  border-color: rgba(239, 193, 76, 0.48);
-  background: rgba(239, 193, 76, 0.13);
-  box-shadow: inset 3px 0 var(--imsda-gold);
-}
-
-.system-navigation-icon {
-  display: grid;
-  width: 31px;
-  height: 31px;
-  flex: 0 0 31px;
-  place-items: center;
-  border-radius: 9px;
-  background: rgba(239, 193, 76, 0.17);
-  color: var(--imsda-gold);
-}
-
-.system-navigation-link strong,
-.system-navigation-link small { display: block; }
-
-.system-navigation-link strong { font-size: max(var(--type-staff-floor, 0px), 0.75rem); }
-.system-navigation-link small { margin-top: 2px; color: #b8cbd5; font-size: max(var(--type-floor, 0px), 0.59rem); }
-
-.event-workspace-label {
-  display: block;
-  margin: 0 9px 8px;
-}
-
-.event-picker-wrap { margin: 0 4px 20px; }
-
-.event-picker-wrap label {
-  display: block;
-  margin: 0 0 7px 5px;
-  color: #b6cbd5;
-  font-size: max(var(--type-body-floor, 0px), 0.65rem);
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-/* The visible "Event workspace" label above names the picker; this one is for screen readers only. */
-.event-picker-wrap label.sr-only { margin: -1px; }
-
-/* Link to the Archived events list (#635); 44px tall for touch. */
-.event-picker-archived-link {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  margin: 2px 0 0 5px;
-  color: #d3e2e8;
-  font-size: max(var(--type-body-floor, 0px), 0.82rem);
-  font-weight: 700;
-  text-decoration: underline;
-}
 
 .select-shell { position: relative; }
 
@@ -693,75 +583,9 @@ textarea:focus-visible {
   transform: translateY(-50%);
 }
 
-/* #468: let the nav scroll inside the fixed sidebar so every link stays
-   reachable at short window heights; the brand and account areas above/below
-   stay fixed since they aren't part of this flex child. */
-.primary-nav {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  min-height: 0;
-  flex: 1 0 180px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  /* Room for the 3px + 3px-offset focus ring and the hover nudge, which the
-     scroll box would otherwise clip; the negative margin keeps the layout. */
-  margin-inline: -6px;
-  padding: 6px;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-  scrollbar-width: thin;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-radius: 12px;
-  color: #b8ccd5;
-  padding: 11px 13px;
-  font-size: max(var(--type-staff-floor, 0px), 0.86rem);
-  font-weight: 600;
-  text-decoration: none;
-  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
-}
-
-.nav-item:hover { color: white; transform: translateX(2px); }
-
-.nav-item.active {
-  background: rgba(255, 255, 255, 0.13);
-  color: white;
-  box-shadow: inset 3px 0 var(--imsda-gold);
-}
-
-.sidebar-foot {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 17px 10px 0;
-}
-
-.sidebar-foot strong,
-.sidebar-foot small { display: block; }
-
-.sidebar-foot strong { font-size: max(var(--type-staff-floor, 0px), 0.76rem); }
-.sidebar-foot small { margin-top: 3px; color: #a9c0ca; font-size: max(var(--type-floor, 0px), 0.68rem); }
-
-.sync-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  margin-top: 5px;
-  border-radius: 50%;
-  background: var(--imsda-gold);
-  box-shadow: 0 0 0 4px rgba(240, 179, 35, 0.15);
-}
 
 .workspace {
   min-height: 100vh;
-  margin-left: var(--sidebar-width);
   padding: 0 38px 54px;
 }
 
@@ -909,6 +733,9 @@ textarea:focus-visible {
   font-weight: 700;
 }
 
+.account-workspaces { display: grid; gap: 0; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.account-workspaces-heading { color: var(--muted) !important; font-size: max(var(--type-staff-floor, 0px), 0.875rem) !important; font-weight: 800 !important; letter-spacing: 0.04em; text-transform: uppercase; }
+.account-workspaces .account-system-link[aria-current="true"] { background: var(--imsda-navy-soft); box-shadow: inset 4px 0 var(--imsda-gold); color: var(--imsda-navy); font-weight: 800; }
 .account-switch-form { margin: 0; }
 .account-switch-button {
   width: 100%;
@@ -1548,7 +1375,6 @@ textarea:focus-visible {
 .act-as-banner span:not(.act-as-banner-actions) { flex: 1 1 auto; }
 .act-as-banner-actions { display: flex; align-items: center; gap: 8px; }
 /* The staff workspace's fixed sidebar covers the left edge of a full-width banner, so start the banner beside it (#700). */
-.act-as-banner-shell { margin-left: var(--sidebar-width); }
 @media (max-width: 800px) { .act-as-banner-shell { margin-left: 0; } }
 /* On the account side the banner joins the same 1180px column as the tabs, hero and page body (#722). */
 .act-as-banner-account { max-width: 1180px; margin: 12px auto 0; }
@@ -2584,7 +2410,6 @@ body:has(.auth-page) { padding-bottom: 0; }
 
 @media (max-width: 800px) {
   body { padding-bottom: calc(73px + env(safe-area-inset-bottom)); }
-  .sidebar { display: none; }
   .workspace { margin: 0; padding: 0 16px 35px; }
   /* Staff shell header (#685): title and controls share one row, and the event
      picker gets its own full-width row so the whole event name stays visible
@@ -2645,8 +2470,9 @@ body:has(.auth-page) { padding-bottom: 0; }
   .mobile-nav a { position: relative; display: flex; min-width: 0; min-height: 52px; flex: 1 1 0; padding: 4px 2px 2px; align-items: center; justify-content: center; flex-direction: column; gap: 3px; border-radius: 10px; color: #566a75; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 700; line-height: 1.1; text-decoration: none; }
   .mobile-nav a span { max-width: 100%; white-space: nowrap; }
   .mobile-nav a.active { background: rgba(0, 59, 92, 0.06); color: var(--imsda-navy); }
-  .mobile-nav a.active::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 3px 3px; background: var(--imsda-purple); }
-  .mobile-nav a.active svg { color: var(--imsda-purple); }
+  /* "Where you are" is the staff gold (#1565): a 4px bar on the current item. */
+  .mobile-nav a.active::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 4px; border-radius: 0 0 4px 4px; background: var(--imsda-gold); }
+  .mobile-nav a.active svg { color: var(--imsda-navy); }
   .staff-row { grid-template-columns: minmax(180px, 1fr) minmax(200px, 1fr) 80px; }
   .staff-row > span:last-child { display: none; }
   .import-row { grid-template-columns: minmax(100px, 0.6fr) minmax(140px, 0.8fr) minmax(190px, 1.2fr) minmax(110px, 0.7fr); }
@@ -10008,108 +9834,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 /* The roster link is part of the help sentence, so it stays inline with the full stop after it. */
 :root .club-going-list .club-roster-age .field-help a { display: inline; min-height: 0; padding-inline: 0; text-decoration: underline; }
 
-/* Staff sidebar: collapse to icons only (#446). Desktop only; the phone layout
-   uses the mobile nav and never shows the sidebar. Text is clipped, not
-   removed, so every link keeps its accessible name. */
-.sidebar-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-  margin: -10px 4px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.17);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.07);
-  color: #d6e3e9;
-  cursor: pointer;
-  padding: 8px 11px;
-  font: inherit;
-  font-size: max(var(--type-staff-floor, 0px), 0.78rem);
-  font-weight: 600;
-}
-.sidebar-toggle:hover { background: rgba(255, 255, 255, 0.13); color: white; }
-
-.sidebar-tooltip {
-  position: fixed;
-  z-index: 60;
-  transform: translateY(-50%);
-  border-radius: 8px;
-  background: var(--imsda-navy-deep);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  color: white;
-  padding: 6px 10px;
-  font-size: max(var(--type-staff-floor, 0px), 0.78rem);
-  font-weight: 600;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-@media (min-width: 801px) {
-  html[data-sidebar="collapsed"] { --sidebar-width: 76px; }
-  html[data-sidebar="collapsed"] .sidebar { padding-inline: 10px; }
-
-  html[data-sidebar="collapsed"] .brand { justify-content: center; margin-inline: 0; }
-  html[data-sidebar="collapsed"] .sidebar-toggle { justify-content: center; margin-inline: 0; padding-inline: 0; }
-
-  html[data-sidebar="collapsed"] .brand > .sidebar-link-label,
-  html[data-sidebar="collapsed"] .sidebar-toggle > span,
-  html[data-sidebar="collapsed"] .nav-item > span,
-  html[data-sidebar="collapsed"] .system-navigation-link > .sidebar-link-label,
-  html[data-sidebar="collapsed"] .sidebar-foot > span:last-child {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  /* Headings and the sidebar event picker need room; the header picker replaces it. */
-  html[data-sidebar="collapsed"] .system-navigation-label,
-  html[data-sidebar="collapsed"] .event-workspace-label,
-  html[data-sidebar="collapsed"] .event-picker-wrap { display: none; }
-
-  /* The sidebar picker is gone, so the header picker takes over: the current
-     event stays visible and changeable without expanding the sidebar. */
-  html[data-sidebar="collapsed"] .workspace-header .mobile-event-picker {
-    position: relative;
-    order: 1;
-    display: flex;
-    flex: 0 1 280px;
-    min-width: 0;
-    align-items: center;
-  }
-  html[data-sidebar="collapsed"] .workspace-header .header-actions { order: 2; }
-  html[data-sidebar="collapsed"] .workspace-header .mobile-event-picker select {
-    width: 100%;
-    min-height: 40px;
-    appearance: none;
-    overflow: hidden;
-    border: 1px solid var(--field-border);
-    border-radius: 10px;
-    background: white;
-    color: var(--imsda-navy);
-    padding: 8px 34px 8px 12px;
-    font-size: max(var(--type-body-floor, 0px), 0.78rem);
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  html[data-sidebar="collapsed"] .workspace-header .mobile-event-picker svg { position: absolute; right: 12px; pointer-events: none; }
-
-  html[data-sidebar="collapsed"] .system-navigation { margin-inline: 0; }
-  html[data-sidebar="collapsed"] .system-navigation-link { justify-content: center; }
-  html[data-sidebar="collapsed"] .nav-item { justify-content: center; padding-inline: 0; }
-  html[data-sidebar="collapsed"] .nav-item:hover { transform: none; }
-  html[data-sidebar="collapsed"] .sidebar-foot { justify-content: center; padding-inline: 0; }
-}
-
-@media (max-width: 800px) { .sidebar-toggle, .sidebar-tooltip { display: none; } }
-@media print { .sidebar-tooltip { display: none !important; } }
-
-
-
 /* Filter by answer on People & registrations (#739) */
 .choice-filter { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .choice-filter-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
@@ -10933,103 +10657,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .module-request-item small { display: block; margin-top: 2px; color: var(--muted, #5b6b73); }
 .module-request-item p { margin: 8px 0 0; overflow-wrap: anywhere; }
 .module-request-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-
-/* #741 slice 4: fixed staff navigation order.
-   The rhythm is tight (the nav still scrolls inside the sidebar, #468); the
-   group headings and the icons-only rule between groups are in the #964 block.
-   Self-contained block; nothing above this comment is changed by it.
-   (plain comment, not a banner: the #743 block test counts banners) */
-.primary-nav { gap: 1px; }
-.primary-nav .nav-item { padding-block: 6px; }
-.system-navigation { margin-bottom: 12px; }
-.event-workspace-label { margin-bottom: 4px; }
-.event-picker-wrap { margin-bottom: 8px; }
-
-/* Staff sidebar: More stays pinned at the bottom of the nav. When every item is
-   visible (a system admin) the nav scrolls, and More, the last item, sticks to
-   the bottom of that scroll box so it never needs a scroll to reach. DOM and tab
-   order are unchanged; the phone layout hides the sidebar and is not touched. */
-@media (min-width: 801px) {
-  .primary-nav > .nav-item[aria-haspopup="dialog"]:last-child {
-    position: sticky;
-    /* The nav has 6px of padding; stick to the very edge so scrolled items never show in that strip. */
-    bottom: -6px;
-    z-index: 1;
-    /* Opaque so items scroll out of sight beneath it. The same gradient as the
-       sidebar, fixed to the viewport (the sidebar is full height), so it blends in. */
-    background-color: var(--imsda-navy-deep);
-    background-image: linear-gradient(180deg, var(--imsda-navy) 0%, var(--imsda-navy-deep) 100%);
-    background-attachment: fixed;
-    /* At the edge the scroll box would clip an outside focus ring, so draw it inside. */
-    outline-offset: -3px;
-  }
-  /* The hover nudge (a transform) would make the fixed fill fall back to scrolling: no nudge here. */
-  .primary-nav > .nav-item[aria-haspopup="dialog"]:last-child:hover,
-  .primary-nav > .nav-item[aria-haspopup="dialog"]:last-child:focus-visible { transform: none; }
-  /* The active tint is layered over that fill, so the item stays opaque. */
-  .primary-nav > .nav-item.active[aria-haspopup="dialog"]:last-child {
-    background-image: linear-gradient(rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.13)), linear-gradient(180deg, var(--imsda-navy) 0%, var(--imsda-navy-deep) 100%);
-    background-attachment: scroll, fixed;
-  }
-}
-
-/* #964: shorter, grouped staff sidebar. The daily items sit directly in the
-   nav; Set up and Reports are collapsible groups whose heading is a button.
-   Icon-only mode (#446) hides the
-   buttons, keeps every group's links showing (a closed group would otherwise
-   hide destinations with no way to open it) and draws the thin rule between
-   groups. Self-contained block; nothing above this comment is changed by it.
-   (plain comment, not a banner: the #743 block test counts banners) */
-.nav-group { display: grid; gap: 1px; }
-.nav-group-items { display: grid; gap: 1px; }
-.nav-group-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  min-height: 44px;
-  margin: 7px 0 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  /* #93abb6 on the navy gradient is 4.91:1 (#7d97a2 was 3.83:1 at the top). */
-  color: #93abb6;
-  padding: 4px 13px;
-  font: inherit;
-  font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.62rem);
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-align: left;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: color 160ms ease, background 160ms ease;
-}
-.nav-group-toggle:hover { color: white; background: rgba(255, 255, 255, 0.07); }
-.nav-group-toggle svg { flex: 0 0 auto; transition: transform 160ms ease; }
-.nav-group-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
-@media (prefers-reduced-motion: reduce) {
-  .nav-group-toggle, .nav-group-toggle svg { transition: none; }
-}
-@media (min-width: 801px) {
-  html[data-sidebar="collapsed"] .nav-group-toggle { display: none; }
-  html[data-sidebar="collapsed"] .nav-group::before {
-    content: "";
-    display: block;
-    height: 1px;
-    margin: 7px 8px 4px;
-    background: rgba(255, 255, 255, 0.16);
-  }
-}
-
-/* Collapsed sidebar: every group's icons show, including groups closed in the expanded sidebar (their toggles are
-   hidden). The base layer's `[hidden] { display: none !important }` beats any unlayered rule, so this one sits in the
-   same layer, where its higher specificity wins. */
-@layer base {
-  @media (min-width: 801px) {
-    html[data-sidebar="collapsed"] .nav-group-items[hidden] { display: grid !important; }
-  }
-}
 
 /* Calendar repeats, office closures and subscribe buttons (#444) */
 .calendar-chip.calendar-closure a, .calendar-chip.calendar-closure span:not(.sr-only) {
@@ -12080,7 +11707,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .app-shell .meta-stack > *, .meta-stack > * { margin: 0; line-height: 1.45; }
 .app-shell :is(.finance-record, .payment-history, .finance-attendee-list, .arrival-row, .attention-row, .check-in-queue-item, .activity-row, .action-card, .record-card, .club-check-in-attendee) :is(strong, small),
 .app-shell .metric-card small,
-.app-shell .system-navigation-link small,
 .app-shell .attendee-summary small { line-height: 1.45; }
 .arrival-row > .meta-stack { justify-items: start; }
 
@@ -12740,31 +12366,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .more-launcher-modules .more-launcher-item { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
 .more-launcher-modules small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.75rem); }
 .more-launcher-item-static { color: var(--muted); cursor: default; }
-.mobile-nav-system-trigger small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.62rem); font-weight: 600; }
-.system-menu-scrim { position: fixed; z-index: 65; inset: 0 0 calc(67px + env(safe-area-inset-bottom, 0px)); background: rgba(0, 43, 69, 0.42); }
-@media screen { .system-menu { position: fixed; z-index: 66; inset: auto 0 calc(67px + env(safe-area-inset-bottom, 0px)); display: flex; max-height: min(78vh, calc(100dvh - 96px)); flex-direction: column; overflow: hidden; border-radius: 18px 18px 0 0; background: var(--card); box-shadow: 0 -12px 32px rgba(0, 43, 69, 0.22); } }
-.system-menu:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.system-menu-head { display: flex; flex: none; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding: 14px 16px 10px; }
-.system-menu-head h2 { margin: 0; font-size: 1.05rem; }
-.system-menu-head p { margin: 2px 0 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8125rem); }
-.system-menu-close { display: inline-flex; min-width: 44px; min-height: 44px; flex: none; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); cursor: pointer; font: inherit; font-weight: 700; padding: 0 12px; }
-.system-menu-close:focus-visible, .system-menu-item:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
-@media screen { .system-menu-body { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 12px; } }
-.system-menu-search { margin: 8px 8px 4px; }
-.system-menu-search .destination-search-empty { color: var(--muted); }
-.system-menu-group h3 { margin: 12px 8px 4px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.75rem); letter-spacing: 0.08em; text-transform: uppercase; }
-.system-menu-group ul { margin: 0; padding: 0; list-style: none; }
-.system-menu-item { display: flex; width: 100%; min-height: 44px; align-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; overflow-wrap: anywhere; padding: 8px; text-align: left; text-decoration: none; cursor: pointer; }
-.system-menu-item.active { background: var(--imsda-navy-soft); color: var(--imsda-navy); font-weight: 700; }
-@media (max-width: 800px) {
-  .mobile-nav a.mobile-nav-system-trigger { position: relative; display: flex; min-width: 0; min-height: 52px; flex: 1 1 0; padding: 4px 2px 2px; align-items: center; justify-content: center; flex-direction: column; gap: 3px; border: 0; border-radius: 10px; background: transparent; color: #566a75; cursor: pointer; font: inherit; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 700; line-height: 1.1; }
-  .mobile-nav a.mobile-nav-system-trigger.active { background: rgba(0, 59, 92, 0.06); color: var(--imsda-navy); }
-  .mobile-nav a.mobile-nav-system-trigger:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
-}
-@media (min-width: 801px) {
-  .system-menu, .system-menu-scrim { display: none; }
-}
-
 /* Attendee account Overview (#1175): registration cards in a main column, account and help in a secondary one.
    Own classes only; no shared font-size rule is touched. One column on a phone, with the cards first. */
 .account-header-identity {
@@ -13064,11 +12665,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (min-width: 601px) { .club-form-fill-mode { min-width: 13rem; } }
 .club-form-apply-club { display: grid; gap: 10px; }
 
-/* Clubs Administrator phone bar (#1232): more pages than fit across, so the bar scrolls sideways inside itself; the page never does. */
-@media (max-width: 800px) {
-  .mobile-nav.mobile-nav-scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
-  .mobile-nav.mobile-nav-scroll::-webkit-scrollbar { display: none; }
-  .mobile-nav.mobile-nav-scroll a { flex: 0 0 auto; min-width: 84px; min-height: 52px; padding-inline: 8px; }
 }
 
 /* Public homepage (#1204) and event page status (#1205). Solid navy, no gradient or glass; body text 1rem, labels 0.875rem,
@@ -13150,11 +12746,11 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-event-help-section a { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; color: var(--imsda-navy); font-weight: 700; }
 
 /* Staff navigation and page arrival (#1300): no layout movement, extra requests or artificial waits. */
-:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle) {
+:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button) {
   transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 100ms ease;
 }
 
-:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle):active:not(:disabled):not([aria-disabled="true"]) {
+:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button):active:not(:disabled):not([aria-disabled="true"]) {
   transform: translateY(1px);
 }
 
@@ -13202,7 +12798,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
     background-size: 100% 2px;
     background-position: center calc(100% - 2px);
   }
-  :is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle):active { transform: none; }
+  :is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button):active { transform: none; }
 }
 
 /* Small confirmations (#1211): a short check-mark pop once, decoration only; none under reduced motion. */
@@ -13320,16 +12916,12 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .settings-saved-detail { font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
 .settings-save-row :is(.primary-button, .secondary-button) { min-height: 44px; }
 .platform-settings-workspace .field-error { display: block; margin: 4px 0 0; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-/* The club year picker in the Clubs sidebar (#1245): a real GET form under the search. Hidden when the sidebar is icons-only. */
-.clubs-year-form { flex-shrink: 0; display: grid; gap: 6px; margin: 0 4px 14px; }
-.clubs-year-form label { margin: 0 0 0 5px; color: #b6cbd5; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+/* The club year picker, on the Clubs tab line (#1245, #1565): a real GET form. */
+.clubs-year-form { flex-shrink: 0; display: flex; align-items: center; gap: 8px; margin: 0; }
+.clubs-year-form label { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
 .clubs-year-controls { display: flex; gap: 8px; }
-.clubs-year-controls select { flex: 1 1 auto; min-width: 0; min-height: 44px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 12px; background: rgba(255, 255, 255, 0.09); color: #fff; cursor: pointer; padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
-.clubs-year-controls select option { color: var(--ink); }
-.clubs-year-controls button { flex: 0 0 auto; min-height: 44px; min-width: 44px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 12px; background: rgba(255, 255, 255, 0.16); color: #fff; cursor: pointer; padding: 0 14px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-@media (min-width: 801px) {
-  html[data-sidebar="collapsed"] .clubs-year-form { display: none; }
-}
+.clubs-year-controls select { min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: 10px; background: var(--card); color: var(--imsda-navy); cursor: pointer; padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.clubs-year-controls button { flex: 0 0 auto; min-height: 44px; min-width: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--secondary-bg, #f9fbfb); color: var(--imsda-navy); cursor: pointer; padding: 0 14px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
 
 /* Reviewed monthly records and required club forms (#1246). */
 .club-report-review { display: grid; gap: 6px; justify-items: start; }
@@ -13810,15 +13402,8 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .destination-search-scope[data-scope="profile"] { background: var(--imsda-gold-soft); color: var(--ink); }
 .destination-search-description { grid-column: 1 / -1; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8125rem); }
 .destination-search-empty { margin: 6px 2px 0; color: #dbe7ee; font-size: max(var(--type-body-floor, 0px), 0.875rem); }
-.sidebar-destination-search { flex-shrink: 0; margin: 0 4px 14px; }
-.sidebar-search-button { display: none; }
 .more-launcher-destination-search { margin-bottom: 10px; }
 .more-launcher-destination-search .destination-search-empty { color: var(--muted); }
-/* Collapsed sidebar: an icon button opens the sidebar and focuses the field. */
-html[data-sidebar="collapsed"] .sidebar .destination-search { display: none; }
-html[data-sidebar="collapsed"] .sidebar-search-button { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.1); color: #fff; cursor: pointer; }
-html[data-sidebar="collapsed"] .sidebar-search-button:hover { background: rgba(255, 255, 255, 0.18); }
-html[data-sidebar="collapsed"] .sidebar-search-button:focus-visible { outline: 2px solid var(--focus-ring-on-dark); outline-offset: 2px; }
 @media (max-width: 768px) {
   .destination-search-input { font-size: 1rem; }
 }
