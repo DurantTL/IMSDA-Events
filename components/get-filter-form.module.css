@@ -1,0 +1,5 @@
+/* The pending look for a filter form that updates in place (#1557). The form stays put and dims a little. */
+.busy {
+  opacity: 0.75;
+  cursor: progress;
+}

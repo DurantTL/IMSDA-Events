@@ -221,3 +221,23 @@ export function createBackGuard(deps: {
     },
   };
 }
+
+/**
+ * Whether a link should scroll to the top (#1557). An explicit `scroll` always wins. Otherwise a link to the same page
+ * that only changes the query (sort, filter, tab, month, page) keeps the reader's place (`false`), and a link to another
+ * page keeps the router's default (`undefined`, scroll to the top). A link with a `#hash` also keeps the default, so
+ * it still scrolls to its target.
+ */
+export function resolveLinkScroll(href: string, currentPathname: string | null | undefined, scroll?: boolean): boolean | undefined {
+  if (scroll !== undefined) return scroll;
+  if (!currentPathname) return undefined;
+  try {
+    const base = new URL(currentPathname, "http://link.invalid");
+    const target = new URL(href, base);
+    if (target.origin !== base.origin || target.hash) return undefined;
+    const clean = (path: string) => (path.length > 1 ? path.replace(/\/+$/, "") : path);
+    return clean(target.pathname) === clean(base.pathname) ? false : undefined;
+  } catch {
+    return undefined;
+  }
+}

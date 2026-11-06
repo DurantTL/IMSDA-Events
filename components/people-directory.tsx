@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { EmptyState, NoMatchesState } from "./empty-state";
 import { ListPager } from "@/components/list-pager";
 import type { ReactNode } from "react";
@@ -39,7 +40,7 @@ function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }:
       <summary className={styles.panelSummary}>
         Filters{count > 0 ? <span className="count-badge">{count} active</span> : null}
       </summary>
-      <form action="/admin/people" className={styles.panelForm} method="get">
+      <GetFilterForm action="/admin/people" className={styles.panelForm}>
         {query ? <input name="q" type="hidden" value={query} /> : null}
         <fieldset className={styles.panelSet}>
           <legend>Roles (anyone with any of these)</legend>
@@ -85,7 +86,7 @@ function PeopleFilterPanel({ query, scope, filters, eventOptions, clubOptions }:
           <button className="primary-button" type="submit">Apply filters</button>
           {count > 0 ? <Link className="secondary-button" href={peopleHref({})}>Clear filters</Link> : null}
         </div>
-      </form>
+      </GetFilterForm>
     </details>
   );
 }

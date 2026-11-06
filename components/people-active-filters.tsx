@@ -35,23 +35,27 @@ export function PeopleActiveFilters({ chips, clearHref }: { chips: readonly Chip
     }
   }, [signature]);
 
-  if (chips.length === 0) return null;
   const remember = (index: number) => () => {
     targets.current = [...chips.slice(index + 1).map((chip) => chip.key), ...chips.slice(0, index).reverse().map((chip) => chip.key), "status"];
   };
   return (
-    <div className={styles.activeBar}>
-      <ul aria-label="Active filters" className={styles.activeList} ref={listRef}>
-        {chips.map((chip, index) => (
-          <li className={styles.activeChip} key={chip.key}>
-            <span>{chip.label}</span>
-            <Link aria-label={chip.removeLabel} className={styles.remove} data-chip={chip.key} href={chip.href} onClick={(event) => { if (!modified(event)) remember(index)(); }}>
-              <span aria-hidden="true">&times;</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <Link className={styles.clearAll} href={clearHref} onClick={(event) => { if (!modified(event)) targets.current = ["status"]; }}>Clear filters</Link>
+    // The bar's row is always there, one chip tall, so choosing the first filter does not push the count and the list down (#1557).
+    <div className={styles.activeBar} data-testid="people-active-filters">
+      {chips.length > 0 ? (
+        <>
+          <ul aria-label="Active filters" className={styles.activeList} ref={listRef}>
+            {chips.map((chip, index) => (
+              <li className={styles.activeChip} key={chip.key}>
+                <span>{chip.label}</span>
+                <Link aria-label={chip.removeLabel} className={styles.remove} data-chip={chip.key} href={chip.href} onClick={(event) => { if (!modified(event)) remember(index)(); }}>
+                  <span aria-hidden="true">&times;</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link className={styles.clearAll} href={clearHref} onClick={(event) => { if (!modified(event)) targets.current = ["status"]; }}>Clear filters</Link>
+        </>
+      ) : null}
     </div>
   );
 }

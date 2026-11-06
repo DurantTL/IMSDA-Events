@@ -6,7 +6,7 @@ import { WorkspaceContent, workspacePageKey } from "@/components/workspace-conte
 import { registerUnsavedChanges } from "@/components/unsaved-changes-registry";
 
 const mocks = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), linkPending: false }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, replace: mocks.replace }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, replace: mocks.replace }), usePathname: () => "/admin/clubs" }));
 vi.mock("next/link", () => ({
   default: ({ href, children, prefetch, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean }) => {
     void prefetch;
