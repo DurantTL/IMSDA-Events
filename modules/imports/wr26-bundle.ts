@@ -1,5 +1,5 @@
 import { formatCents } from "@/modules/payments/format-cents";
-import { createImportSnapshotIdentity,CsvImportError, parseCsvMatrix, type NormalizedImportData, type ParsedImportRow } from "@/modules/imports/csv-parser";
+import { createImportSnapshotIdentity, CsvImportError, parseCsvMatrix, type NormalizedImportData, type ParsedImportRow } from "@/modules/imports/csv-parser";
 
 export type Wr26BundleFile = {
   name: string;
