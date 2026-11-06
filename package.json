@@ -95,6 +95,7 @@
     "test:privacy-browsers": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-privacy-browsers.ts",
     "test:mobile-layout": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-mobile-layout.ts",
     "test:translation-sim": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-translation-simulation.ts",
+    "test:keep-place": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-keep-place.ts",
     "test:live-roster": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-live-roster.ts",
     "test:club-journeys": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-journeys.ts",
     "test:event-journeys": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-journeys.ts",
