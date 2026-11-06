@@ -45,6 +45,10 @@ HEALTH_TIMEOUT="${IMSDA_HEALTH_TIMEOUT:-900}"
 ASSETS_VOLUME="${IMSDA_ASSETS_VOLUME:-imsda_events_assets}"
 KEY_FILE="${IMSDA_KEY_FILE:-/etc/imsda/secret-encryption-key}"
 KEY_TARGET=/run/secrets/encryption-key
+# Only while rotating the key (#1516): the OLD key, mounted read-only beside the current one. Its version
+# (SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION), and SECRET_ENCRYPTION_KEY_VERSION, are plain settings in $ENV_FILE.
+KEY_FILE_PREVIOUS="${IMSDA_PREVIOUS_KEY_FILE:-/etc/imsda/secret-encryption-key-previous}"
+KEY_TARGET_PREVIOUS=/run/secrets/encryption-key-previous
 REGISTRY="${IMSDA_IMAGE_REPO:-ghcr.io/duranttl/imsda-events}"
 SOURCE="${IMSDA_DEPLOY_SOURCE:-ghcr}"
 CHECKOUT="${IMSDA_CHECKOUT:-/var/www/events.imsda.org}"
@@ -101,6 +105,16 @@ else
 fi
 has_var SECRET_ENCRYPTION_KEY_FILE "$ENV_FILE" \
   && fail "remove SECRET_ENCRYPTION_KEY_FILE from $ENV_FILE; this script sets it when it mounts the key file"
+
+# Previous key (#1516): mounted only when its file exists. SECRET_ENCRYPTION_PREVIOUS_KEY_FILE is set only then.
+if [ -f "$KEY_FILE_PREVIOUS" ] && [ -s "$KEY_FILE_PREVIOUS" ]; then
+  has_var SECRET_ENCRYPTION_PREVIOUS_KEY "$ENV_FILE" \
+    && fail "SECRET_ENCRYPTION_PREVIOUS_KEY is in $ENV_FILE and $KEY_FILE_PREVIOUS also exists. The app refuses both; remove the line from $ENV_FILE."
+  has_var SECRET_ENCRYPTION_PREVIOUS_KEY_FILE "$ENV_FILE" \
+    && fail "remove SECRET_ENCRYPTION_PREVIOUS_KEY_FILE from $ENV_FILE; this script sets it when it mounts the previous key file"
+  KEY_ARGS="$KEY_ARGS --mount type=bind,source=$KEY_FILE_PREVIOUS,target=$KEY_TARGET_PREVIOUS,readonly -e SECRET_ENCRYPTION_PREVIOUS_KEY_FILE=$KEY_TARGET_PREVIOUS"
+  log "Previous encryption key: file $KEY_FILE_PREVIOUS (key rotation in progress)"
+fi
 
 docker network inspect "$PG_NETWORK" >/dev/null 2>&1 || fail "database network $PG_NETWORK not found (docker network ls)"
 docker network inspect "$SITE_NETWORK" >/dev/null 2>&1 || {

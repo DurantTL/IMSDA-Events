@@ -858,6 +858,10 @@ once `main` is fixed.
 
 Migrations only move forward; rolling back the image does not undo them.
 
+If the encryption key has been rotated to version 2 or higher ("Rotating the
+encryption key"), an image from before key versioning cannot read the newer
+sealed values, so do not roll back across that point.
+
 Old images (about 1.9 GB each) and build cache are removed by `imsda-cleanup`
 (above). Never run `docker system prune -a --volumes` or `docker volume prune`:
 the database, uploads and backups live in volumes.
@@ -1193,6 +1197,10 @@ docker rm xcloud-site-<id>-app-1
 docker rename xcloud-site-<id>-app-1-old xcloud-site-<id>-app-1
 docker start xcloud-site-<id>-app-1
 ```
+
+If the encryption key was rotated to version 2 or higher while the new
+container ran, the `-old` container (an image from before key versioning)
+cannot read the values re-sealed since; see "Rotating the encryption key".
 
 **Cleanup**, once the new container is confirmed good (the `-old` container
 can be kept a day or two first for extra insurance, no rush):
@@ -1796,9 +1804,11 @@ shred -u /root/keytest/backup-key /root/keytest/db.env && rmdir /root/keytest
 
 ### Rotating the encryption key (#1516)
 
-Every sealed value records the key version that sealed it (`v2.<version>.…`; a
-value from before versioning counts as version 1). The app seals new values with
-the current key and opens each value with the key of its version. During a
+Every sealed value records the key version that sealed it. While the key
+version is 1, values keep the original `v1.…` format (version 1 is implied);
+from version 2 they are written as `v2.<version>.…`, with the version
+authenticated so it can't be edited. The app seals new values with the current
+key and opens each value with the key of its version. During a
 rotation the old key is also loaded, read-only. `npm run key:rotate` then
 re-seals every value with the new key, and `npm run key:check` proves nothing is
 left on the old one.
@@ -1808,21 +1818,35 @@ system administrator) does it; automation does not. Every sealed column is
 covered: staff and attendee authenticator secrets, the short-lived emailed
 codes, roster birth dates (club rosters and the Sterling Volunteers list),
 sensitive club form answers, calendar feed addresses (and their fingerprints),
-health record fields and sealed health copies. The list is
-`modules/security/sealed-columns.ts`.
+health record fields and the field rows of sealed health copies. The list is
+`modules/security/sealed-columns.ts`. Sealed health copies are otherwise
+immutable: migration `20270102100000_health_snapshot_key_rotation` lets the
+database accept exactly one kind of update on them, a change to a copy field's
+sealed value only, inside the rotation command's own transaction. Nothing else
+about a copy can change.
 
 The settings:
 
 | Variable | Meaning |
 | --- | --- |
 | `SECRET_ENCRYPTION_KEY` / `_FILE` | The current key. |
-| `SECRET_ENCRYPTION_KEY_VERSION` | Its version, a whole number from 1 (default 1). |
+| `SECRET_ENCRYPTION_KEY_VERSION` | Its version, a whole number from 1 (default 1). **Once you have rotated, keep it set to the current version permanently**; if it is dropped the app defaults to 1 and can no longer open values sealed with a higher version. |
 | `SECRET_ENCRYPTION_PREVIOUS_KEY` / `_FILE` | The old key, only while rotating. Same file rules as the current key. |
 | `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` | The old key's version. Required with a previous key, and lower than the current version. |
 
 Startup stops (naming the variable, never a key) if a previous key has no
-version, its version is not lower than the current one, it is the same key as
-the current one, or it is under 32 characters in production.
+version, a previous version is set with no previous key, its version is not
+lower than the current one, it is the same key as the current one, or it is
+under 32 characters in production.
+
+Where the keys live, on each deploy path (use the one this server uses):
+
+| | Manual deploy (`scripts/manual-deploy.sh`) | xCloud compose (`deploy/xcloud/docker-compose.env.yml`) |
+| --- | --- | --- |
+| Current (new) key | host file `/etc/imsda/secret-encryption-key`, mounted at `/run/secrets/encryption-key` (the script sets `SECRET_ENCRYPTION_KEY_FILE`) | same host file; `SECRET_ENCRYPTION_KEY_FILE: /run/secrets/encryption-key` |
+| Previous (old) key | host file `/etc/imsda/secret-encryption-key-previous` (or `IMSDA_PREVIOUS_KEY_FILE`), mounted read-only at `/run/secrets/encryption-key-previous`; the script sets `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE` only when the file exists | same host file; uncomment the second bind mount and `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE: /run/secrets/encryption-key-previous` |
+| Versions | `SECRET_ENCRYPTION_KEY_VERSION` and `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` as lines in `.env` | uncomment the two `*_VERSION` lines, or put them in `.env` |
+| Never | do not put `SECRET_ENCRYPTION_PREVIOUS_KEY` or either `_FILE` variable in `.env` (the script refuses) | do not set `SECRET_ENCRYPTION_PREVIOUS_KEY` and its `_FILE` together |
 
 Steps:
 
@@ -1832,47 +1856,60 @@ Steps:
 2. **Make the new key.** At least 32 random characters, for example
    `openssl rand -base64 48`. Put it in the password manager as the new key and
    keep the old entry; label each with its version.
-3. **Load both keys.** The old key goes in `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE`
-   (a root-only `0400` file, mounted like the current one) with
-   `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=<old version>`. The new key goes in
-   `SECRET_ENCRYPTION_KEY_FILE` with `SECRET_ENCRYPTION_KEY_VERSION=<old version + 1>`.
-   Restart the app. `/api/health` (with a token) now reports
+3. **Load both keys.** As root on the server, with the table above:
+   1. Copy the current key file to the previous-key file and set its mode:
+      `install -m 0400 -o root -g root /etc/imsda/secret-encryption-key /etc/imsda/secret-encryption-key-previous`.
+   2. Write the new key over the current file (`0400`, `root:root`), from the
+      password manager, never typed on a command line.
+   3. Set the versions: `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION=<old version>` and
+      `SECRET_ENCRYPTION_KEY_VERSION=<old version + 1>`. Compose path: edit
+      `docker-compose.env.yml` as the table says.
+   4. Redeploy so the container is recreated with both mounts (manual path:
+      `/root/manual-deploy.sh <sha>`; compose path: the usual redeploy). A plain
+      restart is not enough on the manual path.
+ `/api/health` (with a token) now reports
    `"version"`, `"previousKeyLoaded": true` and `"previousVersion"`.
-4. **Dry run.** Inside the app container: `npm run key:rotate`. It writes
+4. **Dry run.** Inside the app container (`docker exec <app> npm run key:rotate`): It writes
    nothing and prints, per column, how many values it would re-seal, how many
    are already current and how many are unreadable. Unreadable must be 0; if
    not, stop and find out why before going on.
-5. **Apply.** `npm run key:rotate -- --apply`. It works in batches, skips values
+5. **Apply.** `docker exec <app> npm run key:rotate -- --apply`. It works in batches, skips values
    already on the new version, and leaves a value alone if it changed while the
    command ran. If it exits 1 (something was skipped), just run it again until
    it reports nothing left. It is safe to stop and to rerun. The app keeps
    working throughout, because it opens each value with the key of its version.
-6. **Check.** `npm run key:check` must exit 0: every value is on the current
+6. **Check.** `docker exec <app> npm run key:check` must exit 0: every value is on the current
    version and opens. It prints counts only.
 7. **Back up the new key and test it.** Add the new key to both offline copies,
    then run the restore test above with the new key (`npm run key:restore-check`
    on a restored dump taken **after** step 5). Do not go on until it passes.
-8. **Remove the old key.** Delete the three `SECRET_ENCRYPTION_PREVIOUS_KEY*`
-   settings (and the old key file from the server), restart, and run
-   `npm run key:check` once more. Keep the old key in the password manager,
+8. **Remove the old key.** Only after step 7 has passed. Delete the previous-key
+   file `/etc/imsda/secret-encryption-key-previous`, the
+   `SECRET_ENCRYPTION_PREVIOUS_KEY_VERSION` line and (compose path) the previous-key
+   mount and variable; redeploy; and run `npm run key:check` once more.
+   **Leave `SECRET_ENCRYPTION_KEY_VERSION` set to the new version.** Keep the old key in the password manager,
    marked retired, until the next restore test of an older backup is no longer
    needed: a database backup taken before step 5 can only be opened with the old
    key.
 
 Things to know:
 
-- **Rollback.** Code from before this change cannot read the new `v2` values.
-  Once any value has been written by this version, rolling the app image back
-  to an older one leaves it unable to open them. Roll forward instead.
+- **Rollback.** While the key version is 1 this change still writes the original
+  `v1.` format, so an older image can read everything. After a rotation to
+  version 2 or higher, new and re-sealed values are `v2.…`, which an image from
+  before this change cannot read. Roll the image back across that point only if
+  you accept that, or roll forward instead.
 - **Old backups.** A dump taken before the rotation is sealed with the old key.
   Restoring it needs the old key (as `SECRET_ENCRYPTION_KEY_FILE` for
   `key:restore-check`, which opens a value with whichever key you give it).
 - **Calendar feeds.** Each feed's address fingerprint is recomputed with its
   address, and so is the copy on items a deleted feed left behind. While the old
   key is loaded, adding a calendar also checks the old fingerprint, so a
-  duplicate is not missed. An item left by a feed deleted long ago keeps an old
-  fingerprint it can't recompute; after the old key is removed it will not
-  re-link to a re-added identical feed (it stays as an ordinary staff item).
+  duplicate is not missed. An item left by a feed deleted before the rotation keeps its old
+  fingerprint, because the address is gone and it can't be recomputed; after the
+  old key is removed it will not re-link to a re-added identical feed (it stays
+  as an ordinary staff item). `npm run key:check` prints how many such items
+  there are (informational, not a failure).
 - **Short-lived codes** (emailed sign-in and reset codes) are re-sealed like
   everything else, expired or not.
 

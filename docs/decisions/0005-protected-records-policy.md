@@ -136,10 +136,13 @@ Two open implementation questions this ADR should settle before #190 starts:
 
 **Key versioning and rotation (decided 2026-11-05, #1516; Caleb asked the build to choose):**
 
-1. Every sealed value now records the key version that sealed it:
-   `v2.<keyVersion>.<nonce>.<tag>.<ciphertext>`, with the version also checked by
-   the cipher so it can't be edited. An older `v1.…` value keeps working and
-   counts as version 1. New writes are always `v2` with the current version.
+1. Every sealed value records the key version that sealed it. While the key
+   version is 1, values keep the original `v1.…` format, with version 1 implied,
+   so an older image can still read them (rollback safety). From version 2 a
+   value is `v2.<keyVersion>.<nonce>.<tag>.<ciphertext>`, with the version also
+   checked by the cipher so it can't be edited. A `v1` value counts as version 1.
+   After a rotation to version 2 or higher, an image from before this change
+   cannot read the new values; `SECRET_ENCRYPTION_KEY_VERSION` must then stay set.
 2. The server loads the current key with `SECRET_ENCRYPTION_KEY_VERSION`
    (default 1). During a rotation it can also load the previous key,
    read-only, with its own version (`SECRET_ENCRYPTION_PREVIOUS_KEY` or
@@ -161,7 +164,16 @@ Two open implementation questions this ADR should settle before #190 starts:
 5. `/api/health` (authorized callers) reports whether a key is configured, its
    source, the current version, whether a previous key is loaded and its
    version. It never scans the database and never shows key text.
-6. Running a rotation in production is a human step; the procedure is in
+6. Sealed health copies are immutable by a database trigger. Migration
+   `20270102100000_health_snapshot_key_rotation` allows exactly one update on
+   them: a copy field's sealed value alone, inside the rotation command's own
+   transaction (`imsda.key_rotation`). Every other update, and every change to a
+   copy itself, is still refused, and the delete rules are unchanged.
+7. Accepted limitation: a calendar item left behind by a deleted feed keeps the
+   address fingerprint it was given, and rotation can't recompute it (the
+   address is gone). Once the previous key is removed it won't relink to an
+   identical re-added feed. `npm run key:check` counts these (informational).
+8. Running a rotation in production is a human step; the procedure is in
    `docs/DEPLOY-DOCKER.md`, "Rotating the encryption key", and is a draft for
    the custodian to review (checklist item 9).
 

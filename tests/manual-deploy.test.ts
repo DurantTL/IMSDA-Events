@@ -128,6 +128,32 @@ describe("manual-deploy.sh", () => {
     expect(result.calls).toContain(`network connect postgresql_9kgaw_239292_xcloud-network ${app}`);
   });
 
+  it("mounts the previous key read-only only when its file exists (key rotation, #1516)", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const plain = run([sha]);
+    expect(plain.status).toBe(0);
+    expect(plain.calls).not.toContain("SECRET_ENCRYPTION_PREVIOUS_KEY_FILE");
+
+    const previousFile = path.join(mkdtempSync(path.join(tmpdir(), "imsda-prev-key-")), "previous");
+    writeFileSync(previousFile, "old-key");
+    const rotating = setup(envWithoutKey, "k");
+    const result = rotating.run([sha], { IMSDA_PREVIOUS_KEY_FILE: previousFile });
+    expect(result.status).toBe(0);
+    expect(result.calls).toMatch(
+      /run -d .*source=.*previous,target=\/run\/secrets\/encryption-key-previous,readonly -e SECRET_ENCRYPTION_PREVIOUS_KEY_FILE=\/run\/secrets\/encryption-key-previous/,
+    );
+    expect(result.calls).not.toContain("old-key");
+  });
+
+  it("refuses a previous key in both .env and its file", () => {
+    const previousFile = path.join(mkdtempSync(path.join(tmpdir(), "imsda-prev-key-")), "previous");
+    writeFileSync(previousFile, "old-key");
+    const { run } = setup(`${envWithoutKey}SECRET_ENCRYPTION_PREVIOUS_KEY=y\n`, "k");
+    const result = run([sha], { IMSDA_PREVIOUS_KEY_FILE: previousFile });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("SECRET_ENCRYPTION_PREVIOUS_KEY is in");
+  });
+
   it("sends the sweep token to the health URL on stdin, never on the command line", () => {
     const { run } = setup(envWithoutKey, "k");
     const result = run([sha]);
