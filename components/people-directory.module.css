@@ -3,6 +3,12 @@
 .search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
 .searchField { display: grid; flex: 1 1 220px; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
 .searchField input, .searchField select { width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: var(--radius-sm); background: var(--card); padding: 8px 10px; font-size: 16px; }
+/* Search or Apply and Clear filters share one row, which on a phone is always its own row, so Clear filters appearing never adds a row (#1557). */
+.searchActions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+@media (max-width: 640px) {
+  .searchActions { flex-basis: 100%; flex-wrap: nowrap; }
+  .searchActions > * { flex: 1 1 0; width: auto; min-width: 0; }
+}
 .search :global(.primary-button), .search :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .count { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -79,14 +85,17 @@
 .panelCheck span { min-width: 0; overflow-wrap: anywhere; }
 .panelActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .panelActions :global(.primary-button), .panelActions :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.statusRow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; min-height: 44px; }
+/* One fixed height with or without chips (a chip is 46px with its border; 4px room each side keeps the focus ring visible). */
+.statusRow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; min-height: 54px; }
 .statusRow > p { flex: 0 1 auto; min-width: 0; }
 /* On a phone the chips stay on the count's line and scroll sideways, so the first chip never adds a row (#1557). */
 @media (max-width: 640px) {
   .statusRow { flex-wrap: nowrap; }
-  .statusRow .activeBar { flex: 1 1 0; flex-wrap: nowrap; overflow-x: auto; }
-  .statusRow .activeList { flex-wrap: nowrap; }
-  .statusRow .activeChip, .statusRow .clearAll { flex: 0 0 auto; white-space: nowrap; }
+  .statusRow .activeBar { flex: 1 1 0; flex-wrap: nowrap; overflow-x: auto; padding: 4px; }
+  .statusRow .activeList { flex: 0 0 auto; flex-wrap: nowrap; min-width: max-content; }
+  .statusRow .activeChip { flex: 0 0 auto; min-width: max-content; max-width: none; white-space: nowrap; }
+  .statusRow .activeChip > span { overflow-wrap: normal; }
+  .statusRow .clearAll { flex: 0 0 auto; white-space: nowrap; }
 }
 .activeBar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .activeList { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }

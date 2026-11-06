@@ -142,6 +142,29 @@ describe("GetFilterForm (#1557)", () => {
     expect(select.value).toBe("2025-26");
   });
 
+  it("keeps a choice not applied yet when something else on the page changes the address", async () => {
+    mounted = await mount(form());
+    const select = mounted.container.querySelector("select") as HTMLSelectElement;
+    select.value = "2026-27";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    nav.search = "year=2025-26&q=casey";
+    await mounted.root.render(form());
+    await flush();
+    expect(select.value).toBe("2026-27");
+  });
+
+  it("resets a choice not applied yet when Back or Forward changes the address", async () => {
+    mounted = await mount(form());
+    const select = mounted.container.querySelector("select") as HTMLSelectElement;
+    select.value = "2026-27";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    nav.search = "year=2025-26";
+    await mounted.root.render(form());
+    await flush();
+    expect(select.value).toBe("2025-26");
+  });
+
   it("asks before pushing when a form has unsaved changes, and Cancel changes nothing (rule B6)", async () => {
     const stop = registerUnsavedChanges("Leave this page?");
     let answer = false;
@@ -186,8 +209,11 @@ describe("people list status row (#1557)", () => {
     expect(readFileSync("components/people-active-filters.tsx", "utf8")).toContain("if (chips.length === 0) return null;");
     const css = readFileSync("components/people-directory.module.css", "utf8");
     // The row is always one chip tall, and on a phone the chips scroll sideways instead of wrapping to a new row.
-    expect(css).toMatch(/\.statusRow \{[^}]*min-height: 44px/);
+    expect(css).toMatch(/\.statusRow \{[^}]*min-height: 54px/);
     expect(css).toMatch(/@media \(max-width: 640px\) \{[\s\S]*?\.statusRow \.activeBar \{[^}]*overflow-x: auto/);
-    expect(css).toMatch(/\.statusRow \.activeList \{ flex-wrap: nowrap/);
+    expect(css).toMatch(/\.statusRow \.activeList \{[^}]*flex-wrap: nowrap[^}]*min-width: max-content/);
+    // Search or Apply and Clear filters share one row on a phone, so Clear filters appearing never adds a row.
+    expect(readFileSync("components/people-quick-filters.tsx", "utf8")).toMatch(/className=\{styles\.searchActions\}>[\s\S]*?Clear filters<\/Link>[\s\S]*?<\/div>/);
+    expect(css).toMatch(/\.searchActions \{[^}]*flex-basis: 100%[^}]*flex-wrap: nowrap/);
   });
 });

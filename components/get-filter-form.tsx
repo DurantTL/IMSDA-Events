@@ -23,16 +23,29 @@ export function GetFilterForm({ children, className, onSubmit, resetParams, ...p
   const formRef = useRef<HTMLFormElement>(null);
   const pathname = usePathname();
   const search = useSearchParams()?.toString() ?? "";
-  // Back, Forward or a link changes the address: put the controls back to what it says (rule B2). The server has
-  // already sent the new defaults, so a reset keeps focus where it is, unlike a remount.
+  // When the address changes, put the controls back to what it says (rule B2). The server has already sent the new
+  // defaults, so a reset keeps focus where it is, unlike a remount. Choices made here but not applied yet are kept when
+  // something else on the page changes the address (for example the search box); Back and Forward always reset.
   const first = useRef(true);
+  const edited = useRef(false);
+  const popped = useRef(false);
+  useEffect(() => {
+    const onPop = () => { popped.current = true; };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
+    const shouldReset = popped.current || !edited.current;
+    popped.current = false;
+    if (!shouldReset) return;
+    edited.current = false;
     formRef.current?.reset();
   }, [pathname, search]);
+  const markEdited = () => { edited.current = true; };
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     onSubmit?.(event);
     if (event.defaultPrevented) return;
@@ -40,6 +53,7 @@ export function GetFilterForm({ children, className, onSubmit, resetParams, ...p
     const submitter = event.nativeEvent.submitter;
     if (props.target || submitter?.hasAttribute("formaction") || submitter?.hasAttribute("formmethod") || submitter?.hasAttribute("formtarget")) return;
     event.preventDefault();
+    edited.current = false;
     const path = new URL(form.action || window.location.href, window.location.href).pathname;
     const href = filterFormHref(path, new FormData(form).entries() as Iterable<[string, FormDataEntryValue]>, resetParams);
     // Applying the same filters again must not stack an entry or reload.
@@ -48,7 +62,7 @@ export function GetFilterForm({ children, className, onSubmit, resetParams, ...p
     void guardedNavigate(() => go(href, "push"));
   };
   return (
-    <form {...props} aria-busy={pending || undefined} className={[className, pending ? styles.busy : ""].filter(Boolean).join(" ") || undefined} method="get" onSubmit={handleSubmit} ref={formRef}>
+    <form {...props} aria-busy={pending || undefined} className={[className, pending ? styles.busy : ""].filter(Boolean).join(" ") || undefined} method="get" onChange={(event) => { markEdited(); props.onChange?.(event); }} onInput={(event) => { markEdited(); props.onInput?.(event); }} onSubmit={handleSubmit} ref={formRef}>
       {children}
     </form>
   );
