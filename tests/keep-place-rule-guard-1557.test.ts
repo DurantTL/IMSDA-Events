@@ -126,3 +126,11 @@ describe("staff role pills never re-wrap on a phone (#1557, B17)", () => {
     expect(css).toMatch(/@media \(max-width: 520px\) \{[^}]*\.admin-role-pills \{[^}]*flex-direction: column/);
   });
 });
+
+describe("portal masthead buttons never re-wrap on a phone (#1557, B17)", () => {
+  it("gives the name its own line so the buttons always start on the next one", () => {
+    const css = readFileSync("components/club-portal-masthead-view.module.css", "utf8");
+    expect(css).toMatch(/@media \(max-width: 640px\) \{[\s\S]*?\.account > :global\(\.club-masthead-identity\) \{[^}]*flex-basis: 100%/);
+    expect(readFileSync("components/portal-masthead-actions.tsx", "utf8")).toMatch(/<div className=\{styles\.account\}>\s*\{identity\}/);
+  });
+});
