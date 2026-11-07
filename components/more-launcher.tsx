@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import type { HTMLAttributes, ReactNode, Ref, RefObject } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -89,6 +89,7 @@ export function MoreLauncherPanel({
   id,
   panelRef,
   onNavigate,
+  onClose,
   variant,
   style,
 }: {
@@ -116,10 +117,13 @@ export function MoreLauncherPanel({
   id?: string;
   panelRef?: Ref<HTMLDivElement>;
   onNavigate?: (card?: { key: string; href: string }) => void;
+  /** The phone sheet's Close button (#1566). */
+  onClose?: () => void;
   variant: "sidebar" | "tab";
   style?: HTMLAttributes<HTMLDivElement>["style"];
 }) {
   const searchId = useId();
+  const titleId = `${searchId}-title`;
   const statusId = `${searchId}-status`;
   const [search, setSearch] = useState("");
   const listed = omitSidebarDuplicates(cards, variant === "sidebar" ? sidebarHrefs : undefined);
@@ -225,10 +229,18 @@ export function MoreLauncherPanel({
       ref={panelRef}
       role="dialog"
       aria-modal={variant === "tab" ? "true" : undefined}
-      aria-label="More tools"
+      aria-label={variant === "tab" ? undefined : "More tools"}
+      aria-labelledby={variant === "tab" ? titleId : undefined}
       style={style}
       tabIndex={-1}
     >
+      {/* The phone sheet names itself and keeps Close in view while a long list scrolls inside it (#1566). */}
+      {variant === "tab" && (
+        <div className="more-launcher-head" inert={Boolean(confirming) || undefined}>
+          <h2 id={titleId}>More</h2>
+          <button type="button" className="more-launcher-close" onClick={() => onClose?.()}><X aria-hidden="true" size={18} /><span>Close</span></button>
+        </div>
+      )}
       {/* While the confirm is open the rest of the panel is inert, to match aria-modal. */}
       {variant === "tab" && destinations && destinations.length > 0 && (
         <div className="more-launcher-destination-search" inert={Boolean(confirming) || undefined}>
@@ -483,7 +495,7 @@ export function MoreLauncher({
       close("escape");
       return;
     }
-    const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input.destination-search-input, input.more-launcher-search-input, a[href], button.more-launcher-toggle:not([disabled])") ?? []);
+    const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input.destination-search-input, input.more-launcher-search-input, button.more-launcher-close, a[href], button.more-launcher-toggle:not([disabled])") ?? []);
     const current = items.indexOf(document.activeElement as HTMLElement);
     // In the search box the caret keys and Home/End edit the text; only Up, Down and Tab leave it.
     if (document.activeElement instanceof HTMLInputElement && !["ArrowDown", "ArrowUp", "Tab"].includes(event.key)) return;
@@ -545,6 +557,7 @@ export function MoreLauncher({
                 close("navigate");
               }}
               panelRef={panelRef}
+              onClose={() => close("toggle")}
               style={variant === "sidebar" && anchor ? { left: anchor.left, bottom: anchor.bottom, maxHeight: `calc(100vh - ${anchor.bottom + 12}px)` } : undefined}
               variant={variant}
             />
