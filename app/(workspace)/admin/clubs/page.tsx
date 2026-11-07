@@ -22,7 +22,7 @@ import { AdminHub } from "@/components/admin-hub";
 import { clubsAdminHrefForYear } from "@/components/staff-navigation";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { buildHubView, type HubViewer } from "@/modules/system-admin/admin-hubs-model";
-import { loadHubMetrics } from "@/modules/system-admin/admin-hubs-repository";
+import { lateRecordCount, loadHubMetrics } from "@/modules/system-admin/admin-hubs-repository";
 import { ClubApplicationApprove, NewClubsRegion } from "@/components/club-application-approve";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { ClubDirectoryCards } from "@/components/club-directory";
@@ -51,16 +51,26 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN";
 
   const hubViewer: HubViewer = { isSystemAdmin: viewer === "SYSTEM_ADMIN", clubsAdmin: true, siteContentEditor: false, healthImport: healthRecordsEnabled() };
-  const [clubs, events, applications, waitingCount, roles, requiredForms, hubValues] = await Promise.all([
+  const [clubs, events, applications, waitingCount, roles, requiredForms] = await Promise.all([
     getAreaClubsSummary(clubYear, now, { backgroundChecks: false }),
     listAreaClubEvents(clubYear),
     listNewClubApplications(viewer),
     countWaitingNewClubApplications(viewer),
     resolveAdminRoles(user),
     getRequiredFormsStatus(clubYear),
-    // The destination cards' live status: each number reads on its own and shows "Unavailable" when it cannot be read.
-    loadHubMetrics("club-administration", hubViewer, now),
   ]);
+  // The destination cards' live status, for the club year picked here: the clubs, late records and waiting applications come
+  // from this page's own reads (not read twice); the rest read on their own and show "Unavailable" when they cannot be read.
+  let lateRecords: number | null = null;
+  try {
+    lateRecords = lateRecordCount(clubs, clubYear, now);
+  } catch {
+    lateRecords = null;
+  }
+  const hubValues = await loadHubMetrics("club-administration", hubViewer, now, {
+    clubYear,
+    known: { clubs: clubs.length, lateRecords, applicationsWaiting: waitingCount },
+  });
   // The club pages that read ?year= keep the year the viewer picked (#1566).
   const hubView = buildHubView("club-administration", hubViewer, hubValues);
   const hubViewForYear = {

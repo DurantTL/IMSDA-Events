@@ -26,7 +26,7 @@ import { neededMetrics, type HubKey, type HubViewer, type MetricKey, type Metric
  * caller has already checked that the viewer may open the hub; each metric reuses the count an existing page reads.
  * Nothing here writes.
  */
-type Context = { now: Date; viewer: HubViewer; shared: Map<string, Promise<unknown>> };
+type Context = { now: Date; viewer: HubViewer; clubYear?: string; shared: Map<string, Promise<unknown>> };
 
 /** One read shared by the metrics that come from it (a failure of it makes each of them unavailable). */
 function shared<T>(context: Context, key: string, read: () => Promise<T>): Promise<T> {
@@ -38,14 +38,19 @@ function shared<T>(context: Context, key: string, read: () => Promise<T>): Promi
   return promise;
 }
 
+/** Clubs with the report month's record late, from a club-year summary a caller already read; throws when the month is not in the year. */
+export function lateRecordCount(clubs: Parameters<typeof monthlyStatusTotals>[0], clubYear: string, now: Date): number {
+  const month = chooseReportMonth(clubYear, now);
+  const totals = monthlyStatusTotals(clubs, clubYear).find((entry) => entry.month === month);
+  if (!totals) throw new Error("The report month is not in the club year.");
+  return totals.late;
+}
+
 const clubsSummary = (context: Context) =>
   shared(context, "clubsSummary", async () => {
-    const clubYear = resolveAreaClubYear(undefined, context.now);
+    const clubYear = context.clubYear ?? resolveAreaClubYear(undefined, context.now);
     const clubs = await getAreaClubsSummary(clubYear, context.now, { backgroundChecks: false });
-    const month = chooseReportMonth(clubYear, context.now);
-    const totals = monthlyStatusTotals(clubs, clubYear).find((entry) => entry.month === month);
-    if (!totals) throw new Error("The report month is not in the club year.");
-    return { clubs: clubs.length, late: totals.late };
+    return { clubs: clubs.length, late: lateRecordCount(clubs, clubYear, context.now) };
   });
 
 const calendarCounts = (context: Context) => shared(context, "calendar", () => countPublicCalendarEntries(context.now));
@@ -103,10 +108,19 @@ const readers: Record<MetricKey, (context: Context) => Promise<number>> = {
  * The values of the named metrics for a viewer, each read on its own: one that failed is logged under `label` and becomes
  * `null` ("Unavailable"). The caller names only metrics the viewer may see.
  */
-export async function loadMetrics(keys: readonly MetricKey[], viewer: HubViewer, label: string, now = new Date()): Promise<MetricValues> {
-  const context: Context = { now, viewer, shared: new Map() };
+export async function loadMetrics(
+  keys: readonly MetricKey[],
+  viewer: HubViewer,
+  label: string,
+  now = new Date(),
+  /** `clubYear`: the club year the page picked (default the current one). `known`: numbers the page already read, so they are not read twice. */
+  options: { clubYear?: string; known?: MetricValues } = {},
+): Promise<MetricValues> {
+  const context: Context = { now, viewer, clubYear: options.clubYear, shared: new Map() };
   const entries = await Promise.all(
     keys.map(async (key): Promise<[MetricKey, number | null]> => {
+      const known = options.known?.[key];
+      if (known !== undefined) return [key, known];
       try {
         const value = await readers[key](context);
         return [key, Number.isFinite(value) ? value : null];
@@ -120,6 +134,6 @@ export async function loadMetrics(keys: readonly MetricKey[], viewer: HubViewer,
 }
 
 /** The values for one hub and viewer. A metric that failed is `null`; a metric the hub does not show is not read. */
-export async function loadHubMetrics(hub: HubKey, viewer: HubViewer, now = new Date()): Promise<MetricValues> {
-  return loadMetrics(neededMetrics(hub, viewer), viewer, hub, now);
+export async function loadHubMetrics(hub: HubKey, viewer: HubViewer, now = new Date(), options: { clubYear?: string; known?: MetricValues } = {}): Promise<MetricValues> {
+  return loadMetrics(neededMetrics(hub, viewer), viewer, hub, now, options);
 }
