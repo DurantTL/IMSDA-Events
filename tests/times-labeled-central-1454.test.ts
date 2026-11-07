@@ -225,7 +225,6 @@ const pendingOtherBuilds: Record<string, string> = {
   "components/registration-meals-history.tsx": PENDING,
   "components/registration-notes-tags-panel.tsx": PENDING,
   "components/square-payment-matching.tsx": PENDING,
-  "modules/system-admin/system-report/model.ts": PENDING,
 };
 
 describe("no unlabeled time formatting outside the shared formatter (#1454)", () => {

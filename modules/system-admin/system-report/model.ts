@@ -13,6 +13,7 @@
  */
 
 import type { ServiceSetup, SetupHelp } from "@/modules/setup-help/types";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 export type SignalState = "ok" | "watch" | "attention" | "unavailable" | "info";
 
@@ -152,22 +153,23 @@ export function emptyTally(): Tally {
   return { ok: 0, watch: 0, attention: 0, unavailable: 0, info: 0 };
 }
 
-const timeFormat = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" });
-const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-const longDateFormat = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+const timeOptions = { hour: "numeric", minute: "2-digit" } as const;
+const dateOptions = { month: "short", day: "numeric", year: "numeric" } as const;
+const longDateOptions = { weekday: "long", month: "long", day: "numeric", year: "numeric" } as const;
 
-/** A reading's time in UTC, as the System home states it. A reading from an earlier day carries its date. */
+/** A reading's time in Central, labeled (B13). A reading from an earlier Central day carries its date. */
 export function reportTimeLabel(iso: string | null, now: Date): string {
   if (!iso) return "Not recorded";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "Not recorded";
-  const time = `${timeFormat.format(date)} UTC`;
-  return dateFormat.format(date) === dateFormat.format(now) ? `${time} today` : `${dateFormat.format(date)}, ${time}`;
+  const time = formatInConferenceTime(date, timeOptions);
+  const day = formatInConferenceTime(date, dateOptions);
+  return day === formatInConferenceTime(now, dateOptions) ? `${time} today` : `${day}, ${time}`;
 }
 
-/** "Friday, October 30, 2026 at 10:42 AM UTC". */
+/** "Friday, October 30, 2026 at 10:42 AM CDT". */
 export function reportReadLabel(now: Date): string {
-  return `${longDateFormat.format(now)} at ${timeFormat.format(now)} UTC`;
+  return `${formatInConferenceTime(now, longDateOptions)} at ${formatInConferenceTime(now, timeOptions)}`;
 }
 
 /** A row for a reading that could not be made: "Tried <time>", state unavailable, never OK and never zero. */
