@@ -64,14 +64,11 @@ describe("type scale tokens (#743)", () => {
     expect(block).toMatch(/\.app-shell \{ font-size: var\(--type-admin-body\); \}/);
   });
 
-  it("keeps muted text at 4.5:1 on every background it sits on, and the sidebar group label on navy", () => {
+  it("keeps muted text at 4.5:1 on every background it sits on", () => {
     const muted = css.match(/--muted:\s*(#[0-9a-f]{6})/i)?.[1] ?? "";
     for (const background of ["#ffffff", "#f4f7f8", "#e6f0f4", "#f1eaf7", "#fff5d7", "#e5f3ed", "#f8fafb", "#f9fbfb", "#fbfcfd", "#dce6ea", "#eee6f5", "#fff1ef"]) {
       expect(contrast(muted, background), `${muted} on ${background}`).toBeGreaterThanOrEqual(4.5);
     }
-    const label = css.match(/\.nav-group-toggle \{[^}]*?\bcolor: (#[0-9a-f]{6});/i)?.[1] ?? "";
-    expect(contrast(label, "#003b5c")).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(label, "#002c45")).toBeGreaterThanOrEqual(4.5);
   });
 });
 

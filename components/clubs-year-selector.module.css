@@ -1,0 +1,6 @@
+/* The club year picker, on the Clubs tab line (#1245, #1565): a real GET form. */
+.form { flex-shrink: 0; display: flex; align-items: center; gap: 8px; margin: 0; }
+.form label { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.controls { display: flex; gap: 8px; }
+.controls select { min-width: 0; min-height: 44px; border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--card); color: var(--imsda-navy); cursor: pointer; padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.controls button { flex: 0 0 auto; min-height: 44px; min-width: 44px; border: 1px solid var(--line); border-radius: var(--field-radius); background: var(--secondary-bg, #f9fbfb); color: var(--imsda-navy); cursor: pointer; padding: 0 14px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }

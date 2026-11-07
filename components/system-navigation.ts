@@ -138,6 +138,9 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
   },
 ];
 
+/** The groups the /admin dashboard draws as its task directory; every other group is a Common tasks group there (#1228). */
+export const adminDirectoryGroups: readonly SystemNavGroup[] = systemNavGroups.filter((group) => group.key === "system-catalogs");
+
 function isAtOrBelow(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`);
 }
@@ -242,7 +245,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/analytics(\/|$)/, "Public analytics"],
   [/^\/admin\/settings(\/|$)/, "Platform settings"],
   [/^\/admin\/pauses(\/|$)/, "Pause an area"],
-  [/^\/admin\/feature-requests(\/|$)/, "Feature requests"],
+  [/^\/admin\/feature-requests(\/|$)/, "Event module requests"],
 ];
 
 /**

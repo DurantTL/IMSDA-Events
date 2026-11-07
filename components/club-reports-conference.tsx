@@ -91,7 +91,7 @@ export function ClubReportsConference({
       ) : (
         <div className="report-table-wrap club-reports-grid">
           {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
-          <table role="table" className="report-table table-cards table-cards-xwide">
+          <table role="table" className="report-table table-cards table-cards-huge">
             <caption className="sr-only">{`Monthly Record points by club for ${clubYear}`}</caption>
             <thead role="rowgroup">
               <tr role="row">

@@ -5,26 +5,64 @@ groupings work, so later pages follow the same pattern.
 
 ## Staff workspaces (#1565)
 
-The desktop sidebar selects Events, Clubs or System before showing that
-workspace's destinations. `staffWorkspaceFor` derives presentation from the
-existing admin section and System registries; it never grants access. Shared
-Clubs/System pages retain the selected role context. Help keeps that context.
+The staff shell has no sidebar. A branded header (the IMAdventist symbol, "Find a
+page or task", Help & learning, Create, notifications and the account menu) sits
+over an 88px icon rail of at most five areas today: Events, Clubs, People, Reports and
+Admin (Home joins when #1568 builds its pages). An area shows when at least one
+of its tabs is a page that area owns, and its rail item opens its first such tab,
+so the item you click is the one that lights.
+Below the header the page column has that area's one row of tabs, or inside an
+event the event's seven tabs (Event home, Registrations, Check-in,
+Communications, Money, Reports, Event setup). Views inside a tab are a bordered
+button strip of at most five; Payments and Refunds live only under Money. The
+two reserved event tabs, Operations and Safety, are supported by
+`components/staff-event-tabs.ts` but have no route yet, so none is drawn.
 
-Events has a portfolio at `/events-admin` and a separate selected-event
-workspace. Only selected-event work shows an event picker and event operations.
-Clubs and System do not require an event. Workspace switches use the existing
-non-prefetched role routes and unsaved-change guard. The brand still opens
-`/calendar`.
+The area and tab model is `components/staff-areas.ts`. It looks every label and
+route up in the existing registries (`systemNavGroups`, `clubsAdminGroups`,
+`eventsAdminHomeItem`, `navigation`), so a renamed or removed page fails a test
+instead of leaving a dead tab. `components/staff-navigation-model.ts` turns that
+into everything the shell draws (the rail, the row, the phone bar and the More
+sheet), and `tests/mobile-directory-parity.test.ts` reads the same function to
+prove a phone and a desktop reach exactly the same pages. Nothing in it grants
+access: every page keeps its server guard.
 
-The desktop Create menu opens authorized existing event and form tools. It
-does not publish records. Phone placement remains with #1566; this slice
-preserves the existing phone controls. Desktop section headers retain local
-views/anchors and parent links while workspace destinations live in the sidebar.
+Each page belongs to one place for the "where you are" marking, so there is one
+`aria-current="page"` across rail, tabs and views. A page two tabs list is the
+same page: Monthly Records is owned by Clubs and Event administration by Events.
+The Admin tabs Events, Clubs, People, Forms and Catalogs and settings open the
+group's first reachable page until the hub pages exist (#1569).
 
-See [the generated staff route matrix](STAFF-WORKSPACE-ROUTES.md) for all
-page patterns. Regenerate it with `npx tsx docs/generate-staff-workspace-map.ts`
-after changing the existing registries or adding a staff page. Keep URL aliases,
-server guards, search predicates and module states with their current owners.
+Below 1024px, and whenever a row would not fit (a ResizeObserver compares the
+row's width with its line), the row is a menu line: the current tab with its
+underline and an "<Area> menu" or "Event menu" button that opens the full list,
+a sheet on a phone and a dialog on wider screens. Both are in the page, so the
+stylesheet decides without a layout shift, and no row scrolls sideways. "Where
+you are" is the rail's gold everywhere in staff (the rail edge, the 4px tab
+underline, the menu line, the current list item, the phone bar's top bar); the
+club portal keeps purple.
+
+The phone bar is Home (the person's main dashboard, current only on exactly that page), Events, Check-in, Clubs and More, filtered by access. More
+lists "This event" first inside an event, then the other areas and the event's
+tools. The account menu is the workspace switcher: it lists only the workspaces
+the signed-in person holds (`staffWorkspaceOptions`) and needs no second
+sign-in. Linking separate accounts is not part of it.
+
+Events has no "All events" tab yet; staff open an event from the Events row's
+"Open an event" picker and switch from the event bar. Clubs and System do not
+require an event. Every move, including the event pickers and the brand link
+(which opens `/calendar`), goes through the unsaved-changes guard.
+
+The desktop Create menu opens authorized existing event and form tools. It does
+not publish records. Section headers on admin pages keep their local views and
+parent links; the section's tabs are the shell's row.
+
+See [the generated staff route matrix](STAFF-WORKSPACE-ROUTES.md) for the
+old-to-new map of every page pattern, the pages that used to be reached only
+through other pages, and what is left out until built. Regenerate it with
+`npx tsx docs/generate-staff-workspace-map.ts` after changing the existing
+registries or adding a staff page. Keep URL aliases, server guards, search
+predicates and module states with their current owners.
 
 ## Back links
 

@@ -1,0 +1,7 @@
+/* The account menu's workspace switcher (#1565, #108). */
+.workspaces { display: grid; gap: 0; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.heading { color: var(--muted) !important; font-size: max(var(--type-staff-floor, 0px), 0.875rem) !important; font-weight: 800 !important; letter-spacing: 0.04em; text-transform: uppercase; }
+.workspaces a[aria-current="true"] { background: var(--imsda-navy-soft); box-shadow: inset 4px 0 var(--imsda-gold); color: var(--imsda-navy); font-weight: 800; }
+
+/* The header's account button is at least 44px square (C2). */
+button.trigger { width: 44px; height: 44px; }

@@ -2,9 +2,10 @@
 
 import { GuardedLink } from "@/components/guarded-link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRightLeft, CalendarPlus, CircleUserRound, Eye, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRightLeft, CalendarPlus, CircleUserRound, Eye, ShieldCheck, Users, UserRound } from "lucide-react";
 import { SignOutButton } from "@/components/sign-out-button";
-import type { WorkspaceContext } from "@/modules/access/workspace-contexts";
+import styles from "./staff-account-menu.module.css";
+import type { WorkspaceSwitchOption } from "@/modules/access/workspace-contexts";
 
 /** The one profile page for every account (#543): profile, two-step and passkeys. */
 export const PROFILE_HREF = "/profile";
@@ -12,28 +13,27 @@ export const PROFILE_HREF = "/profile";
 /**
  * The staff account popover (#543): name and email, Edit profile (the
  * event-independent `/profile` page, where two-step and passkeys live), the
- * workspace switches decided by `otherWorkspaceContextsForStaff` (#108), and
- * Sign out. It is a disclosure, not an ARIA menu: Escape and outside clicks
+ * workspace switcher (#1565, #108: only the workspaces this person holds, with no
+ * second sign-in; see `staffWorkspaceOptions`), and Sign out. It is a disclosure, not an ARIA menu: Escape and outside clicks
  * close it, and Escape returns focus to the trigger.
  */
 export function StaffAccountMenu({
   attendeePreviewHref,
-  canSwitchToAttendee,
   createEventHref,
   defaultOpen = false,
   displayName,
   email,
-  systemAdminContext,
+  workspaces = [],
 }: {
   attendeePreviewHref: string;
-  canSwitchToAttendee: boolean;
   /** Create event (#966): given only to system administrators, the only people who can open that page. */
   createEventHref?: string;
   /** Render the menu already open (used by render tests). */
   defaultOpen?: boolean;
   displayName: string;
   email: string;
-  systemAdminContext?: WorkspaceContext;
+  /** The workspaces this person holds (`staffWorkspaceOptions`); the switcher shows when there is more than one. */
+  workspaces?: readonly WorkspaceSwitchOption[];
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -67,7 +67,7 @@ export function StaffAccountMenu({
         aria-controls="staff-account-menu"
         aria-expanded={open}
         aria-label="Staff account"
-        className="avatar"
+        className={`avatar ${styles.trigger}`}
         onClick={() => setOpen(!open)}
         ref={triggerRef}
         type="button"
@@ -81,25 +81,35 @@ export function StaffAccountMenu({
             <UserRound aria-hidden="true" size={17} />
             Edit profile
           </GuardedLink>
-          {systemAdminContext && (
-            <GuardedLink className="account-system-link" href={systemAdminContext.href} onNavigate={close}>
-              <ShieldCheck aria-hidden="true" size={17} />
-              {systemAdminContext.label}
-            </GuardedLink>
+          {workspaces.length > 1 && (
+            <div role="group" aria-label="Switch workspace" className={styles.workspaces}>
+              <small className={styles.heading}>Switch workspace</small>
+              {workspaces.map((workspace) => workspace.method === "post" ? (
+                <form action={workspace.href} className="account-switch-form" key={workspace.kind} method="post">
+                  <button className="account-system-link account-switch-button" type="submit">
+                    <ArrowRightLeft aria-hidden="true" size={17} />
+                    {workspace.label}
+                  </button>
+                </form>
+              ) : (
+                <GuardedLink
+                  aria-current={workspace.current ? "true" : undefined}
+                  className="account-system-link"
+                  href={workspace.href}
+                  key={workspace.kind}
+                  onNavigate={close}
+                >
+                  {workspace.kind === "system_admin" ? <ShieldCheck aria-hidden="true" size={17} /> : <Users aria-hidden="true" size={17} />}
+                  {workspace.label}
+                </GuardedLink>
+              ))}
+            </div>
           )}
           {createEventHref && (
             <GuardedLink className="account-system-link" href={createEventHref} onNavigate={close}>
               <CalendarPlus aria-hidden="true" size={17} />
               Create event
             </GuardedLink>
-          )}
-          {canSwitchToAttendee && (
-            <form action="/api/auth/switch-to-attendee" className="account-switch-form" method="post">
-              <button className="account-system-link account-switch-button" type="submit">
-                <ArrowRightLeft aria-hidden="true" size={17} />
-                Switch to my attendee account
-              </button>
-            </form>
           )}
           <GuardedLink className="account-system-link" href={attendeePreviewHref} onNavigate={close}>
             <Eye aria-hidden="true" size={17} />

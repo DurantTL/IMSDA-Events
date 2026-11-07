@@ -307,7 +307,7 @@ async function main() {
 
       // Chrome elements must not take part in print layout at all.
       const hidden = await page.evaluate(() => {
-        const selectors = [".skip-link", ".sidebar", ".workspace-header", ".mobile-nav",
+        const selectors = [".skip-link", "#primary-navigation", "[data-staff-tabs]", "[data-staff-views]", ".app-shell > header", "header[class*='pageHeader']", "div[class*='eventBar']", ".mobile-nav",
           ".badge-print-intro", ".badge-print-controls", ".badge-background-picker",
           ".badge-print-summary", ".act-as-banner", ".event-auto-select-notice",
           ".empty-state"];

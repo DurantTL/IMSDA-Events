@@ -334,23 +334,22 @@ describe("launcher in the shell", () => {
     ),
   );
 
-  it("keeps More last in the sidebar and the phone tabs, as a link that opens the launcher", () => {
+  it("keeps More last in the phone bar, as a link that opens the launcher, and All event tools last in the Event setup views", () => {
     const markup = shell();
-    const nav = markup.slice(markup.indexOf('aria-label="Primary navigation"'), markup.indexOf('class="sidebar-foot"'));
-    expect(nav.lastIndexOf("/more?event=event_1")).toBeGreaterThan(nav.lastIndexOf("/communications?event=event_1"));
-    expect(nav).toContain('aria-haspopup="dialog"');
-    expect(nav).toContain('aria-expanded="false"');
+    // Desktop: no sidebar and no More item; the /more directory is the Event setup tab's "All event tools" view.
+    expect(markup).not.toContain('class="sidebar"');
+    expect(markup).toContain('href="/more?event=event_1"');
     const tabs = markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
-    expect(tabs.match(/<a /g)).toHaveLength(6);
-    expect(tabs.lastIndexOf("/more?event=event_1")).toBeGreaterThan(tabs.lastIndexOf("/communications?event=event_1"));
+    expect(tabs.match(/<a /g)).toHaveLength(3);
+    expect(tabs.lastIndexOf("/more?event=event_1")).toBeGreaterThan(tabs.lastIndexOf("/check-in?event=event_1"));
     expect(tabs).toContain('aria-haspopup="dialog"');
   });
 
-  it("renders the launcher closed, and keeps the sidebar collapse button", () => {
+  it("renders the launcher closed, and has no sidebar collapse button", () => {
     const markup = shell();
     expect(markup).not.toContain('role="dialog"');
-    expect(markup).toContain("sidebar-toggle");
-    expect(markup).toContain("Collapse sidebar");
+    expect(markup).not.toContain("sidebar-toggle");
+    expect(markup).not.toContain("Collapse sidebar");
   });
 
   it("no longer pins the club directory in the sidebar", () => {
@@ -467,12 +466,12 @@ describe("launcher search and sidebar duplicates (#967)", () => {
     const markup = renderToStaticMarkup(
       createElement(MoreLauncherPanel, { cards, sidebarHrefs: sidebarHrefsFor(["MANAGE_FORMS"]), isSystemAdmin: false, eventQuery: "?event=event_1", variant: "sidebar" }),
     );
-    expect(markup).toContain("Everything you can open is in the sidebar.");
+    expect(markup).toContain("Everything you can open is in the menus.");
     expect(markup).not.toContain("data-card=");
     // The phone sheet has no sidebar, so it lists the card and shows no such line.
     const phone = renderToStaticMarkup(createElement(MoreLauncherPanel, { cards, isSystemAdmin: false, eventQuery: "?event=event_1", variant: "tab" }));
     expect(phone).toContain('data-card="registration-builder"');
-    expect(phone).not.toContain("Everything you can open is in the sidebar.");
+    expect(phone).not.toContain("Everything you can open is in the menus.");
   });
 
   it("drops footer links that are sidebar items on desktop by exact path, and keeps every footer link on the phone", () => {
@@ -491,11 +490,26 @@ describe("launcher search and sidebar duplicates (#967)", () => {
     expect(render("tab")).toContain('data-footer="event-modules"');
   });
 
-  it("passes the drawn sidebar hrefs to the sidebar launcher only, never the phone tab", () => {
-    const source = readFileSync("components/app-shell.tsx", "utf8");
-    expect(source.match(/sidebarHrefs=/g)).toHaveLength(1);
-    const sidebarUse = source.indexOf("sidebarHrefs=");
-    expect(source.lastIndexOf('variant="sidebar"', sidebarUse)).toBeGreaterThan(source.lastIndexOf('variant="tab"', sidebarUse));
-    expect(source).toContain("must stay exactly what is drawn");
+  it("uses the launcher only as the phone More sheet, with This event first (#1565)", () => {
+    const shellSource = readFileSync("components/app-shell.tsx", "utf8");
+    expect(shellSource).not.toContain("<MoreLauncher");
+    expect(shellSource).not.toContain("sidebarHrefs");
+    const bar = readFileSync("components/staff-phone-bar.tsx", "utf8");
+    expect(bar).toContain('variant="tab"');
+    expect(bar).not.toContain('variant="sidebar"');
+    expect(bar).not.toContain("sidebarHrefs");
+    const sections = renderToStaticMarkup(createElement(MoreLauncherPanel, {
+      cards: [],
+      sections: [
+        { key: "this-event", label: "This event", items: [{ key: "home", label: "Event home", href: "/overview?event=event_1", current: true }] },
+        { key: "areas", label: "Areas", items: [{ key: "reports", label: "Reports", href: "/admin/analytics" }] },
+      ],
+      isSystemAdmin: false,
+      eventQuery: "?event=event_1",
+      variant: "tab",
+    }));
+    expect(sections.indexOf("This event")).toBeGreaterThan(-1);
+    expect(sections.indexOf("This event")).toBeLessThan(sections.indexOf("Areas"));
+    expect(sections).toContain('aria-current="true"');
   });
 });

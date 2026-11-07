@@ -340,9 +340,11 @@ describe("print and placement", () => {
     expect(hideLists.some((list) => list.includes(".destination-search"))).toBe(true);
   });
 
-  it("hides the sidebar copy when the sidebar is collapsed, leaving an icon button", () => {
-    expect(css).toMatch(/html\[data-sidebar="collapsed"\] \.sidebar \.destination-search \{ display: none; \}/);
-    expect(css).toMatch(/html\[data-sidebar="collapsed"\] \.sidebar-search-button \{ display: flex;/);
+  it("keeps the staff shell's header hidden in print and its search out of the phone header (#1565)", () => {
+    const shellCss = readFileSync(join(process.cwd(), "components/staff-shell.module.css"), "utf8");
+    expect(shellCss).toMatch(/@media print \{[^}]*\.topbar[^}]*display: none !important/);
+    // On a phone the search lives in the More sheet, so the header hides it.
+    expect(shellCss).toMatch(/@media \(max-width: 800px\) \{[\s\S]*\.search \{ display: none; \}/);
   });
 });
 
@@ -357,19 +359,15 @@ describe("shell wiring", () => {
   );
   const staff = { displayName: "Synthetic Staff", email: "staff@imsda-events.test", globalRole: null };
 
-  it("draws the search in the sidebar above the navigation, not in the page content", () => {
+  it("draws the search in the header above the rail and the page, not in the page content", () => {
     const markup = render(staff);
     expect(markup.match(/role="combobox"/g)).toHaveLength(1);
-    expect(markup.indexOf('role="search"')).toBeLessThan(markup.indexOf('<nav class="primary-nav"'));
-    expect(markup.indexOf('role="search"')).toBeGreaterThan(markup.indexOf('<aside class="sidebar"'));
-    expect(markup.indexOf('role="search"')).toBeLessThan(markup.indexOf("</aside>"));
+    expect(markup.indexOf('role="search"')).toBeGreaterThan(markup.indexOf("<header"));
+    expect(markup.indexOf('role="search"')).toBeLessThan(markup.indexOf("</header>"));
+    expect(markup.indexOf('role="search"')).toBeLessThan(markup.indexOf('id="primary-navigation"'));
     expect(markup.slice(markup.indexOf('id="workspace-content"'))).not.toContain("destination-search");
-  });
-
-  it("gives the collapsed sidebar a labelled button that reaches the field", () => {
-    const markup = render(staff);
-    expect(markup).toMatch(/<button[^>]*class="sidebar-search-button"[^>]*aria-label="Find a page or task"|<button[^>]*aria-label="Find a page or task"[^>]*class="sidebar-search-button"/);
     expect(markup).toContain('id="destination-search-input"');
+    expect(markup).toContain("Find a page or task");
   });
 
   it("puts the search in the phone More sheet only, not in the desktop popover", () => {

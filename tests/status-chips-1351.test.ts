@@ -42,9 +42,8 @@ describe("a record waiting for approval says the approved word (B12, #1506)", ()
     expect(Object.values(SCHEDULED_EMAIL_STATUS_LABELS)).not.toContain("Waiting for approval");
   });
 
-  it("keeps the registration card's status and the staff pills on the shared chip and badge", () => {
+  it("keeps the registration card's status and the portal counts on the shared chip and badge", () => {
     expect(read("components/account-registration-card.tsx")).toContain("status-chip ${REGISTRATION_STATUS_CHIP_TONE");
-    expect(read("components/app-shell.tsx")).toContain('className="count-badge staff-pill"');
     expect(read("app/(public)/account/(portal)/registrations/page.tsx")).toContain('<span className="count-badge">({counts[key]})</span>');
   });
 });

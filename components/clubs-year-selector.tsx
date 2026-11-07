@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { GetFilterForm } from "@/components/get-filter-form";
+import styles from "./clubs-year-selector.module.css";
 import { clubYearSelectorModel } from "@/components/clubs-year-selector-model";
 
 /**
@@ -16,10 +17,10 @@ export function ClubsYearSelector() {
   const model = clubYearSelectorModel(pathname, searchParams.get("year"), now, searchParams);
   return (
     // Keyed by the selected year, so the select follows the URL after a navigation.
-    <GetFilterForm className="clubs-year-form" action={model.action} key={model.selected}>
+    <GetFilterForm className={styles.form} data-clubs-year-form action={model.action} key={model.selected}>
       <label htmlFor="clubs-year-select">Club year</label>
       {model.carry.map(([name, value]) => <input type="hidden" name={name} value={value} key={name} />)}
-      <div className="clubs-year-controls">
+      <div className={styles.controls}>
         <select
           id="clubs-year-select"
           name="year"

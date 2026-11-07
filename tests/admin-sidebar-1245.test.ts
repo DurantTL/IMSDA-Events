@@ -6,8 +6,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * #1245: the admin sidebars, trimmed and grouped, every group closed until opened. View-only: pages keep their own
- * gates. Synthetic data only.
+ * #1245: the admin destinations, trimmed and grouped (the registries behind the Clubs and Admin tab rows since #1565).
+ * View-only: pages keep their own gates. Synthetic data only.
  */
 
 const navigation = vi.hoisted(() => ({ pathname: "/admin", search: "" }));
@@ -40,14 +40,15 @@ const staff = { displayName: "Synthetic Staff", email: "staff@imsda-events.test"
 const admin = { ...staff, globalRole: "SYSTEM_ADMIN" as const };
 const render = (props: Partial<Parameters<typeof AppShell>[0]> & { user: typeof staff | typeof admin }) =>
   renderToStaticMarkup(createElement(ShellElement, { events, defaultEventId: "evt_one", ...props }, createElement("p", null, "content")));
-const sidebarOf = (markup: string) => {
-  const start = markup.indexOf('<nav class="primary-nav"');
-  return markup.slice(start, markup.indexOf("</nav>", start));
+/** The one row of tabs, and the view strip under it. */
+const tabsOf = (markup: string) => {
+  const start = markup.indexOf('data-staff-tabs="true"');
+  const strip = markup.indexOf("data-staff-views");
+  return markup.slice(start, strip > start ? markup.indexOf("</div>", strip) : markup.indexOf("</nav>", start));
 };
-const toggle = (nav: string, key: string) => new RegExp(`id="nav-group-${key}-toggle"[^>]*aria-expanded="(true|false)"|aria-expanded="(true|false)"[^>]*id="nav-group-${key}-toggle"`).exec(nav);
-const expanded = (nav: string, key: string) => {
-  const match = toggle(nav, key);
-  return (match?.[1] ?? match?.[2]) === "true";
+const currentOf = (markup: string) => {
+  const row = tabsOf(markup);
+  return [...row.slice(0, row.indexOf("</nav>")).matchAll(/<a aria-current="(?:page|true)"[^>]*>([^<]+)</g)].map((match) => match[1]);
 };
 
 beforeEach(() => {
@@ -56,7 +57,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-describe("the System sidebar", () => {
+describe("the System destinations", () => {
   const items = systemNavGroups.flatMap((group) => group.items);
 
   it("lists no destination twice", () => {
@@ -87,22 +88,13 @@ describe("the System sidebar", () => {
     expect(rows.map((row) => row.label)).toEqual(["Conference calendar"]);
   });
 
-  it("starts every group closed, except the one holding the current page", () => {
-    const closed = sidebarOf(render({ user: admin }));
-    for (const group of systemNavGroups) expect(expanded(closed, group.key), group.key).toBe(false);
-    navigation.pathname = "/admin/people";
-    const onTeam = sidebarOf(render({ user: admin }));
-    expect(expanded(onTeam, "system-people")).toBe(true);
-    expect(expanded(onTeam, "system-events")).toBe(false);
-  });
-
   it("keeps collapsedByDefault for the dashboard only", () => {
     expect(readFileSync(join(process.cwd(), "components/app-shell.tsx"), "utf8")).not.toContain("collapsedByDefault");
     expect(readFileSync(join(process.cwd(), "app/(workspace)/admin/page.tsx"), "utf8")).toContain("group.collapsedByDefault");
   });
 });
 
-describe("the Clubs sidebar groups", () => {
+describe("the Clubs destination groups", () => {
   it("has the Clubs Administrator's groups, in order, with page-title labels", () => {
     expect(clubsAdminHomeItem).toMatchObject({ href: "/admin/clubs", label: "Club administration" });
     expect(clubsAdminGroups.map((group) => [group.key, group.label])).toEqual([
@@ -143,45 +135,43 @@ describe("the Clubs sidebar groups", () => {
     expect(clubsAdminActiveHref("/admin/clubs/reports", "points")).toBe("/admin/clubs/summary?view=records#monthly-records");
   });
 
-  it("keeps the phone Clubs bar lit on the Points and Events views (#1304)", () => {
+  it("lights Club summary, Points and Club events on their views, one tab and one place (#1304, #1565)", () => {
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
     const phone = (markup: string) => markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
-    for (const search of ["view=points", "view=events", "view=records"]) {
+    const lit: Record<string, string[]> = { "view=events": ["Club summary"], "view=points": ["Points"], "view=records": ["Monthly Records"] };
+    for (const [search, tab] of Object.entries(lit)) {
       navigation.pathname = "/admin/clubs/summary"; navigation.search = search;
-      const bar = phone(render({ user: staff, adminRoleView: view }));
-      expect(bar.match(/aria-current="page"/g), search).toHaveLength(1);
-      expect(bar).toMatch(/aria-current="page"(?:(?!<\/a>)[^])*Club summary/);
+      const markup = render({ user: staff, adminRoleView: view });
+      // Points is in the Reports row, so the page is in Reports and the Clubs row is not drawn; the rest stay in Clubs.
+      if (search === "view=points") expect(markup).toContain('aria-label="Reports"');
+      else expect(currentOf(markup), search).toEqual(tab);
+      // Exactly one phone item is lit: Clubs for the Clubs pages, More for Points (a Reports page, no bar item of its own).
+      expect(phone(markup).match(/aria-current="(?:page|true)"/g) ?? [], search).toHaveLength(1);
     }
   });
 
-  it("lights Club summary on the phone bar and Monthly Records in the sidebar on the review pages (#1552)", () => {
+  it("lights Monthly Records on the review pages, in the tab row and with the Clubs item on the phone (#1552)", () => {
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
-    const phone = (markup: string) => markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
     for (const path of ["/admin/clubs/reports", "/admin/clubs/reports/club-1/2026-10"]) {
       navigation.pathname = path; navigation.search = "";
       const markup = render({ user: staff, adminRoleView: view });
-      const bar = phone(markup);
-      expect(bar.match(/aria-current="page"/g), path).toHaveLength(1);
-      expect(bar, path).toMatch(/aria-current="page"(?:(?!<\/a>)[^])*Club summary/);
-      expect(sidebarOf(markup), path).toMatch(/aria-current="page"[^>]*href="\/admin\/clubs\/summary\?view=records#monthly-records"|href="\/admin\/clubs\/summary\?view=records#monthly-records"[^>]*aria-current="page"/);
+      expect(currentOf(markup), path).toEqual(["Monthly Records"]);
+      expect(markup.slice(markup.indexOf('aria-label="Mobile navigation"')), path).toMatch(/class="active"[^>]*href="\/admin\/clubs"/);
     }
   });
 
-  it("draws the groups closed, opens the one holding the page, and keeps the health import rule", () => {
+  it("draws the Clubs row with its views, and keeps the health import rule", () => {
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
     navigation.pathname = "/admin/clubs";
-    const home = sidebarOf(render({ user: staff, adminRoleView: view }));
-    for (const group of clubsAdminGroups) {
-      expect(toggle(home, group.key), group.key).not.toBeNull();
-      expect(expanded(home, group.key), group.key).toBe(false);
-    }
+    const home = tabsOf(render({ user: staff, adminRoleView: view }));
+    for (const label of ["Club administration", "Club summary", "New club applications", "Club leaders", "Club member transfers", "Monthly Records"]) expect(home).toContain(`>${label}`);
+    expect(home).not.toContain("Clubs and churches");
     expect(home).toContain('aria-current="page" href="/admin/clubs"');
+    // The Clubs Administrator's imports and Sterling Volunteers are views of Club administration, so none lost its home.
+    for (const href of ["/admin/clubs/import", "/admin/clubs/health-import", "/admin/organizations/background-checks"]) expect(home).toContain(`href="${href}"`);
     navigation.pathname = "/admin/clubs/invites";
-    const invites = sidebarOf(render({ user: staff, adminRoleView: view }));
-    expect(expanded(invites, "clubs-applications")).toBe(true);
-    expect(expanded(invites, "clubs-clubs")).toBe(false);
-    expect(home).toContain("/admin/clubs/health-import");
-    const off = sidebarOf(render({ user: staff, adminRoleView: { ...view, healthImport: false } }));
+    expect(currentOf(render({ user: staff, adminRoleView: view }))).toEqual(["New club applications"]);
+    const off = tabsOf(render({ user: staff, adminRoleView: { ...view, healthImport: false } }));
     expect(off).not.toContain("/admin/clubs/health-import");
   });
 
@@ -194,9 +184,10 @@ describe("the Clubs sidebar groups", () => {
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {} };
     navigation.pathname = "/admin/clubs";
     navigation.search = "year=2025-26";
-    const nav = sidebarOf(render({ user: staff, adminRoleView: view }));
-    expect(nav).toContain('href="/admin/clubs/summary?view=points&amp;year=2025-26#points"');
-    expect(nav).toContain('href="/admin/honors"');
+    const nav = tabsOf(render({ user: staff, adminRoleView: view }));
+    expect(nav).toContain('href="/admin/clubs/summary?year=2025-26"');
+    expect(nav).toContain('href="/admin/clubs/summary?view=records&amp;year=2025-26#monthly-records"');
+    expect(nav).toContain('href="/admin/clubs/leaders"');
   });
 });
 
@@ -239,31 +230,30 @@ describe("the club year selector", () => {
     expect(clubYearSelectorModel("/admin/clubs", "2019-20", now).options).toContain("2019-20");
   });
 
-  it("is a real GET form with a labelled select and a submit button in the Clubs view only", () => {
+  it("is a real GET form with a labelled select and a submit button on the Clubs tab line only", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-27T15:00:00.000Z"));
     navigation.pathname = "/admin/clubs/reports";
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {} };
     const html = render({ user: staff, adminRoleView: view });
-    expect(html).toContain('<form class="clubs-year-form" action="/admin/clubs/reports" method="get">');
+    expect(html).toContain('<form data-clubs-year-form="true"');
     expect(html).toContain('<label for="clubs-year-select">Club year</label>');
     expect(html).toMatch(/<select id="clubs-year-select" name="year">/);
     expect(html).toContain('<option value="2026-27" selected="">2026-27</option>');
     expect(html).toMatch(/<button type="submit">Show<\/button>/);
-    expect(render({ user: admin })).not.toContain("clubs-year-form");
+    navigation.pathname = "/admin/people";
+    expect(render({ user: admin })).not.toContain("data-clubs-year-form");
   });
 
-  it("hides the dashboard's own year form only above 800px and keeps 44px targets", () => {
+  it("hides the dashboard's own year form wherever the shell has one, and keeps 44px targets", () => {
     const pageCss = readFileSync(join(process.cwd(), "app/(workspace)/admin/clubs/admin-clubs.module.css"), "utf8");
-    expect(pageCss).toMatch(/@media \(min-width: 801px\) \{[^}]*\.yearForm \{ display: none; \}/);
-    const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
-    const block = css.slice(css.indexOf("The club year picker in the Clubs sidebar (#1245)"), css.indexOf("/* Registration form builder editor shell (#1132)"));
-    expect(block.length).toBeGreaterThan(100);
-    expect(block).toMatch(/\.clubs-year-controls select \{[^}]*min-height: 44px/);
-    expect(block).toMatch(/\.clubs-year-controls button \{[^}]*min-height: 44px/);
+    expect(pageCss).toMatch(/:global\(\.app-shell:has\(\[data-clubs-year-form\]\)\) \.yearForm \{ display: none; \}/);
+    const block = readFileSync(join(process.cwd(), "components/clubs-year-selector.module.css"), "utf8");
+    expect(block).toMatch(/\.controls select \{[^}]*min-height: 44px/);
+    expect(block).toMatch(/\.controls button \{[^}]*min-height: 44px/);
     expect(block).not.toContain(":hover");
-    expect(css).toMatch(/\.nav-group-toggle \{[^}]*min-height: 44px/);
   });
+
 });
 
 describe("Find a page or task in the Clubs view", () => {
@@ -301,23 +291,25 @@ describe("Find a page or task in the Clubs view", () => {
   });
 });
 
-describe("the Events view sidebar", () => {
-  const view = { held: ["EVENTS_ADMIN" as const, "SYSTEM_ADMIN" as const], active: "EVENTS_ADMIN" as const, counts: {} };
+describe("the Events row", () => {
+  const view = { held: ["EVENTS_ADMIN" as const], active: "EVENTS_ADMIN" as const, counts: {} };
 
-  it("starts with an Event administration link that lights on /events-admin", () => {
+  it("opens with Event administration, lit on /events-admin", () => {
     navigation.pathname = "/events-admin";
-    const nav = sidebarOf(render({ user: staff, adminRoleView: view }));
-    expect(nav.indexOf("Event administration")).toBeGreaterThan(-1);
-    expect(nav).toMatch(/^<nav class="primary-nav"[^>]*><a class="nav-item active" aria-current="page" href="\/events-admin">/);
+    const row = tabsOf(render({ user: staff, adminRoleView: view }));
+    expect(row).toContain('<a aria-current="page" href="/events-admin?event=evt_one">Event administration');
+    expect(currentOf(render({ user: staff, adminRoleView: view }))).toEqual(["Event administration"]);
+    // Inside an event the event tabs replace the area's row.
     navigation.pathname = "/overview";
-    expect(sidebarOf(render({ user: staff, adminRoleView: view }))).toMatch(/^<nav class="primary-nav"[^>]*><a class="nav-item" href="\/events-admin">/);
+    expect(tabsOf(render({ user: staff, adminRoleView: view }))).not.toContain('href="/events-admin"');
   });
 
-  it("is not drawn in any other view", () => {
-    for (const active of ["SYSTEM_ADMIN", "CLUBS_ADMIN"] as const) {
-      expect(sidebarOf(render({ user: staff, adminRoleView: { ...view, held: ["EVENTS_ADMIN", "SYSTEM_ADMIN", "CLUBS_ADMIN"], active } }))).not.toContain('href="/events-admin"');
+  it("is not drawn for a person without the Events Administrator role", () => {
+    navigation.pathname = "/overview";
+    for (const held of [["CLUBS_ADMIN"], []] as const) {
+      const markup = render({ user: staff, adminRoleView: held.length ? { held: [...held], active: held[0], counts: {} } : null });
+      expect(markup).not.toContain('href="/events-admin"');
     }
-    expect(sidebarOf(render({ user: staff }))).not.toContain('href="/events-admin"');
     expect(staffSubpageTitle("/events-admin")).toBe("Event administration");
   });
 });
