@@ -408,6 +408,12 @@ const pages: PageSpec[] = [
   staff("registration-builder", "/registration-builder"),
   // Staff, as a system administrator.
   staff("system-home", "/admin", "system-admin"),
+  // The Admin hub pages (#1569): key numbers, one main action, then every destination as a card with its live status.
+  { ...staff("admin-hub-events", "/admin/hubs/events", "system-admin"), expectText: /Start something/ },
+  { ...staff("admin-hub-clubs", "/admin/hubs/clubs", "system-admin"), expectText: /Directory/ },
+  { ...staff("admin-hub-people", "/admin/hubs/people", "system-admin"), expectText: /Health records/ },
+  { ...staff("admin-hub-forms", "/admin/hubs/forms", "system-admin"), expectText: /Building blocks/ },
+  { ...staff("admin-hub-catalogs", "/admin/hubs/catalogs", "system-admin"), expectText: /Website and email/ },
   // Break-glass and legal holds (#1617). The audit server runs with HEALTH_RECORDS_ENABLED off, so the page skips the
   // acknowledgment gate and shows the real grants and holds.
   { ...staff("health-access", "/admin/health-access", "system-admin"), expectText: /Legal holds/ },
