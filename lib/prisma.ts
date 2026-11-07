@@ -1,13 +1,15 @@
 import { PrismaClient } from "@prisma/client";
 import { getServerEnv } from "@/lib/env";
+import { withClubsAdministratorMarker } from "@/modules/audit/clubs-administrator-marker";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 /**
  * The app's database client. Every audit row written through it, in a transaction or not, gets the Clubs Administrator
- * marker when it applies (#1643, `modules/audit/clubs-administrator-marker.ts`). The marker's lookups run on the plain
- * client below, outside the caller's transaction. The extended client is typed as `PrismaClient`: the extension changes
- * what two writes store and nothing else.
+ * marker when it applies (#1643, `modules/audit/clubs-administrator-marker.ts`). The marker makes no database query: it
+ * reads what the permission lookup recorded for the request, so it never needs a second pool connection inside a
+ * caller's transaction. The extended client is typed as `PrismaClient` for the rest of the app: the extension changes what
+ * two writes store and nothing else, but `$on` and `$use` are not available on an extended client, so code must not call them.
  */
 function createClient(): PrismaClient {
   const base = new PrismaClient({
@@ -17,14 +19,10 @@ function createClient(): PrismaClient {
     query: {
       auditLog: {
         async create({ args, query }) {
-          const { withClubsAdministratorMarker } = await import("@/modules/audit/clubs-administrator-marker");
-          return query({ ...args, data: await withClubsAdministratorMarker(args.data, base) });
+          return query({ ...args, data: withClubsAdministratorMarker(args.data) });
         },
         async createMany({ args, query }) {
-          const { withClubsAdministratorMarker } = await import("@/modules/audit/clubs-administrator-marker");
-          const rows = Array.isArray(args.data) ? args.data : [args.data];
-          const marked = await Promise.all(rows.map((row) => withClubsAdministratorMarker(row, base)));
-          return query({ ...args, data: Array.isArray(args.data) ? marked : marked[0] });
+          return query({ ...args, data: Array.isArray(args.data) ? args.data.map((row) => withClubsAdministratorMarker(row)) : withClubsAdministratorMarker(args.data) });
         },
       },
     },

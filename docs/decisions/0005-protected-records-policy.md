@@ -439,12 +439,17 @@ birth dates need their own protection.
    coordinator health view (`VIEW_HEALTH_INFORMATION`, Addendum C) and finalizing
    an invoice (`FINALIZE_INVOICES`) are still granted one staff assignment at a
    time by a system administrator, and creating, copying or deleting events and
-   system settings stay with system administrators. Every audit row
-   written for a club event by a Clubs Administrator who holds no real Event
-   Administrator assignment on it (and is not a system administrator) carries
-   `actorRole: CLUBS_ADMINISTRATOR` in its metadata, like the club areas. The
-   database client adds it to every audit write, whichever repository writes
-   the row, and an `actorRole` a caller already set is kept. The Events
+   system settings stay with system administrators. An audit row
+   written for a club event carries `actorRole: CLUBS_ADMINISTRATOR` in its
+   metadata, like the club areas, in every request where the person's access to
+   that event was checked through this role (an active grant, not a system
+   administrator, no real Event Administrator assignment on it). The permission
+   check remembers that for the request and the database client adds the marker to
+   every audit write for that person and event, whichever repository writes the
+   row, with no extra query (so it cannot hold up a transaction). It is kept for
+   route handlers that run inside the request context and for server components
+   and actions within one render; a write outside those (a script or background
+   job) is not marked. An `actorRole` a caller already set is kept. The Events
    Administrator surfaces (the Events Administrator dashboard, its sidebar pill
    and the Events header) stay keyed to real Event Administrator assignments by
    design, so they do not appear for this role; Club administration remains a

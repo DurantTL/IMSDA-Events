@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -62,6 +64,8 @@ import { requirePermission, effectivePermissions, AccessDeniedError, type Sessio
 import { clubsAdministratorPermissions, findEffectiveMembership } from "@/modules/access/club-event-access";
 import { listActiveEventPermissionsForUser, listActiveEventRolesForUser } from "@/modules/access/membership-repository";
 import { eventPermissions, rolePermissions } from "@/modules/access/permissions";
+import { wasClubsAdministratorAccess } from "@/lib/clubs-administrator-access-record";
+import { runWithRequestScopedSet } from "@/lib/request-scoped-set";
 import { withClubsAdministratorMarker } from "@/modules/audit/clubs-administrator-marker";
 import { findActiveMembership } from "@/modules/events/repository";
 
@@ -157,41 +161,61 @@ describe("event permissions for a Clubs Administrator (#1643)", () => {
 });
 
 describe("the audit marker (#1643)", () => {
-  const mark = (row: Record<string, unknown>) => withClubsAdministratorMarker(row, fakeClient() as never);
   const row = (eventId: string | undefined, actorUserId: string | undefined, metadata?: unknown) => ({ eventId, actorUserId, action: "X", entityType: "Event", summary: "s", metadata });
+  const inRequest = <T>(run: () => T) => runWithRequestScopedSet(run);
 
-  it("records actorRole CLUBS_ADMINISTRATOR for an action on a club event reached through the role", async () => {
-    expect((await mark(row(CLUB, clubsAdmin.id, { field: "capacity" }))).metadata).toEqual({ field: "capacity", actorRole: "CLUBS_ADMINISTRATOR" });
+  it("marks a row whose actor and event match an access the lookup recorded in this request", async () => {
+    await inRequest(async () => {
+      await findActiveMembership(clubsAdmin.id, CLUB);
+      expect(withClubsAdministratorMarker(row(CLUB, clubsAdmin.id, { field: "capacity" })).metadata).toEqual({ field: "capacity", actorRole: "CLUBS_ADMINISTRATOR" });
+      expect(withClubsAdministratorMarker(row(CLUB, clubsAdmin.id))).toEqual({ ...row(CLUB, clubsAdmin.id), metadata: { actorRole: "CLUBS_ADMINISTRATOR" } });
+    });
   });
 
-  it("adds the marker when the row had no metadata, and keeps the rest of the row", async () => {
-    expect(await mark(row(CLUB, clubsAdmin.id))).toEqual({ ...row(CLUB, clubsAdmin.id), metadata: { actorRole: "CLUBS_ADMINISTRATOR" } });
+  it("does not mark a different event, a different actor, a row with no event or actor, or a request that recorded nothing", async () => {
+    await inRequest(async () => {
+      await findActiveMembership(clubsAdmin.id, CLUB);
+      expect(withClubsAdministratorMarker(row(CAMP, clubsAdmin.id, { a: 1 })).metadata).toEqual({ a: 1 });
+      expect(withClubsAdministratorMarker(row(CLUB, "user-plain", { a: 2 })).metadata).toEqual({ a: 2 });
+      expect(withClubsAdministratorMarker(row(undefined, clubsAdmin.id, { a: 3 })).metadata).toEqual({ a: 3 });
+      expect(withClubsAdministratorMarker(row(CLUB, undefined)).metadata).toBeUndefined();
+    });
+    await inRequest(async () => {
+      expect(withClubsAdministratorMarker(row(CLUB, clubsAdmin.id, { a: 4 })).metadata).toEqual({ a: 4 });
+    });
   });
 
-  it("does not mark a non-club event, a system administrator, a revoked grant, or a real event administrator", async () => {
-    const out: unknown[] = [];
-    out.push((await mark(row(CAMP, clubsAdmin.id, { a: 1 }))).metadata);
-    db.users[0].globalRole = "SYSTEM_ADMIN";
-    out.push((await mark(row(CLUB, clubsAdmin.id, { a: 2 }))).metadata);
-    db.users[0].globalRole = null;
-    db.grants[0].revokedAt = new Date();
-    out.push((await mark(row(CLUB, clubsAdmin.id, { a: 3 }))).metadata);
-    db.grants[0].revokedAt = null;
-    db.memberships = [{ eventId: CLUB, userId: clubsAdmin.id, role: "EVENT_ADMIN", status: "ACTIVE", permissions: [] }];
-    out.push((await mark(row(CLUB, clubsAdmin.id, { a: 4 }))).metadata);
-    expect(out).toEqual([{ a: 1 }, { a: 2 }, { a: 3 }, { a: 4 }]);
+  it("does not leak between requests, and writes unmarked with no store", async () => {
+    await inRequest(() => findActiveMembership(clubsAdmin.id, CLUB));
+    await inRequest(async () => expect(withClubsAdministratorMarker(row(CLUB, clubsAdmin.id)).metadata).toBeUndefined());
+    // Outside a request and outside a React render nothing is kept.
+    await findActiveMembership(clubsAdmin.id, CLUB);
+    expect(withClubsAdministratorMarker(row(CLUB, clubsAdmin.id)).metadata).toBeUndefined();
   });
 
-  it("keeps an actorRole already set, and rows with no event or actor", async () => {
-    expect((await mark(row(CLUB, clubsAdmin.id, { actorRole: "CLUBS_ADMINISTRATOR", n: 1 }))).metadata).toEqual({ actorRole: "CLUBS_ADMINISTRATOR", n: 1 });
-    expect((await mark(row(undefined, clubsAdmin.id, { n: 2 }))).metadata).toEqual({ n: 2 });
-    expect((await mark(row(CLUB, undefined))).metadata).toBeUndefined();
+  it("records nothing for a non-club event, a revoked grant, a system administrator's own lookup, or a real event administrator", async () => {
+    await inRequest(async () => {
+      await findActiveMembership(clubsAdmin.id, CAMP);
+      db.grants[0].revokedAt = new Date();
+      await findActiveMembership(clubsAdmin.id, CLUB);
+      db.grants[0].revokedAt = null;
+      db.memberships = [{ eventId: CLUB, userId: clubsAdmin.id, role: "EVENT_ADMIN", status: "ACTIVE", permissions: [] }];
+      await findActiveMembership(clubsAdmin.id, CLUB);
+      expect(wasClubsAdministratorAccess(clubsAdmin.id, CAMP)).toBe(false);
+      expect(wasClubsAdministratorAccess(clubsAdmin.id, CLUB)).toBe(false);
+    });
   });
 
-  it("writes the row unmarked when the lookup fails", async () => {
-    const broken = { clubsAdministratorGrant: { findFirst: async () => { throw new Error("lookup failed"); } } };
-    const input = row(CLUB, clubsAdmin.id, { n: 3 });
-    expect(await withClubsAdministratorMarker(input, broken as never)).toBe(input);
+  it("keeps an actorRole already set", async () => {
+    await inRequest(async () => {
+      await findActiveMembership(clubsAdmin.id, CLUB);
+      expect(withClubsAdministratorMarker(row(CLUB, clubsAdmin.id, { actorRole: "SOMETHING", n: 1 })).metadata).toEqual({ actorRole: "SOMETHING", n: 1 });
+    });
+  });
+
+  it("makes no database query", () => {
+    const source = readFileSync(join(process.cwd(), "modules/audit/clubs-administrator-marker.ts"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(source).not.toMatch(/getPrisma|await |client\.|async /);
   });
 });
 
