@@ -2,6 +2,9 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
+import { hasApprovedReconciliation } from "@/modules/attendance-reconciliation/repository";
+import { getBillingResponsibilityView } from "@/modules/billing-responsibility/repository";
+import { countOpenInvoiceDrafts } from "@/modules/invoices/repository";
 import { listPolicyVersions } from "@/modules/cancellation-policy/repository";
 import { reconcileRegistrationLedger } from "@/modules/ledger/reconciliation";
 import { countOpenChurchSponsorFlags } from "@/modules/promo-codes/church-sponsor-lodging";
@@ -28,6 +31,8 @@ function shared<T>(context: Context, key: string, read: () => Promise<T>): Promi
 
 const policy = (context: Context) => shared(context, "policy", () => listPolicyVersions(context.eventId, context.now));
 
+const billing = (context: Context) => shared(context, "billing", () => getBillingResponsibilityView(context.eventId));
+
 const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
   // The Payments page's notice and the Owed by churches page read the same open flags.
   churchFlags: ({ eventId }) => countOpenChurchSponsorFlags(eventId),
@@ -36,8 +41,12 @@ const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
   policyVersions: async (context) => (await policy(context)).versions.length,
   // A version that is saved but unreadable, or starts later, is not "in effect".
   policyInEffect: async (context) => ((await policy(context)).inEffectVersionId ? 1 : 0),
-  // The Invoices report's own draft count.
-  draftInvoices: ({ eventId }) => getPrisma().invoiceVersion.count({ where: { eventId, status: "DRAFT" } }),
+  // The Invoices page's own draft count (church promo-code invoices are left out, as there).
+  draftInvoices: ({ eventId }) => countOpenInvoiceDrafts(eventId),
+  // The Billing responsibility page's own counts, from one read.
+  billingUnrecorded: async (context) => (await billing(context)).unrecordedCount,
+  billingOutdated: async (context) => (await billing(context)).outdatedCount,
+  attendanceApproved: async ({ eventId }) => ((await hasApprovedReconciliation(eventId)) ? 1 : 0),
   // Exact server cents, as the Scholarship fund page shows its balance.
   scholarshipBalanceCents: async ({ eventId }) => (await getFundView(eventId)).summary.balanceCents,
 };

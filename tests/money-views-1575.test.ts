@@ -4,7 +4,6 @@ import { staffPageTitles, navigation, staffSubpageTitle } from "@/components/sta
 import type { EventPermission } from "@/modules/access/permissions";
 import {
   buildMoneyToolsView,
-  canOpenMoneyTools,
   moneyToolPaths,
   neededMoneyMetrics,
   type MoneyMetricKey,
@@ -89,12 +88,10 @@ describe("More money tools model (#1575)", () => {
   });
 
   it("hides every card, and reads nothing, for a viewer who cannot open the pages", () => {
-    expect(canOpenMoneyTools(nobody)).toBe(false);
-    expect(canOpenMoneyTools(finance)).toBe(true);
     expect(neededMoneyMetrics(nobody)).toEqual([]);
     expect(buildMoneyToolsView(nobody, "evt_1", {}).groups).toEqual([]);
     expect(neededMoneyMetrics(finance).sort()).toEqual(
-      (["churchFlags", "ledgerDifferences", "policyVersions", "policyInEffect", "draftInvoices", "scholarshipBalanceCents"] as MoneyMetricKey[]).sort(),
+      (["churchFlags", "ledgerDifferences", "policyVersions", "policyInEffect", "draftInvoices", "scholarshipBalanceCents", "billingUnrecorded", "billingOutdated", "attendanceApproved"] as MoneyMetricKey[]).sort(),
     );
   });
 
@@ -106,7 +103,7 @@ describe("More money tools model (#1575)", () => {
   it("shows a failed read as Unavailable, never as zero or healthy", () => {
     const failed = allMetrics(finance, null);
     const withStatus = cards(failed).filter((card) => card.status);
-    expect(withStatus.length).toBe(5);
+    expect(withStatus.length).toBe(7);
     for (const card of withStatus) expect(card.status).toEqual(UNAVAILABLE_STATUS);
     // One failed read does not hide the others.
     expect(statusOf(staffPageTitles.churchOwed, { ...allMetrics(finance, 0), churchFlags: null })).toEqual(UNAVAILABLE_STATUS);
@@ -133,8 +130,15 @@ describe("More money tools model (#1575)", () => {
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 0, policyInEffect: 0 })).toEqual({ tone: "draft", text: "No rules set" });
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 2, policyInEffect: 0 })).toEqual({ tone: "soon", text: "None in effect yet" });
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 2, policyInEffect: 1 })).toEqual({ tone: "ok", text: "In effect" });
-    for (const title of [staffPageTitles.billingResponsibility, staffPageTitles.squarePayments, staffPageTitles.attendanceReconciliation]) {
-      expect(statusOf(title, allMetrics(finance, 1)), title).toBeNull();
-    }
+    expect(statusOf(staffPageTitles.squarePayments, allMetrics(finance, 1))).toBeNull();
+    expect(statusOf(staffPageTitles.billingResponsibility, zero)).toEqual({ tone: "ok", text: "All recorded" });
+    expect(statusOf(staffPageTitles.billingResponsibility, { billingUnrecorded: 3, billingOutdated: 0 })).toEqual({ tone: "review", text: "3 to record" });
+    expect(statusOf(staffPageTitles.billingResponsibility, { billingUnrecorded: 0, billingOutdated: 1 })).toEqual({ tone: "warn", text: "1 out of date" });
+    expect(statusOf(staffPageTitles.billingResponsibility, { billingUnrecorded: 2, billingOutdated: 1 })).toEqual({ tone: "review", text: "2 to record, 1 out of date" });
+    expect(statusOf(staffPageTitles.attendanceReconciliation, { attendanceApproved: 1 })).toEqual({ tone: "ok", text: "Approved" });
+    expect(statusOf(staffPageTitles.attendanceReconciliation, { attendanceApproved: 0 })).toEqual({ tone: "draft", text: "Not approved yet" });
+    // One unreadable number makes the whole Billing responsibility card unavailable.
+    expect(statusOf(staffPageTitles.billingResponsibility, { billingUnrecorded: 0, billingOutdated: null })).toEqual(UNAVAILABLE_STATUS);
+    expect(statusOf(staffPageTitles.attendanceReconciliation, {})).toEqual(UNAVAILABLE_STATUS);
   });
 });

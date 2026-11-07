@@ -16,7 +16,7 @@ import { UNAVAILABLE_STATUS, type CardStatus, type HubBody, type HubCard, type H
  *   from data nobody read.
  * - Every card is a link and carries `?event=`. Nothing here writes, refunds, matches or changes a record.
  */
-export type MoneyMetricKey = "churchFlags" | "ledgerDifferences" | "policyVersions" | "policyInEffect" | "draftInvoices" | "scholarshipBalanceCents";
+export type MoneyMetricKey = "churchFlags" | "ledgerDifferences" | "policyVersions" | "policyInEffect" | "draftInvoices" | "scholarshipBalanceCents" | "billingUnrecorded" | "billingOutdated" | "attendanceApproved";
 
 /** `null` is "could not be read"; a missing key is "not asked for". */
 export type MoneyMetricValues = Partial<Record<MoneyMetricKey, number | null>>;
@@ -67,6 +67,13 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         title: staffPageTitles.billingResponsibility,
         description: "Who each registration is billed to, and the ones that still need an answer.",
         gate: finance,
+        metrics: ["billingUnrecorded", "billingOutdated"],
+        status: (read) => {
+          const unrecorded = read("billingUnrecorded")!;
+          const outdated = read("billingOutdated")!;
+          if (unrecorded === 0 && outdated === 0) return { tone: "ok", text: "All recorded" };
+          return { tone: unrecorded > 0 ? "review" : "warn", text: [unrecorded > 0 ? `${unrecorded} to record` : null, outdated > 0 ? `${outdated} out of date` : null].filter(Boolean).join(", ") };
+        },
       },
     ],
   },
@@ -82,7 +89,7 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         status: (read) => ({ tone: "draft", text: `Balance ${formatCents(read("scholarshipBalanceCents")!)}` }),
       },
       {
-        // No status: the unmatched list comes from Square itself, over a date window and not for one event, so it is not read here.
+        // No status on purpose: the unmatched list is a live Square read over a date window, not scoped to one event.
         href: "/finance/square-payments",
         title: staffPageTitles.squarePayments,
         description: "Square payments that no registration has claimed yet, ready to match by hand.",
@@ -93,6 +100,8 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         title: staffPageTitles.attendanceReconciliation,
         description: "Who attended and what each church is billed for, before invoices go out.",
         gate: finance,
+        metrics: ["attendanceApproved"],
+        status: (read) => (read("attendanceApproved")! > 0 ? { tone: "ok", text: "Approved" } : { tone: "draft", text: "Not approved yet" }),
       },
     ],
   },
@@ -130,11 +139,6 @@ export const moneyToolsDescription = "The rest of this event's finance pages. Ev
 function visibleCards(viewer: MoneyToolsViewer) {
   const permissions = new Set(viewer.permissions);
   return groupDefs.flatMap((group) => group.cards.filter((card) => card.gate(permissions)));
-}
-
-/** Whether the viewer sees at least one card, so a page nobody could use is never listed. */
-export function canOpenMoneyTools(viewer: MoneyToolsViewer): boolean {
-  return visibleCards(viewer).length > 0;
 }
 
 /** The metrics of the cards this viewer sees: nothing hidden is read. */

@@ -14,7 +14,7 @@ const render = async () => renderToStaticMarkup(await MoreMoneyToolsPage({ searc
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dependencies.loadMoneyToolMetrics.mockResolvedValue({ churchFlags: 2, ledgerDifferences: 0, policyVersions: 1, policyInEffect: 1, draftInvoices: 0, scholarshipBalanceCents: 5000 });
+  dependencies.loadMoneyToolMetrics.mockResolvedValue({ churchFlags: 2, ledgerDifferences: 0, policyVersions: 1, policyInEffect: 1, draftInvoices: 0, scholarshipBalanceCents: 5000, billingUnrecorded: 0, billingOutdated: 0, attendanceApproved: 1 });
 });
 
 describe("More money tools page access (#1575)", () => {
