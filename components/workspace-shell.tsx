@@ -15,6 +15,7 @@ import { eventsNeedingModuleState } from "@/modules/event-modules/shell-scope";
 import { countEventsAdminWaiting } from "@/modules/events/events-admin-home-repository";
 import { loadWorkspaceEventContext } from "@/modules/events/selection";
 import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
+import { attentionTotalIsComplete } from "@/modules/system-admin/attention-model";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { canManageSiteContent } from "@/modules/access/site-content-editor";
@@ -70,8 +71,8 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
       : undefined,
     isSystemAdmin
       ? getAdminAttentionSummary().then((summary) => {
-        // A summary with an unreadable check understates the total, so the pill and the Home tab's count are left off (#1568).
-        if (!summary.partial) adminRoleCounts.SYSTEM_ADMIN = summary.total;
+        // A summary with an unreadable alert check understates the total, so the pill and the Home tab's count are left off; an unreadable review-only list is not in the total (#1568).
+        if (attentionTotalIsComplete(summary)) adminRoleCounts.SYSTEM_ADMIN = summary.total;
       }).catch(() => undefined)
       : undefined,
   ]);

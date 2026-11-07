@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -7,10 +8,11 @@ import { phoneBarCurrent, phoneBarItems } from "@/components/staff-phone-bar-mod
 import { staffSubpageTitle } from "@/components/staff-navigation";
 import type { EventTab } from "@/components/staff-event-tabs";
 import { buildEventsAdminHome, type EventsAdminEventSource } from "@/modules/events/events-admin-home-model";
-import { buildAttentionSummary, type AttentionSignals } from "@/modules/system-admin/attention-model";
+import { attentionTotalIsComplete, buildAttentionSummary, type AttentionSignals } from "@/modules/system-admin/attention-model";
 import {
   buildComingUp,
   buildNeedsView,
+  comingUpNextStep,
   needsYouTabCount,
   sectionStatusText,
   type ComingUpEventSource,
@@ -182,6 +184,25 @@ describe("Needs you model (#1568)", () => {
     expect(system.total).toBeNull();
   });
 
+  it("keeps the System count when only a review-only list could not be read, and drops it for an alert check", () => {
+    const reviewOnly = buildAttentionSummary(signals({ emailFailed: { total: 3, topEventId: null }, unreadableChecks: 1, unreadableKeys: ["directory-review"] }));
+    expect(reviewOnly.total).toBe(3);
+    expect(attentionTotalIsComplete(reviewOnly)).toBe(true);
+    const alert = buildAttentionSummary(signals({ unreadableChecks: 1, unreadableKeys: ["email-stuck"] }));
+    expect(attentionTotalIsComplete(alert)).toBe(false);
+    const mixed = buildAttentionSummary(signals({ unreadableChecks: 2, unreadableKeys: ["directory-review", "email-stuck"] }));
+    expect(attentionTotalIsComplete(mixed)).toBe(false);
+    // Without keys a partial summary cannot be trusted.
+    expect(attentionTotalIsComplete({ partial: true, unreadable: [] })).toBe(false);
+    expect(readFileSync("components/workspace-shell.tsx", "utf8")).toContain("if (attentionTotalIsComplete(summary)) adminRoleCounts.SYSTEM_ADMIN = summary.total;");
+    // The page lists the unreadable review list as Unavailable, uncounted, so the section total stays.
+    const system = buildNeedsView({ held: ["SYSTEM_ADMIN"], attention: reviewOnly }).sections[0];
+    expect(system.items.map((item) => [item.key, item.count, item.counted])).toEqual([["email-failed", 3, true], ["directory-review", null, false]]);
+    expect(system.total).toBe(3);
+    expect(system.unavailable).toBe(true);
+    expect(needsYouTabCount(["SYSTEM_ADMIN"], { SYSTEM_ADMIN: reviewOnly.total })).toBe(3);
+  });
+
   it("says nothing needs you only when every read worked and found nothing", () => {
     const view = buildNeedsView({ held: ["EVENTS_ADMIN", "CLUBS_ADMIN", "SYSTEM_ADMIN"], events: buildEventsAdminHome([], now), clubs: { applications: 0, lateRecords: 0 }, attention: buildAttentionSummary(signals()) });
     expect(view.allClear).toBe(true);
@@ -252,6 +273,12 @@ describe("Coming up model (#1568)", () => {
     expect(html).toContain('href="/overview?event=a"');
     expect(html).toContain("Published");
     expect(renderToStaticMarkup(createElement(ComingUpPage, { events: [] }))).toContain("No upcoming events.");
+    // The empty state always has a next step: a link the viewer can open, or plain guidance.
+    expect(comingUpNextStep(["EVENTS_ADMIN"], false)).toEqual({ href: "/events-admin", label: "Open Event administration" });
+    expect(comingUpNextStep([], true)?.href).toBe("/event-setup");
+    expect(comingUpNextStep(["CLUBS_ADMIN"], false)).toBeNull();
+    expect(renderToStaticMarkup(createElement(ComingUpPage, { events: [], nextStep: comingUpNextStep(["EVENTS_ADMIN"], false) }))).toContain('href="/events-admin"');
+    expect(renderToStaticMarkup(createElement(ComingUpPage, { events: [] }))).toContain("ask an event administrator");
     const failed = renderToStaticMarkup(createElement(ComingUpPage, { events: null }));
     expect(failed).toContain("Unavailable");
     expect(failed).not.toContain("No upcoming events.");

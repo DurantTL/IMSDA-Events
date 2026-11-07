@@ -1,5 +1,5 @@
 import { ADMIN_ROLE_LABELS, type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
-import { isSafeAttentionHref, type AttentionItemKey, type AttentionSummary } from "@/modules/system-admin/attention-model";
+import { isSafeAttentionHref, reviewOnlyAttentionKeys, type AttentionItemKey, type AttentionSummary } from "@/modules/system-admin/attention-model";
 import type { EventsAdminHome } from "@/modules/events/events-admin-home-model";
 import { isUpcomingEvent } from "@/modules/system-admin/dashboard";
 
@@ -157,7 +157,8 @@ function systemItems(attention: AttentionSummary | null, clubsShown: boolean): N
   for (const key of attention.unreadable) {
     if (key === "club-applications" && clubsShown) continue;
     if (items.some((item) => item.key === key)) continue;
-    items.push({ key, label: checkNames[key], unit: null, count: null, counted: true, links: [], note: null });
+    // A review-only list is not in the System count, so an unreadable one is Unavailable but never blocks the section's total.
+    items.push({ key, label: checkNames[key], unit: null, count: null, counted: !reviewOnlyAttentionKeys.includes(key), links: [], note: null });
   }
   return items;
 }
@@ -263,4 +264,15 @@ export function buildComingUp(sources: readonly ComingUpEventSource[], now: Date
       status: event.isPublished ? { text: "Published", tone: "ok" } : { text: "Not published", tone: "draft" },
       href: `/overview?event=${encodeURIComponent(event.id)}`,
     }));
+}
+
+/**
+ * The next step when Coming up is empty (rule B4): a link to a page this person can open, gated like the tabs (a system
+ * administrator creates an event, an Events Administrator opens Event administration), or `null` when they have no such page
+ * and the page gives plain guidance instead.
+ */
+export function comingUpNextStep(held: readonly AdminRole[], isSystemAdmin: boolean): { href: string; label: string } | null {
+  if (isSystemAdmin) return { href: "/event-setup", label: "Create an event" };
+  if (held.includes("EVENTS_ADMIN")) return { href: "/events-admin", label: "Open Event administration" };
+  return null;
 }
