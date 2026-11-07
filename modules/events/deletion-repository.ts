@@ -3,6 +3,7 @@ import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
 import { isDeadlockError, isLockTimeoutError } from "@/lib/prisma-errors";
 import { currentCorrelationId } from "@/lib/request-context";
+import { findEffectiveMembership } from "@/modules/access/club-event-access";
 import type { EventRole } from "@/modules/access/permissions";
 import {
   EVENT_DELETION_TRANSACTION_MAX_WAIT_MS,
@@ -163,10 +164,8 @@ export type EventDeletionActorInput = { userId: string; globalRole?: "SYSTEM_ADM
 
 async function actorEventRole(db: Db, actor: EventDeletionActorInput, eventId: string): Promise<EventRole | null> {
   if (actor.globalRole === "SYSTEM_ADMIN") return null;
-  const membership = await db.eventMembership.findUnique({
-    where: { eventId_userId: { eventId, userId: actor.userId } },
-    select: { role: true, status: true },
-  });
+  // Includes an active Clubs Administrator's EVENT_ADMIN role on a club event (#1643).
+  const membership = await findEffectiveMembership(db, actor.userId, eventId);
   return membership && membership.status === "ACTIVE" ? membership.role : null;
 }
 

@@ -1,6 +1,7 @@
 import { eventBillsSponsoredPromoCodes } from "@/modules/promo-codes/church-sponsored";
 import { sumChurchSponsoredPromoCents } from "@/modules/promo-codes/church-sponsored-repository";
 import type { MembershipRecord } from "@/modules/access/authorization";
+import { findEffectiveMembership, hasActiveClubsAdministratorGrant } from "@/modules/access/club-event-access";
 import { Prisma } from "@prisma/client";
 import { isLockTimeoutError } from "@/lib/prisma-errors";
 import { getPrisma } from "@/lib/prisma";
@@ -29,12 +30,17 @@ export async function findActiveMembership(
   userId: string,
   eventId: string,
 ): Promise<MembershipRecord | null> {
-  const membership = await getPrisma().eventMembership.findUnique({
-    where: { eventId_userId: { eventId, userId } },
-    select: { eventId: true, userId: true, role: true, status: true, permissions: true },
-  });
+  // The one membership lookup every event route and page hands to `requirePermission`. An active Clubs Administrator
+  // holds EVENT_ADMIN on a club event here (#1643); see `modules/access/club-event-access.ts`.
+  return findEffectiveMembership(getPrisma(), userId, eventId);
+}
 
-  return membership;
+/** Where the account's own staff assignments and, for an active Clubs Administrator, every club event, put an event in a list (#1643). */
+export async function eventAccessFilter(userId: string, isSystemAdmin: boolean, clubEvents: "include" | "exclude") {
+  if (isSystemAdmin) return {};
+  const own = { memberships: { some: { userId, status: "ACTIVE" as const } } };
+  if (clubEvents === "include" && await hasActiveClubsAdministratorGrant(userId)) return { OR: [own, { audience: "CLUB" as const }] };
+  return own;
 }
 
 /**
@@ -43,13 +49,16 @@ export async function findActiveMembership(
  * and listing calls this with the default, so an archived event can only come
  * back through an explicit choice (the Archived events list, or a direct link
  * to the event that `resolveEventContext` resolves).
+ *
+ * An active Clubs Administrator also gets every club event (#1643). `clubEvents: "exclude"` leaves those out, for the one
+ * caller that wants only the account's own staff assignments: where sign-in lands (their home stays Club administration).
  */
 export async function listEventsForUser(
   userId: string,
   isSystemAdmin: boolean,
-  options: { archived?: "exclude" | "include" } = {},
+  options: { archived?: "exclude" | "include"; clubEvents?: "include" | "exclude" } = {},
 ) {
-  const membershipFilter = isSystemAdmin ? {} : { memberships: { some: { userId, status: "ACTIVE" as const } } };
+  const membershipFilter = await eventAccessFilter(userId, isSystemAdmin, options.clubEvents ?? "include");
   return getPrisma().event.findMany({
     where: options.archived === "include" ? membershipFilter : { ...membershipFilter, archivedAt: null },
     orderBy: { startsAt: "asc" },

@@ -30,7 +30,7 @@ export default async function NoAccessPage({ searchParams }: { searchParams: Pro
   if (session.user.globalRole === "SYSTEM_ADMIN") redirect("/event-setup");
   const { from } = await searchParams;
   // Event Admins and anyone working in an event are sent here from the event-creation pages (#1411).
-  const hasEvents = (await listEventsForUser(session.user.id, false)).length > 0;
+  const hasEvents = (await listEventsForUser(session.user.id, false, { clubEvents: "exclude" })).length > 0;
   const clubsAdmin = await isActiveClubsAdministrator(session.user.id);
   // No reason given (a page that needs an event, the picker, a stale link): a Clubs Administrator's home is Club administration.
   if (clubsAdmin && !(typeof from === "string" && (CLUBS_ADMIN_NO_ACCESS_REASONS as readonly string[]).includes(from))) redirect(CLUBS_ADMIN_HOME_PATH);

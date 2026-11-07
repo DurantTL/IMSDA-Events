@@ -90,6 +90,7 @@
     "test:event-creation-features": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-creation-features.ts",
     "test:event-deletion": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-deletion.ts",
     "test:event-archive": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-archive.ts",
+    "test:clubs-admin-club-events": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-clubs-admin-club-events.ts",
     "test:event-lifecycle": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-lifecycle.ts",
     "test:badge-print": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-badge-print.ts",
     "test:privacy-browsers": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-privacy-browsers.ts",

@@ -266,6 +266,9 @@ jobs:
       # Real-database check of archiving an event (#635): permissions, audit rows with ids only, no other row
       # changed, hidden from staff lists, the public page and calendar, registration closed, unarchive restores it.
       - run: npm run test:event-archive
+      # Real-database check that a Clubs Administrator is the event administrator of every club event and only club events
+      # (#1643): permissions, revoke at once, the event list, and the audit role marker.
+      - run: npm run test:clubs-admin-club-events
       - run: npm run test:event-lifecycle
       # Real-database check of PBE advancement inside one event (#945): 1st and 2nd per Area advance (a tie advances
       # both), staff overrides are audited with ids only and survive a recompute, the Conference list, results and
