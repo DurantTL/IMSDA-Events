@@ -1,4 +1,5 @@
 import { adminHubs, systemNavGroups, clubsAdminRecordsHref, type AdminHubKey } from "@/components/system-navigation";
+import { clubsAdminGroups, clubsAdminHomeItem } from "@/components/staff-navigation";
 import { pluralize } from "@/lib/pluralize";
 
 /**
@@ -15,7 +16,19 @@ import { pluralize } from "@/lib/pluralize";
  */
 export type { AdminHubKey };
 
-export type HubViewer = { isSystemAdmin: boolean; clubsAdmin: boolean; siteContentEditor: boolean };
+/**
+ * The five Admin hubs plus Club administration (#1568), the Clubs Administrator's home. Club administration is not an Admin
+ * tab: it reuses the same card definitions, model and component, and lists the Clubs area's destinations.
+ */
+export type HubKey = AdminHubKey | "club-administration";
+
+export type HubViewer = {
+  isSystemAdmin: boolean;
+  clubsAdmin: boolean;
+  siteContentEditor: boolean;
+  /** The health record import exists only while the Health Record feature is on (#1232); left out means off. */
+  healthImport?: boolean;
+};
 
 export type MetricKey =
   | "upcomingEvents" | "unpublishedEvents" | "copyableEvents" | "archivedEvents" | "calendarPublished" | "calendarUnpublished" | "moduleRequests" | "eventTemplates"
@@ -54,7 +67,13 @@ type CardDef = {
 type StatDef = { metric: MetricKey; singular: string; plural: string; gate: HubGate; alsoNeeds?: readonly MetricKey[]; note?: (read: Reader) => string | null };
 type ActionDef = { href: string; label: string; gate: HubGate };
 type GroupDef = { title: string; cards: readonly CardDef[] };
-type HubDef = { stats: readonly StatDef[]; actions: readonly ActionDef[]; groups: readonly GroupDef[] };
+type HubDef = {
+  stats: readonly StatDef[];
+  actions: readonly ActionDef[];
+  groups: readonly GroupDef[];
+  /** A group left with one card (a gate removed the others) joins its neighbour, so no row is ever a lone card. */
+  regroupLoneCards?: boolean;
+};
 
 const systemItems = new Map(systemNavGroups.flatMap((group) => group.items.map((item) => [item.href, item] as const)));
 
@@ -65,12 +84,47 @@ export function destinationText(href: string): { title: string; description: str
   return { title: item.label, description: item.description };
 }
 
+/** The Clubs area's own pages (the Clubs Administrator's registry) that the System registry does not list; their title is the registry's. */
+const clubsRegistry = new Map([clubsAdminHomeItem, ...clubsAdminGroups.flatMap((group) => group.items)].map((item) => [item.href, item.label] as const));
+
+function cardTitle(card: CardDef): string {
+  if (card.title) return card.title;
+  const label = clubsRegistry.get(card.href);
+  return systemItems.has(card.href) ? destinationText(card.href).title : label ?? destinationText(card.href).title;
+}
+
+function cardDescription(card: CardDef): string {
+  return card.description ?? destinationText(card.href).description;
+}
+
 const count = (n: number, tone: StatusTone, one: string, many = one): CardStatus => ({ tone, text: `${n} ${n === 1 ? one : many}` });
 const waiting = (n: number, noun: string, none: string): CardStatus => (n > 0 ? { tone: "review", text: `${n} ${noun}` } : { tone: "ok", text: none });
 
 export const moduleRequestsHref = "/admin/feature-requests";
 
-const hubDefs: Record<AdminHubKey, HubDef> = {
+/** Cards both the Clubs hub and Club administration show, defined once. */
+const clubCards = {
+  clubsAndChurches: { href: "/admin/organizations", gate: hubGates.system, metrics: ["clubs"], status: (read) => count(read("clubs")!, "draft", "active club", "active clubs") },
+  summary: { href: "/admin/clubs/summary", gate: hubGates.clubs, metrics: ["lateRecords"], status: lateStatus },
+  leaders: { href: "/admin/clubs/leaders", gate: hubGates.clubs, metrics: ["clubLeaders"], status: (read) => count(read("clubLeaders")!, "draft", "current leader", "current leaders") },
+  records: { href: clubsAdminRecordsHref, gate: hubGates.clubs, metrics: ["lateRecords"], status: lateStatus },
+  applications: { href: "/admin/clubs/applications", gate: hubGates.clubs, metrics: ["applicationsWaiting"], status: (read) => waiting(read("applicationsWaiting")!, "waiting", "None waiting") },
+  transfers: { href: "/admin/clubs/transfers", gate: hubGates.clubs, metrics: ["openTransfers"], status: (read) => waiting(read("openTransfers")!, "open", "None open") },
+  sterling: { href: "/admin/organizations/background-checks", gate: hubGates.clubs },
+  honors: { href: "/admin/honors", gate: hubGates.clubs, metrics: ["honors"], status: (read) => count(read("honors")!, "draft", "honor", "honors") },
+  supplies: { href: "/admin/club-supplies", gate: hubGates.clubs },
+  clubForms: { href: "/admin/club-forms", gate: hubGates.clubs, metrics: ["clubFormsOn"], status: (read) => count(read("clubFormsOn")!, "ok", "form on", "forms on") },
+  publicClubForms: { href: "/admin/club-forms/public-page", gate: hubGates.clubs },
+} satisfies Record<string, CardDef>;
+
+const clubStats: readonly StatDef[] = [
+  { metric: "clubs", singular: "Active club", plural: "Active clubs", gate: hubGates.clubs },
+  { metric: "applicationsWaiting", singular: "Application waiting", plural: "Applications waiting", gate: hubGates.clubs },
+  { metric: "lateRecords", singular: "Late Monthly Record", plural: "Late Monthly Records", gate: hubGates.clubs },
+  { metric: "openTransfers", singular: "Open member transfer", plural: "Open member transfers", gate: hubGates.clubs },
+];
+
+const hubDefs: Record<HubKey, HubDef> = {
   events: {
     stats: [
       { metric: "upcomingEvents", singular: "Upcoming published event", plural: "Upcoming published events", gate: hubGates.system },
@@ -119,28 +173,50 @@ const hubDefs: Record<AdminHubKey, HubDef> = {
     ],
   },
   clubs: {
-    stats: [
-      { metric: "clubs", singular: "Active club", plural: "Active clubs", gate: hubGates.clubs },
-      { metric: "applicationsWaiting", singular: "Application waiting", plural: "Applications waiting", gate: hubGates.clubs },
-      { metric: "lateRecords", singular: "Late Monthly Record", plural: "Late Monthly Records", gate: hubGates.clubs },
-      { metric: "openTransfers", singular: "Open member transfer", plural: "Open member transfers", gate: hubGates.clubs },
-    ],
+    stats: clubStats,
     actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs }],
     groups: [
+      { title: "Directory", cards: [clubCards.clubsAndChurches, clubCards.summary, clubCards.leaders] },
+      { title: "Records", cards: [clubCards.records] },
+      { title: "Changes", cards: [clubCards.applications, clubCards.transfers] },
+    ],
+  },
+  // The Clubs Administrator's home (#1568, #1559 item 6): the same pattern, grouped as the approved mockup. The page keeps its own
+  // key numbers, so this definition has none; it adds the one main action and a card for every destination of the Clubs area.
+  "club-administration": {
+    regroupLoneCards: true,
+    stats: [],
+    actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs }],
+    groups: [
+      { title: "Clubs", cards: [clubCards.summary, clubCards.clubsAndChurches, clubCards.transfers, clubCards.sterling] },
       {
-        title: "Directory",
+        title: "Records and points",
         cards: [
-          { href: "/admin/organizations", gate: hubGates.system, metrics: ["clubs"], status: (read) => count(read("clubs")!, "draft", "active club", "active clubs") },
-          { href: "/admin/clubs/summary", gate: hubGates.clubs, metrics: ["lateRecords"], status: lateStatus },
-          { href: "/admin/clubs/leaders", gate: hubGates.clubs, metrics: ["clubLeaders"], status: (read) => count(read("clubLeaders")!, "draft", "current leader", "current leaders") },
+          clubCards.records,
+          { href: "/admin/clubs/reports/year-end", description: "Each club's end-of-year report for the club year.", gate: hubGates.clubs },
+          { href: "/admin/clubs/summary?view=points#points", description: "Club points for the year, club by club.", gate: hubGates.clubs },
         ],
       },
-      { title: "Records", cards: [{ href: clubsAdminRecordsHref, gate: hubGates.clubs, metrics: ["lateRecords"], status: lateStatus }] },
       {
-        title: "Changes",
+        title: "Applications",
+        cards: [clubCards.applications, { href: "/admin/clubs/invites", description: "Invitations sent to people who may start a new club.", gate: hubGates.clubs }],
+      },
+      {
+        title: "Club events and forms",
         cards: [
-          { href: "/admin/clubs/applications", gate: hubGates.clubs, metrics: ["applicationsWaiting"], status: (read) => waiting(read("applicationsWaiting")!, "waiting", "None waiting") },
-          { href: "/admin/clubs/transfers", gate: hubGates.clubs, metrics: ["openTransfers"], status: (read) => waiting(read("openTransfers")!, "open", "None open") },
+          { href: "/admin/clubs/summary?view=events#club-events", description: "Which clubs are registered for each club event.", gate: hubGates.clubs },
+          clubCards.clubForms,
+          clubCards.publicClubForms,
+        ],
+      },
+      { title: "People", cards: [clubCards.leaders, { href: "/admin/people", gate: hubGates.clubs }] },
+      {
+        title: "Catalogs and imports",
+        cards: [
+          clubCards.honors,
+          clubCards.supplies,
+          { href: "/admin/clubs/import", description: "Add or update clubs from a spreadsheet.", gate: hubGates.clubs },
+          { href: "/admin/clubs/health-import", description: "Bring club members' health records in from a file.", gate: (v) => hubGates.clubs(v) && v.healthImport === true },
         ],
       },
     ],
@@ -183,8 +259,8 @@ const hubDefs: Record<AdminHubKey, HubDef> = {
       {
         title: "Club forms",
         cards: [
-          { href: "/admin/club-forms", gate: hubGates.clubs, metrics: ["clubFormsOn"], status: (read) => count(read("clubFormsOn")!, "ok", "form on", "forms on") },
-          { href: "/admin/club-forms/public-page", gate: hubGates.clubs },
+          clubCards.clubForms,
+          clubCards.publicClubForms,
         ],
       },
       {
@@ -262,10 +338,10 @@ const hubDefs: Record<AdminHubKey, HubDef> = {
       {
         title: "Catalogs",
         cards: [
-          { href: "/admin/honors", gate: hubGates.clubs, metrics: ["honors"], status: (read) => count(read("honors")!, "draft", "honor", "honors") },
-          { href: "/admin/club-supplies", gate: hubGates.clubs },
+          clubCards.honors,
+          clubCards.supplies,
           { href: "/admin/master-award-rules", gate: hubGates.system },
-          { href: "/admin/organizations/background-checks", gate: hubGates.clubs },
+          clubCards.sterling,
         ],
       },
       { title: "Settings", cards: [{ href: "/admin/settings", gate: hubGates.system }] },
@@ -278,11 +354,14 @@ function lateStatus(read: Reader): CardStatus {
   return n > 0 ? { tone: "warn", text: `${n} late` } : { tone: "ok", text: "None late" };
 }
 
+/** The one line under the Club administration page's numbers; the page's own header stays as it was. */
+export const clubAdministrationDescription = "Every club destination, with its own live status.";
+
 export type HubStat = { key: MetricKey; value: number | null; label: string; display: string; note: string | null };
 export type HubCard = { href: string; title: string; description: string; status: CardStatus | null };
 export type HubGroup = { title: string; cards: HubCard[] };
 export type HubView = {
-  key: AdminHubKey;
+  key: HubKey;
   title: string;
   description: string;
   stats: HubStat[];
@@ -303,6 +382,28 @@ export function splitGroup<T>(group: { title: string; cards: readonly T[] }): Ar
   ];
 }
 
+/**
+ * A group of one card (a gate removed the others) joins the smaller neighbouring group, so no row is ever a lone card. The
+ * group that takes it keeps its heading; with a single group there is nothing to join and it stays.
+ */
+export function mergeLoneCards<T>(groups: ReadonlyArray<{ title: string; cards: T[] }>): Array<{ title: string; cards: T[] }> {
+  const result = groups.map((group) => ({ title: group.title, cards: [...group.cards] }));
+  for (let index = 0; index < result.length; ) {
+    if (result[index].cards.length !== 1 || result.length === 1) {
+      index += 1;
+      continue;
+    }
+    const before = index > 0 ? result[index - 1] : null;
+    const after = index < result.length - 1 ? result[index + 1] : null;
+    const target = before && after ? (before.cards.length <= after.cards.length ? before : after) : before ?? after!;
+    if (target === after) target.cards.unshift(...result[index].cards);
+    else target.cards.push(...result[index].cards);
+    result.splice(index, 1);
+    index = 0;
+  }
+  return result;
+}
+
 /** Cards per row at desktop width for a group of `size` cards: 1, 2, 3 or 4 across, and 5 is 3 + 2, 6 is 3 + 3. */
 export function cardRowSizes(size: number): number[] {
   if (size <= 0) return [];
@@ -320,7 +421,8 @@ export function cardRowSizes(size: number): number[] {
 }
 
 /** Who may open each hub page: the same people the Admin tab is shown to (`areaTabSpecs.admin`). */
-const hubAccess: Record<AdminHubKey, HubGate> = {
+const hubAccess: Record<HubKey, HubGate> = {
+  "club-administration": hubGates.clubs,
   events: hubGates.system,
   clubs: hubGates.system,
   people: hubGates.system,
@@ -329,7 +431,7 @@ const hubAccess: Record<AdminHubKey, HubGate> = {
 };
 
 /** Whether the viewer may open the hub and sees at least one card on it. */
-export function canOpenHub(hub: AdminHubKey, viewer: HubViewer): boolean {
+export function canOpenHub(hub: HubKey, viewer: HubViewer): boolean {
   return hubAccess[hub](viewer) && visibleCards(hubDefs[hub], viewer).length > 0;
 }
 
@@ -342,7 +444,7 @@ function visibleStats(def: HubDef, viewer: HubViewer) {
 }
 
 /** The metrics the viewer's hub needs: only those of a shown card or a shown number, so nothing hidden is read. */
-export function neededMetrics(hub: AdminHubKey, viewer: HubViewer): MetricKey[] {
+export function neededMetrics(hub: HubKey, viewer: HubViewer): MetricKey[] {
   const def = hubDefs[hub];
   const keys = new Set<MetricKey>();
   for (const card of visibleCards(def, viewer)) for (const key of card.metrics ?? []) keys.add(key);
@@ -353,7 +455,7 @@ export function neededMetrics(hub: AdminHubKey, viewer: HubViewer): MetricKey[] 
   return [...keys];
 }
 
-export function buildHubView(hub: AdminHubKey, viewer: HubViewer, values: MetricValues): HubView {
+export function buildHubView(hub: HubKey, viewer: HubViewer, values: MetricValues): HubView {
   const def = hubDefs[hub];
   const reading = (key: MetricKey): number | null => {
     const value = values[key];
@@ -370,25 +472,21 @@ export function buildHubView(hub: AdminHubKey, viewer: HubViewer, values: Metric
     };
   });
   const action = def.actions.find((candidate) => candidate.gate(viewer)) ?? null;
-  const groups = def.groups.flatMap((group): HubGroup[] => {
+  let shown = def.groups.flatMap((group): Array<{ title: string; cards: HubCard[] }> => {
     const cards = group.cards.filter((card) => card.gate(viewer)).map((card): HubCard => {
       const needs = card.metrics ?? [];
-      const text = card.href === moduleRequestsHref ? null : destinationText(card.href);
       let status: CardStatus | null = null;
       if (card.status) status = needs.some((key) => reading(key) === null) ? UNAVAILABLE_STATUS : card.status(reading);
-      return {
-        href: card.href,
-        title: card.title ?? text!.title,
-        description: card.description ?? text!.description,
-        status,
-      };
+      return { href: card.href, title: cardTitle(card), description: cardDescription(card), status };
     });
-    return cards.length > 0 ? splitGroup({ title: group.title, cards }) : [];
+    return cards.length > 0 ? [{ title: group.title, cards }] : [];
   });
+  if (def.regroupLoneCards) shown = mergeLoneCards(shown);
+  const groups = shown.flatMap((group) => splitGroup(group));
   return {
     key: hub,
-    title: adminHubs[hub].title,
-    description: adminHubs[hub].description,
+    title: hub === "club-administration" ? clubsAdminHomeItem.label : adminHubs[hub].title,
+    description: hub === "club-administration" ? clubAdministrationDescription : adminHubs[hub].description,
     stats,
     action: action ? { href: action.href, label: action.label } : null,
     groups,

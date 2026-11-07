@@ -18,7 +18,7 @@ import { listAreaPauses } from "@/modules/system-admin/area-pause";
 import { listClubLeaders } from "@/modules/system-admin/club-leaders";
 import { listPendingInvitesPage } from "@/modules/system-admin/pending-invites";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
-import { neededMetrics, type AdminHubKey, type HubViewer, type MetricKey, type MetricValues } from "@/modules/system-admin/admin-hubs-model";
+import { neededMetrics, type HubKey, type HubViewer, type MetricKey, type MetricValues } from "@/modules/system-admin/admin-hubs-model";
 
 /**
  * The numbers behind the Admin hub pages (#1569). Only the metrics a hub shows to this viewer are read (`neededMetrics`),
@@ -120,6 +120,6 @@ export async function loadMetrics(keys: readonly MetricKey[], viewer: HubViewer,
 }
 
 /** The values for one hub and viewer. A metric that failed is `null`; a metric the hub does not show is not read. */
-export async function loadHubMetrics(hub: AdminHubKey, viewer: HubViewer, now = new Date()): Promise<MetricValues> {
+export async function loadHubMetrics(hub: HubKey, viewer: HubViewer, now = new Date()): Promise<MetricValues> {
   return loadMetrics(neededMetrics(hub, viewer), viewer, hub, now);
 }

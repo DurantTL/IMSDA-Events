@@ -18,6 +18,11 @@ import {
   clubsAdminHrefs,
 } from "@/modules/club-reports/clubs-admin-home-model";
 import { ActAsButton } from "@/components/act-as-button";
+import { AdminHub } from "@/components/admin-hub";
+import { clubsAdminHrefForYear } from "@/components/staff-navigation";
+import { healthRecordsEnabled } from "@/modules/health-records/flag";
+import { buildHubView, type HubViewer } from "@/modules/system-admin/admin-hubs-model";
+import { loadHubMetrics } from "@/modules/system-admin/admin-hubs-repository";
 import { ClubApplicationApprove, NewClubsRegion } from "@/components/club-application-approve";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { ClubDirectoryCards } from "@/components/club-directory";
@@ -45,14 +50,24 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   const query = parseClubQuery(params.q);
   const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN";
 
-  const [clubs, events, applications, waitingCount, roles, requiredForms] = await Promise.all([
+  const hubViewer: HubViewer = { isSystemAdmin: viewer === "SYSTEM_ADMIN", clubsAdmin: true, siteContentEditor: false, healthImport: healthRecordsEnabled() };
+  const [clubs, events, applications, waitingCount, roles, requiredForms, hubValues] = await Promise.all([
     getAreaClubsSummary(clubYear, now, { backgroundChecks: false }),
     listAreaClubEvents(clubYear),
     listNewClubApplications(viewer),
     countWaitingNewClubApplications(viewer),
     resolveAdminRoles(user),
     getRequiredFormsStatus(clubYear),
+    // The destination cards' live status: each number reads on its own and shows "Unavailable" when it cannot be read.
+    loadHubMetrics("club-administration", hubViewer, now),
   ]);
+  // The club pages that read ?year= keep the year the viewer picked (#1566).
+  const hubView = buildHubView("club-administration", hubViewer, hubValues);
+  const hubViewForYear = {
+    ...hubView,
+    groups: hubView.groups.map((group) => ({ ...group, cards: group.cards.map((card) => ({ ...card, href: clubsAdminHrefForYear(card.href, params.year ? clubYear : null) })) })),
+    action: hubView.action ? { ...hubView.action, href: clubsAdminHrefForYear(hubView.action.href, params.year ? clubYear : null) } : null,
+  };
   const home = buildClubsAdminHome({ clubYear, now, clubs, events, applications, waitingCount, requiredForms, query });
   const { counts, nextEvent, registeredClubs } = home;
   const viewAllCount = query ? registeredClubs.matchCount : registeredClubs.total;
@@ -139,6 +154,8 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
           {nextEvent && <> · <strong>{nextEvent.people}</strong> people registered for {nextEvent.name}</>}
         </p>
       </section>
+
+      <AdminHub view={hubViewForYear} />
 
       <NewClubsRegion headingId="new-clubs-heading">
       <section className={`panel ${styles.panel}`} id="new-clubs" aria-labelledby="new-clubs-heading">

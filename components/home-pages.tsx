@@ -88,7 +88,7 @@ export function ComingUpPage({ events }: { events: ComingUpEvent[] | null }) {
   return (
     <div className={styles.home} data-testid="home-coming-up">
       {events.length === 0 ? (
-        <p className={styles.message} data-testid="home-coming-up-empty">No upcoming events.</p>
+        <p className={styles.message} data-testid="home-coming-up-empty"><strong>No upcoming events.</strong> Events that have ended or been archived are not listed here.</p>
       ) : (
         <ul className={styles.list}>
           {events.map((event) => (
