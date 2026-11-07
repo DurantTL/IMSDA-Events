@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
+import { BackLink } from "@/components/back-link";
 import { LodgingRequestsWorkspace } from "@/components/lodging-requests-workspace";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -29,11 +30,14 @@ export default async function LodgingRequestsPage({ searchParams }: { searchPara
     );
   }
   return (
-    <LodgingRequestsWorkspace
-      eventName={event.name}
-      initialView={view}
-      canConfigure={permissions.includes("CONFIGURE_EVENT")}
-      canExport={permissions.includes("VIEW_REPORTS")}
-    />
+    <>
+      <BackLink href={`/more/lodging?event=${encodeURIComponent(event.id)}`} variant="staff">Back to lodging</BackLink>
+      <LodgingRequestsWorkspace
+        eventName={event.name}
+        initialView={view}
+        canConfigure={permissions.includes("CONFIGURE_EVENT")}
+        canExport={permissions.includes("VIEW_REPORTS")}
+      />
+    </>
   );
 }
