@@ -64,10 +64,12 @@ function SignalRow({ signal, now, registry }: { signal: Signal; now: Date; regis
         {signal.checkedAt ? reportTimeLabel(signal.checkedAt, now) : signal.noTimeLabel ?? reportTimeLabel(null, now)}
       </div>
       <div className={styles.rowResult}>
-        <StateChip state={signal.state} label={signal.chipLabel} />
+        {signal.chipLabel
+          ? <a className={`text-link ${styles.guideLink}`} href={`#guide-${signal.key}`}>{signal.chipLabel}</a>
+          : <StateChip state={signal.state} />}
         <span>{signal.resultText}</span>
         {signal.items && signal.items.length > 0 && (
-          <ul className={styles.items} aria-label={`${signal.name}: ${signal.itemsLabel ?? "open items"}`}>
+          <ul className={styles.items} id={`guide-${signal.key}`} aria-label={`${signal.name}: ${signal.itemsLabel ?? "open items"}`}>
             {signal.items.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
           </ul>
         )}

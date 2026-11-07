@@ -15,7 +15,7 @@ import styles from "./system-readiness-workspace.module.css";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 const statusLabel = {
-  ok: "Checked: OK",
+  ok: "OK",
   attention: "Needs attention",
   info: "For information",
   unknown: "Could not check",

@@ -181,7 +181,7 @@ export function ClubDirectorsWorkspace({
               ? null
               : <> Before they can open club pages, they&apos;ll set up two-step sign-in. It takes about two minutes, and we walk them through it.</>}
           </p>
-          {!given.twoStepOn && <span className="status-chip gold">Two-step sign-in: not set up yet</span>}
+          {!given.twoStepOn && <span className="status-chip gold">Two-step not set up</span>}
         </div>
       )}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
