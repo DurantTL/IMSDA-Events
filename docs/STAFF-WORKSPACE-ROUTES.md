@@ -2,9 +2,9 @@
 
 Generated with `npx tsx docs/generate-staff-workspace-map.ts`. This is the staff-only subset for #1558, not a second runtime registry or a decision to build a whole-system site-map page.
 
-The staff shell is a branded header, an icon rail of the areas a person can reach (Events, Clubs, People, Reports, Admin; Home waits for its own pages in #1568), and below it that area's one row of tabs, or inside an event the event's tabs (Event home, Registrations, Check-in, Communications, Money, Reports, Event setup). Views inside a tab are a button strip. Below 1024px, or when a row would not fit, a row is a menu line ("<Area> menu" or "Event menu"). There is no sidebar. Each page belongs to exactly one place for the "where you are" marking; a page that two tabs list is the same page, and the area named here owns the marking.
+The staff shell is a branded header, an icon rail of the areas a person can reach (Home, Events, Clubs, People, Reports, Admin), and below it that area's one row of tabs, or inside an event the event's tabs (Event home, Registrations, Check-in, Communications, Money, Reports, Event setup). Views inside a tab are a button strip. Below 1024px, or when a row would not fit, a row is a menu line ("<Area> menu" or "Event menu"). There is no sidebar. Each page belongs to exactly one place for the "where you are" marking; a page that two tabs list is the same page, and the area named here owns the marking.
 
-A role's tab row lists only the pages that role may open; every route keeps its server guard, and menu and search visibility keep their existing role, grant and module predicates. Record pages open through their existing parent links. Help and Profile light no rail item. No URL changes: aliases and redirects stay as they were.
+A role's tab row lists only the pages that role may open; every route keeps its server guard, and menu and search visibility keep their existing role, grant and module predicates. Record pages open through their existing parent links. Help and Profile light Home on the rail and no tab. No URL changes: aliases and redirects stay as they were.
 
 | Route | Previously reached from | Rail area | Tab | View | Phone | Menu line | Note | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -73,7 +73,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/team` | System management | People | People & access | - | More, Areas | People menu | - | `app/(workspace)/admin/team/page.tsx` |
 | `/archived-events` | System management | Events | Archived events | - | bar: Events | Events menu | - | `app/archived-events/page.tsx` |
 | `/check-in` | Event sidebar | Events (inside an event) | Check-in | Arrivals | bar: Check-in | Event menu | - | `app/(workspace)/check-in/page.tsx` |
-| `/check-in-station` | Existing page link | Home | none (Help, Profile and pages no tab lists light no rail item) | - | bar: Home | Home menu | - | `app/check-in-station/page.tsx` |
+| `/check-in-station` | Existing page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/check-in-station/page.tsx` |
 | `/check-in/assets` | Page link | Events (inside an event) | Check-in | Keys and items | bar: Check-in | Event menu | - | `app/(workspace)/check-in/assets/page.tsx` |
 | `/check-in/badges` | Page link | Events (inside an event) | Check-in | Name badges | bar: Check-in | Event menu | - | `app/(workspace)/check-in/badges/page.tsx` |
 | `/check-in/passes` | Page link | Events (inside an event) | Check-in | Attendee passes | bar: Check-in | Event menu | - | `app/(workspace)/check-in/passes/page.tsx` |
@@ -97,9 +97,11 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/finance/invoices/statements/[partyId]` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/invoices/statements/[partyId]/page.tsx` |
 | `/finance/scholarship-fund` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/scholarship-fund/page.tsx` |
 | `/finance/square-payments` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/square-payments/page.tsx` |
-| `/help` | Page link | Home | none (Help, Profile and pages no tab lists light no rail item) | - | bar: Home | Home menu | - | `app/(workspace)/help/page.tsx` |
-| `/help/[guideId]` | Page link | Home | none (Help, Profile and pages no tab lists light no rail item) | - | bar: Home | Home menu | - | `app/(workspace)/help/[guideId]/page.tsx` |
-| `/help/glossary` | Page link | Home | none (Help, Profile and pages no tab lists light no rail item) | - | bar: Home | Home menu | - | `app/(workspace)/help/glossary/page.tsx` |
+| `/help` | Page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/(workspace)/help/page.tsx` |
+| `/help/[guideId]` | Page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/(workspace)/help/[guideId]/page.tsx` |
+| `/help/glossary` | Page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/(workspace)/help/glossary/page.tsx` |
+| `/home` | Page link | Home | Needs you | - | bar: Home | Home menu | - | `app/(workspace)/home/page.tsx` |
+| `/home/coming-up` | Page link | Home | Coming up | - | bar: Home | Home menu | - | `app/(workspace)/home/coming-up/page.tsx` |
 | `/imports` | More directory | Events (inside an event) | Registrations | Imports | More, This event | Event menu | - | `app/(workspace)/imports/page.tsx` |
 | `/information-forms` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/information-forms/page.tsx` |
 | `/information-forms/responses` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/information-forms/responses/page.tsx` |
@@ -161,10 +163,10 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/people/staff-invitations` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/page.tsx` |
 | `/people/staff-invitations/approvals` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/approvals/page.tsx` |
 | `/registration-builder` | Event sidebar | Events (inside an event) | Event setup | Registration forms | More, This event | Event menu | - | `app/(workspace)/registration-builder/page.tsx` |
-| `/select-event` | Existing page link | Home | none (Help, Profile and pages no tab lists light no rail item) | - | bar: Home | Home menu | - | `app/select-event/page.tsx` |
+| `/select-event` | Existing page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/select-event/page.tsx` |
 | `/staff` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/staff/page.tsx` |
 
-155 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
+157 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
 
 ## Query states that move a page to another tab or view
 
@@ -176,6 +178,10 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/clubs/summary?view=points` | Reports | Points | - |
 | `/finance` | Events (inside an event) | Money | Payments |
 | `/finance?filter=BALANCE` | Events (inside an event) | Money | Balances due |
+
+## Home (#1568)
+
+Home is on the rail for every staff viewer and has two tabs. **Needs you** (`/home`) is the work waiting for the person, one section per admin role they hold, built from the same reads as the role pills so the numbers agree; every item links to the page that does the work, a read that failed says "Unavailable" (never zero or "Nothing waiting"), and "Nothing needs you right now" shows only when every read worked and found nothing. The tab's count is the held roles' counts added up, shown only when every held role's count was read. **Coming up** (`/home/coming-up`) lists the upcoming events the person can open, soonest first, each linking to its event home. Help and Profile also light Home but no tab. The phone bar's Home slot opens `/home`; where people land after sign-in is unchanged (the role switcher's decision, #108).
 
 ## Admin hub pages (#1569)
 
@@ -197,6 +203,5 @@ Each Admin tab (Events, Clubs, People, Forms, Catalogs and settings) opens its o
 
 ## Left out until built
 
-- Home (Needs you, Coming up): #1568 builds the pages; until then the rail has no Home item and the phone bar's Home slot opens the person's main dashboard.
 - Events > All events: there is no in-shell list of all events yet. Staff open an event from the Events row's "Open an event" picker or the dashboards, and switch from the event bar.
 - Money > Refunds and More money tools (#1575), Registrations > Review queues (#1574), Event setup groups (#1571 and the setup issues), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).

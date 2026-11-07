@@ -406,6 +406,9 @@ const pages: PageSpec[] = [
   staff("communications-scheduled", `/communications/scheduled?event=${blocksEventId}`, "system-admin"),
   staff("communications-scheduled-new", `/communications/scheduled?event=${blocksEventId}&new=1`, "system-admin"),
   staff("registration-builder", "/registration-builder"),
+  // Home (#1568): the work waiting for this person, and the upcoming events they can open.
+  { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
+  { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
   // Staff, as a system administrator.
   staff("system-home", "/admin", "system-admin"),
   // The Admin hub pages (#1569): key numbers, one main action, then every destination as a card with its live status.

@@ -1,0 +1,173 @@
+/* Home (#1568): Needs you and Coming up. List rows are cards; one column on a phone, nothing scrolls sideways. */
+.home {
+  display: grid;
+  gap: 24px;
+  padding-bottom: 32px;
+}
+
+.section {
+  display: grid;
+  gap: 10px;
+}
+
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 800;
+}
+
+.sectionStatus {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 14px 16px;
+}
+
+.row[data-unavailable="true"] {
+  border-style: dashed;
+}
+
+.rowMain {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rowTitle {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.rowText {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.count {
+  color: var(--imsda-navy);
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.rowSide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--touch-target, 44px);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+/* The shared .status-chip colours; this only lets long words wrap and keeps the text at the staff floor. */
+.chip {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.message {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 14px 16px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  line-height: 1.5;
+}
+
+.message[data-tone="unavailable"] {
+  border-style: dashed;
+}
+
+.message a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target, 44px);
+  color: var(--imsda-navy);
+  font-weight: 800;
+}
+
+.eventRow {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  min-height: var(--touch-target, 44px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 14px 16px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.eventRow:hover {
+  border-color: var(--imsda-navy);
+}
+
+.eventTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+
+@media (max-width: 600px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rowSide {
+    justify-content: flex-start;
+  }
+}

@@ -47,7 +47,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
   // Club forms (#610): one answer per user, from the same helper `resolveStaffViewer`
   // uses (system admin, or EVENT_ADMIN of any event that has not ended).
   // The admin role switcher (#1225): the roles held (read from the database now, so a revoke applies at once) and what is
-  // waiting in each. The counts are for the pills only; a count that cannot be read is left off, never shown as zero.
+  // waiting in each. The counts are for the pills and the Home tab's Needs you count (#1568); a count that cannot be read is left off, never shown as zero.
   const adminRoleView = await resolveAdminRoleView(user);
   // A Site content editor who is not a system administrator reaches Homepage & site content from the sidebar (#111).
   const siteContentEditor = !isSystemAdmin && (await canManageSiteContent(user));
@@ -69,7 +69,10 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
       ? countWaitingNewClubApplications(isSystemAdmin ? "SYSTEM_ADMIN" : "CLUBS_ADMIN").then((count) => { adminRoleCounts.CLUBS_ADMIN = count; }).catch(() => undefined)
       : undefined,
     isSystemAdmin
-      ? getAdminAttentionSummary().then((summary) => { adminRoleCounts.SYSTEM_ADMIN = summary.total; }).catch(() => undefined)
+      ? getAdminAttentionSummary().then((summary) => {
+        // A summary with an unreadable check understates the total, so the pill and the Home tab's count are left off (#1568).
+        if (!summary.partial) adminRoleCounts.SYSTEM_ADMIN = summary.total;
+      }).catch(() => undefined)
       : undefined,
   ]);
   const shellEvents = events.map((event) => ({

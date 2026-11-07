@@ -184,6 +184,8 @@ type SubpageRule = readonly [path: string, match: "exact" | "prefix" | "under", 
  * `prefix` is both.
  */
 const subpageRules: readonly SubpageRule[] = [
+  // Home (#1568): Needs you and Coming up are the two tabs of one area, so the header names the area.
+  ["/home", "prefix", "Home"],
   // Help & learning (#1077) is not a nav item; the sidebar draws its own link.
   ["/help/glossary", "prefix", "Glossary"],
   ["/help", "prefix", helpPageTitle],

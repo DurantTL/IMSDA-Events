@@ -249,7 +249,7 @@ function normal(href: string): string {
 const pathOnly = (href: string) => normal(href).split(/[?#]/)[0];
 
 /** A representative page in each area, so the shell draws that area's row. */
-const areaPages: Record<StaffArea, string> = { home: "/help", events: "/events-admin", clubs: "/admin/clubs", people: "/admin/people", reports: "/admin/analytics", admin: "/admin" };
+const areaPages: Record<StaffArea, string> = { home: "/home", events: "/events-admin", clubs: "/admin/clubs", people: "/admin/people", reports: "/admin/analytics", admin: "/admin" };
 
 function rowHrefs(navigationResult: StaffNavigation): string[] {
   return navigationResult.rowTabs.flatMap((tab) => [tab.href, ...(tab.views ?? []).map((view) => view.href)]);
@@ -440,11 +440,11 @@ describe("a phone reaches exactly the pages a desktop reaches (#475, #1565)", ()
     );
     const bar = markup.slice(markup.indexOf('<nav class="mobile-nav"'));
     const hrefs = [...bar.matchAll(/<a [^>]*href="([^"?]+)/g)].map((match) => match[1]);
-    expect(hrefs).toEqual(["/admin", "/admin/calendar", "/check-in", "/admin/clubs", "/more"]);
+    expect(hrefs).toEqual(["/home", "/admin/calendar", "/check-in", "/admin/clubs", "/more"]);
     expect([...bar.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1])).toEqual(["Home", "Events", "Check-in", "Clubs", "More"]);
     // The same links the rail offers.
     const rail = markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf("</nav>", markup.indexOf('id="primary-navigation"')));
-    for (const href of ["/admin", "/admin/calendar", "/admin/clubs"]) expect(rail).toContain(`href="${href}`);
+    for (const href of ["/home", "/admin/calendar", "/admin/clubs"]) expect(rail).toContain(`href="${href}`);
   });
 
   it("keeps every page that left the sidebar reachable as a view or a More card, with the permission it had (#964, #1565)", () => {
@@ -488,13 +488,12 @@ describe("a phone reaches exactly the pages a desktop reaches (#475, #1565)", ()
     }
   });
 
-  it("starts every phone bar with Home (or the area that opens the same page) and ends it with More, whatever the role", () => {
+  it("starts every phone bar with Home (/home) and ends it with More, whatever the role", () => {
     for (const scenario of scenarios) {
       const bar = navFor(scenario).phoneItems;
       if (bar.length === 0) continue;
-      // A dashboard Home gives way to the item that opens the same page (an Events Administrator's Events), so no page
-      // has two bar links.
-      expect(["home", "events", "clubs"], scenario.name).toContain(bar[0].key);
+      // Home opens its own page (#1568), so no other item shares it and no page has two bar links.
+      expect(bar[0], scenario.name).toMatchObject({ key: "home", href: expect.stringMatching(/^\/home/) });
       const paths = bar.map((item) => new URL(item.href, "https://events.example.test").pathname);
       expect(new Set(paths).size, scenario.name).toBe(paths.length);
       const more = bar.findIndex((item) => item.key === "more");

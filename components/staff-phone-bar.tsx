@@ -27,8 +27,9 @@ export function StaffPhoneBar({
   launcher,
 }: {
   items: readonly PhoneBarItem[];
-  place: Pick<StaffPlace, "area" | "inEvent">;
+  place: Pick<StaffPlace, "area" | "inEvent" | "tab">;
   eventTab: EventTabKey | null;
+  /** The event's first tab, which an Events item with no Events row of its own opens (it lights only there). */
   firstEventTab?: EventTabKey | null;
   /** The tab row or view strip already marks this page "page", so the bar only says "true": one "page" per document. */
   pageMarkedAbove?: boolean;
@@ -47,7 +48,7 @@ export function StaffPhoneBar({
 }) {
   const pathname = usePathname();
   if (items.length === 0) return null;
-  const current = phoneBarCurrent(items, place, eventTab, firstEventTab, pathname);
+  const current = phoneBarCurrent(items, place, eventTab, firstEventTab);
   const currentFor = (href: string) => (!pageMarkedAbove && new URL(href, "https://events.example.test").pathname === pathname ? "page" : "true");
   return (
     <nav className="mobile-nav" aria-label="Mobile navigation">

@@ -99,20 +99,27 @@ const readers: Record<MetricKey, (context: Context) => Promise<number>> = {
   honors: () => getPrisma().honor.count(),
 };
 
-/** The values for one hub and viewer. A metric that failed is `null`; a metric the hub does not show is not read. */
-export async function loadHubMetrics(hub: AdminHubKey, viewer: HubViewer, now = new Date()): Promise<MetricValues> {
+/**
+ * The values of the named metrics for a viewer, each read on its own: one that failed is logged under `label` and becomes
+ * `null` ("Unavailable"). The caller names only metrics the viewer may see.
+ */
+export async function loadMetrics(keys: readonly MetricKey[], viewer: HubViewer, label: string, now = new Date()): Promise<MetricValues> {
   const context: Context = { now, viewer, shared: new Map() };
-  const keys = neededMetrics(hub, viewer);
   const entries = await Promise.all(
     keys.map(async (key): Promise<[MetricKey, number | null]> => {
       try {
         const value = await readers[key](context);
         return [key, Number.isFinite(value) ? value : null];
       } catch (error) {
-        logError(`Admin hub number could not load: ${hub}/${key}`, error);
+        logError(`Admin hub number could not load: ${label}/${key}`, error);
         return [key, null];
       }
     }),
   );
   return Object.fromEntries(entries);
+}
+
+/** The values for one hub and viewer. A metric that failed is `null`; a metric the hub does not show is not read. */
+export async function loadHubMetrics(hub: AdminHubKey, viewer: HubViewer, now = new Date()): Promise<MetricValues> {
+  return loadMetrics(neededMetrics(hub, viewer), viewer, hub, now);
 }
