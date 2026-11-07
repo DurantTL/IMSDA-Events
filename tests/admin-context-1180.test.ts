@@ -100,6 +100,10 @@ describe("distinct work contexts", () => {
     expect(event).toContain('data-context="event"');
     expect(event).toContain("Synthetic Event One");
     expect(render("limited", "/profile")).toContain('data-context="profile"');
+    // Home (#1568) spans every event the person holds, so it names none.
+    const home = render("admin", "/home");
+    expect(home).toContain("Your work");
+    expect(home).not.toContain("Synthetic Event One</span>");
   });
 });
 
