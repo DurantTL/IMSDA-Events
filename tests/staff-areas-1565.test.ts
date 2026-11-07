@@ -189,11 +189,14 @@ describe("event tabs (#1565)", () => {
     expect(tabs.map((tab) => tab.label)).not.toContain("Refunds");
     for (const tab of tabs) {
       const labels = tab.views.map((view) => view.label);
-      if (tab.key === "money") expect(labels).toContain("Payments");
-      else expect(labels).not.toContain("Payments");
-      expect(labels).not.toContain("Refunds");
+      if (tab.key === "money") expect(labels).toEqual(expect.arrayContaining(["Payments", "Refunds"]));
+      else {
+        expect(labels).not.toContain("Payments");
+        expect(labels).not.toContain("Refunds");
+      }
     }
-    expect(tabs.find((tab) => tab.key === "money")?.views.map((view) => view.label)).toEqual(["Payments", "Balances due", "Promo codes"]);
+    // Exactly five views, in this order (#1575).
+    expect(tabs.find((tab) => tab.key === "money")?.views.map((view) => view.label)).toEqual(["Payments", "Balances due", "Refunds", "Promo codes", "More money tools"]);
   });
 
   it("leaves out a tab with nothing the viewer may open, so none is empty", () => {
@@ -234,7 +237,8 @@ describe("event tabs (#1565)", () => {
     expect(place("/check-in/badges")).toEqual({ tab: "check-in", view: "badges" });
     expect(place("/finance")).toEqual({ tab: "money", view: "payments" });
     expect(place("/finance", "filter=BALANCE")).toEqual({ tab: "money", view: "balances" });
-    expect(place("/finance/invoices")).toEqual({ tab: "money", view: "payments" });
+    expect(place("/finance/cancellation-requests")).toEqual({ tab: "money", view: "refunds" });
+    expect(place("/finance/tools")).toEqual({ tab: "money", view: "more-tools" });
     expect(place("/more/promo-codes")).toEqual({ tab: "money", view: "promo" });
     expect(place(kitchenCountsPath)).toEqual({ tab: "reports", view: "kitchen-counts" });
     expect(place("/more/reports/packets")).toEqual({ tab: "reports", view: "printouts" });

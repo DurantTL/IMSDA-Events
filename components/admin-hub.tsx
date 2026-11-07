@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import styles from "@/components/admin-hub.module.css";
-import type { HubView } from "@/modules/system-admin/admin-hubs-model";
+import type { HubBody } from "@/modules/system-admin/admin-hubs-model";
 
 /** The shared chip colours (`.status-chip` in globals.css): status words always, colour only as a second cue. */
 const chipClass = { ok: "green", warn: "coral", review: "purple", soon: "gold", draft: "neutral" } as const;
@@ -11,7 +11,8 @@ const chipClass = { ok: "green", warn: "coral", review: "purple", soon: "gold", 
  * status. The page title is the workspace topbar's heading. Everything here is a link: nothing approves, publishes, sends
  * or changes a record. A status says its words ("Unavailable", "1 to review"), never colour alone.
  */
-export function AdminHub({ view }: { view: HubView }) {
+export function AdminHub({ view }: { view: HubBody }) {
+  const stats = view.stats ?? [];
   return (
     <div className={styles.hub} data-testid={`admin-hub-${view.key}`}>
       <div className={styles.intro}>
@@ -24,11 +25,11 @@ export function AdminHub({ view }: { view: HubView }) {
         ) : null}
       </div>
 
-      {view.stats.length > 0 ? (
+      {stats.length > 0 ? (
         <section aria-labelledby="hub-stats-heading">
           <h2 id="hub-stats-heading" className="sr-only">Key numbers</h2>
-          <ul className={`metric-grid ${styles.stats}`} data-testid="hub-stats" data-count={view.stats.length}>
-            {view.stats.map((stat) => (
+          <ul className={`metric-grid ${styles.stats}`} data-testid="hub-stats" data-count={stats.length}>
+            {stats.map((stat) => (
               <li key={stat.key} className={`metric-card ${styles.stat}`} data-metric={stat.key} data-unavailable={stat.value === null ? "true" : undefined}>
                 <strong className={styles.statValue}>{stat.display}</strong>
                 <p className={styles.statLabel}>{stat.value === null ? `${stat.label}: could not be read just now` : stat.label}</p>

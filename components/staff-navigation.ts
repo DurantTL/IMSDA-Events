@@ -35,6 +35,7 @@ import {
   Users,
   UsersRound,
   WalletCards,
+  Wrench,
 } from "lucide-react";
 import { kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
@@ -171,6 +172,16 @@ export const staffPageTitles = {
   issuedAssets: "Issued assets",
   scheduledEmails: "Scheduled emails",
   ledgerCheck: "Ledger check (shadow)",
+  // The money pages the More money tools view lists (#1575): the titles the pages already carry, named once here.
+  moreMoneyTools: "More money tools",
+  invoices: "Invoices",
+  churchOwed: "Owed by churches",
+  billingResponsibility: "Billing responsibility",
+  scholarshipFund: "Scholarship fund",
+  squarePayments: "Unmatched Square payments",
+  attendanceReconciliation: "Attendance reconciliation",
+  cancellationPolicy: "Cancellation rules",
+  cancellationRequests: "Cancellation requests",
 } as const;
 
 /** Help & learning (#1077): not a nav item (the sidebar draws its own link), so it is not in `staffPageTitles`. */
@@ -214,6 +225,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/emergency-plan", "prefix", staffPageTitles.emergencyPlan],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
   ["/more/ledger-health", "prefix", staffPageTitles.ledgerCheck],
+  ["/finance/tools", "prefix", staffPageTitles.moreMoneyTools],
   ["/more/kitchen-report/counts", "prefix", staffPageTitles.kitchenCounts],
   ["/more/kitchen-report/closeout", "prefix", staffPageTitles.mealCloseout],
   ["/events-admin", "exact", "Event administration"],
@@ -384,6 +396,7 @@ export const navigation: readonly NavigationItem[] = [
   { href: "/imports", label: staffPageTitles.imports, icon: FileUp, requiredPermission: "MANAGE_IMPORTS", sidebarParent: "/people" },
   { href: "/staff", label: staffPageTitles.team, icon: UserCog, requiredPermission: "MANAGE_STAFF", sidebarParent: "/more" },
   { href: "/more/promo-codes", label: staffPageTitles.promoCodes, icon: TicketPercent, requiredPermission: "MANAGE_FINANCE", sidebarParent: "/finance" },
+  { href: "/finance/tools", label: staffPageTitles.moreMoneyTools, icon: Wrench, requiredPermission: "MANAGE_FINANCE", sidebarParent: "/finance" },
   {
     href: "/more",
     label: staffPageTitles.more,

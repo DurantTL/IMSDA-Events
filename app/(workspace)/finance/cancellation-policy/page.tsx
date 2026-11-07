@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { staffPageTitles } from "@/components/staff-navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { CancellationPolicyWorkspace } from "@/components/cancellation-policy-workspace";
 import { listPolicyVersions } from "@/modules/cancellation-policy/repository";
 import { listCancellationPresetOptions } from "@/modules/event-content/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 
-export const metadata: Metadata = { title: "Cancellation rules" };
+export const metadata: Metadata = { title: staffPageTitles.cancellationPolicy };
 
 export default async function CancellationPolicyPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;

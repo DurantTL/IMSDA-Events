@@ -195,7 +195,7 @@ export function ChurchAmountsOwed({
         </section>
       )}
       <p className="field-help">
-        <Link href={`/finance?event=${eventId}`}>Back to payments &amp; balances</Link>
+        <Link href={`/finance/tools?event=${eventId}`}>Back to More money tools</Link>
       </p>
     </section>
   );

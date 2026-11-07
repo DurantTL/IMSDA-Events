@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { staffPageTitles } from "@/components/staff-navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { ChurchAmountsOwed } from "@/components/church-amounts-owed";
 import { ChurchCodeInvoices } from "@/components/church-code-invoices";
@@ -11,7 +12,7 @@ import { listChurchSponsoredPromoLines } from "@/modules/promo-codes/church-spon
 import { listOpenChurchSponsorFlags } from "@/modules/promo-codes/church-sponsor-lodging";
 import { listChurchAmountsOwed } from "@/modules/club-registrations/repository";
 
-export const metadata: Metadata = { title: "Owed by churches" };
+export const metadata: Metadata = { title: staffPageTitles.churchOwed };
 
 export default async function ChurchOwedPage({ searchParams }: { searchParams: Promise<{ event?: string; location?: string }> }) {
   const { event: requested, location: requestedLocation } = await searchParams;
