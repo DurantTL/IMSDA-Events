@@ -85,18 +85,19 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/event-setup/from-template` | Page link | Events | Create an event | - | bar: Events | Events menu | - | `app/(workspace)/event-setup/from-template/page.tsx` |
 | `/events-admin` | Page link | Events | Event administration | - | bar: Events | Events menu | - | `app/(workspace)/events-admin/page.tsx` |
 | `/finance` | Event sidebar | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/page.tsx` |
-| `/finance/attendance-reconciliation` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/attendance-reconciliation/page.tsx` |
-| `/finance/billing-responsibility` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/billing-responsibility/page.tsx` |
-| `/finance/cancellation-policy` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/cancellation-policy/page.tsx` |
-| `/finance/cancellation-requests` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/cancellation-requests/page.tsx` |
-| `/finance/church-owed` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/church-owed/page.tsx` |
-| `/finance/invoices` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/invoices/page.tsx` |
-| `/finance/invoices/[invoiceId]` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/invoices/[invoiceId]/page.tsx` |
-| `/finance/invoices/[invoiceId]/send` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/invoices/[invoiceId]/send/page.tsx` |
-| `/finance/invoices/statements` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/invoices/statements/page.tsx` |
-| `/finance/invoices/statements/[partyId]` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/invoices/statements/[partyId]/page.tsx` |
-| `/finance/scholarship-fund` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/scholarship-fund/page.tsx` |
-| `/finance/square-payments` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/finance/square-payments/page.tsx` |
+| `/finance/attendance-reconciliation` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/attendance-reconciliation/page.tsx` |
+| `/finance/billing-responsibility` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/billing-responsibility/page.tsx` |
+| `/finance/cancellation-policy` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/cancellation-policy/page.tsx` |
+| `/finance/cancellation-requests` | Page link | Events (inside an event) | Money | Refunds | More, This event | Event menu | - | `app/(workspace)/finance/cancellation-requests/page.tsx` |
+| `/finance/church-owed` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/church-owed/page.tsx` |
+| `/finance/invoices` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/invoices/page.tsx` |
+| `/finance/invoices/[invoiceId]` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/invoices/[invoiceId]/page.tsx` |
+| `/finance/invoices/[invoiceId]/send` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/invoices/[invoiceId]/send/page.tsx` |
+| `/finance/invoices/statements` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/invoices/statements/page.tsx` |
+| `/finance/invoices/statements/[partyId]` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/invoices/statements/[partyId]/page.tsx` |
+| `/finance/scholarship-fund` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/scholarship-fund/page.tsx` |
+| `/finance/square-payments` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/square-payments/page.tsx` |
+| `/finance/tools` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/finance/tools/page.tsx` |
 | `/help` | Page link | Home | none (Help, Profile and pages no tab lists light no rail item) | - | bar: Home | Home menu | - | `app/(workspace)/help/page.tsx` |
 | `/help/[guideId]` | Page link | Home | none (Help, Profile and pages no tab lists light no rail item) | - | bar: Home | Home menu | - | `app/(workspace)/help/[guideId]/page.tsx` |
 | `/help/glossary` | Page link | Home | none (Help, Profile and pages no tab lists light no rail item) | - | bar: Home | Home menu | - | `app/(workspace)/help/glossary/page.tsx` |
@@ -131,7 +132,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/more/kitchen-report/closeout` | Page link | Events (inside an event) | Reports | Kitchen report | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/closeout/page.tsx` |
 | `/more/kitchen-report/counts` | Event sidebar | Events (inside an event) | Reports | Kitchen counts | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/counts/page.tsx` |
 | `/more/kitchen-report/scanner-import` | Page link | Events (inside an event) | Reports | Kitchen report | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/scanner-import/page.tsx` |
-| `/more/ledger-health` | Page link | Events (inside an event) | Money | Payments | More, This event | Event menu | - | `app/(workspace)/more/ledger-health/page.tsx` |
+| `/more/ledger-health` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/more/ledger-health/page.tsx` |
 | `/more/lodging` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/lodging/page.tsx` |
 | `/more/lodging/assignments` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/lodging/assignments/page.tsx` |
 | `/more/lodging/requests` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/lodging/requests/page.tsx` |
@@ -164,7 +165,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/select-event` | Existing page link | Home | none (Help, Profile and pages no tab lists light no rail item) | - | bar: Home | Home menu | - | `app/select-event/page.tsx` |
 | `/staff` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/staff/page.tsx` |
 
-155 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
+156 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
 
 ## Query states that move a page to another tab or view
 
