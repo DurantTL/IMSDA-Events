@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -52,13 +54,44 @@ describe("/no-access for event staff is unchanged", () => {
   });
 });
 
+describe("club-scoped refusals give a Clubs Administrator a reason (B14)", () => {
+  beforeEach(() => mocks.clubsAdmin.mockResolvedValue(true));
+
+  it.each([
+    ["club-only", "Only club organizations are managed from Club administration."],
+    ["site-content", "Website content needs the site-content permission"],
+    ["health-access", "managed by IMSDA system administrators"],
+  ])("says why for from=%s, names who to ask and links back to Club administration", async (from, words) => {
+    const html = await render(from);
+    expect(html).toContain(words);
+    expect(html).toContain("Ask an IMSDA system administrator if you need access.");
+    expect(html).toContain('href="/admin/clubs"');
+    expect(html).not.toContain("No events are assigned");
+  });
+
+  it("keeps the existing copy for event staff who arrive with the same reasons", async () => {
+    mocks.clubsAdmin.mockResolvedValue(false);
+    expect(await render("site-content")).toContain("No events are assigned");
+  });
+
+  it("sends the reasons from the pages that refuse", () => {
+    const read = (file: string) => readFileSync(`app/(workspace)/admin/${file}/page.tsx`, "utf8");
+    for (const file of ["organizations/[organizationId]/profile", "organizations/[organizationId]/directors", "organizations/[organizationId]/club/honors"]) {
+      expect(read(file)).toContain('redirect("/no-access?from=club-only")');
+    }
+    for (const file of ["site-content", "site-content/preview"]) expect(read(file)).toContain('redirect("/no-access?from=site-content")');
+    expect(read("health-access")).toContain('redirect("/no-access?from=health-access")');
+  });
+});
+
 describe("system-only /admin pages send the reason", () => {
-  it("adds ?from=system to the redirects in app/(workspace)/admin", async () => {
-    const { execSync } = await import("node:child_process");
-    const plain = execSync(`grep -rn 'globalRole !== "SYSTEM_ADMIN") redirect("/no-access")' "app/(workspace)/admin" || true`).toString();
-    expect(plain).toBe("");
+  it("adds ?from=system to the redirects in app/(workspace)/admin", () => {
+    const root = "app/(workspace)/admin";
+    const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? walk(join(dir, entry.name)) : entry.name === "page.tsx" ? [join(dir, entry.name)] : []);
+    const plain = walk(root).filter((file) => /globalRole !== "SYSTEM_ADMIN"\) redirect\("\/no-access"\)/.test(readFileSync(file, "utf8")));
+    expect(plain).toEqual([]);
     for (const file of ["page.tsx", "email/page.tsx"]) {
-      expect((await import("node:fs")).readFileSync(`app/(workspace)/admin/${file}`, "utf8")).toContain('redirect("/no-access?from=system")');
+      expect(readFileSync(join(root, file), "utf8")).toContain('redirect("/no-access?from=system")');
     }
   });
 });

@@ -143,6 +143,22 @@ describe("POST /api/auth/login destination", () => {
     expect((await response.json()).redirectTo).toBe("/admin/clubs");
   });
 
+  it("sends a Clubs Administrator whose only events are archived to Club administration, not the archived list", async () => {
+    mocks.authenticateWithPassword.mockResolvedValue(signedInSession());
+    mocks.listEventsForUser.mockResolvedValue([{ id: "evt_old", archivedAt: new Date("2025-01-01T00:00:00Z") }]);
+    mocks.isActiveClubsAdministrator.mockResolvedValue(true);
+
+    expect((await (await login(post("/api/auth/login", credentials))).json()).redirectTo).toBe("/admin/clubs");
+  });
+
+  it("still sends event staff with only archived events to the archived list", async () => {
+    mocks.authenticateWithPassword.mockResolvedValue(signedInSession());
+    mocks.listEventsForUser.mockResolvedValue([{ id: "evt_old", archivedAt: new Date("2025-01-01T00:00:00Z") }]);
+    mocks.isActiveClubsAdministrator.mockResolvedValue(false);
+
+    expect((await (await login(post("/api/auth/login", credentials))).json()).redirectTo).toBe("/archived-events");
+  });
+
   it("still sends event staff with no events to no-access", async () => {
     mocks.authenticateWithPassword.mockResolvedValue(signedInSession());
     mocks.listEventsForUser.mockResolvedValue([]);
