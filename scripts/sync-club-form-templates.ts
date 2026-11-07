@@ -27,6 +27,29 @@ import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
+/** Submissions whose sealed value still holds one of the two forms' emergency keys (opened here, never printed). */
+async function countStillSealed(
+  prisma: import("@prisma/client").PrismaClient,
+  templateKeys: string[],
+  keysByTemplate: Readonly<Record<string, readonly string[]>>,
+) {
+  const { openSensitiveAnswers } = await import("../modules/club-forms/sealed-answers");
+  const rows = await prisma.clubFormSubmission.findMany({
+    where: { template: { key: { in: templateKeys } }, sealedSensitiveAnswers: { not: null } },
+    select: { id: true, sealedSensitiveAnswers: true, template: { select: { key: true } } },
+  });
+  let count = 0;
+  for (const row of rows) {
+    try {
+      const held = Object.keys(openSensitiveAnswers(row.id, row.sealedSensitiveAnswers!));
+      if (held.some((key) => keysByTemplate[row.template.key]?.includes(key))) count += 1;
+    } catch {
+      // A value that cannot be opened here is the unseal script's to report, not this reminder's.
+    }
+  }
+  return count;
+}
+
 async function main() {
   const { getPrisma } = await import("../lib/prisma");
   const { syncClubFormTemplates } = await import("../modules/club-forms/templates");
@@ -48,7 +71,7 @@ async function main() {
     const { EMERGENCY_PLAIN_KEYS } = await import("../modules/club-forms/plain-emergency");
     const emergencyKeys = Object.keys(EMERGENCY_PLAIN_KEYS);
     const versionChanged = updated.some((item) => !item.created && emergencyKeys.includes(item.key));
-    const stillSealed = versionChanged ? 0 : await prisma.clubFormSubmission.count({ where: { template: { key: { in: emergencyKeys } }, sealedSensitiveAnswers: { not: null } } });
+    const stillSealed = versionChanged ? 0 : await countStillSealed(prisma, emergencyKeys, EMERGENCY_PLAIN_KEYS);
     if (versionChanged || stillSealed > 0) {
       console.log("The Off-Premises Permission Slip and the Transportation Passenger List now keep emergency and physician answers plain. Move the existing ones with: npm run club-forms:unseal-emergency (dry run), then npm run club-forms:unseal-emergency -- --execute --actor <your account email>.");
     }

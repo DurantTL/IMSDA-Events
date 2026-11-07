@@ -1013,7 +1013,7 @@ async function main() {
     // Everyone who can see the form sees the answers; the other sealed answer stays Restricted; the CSV has the columns.
     const areaPlain = await submissions.getSubmissionForViewer(area, onlyEmergency.id);
     assert(areaPlain.answers.physician_name === SECRET_PHYSICIAN && areaPlain.answers.emergency_contact_phone === SECRET_PHONE, "an Area Coordinator now reads the physician and emergency answers");
-    assert(areaPlain.restrictedKeys.includes("activity") && !areaPlain.restrictedKeys.includes("physician_name") && !areaPlain.restrictedKeys.includes("emergency_contact_phone") && !("activity" in areaPlain.answers), "the other sealed answer is still Restricted for an Area Coordinator");
+    assert(areaPlain.restrictedKeys.join() === "activity" && !("activity" in areaPlain.answers), "the other sealed answer is still Restricted for an Area Coordinator");
     const areaList = await submissions.getSubmissionForViewer(area, roster.id);
     assert(areaList.answers.passenger_1_emergency_contact === PASSENGER_CONTACT && areaList.restrictedKeys.length === 0, "an Area Coordinator reads the passenger emergency contact");
     const planCsv = await csv.buildClubFormsCsv(eventAdmin, { templateKey: PASSENGERS });

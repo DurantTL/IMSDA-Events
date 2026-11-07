@@ -456,8 +456,19 @@ export async function getSubmissionForViewer(
   // Between a deploy and the human-run `npm run club-forms:unseal-emergency`, an older submission still holds the
   // emergency answers inside its sealed value. A viewer who cannot open it sees Restricted, not a blank (ADR 0005 Addendum G).
   if (!reveal && row.hasSensitiveAnswers) {
-    for (const key of emergencyPlainKeys(template.key)) {
-      if ((row.answers as Record<string, unknown>)[key] === undefined) restricted.add(key);
+    const missing = emergencyPlainKeys(template.key).filter((key) => (row.answers as Record<string, unknown>)[key] === undefined);
+    // Only the keys the sealed value really holds are restricted (the values themselves never leave here). When it
+    // cannot be opened, every missing one is, so nothing is ever shown as a harmless blank.
+    let held: ReadonlySet<string> | null = null;
+    if (missing.length > 0 && row.sealedSensitiveAnswers && isSecretEncryptionConfigured()) {
+      try {
+        held = new Set(Object.keys(openSensitiveAnswers(row.id, row.sealedSensitiveAnswers)));
+      } catch {
+        held = null;
+      }
+    }
+    for (const key of missing) {
+      if (!held || held.has(key)) restricted.add(key);
     }
   }
 

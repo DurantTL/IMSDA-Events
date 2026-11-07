@@ -45,6 +45,9 @@ import { buildClubFormsCsv } from "@/modules/club-forms/csv";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
 import { parseClubFormTemplate, restrictedFieldKeys, splitAnswers, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { EMERGENCY_PLAIN_KEYS, emergencyPlainKeys, withoutEmergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
+import { sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
+import { SLIP_MEDICAL_NOTE_AFTER, SLIP_MEDICAL_NOTE_BEFORE } from "@/modules/club-forms/plain-emergency";
+import { getClubFormTemplateAtVersion } from "@/modules/club-forms/versions";
 import { getSubmissionForViewer } from "@/modules/club-forms/submissions";
 import { syncClubFormTemplates } from "@/modules/club-forms/templates";
 
@@ -185,18 +188,41 @@ describe("what everyone who can see the form gets", () => {
 });
 
 describe("between the deploy and the unseal script", () => {
-  const view = (answers: Record<string, unknown>, hasSensitiveAnswers: boolean) => ({
+  const view = (answers: Record<string, unknown>, hasSensitiveAnswers: boolean, sealedValue: Record<string, unknown> | null = null) => ({
     id: "sub-1", organizationId: "club-a", clubYear: "2026-27", rosterMemberId: null, subjectName: "Riley Sample", status: "SUBMITTED",
     submittedAt: new Date("2026-10-05T15:00:00Z"), enteredVia: "ATTENDEE", unlistedClubName: null, answers,
-    sealedSensitiveAnswers: null, hasSensitiveAnswers, templateVersion: slip.version, organization: { name: "Example Pathfinders" }, template: row(slip),
+    sealedSensitiveAnswers: sealedValue ? sealSensitiveAnswers("sub-1", sealedValue) : null, hasSensitiveAnswers, templateVersion: slip.version, organization: { name: "Example Pathfinders" }, template: row(slip),
   });
 
   it("shows Restricted, not a blank, to a viewer who cannot open the sealed value that still holds the answers", async () => {
     mocks.templateFindUnique.mockResolvedValue(row(slip));
-    mocks.submissionFindFirst.mockResolvedValue(view({ child_name: "Riley Sample" }, true));
+    mocks.submissionFindFirst.mockResolvedValue(view({ child_name: "Riley Sample" }, true, { physician_name: "Dr. Sealed", emergency_contact_phone: "(515) 555-0199" }));
     const seen = await getSubmissionForViewer(areaCoordinator, "sub-1");
-    expect([...seen.restrictedKeys].sort()).toEqual([...OLD_SLIP_KEYS].sort());
+    expect([...seen.restrictedKeys].sort()).toEqual(["emergency_contact_phone", "physician_name"]);
     expect(seen.answers).not.toHaveProperty("physician_name");
+    expect(JSON.stringify(seen)).not.toContain("Dr. Sealed");
+  });
+
+  it("restricts every missing key when the sealed value cannot be opened", async () => {
+    mocks.templateFindUnique.mockResolvedValue(row(slip));
+    mocks.submissionFindFirst.mockResolvedValue({ ...view({ child_name: "Riley Sample" }, true), sealedSensitiveAnswers: "v1.not.a.value" });
+    expect([...(await getSubmissionForViewer(areaCoordinator, "sub-1")).restrictedKeys].sort()).toEqual([...OLD_SLIP_KEYS].sort());
+  });
+
+  it("after the unseal, a blank emergency field next to another sealed answer is not restricted", async () => {
+    mocks.templateFindUnique.mockResolvedValue(row(slip));
+    mocks.submissionFindFirst.mockResolvedValue(view({ child_name: "Riley Sample", physician_name: "Dr. Plain" }, true, { activity: "kept sealed" }));
+    const seen = await getSubmissionForViewer(areaCoordinator, "sub-1");
+    expect(seen.restrictedKeys).toEqual([]);
+  });
+
+  it("shows an older version's slip with the new medical note, and leaves a note staff wrote", async () => {
+    const current = parseClubFormTemplate(row(slip));
+    const old = (notes: unknown) => ({ version: 2, definition: slip.definition, sectionNotes: notes, sensitiveFieldKeys: OLD_SLIP_KEYS, birthDateFieldKeys: [], staffOnlyFieldKeys: [], hiddenFieldKeys: [], printLayout: "STANDARD" });
+    (client.clubFormTemplateVersion.findUnique as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(old({ sec_medical: [SLIP_MEDICAL_NOTE_BEFORE] }));
+    expect((await getClubFormTemplateAtVersion(current, 2, client as never)).sectionNotes.sec_medical).toEqual([SLIP_MEDICAL_NOTE_AFTER]);
+    (client.clubFormTemplateVersion.findUnique as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(old({ sec_medical: ["Staff note."] }));
+    expect((await getClubFormTemplateAtVersion(current, 2, client as never)).sectionNotes.sec_medical).toEqual(["Staff note."]);
   });
 
   it("does not restrict a key that already has its plain answer, or a submission with nothing sealed", async () => {

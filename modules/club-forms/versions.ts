@@ -7,7 +7,7 @@ import {
   sectionNotesSchema,
   type ClubFormTemplateRecord,
 } from "@/modules/club-forms/domain";
-import { withoutEmergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
+import { sectionNotesWithPlainEmergencyText, withoutEmergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import type { ClubFormProtectionHistory } from "@/modules/club-forms/builder-domain";
 import { fieldDisplayLabel, registrationFormDefinitionSchema, type RegistrationFormField } from "@/modules/forms/definition";
 
@@ -88,7 +88,8 @@ function recordAtVersion(current: ClubFormTemplateRecord, row: VersionRow): Club
     ...current,
     version: row.version,
     definition: registrationFormDefinitionSchema.parse(row.definition),
-    sectionNotes: sectionNotesSchema.parse(row.sectionNotes ?? {}),
+    // An older version's slip note says only directors and staff can read the medical answers; after the 2026-11-07 decision it does not.
+    sectionNotes: sectionNotesSchema.parse(sectionNotesWithPlainEmergencyText(current.key, row.sectionNotes ?? {}) ?? row.sectionNotes ?? {}),
     // The owner's 2026-11-07 decision (plain-emergency.ts) is the one exception: an older version's emergency
     // keys do not stay sensitive once the current template no longer lists them (their answers are plain after
     // `npm run club-forms:unseal-emergency`), so the staff CSV and the views read them.
