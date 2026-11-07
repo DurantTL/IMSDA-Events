@@ -87,6 +87,7 @@ export const config = {
     "/community/:path*",
     "/finance/:path*",
     "/help/:path*",
+    "/home/:path*",
     "/imports/:path*",
     "/information-forms/:path*",
     "/more/:path*",
