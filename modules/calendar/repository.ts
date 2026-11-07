@@ -345,6 +345,15 @@ export async function listCalendarEntryPage(query: CalendarEntryQuery = defaultE
 }
 
 /**
+ * How many entries the Entries list would match for a set of filters, by the same where-clause (repeating series that began
+ * in the past count while they still have an occurrence). Used by the Admin Events hub (#1569).
+ */
+export async function countCalendarEntries(filters: EntryFilters, now = new Date()): Promise<number> {
+  const prisma = getPrisma();
+  return prisma.calendarEntry.count({ where: await entryWhereFor(prisma, filters, calendarDateIn(now)) });
+}
+
+/**
  * The ids behind "Select all N matching": every entry the filters match, found by the same where-clause as the list, up to
  * the bulk limit. Past the limit only the count comes back, and the list asks to narrow the filters (#1492).
  */

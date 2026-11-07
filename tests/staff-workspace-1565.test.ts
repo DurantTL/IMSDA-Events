@@ -114,9 +114,9 @@ describe("aria-current (#1565)", () => {
     const clubs = shell("/admin/clubs", { active: "CLUBS_ADMIN" });
     expect(pageMarks(clubs.slice(clubs.indexOf('<nav class="mobile-nav"')))).toBe(0);
     expect(pageMarks(clubs.slice(0, clubs.indexOf('<nav class="mobile-nav"')))).toBe(1);
-    // The tab links elsewhere than the page (Catalogs and settings opens its hub, a card there opens the requests page): "true", not "page".
+    // The tab links elsewhere than the page (Events opens its hub, a card there opens the requests page): "true", not "page".
     const requests = shell("/admin/feature-requests");
-    expect(row(requests)).toContain('aria-current="true" href="/admin/hubs/catalogs?event=synthetic_event">Catalogs and settings');
+    expect(row(requests)).toContain('aria-current="true" href="/admin/hubs/events?event=synthetic_event">Events');
   });
 });
 

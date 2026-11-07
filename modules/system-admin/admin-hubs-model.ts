@@ -18,11 +18,11 @@ export type { AdminHubKey };
 export type HubViewer = { isSystemAdmin: boolean; clubsAdmin: boolean; siteContentEditor: boolean };
 
 export type MetricKey =
-  | "upcomingEvents" | "unpublishedEvents" | "pastEvents" | "archivedEvents" | "calendarThisMonth" | "calendarUnpublished" | "moduleRequests" | "eventTemplates"
+  | "upcomingEvents" | "unpublishedEvents" | "copyableEvents" | "archivedEvents" | "calendarPublished" | "calendarUnpublished" | "moduleRequests" | "eventTemplates"
   | "clubs" | "applicationsWaiting" | "lateRecords" | "openTransfers" | "clubLeaders"
   | "staffLogins" | "invitesWaiting"
   | "formsTotal" | "clubFormsOn" | "informationFormsOpen" | "draftForms" | "formTemplates" | "savedQuestions"
-  | "readinessAttention" | "readinessToConfirm" | "emailProblems" | "pausedAreas" | "honors";
+  | "readinessAttention" | "readinessToConfirm" | "readinessUnknown" | "emailProblems" | "pausedAreas" | "honors";
 
 /** `null` is "could not be read"; a missing key is "not asked for". */
 export type MetricValues = Partial<Record<MetricKey, number | null>>;
@@ -50,7 +50,8 @@ type CardDef = {
   status?: (read: Reader) => CardStatus | null;
 };
 
-type StatDef = { metric: MetricKey; singular: string; plural: string; gate: HubGate };
+/** `note` is a line under the label for a caveat the number alone would hide (checks that could not be read). */
+type StatDef = { metric: MetricKey; singular: string; plural: string; gate: HubGate; alsoNeeds?: readonly MetricKey[]; note?: (read: Reader) => string | null };
 type ActionDef = { href: string; label: string; gate: HubGate };
 type GroupDef = { title: string; cards: readonly CardDef[] };
 type HubDef = { stats: readonly StatDef[]; actions: readonly ActionDef[]; groups: readonly GroupDef[] };
@@ -74,7 +75,7 @@ const hubDefs: Record<AdminHubKey, HubDef> = {
     stats: [
       { metric: "upcomingEvents", singular: "Upcoming published event", plural: "Upcoming published events", gate: hubGates.system },
       { metric: "unpublishedEvents", singular: "Unpublished upcoming event", plural: "Unpublished upcoming events", gate: hubGates.system },
-      { metric: "calendarThisMonth", singular: "Calendar item this month", plural: "Calendar items this month", gate: hubGates.system },
+      { metric: "calendarPublished", singular: "Published upcoming calendar item", plural: "Published upcoming calendar items", gate: hubGates.system },
       { metric: "moduleRequests", singular: "Module request waiting", plural: "Module requests waiting", gate: hubGates.system },
     ],
     actions: [{ href: "/event-setup", label: "Create an event", gate: hubGates.system }],
@@ -83,7 +84,7 @@ const hubDefs: Record<AdminHubKey, HubDef> = {
         title: "Start something",
         cards: [
           { href: "/event-setup", gate: hubGates.system },
-          { href: "/event-setup/copy", gate: hubGates.system, metrics: ["pastEvents"], status: (read) => count(read("pastEvents")!, "draft", "past event", "past events") },
+          { href: "/event-setup/copy", gate: hubGates.system, metrics: ["copyableEvents"], status: (read) => count(read("copyableEvents")!, "draft", "event to copy", "events to copy") },
         ],
       },
       {
@@ -197,7 +198,18 @@ const hubDefs: Record<AdminHubKey, HubDef> = {
   },
   catalogs: {
     stats: [
-      { metric: "readinessAttention", singular: "Readiness check needs attention", plural: "Readiness checks need attention", gate: hubGates.system },
+      {
+        metric: "readinessAttention",
+        singular: "Readiness check needs attention",
+        plural: "Readiness checks need attention",
+        gate: hubGates.system,
+        alsoNeeds: ["readinessUnknown"],
+        note: (read) => {
+          const unknown = read("readinessUnknown");
+          if (unknown === null) return "Some checks could not be read";
+          return unknown > 0 ? `${unknown} ${unknown === 1 ? "check" : "checks"} could not be read` : null;
+        },
+      },
       { metric: "emailProblems", singular: "Failed or bounced email", plural: "Failed or bounced emails", gate: hubGates.system },
       { metric: "pausedAreas", singular: "Area paused", plural: "Areas paused", gate: hubGates.system },
       { metric: "honors", singular: "Honor in the catalog", plural: "Honors in the catalog", gate: hubGates.clubs },
@@ -214,11 +226,14 @@ const hubDefs: Record<AdminHubKey, HubDef> = {
           {
             href: "/admin/readiness",
             gate: hubGates.system,
-            metrics: ["readinessAttention", "readinessToConfirm"],
+            metrics: ["readinessAttention", "readinessToConfirm", "readinessUnknown"],
             status: (read) => {
               const attention = read("readinessAttention")!;
               const toConfirm = read("readinessToConfirm")!;
+              const unknown = read("readinessUnknown")!;
               if (attention > 0) return { tone: "warn", text: `${attention} need${attention === 1 ? "s" : ""} attention` };
+              // A check that could not be read is never "ready".
+              if (unknown > 0) return { tone: "soon", text: `${unknown} could not be read` };
               return toConfirm > 0 ? { tone: "soon", text: `${toConfirm} to confirm` } : { tone: "ok", text: "All ready" };
             },
           },
@@ -263,7 +278,7 @@ function lateStatus(read: Reader): CardStatus {
   return n > 0 ? { tone: "warn", text: `${n} late` } : { tone: "ok", text: "None late" };
 }
 
-export type HubStat = { key: MetricKey; value: number | null; label: string; display: string };
+export type HubStat = { key: MetricKey; value: number | null; label: string; display: string; note: string | null };
 export type HubCard = { href: string; title: string; description: string; status: CardStatus | null };
 export type HubGroup = { title: string; cards: HubCard[] };
 export type HubView = {
@@ -331,7 +346,10 @@ export function neededMetrics(hub: AdminHubKey, viewer: HubViewer): MetricKey[] 
   const def = hubDefs[hub];
   const keys = new Set<MetricKey>();
   for (const card of visibleCards(def, viewer)) for (const key of card.metrics ?? []) keys.add(key);
-  for (const stat of visibleStats(def, viewer)) keys.add(stat.metric);
+  for (const stat of visibleStats(def, viewer)) {
+    keys.add(stat.metric);
+    for (const key of stat.alsoNeeds ?? []) keys.add(key);
+  }
   return [...keys];
 }
 
@@ -348,6 +366,7 @@ export function buildHubView(hub: AdminHubKey, viewer: HubViewer, values: Metric
       value,
       label: value === 1 ? stat.singular : stat.plural,
       display: value === null ? "Unavailable" : value.toLocaleString("en-US"),
+      note: stat.note ? stat.note(reading) : null,
     };
   });
   const action = def.actions.find((candidate) => candidate.gate(viewer)) ?? null;

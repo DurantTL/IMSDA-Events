@@ -274,7 +274,7 @@ function readiness(overrides: Partial<SystemReadiness> = {}): SystemReadiness {
       }],
     }],
     ticksAvailable: true,
-    summary: { manualDone: 1, manualTotal: 2, automaticAttention: 1 },
+    summary: { manualDone: 1, manualTotal: 2, automaticAttention: 1, automaticUnknown: 0 },
     ...overrides,
   };
 }
@@ -435,7 +435,7 @@ describe("readiness page keeps four kinds apart", () => {
     const html = renderReadiness(readiness({
       automatic: [{ key: "migrations", title: "x", status: "unknown", summary: "could not be read", people: [] }],
       groups: [],
-      summary: { manualDone: 0, manualTotal: 0, automaticAttention: 0 },
+      summary: { manualDone: 0, manualTotal: 0, automaticAttention: 0, automaticUnknown: 0 },
     }));
     expect(html).not.toContain("Every automatic check passed");
     expect(html).toContain("Could not be checked, so not counted as done");

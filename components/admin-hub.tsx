@@ -3,6 +3,9 @@ import { NavigationLink as Link } from "@/components/navigation-link";
 import styles from "@/components/admin-hub.module.css";
 import type { HubView } from "@/modules/system-admin/admin-hubs-model";
 
+/** The shared chip colours (`.status-chip` in globals.css): status words always, colour only as a second cue. */
+const chipClass = { ok: "green", warn: "coral", review: "purple", soon: "gold", draft: "neutral" } as const;
+
 /**
  * One Admin hub page body (#1569): the key numbers, the one main action, then a card for each destination with its own
  * status. The page title is the workspace topbar's heading. Everything here is a link: nothing approves, publishes, sends
@@ -24,11 +27,12 @@ export function AdminHub({ view }: { view: HubView }) {
       {view.stats.length > 0 ? (
         <section aria-labelledby="hub-stats-heading">
           <h2 id="hub-stats-heading" className="sr-only">Key numbers</h2>
-          <ul className={styles.stats} data-testid="hub-stats">
+          <ul className={`metric-grid ${styles.stats}`} data-testid="hub-stats" data-count={view.stats.length}>
             {view.stats.map((stat) => (
-              <li key={stat.key} className={styles.stat} data-metric={stat.key} data-unavailable={stat.value === null ? "true" : undefined}>
-                <span className={styles.statValue}>{stat.display}</span>
-                <span className={styles.statLabel}>{stat.value === null ? `${stat.label}: could not be read just now` : stat.label}</span>
+              <li key={stat.key} className={`metric-card ${styles.stat}`} data-metric={stat.key} data-unavailable={stat.value === null ? "true" : undefined}>
+                <strong className={styles.statValue}>{stat.display}</strong>
+                <p className={styles.statLabel}>{stat.value === null ? `${stat.label}: could not be read just now` : stat.label}</p>
+                {stat.note ? <small className={styles.statNote}>{stat.note}</small> : null}
               </li>
             ))}
           </ul>
@@ -46,7 +50,7 @@ export function AdminHub({ view }: { view: HubView }) {
                   <Link className={styles.card} href={card.href} data-testid="hub-card">
                     <span className={styles.cardTop}>
                       <span className={styles.cardTitle}>{card.title}</span>
-                      {card.status ? <span className={styles.chip} data-tone={card.status.tone}>{card.status.text}</span> : null}
+                      {card.status ? <span className={`status-chip ${chipClass[card.status.tone]} ${styles.chip}`} data-tone={card.status.tone}>{card.status.text}</span> : null}
                     </span>
                     <span className={styles.cardText}>{card.description}</span>
                   </Link>

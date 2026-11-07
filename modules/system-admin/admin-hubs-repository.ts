@@ -2,7 +2,9 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
-import { calendarDateIn } from "@/modules/calendar/domain";
+import { defaultEntryFilters } from "@/modules/calendar/admin-list";
+import { countCalendarEntries } from "@/modules/calendar/repository";
+import { listInformationForms } from "@/modules/information-forms/repository";
 import { countWaitingNewClubApplications } from "@/modules/club-applications/repository";
 import { listClubFormsForHub } from "@/modules/club-forms/hub";
 import { countStaffTransferQueue } from "@/modules/club-transfers/repository";
@@ -53,20 +55,24 @@ const readiness = (context: Context) => shared(context, "readiness", () => getSy
 
 const attention = (context: Context) => shared(context, "attention", () => getAdminAttentionSummary(context.now.getTime()));
 
+/** Standard items and closures: the entry types the public calendar can show. */
+async function countPublicCalendarEntries(filters: typeof defaultEntryFilters, now: Date) {
+  const [standard, closures] = await Promise.all([
+    countCalendarEntries({ ...filters, entryType: "STANDARD" }, now),
+    countCalendarEntries({ ...filters, entryType: "CLOSURE" }, now),
+  ]);
+  return standard + closures;
+}
+
 const readers: Record<MetricKey, (context: Context) => Promise<number>> = {
   upcomingEvents: () => getPrisma().event.count({ where: { archivedAt: null, isPublished: true, endsAt: { gte: new Date() } } }),
   unpublishedEvents: () => getPrisma().event.count({ where: { archivedAt: null, isPublished: false, endsAt: { gte: new Date() } } }),
-  pastEvents: () => getPrisma().event.count({ where: { archivedAt: null, endsAt: { lt: new Date() } } }),
+  // The Copy from a past event page lists every event, archived ones included, so the count is every event.
+  copyableEvents: () => getPrisma().event.count(),
   archivedEvents: () => getPrisma().event.count({ where: { archivedAt: { not: null } } }),
-  calendarThisMonth: ({ now }) => {
-    const month = calendarDateIn(now).slice(0, 7);
-    return getPrisma().calendarEntry.count({ where: { startsOn: { gte: `${month}-01`, lte: `${month}-31` }, sourceRemovedAt: null, isHiddenLocally: false } });
-  },
-  // Deadlines are never on the public calendar, so they are not "unpublished" items.
-  calendarUnpublished: ({ now }) =>
-    getPrisma().calendarEntry.count({
-      where: { isPublished: false, entryType: { not: "DEADLINE" }, sourceRemovedAt: null, isHiddenLocally: false, endsOn: { gte: calendarDateIn(now) } },
-    }),
+  // The Entries list's own rules (repeating series, upcoming). Deadlines never go on the public calendar, so they are not counted either way.
+  calendarPublished: async ({ now }) => (await countPublicCalendarEntries({ ...defaultEntryFilters, state: "published", time: "upcoming" }, now)),
+  calendarUnpublished: async ({ now }) => (await countPublicCalendarEntries({ ...defaultEntryFilters, state: "draft", time: "upcoming" }, now)),
   moduleRequests: () => getPrisma().moduleRequest.count({ where: { status: "PENDING" } }),
   eventTemplates: () => getPrisma().eventTemplate.count({ where: { status: { not: "ARCHIVED" } } }),
   clubs: async (context) => (await clubsSummary(context)).clubs,
@@ -78,7 +84,8 @@ const readers: Record<MetricKey, (context: Context) => Promise<number>> = {
   invitesWaiting: async () => (await listPendingInvitesPage({ query: "", scope: "full" }, 1)).total,
   formsTotal: async (context) => (await formsHub(context)).length,
   clubFormsOn: async () => (await listClubFormsForHub()).filter((row) => row.status === "OPEN").length,
-  informationFormsOpen: async (context) => (await formsHub(context)).filter((row) => row.kind !== "CLUB" && row.status === "OPEN").length,
+  // The Information forms page lists the GENERAL forms only (event forms belong to their events).
+  informationFormsOpen: async () => (await listInformationForms({ scope: "GENERAL" })).filter((form) => form.status === "OPEN").length,
   draftForms: () => getPrisma().registrationForm.count({ where: { status: "DRAFT", event: { archivedAt: null } } }),
   formTemplates: async () => (await listFormTemplateLibrary()).length,
   savedQuestions: () => getPrisma().questionLibraryItem.count(),
@@ -89,6 +96,8 @@ const readers: Record<MetricKey, (context: Context) => Promise<number>> = {
     if (!result.ticksAvailable) throw new Error("Readiness confirmations could not be read.");
     return result.summary.manualTotal - result.summary.manualDone;
   },
+  // Checks whose answer could not be read (an unreadable backup log or migration status): never "ready".
+  readinessUnknown: async (context) => (await readiness(context)).summary.automaticUnknown,
   emailProblems: async (context) => {
     const summary = await attention(context);
     if (summary.unreadable.includes("email-failed")) throw new Error("The failed email check could not be read.");

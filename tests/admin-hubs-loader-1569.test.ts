@@ -5,7 +5,6 @@ vi.mock("server-only", () => ({}));
 const calls: string[] = [];
 const prisma = {
   event: { count: vi.fn(async () => 5) },
-  calendarEntry: { count: vi.fn(async () => 2) },
   moduleRequest: { count: vi.fn(async () => 1) },
   eventTemplate: { count: vi.fn(async () => 4) },
   user: { count: vi.fn(async () => 9) },
@@ -19,15 +18,19 @@ vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 const getAreaClubsSummary = vi.fn();
 vi.mock("@/modules/club-reports/area-summary-repository", () => ({ getAreaClubsSummary: (...args: unknown[]) => getAreaClubsSummary(...args) }));
 vi.mock("@/modules/club-applications/repository", () => ({ countWaitingNewClubApplications: vi.fn(async () => { calls.push("applications"); return 3; }) }));
+const countCalendarEntries = vi.fn(async (filters: { entryType: string; state: string; time: string }) => (filters.entryType === "STANDARD" ? 3 : 1));
+vi.mock("@/modules/calendar/repository", () => ({ countCalendarEntries: (filters: { entryType: string; state: string; time: string }) => countCalendarEntries(filters) }));
+vi.mock("@/modules/information-forms/repository", () => ({ listInformationForms: vi.fn(async (target: { scope: string }) => { calls.push(`information:${target.scope}`); return [{ status: "OPEN" }, { status: "CLOSED" }, { status: "OPEN" }]; }) }));
 vi.mock("@/modules/club-forms/hub", () => ({ listClubFormsForHub: vi.fn(async () => { calls.push("clubForms"); return [{ status: "OPEN" }, { status: "NOT_OPEN" }]; }) }));
 vi.mock("@/modules/club-transfers/repository", () => ({ countStaffTransferQueue: vi.fn(async () => 1) }));
 vi.mock("@/modules/forms-hub/load", () => ({ loadFormsHub: vi.fn(async () => { calls.push("formsHub"); return [{ kind: "CLUB", status: "OPEN" }, { kind: "GENERAL", status: "OPEN" }, { kind: "EVENT", status: "CLOSED" }]; }) }));
 vi.mock("@/modules/forms/form-template-library", () => ({ listFormTemplateLibrary: vi.fn(async () => [{}, {}]) }));
-vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: vi.fn(async () => { calls.push("attention"); return { unreadable: [], groups: [{ items: [{ key: "email-failed", count: 1 }] }] }; }) }));
+vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: vi.fn(async () => { calls.push("attention"); return attentionSummary(); }) }));
 vi.mock("@/modules/system-admin/area-pause", () => ({ listAreaPauses: vi.fn(async () => [{ paused: false }, { paused: true }]) }));
 vi.mock("@/modules/system-admin/club-leaders", () => ({ listClubLeaders: vi.fn(async () => ({ total: 168 })) }));
 vi.mock("@/modules/system-admin/pending-invites", () => ({ listPendingInvitesPage: vi.fn(async () => ({ total: 1 })) }));
 const getSystemReadiness = vi.fn();
+const attentionSummary = vi.fn();
 vi.mock("@/modules/system-admin/readiness-repository", () => ({ getSystemReadiness: (...args: unknown[]) => { calls.push("readiness"); return getSystemReadiness(...args); } }));
 
 const { loadHubMetrics } = await import("@/modules/system-admin/admin-hubs-repository");
@@ -39,7 +42,10 @@ const now = new Date("2026-11-07T18:00:00Z");
 beforeEach(() => {
   calls.length = 0;
   getSystemReadiness.mockReset();
-  getSystemReadiness.mockResolvedValue({ ticksAvailable: true, summary: { automaticAttention: 0, manualDone: 3, manualTotal: 3 } });
+  getSystemReadiness.mockResolvedValue({ ticksAvailable: true, summary: { automaticAttention: 0, automaticUnknown: 0, manualDone: 3, manualTotal: 3 } });
+  attentionSummary.mockReset();
+  attentionSummary.mockReturnValue({ unreadable: [], groups: [{ items: [{ key: "email-failed", count: 1 }] }] });
+  countCalendarEntries.mockClear();
   getAreaClubsSummary.mockReset();
   getAreaClubsSummary.mockResolvedValue([
     { id: "c1", months: [{ month: "2026-11", status: "LATE", points: 4 }] },
@@ -67,11 +73,34 @@ describe("Admin hub loaders (#1569)", () => {
   });
 
   it("does not turn an unreadable confirmation table or email check into zero", async () => {
-    getSystemReadiness.mockResolvedValue({ ticksAvailable: false, summary: { automaticAttention: 0, manualDone: 0, manualTotal: 0 } });
+    getSystemReadiness.mockResolvedValue({ ticksAvailable: false, summary: { automaticAttention: 0, automaticUnknown: 0, manualDone: 0, manualTotal: 0 } });
     expect((await loadHubMetrics("catalogs", system, now)).readinessToConfirm).toBeNull();
+    attentionSummary.mockReturnValue({ unreadable: ["email-failed"], groups: [] });
+    expect((await loadHubMetrics("catalogs", system, now)).emailProblems).toBeNull();
     prisma.event.count.mockRejectedValueOnce(new Error("down"));
     const events = await loadHubMetrics("events", system, now);
     expect(Object.values(events).filter((value) => value === null)).toHaveLength(1);
+  });
+
+  it("reports checks that could not be read, apart from the ones needing attention", async () => {
+    getSystemReadiness.mockResolvedValue({ ticksAvailable: true, summary: { automaticAttention: 0, automaticUnknown: 2, manualDone: 3, manualTotal: 3 } });
+    const values = await loadHubMetrics("catalogs", system, now);
+    expect(values).toMatchObject({ readinessAttention: 0, readinessUnknown: 2 });
+  });
+
+  it("counts only the General information forms that are open, the page's own scope", async () => {
+    const values = await loadHubMetrics("forms", system, now);
+    expect(values.informationFormsOpen).toBe(2);
+    expect(calls).toContain("information:GENERAL");
+    expect(calls).not.toContain("information:EVENT");
+  });
+
+  it("counts calendar items by the Entries list's rules for standard items and closures, never deadlines", async () => {
+    const values = await loadHubMetrics("events", system, now);
+    expect(values).toMatchObject({ calendarPublished: 4, calendarUnpublished: 4, copyableEvents: 5 });
+    const types = countCalendarEntries.mock.calls.map(([filters]) => filters.entryType).sort();
+    expect(types).toEqual(["CLOSURE", "CLOSURE", "STANDARD", "STANDARD"]);
+    expect(countCalendarEntries.mock.calls.every(([filters]) => filters.time === "upcoming")).toBe(true);
   });
 
   it("reads nothing a restricted viewer does not see", async () => {

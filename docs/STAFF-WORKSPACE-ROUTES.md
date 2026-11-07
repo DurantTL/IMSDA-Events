@@ -33,7 +33,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/event-templates` | System management | Events | Event templates | - | bar: Events | Events menu | - | `app/(workspace)/admin/event-templates/page.tsx` |
 | `/admin/event-templates/[templateId]` | System management | Events | Event templates | - | bar: Events | Events menu | - | `app/(workspace)/admin/event-templates/[templateId]/page.tsx` |
 | `/admin/event-templates/from-event` | Page link | Events | Event templates | - | bar: Events | Events menu | - | `app/(workspace)/admin/event-templates/from-event/page.tsx` |
-| `/admin/feature-requests` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/feature-requests/page.tsx` |
+| `/admin/feature-requests` | System management | Admin | Events | - | More, Areas | Admin menu | - | `app/(workspace)/admin/feature-requests/page.tsx` |
 | `/admin/form-templates` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/form-templates/page.tsx` |
 | `/admin/form-templates/[templateKey]` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/form-templates/[templateKey]/page.tsx` |
 | `/admin/forms` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/forms/page.tsx` |

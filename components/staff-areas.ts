@@ -261,6 +261,8 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   if (under(pathname, adminHubs.people.href)) return place("admin", "hub-people");
   if (under(pathname, adminHubs.forms.href)) return place("admin", "hub-forms");
   if (under(pathname, adminHubs.catalogs.href)) return place("admin", "hub-catalogs");
+  // A card on the Events hub, so it lights the Events tab and not the /admin fallback below.
+  if (under(pathname, "/admin/feature-requests")) return place("admin", "hub-events");
   if (pathname === "/events-admin") return place("events", "event-administration");
   if (under(pathname, "/event-setup")) return place("events", pathname === "/event-setup/copy" ? "copy" : "create");
   if (under(pathname, "/admin/calendar")) return place("events", "calendar");

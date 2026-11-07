@@ -119,7 +119,7 @@ describe("staff areas (#1565)", () => {
       ["/events-admin", "", "events", "event-administration"],
       ["/event-setup/copy", "", "events", "copy"],
       ["/admin/event-templates/abc", "", "events", "templates"],
-      ["/admin/feature-requests", "", "admin", "hub-catalogs"],
+      ["/admin/feature-requests", "", "admin", "hub-events"],
       ["/help", "", "home", null],
       ["/profile", "", "home", null],
     ];

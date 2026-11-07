@@ -178,6 +178,7 @@ describe("Admin hub model (#1569)", () => {
     expect(html).toContain("could not be read just now");
     const css = readFileSync(path.join(process.cwd(), "components/admin-hub.module.css"), "utf8");
     expect(css).toContain("overflow-wrap: anywhere");
+    expect(html).toMatch(/class="status-chip (green|coral|purple|gold|neutral)/);
     expect(css).not.toMatch(/overflow-x:\s*(auto|scroll)/);
     expect(css).not.toMatch(/white-space:\s*nowrap/);
   });
@@ -209,9 +210,37 @@ describe("Admin hub card layout (#1569)", () => {
     }
   });
 
+  it("fits the stats to their count with the shared metric grid, so no row has a lone card", () => {
+    const css = readFileSync(path.join(process.cwd(), "components/admin-hub.module.css"), "utf8");
+    const html = renderToStaticMarkup(createElement(AdminHub, { view: buildHubView("clubs", system, allMetrics("clubs", system, 1)) }));
+    expect(html).toContain('class="metric-grid ');
+    expect(html).toContain('data-count="4"');
+    expect(html).toContain("metric-card");
+    expect(css).not.toContain("auto-fit");
+    expect(css).toMatch(/ul\.stats\[data-count="4"\]\s*\{\s*grid-template-columns:\s*repeat\(4/);
+    expect(css).toMatch(/@media \(max-width: 1024px\)\s*\{\s*ul\.stats\[data-count="4"\]\s*\{\s*grid-template-columns:\s*repeat\(2/);
+    expect(css).toMatch(/@media \(max-width: 600px\)\s*\{\s*ul\.stats\[data-count\]\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\)/);
+    for (const count of [1, 2, 3]) expect(css).toContain(`ul.stats[data-count="${count}"]`);
+    // Chip colours come from the shared .status-chip, not a copy.
+    expect(css).not.toMatch(/data-tone/);
+  });
+
+  it("never says all ready, or zero needing attention, while a readiness check could not be read", () => {
+    const base = allMetrics("catalogs", system, 0);
+    const card = (values: MetricValues) => cardsOf("catalogs", system, values).find((entry) => entry.title === "System readiness")?.status;
+    expect(card({ ...base, readinessUnknown: 2 })).toEqual({ tone: "soon", text: "2 could not be read" });
+    expect(card({ ...base, readinessUnknown: null })).toEqual({ tone: "draft", text: "Unavailable" });
+    expect(card({ ...base, readinessUnknown: 0 })).toEqual({ tone: "ok", text: "All ready" });
+    const stat = (values: MetricValues) => buildHubView("catalogs", system, values).stats.find((entry) => entry.key === "readinessAttention")!;
+    expect(stat({ ...base, readinessUnknown: 1 })).toMatchObject({ display: "0", note: "1 check could not be read" });
+    expect(stat({ ...base, readinessUnknown: null }).note).toBe("Some checks could not be read");
+    expect(stat(base).note).toBeNull();
+    expect(neededMetrics("catalogs", system)).toContain("readinessUnknown");
+  });
+
   it("styles the grids by count, four become two by two on an iPad, and one per row on a phone", () => {
     const css = readFileSync(path.join(process.cwd(), "components/admin-hub.module.css"), "utf8");
-    expect(css).toMatch(/data-count="4"\]\s*\{\s*grid-template-columns:\s*repeat\(4/);
+    expect(css).toMatch(/\.cards\[data-count="4"\]\s*\{\s*grid-template-columns:\s*repeat\(4/);
     expect(css).toMatch(/@media \(max-width: 1024px\)\s*\{\s*\.cards\[data-count="4"\]\s*\{\s*grid-template-columns:\s*repeat\(2/);
     expect(css).toMatch(/@media \(max-width: 600px\)[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\)/);
     expect(css).toMatch(/data-count="5"\]\s*>\s*li:nth-child\(n \+ 4\)\s*\{\s*grid-column:\s*span 3/);

@@ -140,7 +140,8 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
 
 /**
  * The five Admin hub pages (#1569), one per Admin tab. Not part of `systemNavGroups` (the /admin dashboard, the sidebar and
- * the search draw those); they are registered here so the tabs and Find a page can look them up like any other destination.
+ * Find a page draw those, so the hubs are not in the search); they are registered here so the Admin tabs can look them up
+ * (`registeredDestination`) and the route map lists them.
  */
 export type AdminHubKey = "events" | "clubs" | "people" | "forms" | "catalogs";
 

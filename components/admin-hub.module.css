@@ -36,46 +36,65 @@
   text-decoration: none;
 }
 
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
-  gap: 12px;
+/* The stats use the shared .metric-grid and .metric-card; this fits them to the count so a row is never left with a lone card:
+   1 across the row, 2, 3 or 4 across, four as 2 x 2 on an iPad, one per row on a phone. */
+ul.stats {
   margin: 0;
   padding: 0;
   list-style: none;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+ul.stats[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+ul.stats[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ul.stats[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+ul.stats[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+ul.stats[data-count] > li:last-child { grid-column: auto; }
+
+@media (max-width: 1024px) {
+  ul.stats[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  ul.stats[data-count] { grid-template-columns: minmax(0, 1fr); }
 }
 
 .stat {
   display: grid;
+  align-content: start;
   gap: 4px;
   min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  background: var(--card);
-  padding: 14px 16px;
+  min-height: 0;
+  padding: 14px 16px 14px 20px;
 }
 
 .stat[data-unavailable="true"] {
   border-style: dashed;
 }
 
-.statValue {
-  color: var(--imsda-navy);
+.stat .statValue {
   font-size: 1.6rem;
-  font-weight: 800;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 
-.stat[data-unavailable="true"] .statValue {
+.stat[data-unavailable="true"] .stat .statValue {
   color: var(--gold-text);
   font-size: max(var(--type-staff-floor, 0px), 1rem);
 }
 
-.statLabel {
-  color: var(--muted);
+.stat .statLabel {
+  margin: 0;
+  color: var(--ink);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.stat .statNote {
+  color: var(--gold-text);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -164,22 +183,12 @@
   overflow-wrap: anywhere;
 }
 
+/* The colours are the shared .status-chip; the staff shell raises its text to 14px. This only lets long words wrap. */
 .chip {
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--radius-pill);
-  padding: 2px 10px;
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  font-weight: 700;
   white-space: normal;
   overflow-wrap: anywhere;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
-
-.chip[data-tone="ok"] { background: var(--green-soft); color: var(--green); }
-.chip[data-tone="warn"] { background: var(--coral-soft); color: var(--coral); }
-.chip[data-tone="review"] { background: var(--imsda-purple-soft); color: var(--imsda-purple); }
-.chip[data-tone="soon"] { background: var(--imsda-gold-soft); color: var(--gold-text); }
-.chip[data-tone="draft"] { background: var(--paper); color: var(--muted); }
 
 .card:hover {
   border-color: var(--imsda-navy);
