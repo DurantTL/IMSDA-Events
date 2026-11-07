@@ -27,7 +27,7 @@ import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
-/** Submissions whose sealed value still holds one of the two forms' emergency keys (opened here, never printed). */
+/** 1 when any submission on the two forms still holds an emergency key in its sealed value (or cannot be checked), else 0. Opened here, never printed. */
 async function countStillSealed(
   prisma: import("@prisma/client").PrismaClient,
   templateKeys: string[],
@@ -44,8 +44,10 @@ async function countStillSealed(
       const held = Object.keys(openSensitiveAnswers(row.id, row.sealedSensitiveAnswers!));
       if (held.some((key) => keysByTemplate[row.template.key]?.includes(key))) count += 1;
     } catch {
-      // A value that cannot be opened here is the unseal script's to report, not this reminder's.
+      // Unsure (wrong or missing key): count it, so the reminder still prints. The unseal script reports the details.
+      count += 1;
     }
+    if (count > 0) break; // Only used as a yes/no check.
   }
   return count;
 }

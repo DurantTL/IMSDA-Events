@@ -44,9 +44,14 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 import { buildClubFormsCsv } from "@/modules/club-forms/csv";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
 import { parseClubFormTemplate, restrictedFieldKeys, splitAnswers, type ClubFormsViewer } from "@/modules/club-forms/domain";
-import { EMERGENCY_PLAIN_KEYS, emergencyPlainKeys, withoutEmergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
+import {
+  EMERGENCY_PLAIN_KEYS,
+  emergencyPlainKeys,
+  SLIP_MEDICAL_NOTE_AFTER,
+  SLIP_MEDICAL_NOTE_BEFORE,
+  withoutEmergencyPlainKeys,
+} from "@/modules/club-forms/plain-emergency";
 import { sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
-import { SLIP_MEDICAL_NOTE_AFTER, SLIP_MEDICAL_NOTE_BEFORE } from "@/modules/club-forms/plain-emergency";
 import { getClubFormTemplateAtVersion } from "@/modules/club-forms/versions";
 import { getSubmissionForViewer } from "@/modules/club-forms/submissions";
 import { syncClubFormTemplates } from "@/modules/club-forms/templates";

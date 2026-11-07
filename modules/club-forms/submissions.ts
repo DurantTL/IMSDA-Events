@@ -42,8 +42,10 @@ import { formatPersonName } from "@/lib/person-name";
  * Club form submissions (#610). Every function takes a resolved viewer and
  * checks it again, so a caller that forgot a role check still cannot read or
  * write another club's files. Sensitive answers are sealed before they reach
- * Prisma and are opened only in `getSubmissionForViewer`, after the audit row
- * for the view has been written.
+ * Prisma and are opened only in `getSubmissionForViewer`: revealed only after
+ * the audit row for the view has been written, and, for a viewer who cannot
+ * see them, opened only to list which emergency keys are still sealed (no
+ * values leave the function).
  */
 
 function attribution(actor: ClubFormActor) {
