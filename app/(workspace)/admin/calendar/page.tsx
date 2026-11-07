@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function CalendarAdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   // The Entries list is paged, filtered and ordered in the database from the address (#1492).
   const address = new URLSearchParams();
   for (const [name, value] of Object.entries(await searchParams)) if (typeof value === "string") address.set(name, value);

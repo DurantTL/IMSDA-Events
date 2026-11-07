@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Billing contact" };
 export default async function StaffOrganizationBillingContactPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const { organizationId } = await params;
   const view = await getOrganizationBillingContactAdminView(organizationId, { id: user.id, globalRole: user.globalRole });
   if (!view) notFound();

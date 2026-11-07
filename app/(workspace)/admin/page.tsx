@@ -117,7 +117,7 @@ export default async function SystemAdminPage({
   const unavailable = (await searchParams).unavailable === "1";
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   // Each panel reads on its own (#1182): a failed read leaves that panel "unavailable" and the others keep their data.
   const [dashboardRead, healthRead, requestsRead, attentionRead, feedRead] = await Promise.all([

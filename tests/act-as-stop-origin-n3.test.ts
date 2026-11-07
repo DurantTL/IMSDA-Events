@@ -39,8 +39,8 @@ const admin = { user: { id: "admin-1", email: "admin@example.test", displayName:
 
 const request = (path: string, body?: unknown) => new Request(`${origin}${path}`, { method: "POST", headers: { origin, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
 const startFrom = (body?: unknown) => start(request("/api/admin/act-as/area-coordinator", body));
-async function stopHref() {
-  mocks.findFirst.mockResolvedValueOnce({ id: "act-1", role: "AREA_COORDINATOR", organizationId: null });
+async function stopHref(role = "AREA_COORDINATOR", organizationId: string | null = null) {
+  mocks.findFirst.mockResolvedValueOnce({ id: "act-1", role, organizationId });
   mocks.updateMany.mockResolvedValueOnce({ count: 1 });
   return (await (await stop(request("/api/admin/act-as/stop", {}))).json() as { href: string }).href;
 }
@@ -90,5 +90,31 @@ describe("Stop acting returns to where the act-as started (N3)", () => {
   it("stores the key as an httpOnly cookie", async () => {
     await startFrom({ origin: "clubs" });
     expect(mocks.cookieSet).toHaveBeenCalledWith(ACT_AS_ORIGIN_COOKIE, "clubs", expect.objectContaining({ httpOnly: true, sameSite: "lax" }));
+  });
+
+  it("ignores the cookie for a club director", async () => {
+    mocks.jar.set(ACT_AS_ORIGIN_COOKIE, "clubs");
+    expect(await stopHref("CLUB_DIRECTOR", "club-1")).toBe("/admin/organizations/club-1/club");
+  });
+
+  it("clears the cookie even when nothing was active, with the same attributes it was set with", async () => {
+    mocks.jar.set(ACT_AS_ORIGIN_COOKIE, "clubs");
+    const response = await stop(request("/api/admin/act-as/stop", {}));
+    expect((await response.json() as { stopped: boolean }).stopped).toBe(false);
+    expect(mocks.jar.has(ACT_AS_ORIGIN_COOKIE)).toBe(false);
+    expect(mocks.cookieSet).toHaveBeenCalledWith(ACT_AS_ORIGIN_COOKIE, "", expect.objectContaining({ httpOnly: true, sameSite: "lax", secure: false, path: "/", maxAge: 0 }));
+  });
+
+  it("sets no cookie when the start is refused", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "s", email: "s@example.test", displayName: "S", globalRole: null }, sessionId: "x" });
+    expect((await startFrom({ origin: "clubs" })).status).toBe(403);
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
+    expect(mocks.jar.size).toBe(0);
+  });
+
+  it("sends a Clubs Administrator with no cookie to the clubs summary", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "ca-1", email: "ca@example.test", displayName: "CA", globalRole: null }, sessionId: "staff-session-9" });
+    mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
+    expect(await stopHref()).toBe("/admin/clubs/summary");
   });
 });

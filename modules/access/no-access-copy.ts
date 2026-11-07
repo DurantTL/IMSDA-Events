@@ -7,7 +7,8 @@ export type NoAccessCopy = { heading: string; body: string; whoToAsk: string; sh
  */
 export function noAccessCopy(input: { from?: string | null; hasEvents: boolean; email: string; clubsAdmin?: boolean }): NoAccessCopy {
   // A Clubs Administrator is signed in and working: "no events assigned" would send them to the wrong people (rule B14).
-  if (input.clubsAdmin) {
+  // Only a system-only page (`?from=system`) or event creation says so; any other arrival sends them home (see /no-access).
+  if (input.clubsAdmin && (input.from === "system" || input.from === "event-setup")) {
     return input.from === "event-setup"
       ? {
           heading: "Creating events needs a system administrator",

@@ -8445,7 +8445,7 @@ a.calendar-year-day:hover { background: #eef3f6; }
 .calendar-search input { width: 100%; min-height: 46px; font-size: max(var(--type-body-floor, 0px), 1rem); }
 .calendar-filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-items: end; gap: 10px; }
 .calendar-filter-row > label { min-width: 0; }
-.calendar-filter-row select { width: 100%; }
+.calendar-filter-row select { width: 100%; min-height: 44px; }
 .calendar-edit-dialog .form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .calendar-admin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .calendar-admin-actions input { width: 150px; border: 1px solid var(--field-border); border-radius: 10px; padding: 8px 10px; font-size: max(var(--type-body-floor, 0px), 0.76rem); }

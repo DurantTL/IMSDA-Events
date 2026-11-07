@@ -21,7 +21,7 @@ export default async function StaffChurchLocationPage({
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const { organizationId } = await params;
   const location = await getChurchLocation(organizationId);
   if (!location) notFound();

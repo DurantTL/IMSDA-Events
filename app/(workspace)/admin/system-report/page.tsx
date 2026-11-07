@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function SystemReportPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   // Only this admin's own request is described. Nothing is logged or stored.
   const ownConnection = describeOwnConnection(new Request("http://system-report.invalid/", { headers: await headers() }));

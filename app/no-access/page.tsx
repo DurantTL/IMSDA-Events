@@ -7,7 +7,7 @@ import { BrandLink } from "@/components/brand-link";
 import { SignOutButton } from "@/components/sign-out-button";
 import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { EVENT_PICKER_PATH, staffSignInLinkFor } from "@/modules/access/login-routing";
+import { CLUBS_ADMIN_HOME_PATH, EVENT_PICKER_PATH, staffSignInLinkFor } from "@/modules/access/login-routing";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import { attendeeStaffPageCopy, noAccessCopy } from "@/modules/access/no-access-copy";
 import { listEventsForUser } from "@/modules/events/repository";
@@ -32,6 +32,8 @@ export default async function NoAccessPage({ searchParams }: { searchParams: Pro
   // Event Admins and anyone working in an event are sent here from the event-creation pages (#1411).
   const hasEvents = (await listEventsForUser(session.user.id, false)).length > 0;
   const clubsAdmin = await isActiveClubsAdministrator(session.user.id);
+  // No reason given (a page that needs an event, the picker, a stale link): a Clubs Administrator's home is Club administration.
+  if (clubsAdmin && from !== "system" && from !== "event-setup") redirect(CLUBS_ADMIN_HOME_PATH);
   const copy = noAccessCopy({ from: typeof from === "string" ? from : null, hasEvents, email: session.user.email, clubsAdmin });
   return <main className="auth-page"><section className="auth-card no-access-card"><BrandLink className="auth-brand" wordmark /><AccessRestricted title={copy.heading} detail={copy.body} whoToAsk={copy.whoToAsk} headingLevel={1} />{copy.showClubs && <Link className="primary-button full-button" href="/admin/clubs">Back to Club administration</Link>}{copy.showEvents && <Link className="primary-button full-button" href={EVENT_PICKER_PATH}>Back to your events</Link>}<SignOutButton className="secondary-button full-button" /></section></main>;
 }
