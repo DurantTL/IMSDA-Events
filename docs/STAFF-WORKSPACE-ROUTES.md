@@ -39,11 +39,11 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/forms` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/forms/page.tsx` |
 | `/admin/health-access` | System management | People | Break-glass and legal holds | - | More, Areas | People menu | - | `app/(workspace)/admin/health-access/page.tsx` |
 | `/admin/honors` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/honors/page.tsx` |
-| `/admin/hubs/catalogs` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/catalogs/page.tsx` |
-| `/admin/hubs/clubs` | System management | Admin | Clubs | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/clubs/page.tsx` |
-| `/admin/hubs/events` | System management | Admin | Events | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/events/page.tsx` |
-| `/admin/hubs/forms` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/forms/page.tsx` |
-| `/admin/hubs/people` | System management | Admin | People | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/people/page.tsx` |
+| `/admin/hubs/catalogs` | Page link | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/catalogs/page.tsx` |
+| `/admin/hubs/clubs` | Page link | Admin | Clubs | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/clubs/page.tsx` |
+| `/admin/hubs/events` | Page link | Admin | Events | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/events/page.tsx` |
+| `/admin/hubs/forms` | Page link | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/forms/page.tsx` |
+| `/admin/hubs/people` | Page link | Admin | People | - | More, Areas | Admin menu | - | `app/(workspace)/admin/hubs/people/page.tsx` |
 | `/admin/information-forms` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/information-forms/page.tsx` |
 | `/admin/information-forms/[formId]` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/information-forms/[formId]/page.tsx` |
 | `/admin/information-forms/[formId]/responses` | System management | Admin | Forms | - | More, Areas | Admin menu | - | `app/(workspace)/admin/information-forms/[formId]/responses/page.tsx` |

@@ -10,7 +10,7 @@ import {
   eventFeaturesItem,
   navigation,
 } from "@/components/staff-navigation";
-import { systemNavGroups, type SystemNavGroup } from "@/components/system-navigation";
+import { adminHubs, systemNavGroups, type SystemNavGroup } from "@/components/system-navigation";
 import { eventPermissions } from "@/modules/access/permissions";
 
 /**
@@ -203,6 +203,9 @@ export function buildRouteMapping(): RouteMappingRow[] {
   }
   rows.push({ route: "/admin", kind: "shell", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "System administration home", group: "System", note: "Opened from the sidebar's System administration link and the phone System menu bar." });
   rows.push({ route: "/admin/feature-requests", kind: "reached", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "Feature requests", group: "/admin", reachedFrom: { parent: "/admin", linkedIn: "app/(workspace)/admin/page.tsx" }, note: "System administrators only. Approve or decline event feature requests; the System home only counts them." });
+  for (const hub of Object.values(adminHubs)) {
+    rows.push({ route: hub.href, kind: "shell", oldPlace: "Page link", scope: "System", destinationPath: hub.href, label: `${hub.label} hub`, group: "Admin hubs", note: "New in #1569. Opened from its Admin tab (the Admin area's tab row); a card there opens each destination of the group the person can reach." });
+  }
   rows.push({ route: "/help", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Help & learning", group: "Help", note: "New in #1077. Opened from the sidebar's pinned Help & learning link and from search; every staff member, including staff with no event." });
   rows.push({ route: "/help/glossary", kind: "reached", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Glossary", group: "/help", reachedFrom: { parent: "/help", linkedIn: "app/(workspace)/help/page.tsx" } });
   rows.push({ route: "/events-admin", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/events-admin", label: "Events Administrator dashboard", group: "Event administration", note: "The Events Administrator's home, opened from the role switcher. Only people with an active EVENT_ADMIN membership see it, and only for those events." });
