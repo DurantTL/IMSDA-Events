@@ -39,7 +39,7 @@ import {
   type EntryFilters,
   type EntrySort,
 } from "@/modules/calendar/admin-list";
-import { buildCalendarFilterGroups, calendarCategoryChoices, eventOnPublicFilter, type CalendarCategoryChoices } from "@/modules/calendar/filter-groups";
+import { buildCalendarFilterGroups, categoryOnPublicFilter, calendarCategoryChoices, eventOnPublicFilter, type CalendarCategoryChoices } from "@/modules/calendar/filter-groups";
 import { calendarStatusLabels, closureLabel, formatDateRange } from "@/modules/calendar/domain";
 import { describeRepeat, previewOccurrences, weekdayLabels, type RepeatRule } from "@/modules/calendar/recurrence";
 import type { CalendarAdminEntry, CalendarAdminEvent } from "@/modules/calendar/repository";
@@ -419,11 +419,15 @@ export function CalendarAdminWorkspace({
     }
   }
 
-  // The Category filter lists what is in use; the dropdowns in the forms list the public buttons' categories (#1611).
-  const categoryOptions = [...new Set([
-    ...entryList.categories,
-    ...events.map((event) => event.calendarCategory),
-  ].filter(Boolean))].sort();
+  // The Category filter lists every public-filter category (the same list as the entry form), then any other category in
+  // use, then the value in the address when it is none of those, so the box always shows the filter in effect.
+  const categoryOptions = (() => {
+    const listed = new Set(publicFilters.options);
+    const inUse = [...new Set([...entryList.categories, ...events.map((event) => event.calendarCategory)].filter(Boolean))].filter((name) => !listed.has(name)).sort();
+    const fromAddress = filters.category && filters.category !== noCategoryFilter && filters.category !== unmatchedCategoryFilter ? filters.category : "";
+    const extras = fromAddress && !listed.has(fromAddress) && !inUse.includes(fromAddress) ? [fromAddress] : [];
+    return { options: [...publicFilters.options, ...inUse, ...extras], fromAddress: extras[0] ?? "" };
+  })();
   // Events that sit on no public button, for the Events tab's "Not on a public filter" list.
   const [eventListParams, setEventListParams] = useAddressParams(defaultEventListParams, parseEventListParams);
   const unmatchedEvents = events.filter((event) => !eventOnPublicFilter(event, publicFilters.matched));
@@ -497,7 +501,9 @@ export function CalendarAdminWorkspace({
             ) : (
               <>
               <EntryFiltersBar
-                categories={categoryOptions}
+                categories={categoryOptions.options}
+                addressCategory={categoryOptions.fromAddress}
+                matchedCategories={publicFilters.matched}
                 feeds={initialFeeds}
                 filters={filters}
                 onChange={changeFilters}
@@ -1126,6 +1132,8 @@ function RepeatEditor({
 /** Search box, the filters and the sort for the Entries list. */
 function EntryFiltersBar({
   categories,
+  addressCategory,
+  matchedCategories,
   feeds,
   filters,
   onChange,
@@ -1135,6 +1143,9 @@ function EntryFiltersBar({
   sort,
 }: {
   categories: string[];
+  /** The category in the address when no list holds it: shown marked, like the entry form does. */
+  addressCategory: string;
+  matchedCategories: readonly string[];
   feeds: CalendarAdminFeed[];
   filters: EntryFilters;
   onChange: (patch: Partial<EntryFilters>) => void;
@@ -1161,7 +1172,7 @@ function EntryFiltersBar({
           <option value="">Any category</option>
           <option value={noCategoryFilter}>No category</option>
           <option value={unmatchedCategoryFilter}>{notOnPublicFilterLabel}</option>
-          {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+          {categories.map((category) => <option key={category} value={category}>{category === addressCategory && !categoryOnPublicFilter(category, matchedCategories) ? `${category} (${notOnPublicFilterLabel})` : category}</option>)}
         </select>
       </label>
       <label>

@@ -31,7 +31,7 @@ const statuses = ["ACTIVE", "INACTIVE"] as const;
 export default async function OrganizationsPage({ searchParams }: { searchParams: Promise<{ kind?: string; status?: string; q?: string; page?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   const params = await searchParams;
   const kind = params.kind === "CHURCH" || params.kind === "CLUB" ? params.kind : null;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CLUBS_ADMIN_HOME_PATH,
   EVENT_PICKER_PATH,
   NO_EVENTS_PATH,
   SYSTEM_ADMIN_PATH,
@@ -67,6 +68,12 @@ describe("resolveLoginDestination", () => {
       isSystemAdmin: false,
       events: [],
     })).toBe(NO_EVENTS_PATH);
+  });
+
+  it("sends a Clubs Administrator with no event assignment to Club administration, not no-access", () => {
+    expect(resolveLoginDestination({ isSystemAdmin: false, events: [], isClubsAdmin: true })).toBe(CLUBS_ADMIN_HOME_PATH);
+    expect(CLUBS_ADMIN_HOME_PATH).toBe("/admin/clubs");
+    expect(resolveLoginDestination({ isSystemAdmin: false, events: [{ id: "event_1" }], isClubsAdmin: true })).toBe("/overview?event=event_1");
   });
 
   it("routes an account with no active event memberships the same way whether it is unassigned staff or, hypothetically, a club leader/attendee id — this page is never reached by the real attendee/club portal login, which is a separate flow entirely (#108 queue 1)", () => {

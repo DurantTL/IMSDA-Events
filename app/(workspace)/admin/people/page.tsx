@@ -68,6 +68,7 @@ export default async function PeopleAccessPage({
               access="View only"
               endpoint="/api/admin/act-as/area-coordinator"
               label="Act as Area Coordinator (2 hours)"
+              origin="people"
               resultAction="Open the Area Coordinator portal"
               role="Area Coordinator"
             />

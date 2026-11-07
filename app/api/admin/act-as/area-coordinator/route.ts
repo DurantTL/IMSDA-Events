@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { ACT_AS_ORIGIN_COOKIE, actAsOriginCookieOptions, parseActAsOrigin } from "@/modules/organizations/act-as-origin";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { actAsActor, requireClubsAdministration } from "@/modules/organizations/access";
@@ -18,7 +20,12 @@ async function postHandler(request: Request) {
     // because `requiresMfa` covers only system administrators and event members. This route adds no MFA check of its own.
     const { sessionId } = await getCurrentSession();
     if (!sessionId) throw new Error("A staff session is missing its session id.");
+    const origin = parseActAsOrigin(((await request.json().catch(() => null)) as { origin?: unknown } | null)?.origin);
     await actAsAreaCoordinator(actAsActor(actor), sessionId);
+    // Remember where it started so "Stop acting" can return there; only a key from the fixed list is ever stored.
+    const jar = await cookies();
+    if (origin) jar.set(ACT_AS_ORIGIN_COOKIE, origin, actAsOriginCookieOptions(ACT_AS_MINUTES * 60));
+    else jar.set(ACT_AS_ORIGIN_COOKIE, "", actAsOriginCookieOptions(0));
     return Response.json({
       href: AREA_COORDINATOR_PORTAL_HREF,
       message: `You're acting as an ${systemRoleText.AREA_COORDINATOR.name} for the next ${ACT_AS_MINUTES / 60} hours, view only.`,

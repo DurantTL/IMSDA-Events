@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Master Award rules" };
 export default async function MasterAwardRulesPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   const [rules, choices] = await Promise.all([listMasterAwardRules(), listRuleChoices()]);
   return (

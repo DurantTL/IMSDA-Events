@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Find map locations" };
 export default async function ChurchMapLocationsPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const [eligible, items] = await Promise.all([countGeocodableChurches(), listGeocodeReview()]);
   return (
     <>

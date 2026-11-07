@@ -27,7 +27,7 @@ export default async function ClubDirectorsPage({
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   const { organizationId } = await params;
-  if (!(await canAdministerClubOrganization(user, organizationId))) redirect("/no-access");
+  if (!(await canAdministerClubOrganization(user, organizationId))) redirect("/no-access?from=club-only");
   const { from } = await searchParams;
   let initial: Awaited<ReturnType<typeof listDirectorGrants>>;
   try {

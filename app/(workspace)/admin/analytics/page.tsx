@@ -56,7 +56,7 @@ const rate = (part: number, whole: number) => (whole > 0 ? part / whole : null);
 export default async function PublicAnalyticsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const search = await searchParams;
   const summary = await getAnalyticsSummary(conferenceToday());
   const { totals } = summary;
