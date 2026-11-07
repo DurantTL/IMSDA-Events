@@ -1091,8 +1091,14 @@ For attendees of **club events** only:
 - **medications** show "Not collected". The encrypted Health record (#611) will
   add them.
 
+**Superseded by Addendum G (2026-11-07) for the slip's `emergency_contact_phone`
+and the passenger list's `passenger_N_emergency_contact`: those answers are now
+plain, so this view reads them from the plain answers and no longer needs to
+decrypt anything for them. The paragraph below remains true only for sealed
+answers that other forms may still hold.**
+
 Nothing else is shown or returned. A club form's sealed answers have to be
-decrypted as one object, so the physician and clinic fields are decrypted in
+decrypted as one object, so the physician and clinic fields were decrypted in
 memory with the rest. Every key except the ones listed above is dropped from
 that object immediately after decrypting: it is never shown, returned, logged
 or kept, and no other registration answer is shown.
@@ -1268,3 +1274,40 @@ rule that every account page needs a second step for a club role.
   cannot enrol their own device and skip it.
 - **Passkey first.** Setup lists the passkey ("Easiest") before the
   authenticator app when passkeys are switched on.
+
+## Addendum G: Emergency and physician answers on two club forms are plain
+
+Status: **Accepted.** Decided by Caleb Durant, repository owner, on 2026-11-07
+(recorded on GitHub issue #1652). It narrows the club form sealing rule of
+2026-09-29 (#610) and the Area Coordinator `Restricted` rule for these answers.
+Nothing else in this ADR changes.
+
+- **What changes.** On the Off-Premises Permission Slip
+  (`off_premises_permission_slip`): `physician_name`, `physician_phone`,
+  `clinic_name`, `clinic_phone` and `emergency_contact_phone`. On the
+  Transportation Passenger List (`transportation_passenger_list`):
+  `passenger_1_emergency_contact` to `passenger_20_emergency_contact`. These
+  are ordinary plain answers: not sealed, shown to everyone who can see that
+  form or submission, and included in the staff CSV.
+- **Why.** Directors carry the paper forms; the system copy is a backup. It has
+  to stay reachable in an emergency, including to people who could not open a
+  sealed answer.
+- **Unchanged and still sealed.** The Membership Application birth date; the
+  Staff/Volunteer Service form birth dates, health limitation and conduct
+  answers; any field a staff builder marks sensitive; and every birth-date rule
+  (Addendum A).
+- **How it is built.** The two seed templates list no sensitive keys (versions
+  3 and 2). `assertNotLoosened` still refuses every other field that would stop
+  being sensitive; it allows exactly these keys, for exactly these template
+  keys (`modules/club-forms/plain-emergency.ts`). A copy edited in the app that
+  kept the seed's key loses exactly these keys from its sensitive list on the
+  next sync; a staff copy under another key is untouched.
+- **Existing submissions.** `npm run club-forms:unseal-emergency` (dry run by
+  default; `-- --execute --actor <email>` to apply, the actor recorded on the audit row) moves these answers from the sealed value
+  into the plain answers, keeps every other sealed answer sealed, and drops the
+  sealed value when nothing sensitive is left. It is idempotent, runs per
+  template in one transaction under the template row lock, and audits
+  (`CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED`) template key and counts only. A human
+  runs it in production, after `npm run club-forms:sync`.
+- **Backups.** A database backup taken before the script ran still holds these
+  answers sealed; one taken after holds them plain.

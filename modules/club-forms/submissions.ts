@@ -27,6 +27,7 @@ import {
   type ClubFormActor,
   type ClubFormsViewer,
 } from "@/modules/club-forms/domain";
+import { emergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import { assertClubFormTemplateCurrent, lockClubFormTemplateForWrite } from "@/modules/club-forms/template-lock";
@@ -41,8 +42,10 @@ import { formatPersonName } from "@/lib/person-name";
  * Club form submissions (#610). Every function takes a resolved viewer and
  * checks it again, so a caller that forgot a role check still cannot read or
  * write another club's files. Sensitive answers are sealed before they reach
- * Prisma and are opened only in `getSubmissionForViewer`, after the audit row
- * for the view has been written.
+ * Prisma and are opened only in `getSubmissionForViewer`: revealed only after
+ * the audit row for the view has been written, and, for a viewer who cannot
+ * see them, opened only to list which emergency keys are still sealed (no
+ * values leave the function).
  */
 
 function attribution(actor: ClubFormActor) {
@@ -452,6 +455,24 @@ export async function getSubmissionForViewer(
   const restricted = new Set(restrictedFieldKeys(viewer, row.organizationId, template));
   const reveal = viewerCanRevealSensitive(viewer, row.organizationId);
   const revealBirthDates = viewerCanRevealBirthDates(viewer, row.organizationId);
+  // Between a deploy and the human-run `npm run club-forms:unseal-emergency`, an older submission still holds the
+  // emergency answers inside its sealed value. A viewer who cannot open it sees Restricted, not a blank (ADR 0005 Addendum G).
+  if (!reveal && row.hasSensitiveAnswers) {
+    const missing = emergencyPlainKeys(template.key).filter((key) => (row.answers as Record<string, unknown>)[key] === undefined);
+    // Only the keys the sealed value really holds are restricted (the values themselves never leave here). When it
+    // cannot be opened, every missing one is, so nothing is ever shown as a harmless blank.
+    let held: ReadonlySet<string> | null = null;
+    if (missing.length > 0 && row.sealedSensitiveAnswers && isSecretEncryptionConfigured()) {
+      try {
+        held = new Set(Object.keys(openSensitiveAnswers(row.id, row.sealedSensitiveAnswers)));
+      } catch {
+        held = null;
+      }
+    }
+    for (const key of missing) {
+      if (!held || held.has(key)) restricted.add(key);
+    }
+  }
 
   // A plain answer under a sensitive key (stored before that key became sensitive) counts too: never an unaudited view.
   const sensitiveKeys = new Set(template.sensitiveFieldKeys);

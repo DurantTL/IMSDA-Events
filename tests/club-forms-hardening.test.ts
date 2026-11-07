@@ -85,7 +85,9 @@ describe("the passenger list print (#610)", () => {
 
   it("shows Restricted, never the contact, to a viewer who may not read emergency contacts", () => {
     // The repository leaves a restricted answer out, so nothing leaks and no row is invented for it.
-    const html = render(submission({ passenger_1_name: "Riley Sample" }, seed.sensitiveFieldKeys));
+    // The seeded list no longer seals these (owner decision, 2026-11-07), so a copy that still restricts them stands in.
+    const restricted = Array.from({ length: 20 }, (_, index) => `passenger_${index + 1}_emergency_contact`);
+    const html = render(submission({ passenger_1_name: "Riley Sample" }, restricted));
     expect(html).toContain("Restricted");
     expect(html).not.toContain("Pat Sample");
     expect(html.match(/club-form-roll-box/g)).toHaveLength(5);

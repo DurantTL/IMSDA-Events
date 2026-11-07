@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
@@ -55,9 +55,19 @@ const staffSensitive: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", syst
 const director: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
 
 const slip = clubFormTemplateSeeds.find((seed) => seed.key === "off_premises_permission_slip")!;
+/**
+ * The seeded slip no longer seals these keys (owner decision, 2026-11-07; see club-forms-emergency-plain.test.ts for
+ * the real behaviour). The sync, re-seal, lag and CSV rules in this file are the same for any sensitive key, so for
+ * this file the slip seed stands in for "a template that seals": it lists the old keys while each test runs.
+ */
+const SEALED_SLIP_KEYS = ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"];
+const realSlipSensitiveKeys = slip.sensitiveFieldKeys;
+beforeEach(() => { (slip as { sensitiveFieldKeys: string[] }).sensitiveFieldKeys = SEALED_SLIP_KEYS; });
+afterEach(() => { (slip as { sensitiveFieldKeys: string[] }).sensitiveFieldKeys = realSlipSensitiveKeys; });
+
 const slipRow = {
   id: "template-slip", key: slip.key, name: slip.name, description: slip.description, version: slip.version,
-  definition: slip.definition, sectionNotes: slip.sectionNotes, sensitiveFieldKeys: slip.sensitiveFieldKeys,
+  definition: slip.definition, sectionNotes: slip.sectionNotes, sensitiveFieldKeys: SEALED_SLIP_KEYS,
   birthDateFieldKeys: slip.birthDateFieldKeys, staffOnlyFieldKeys: slip.staffOnlyFieldKeys, printLayout: slip.printLayout, enabled: true,
 };
 

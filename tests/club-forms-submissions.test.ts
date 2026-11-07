@@ -62,6 +62,14 @@ const staffPlain: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAd
 const SECRET_PHYSICIAN = "Dr. Synthetic Physician";
 const SECRET_PHONE = "(515) 555-0199";
 
+/**
+ * A generic "sealed answers" fixture. The seeded slip no longer seals these keys (owner decision, 2026-11-07), so
+ * this stored row keeps the old list on purpose, the way a copy edited in the app that still seals them would.
+ * The sealing, audit and restriction rules below are the same for any sensitive key; the plain behaviour of the
+ * seeded slip has its own tests (club-forms-emergency-plain.test.ts).
+ */
+const SEALED_FIXTURE_KEYS = ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"];
+
 function slipTemplateRow() {
   const seed = clubFormTemplateSeeds.find((template) => template.key === "off_premises_permission_slip");
   if (!seed) throw new Error("missing seed");
@@ -73,7 +81,7 @@ function slipTemplateRow() {
     version: seed.version,
     definition: seed.definition,
     sectionNotes: seed.sectionNotes,
-    sensitiveFieldKeys: seed.sensitiveFieldKeys,
+    sensitiveFieldKeys: SEALED_FIXTURE_KEYS,
     birthDateFieldKeys: seed.birthDateFieldKeys,
     staffOnlyFieldKeys: seed.staffOnlyFieldKeys,
     printLayout: seed.printLayout,
@@ -409,12 +417,16 @@ describe("opening a submission (#610)", () => {
   });
 
   it("restricts what the code marks sensitive even when the stored template lags", async () => {
+    // The staff form's health answers are still sealed by the code; the slip's emergency answers are not (2026-11-07).
+    const staffSeed = clubFormTemplateSeeds.find((template) => template.key === "pathfinder_staff_service_information");
+    if (!staffSeed) throw new Error("missing seed");
     mocks.submissionFindFirst.mockImplementation(async () => row({
-      template: { ...slipTemplateRow(), sensitiveFieldKeys: [], birthDateFieldKeys: [] },
+      answers: { health_limitation: "Plain by mistake" },
+      template: { ...slipTemplateRow(), key: staffSeed.key, definition: staffSeed.definition, sectionNotes: staffSeed.sectionNotes, staffOnlyFieldKeys: staffSeed.staffOnlyFieldKeys, sensitiveFieldKeys: [], birthDateFieldKeys: [] },
     }));
     const view = await getSubmissionForViewer(areaCoordinator, submissionId);
-    expect(new Set(view.restrictedKeys)).toEqual(new Set(slipTemplateRow().sensitiveFieldKeys));
-    expect(view.answers).not.toHaveProperty("physician_name");
+    expect(new Set(view.restrictedKeys)).toEqual(new Set(staffSeed.sensitiveFieldKeys));
+    expect(view.answers).not.toHaveProperty("health_limitation");
   });
 
   it("drops a restricted key from the plain answers too, in case one was stored there", async () => {

@@ -7,6 +7,7 @@ import {
   sectionNotesSchema,
   type ClubFormTemplateRecord,
 } from "@/modules/club-forms/domain";
+import { sectionNotesWithPlainEmergencyText, withoutEmergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import type { ClubFormProtectionHistory } from "@/modules/club-forms/builder-domain";
 import { fieldDisplayLabel, registrationFormDefinitionSchema, type RegistrationFormField } from "@/modules/forms/definition";
 
@@ -87,8 +88,12 @@ function recordAtVersion(current: ClubFormTemplateRecord, row: VersionRow): Club
     ...current,
     version: row.version,
     definition: registrationFormDefinitionSchema.parse(row.definition),
-    sectionNotes: sectionNotesSchema.parse(row.sectionNotes ?? {}),
-    sensitiveFieldKeys: union(row.sensitiveFieldKeys, current.sensitiveFieldKeys),
+    // An older version's slip note says only directors and staff can read the medical answers; after the 2026-11-07 decision it does not.
+    sectionNotes: sectionNotesSchema.parse(sectionNotesWithPlainEmergencyText(current.key, row.sectionNotes ?? {}) ?? row.sectionNotes ?? {}),
+    // The owner's 2026-11-07 decision (plain-emergency.ts) is the one exception: an older version's emergency
+    // keys do not stay sensitive once the current template no longer lists them (their answers are plain after
+    // `npm run club-forms:unseal-emergency`), so the staff CSV and the views read them.
+    sensitiveFieldKeys: union(withoutEmergencyPlainKeys(current.key, row.sensitiveFieldKeys), current.sensitiveFieldKeys),
     birthDateFieldKeys: union(row.birthDateFieldKeys, current.birthDateFieldKeys),
     staffOnlyFieldKeys: row.staffOnlyFieldKeys,
     hiddenFieldKeys: row.hiddenFieldKeys,
@@ -166,7 +171,7 @@ export function exportColumnsAcrossVersions(versions: readonly ClubFormTemplateR
 /** What earlier versions fix in place, read inside the publishing transaction. */
 export async function loadProtectionHistory(
   client: Client,
-  template: { id: string; sensitiveFieldKeys: readonly string[]; birthDateFieldKeys: readonly string[]; definition: unknown },
+  template: { id: string; key?: string; sensitiveFieldKeys: readonly string[]; birthDateFieldKeys: readonly string[]; definition: unknown },
 ): Promise<ClubFormProtectionHistory> {
   const [rows, submissionCount] = await Promise.all([
     client.clubFormTemplateVersion.findMany({
@@ -176,8 +181,10 @@ export async function loadProtectionHistory(
     client.clubFormSubmission.count({ where: { templateId: template.id } }),
   ]);
   const published = registrationFormDefinitionSchema.parse(template.definition);
+  // The emergency keys the owner made plain on 2026-11-07 (plain-emergency.ts) are not locked sensitive in a copy edited in the app.
+  const earlier = rows.map((row) => (template.key ? withoutEmergencyPlainKeys(template.key, row.sensitiveFieldKeys) : row.sensitiveFieldKeys));
   return {
-    everSensitiveKeys: union(template.sensitiveFieldKeys, ...rows.map((row) => row.sensitiveFieldKeys)),
+    everSensitiveKeys: union(template.key ? withoutEmergencyPlainKeys(template.key, template.sensitiveFieldKeys) : template.sensitiveFieldKeys, ...earlier),
     everBirthDateKeys: union(template.birthDateFieldKeys, ...rows.map((row) => row.birthDateFieldKeys)),
     hasSubmissions: submissionCount > 0,
     publishedFieldKeys: allFields(published).map((field) => field.key),

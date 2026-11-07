@@ -22,6 +22,7 @@ import { ClubFormError } from "@/modules/club-forms/errors";
 import { STALE_DRAFT_MESSAGE } from "@/modules/club-forms/builder-messages";
 import { resealClubFormSubmissions } from "@/modules/club-forms/reseal";
 import { RESEAL_TRANSACTION } from "@/modules/club-forms/templates";
+import { emergencyPlainKeys, withoutEmergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import { loadProtectionHistory, recordClubFormTemplateVersion } from "@/modules/club-forms/versions";
 
 /**
@@ -124,6 +125,8 @@ export type ClubFormBuilderView = {
   /** Keys that keep their sensitive or birth-date setting for good, and so cannot be deleted while submissions exist. */
   lockedSensitiveKeys: string[];
   lockedBirthDateKeys: string[];
+  /** Keys that are plain by the owner's 2026-11-07 decision: the builder does not offer to make them sensitive. */
+  plainByDecisionKeys: string[];
   versions: Array<{ version: number; recordedAt: string }>;
 };
 
@@ -139,7 +142,8 @@ export async function getClubFormBuilderView(key: string): Promise<ClubFormBuild
     prisma.clubFormSubmission.count({ where: { templateId: row.id } }),
   ]);
   const seed = clubFormTemplateSeeds.find((candidate) => candidate.key === key);
-  const draft = row.draft ? readDraftShape(row.draft) : null;
+  const storedDraft = row.draft ? readDraftShape(row.draft) : null;
+  const draft = storedDraft ? { ...storedDraft, sensitiveFieldKeys: withoutEmergencyPlainKeys(key, storedDraft.sensitiveFieldKeys) } : null;
   const draftWarnings = draft ? checkClubFormDraft(draft, history).issues : [];
   return {
     key,
@@ -157,6 +161,7 @@ export async function getClubFormBuilderView(key: string): Promise<ClubFormBuild
     draftUnreadable: Boolean(row.draft) && draft === null,
     draftWarnings,
     lockedSensitiveKeys: history.everSensitiveKeys.filter((candidate) => history.publishedFieldKeys.includes(candidate)),
+    plainByDecisionKeys: [...emergencyPlainKeys(key)],
     lockedBirthDateKeys: history.everBirthDateKeys.filter((candidate) => history.publishedFieldKeys.includes(candidate)),
     versions: versions.map((version) => ({ version: version.version, recordedAt: version.createdAt.toISOString() })),
   };
@@ -191,11 +196,13 @@ export async function saveClubFormDraft(key: string, input: SaveDraftInput, acto
     if (!shaped) {
       throw validationFailed([{ key: "template", message: `This draft could not be read, or it is larger than ${Math.round(CLUB_FORM_DRAFT_MAX_BYTES / 1000)} KB.` }]);
     }
-    const warnings = checkClubFormDraft(shaped, history).issues;
+    // The owner's 2026-11-07 decision (plain-emergency.ts): these keys cannot be made sensitive again from the builder.
+    const draftToSave = { ...shaped, sensitiveFieldKeys: withoutEmergencyPlainKeys(row.key, shaped.sensitiveFieldKeys) };
+    const warnings = checkClubFormDraft(draftToSave, history).issues;
     await tx.clubFormTemplate.update({
       where: { id: row.id },
       data: {
-        draft: shaped as unknown as Prisma.InputJsonValue,
+        draft: draftToSave as unknown as Prisma.InputJsonValue,
         draftUpdatedAt: now,
         draftBaseVersion: row.version,
         draftUpdatedByUserId: actorUserId,
@@ -252,7 +259,9 @@ export async function publishClubFormDraft(key: string, input: { baseVersion: nu
     if (!row.draft) throw new ClubFormError("VALIDATION_FAILED", "There is no saved draft to publish.");
     if (isStaleDraft(row)) throw changed(STALE_DRAFT_MESSAGE);
     const history = await loadProtectionHistory(tx, row);
-    const check = checkClubFormDraft(row.draft, history);
+    // A draft saved before the 2026-11-07 decision may still list the emergency keys as sensitive: they are dropped here.
+    const storedDraft = readDraftShape(row.draft);
+    const check = checkClubFormDraft(storedDraft ? { ...storedDraft, sensitiveFieldKeys: withoutEmergencyPlainKeys(row.key, storedDraft.sensitiveFieldKeys) } : row.draft, history);
     if (!check.ok) throw validationFailed(check.issues);
     const spec = check.spec;
     const newly = newlySensitiveKeys(spec, row.sensitiveFieldKeys);

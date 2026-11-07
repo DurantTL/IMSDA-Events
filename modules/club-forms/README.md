@@ -27,11 +27,12 @@ themselves. Every form is off until a system administrator turns it on.
 - `links.ts`, `link-email.ts`: private links and their email.
 - `access.ts`: turns a session into a viewer (club leader, Area Coordinator,
   conference staff).
-- `csv.ts`: the staff CSV, non-sensitive columns only.
+- `csv.ts`: the staff CSV. Sensitive columns are absent; plain answers, including the emergency and physician/clinic ones, are in it.
+- `plain-emergency.ts`, `unseal-emergency.ts`: the 2026-11-07 decision (fixed key list) and the human-run script that moves existing answers out of the sealed value.
 
 ## Who sees what
 
-| Viewer | Fill in / send link | Submitted forms | Health, conduct, physician, emergency answers | Birth dates |
+| Viewer | Fill in / send link | Submitted forms | Health and conduct answers (sealed) | Birth dates |
 | --- | --- | --- | --- | --- |
 | Director or deputy (or a system administrator acting as the director) of the club | yes | own club, including drafts | shown | shown |
 | Registrar, reporter | no | no | no | no |
@@ -39,6 +40,17 @@ themselves. Every form is off until a system administrator turns it on.
 | Area Coordinator (or admin acting as one) | send a link for any club (#1221; narrow in `viewerCanSendLinkForClub` once #843 assigns areas), not fill in | every club, submitted only | `Restricted` | `Restricted` |
 | Event Admin of a current event | no | every club, submitted only | shown | `Restricted` |
 | System administrator | no (unless acting as a director) | every club, submitted only | shown | shown |
+
+**Emergency contact and physician/clinic answers are not in that column.** On
+the Off-Premises Permission Slip (`physician_name`, `physician_phone`,
+`clinic_name`, `clinic_phone`, `emergency_contact_phone`) and the Transportation
+Passenger List (`passenger_N_emergency_contact`) they are plain answers, by
+Caleb's decision of 2026-11-07 (ADR 0005 Addendum G): directors carry the paper
+forms, and the system copy is a backup that must stay reachable in an emergency.
+Everyone who can see one of those submissions sees them, Area Coordinators
+included, and they are in the CSV. The code that allows this is
+`plain-emergency.ts`; every other field that would stop being sensitive is still
+refused.
 
 **Conference staff** is only system administrators and users with an ACTIVE
 `EVENT_ADMIN` membership on an event that has not ended (`hasEventEnded`; the
@@ -141,7 +153,30 @@ same transaction as the template update, moving the answer into each
 submission's sealed value. It needs `SECRET_ENCRYPTION_KEY`, and it fails (and
 changes nothing) if it cannot re-seal. A version that would make a sensitive
 field **stop** being sensitive is refused outright; that needs a reviewed,
-hand-written change; so is a birth-date field that stops being one. Changing only
+hand-written change; so is a birth-date field that stops being one. The one
+reviewed change so far is Caleb's of 2026-11-07: the emergency contact and
+physician/clinic keys of the Off-Premises Permission Slip and the Transportation
+Passenger List (`plain-emergency.ts`, a fixed list, not a setting). The sync
+applies it to the template (and to a copy edited in the app that kept the key);
+existing answers are then moved out of each sealed value by the human-run
+`npm run club-forms:unseal-emergency` (dry run by default; idempotent; audit rows
+hold counts and the acting user's id only).
+
+**Runbook, after the deploy that carries this change:**
+
+1. `npm run club-forms:sync` (the deploy entrypoint already runs it).
+2. `npm run club-forms:unseal-emergency` (dry run: takes no lock, changes
+   nothing, prints counts and any `NOT_SYNCED` / `FAILED` template).
+3. `npm run club-forms:unseal-emergency -- --execute --actor <your account email>`
+   (the actor is required and is recorded on the audit row).
+4. Run step 3 again to confirm it moves 0.
+
+Until step 3 has run, an old submission's emergency answers are still inside its
+sealed value: viewers who may open sealed answers see them, and everyone else
+sees `Restricted` for them rather than a blank. The builder does not offer to
+make these keys sensitive again, and a draft or a copy edited in the app that
+still lists them has them removed (the sync does it for stored drafts; save and
+publish do it too). Changing only
 the birth-date class needs no re-seal, since both classes are sealed.
 
 The re-seal runs in the **sync step**, `npm run club-forms:sync`, which
