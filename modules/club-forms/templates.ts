@@ -13,6 +13,7 @@ import {
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import { normalizeRequirement, type ClubFormRequirementValue, type RequiredRoleType } from "@/modules/club-forms/required-domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
+import { emergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import { resealClubFormSubmissions } from "@/modules/club-forms/reseal";
 import { recordClubFormTemplateVersion } from "@/modules/club-forms/versions";
 import { logError, logInfo } from "@/lib/logger";
@@ -145,17 +146,22 @@ async function sealSeedKeysForCustomized(client: Client, seed: Seed, templateId:
     const locked = await lockClubFormTemplateForReseal(tx, templateId);
     const newlySensitive = seed.sensitiveFieldKeys.filter((key) => !locked.sensitiveFieldKeys.includes(key));
     const newlyBirthDate = seed.birthDateFieldKeys.filter((key) => !locked.birthDateFieldKeys.includes(key));
-    if (newlySensitive.length === 0 && newlyBirthDate.length === 0) return;
+    // The owner's 2026-11-07 decision (plain-emergency.ts) also applies to a copy edited in the app that kept the
+    // seed's key: exactly those keys stop being sensitive. The answers move out of the sealed value with the
+    // operator script (`npm run club-forms:unseal-emergency`), never here.
+    const declassified = locked.sensitiveFieldKeys.filter((key) => emergencyPlainKeys(seed.key).includes(key) && !seed.sensitiveFieldKeys.includes(key));
+    if (newlySensitive.length === 0 && newlyBirthDate.length === 0 && declassified.length === 0) return;
     await resealClubFormSubmissions(tx, templateId, newlySensitive);
     await tx.clubFormTemplate.update({
       where: { id: templateId },
       data: {
-        sensitiveFieldKeys: [...new Set([...locked.sensitiveFieldKeys, ...newlySensitive])],
+        sensitiveFieldKeys: [...new Set([...locked.sensitiveFieldKeys.filter((key) => !declassified.includes(key)), ...newlySensitive])],
         birthDateFieldKeys: [...new Set([...locked.birthDateFieldKeys, ...newlyBirthDate])],
       },
     });
     const sealedKeyCount = newlySensitive.length + newlyBirthDate.length;
-    logInfo("Club form sync sealed extra keys for a template edited in the app.", { templateKey: seed.key, keys: sealedKeyCount });
+    if (sealedKeyCount > 0) logInfo("Club form sync sealed extra keys for a template edited in the app.", { templateKey: seed.key, keys: sealedKeyCount });
+    if (declassified.length > 0) logInfo("Club form sync made emergency fields plain for a template edited in the app (owner decision, 2026-11-07).", { templateKey: seed.key, keys: declassified.length });
   };
   if ("$transaction" in client) await client.$transaction(apply, RESEAL_TRANSACTION);
   else await apply(client);
@@ -241,7 +247,10 @@ function assertNotLoosened(
   seed: { key: string; sensitiveFieldKeys: readonly string[]; birthDateFieldKeys: readonly string[] },
   stored: { sensitiveFieldKeys: readonly string[]; birthDateFieldKeys: readonly string[] },
 ) {
-  const noLongerSensitive = stored.sensitiveFieldKeys.filter((key) => !seed.sensitiveFieldKeys.includes(key));
+  // The one reviewed exception: exactly the emergency contact and physician/clinic keys of two forms, by the
+  // owner's decision of 2026-11-07 (plain-emergency.ts). Every other key that would stop being sensitive is still refused.
+  const allowed = new Set(emergencyPlainKeys(seed.key));
+  const noLongerSensitive = stored.sensitiveFieldKeys.filter((key) => !seed.sensitiveFieldKeys.includes(key) && !allowed.has(key));
   if (noLongerSensitive.length > 0) {
     throw new ClubFormError("INVALID_TEMPLATE", `${seed.key}: ${noLongerSensitive[0]} would stop being sensitive, which needs a reviewed change.`);
   }

@@ -25,7 +25,12 @@
  *   hash, single use holds when many submits race (exactly one submission),
  *   expiry, withdrawal, a link that lost its email delivery, a submit racing a
  *   withdrawal, another club's link, and the real rate limits;
- * - the staff CSV has no sensitive column and no sensitive text.
+ * - the staff CSV has no sensitive column and no sensitive text;
+ * - the emergency contact and physician/clinic answers of the slip and the
+ *   passenger list are plain (owner decision, 2026-11-07): the sync applies the
+ *   new versions, `unsealEmergencyAnswers` (dry run, then execute, then again)
+ *   moves existing answers out of the sealed value and keeps everything else
+ *   sealed, and Area Coordinators, staff and the CSV read them.
  *
  * Uses fictitious rows it creates and removes itself.
  *
@@ -52,6 +57,7 @@ const accounts = { a: `${P}_acct_a`, b: `${P}_acct_b`, area: `${P}_acct_area` };
 const SLIP = "off_premises_permission_slip";
 const STAFF_FORM = "pathfinder_staff_service_information";
 const PASSENGERS = "transportation_passenger_list";
+const LEGACY_SLIP_SENSITIVE = ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"];
 const templateKeys = [SLIP, STAFF_FORM, PASSENGERS, "pathfinder_membership_application"];
 const BUILDER_PREFIX = "cf712_";
 const TLT_APPLICATION = "club_tlt_application";
@@ -102,6 +108,11 @@ async function cleanup() {
   await prisma.clubFormTemplate.deleteMany({ where: { id: { in: builderTemplateIds } } });
   // Templates are shared rows: leave them, but switch every one back off.
   await prisma.clubFormTemplate.updateMany({ where: { key: { in: [...templateKeys, TLT_APPLICATION, CAN_COLLECTING] } }, data: { enabled: false, enabledAt: null, enabledByUserId: null, requirement: "NOT_REQUIRED", requiredRoles: [], requirementChangedAt: null, requirementChangedByUserId: null } });
+  // The slip's stored keys follow the code's seed again (this script lists the old ones while it runs).
+  const { clubFormTemplateSeeds: codeSeeds } = await import("../modules/club-forms/definitions");
+  for (const seed of codeSeeds.filter((candidate) => [SLIP, PASSENGERS].includes(candidate.key))) {
+    await prisma.clubFormTemplate.updateMany({ where: { key: seed.key }, data: { sensitiveFieldKeys: seed.sensitiveFieldKeys, customizedAt: null } });
+  }
   // "Who fills it in" is the sync's again: back to the code's default, with no staff change recorded (#1229).
   const { clubFormTemplateSeeds } = await import("../modules/club-forms/definitions");
   for (const seed of clubFormTemplateSeeds.filter((candidate) => [TLT_APPLICATION, CAN_COLLECTING].includes(candidate.key))) {
@@ -203,6 +214,10 @@ async function main() {
   );
   for (const key of templateKeys) await templates.setClubFormTemplateEnabled(key, true, users.admin);
   assert((await templates.listEnabledClubFormTemplates()).filter((row) => templateKeys.includes(row.key)).length === 4, "an enabled form shows to clubs");
+  // The seeded slip's physician and emergency answers are plain (owner decision, 2026-11-07). The sealing, audit and
+  // restriction rules below are the same for any sensitive key, so until section 12 the stored slip row lists the old
+  // keys, as a copy edited in the app that still seals them would. Section 12 runs the real decision end to end.
+  await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { sensitiveFieldKeys: LEGACY_SLIP_SENSITIVE } });
   const slipRow = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: SLIP } });
   assert(slipRow.enabledByUserId === users.admin && slipRow.enabledAt, "who turned it on and when is recorded");
   assert(await prisma.auditLog.count({ where: { action: "CLUB_FORM_TEMPLATE_ENABLED", entityId: slipRow.id, actorUserId: users.admin } }) === 1, "turning a form on is audited once");
@@ -784,6 +799,12 @@ async function main() {
     assert(discarded.draft === null && discarded.draftBaseVersion === null, "discarding clears a stale draft");
 
     // A customized template ignores the code's definition, but a key the code added as sensitive is still sealed.
+    // The seeded slip no longer lists sensitive keys (2026-11-07), so for this check the seed lists the old ones, as a code seed adding a key would.
+    const { clubFormTemplateSeeds: seedsInCode } = await import("../modules/club-forms/definitions");
+    const slipSeedInCode = seedsInCode.find((seed) => seed.key === SLIP)! as { sensitiveFieldKeys: string[] };
+    const realSeedKeys = slipSeedInCode.sensitiveFieldKeys;
+    slipSeedInCode.sensitiveFieldKeys = LEGACY_SLIP_SENSITIVE;
+    try {
     await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { customizedAt: new Date(), sensitiveFieldKeys: original.sensitiveFieldKeys.filter((key) => key !== "physician_name") } });
     const plainStored = await prisma.clubFormSubmission.create({
       data: {
@@ -795,6 +816,9 @@ async function main() {
     const sealedNow = await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: plainStored.id } });
     assert(!(sealedNow.answers as Record<string, unknown>).physician_name && sealedNow.sealedSensitiveAnswers !== null && sealed.openSensitiveAnswers(plainStored.id, sealedNow.sealedSensitiveAnswers).physician_name === SECRET_PHYSICIAN, "the sync seals a key the code added for a template edited in the app");
     assert((await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: SLIP } })).sensitiveFieldKeys.includes("physician_name"), "the stored sensitive keys gained the code's key");
+    } finally {
+      slipSeedInCode.sensitiveFieldKeys = realSeedKeys;
+    }
   } finally {
     await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { name: original.name, version: original.version, customizedAt: original.customizedAt, sensitiveFieldKeys: original.sensitiveFieldKeys, draft: Prisma.DbNull, draftUpdatedAt: null, draftBaseVersion: null } });
   }
@@ -923,6 +947,77 @@ async function main() {
   // Club forms and links block deleting a club.
   const deletion = await orgRepository.getOrganizationDeletionCheck(clubs.a);
   assert(deletion.blockers.some((blocker) => /club form/i.test(blocker) && /private link/i.test(blocker)), "the club deletion check counts club forms and links");
+
+  // 13. Emergency and physician answers are plain (owner decision, 2026-11-07; ADR 0005 Addendum G) --------------
+  {
+    const emergency = await import("../modules/club-forms/unseal-emergency");
+    const { clubFormTemplateSeeds: seeds } = await import("../modules/club-forms/definitions");
+    const slipSeed = seeds.find((seed) => seed.key === SLIP)!;
+    const listSeed = seeds.find((seed) => seed.key === PASSENGERS)!;
+    const OLD_PASSENGER_KEYS = Array.from({ length: 20 }, (_, index) => `passenger_${index + 1}_emergency_contact`);
+    const PASSENGER_CONTACT = "Pat Verify (515) 555-0123";
+    const rawRows = async (ids: string[]) => prisma.$queryRaw<Array<{ id: string; text: string }>>`SELECT s.id, s::text AS text FROM "ClubFormSubmission" s WHERE s.id IN (${Prisma.join(ids)}) ORDER BY s.id`;
+
+    // The state before the decision: the slip is a copy edited in the app that seals the five keys and one more
+    // (so a sealed answer remains afterwards), the passenger list is the old version 1 that seals the contacts.
+    await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { customizedAt: new Date(), sensitiveFieldKeys: [...LEGACY_SLIP_SENSITIVE, "activity"] } });
+    await prisma.clubFormTemplate.update({ where: { key: PASSENGERS }, data: { sensitiveFieldKeys: OLD_PASSENGER_KEYS } });
+    const onlyEmergency = await submissions.saveClubFormSubmission(directorA, { organizationId: clubs.a, templateKey: SLIP, answers: { ...slipAnswers, activity: "Hike" }, submit: true });
+    const roster = await submissions.saveClubFormSubmission(directorA, {
+      organizationId: clubs.a, templateKey: PASSENGERS, answers: { contact_name: "Dana Verify", contact_cell: "515-555-0120", driver_name: "Drew Verify", driver_cell: "515-555-0121", passenger_1_name: "Riley Verify", passenger_1_emergency_contact: PASSENGER_CONTACT }, submit: true,
+    });
+    const before = await rawRows([onlyEmergency.id, roster.id, birthForm.id]);
+    assert(before.every((row) => !row.text.includes(SECRET_PHYSICIAN) && !row.text.includes(PASSENGER_CONTACT)), "before the change the emergency answers are sealed");
+    await prisma.clubFormTemplate.update({ where: { key: PASSENGERS }, data: { version: listSeed.version - 1 } });
+
+    // The script refuses while a template still lists the keys, and the dry run changes nothing.
+    const early = await emergency.unsealEmergencyAnswers(prisma);
+    assert(early.templates.find((item) => item.templateKey === SLIP)?.status === "NOT_SYNCED", "the script waits for the sync on a template that still seals the keys");
+    const syncResult = await templates.syncClubFormTemplates(prisma, { continueOnRefusal: true });
+    assert(syncResult.refused.length === 0, "the sync applies the change without refusing");
+    const slipAfterSync = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: SLIP } });
+    assert(slipAfterSync.sensitiveFieldKeys.join() === "activity", "a copy edited in the app loses exactly the emergency keys and keeps the others");
+    const listAfterSync = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: PASSENGERS } });
+    assert(listAfterSync.version === listSeed.version && listAfterSync.sensitiveFieldKeys.length === 0, "the passenger list is at its new version with no sensitive keys");
+    assert(JSON.stringify(await rawRows([onlyEmergency.id, roster.id, birthForm.id])) === JSON.stringify(before), "the sync moved no answer");
+
+    const dry = await emergency.unsealEmergencyAnswers(prisma);
+    const dryRows = dry.templates.filter((item) => [SLIP, PASSENGERS].includes(item.templateKey));
+    assert(dryRows.every((item) => item.status === "DRY_RUN") && dryRows.every((item) => item.submissionsMoved >= 1), "the dry run reports what it would move");
+    assert(JSON.stringify(await rawRows([onlyEmergency.id, roster.id, birthForm.id])) === JSON.stringify(before), "the dry run changes nothing");
+    assert(await prisma.auditLog.count({ where: { action: "CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED", entityId: { in: [slipAfterSync.id, listAfterSync.id] }, createdAt: { gte: reqAuditSince } } }) === 0, "the dry run writes no audit row");
+
+    const done = await emergency.unsealEmergencyAnswers(prisma, { execute: true });
+    assert(done.templates.filter((item) => [SLIP, PASSENGERS].includes(item.templateKey)).every((item) => item.status === "DONE"), "the run completes");
+    const movedSlip = await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: onlyEmergency.id } });
+    const slipAnswersNow = movedSlip.answers as Record<string, unknown>;
+    assert(slipAnswersNow.physician_name === SECRET_PHYSICIAN && slipAnswersNow.emergency_contact_phone === SECRET_PHONE, "the slip's answers are now plain");
+    assert(movedSlip.hasSensitiveAnswers && movedSlip.sealedSensitiveAnswers !== null && JSON.stringify(sealed.openSensitiveAnswers(movedSlip.id, movedSlip.sealedSensitiveAnswers)) === JSON.stringify({ activity: "Hike" }), "only the other sealed answer stays sealed");
+    const movedList = await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: roster.id } });
+    assert((movedList.answers as Record<string, unknown>).passenger_1_emergency_contact === PASSENGER_CONTACT && movedList.sealedSensitiveAnswers === null && !movedList.hasSensitiveAnswers, "the passenger contact is plain and the emptied sealed value is dropped");
+    const staffRowAfter = (await rawRows([birthForm.id]))[0];
+    assert(staffRowAfter.text === before.find((row) => row.id === birthForm.id)!.text, "another form's sealed answers are untouched");
+    const unsealAudit = await prisma.auditLog.findMany({ where: { action: "CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED", entityId: { in: [slipAfterSync.id, listAfterSync.id] }, createdAt: { gte: reqAuditSince } } });
+    assert(unsealAudit.length === 2 && JSON.stringify(unsealAudit).indexOf(SECRET_PHYSICIAN) < 0 && JSON.stringify(unsealAudit).indexOf(PASSENGER_CONTACT) < 0, "each template is audited once, with counts and no answer");
+
+    const afterRun = await rawRows([onlyEmergency.id, roster.id, birthForm.id]);
+    const again = await emergency.unsealEmergencyAnswers(prisma, { execute: true });
+    assert(again.templates.every((item) => item.submissionsMoved === 0) && JSON.stringify(await rawRows([onlyEmergency.id, roster.id, birthForm.id])) === JSON.stringify(afterRun), "a second run changes nothing");
+
+    // Everyone who can see the form sees the answers; the other sealed answer stays Restricted; the CSV has the columns.
+    const areaPlain = await submissions.getSubmissionForViewer(area, onlyEmergency.id);
+    assert(areaPlain.answers.physician_name === SECRET_PHYSICIAN && areaPlain.answers.emergency_contact_phone === SECRET_PHONE, "an Area Coordinator now reads the physician and emergency answers");
+    assert(areaPlain.restrictedKeys.join() === "activity" && !("activity" in areaPlain.answers), "the other sealed answer is still Restricted for an Area Coordinator");
+    const areaList = await submissions.getSubmissionForViewer(area, roster.id);
+    assert(areaList.answers.passenger_1_emergency_contact === PASSENGER_CONTACT && areaList.restrictedKeys.length === 0, "an Area Coordinator reads the passenger emergency contact");
+    const planCsv = await csv.buildClubFormsCsv(eventAdmin, { templateKey: PASSENGERS });
+    assert(planCsv.csv.includes(PASSENGER_CONTACT) && planCsv.csv.includes("Passenger 1 emergency contact"), "the CSV carries the passenger emergency contacts");
+    const slipExport = await csv.buildClubFormsCsv(eventAdmin, { templateKey: SLIP });
+    assert(slipExport.csv.includes(SECRET_PHYSICIAN) && slipExport.csv.includes("Physician's name") && !slipExport.csv.includes("Hike"), "the slip CSV carries the physician and emergency answers but not the sealed activity");
+
+    // Put the shared rows back as the sync leaves them.
+    await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { customizedAt: null, sensitiveFieldKeys: slipSeed.sensitiveFieldKeys } });
+  }
 
   console.log("Club forms verification passed.");
 }

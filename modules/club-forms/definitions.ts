@@ -334,18 +334,19 @@ const permissionSlip: ClubFormTemplateSeed = {
   key: "off_premises_permission_slip",
   name: "Off-Premises Permission Slip",
   description: "A parent or guardian's permission for a child to take part in one off-premises club activity, with medical and emergency details.",
-  version: 2,
+  // v3: the physician, clinic and emergency contact answers are plain (owner decision, 2026-11-07; see plain-emergency.ts).
+  version: 3,
   sortOrder: 30,
   fillMode: "FAMILY",
   printLayout: "STANDARD",
-  sensitiveFieldKeys: ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"],
+  sensitiveFieldKeys: [],
   birthDateFieldKeys: [],
   staffOnlyFieldKeys: [],
   sectionNotes: {
     sec_permission: [
       "I hereby give my permission for my child to participate in the pre-planned activity named below, on the date given.",
     ],
-    sec_medical: ["Medical and emergency information. Only the club's director and deputies, and conference staff with sensitive-data access, can read these answers."],
+    sec_medical: ["Medical and emergency information. The club keeps the paper form; this copy is a backup, so anyone who can open this form can read these answers."],
   },
   definition: {
     title: "Iowa-Missouri Conference, Pathfinder/Adventurer Club, Permission Slip for Off-Premises Activities",
@@ -404,11 +405,12 @@ const passengerList: ClubFormTemplateSeed = {
   key: "transportation_passenger_list",
   name: "Transportation Passenger List",
   description: "A roll-call sheet for one trip: contacts, up to 20 passengers with emergency contacts, and printable roll-call columns 1 to 5.",
-  version: 1,
+  // v2: the emergency contact answers are plain (owner decision, 2026-11-07; see plain-emergency.ts).
+  version: 2,
   sortOrder: 40,
   fillMode: "CLUB",
   printLayout: "PASSENGER_LIST",
-  sensitiveFieldKeys: Array.from({ length: 20 }, (_, index) => `passenger_${index + 1}_emergency_contact`),
+  sensitiveFieldKeys: [],
   birthDateFieldKeys: [],
   staffOnlyFieldKeys: [],
   sectionNotes: {

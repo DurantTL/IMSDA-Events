@@ -126,10 +126,28 @@ const slipSeed = clubFormTemplateSeeds.find((seed) => seed.key === "off_premises
 const director: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } };
 const staff: ClubFormsViewer = { kind: "STAFF", userId: "staff-1", systemAdmin: true, clubsAdministrator: false, sensitiveAnswers: true };
 
+/**
+ * The seeded slip no longer seals these keys (owner decision, 2026-11-07), so this stored row keeps the old list on
+ * purpose: the builder, version and sync rules under test are the same for any sensitive key. The two sync tests that
+ * need the code seed itself to add a sensitive key set it on the seed for their duration (`withSeedSealing`).
+ */
+const SEALED_SLIP_KEYS = ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"];
+
+async function withSeedSealing(work: () => Promise<void>) {
+  const seed = slipSeed as { sensitiveFieldKeys: string[] };
+  const original = seed.sensitiveFieldKeys;
+  seed.sensitiveFieldKeys = SEALED_SLIP_KEYS;
+  try {
+    await work();
+  } finally {
+    seed.sensitiveFieldKeys = original;
+  }
+}
+
 function seedRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "tpl-slip", key: slipSeed.key, name: slipSeed.name, description: slipSeed.description, version: slipSeed.version,
-    definition: slipSeed.definition, sectionNotes: slipSeed.sectionNotes, sensitiveFieldKeys: slipSeed.sensitiveFieldKeys,
+    definition: slipSeed.definition, sectionNotes: slipSeed.sectionNotes, sensitiveFieldKeys: SEALED_SLIP_KEYS,
     birthDateFieldKeys: slipSeed.birthDateFieldKeys, staffOnlyFieldKeys: slipSeed.staffOnlyFieldKeys, hiddenFieldKeys: [],
     printLayout: slipSeed.printLayout, sortOrder: slipSeed.sortOrder, enabled: true, customizedAt: null, draft: null, draftUpdatedAt: null,
     ...overrides,
@@ -261,7 +279,7 @@ describe("saving and publishing a draft (#712)", () => {
 describe("sensitive-flag protection on the server (#712)", () => {
   it("warns on save about a cleared sensitive flag, and refuses to publish it", async () => {
     const published = await currentSpec();
-    const key = slipSeed.sensitiveFieldKeys[0];
+    const key = SEALED_SLIP_KEYS[0];
     const loosened = setFieldFlag(published, idOf(published, key), "sensitive", false);
     const saved = await saveClubFormDraft(slipSeed.key, { draft: loosened, baseVersion: slipSeed.version }, "admin-1", now);
     expect(saved.warnings[0]).toMatchObject({ key: `field:${idOf(published, key)}` });
@@ -273,7 +291,7 @@ describe("sensitive-flag protection on the server (#712)", () => {
   it("refuses to delete a sensitive field once forms exist, but allows hiding it", async () => {
     state.submissions.push({ id: "sub-1", templateId: "tpl-slip", answers: {}, sealedSensitiveAnswers: null, templateVersion: slipSeed.version });
     const published = await currentSpec();
-    const key = slipSeed.sensitiveFieldKeys[0];
+    const key = SEALED_SLIP_KEYS[0];
     const removedSave = await saveClubFormDraft(slipSeed.key, { draft: removeField(published, idOf(published, key)), baseVersion: slipSeed.version }, "admin-1", now);
     expect(removedSave.warnings).toEqual([expect.objectContaining({ key: `removed:${key}` })]);
     await expect(publishClubFormDraft(slipSeed.key, { baseVersion: slipSeed.version }, "admin-1", now))
@@ -288,7 +306,7 @@ describe("sensitive-flag protection on the server (#712)", () => {
 
   it("checks the protection rules again at publish, against the history as it is then", async () => {
     const published = await currentSpec();
-    const key = slipSeed.sensitiveFieldKeys[0];
+    const key = SEALED_SLIP_KEYS[0];
     // A draft saved before the field was ever sensitive in a published version cannot slip through.
     state.templates[0].draft = setFieldFlag(published, idOf(published, key), "sensitive", false);
     state.templates[0].draftUpdatedAt = now;
@@ -378,9 +396,25 @@ describe("the sync leaves edited templates alone (#712)", () => {
     const { skipped, refused } = await syncClubFormTemplates(client as never, { continueOnRefusal: true });
     expect(skipped).toEqual([{ key: slipSeed.key, reason: "edited in the app" }]);
     expect(refused).toEqual([]);
-    expect(JSON.stringify(state.templates[0])).toBe(before);
+    // Only the owner's 2026-11-07 decision reaches an edited copy: its emergency keys stop being sensitive; nothing else changes.
+    expect(state.templates[0].sensitiveFieldKeys).toEqual([]);
+    expect(JSON.stringify({ ...state.templates[0], sensitiveFieldKeys: SEALED_SLIP_KEYS })).toBe(before);
     // The other seeds are still created.
     expect(state.templates.length).toBe(clubFormTemplateSeeds.length);
+  });
+
+  it("drops exactly the emergency keys from an edited copy's sensitive list and keeps the others (owner decision, 2026-11-07)", async () => {
+    state.templates[0].customizedAt = now;
+    state.templates[0].sensitiveFieldKeys = [...SEALED_SLIP_KEYS, "activity"];
+    state.submissions.push({ id: "sub-1", templateId: "tpl-slip", answers: { child_name: "Riley Sample" }, sealedSensitiveAnswers: sealSensitiveAnswers("sub-1", { physician_name: "Dr. Synthetic Physician" }), hasSensitiveAnswers: true, templateVersion: slipSeed.version });
+    const sealedBefore = state.submissions[0].sealedSensitiveAnswers;
+    await syncClubFormTemplates(client as never, { continueOnRefusal: true });
+    expect(state.templates[0].sensitiveFieldKeys).toEqual(["activity"]);
+    // The sync never touches answers: moving them is the human-run script's job.
+    expect(state.submissions[0].sealedSensitiveAnswers).toBe(sealedBefore);
+    // Run again: nothing more changes.
+    await syncClubFormTemplates(client as never, { continueOnRefusal: true });
+    expect(state.templates[0].sensitiveFieldKeys).toEqual(["activity"]);
   });
 
   it("still applies a seed update when a draft is pending: the form stays fillable and the draft goes stale", async () => {
@@ -426,35 +460,33 @@ describe("the sync leaves edited templates alone (#712)", () => {
     expect((await publishClubFormDraft(slipSeed.key, { baseVersion: slipSeed.version }, "admin-1", now)).version).toBe(slipSeed.version + 1);
   });
 
-  it("still seals keys the code seed added for a template edited in the app, without touching its definition", async () => {
-    const published = await currentSpec();
-    const added = slipSeed.sensitiveFieldKeys[0];
-    // The app-edited template's stored list lacks a key the code now marks sensitive; an answer to it sits in plain text.
-    state.templates[0].sensitiveFieldKeys = slipSeed.sensitiveFieldKeys.filter((key) => key !== added);
-    state.templates[0].customizedAt = now;
-    state.submissions.push({ id: "sub-1", templateId: "tpl-slip", answers: { [added]: "Synthetic plain value" }, sealedSensitiveAnswers: null, hasSensitiveAnswers: false, templateVersion: slipSeed.version });
-    const definitionBefore = JSON.stringify(state.templates[0].definition);
-    const { skipped } = await syncClubFormTemplates(client as never, { continueOnRefusal: true });
-    expect(skipped).toEqual([{ key: slipSeed.key, reason: "edited in the app" }]);
-    expect(JSON.stringify(state.templates[0].definition)).toBe(definitionBefore);
-    expect(state.templates[0].sensitiveFieldKeys).toContain(added);
-    const row = state.submissions[0];
-    expect(JSON.stringify(row)).not.toContain("Synthetic plain value");
-    expect(openSensitiveAnswers("sub-1", row.sealedSensitiveAnswers as string)).toEqual({ [added]: "Synthetic plain value" });
-    expect(published.name).toBeTruthy();
-  });
-
-  it("publishing seals only keys newly sensitive against the stored list, not the seed-merged one", async () => {
-    const published = await currentSpec();
-    const key = slipSeed.sensitiveFieldKeys[0];
-    // Stored list lacks the key (the sync has not run); the draft keeps it sensitive. Publish must seal it.
-    state.templates[0].sensitiveFieldKeys = slipSeed.sensitiveFieldKeys.filter((candidate) => candidate !== key);
-    state.submissions.push({ id: "sub-1", templateId: "tpl-slip", answers: { [key]: "Synthetic plain value" }, sealedSensitiveAnswers: null, hasSensitiveAnswers: false, templateVersion: slipSeed.version });
-    await saveClubFormDraft(slipSeed.key, { draft: { ...published, sensitiveFieldKeys: slipSeed.sensitiveFieldKeys }, baseVersion: slipSeed.version }, "admin-1", now);
-    await publishClubFormDraft(slipSeed.key, { baseVersion: slipSeed.version }, "admin-1", now);
-    expect(JSON.stringify(state.submissions[0])).not.toContain("Synthetic plain value");
-  });
-
+  it("still seals keys the code seed added for a template edited in the app, without touching its definition", async () => withSeedSealing(async () => {
+      const published = await currentSpec();
+      const added = SEALED_SLIP_KEYS[0];
+      // The app-edited template's stored list lacks a key the code now marks sensitive; an answer to it sits in plain text.
+      state.templates[0].sensitiveFieldKeys = SEALED_SLIP_KEYS.filter((key) => key !== added);
+      state.templates[0].customizedAt = now;
+      state.submissions.push({ id: "sub-1", templateId: "tpl-slip", answers: { [added]: "Synthetic plain value" }, sealedSensitiveAnswers: null, hasSensitiveAnswers: false, templateVersion: slipSeed.version });
+      const definitionBefore = JSON.stringify(state.templates[0].definition);
+      const { skipped } = await syncClubFormTemplates(client as never, { continueOnRefusal: true });
+      expect(skipped).toEqual([{ key: slipSeed.key, reason: "edited in the app" }]);
+      expect(JSON.stringify(state.templates[0].definition)).toBe(definitionBefore);
+      expect(state.templates[0].sensitiveFieldKeys).toContain(added);
+      const row = state.submissions[0];
+      expect(JSON.stringify(row)).not.toContain("Synthetic plain value");
+      expect(openSensitiveAnswers("sub-1", row.sealedSensitiveAnswers as string)).toEqual({ [added]: "Synthetic plain value" });
+      expect(published.name).toBeTruthy();
+  }));
+  it("publishing seals only keys newly sensitive against the stored list, not the seed-merged one", async () => withSeedSealing(async () => {
+      const published = await currentSpec();
+      const key = SEALED_SLIP_KEYS[0];
+      // Stored list lacks the key (the sync has not run); the draft keeps it sensitive. Publish must seal it.
+      state.templates[0].sensitiveFieldKeys = SEALED_SLIP_KEYS.filter((candidate) => candidate !== key);
+      state.submissions.push({ id: "sub-1", templateId: "tpl-slip", answers: { [key]: "Synthetic plain value" }, sealedSensitiveAnswers: null, hasSensitiveAnswers: false, templateVersion: slipSeed.version });
+      await saveClubFormDraft(slipSeed.key, { draft: { ...published, sensitiveFieldKeys: SEALED_SLIP_KEYS }, baseVersion: slipSeed.version }, "admin-1", now);
+      await publishClubFormDraft(slipSeed.key, { baseVersion: slipSeed.version }, "admin-1", now);
+      expect(JSON.stringify(state.submissions[0])).not.toContain("Synthetic plain value");
+  }));
   it("keeps updating a template that was never edited, and records the version it writes", async () => {
     state.templates[0].version = slipSeed.version - 1;
     state.templates[0].name = "Old name";
@@ -482,7 +514,7 @@ describe("creating and copying a form (#712)", () => {
     expect(created.key).toBe("synthetic_slip_copy");
     const copy = state.templates.find((candidate) => candidate.key === created.key)!;
     expect(copy.enabled).toBe(false);
-    expect(copy.sensitiveFieldKeys).toEqual(slipSeed.sensitiveFieldKeys);
+    expect(copy.sensitiveFieldKeys).toEqual(SEALED_SLIP_KEYS);
     expect(copy.sectionNotes).toEqual(slipSeed.sectionNotes);
     expect(copy.id).not.toBe("tpl-slip");
     expect(state.audit.at(-1)).toMatchObject({ metadata: { copiedFromKey: slipSeed.key } });
@@ -513,7 +545,7 @@ describe("the builder view never carries answers (#712)", () => {
     expect(view.submissionCount).toBe(1);
     expect(JSON.stringify(view)).not.toContain("Riley Sample");
     expect(JSON.stringify(view)).not.toContain("Dr. Synthetic Physician");
-    expect(view.lockedSensitiveKeys).toEqual(expect.arrayContaining(slipSeed.sensitiveFieldKeys));
+    expect(view.lockedSensitiveKeys).toEqual(expect.arrayContaining(SEALED_SLIP_KEYS));
   });
 });
 
@@ -594,7 +626,7 @@ describe("hidden fields on every new-fill path (#712)", () => {
     await hide(["physician_name"]);
     // The stored list (and the seed union) are changed under it: only the sealed blob says physician_name was sensitive.
     state.templates[0].sensitiveFieldKeys = [];
-    const seedKeys = slipSeed.sensitiveFieldKeys.filter((key) => key !== "physician_name");
+    const seedKeys = SEALED_SLIP_KEYS.filter((key) => key !== "physician_name");
     void seedKeys;
     await saveClubFormSubmission(director, { organizationId: "club-a", templateKey: slipSeed.key, submissionId: "sub-d", answers: { child_name: "Riley Sample" }, submit: false }, now);
     const row = state.submissions.find((candidate) => candidate.id === "sub-d")!;

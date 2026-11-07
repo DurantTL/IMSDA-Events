@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
+import { emergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import {
   allFields,
   definitionForLink,
@@ -66,12 +67,18 @@ describe("seeded club form templates", () => {
     for (const key of ["full_name", "email", "phone_cell", "reference_1_name", "honor_1_name"]) expect(keys.has(key), key).toBe(false);
   });
 
-  it("marks the permission slip's physician, clinic and emergency contact sensitive", () => {
-    expect(new Set(slip().sensitiveFieldKeys)).toEqual(new Set(["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"]));
+  it("lists no sensitive keys on the permission slip: physician, clinic and emergency contact are plain (owner decision, 2026-11-07)", () => {
+    expect(slip().sensitiveFieldKeys).toEqual([]);
+    expect(slip().version).toBe(3);
+    const fieldKeys = allFields(slip().definition).map((field) => field.key);
+    for (const key of emergencyPlainKeys("off_premises_permission_slip")) expect(fieldKeys).toContain(key);
+    expect([...emergencyPlainKeys("off_premises_permission_slip")].sort()).toEqual(["clinic_name", "clinic_phone", "emergency_contact_phone", "physician_name", "physician_phone"]);
   });
 
-  it("marks every passenger emergency contact sensitive and offers 20 passengers", () => {
-    const keys = passengers().sensitiveFieldKeys;
+  it("lists no sensitive keys on the passenger list and offers 20 passengers (owner decision, 2026-11-07)", () => {
+    expect(passengers().sensitiveFieldKeys).toEqual([]);
+    expect(passengers().version).toBe(2);
+    const keys = emergencyPlainKeys("transportation_passenger_list");
     expect(keys).toHaveLength(20);
     expect(keys).toContain("passenger_20_emergency_contact");
     const fieldKeys = allFields(passengers().definition).map((field) => field.key);
@@ -372,7 +379,7 @@ describe("staff form answers", () => {
 });
 
 describe("permission slip and passenger list answers", () => {
-  it("accepts a complete permission slip and seals the medical block", () => {
+  it("accepts a complete permission slip and keeps the medical block as plain answers", () => {
     const template = slip();
     const answers = sanitizeClubFormAnswers(template.definition, {
       child_name: "Riley Sample",
@@ -392,8 +399,10 @@ describe("permission slip and passenger list answers", () => {
     });
     expect(validateClubFormAnswers(template.definition, answers)).toEqual([]);
     const { plain, sensitive } = splitAnswers(template, answers);
-    expect(Object.keys(sensitive).sort()).toEqual(["emergency_contact_phone", "physician_name"]);
+    expect(sensitive).toEqual({});
     expect(plain).toHaveProperty("activity", "Canoe trip");
+    expect(plain).toHaveProperty("physician_name", "Dr. Example");
+    expect(plain).toHaveProperty("emergency_contact_phone");
   });
 
   it("requires the emergency contact phone on the slip", () => {
@@ -401,7 +410,7 @@ describe("permission slip and passenger list answers", () => {
     expect(keys).toContain("emergency_contact_phone");
   });
 
-  it("needs one passenger and the four contacts, and seals emergency contacts", () => {
+  it("needs one passenger and the four contacts, and keeps emergency contacts plain", () => {
     const template = passengers();
     expect(validateClubFormAnswers(template.definition, {}).map((issue) => issue.key).sort()).toEqual([
       "contact_cell", "contact_name", "driver_cell", "driver_name", "passenger_1_name",
@@ -418,7 +427,8 @@ describe("permission slip and passenger list answers", () => {
     });
     expect(validateClubFormAnswers(template.definition, answers)).toEqual([]);
     const { plain, sensitive } = splitAnswers(template, answers);
-    expect(sensitive).toEqual({ passenger_1_emergency_contact: "Pat Sample 515-555-0123" });
+    expect(sensitive).toEqual({});
+    expect(plain).toHaveProperty("passenger_1_emergency_contact", "Pat Sample 515-555-0123");
     expect(plain).toHaveProperty("passenger_20_name", "Last Passenger");
   });
 });

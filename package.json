@@ -132,6 +132,7 @@
     "db:seed": "prisma db seed",
     "db:refresh-demo": "tsx --require ./scripts/support/allow-server-only.cjs scripts/refresh-local-demo.ts",
     "club-forms:sync": "tsx --require ./scripts/support/allow-server-only.cjs scripts/sync-club-form-templates.ts",
+    "club-forms:unseal-emergency": "tsx --require ./scripts/support/allow-server-only.cjs scripts/unseal-club-form-emergency-answers.ts",
     "ledger:backfill": "tsx --require ./scripts/support/allow-server-only.cjs scripts/ledger-backfill.ts",
     "lodging:sync": "tsx --require ./scripts/support/allow-server-only.cjs scripts/sync-lodging-templates.ts",
     "form-templates:sync": "tsx --require ./scripts/support/allow-server-only.cjs scripts/sync-seeded-form-templates.ts",

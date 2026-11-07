@@ -44,6 +44,7 @@ async function main() {
       return;
     }
     console.log("Club form templates are in sync.");
+    console.log("If this run updated the Off-Premises Permission Slip or the Transportation Passenger List, now run: npm run club-forms:unseal-emergency (dry run), then with -- --execute.");
   } finally {
     await prisma.$disconnect();
   }
