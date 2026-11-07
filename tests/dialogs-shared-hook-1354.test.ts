@@ -481,7 +481,7 @@ describe("More launcher", () => {
     await frame();
     return { trigger, panel: document.querySelector<HTMLElement>(".more-launcher")! };
   }
-  const links = (panel: HTMLElement) => [...panel.querySelectorAll<HTMLElement>("input.destination-search-input, input.more-launcher-search-input, a[href], button.more-launcher-toggle:not([disabled])")];
+  const links = (panel: HTMLElement) => [...panel.querySelectorAll<HTMLElement>("input.destination-search-input, input.more-launcher-search-input, button.more-launcher-close, a[href], button.more-launcher-toggle:not([disabled])")];
 
   it("phone sheet: opens on the first link, Escape closes it and returns focus to the trigger", async () => {
     const { trigger, panel } = await openLauncher("tab");
@@ -492,7 +492,7 @@ describe("More launcher", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("phone sheet: Tab and Shift+Tab walk the links in a loop, and arrows move through them", async () => {
+  it("phone sheet: Tab and Shift+Tab walk Close and the links in a loop, and arrows move through them", async () => {
     const { panel } = await openLauncher("tab");
     const items = links(panel);
     focusOn(items.at(-1)!);
@@ -500,9 +500,12 @@ describe("More launcher", () => {
     expect(document.activeElement).toBe(items[0]);
     await press("Tab", { shiftKey: true });
     expect(document.activeElement).toBe(items.at(-1));
+    // Close comes first, then the search box; Down walks on, and Home/End edit the text while the search box has focus.
     focusOn(items[0]);
     await press("ArrowDown");
     expect(document.activeElement).toBe(items[1]);
+    await press("ArrowDown");
+    expect(document.activeElement).toBe(items[2]);
     await press("End");
     expect(document.activeElement).toBe(items.at(-1));
     // Tab from the sheet itself (nothing focused inside) still enters the loop.

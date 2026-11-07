@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "@fontsource/noto-sans/400.css";
 import "@fontsource/noto-sans/500.css";
 import "@fontsource/noto-sans/600.css";
@@ -21,6 +21,11 @@ export const metadata: Metadata = {
   applicationName: PRODUCT_NAME,
   icons: { icon: "/brand/favicon.ico", apple: BRAND_APPLE_TOUCH_PATH },
 };
+
+// The page runs edge to edge (viewport-fit=cover) so the safe-area insets are real: a notch, rounded corners and the home
+// indicator give `env(safe-area-inset-*)` a value, and the shell's fixed bars and sheets pad by it (#1566, docs/RESPONSIVE.md).
+// The keyboard keeps the browser's default (it overlays, the layout stays put); the staff phone bar steps aside while a field has focus.
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 // Reading the request nonce makes every page render per request, which the
 // nonce-based Content-Security-Policy from proxy.ts needs (#1401).
