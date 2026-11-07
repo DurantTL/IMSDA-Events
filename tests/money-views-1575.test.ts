@@ -61,6 +61,13 @@ describe("Money tab views (#1575)", () => {
     expect(item?.label).toBe(staffPageTitles.moreMoneyTools);
     expect(item?.requiredPermission).toBe("MANAGE_FINANCE");
     expect(staffSubpageTitle("/finance/tools")).toBe("More money tools");
+    // Each money page names itself; the cancellation request queue is the Refunds view.
+    expect(staffSubpageTitle("/finance/cancellation-requests")).toBe("Refunds");
+    expect(staffSubpageTitle("/finance/church-owed")).toBe(staffPageTitles.churchOwed);
+    expect(staffSubpageTitle("/finance/invoices/statements")).toBe(staffPageTitles.invoices);
+    expect(staffSubpageTitle("/finance/square-payments")).toBe(staffPageTitles.squarePayments);
+    expect(staffSubpageTitle("/finance/cancellation-policy")).toBe(staffPageTitles.cancellationPolicy);
+    expect(staffSubpageTitle("/finance")).toBeNull();
   });
 });
 

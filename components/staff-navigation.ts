@@ -226,6 +226,16 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
   ["/more/ledger-health", "prefix", staffPageTitles.ledgerCheck],
   ["/finance/tools", "prefix", staffPageTitles.moreMoneyTools],
+  // Each money page names itself (#1575), like the Ledger check, instead of the Payments page it used to sit under.
+  // The cancellation request queue is the Money tab's Refunds view, so its heading says Refunds.
+  ["/finance/invoices", "prefix", staffPageTitles.invoices],
+  ["/finance/church-owed", "prefix", staffPageTitles.churchOwed],
+  ["/finance/billing-responsibility", "prefix", staffPageTitles.billingResponsibility],
+  ["/finance/scholarship-fund", "prefix", staffPageTitles.scholarshipFund],
+  ["/finance/square-payments", "prefix", staffPageTitles.squarePayments],
+  ["/finance/attendance-reconciliation", "prefix", staffPageTitles.attendanceReconciliation],
+  ["/finance/cancellation-policy", "prefix", staffPageTitles.cancellationPolicy],
+  ["/finance/cancellation-requests", "prefix", "Refunds"],
   ["/more/kitchen-report/counts", "prefix", staffPageTitles.kitchenCounts],
   ["/more/kitchen-report/closeout", "prefix", staffPageTitles.mealCloseout],
   ["/events-admin", "exact", "Event administration"],
