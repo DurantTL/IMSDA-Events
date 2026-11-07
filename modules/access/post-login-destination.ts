@@ -19,9 +19,11 @@ export async function resolvePostLoginDestination(
 ): Promise<string> {
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
   const [allEvents, lastEventId] = await Promise.all([
-    isSystemAdmin ? Promise.resolve([]) : listEventsForUser(user.id, false, { archived: "include" }),
+    isSystemAdmin ? Promise.resolve([]) : listEventsForUser(user.id, false, { archived: "include", clubEvents: "exclude" }),
     isSystemAdmin ? Promise.resolve(null) : readLastUsedEventId(),
   ]);
+  // Only the account's own staff assignments count here: a Clubs Administrator's club events (#1643) are reached from
+  // Club administration, which stays their home, so they never turn sign-in into an event landing or the picker.
   // Archived events (#635) are never a landing choice.
   const events = withoutArchivedEvents(allEvents);
 

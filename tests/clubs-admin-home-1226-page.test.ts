@@ -123,18 +123,11 @@ describe("what it shows", () => {
     expect(mocks.listAreaClubEvents).toHaveBeenCalledWith("2024-25");
   });
 
-  it("hides the event links from a Clubs Administrator with no event access", async () => {
-    const html = await render();
-    expect(html).not.toContain("/overview?event=");
-    expect(html).not.toContain("/more/kitchen-report?event=");
-    expect(html).toContain("Ask the event&#x27;s administrator for the event workspace.");
-  });
-
-  it("shows them to a Clubs Administrator who is also an Event Admin on that event", async () => {
-    mocks.resolveAdminRoles.mockResolvedValue({ systemAdmin: false, clubsAdministrator: true, eventAdminEventIds: ["evt-1"] });
+  it("shows the event links to a Clubs Administrator with no staff assignment: they administer every club event (#1643)", async () => {
     const html = await render();
     expect(html).toContain('href="/overview?event=evt-1"');
     expect(html).toContain('href="/more/kitchen-report?event=evt-1"');
+    expect(html).not.toContain("Ask the event&#x27;s administrator for the event workspace.");
   });
 
   it("shows them to a system administrator", async () => {

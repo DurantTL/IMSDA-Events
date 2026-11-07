@@ -27,7 +27,8 @@ export async function requireSystemAdministrator(
  * roster birth dates, new club applications and the Sterling Volunteers read routes. A system administrator, or an
  * active Clubs Administrator. #1232 adds the club management actions (imports, invites, transfers, supplies, honors,
  * Sterling Volunteers review, health-record import); the ones scoped to one organization use
- * `requireClubOrganizationAdministration` below. Never used for system or email settings, accounts, Team management or events.
+ * `requireClubOrganizationAdministration` below. Never used for system or email settings, accounts or Team management; and not for events either: a Clubs Administrator
+ * reaches club events (audience CLUB only) through the event permission lookup instead (#1643, `modules/access/club-event-access.ts`).
  * Caleb, 2026-10-26: within the club areas a Clubs Administrator sees what a system administrator sees, so the health
  * record, break-glass and guardian paths also admit an active Clubs Administrator (`isActiveClubsAdministrator`), each
  * keeping its own reasons and audit entries. The role switcher's cookie is never read here.

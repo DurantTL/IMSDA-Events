@@ -389,7 +389,8 @@ birth dates need their own protection.
    Decided 2026-10-26): club form sensitive answers, health records and sealed
    copies, Sterling Volunteers detail for club people, and guardian contacts.
    The role does **not** extend to system or email settings, accounts, Team
-   management, events the person is not assigned to, event-scoped coordinator
+   management, events the person is not assigned to (except club events, see
+   "Clubs Administrators on club events" below), event-scoped coordinator
    health, sealed-copy holds, or generic organization management (see the
    2026-10-26 follow-up below for what it does cover). The role is read from
    the database on every request, so a removal takes effect on the next one.
@@ -416,8 +417,47 @@ birth dates need their own protection.
    Addendum D). Generic organization management (list,
    create, billing, pastor, location, status, deletion, external identities,
    directory import), Master Award rules, seat overrides, settings, accounts,
-   the Team, events, sealed-copy holds, club-form alert emails and template
-   sync stay with system administrators.
+   the Team, events (apart from club events, below), sealed-copy holds,
+   club-form alert emails and template sync stay with system administrators.
+
+   **Clubs Administrators on club events** (decided 2026-11-07 by Caleb Durant,
+   GitHub issue #1643; Caleb: "They should be able to handle everything that is
+   club events"): an active Clubs Administrator holds the Event Administrator
+   role's permissions on **every event whose audience is Club**, with no staff
+   assignment on the event, and with the same powers an Event Administrator has
+   today, nothing held back. That includes what Event Administrators see and do
+   on a club event: the registration list and people pages, the dietary and
+   kitchen reports and the anonymous kitchen report (Addendum D), the finance
+   pages, payments and refunds as far as the Event Administrator role allows
+   them, exports, messages to attendees, settings and Event staff. Camp Meeting,
+   retreats and every other non-club event are unchanged: a Clubs Administrator
+   has access there only through a real staff assignment, and a real assignment
+   on a club event still applies on top. The server reads the event's audience
+   from the database and the grant on every request (never from the request or
+   a cached session), so removing the role removes the access on the next
+   request. What no Event Administrator holds stays as it was: the
+   coordinator health view (`VIEW_HEALTH_INFORMATION`, Addendum C) and finalizing
+   an invoice (`FINALIZE_INVOICES`) are still granted one staff assignment at a
+   time by a system administrator, and creating, copying or deleting events and
+   system settings stay with system administrators. An audit row
+   written for a club event carries `actorRole: CLUBS_ADMINISTRATOR` in its
+   metadata, like the club areas, in every request where the person's access to
+   that event was checked through this role (an active grant, not a system
+   administrator, no real Event Administrator assignment on it). The permission
+   check remembers that for the request and the database client adds the marker to
+   every audit write for that person and event, whichever repository writes the
+   row, with no extra query (so it cannot hold up a transaction). It is kept for
+   route handlers wrapped in `withRequestContext` (including `mealRoute`) and for
+   server components within one render; a write outside those (a server action,
+   of which none exist today, a script or a background job) is not marked, so a
+   missing marker does not prove the access came from a real staff assignment. An `actorRole` a caller already set is kept. The Events
+   Administrator surfaces (the Events Administrator dashboard, its sidebar pill
+   and the Events header) stay keyed to real Event Administrator assignments by
+   design, so they do not appear for this role; Club administration remains a
+   Clubs Administrator's home, and club events are reached from it, the event
+   picker and the event switcher.
+   Two-step sign-in already applies to the role (Caleb, Nov 6, 2026) and
+   nothing new is asked.
 
    **Club Registrar and Reporter roles** (decided 2026-09-23, #375): a
    director or deputy may give a club **Registrar** the roster and event
@@ -1035,6 +1075,11 @@ forms, which stay `Restricted` to them.
 
 For attendees of **club events** only:
 
+> Who may open it is unchanged by the 2026-11-07 decision that makes Clubs
+> Administrators Event Administrators on club events (#1643, section 3): the
+> view still needs `VIEW_HEALTH_INFORMATION`, which no role carries, so a Clubs
+> Administrator does not get it from that decision.
+
 - the club registration's `dietary_needs` answer, labelled "Dietary
   restrictions / allergies (as entered)". It is free text and is not an allergy
   record;
@@ -1156,7 +1201,9 @@ issue #787, from the Communication Director's decision of 2026-10-05.
   apply to that view. Clubs Administrators acting as an Area Coordinator
   (Caleb, Nov 6, 2026) may also open the area kitchen report: the same
   anonymous grouped counts, with nothing else widened. System administrators
-  acting as an Area Coordinator already could.
+  acting as an Area Coordinator already could. A Clubs Administrator also holds
+  `VIEW_REPORTS` on every club event as its Event Administrator (Caleb, Nov 7,
+  2026, #1643; see section 3), so the staff row above covers them there too.
 - **Not audited.** Opening or downloading it is not written to the audit log,
   because the report contains no names.
 - **Accepted risk.** Free text can still identify someone at a small event

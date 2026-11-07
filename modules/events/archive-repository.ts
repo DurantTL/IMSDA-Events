@@ -8,7 +8,7 @@ import {
   type EventArchiveAuditMetadata,
 } from "@/modules/events/archive";
 import { effectiveLifecycleState } from "@/modules/events/lifecycle-state";
-import { EventOperationError } from "@/modules/events/repository";
+import { EventOperationError, eventAccessFilter } from "@/modules/events/repository";
 
 export class EventArchiveForbiddenError extends Error {
   constructor(message: string) {
@@ -85,7 +85,7 @@ export async function listArchivedEventsForUser(userId: string, isSystemAdmin: b
   return getPrisma().event.findMany({
     where: {
       archivedAt: { not: null },
-      ...(isSystemAdmin ? {} : { memberships: { some: { userId, status: "ACTIVE" } } }),
+      ...(await eventAccessFilter(userId, isSystemAdmin, "include")),
     },
     orderBy: [{ startsAt: "desc" }, { id: "asc" }],
     select: { id: true, slug: true, name: true, startsAt: true, endsAt: true, timezone: true, archivedAt: true },
