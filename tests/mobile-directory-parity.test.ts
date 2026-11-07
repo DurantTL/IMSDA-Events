@@ -471,7 +471,7 @@ describe("a phone reaches exactly the pages a desktop reaches (#475, #1565)", ()
   it("has Payments and Refunds only in the Money views, and Promo codes behind MANAGE_FINANCE", () => {
     const withFinance = navFor({ name: "finance", permissions: ["MANAGE_FINANCE", "VIEW_EVENT"], isSystemAdmin: false, clubOversight: false, clubEvent: false, clubFormsAccess: false });
     const money = withFinance.eventTabs.find((tab) => tab.key === "money");
-    expect(money?.views.map((view) => view.label)).toEqual(["Payments", "Balances due", "Promo codes"]);
+    expect(money?.views.map((view) => view.label)).toEqual(["Payments", "Balances due", "Refunds", "Promo codes", "More money tools"]);
     expect(withFinance.eventTabs.map((tab) => tab.label)).not.toContain("Payments");
     expect(withFinance.launcherCards.filter((card) => card.allowed).map((card) => card.href)).toContain("/more/promo-codes?event=event_1");
     const without = navFor({ name: "reports", permissions: ["VIEW_REPORTS"], isSystemAdmin: false, clubOversight: false, clubEvent: false, clubFormsAccess: false });
