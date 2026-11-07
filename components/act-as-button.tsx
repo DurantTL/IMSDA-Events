@@ -23,6 +23,7 @@ export function ActAsButton({
   club,
   endpoint,
   label,
+  origin,
   resultAction,
   role,
 }: {
@@ -32,6 +33,8 @@ export function ActAsButton({
   club?: string;
   endpoint: string;
   label: string;
+  /** Which page this button is on, so "Stop acting" can return there (Area Coordinator only). A fixed key, not a path. */
+  origin?: "clubs" | "people";
   /** The call to action shown once acting has started, e.g. "Open the club portal". */
   resultAction: string;
   role: string;
@@ -53,7 +56,7 @@ export function ActAsButton({
     setBusy(true);
     setError("");
     try {
-      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(origin ? { origin } : {}) });
       const body = await response.json().catch(() => ({})) as { message?: string; href?: string };
       if (!response.ok || !body.href) throw new Error(body.message ?? "That didn't work. Try again.");
       setResult({ message: body.message ?? "", href: body.href });

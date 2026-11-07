@@ -77,6 +77,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
           access="View only"
           endpoint="/api/admin/act-as/area-coordinator"
           label="Act as Area Coordinator (2 hours)"
+          origin="clubs"
           resultAction="Open the Area Coordinator portal"
           role="Area Coordinator"
         />

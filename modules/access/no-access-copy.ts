@@ -1,11 +1,29 @@
-export type NoAccessCopy = { heading: string; body: string; whoToAsk: string; showEvents: boolean };
+export type NoAccessCopy = { heading: string; body: string; whoToAsk: string; showEvents: boolean; /** Offer a link back to Club administration (a Clubs Administrator is working, just not here). */ showClubs?: boolean };
 
 /**
  * What /no-access says (#1411): event-creation pages send `?from=event-setup`; anyone else with an assignment gets a
  * general line. `body` is the reason in one sentence; `whoToAsk` fills the shared "Ask ... if you need access." line
  * that `AccessRestricted` shows everywhere (rule 14).
  */
-export function noAccessCopy(input: { from?: string | null; hasEvents: boolean; email: string }): NoAccessCopy {
+export function noAccessCopy(input: { from?: string | null; hasEvents: boolean; email: string; clubsAdmin?: boolean }): NoAccessCopy {
+  // A Clubs Administrator is signed in and working: "no events assigned" would send them to the wrong people (rule B14).
+  if (input.clubsAdmin) {
+    return input.from === "event-setup"
+      ? {
+          heading: "Creating events needs a system administrator",
+          body: "New events are set up by IMSDA system administrators, and your Clubs Administrator account is not one.",
+          whoToAsk: "an IMSDA system administrator",
+          showEvents: input.hasEvents,
+          showClubs: true,
+        }
+      : {
+          heading: "System management needs a system administrator",
+          body: "System management pages are for IMSDA system administrators. Your Clubs Administrator account covers Club administration.",
+          whoToAsk: "an IMSDA system administrator",
+          showEvents: input.hasEvents,
+          showClubs: true,
+        };
+  }
   if (!input.hasEvents) {
     return {
       heading: "No events are assigned",

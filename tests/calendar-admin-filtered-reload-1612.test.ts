@@ -52,3 +52,31 @@ describe("the imported calendar's default category (#1612)", () => {
     expect(select.selectedOptions[0].textContent).toBe(`Old Custom (${notOnPublicFilterLabel})`);
   });
 });
+
+describe("the Category filter shows the filter in the address (N2)", () => {
+  const choices = { options: ["Pathfinders", "Conference"], matched: ["Pathfinders", "Conference"], filterSlugs: [] };
+  const categorySelect = () => [...mounted.container.querySelectorAll<HTMLSelectElement>(".calendar-filter-row select")].find((select) => select.closest("label")?.textContent?.startsWith("Category"))!;
+  const mountAt = async (category: string) => {
+    window.history.replaceState(null, "", `/admin/calendar?category=${encodeURIComponent(category)}`);
+    mounted = await mount(createElement(CalendarAdminWorkspace, { initialEntries: [entry], initialEvents: [], initialQueryKey: `category=${category}`, publicFilters: choices }));
+  };
+
+  it("lists every public-filter category even when nothing uses it", async () => {
+    await mountAt("Conference");
+    const options = [...categorySelect().options].map((option) => option.textContent);
+    expect(options).toEqual(expect.arrayContaining(["Pathfinders", "Conference"]));
+    expect(categorySelect().value).toBe("Conference");
+  });
+
+  it("adds an address category that is on no list, marked like the entry form", async () => {
+    await mountAt("Zebra Rally");
+    expect(categorySelect().value).toBe("Zebra Rally");
+    expect(categorySelect().selectedOptions[0].textContent).toBe(`Zebra Rally (${notOnPublicFilterLabel})`);
+  });
+
+  it("does not add an extra row for a category the entries already use", async () => {
+    await mountAt("Youth");
+    expect(categorySelect().value).toBe("Youth");
+    expect([...categorySelect().options].filter((option) => option.value === "Youth")).toHaveLength(1);
+  });
+});

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { BrandLink } from "@/components/brand-link";
 import { SignOutButton } from "@/components/sign-out-button";
+import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { EVENT_PICKER_PATH, staffSignInLinkFor } from "@/modules/access/login-routing";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
@@ -30,6 +31,7 @@ export default async function NoAccessPage({ searchParams }: { searchParams: Pro
   const { from } = await searchParams;
   // Event Admins and anyone working in an event are sent here from the event-creation pages (#1411).
   const hasEvents = (await listEventsForUser(session.user.id, false)).length > 0;
-  const copy = noAccessCopy({ from: typeof from === "string" ? from : null, hasEvents, email: session.user.email });
-  return <main className="auth-page"><section className="auth-card no-access-card"><BrandLink className="auth-brand" wordmark /><AccessRestricted title={copy.heading} detail={copy.body} whoToAsk={copy.whoToAsk} headingLevel={1} />{copy.showEvents && <Link className="primary-button full-button" href={EVENT_PICKER_PATH}>Back to your events</Link>}<SignOutButton className="secondary-button full-button" /></section></main>;
+  const clubsAdmin = await isActiveClubsAdministrator(session.user.id);
+  const copy = noAccessCopy({ from: typeof from === "string" ? from : null, hasEvents, email: session.user.email, clubsAdmin });
+  return <main className="auth-page"><section className="auth-card no-access-card"><BrandLink className="auth-brand" wordmark /><AccessRestricted title={copy.heading} detail={copy.body} whoToAsk={copy.whoToAsk} headingLevel={1} />{copy.showClubs && <Link className="primary-button full-button" href="/admin/clubs">Back to Club administration</Link>}{copy.showEvents && <Link className="primary-button full-button" href={EVENT_PICKER_PATH}>Back to your events</Link>}<SignOutButton className="secondary-button full-button" /></section></main>;
 }

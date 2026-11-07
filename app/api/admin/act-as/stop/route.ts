@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { ACT_AS_ORIGIN_COOKIE, actAsOriginPath } from "@/modules/organizations/act-as-origin";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { actAsActor, requireClubsAdministration } from "@/modules/organizations/access";
@@ -21,7 +23,11 @@ async function postHandler(request: Request) {
     if (!sessionId) throw new Error("A staff session is missing its session id.");
     const staff = actAsActor(actor);
     const stopped = await stopActingAs(staff, sessionId);
-    return Response.json({ ok: true, stopped: Boolean(stopped), href: stopActingHref(stopped, staff.viaClubsAdministrator ? "/admin/clubs/summary" : undefined) });
+    const jar = await cookies();
+    // Only an Area Coordinator act-as remembers where it started; a club director goes to the club's own page.
+    const origin = stopped?.role === "AREA_COORDINATOR" ? actAsOriginPath(jar.get(ACT_AS_ORIGIN_COOKIE)?.value) : null;
+    if (stopped) jar.set(ACT_AS_ORIGIN_COOKIE, "", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 0 });
+    return Response.json({ ok: true, stopped: Boolean(stopped), href: stopActingHref(stopped, origin ?? (staff.viaClubsAdministrator ? "/admin/clubs/summary" : undefined)) });
   } catch (error) {
     return userAdminApiError(error, "Stopping act-as");
   }
