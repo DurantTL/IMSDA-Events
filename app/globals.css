@@ -13302,7 +13302,7 @@ body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-are
 @media (max-width: 800px) {
   /* Slid off the bottom, not display:none: it stays focusable, so a dialog that closes while the keyboard is up can still give focus back to More (the watch then brings the bar back). */
   html[data-keyboard="open"] .mobile-nav { transform: translateY(calc(100% + 12px)); box-shadow: none; }
-  html[data-keyboard="open"] body { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* The body keeps its bar-height bottom padding while the bar is away, so focusing a field never changes the page height. */
   html[data-keyboard="open"] .event-savebar.is-pinned { position: static; }
   html[data-keyboard="open"] .more-launcher-scrim { inset: 0; }
   html[data-keyboard="open"] .more-launcher-tab { bottom: env(safe-area-inset-bottom, 0px); max-height: calc(100dvh - 24px); }
