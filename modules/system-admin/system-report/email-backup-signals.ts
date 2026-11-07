@@ -1,5 +1,6 @@
 import type { EmailBackupStatus } from "@/integrations/email/provider";
 import type { Signal } from "./model";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * Pure mappers for the backup email service rows (#1444). They read nothing and carry counts, times and fixed words
@@ -9,7 +10,7 @@ export type BackupFields = Pick<Signal, "key" | "state" | "resultText" | "checke
 
 export const BACKUP_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
-const stamp = (date: Date) => `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+const stamp = (date: Date) => formatInConferenceTime(date, { dateStyle: "medium", timeStyle: "short" });
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 const OFF_REASON: Record<NonNullable<EmailBackupStatus["reason"]>, string> = {

@@ -61,41 +61,60 @@ const NOT_A_RECORD_STATUS = [...Object.values(clubDirectorRoleLabels), "Clear", 
 
 /**
  * B12 info labels (Caleb, Nov 7, 2026): chips that say something other than the state of a record. Allowed next to the
- * status words, but only in these shapes, so a stray word still fails.
+ * status words, but only in exactly these shapes and this casing, so a stray word still fails.
  *  - money: "$350 due", "Paid in full", "No charge";
  *  - account type: "Staff login", "Website account", "Two-step on", "Two-step not set up";
- *  - publishing: "Published" (with a date after it), "Draft", "Active", "Inactive", "No unpublished changes";
- *  - system health: exactly "OK" (green), "Check soon" (amber, the gold chip), "Needs attention" (red, the coral chip), in
- *    that order of severity; the System report's tally chips ("3 need attention") use the same words and colors. The
- *    System report also says "Unavailable" and "Count only" (neutral) for a reading that has no verdict, never OK.
+ *  - publishing: "Published", "Published Nov 6, 2026, 3:36 PM CST" (optionally "Published by <name> <that date>"),
+ *    "Draft", "Active", "Inactive", "No unpublished changes";
+ *  - system health: exactly "OK" (green), "Check soon" (amber, the gold chip), "Needs attention" (red, the coral chip),
+ *    in that order of severity;
+ *  - neutral reading labels (grey, never OK): "Unavailable", "Count only", "Not run yet";
+ *  - progress: "N of M ticked";
+ *  - tallies of the above: "N OK", "N check soon", "N need attention", "N unavailable", "N count only".
+ * A detail after " · " is checked part by part: each part must be one of these labels or a count like "2 chosen".
  */
 export const HEALTH_LABELS = [
   { word: "OK", color: "green" },
   { word: "Check soon", color: "gold" },
   { word: "Needs attention", color: "coral" },
 ] as const;
-const MONEY_LABELS = [/^\$[\d,]+(\.\d{2})? due$/i, /^paid in full$/i, /^no charge$/i];
-const ACCOUNT_LABELS = ["staff login", "website account", "two-step on", "two-step not set up"];
-const PUBLISHING_LABELS = [/^published( .+)?$/i, /^draft$/i, /^active$/i, /^inactive$/i, /^no unpublished changes$/i];
-const READING_LABELS = [/^unavailable$/i, /^count only$/i, /^\d+ unavailable$/i, /^\d+ count only$/i];
-const HEALTH_TALLY = /^\d+ (ok|check soon|need attention)$/i;
+const MONEY_LABELS = [/^\$[\d,]+(\.\d{2})? due$/, /^Paid in full$/, /^No charge$/];
+const ACCOUNT_LABELS = ["Staff login", "Website account", "Two-step on", "Two-step not set up"];
+const PUBLISHED_AT = /^Published( by [^·]+?)? [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2} [AP]M C[SD]T$/;
+const PUBLISHING_LABELS = [/^Published$/, PUBLISHED_AT, /^Draft$/, /^Active$/, /^Inactive$/, /^No unpublished changes$/];
+const READING_WORDS = ["Unavailable", "Count only", "Not run yet"];
+const PROGRESS_LABEL = /^\d+ of \d+ ticked$/;
+const COUNT_DETAIL = /^\d+ [a-z]+$/;
 
-/** The family of an info label, or null when the chip is not one (the word before any " · " detail is what counts). */
-export function infoLabelKind(chip: string): "money" | "account" | "publishing" | "health" | "reading" | null {
-  const word = chip.split(" · ")[0]!.trim();
-  if (MONEY_LABELS.some((pattern) => pattern.test(word))) return "money";
-  if (ACCOUNT_LABELS.includes(word.toLowerCase())) return "account";
-  if (PUBLISHING_LABELS.some((pattern) => pattern.test(word))) return "publishing";
-  if (HEALTH_LABELS.some((label) => label.word === word) || HEALTH_TALLY.test(word)) return "health";
-  if (READING_LABELS.some((pattern) => pattern.test(word))) return "reading";
+type InfoKind = "money" | "account" | "publishing" | "health" | "reading" | "progress";
+
+function infoKindOfPart(part: string): InfoKind | null {
+  if (MONEY_LABELS.some((pattern) => pattern.test(part))) return "money";
+  if (ACCOUNT_LABELS.includes(part)) return "account";
+  if (PUBLISHING_LABELS.some((pattern) => pattern.test(part))) return "publishing";
+  if (HEALTH_LABELS.some((label) => label.word === part) || /^\d+ (OK|check soon|need attention)$/.test(part)) return "health";
+  if (READING_WORDS.includes(part) || /^\d+ (unavailable|count only)$/.test(part)) return "reading";
+  if (PROGRESS_LABEL.test(part)) return "progress";
   return null;
 }
 
-/** The color a health chip must have (green, gold = amber, coral = red), or null for a chip that is not a health word. */
+/** The family of an info label, or null when the chip is not one. Every part after " · " must itself be an info label or a count. */
+export function infoLabelKind(chip: string): InfoKind | null {
+  const [first, ...rest] = chip.split(" · ").map((part) => part.trim());
+  const kind = infoKindOfPart(first!);
+  if (!kind) return null;
+  return rest.every((part) => infoKindOfPart(part) !== null || COUNT_DETAIL.test(part)) ? kind : null;
+}
+
+/** The color a health or reading chip must have (green, gold = amber, coral = red, neutral = grey), or null for any other chip. */
 export function requiredHealthColor(chip: string): string | null {
-  const word = chip.split(" · ")[0]!.trim().toLowerCase().replace(/^\d+ /, "");
-  const found = HEALTH_LABELS.find((label) => label.word.toLowerCase() === word) ?? (word === "need attention" ? HEALTH_LABELS[2] : null);
-  return found ? found.color : null;
+  const word = chip.split(" · ")[0]!.trim().replace(/^\d+ /, "");
+  const found = HEALTH_LABELS.find((label) => label.word === word);
+  if (found) return found.color;
+  if (word === "need attention") return "coral";
+  if (word === "check soon") return "gold";
+  if (word === "unavailable" || word === "count only" || READING_WORDS.includes(word)) return "neutral";
+  return null;
 }
 
 export const clean = (text: string) => text.replace(/\[es\]\s*/g, "").replace(/\s+/g, " ").trim();

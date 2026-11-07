@@ -1,4 +1,5 @@
 import type { BackupObject } from "@/integrations/backups/types";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * Whether the production backups xCloud writes to Cloudflare R2 are fresh (#1412). Pure: the reader lists the
@@ -134,7 +135,7 @@ export function formatBackupSize(bytes: number | null): string {
   return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 }
 
-/** "2026-10-31 03:12 UTC". */
+/** "Oct 30, 2026, 10:12 PM CDT": Central, labeled (B13). */
 export function formatBackupTime(iso: string): string {
-  return `${iso.slice(0, 16).replace("T", " ")} UTC`;
+  return formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" });
 }

@@ -1,4 +1,5 @@
 import type { Signal } from "./model";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * Pure mappers for the "Payment and email notices" checks (#1376): what the last notice, the recent sends and the
@@ -14,7 +15,7 @@ export const NOTICE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
 const iso = (date: Date | null) => (date ? date.toISOString() : null);
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
-const stamp = (date: Date) => `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+const stamp = (date: Date) => formatInConferenceTime(date, { dateStyle: "medium", timeStyle: "short" });
 
 /**
  * Where a notice row stands, from the last notice and the NEWEST thing sent or paid in the last 24 hours that is older

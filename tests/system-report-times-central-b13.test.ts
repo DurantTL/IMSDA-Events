@@ -51,3 +51,21 @@ describe("System report times in Central (B13)", () => {
     expect(reportTimeLabel("not a date", now)).toBe("Not recorded");
   });
 });
+
+describe("the other System report time stamps are Central too (B13)", () => {
+  it("prints the notice stamps in Central", async () => {
+    const { squareNoticeFields, rejectedNoticeFields } = await import("@/modules/system-admin/system-report/notice-signals");
+    const now = new Date("2026-11-07T03:00:00.000Z");
+    const last = squareNoticeFields("k", { configured: true, lastNoticeAt: new Date("2026-11-07T02:30:00.000Z"), newestPaymentAt: null, ignoredCount: 0, now });
+    expect(last.resultText).toContain("Nov 6, 2026, 8:30 PM CST");
+    expect(last.resultText).not.toContain("UTC");
+    const rejected = rejectedNoticeFields("k", { squareRejectedAt: new Date("2026-10-30T22:00:00.000Z"), resendRejectedAt: null, active: "Amazon SES" as never, alertDeliveryConfigured: true, now });
+    expect(rejected.resultText).toContain("Oct 30, 2026, 5:00 PM CDT");
+    expect(rejected.resultText).not.toContain("UTC");
+  });
+
+  it("prints the backup stamp in Central", async () => {
+    const { formatBackupTime } = await import("@/modules/operations/offsite-backups");
+    expect(formatBackupTime("2026-11-07T03:12:00.000Z")).toBe("Nov 6, 2026, 9:12 PM CST");
+  });
+});

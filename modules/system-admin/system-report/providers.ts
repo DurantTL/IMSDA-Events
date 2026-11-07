@@ -86,6 +86,7 @@ import { buildNoticeProviders } from "./notice-providers";
 import { systemSetupFor } from "@/modules/setup-help/system-setup-steps";
 import type { SetupHelp } from "@/modules/setup-help/types";
 import { summarizeServices } from "./service-setup";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /**
  * The System report's signal providers (#1357). Each provider wraps ONE existing module computation and turns it into
@@ -429,7 +430,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
       ? { key: "release-version", state: "unavailable" as const, checkedAt, whenLabel: "Tried", resultText: "The release code is not recorded on this server, so the version is not known." }
       : { key: "release-version", state: "info" as const, checkedAt, whenLabel: "Read", resultText: `Release ${release.sha.slice(0, 7)}${release.buildId ? `, build ${release.buildId}` : ""}.` };
     const { startedAt, builtAt } = getReleaseTimes(ctx.now);
-    const stamp = (date: Date) => `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+    const stamp = (date: Date) => formatInConferenceTime(date, { dateStyle: "medium", timeStyle: "short" });
     const deployed = startedAt
       ? { key: "release-deployed", state: "info" as const, checkedAt: iso(startedAt), whenLabel: "Server started", resultText: `Started ${stamp(startedAt)}.${builtAt ? ` Built ${stamp(builtAt)}.` : ""}` }
       : { key: "release-deployed", state: "unavailable" as const, checkedAt, whenLabel: "Tried", resultText: "The server's start time could not be read, so the deploy time is not known." };
