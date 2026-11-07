@@ -80,6 +80,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
+import { phoneMaxWidthPx } from "../components/more-launcher-model";
 import { clubYearChoices } from "../modules/club-rosters/domain";
 import { defaultPublicClubFormsSettings } from "../modules/club-forms/public-index-settings-domain";
 
@@ -4071,7 +4072,21 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   // The More launcher's Turn off confirm (#810): open the launcher, press the first Turn off, and the
   // confirm must fit, say the data is kept, and every control in it must be a big enough tap target.
   // It is cancelled, never confirmed, so no module is changed.
-  if (spec.name === "staff-more-launcher-admin") {
+  // The launcher with Turn off toggles exists only on a phone (800px or narrower); wider windows use the page.
+  if (spec.name === "staff-more-launcher-admin" && width > phoneMaxWidthPx) {
+    const desktopName = `${spec.name} (features page)`;
+    const before = page.url();
+    try {
+      await page.goto(`${baseUrl}/more/features`, { waitUntil: "load" });
+      if ((await page.locator('button[aria-label$="Press to turn off."]:visible, button[aria-label$="Press to turn on."]:visible').count()) === 0) {
+        record("dialog-open-failed", desktopName, width, "a system administrator sees no feature switch on /more/features");
+      }
+    } catch (error) {
+      record("dialog-open-failed", desktopName, width, (error as Error).message.split("\n")[0] ?? "failed");
+    }
+    if (page.url() !== before) await page.goto(before, { waitUntil: "load" });
+  }
+  if (spec.name === "staff-more-launcher-admin" && width <= phoneMaxWidthPx) {
     const launcherName = `${spec.name} (turn off confirm)`;
     try {
       await page.locator('a[aria-haspopup="dialog"]:visible').first().click({ timeout: 3000 });
