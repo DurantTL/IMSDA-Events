@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
   buildEntryWhere,
   CALENDAR_ENTRY_PAGE_SIZE,
+  defaultEntryFilters,
   defaultEntryQuery,
   entryOrderBy,
   isUpcoming,
@@ -345,12 +346,20 @@ export async function listCalendarEntryPage(query: CalendarEntryQuery = defaultE
 }
 
 /**
- * How many entries the Entries list would match for a set of filters, by the same where-clause (repeating series that began
- * in the past count while they still have an occurrence). Used by the Admin Events hub (#1569).
+ * Upcoming calendar items that can go on the public calendar, split by published or not (#1569). The Entries list's own
+ * upcoming rule (repeating series that began in the past count while they still have an occurrence, worked out once), with
+ * the public calendar's guards: a Deadline is never public, and an item staff hid or that left its feed is neither
+ * "published" nor something staff can publish, so it is not counted either way.
  */
-export async function countCalendarEntries(filters: EntryFilters, now = new Date()): Promise<number> {
+export async function countPublicCalendarEntries(now = new Date()): Promise<{ published: number; unpublished: number }> {
   const prisma = getPrisma();
-  return prisma.calendarEntry.count({ where: await entryWhereFor(prisma, filters, calendarDateIn(now)) });
+  const upcoming = await entryWhereFor(prisma, { ...defaultEntryFilters, time: "upcoming" }, calendarDateIn(now));
+  const base: Prisma.CalendarEntryWhereInput = { AND: [upcoming, { entryType: { not: "DEADLINE" }, isHiddenLocally: false, sourceRemovedAt: null }] };
+  const [published, unpublished] = await Promise.all([
+    prisma.calendarEntry.count({ where: { AND: [base, { isPublished: true }] } }),
+    prisma.calendarEntry.count({ where: { AND: [base, { isPublished: false }] } }),
+  ]);
+  return { published, unpublished };
 }
 
 /**

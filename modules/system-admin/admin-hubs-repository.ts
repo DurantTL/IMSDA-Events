@@ -2,8 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
-import { defaultEntryFilters } from "@/modules/calendar/admin-list";
-import { countCalendarEntries } from "@/modules/calendar/repository";
+import { countPublicCalendarEntries } from "@/modules/calendar/repository";
 import { listInformationForms } from "@/modules/information-forms/repository";
 import { countWaitingNewClubApplications } from "@/modules/club-applications/repository";
 import { listClubFormsForHub } from "@/modules/club-forms/hub";
@@ -49,20 +48,13 @@ const clubsSummary = (context: Context) =>
     return { clubs: clubs.length, late: totals.late };
   });
 
+const calendarCounts = (context: Context) => shared(context, "calendar", () => countPublicCalendarEntries(context.now));
+
 const formsHub = (context: Context) => shared(context, "formsHub", () => loadFormsHub());
 
 const readiness = (context: Context) => shared(context, "readiness", () => getSystemReadiness(context.now));
 
 const attention = (context: Context) => shared(context, "attention", () => getAdminAttentionSummary(context.now.getTime()));
-
-/** Standard items and closures: the entry types the public calendar can show. */
-async function countPublicCalendarEntries(filters: typeof defaultEntryFilters, now: Date) {
-  const [standard, closures] = await Promise.all([
-    countCalendarEntries({ ...filters, entryType: "STANDARD" }, now),
-    countCalendarEntries({ ...filters, entryType: "CLOSURE" }, now),
-  ]);
-  return standard + closures;
-}
 
 const readers: Record<MetricKey, (context: Context) => Promise<number>> = {
   upcomingEvents: () => getPrisma().event.count({ where: { archivedAt: null, isPublished: true, endsAt: { gte: new Date() } } }),
@@ -70,9 +62,9 @@ const readers: Record<MetricKey, (context: Context) => Promise<number>> = {
   // The Copy from a past event page lists every event, archived ones included, so the count is every event.
   copyableEvents: () => getPrisma().event.count(),
   archivedEvents: () => getPrisma().event.count({ where: { archivedAt: { not: null } } }),
-  // The Entries list's own rules (repeating series, upcoming). Deadlines never go on the public calendar, so they are not counted either way.
-  calendarPublished: async ({ now }) => (await countPublicCalendarEntries({ ...defaultEntryFilters, state: "published", time: "upcoming" }, now)),
-  calendarUnpublished: async ({ now }) => (await countPublicCalendarEntries({ ...defaultEntryFilters, state: "draft", time: "upcoming" }, now)),
+  // The Entries list's upcoming rule with the public calendar's guards (no deadlines, hidden or feed-removed items); one shared read.
+  calendarPublished: async (context) => (await calendarCounts(context)).published,
+  calendarUnpublished: async (context) => (await calendarCounts(context)).unpublished,
   moduleRequests: () => getPrisma().moduleRequest.count({ where: { status: "PENDING" } }),
   eventTemplates: () => getPrisma().eventTemplate.count({ where: { status: { not: "ARCHIVED" } } }),
   clubs: async (context) => (await clubsSummary(context)).clubs,

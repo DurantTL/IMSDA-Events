@@ -78,7 +78,7 @@ ul.stats[data-count] > li:last-child { grid-column: auto; }
   overflow-wrap: anywhere;
 }
 
-.stat[data-unavailable="true"] .stat .statValue {
+.stat[data-unavailable="true"] .statValue {
   color: var(--gold-text);
   font-size: max(var(--type-staff-floor, 0px), 1rem);
 }

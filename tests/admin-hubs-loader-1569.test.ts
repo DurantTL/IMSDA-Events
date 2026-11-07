@@ -18,8 +18,8 @@ vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 const getAreaClubsSummary = vi.fn();
 vi.mock("@/modules/club-reports/area-summary-repository", () => ({ getAreaClubsSummary: (...args: unknown[]) => getAreaClubsSummary(...args) }));
 vi.mock("@/modules/club-applications/repository", () => ({ countWaitingNewClubApplications: vi.fn(async () => { calls.push("applications"); return 3; }) }));
-const countCalendarEntries = vi.fn(async (filters: { entryType: string; state: string; time: string }) => (filters.entryType === "STANDARD" ? 3 : 1));
-vi.mock("@/modules/calendar/repository", () => ({ countCalendarEntries: (filters: { entryType: string; state: string; time: string }) => countCalendarEntries(filters) }));
+const countPublicCalendarEntries = vi.fn(async () => ({ published: 4, unpublished: 4 }));
+vi.mock("@/modules/calendar/repository", () => ({ countPublicCalendarEntries: () => countPublicCalendarEntries() }));
 vi.mock("@/modules/information-forms/repository", () => ({ listInformationForms: vi.fn(async (target: { scope: string }) => { calls.push(`information:${target.scope}`); return [{ status: "OPEN" }, { status: "CLOSED" }, { status: "OPEN" }]; }) }));
 vi.mock("@/modules/club-forms/hub", () => ({ listClubFormsForHub: vi.fn(async () => { calls.push("clubForms"); return [{ status: "OPEN" }, { status: "NOT_OPEN" }]; }) }));
 vi.mock("@/modules/club-transfers/repository", () => ({ countStaffTransferQueue: vi.fn(async () => 1) }));
@@ -45,7 +45,7 @@ beforeEach(() => {
   getSystemReadiness.mockResolvedValue({ ticksAvailable: true, summary: { automaticAttention: 0, automaticUnknown: 0, manualDone: 3, manualTotal: 3 } });
   attentionSummary.mockReset();
   attentionSummary.mockReturnValue({ unreadable: [], groups: [{ items: [{ key: "email-failed", count: 1 }] }] });
-  countCalendarEntries.mockClear();
+  countPublicCalendarEntries.mockClear();
   getAreaClubsSummary.mockReset();
   getAreaClubsSummary.mockResolvedValue([
     { id: "c1", months: [{ month: "2026-11", status: "LATE", points: 4 }] },
@@ -95,12 +95,10 @@ describe("Admin hub loaders (#1569)", () => {
     expect(calls).not.toContain("information:EVENT");
   });
 
-  it("counts calendar items by the Entries list's rules for standard items and closures, never deadlines", async () => {
+  it("reads the calendar counts once for both numbers", async () => {
     const values = await loadHubMetrics("events", system, now);
     expect(values).toMatchObject({ calendarPublished: 4, calendarUnpublished: 4, copyableEvents: 5 });
-    const types = countCalendarEntries.mock.calls.map(([filters]) => filters.entryType).sort();
-    expect(types).toEqual(["CLOSURE", "CLOSURE", "STANDARD", "STANDARD"]);
-    expect(countCalendarEntries.mock.calls.every(([filters]) => filters.time === "upcoming")).toBe(true);
+    expect(countPublicCalendarEntries).toHaveBeenCalledTimes(1);
   });
 
   it("reads nothing a restricted viewer does not see", async () => {
