@@ -12,6 +12,7 @@ import {
   type StaffAreaViewer,
 } from "@/components/staff-areas";
 import { buildEventTabs, currentEventPlace, eventTabSpecs, markCurrentEventTab, maxTabsPerRow, maxViewsPerTab, reservedTabWouldShow, type EventTabsContext } from "@/components/staff-event-tabs";
+import { buildHubView } from "@/modules/system-admin/admin-hubs-model";
 import { commonTaskHrefs } from "@/modules/system-admin/home-model";
 import { adminDirectoryGroups, systemNavGroups } from "@/components/system-navigation";
 import { eventPermissions, kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
@@ -25,6 +26,11 @@ const viewers: Record<string, StaffAreaViewer> = {
   editor: { ...base, hasEvents: false, siteContentEditor: true },
 };
 const keys = (area: StaffArea, viewer: StaffAreaViewer) => areaTabs(area, viewer).map((tab) => tab.key);
+
+function hubCardHrefs(viewer: StaffAreaViewer) {
+  const hubViewer = { isSystemAdmin: viewer.isSystemAdmin, clubsAdmin: viewer.held.includes("CLUBS_ADMIN"), siteContentEditor: viewer.siteContentEditor };
+  return (["events", "clubs", "people", "forms", "catalogs"] as const).flatMap((hub) => buildHubView(hub, hubViewer, {}).groups.flatMap((group) => group.cards.map((card) => card.href)));
+}
 
 describe("staff areas (#1565)", () => {
   it("keeps the rail at six areas and every row within the tab limits", () => {
@@ -75,7 +81,7 @@ describe("staff areas (#1565)", () => {
     expect(railItems(viewers.staff, "/overview?event=e1")).toEqual([expect.objectContaining({ area: "events", href: "/overview?event=e1" })]);
     // A site content editor reaches only the site content page.
     expect(visibleAreas(viewers.editor)).toEqual(["admin"]);
-    expect(areaTabs("admin", viewers.editor)[0].href).toBe("/admin/site-content");
+    expect(areaTabs("admin", viewers.editor)[0].href).toBe("/admin/hubs/catalogs");
   });
 
   it("shows the waiting count on New club applications only when it is above zero", () => {
@@ -113,7 +119,7 @@ describe("staff areas (#1565)", () => {
       ["/events-admin", "", "events", "event-administration"],
       ["/event-setup/copy", "", "events", "copy"],
       ["/admin/event-templates/abc", "", "events", "templates"],
-      ["/admin/feature-requests", "", "admin", "hub-catalogs"],
+      ["/admin/feature-requests", "", "admin", "hub-events"],
       ["/help", "", "home", null],
       ["/profile", "", "home", null],
     ];
@@ -132,12 +138,13 @@ describe("staff areas (#1565)", () => {
     const system = viewers.system;
     const homes = [
       ...staffAreaOrder.flatMap((area) => areaTabs(area, system).flatMap((tab) => [tab.href, ...(tab.views ?? []).map((view) => view.href)])),
+      ...hubCardHrefs(system),
     ].map((href) => href.split("#")[0].split("?")[0]);
     for (const path of ["/admin/clubs/invites", "/admin/clubs/import", "/admin/clubs/health-import", "/admin/organizations/background-checks", "/admin/club-forms", "/admin/club-forms/public-page", "/admin/honors", "/admin/club-supplies", "/admin/email", "/admin/site-content", "/admin/settings"]) {
       expect(homes, path).toContain(path);
     }
-    // The rest of the System destinations (Master Award rules, readiness, pauses, event module requests ...) stay on the
-    // System administration dashboard until its hub cards exist (#1569).
+    // The rest of the System destinations (Master Award rules, readiness, pauses, event module requests ...) are hub cards.
+    for (const path of ["/admin/master-award-rules", "/admin/readiness", "/admin/pauses", "/admin/feature-requests", "/admin/information-forms"]) expect(homes, path).toContain(path);
     expect(homes).toContain("/admin");
   });
 });
@@ -157,6 +164,7 @@ describe("System destinations stay on screen (#1565, #1569)", () => {
   it("shows every systemNavGroups page in an area row or view, in the Common tasks, or in the Catalogs directory on /admin", () => {
     const onScreen = new Set([
       ...staffAreaOrder.flatMap((area) => areaTabs(area, viewers.system).flatMap((tab) => [tab.href, ...(tab.views ?? []).map((view) => view.href)])),
+      ...hubCardHrefs(viewers.system),
       ...commonTaskHrefs.map((task) => task.href),
       // The list the /admin dashboard draws as its task directory: the page uses this same export, so removing it breaks this test.
       ...adminDirectoryGroups.flatMap((group) => group.items.map((item) => item.href)),

@@ -7,7 +7,7 @@ import {
   clubsAdminHrefForYear,
   eventsAdminHomeItem,
 } from "@/components/staff-navigation";
-import { clubsAdminRecordsHref, systemNavGroups } from "@/components/system-navigation";
+import { adminHubs, clubsAdminRecordsHref, systemNavGroups } from "@/components/system-navigation";
 import { type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import { maxTabsPerRow, maxViewsPerTab } from "@/components/staff-event-tabs";
 
@@ -59,8 +59,6 @@ export type AreaTab = {
   count?: number;
   /** Views of the tab: a button strip, at most five. */
   views?: AreaView[];
-  /** The tab opens a page that another area owns until the area's own hub is built (#1569). Recorded in docs/STAFF-WORKSPACE-ROUTES.md. */
-  hubPending?: boolean;
   current?: boolean;
 };
 
@@ -72,6 +70,7 @@ const registered: readonly Registered[] = [
   { href: clubsAdminHomeItem.href, label: clubsAdminHomeItem.label },
   { href: eventsAdminHomeItem.href, label: eventsAdminHomeItem.label },
   { href: "/admin", label: "System administration" },
+  ...Object.values(adminHubs).map(({ href, label }) => ({ href, label })),
 ];
 
 /** A destination from the registries; throws when one was renamed or removed so a tab can never point nowhere. */
@@ -96,7 +95,6 @@ type TabSpec = {
   href?: (viewer: StaffAreaViewer) => string;
   visible: Gate;
   views?: readonly ViewSpec[];
-  hubPending?: boolean;
   count?: (viewer: StaffAreaViewer) => number | undefined;
 };
 
@@ -169,38 +167,12 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
   ],
   admin: [
     { key: "system-administration", destination: "/admin", visible: sys },
-    // The four hub tabs open the group's first reachable page until each area's hub page is built (#1569).
-    { key: "hub-events", label: "Events", destination: "/event-setup", visible: sys, hubPending: true },
-    { key: "hub-clubs", label: "Clubs", destination: "/admin/organizations", visible: sys, hubPending: true },
-    { key: "hub-people", label: "People", destination: "/admin/people", visible: sys, hubPending: true },
-    {
-      key: "hub-forms",
-      label: "Forms",
-      href: (v) => (v.isSystemAdmin ? "/admin/forms" : "/admin/club-forms"),
-      visible: eitherClubsOrSys,
-      hubPending: true,
-      views: [
-        { href: "/admin/forms", visible: sys },
-        { href: "/admin/club-forms", visible: eitherClubsOrSys },
-        { href: "/admin/club-forms/public-page", visible: eitherClubsOrSys },
-        { href: "/admin/form-templates", visible: sys },
-        { href: "/admin/question-library", visible: sys },
-      ],
-    },
-    {
-      key: "hub-catalogs",
-      label: "Catalogs and settings",
-      href: (v) => (eitherClubsOrSys(v) ? "/admin/honors" : "/admin/site-content"),
-      visible: (v) => eitherClubsOrSys(v) || v.siteContentEditor,
-      hubPending: true,
-      views: [
-        { href: "/admin/honors", visible: eitherClubsOrSys },
-        { href: "/admin/club-supplies", visible: eitherClubsOrSys },
-        { href: "/admin/email", visible: sys },
-        { href: "/admin/site-content", visible: (v) => v.isSystemAdmin || v.siteContentEditor },
-        { href: "/admin/settings", visible: sys },
-      ],
-    },
+    // Each hub tab opens its hub page (#1569): the hub lists every destination of its group as a card, so no view strip is needed.
+    { key: "hub-events", destination: adminHubs.events.href, visible: sys },
+    { key: "hub-clubs", destination: adminHubs.clubs.href, visible: sys },
+    { key: "hub-people", destination: adminHubs.people.href, visible: sys },
+    { key: "hub-forms", destination: adminHubs.forms.href, visible: eitherClubsOrSys },
+    { key: "hub-catalogs", destination: adminHubs.catalogs.href, visible: (v) => eitherClubsOrSys(v) || v.siteContentEditor },
   ],
 };
 
@@ -247,13 +219,12 @@ export function areaTabs(area: StaffArea, viewer: StaffAreaViewer): AreaTab[] {
         href: area === "clubs" || area === "reports" ? withYear(baseHref, viewer) : baseHref,
         ...(count && count > 0 ? { count } : {}),
         views: resolveViews(spec.views, viewer, area),
-        ...(spec.hubPending ? { hubPending: true } : {}),
       };
     })
     .slice(0, maxTabsPerRow);
 }
 
-/** Whether a tab is a page its own area owns for the "where you are" marking (a hub tab that opens another area's page is not). */
+/** Whether a tab is a page its own area owns for the "where you are" marking (a tab that opens another area's page is not). */
 export function tabIsOwned(area: StaffArea, tab: Pick<AreaTab, "key" | "href">): boolean {
   const url = new URL(tab.href, "https://events.example.test");
   const place = staffPlaceFor(url.pathname, url.searchParams);
@@ -299,6 +270,13 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   if (isEventScopedPath(pathname)) return { area: "events", tab: null, view: null, inEvent: true };
 
   if (pathname === "/admin") return place("admin", "system-administration");
+  if (under(pathname, adminHubs.events.href)) return place("admin", "hub-events");
+  if (under(pathname, adminHubs.clubs.href)) return place("admin", "hub-clubs");
+  if (under(pathname, adminHubs.people.href)) return place("admin", "hub-people");
+  if (under(pathname, adminHubs.forms.href)) return place("admin", "hub-forms");
+  if (under(pathname, adminHubs.catalogs.href)) return place("admin", "hub-catalogs");
+  // A card on the Events hub, so it lights the Events tab and not the /admin fallback below.
+  if (under(pathname, "/admin/feature-requests")) return place("admin", "hub-events");
   if (pathname === "/events-admin") return place("events", "event-administration");
   if (under(pathname, "/event-setup")) return place("events", pathname === "/event-setup/copy" ? "copy" : "create");
   if (under(pathname, "/admin/calendar")) return place("events", "calendar");

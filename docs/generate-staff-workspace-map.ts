@@ -54,13 +54,7 @@ function placeOf(route: string, query = "") {
     view: view?.label ?? "",
     phone,
     menu,
-    // A page under a hub-pending tab that is neither the tab's landing page nor one of its views has no link in the row or
-    // the menu line. Its home is the System administration page (/admin), which lists every System group, and search.
-    note: tab?.hubPending
-      ? (!view && sample !== tab.href.split(/[?#]/)[0]
-        ? "hub pending #1569; not in the row: linked from the System administration page (/admin) and Find a page or task"
-        : "hub pending #1569")
-      : "",
+    note: "",
   };
 }
 
@@ -100,9 +94,9 @@ for (const [route, query] of [
 
 text.push(
   "",
-  "## Hub pending (#1569)",
+  "## Admin hub pages (#1569)",
   "",
-  "The Admin area's tabs Events, Clubs, People, Forms and Catalogs and settings are for each group's hub page, which #1569 builds. Until then each opens the group's first page the person may reach, and that page keeps its own area for the marking (for example Admin > Events opens Create an event, which is in the Events area). System administration (`/admin`) keeps the task directory and the Common tasks for every System group, so no System destination lost its link. The Admin tabs Forms and Catalogs and settings also show the Clubs Administrator's pages as views (Club forms, Public club forms page, Honor catalog, Club supply catalog).",
+  "Each Admin tab (Events, Clubs, People, Forms, Catalogs and settings) opens its own hub page under `/admin/hubs/`: a few key numbers, one main action, then a card for each destination with its own status. A card is a link only and is drawn only for a destination the person can open; a number that cannot be read shows \"Unavailable\", never zero. The hub lists every destination of its group, so the Forms and Catalogs tabs have no view buttons. The pages a hub links to keep their own area for the marking (for example Create an event is in Events); the Admin pages with no hub of their own light the Forms or Catalogs and settings tab. System administration (`/admin`) keeps the task directory and the Common tasks. Break-glass and legal-hold counts are not shown on the People hub: that page asks for the health privacy acknowledgment first.",
   "",
   "## Pages that used to be reached only through other pages",
   "",
@@ -122,7 +116,7 @@ text.push(
   "",
   "- Home (Needs you, Coming up): #1568 builds the pages; until then the rail has no Home item and the phone bar's Home slot opens the person's main dashboard.",
   "- Events > All events: there is no in-shell list of all events yet. Staff open an event from the Events row's \"Open an event\" picker or the dashboards, and switch from the event bar.",
-  "- Money > Refunds and More money tools (#1575), Registrations > Review queues (#1574), Event setup groups (#1571 and the setup issues), Admin hub pages (#1569), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).",
+  "- Money > Refunds and More money tools (#1575), Registrations > Review queues (#1574), Event setup groups (#1571 and the setup issues), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).",
   "",
 );
 writeFileSync("docs/STAFF-WORKSPACE-ROUTES.md", text.join("\n"));

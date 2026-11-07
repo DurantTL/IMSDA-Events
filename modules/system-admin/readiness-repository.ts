@@ -55,7 +55,7 @@ export type SystemReadiness = {
   groups: Array<{ id: ManualReadinessGroup; title: string; items: ManualReadinessRow[] }>;
   /** False when the tick table could not be read (for example, its migration is not applied yet). */
   ticksAvailable: boolean;
-  summary: { manualDone: number; manualTotal: number; automaticAttention: number };
+  summary: { manualDone: number; manualTotal: number; automaticAttention: number; /** Automatic checks whose answer could not be read (#1569); they are neither passing nor counted in `automaticAttention`. */ automaticUnknown: number };
 };
 
 async function readAdmins(): Promise<ReadinessFacts["admins"]> {
@@ -172,6 +172,7 @@ export async function getSystemReadiness(now = new Date()): Promise<SystemReadin
       manualDone: ticks === null ? 0 : manual.filter((item) => item.tick).length,
       manualTotal: manual.length,
       automaticAttention: automatic.filter((row) => row.status === "attention").length,
+      automaticUnknown: automatic.filter((row) => row.status === "unknown").length,
     },
   };
 }

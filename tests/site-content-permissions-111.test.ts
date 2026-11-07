@@ -210,7 +210,7 @@ describe("the Admin area link for editors who are not system administrators", ()
     expect(shell).toContain("siteContentEditor,");
     const { areaTabs } = await import("@/components/staff-areas");
     const editor = { isSystemAdmin: false, held: [], activeRole: null, hasEvents: false, siteContentEditor: true, healthImport: true, clubYear: null, counts: {} } as const;
-    expect(areaTabs("admin", editor).map((tab) => tab.href)).toEqual(["/admin/site-content"]);
+    expect(areaTabs("admin", editor).map((tab) => tab.href)).toEqual(["/admin/hubs/catalogs"]);
     expect(areaTabs("admin", { ...editor, siteContentEditor: false })).toEqual([]);
     const workspace = readFileSync("components/workspace-shell.tsx", "utf8");
     expect(workspace).toContain("const siteContentEditor = !isSystemAdmin && (await canManageSiteContent(user));");

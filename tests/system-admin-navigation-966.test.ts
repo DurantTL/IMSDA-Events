@@ -123,21 +123,21 @@ describe("the Admin area on /admin pages", () => {
     expect(row).not.toContain("Registrations");
   });
 
-  it("opens each hub tab on the group's first page, and every group's pages stay on the System administration dashboard until the hubs exist (#1569)", () => {
+  it("opens each hub tab on its hub page, and the System administration dashboard keeps its task directory (#1569)", () => {
     const row = tabsOf(render(admin));
-    expect(row).toContain('href="/event-setup?event=evt_one">Events');
-    expect(row).toContain('href="/admin/organizations?event=evt_one">Clubs');
-    expect(row).toContain('href="/admin/people?event=evt_one">People');
-    expect(row).toContain('href="/admin/forms?event=evt_one">Forms');
-    expect(row).toContain('href="/admin/honors?event=evt_one">Catalogs and settings');
+    expect(row).toContain('href="/admin/hubs/events?event=evt_one">Events');
+    expect(row).toContain('href="/admin/hubs/clubs?event=evt_one">Clubs');
+    expect(row).toContain('href="/admin/hubs/people?event=evt_one">People');
+    expect(row).toContain('href="/admin/hubs/forms?event=evt_one">Forms');
+    expect(row).toContain('href="/admin/hubs/catalogs?event=evt_one">Catalogs and settings');
     expect(row).toContain('aria-current="page" href="/admin?event=evt_one">System administration');
   });
 
-  it("highlights the current page's tab and its view", () => {
+  it("highlights the tab of a page the hub tab does not itself open, and marks the hub tab as the page on its hub", () => {
     navigation.pathname = "/admin/honors";
-    const markup = render(admin);
-    expect(markup).toContain('aria-current="true" href="/admin/honors?event=evt_one">Catalogs and settings');
-    expect(markup).toContain('<a aria-current="page" href="/admin/honors?event=evt_one">Honor catalog');
+    expect(render(admin)).toContain('aria-current="true" href="/admin/hubs/catalogs?event=evt_one">Catalogs and settings');
+    navigation.pathname = "/admin/hubs/catalogs";
+    expect(tabsOf(render(admin))).toContain('aria-current="page" href="/admin/hubs/catalogs?event=evt_one">Catalogs and settings');
   });
 
   it("keeps the current event on system links and lists Archived events once per page", () => {
