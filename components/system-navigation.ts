@@ -138,6 +138,20 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
   },
 ];
 
+/**
+ * The five Admin hub pages (#1569), one per Admin tab. Not part of `systemNavGroups` (the /admin dashboard, the sidebar and
+ * the search draw those); they are registered here so the tabs and Find a page can look them up like any other destination.
+ */
+export type AdminHubKey = "events" | "clubs" | "people" | "forms" | "catalogs";
+
+export const adminHubs: Record<AdminHubKey, { href: string; label: string; title: string; description: string }> = {
+  events: { href: "/admin/hubs/events", label: "Events", title: "Events", description: "Creating events, the public calendar, templates and requests from event staff." },
+  clubs: { href: "/admin/hubs/clubs", label: "Clubs", title: "Clubs", description: "The club directory, club records, and new clubs. Day-to-day club work lives in the Clubs area." },
+  people: { href: "/admin/hubs/people", label: "People", title: "People", description: "Who can sign in, what they can reach, and sealed health records." },
+  forms: { href: "/admin/hubs/forms", label: "Forms", title: "Forms", description: "Every form, and the templates and saved questions forms are built from." },
+  catalogs: { href: "/admin/hubs/catalogs", label: "Catalogs and settings", title: "Catalogs and settings", description: "System health, the website and email, catalogs clubs choose from, and platform settings." },
+};
+
 /** The groups the /admin dashboard draws as its task directory; every other group is a Common tasks group there (#1228). */
 export const adminDirectoryGroups: readonly SystemNavGroup[] = systemNavGroups.filter((group) => group.key === "system-catalogs");
 
@@ -192,6 +206,11 @@ type SystemTitleRule = readonly [path: RegExp, title: string];
  * management.
  */
 const systemTitleRules: readonly SystemTitleRule[] = [
+  [/^\/admin\/hubs\/events(\/|$)/, adminHubs.events.title],
+  [/^\/admin\/hubs\/clubs(\/|$)/, adminHubs.clubs.title],
+  [/^\/admin\/hubs\/people(\/|$)/, adminHubs.people.title],
+  [/^\/admin\/hubs\/forms(\/|$)/, adminHubs.forms.title],
+  [/^\/admin\/hubs\/catalogs(\/|$)/, adminHubs.catalogs.title],
   [/^\/event-setup\/from-template(\/|$)/, "Start from template"],
   [/^\/event-setup\/copy(\/|$)/, "Copy from a past event"],
   [/^\/event-setup(\/|$)/, "Create an event"],
