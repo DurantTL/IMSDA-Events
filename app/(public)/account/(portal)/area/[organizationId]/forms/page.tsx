@@ -74,7 +74,7 @@ export default async function AreaClubFormsPage({ params, searchParams }: { para
         </section>
       )}
       <p className="field-help">
-        Health, conduct, physician, emergency-contact and birth-date answers show as Restricted. Forms the conference has since switched off stay listed.
+        Health, conduct and birth-date answers show as Restricted. Emergency contact and physician and clinic answers on the Off-Premises Permission Slip and the Transportation Passenger List are plain: anyone who can see those forms sees them. Forms the conference has since switched off stay listed.
       </p>
       {submissions.length === 0 && <CoordinatorSetupHelp context="club forms" id="club-no-forms" />}
       {submissions.length === 0 ? (

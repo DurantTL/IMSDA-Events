@@ -29,3 +29,15 @@ export function withoutEmergencyPlainKeys(templateKey: string, keys: readonly st
   const plain = new Set(emergencyPlainKeys(templateKey));
   return plain.size === 0 ? [...keys] : keys.filter((key) => !plain.has(key));
 }
+
+/** The slip's medical-section note before the decision, and the text that replaces it. Only an unedited old note is replaced. */
+export const SLIP_MEDICAL_NOTE_BEFORE = "Medical and emergency information. Only the club's director and deputies, and conference staff with sensitive-data access, can read these answers.";
+export const SLIP_MEDICAL_NOTE_AFTER = "Medical and emergency information. The club keeps the paper form; this copy is a backup, so anyone who can open this form can read these answers.";
+
+/** `notes` with the old slip medical note swapped for the new one; any other note is left alone. Returns null when nothing changes. */
+export function sectionNotesWithPlainEmergencyText(templateKey: string, notes: unknown): Record<string, string[]> | null {
+  if (templateKey !== "off_premises_permission_slip" || !notes || typeof notes !== "object") return null;
+  const current = (notes as Record<string, unknown>).sec_medical;
+  if (!Array.isArray(current) || current.length !== 1 || current[0] !== SLIP_MEDICAL_NOTE_BEFORE) return null;
+  return { ...(notes as Record<string, string[]>), sec_medical: [SLIP_MEDICAL_NOTE_AFTER] };
+}

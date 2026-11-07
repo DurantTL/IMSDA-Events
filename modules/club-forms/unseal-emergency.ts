@@ -47,12 +47,14 @@ export type UnsealEmergencyResult = { execute: boolean; templates: UnsealTemplat
 
 export async function unsealEmergencyAnswers(
   client: Client = getPrisma(),
-  options: { execute?: boolean } = {},
+  options: { execute?: boolean; actorUserId?: string } = {},
 ): Promise<UnsealEmergencyResult> {
   const execute = options.execute === true;
+  // Every executed run is attributed to a person: there is no fallback actor.
+  if (execute && !options.actorUserId) throw new ClubFormError("INVALID_TEMPLATE", "An executed run needs the user who runs it (--actor <email>).");
   const templates: UnsealTemplateReport[] = [];
   for (const [templateKey, keys] of Object.entries(EMERGENCY_PLAIN_KEYS)) {
-    templates.push(await unsealOneTemplate(client, templateKey, new Set(keys), execute));
+    templates.push(await unsealOneTemplate(client, templateKey, new Set(keys), execute, options.actorUserId));
   }
   return { execute, templates };
 }
@@ -61,7 +63,7 @@ function emptyReport(templateKey: string, status: UnsealTemplateReport["status"]
   return { templateKey, status, scanned: 0, submissionsMoved: 0, answersMoved: 0, sealedDropped: 0, failedSubmissionIds: [], message };
 }
 
-async function unsealOneTemplate(client: Client, templateKey: string, keys: ReadonlySet<string>, execute: boolean): Promise<UnsealTemplateReport> {
+async function unsealOneTemplate(client: Client, templateKey: string, keys: ReadonlySet<string>, execute: boolean, actorUserId?: string): Promise<UnsealTemplateReport> {
   const template = await client.clubFormTemplate.findUnique({ where: { key: templateKey }, select: { id: true } });
   if (!template) return emptyReport(templateKey, "NOT_PRESENT", "No such template here.");
   if (!isSecretEncryptionConfigured()) {
@@ -70,12 +72,17 @@ async function unsealOneTemplate(client: Client, templateKey: string, keys: Read
   const report = emptyReport(templateKey, execute ? "DONE" : "DRY_RUN");
 
   const apply = async (tx: Prisma.TransactionClient) => {
-    // Waits for in-flight saves and holds off new ones until this transaction commits.
-    const locked = await lockClubFormTemplateForReseal(tx, template.id);
+    // A dry run only reads: it takes no lock. A real run waits for in-flight saves and holds off new ones until it commits.
+    const locked = execute
+      ? await lockClubFormTemplateForReseal(tx, template.id)
+      : await tx.clubFormTemplate.findUnique({ where: { id: template.id }, select: { sensitiveFieldKeys: true } });
     // While the template still lists a key as sensitive, a save would seal it again: sync first.
-    if (locked.sensitiveFieldKeys.some((key) => keys.has(key))) {
+    if (!locked || locked.sensitiveFieldKeys.some((key) => keys.has(key))) {
       return emptyReport(templateKey, "NOT_SYNCED", "The template still lists these answers as sensitive. Run npm run club-forms:sync first.");
     }
+    // Pass 1 reads and decrypts everything and plans every change, so an unreadable value stops the run before
+    // any write, even when this runs inside a caller's transaction that cannot be rolled back from here.
+    const planned: Array<{ id: string; plain: Record<string, unknown>; remaining: Record<string, unknown> }> = [];
     let cursor: string | undefined;
     for (;;) {
       const batch = await tx.clubFormSubmission.findMany({
@@ -103,27 +110,28 @@ async function unsealOneTemplate(client: Client, templateKey: string, keys: Read
           plain[key] = sealed[key];
           delete sealed[key];
         }
-        const remaining = Object.keys(sealed).length > 0;
         report.submissionsMoved += 1;
         report.answersMoved += toMove.length;
-        if (!remaining) report.sealedDropped += 1;
-        if (!execute) continue;
-        await tx.clubFormSubmission.update({
-          where: { id: row.id },
-          data: {
-            answers: plain as Prisma.InputJsonValue,
-            sealedSensitiveAnswers: remaining ? sealSensitiveAnswers(row.id, sealed) : null,
-            hasSensitiveAnswers: remaining,
-          },
-        });
+        if (Object.keys(sealed).length === 0) report.sealedDropped += 1;
+        if (execute) planned.push({ id: row.id, plain, remaining: sealed });
       }
     }
-    // One unreadable value stops the whole template, so it is never half moved.
-    if (report.failedSubmissionIds.length > 0) {
-      throw new UnsealFailed(report.failedSubmissionIds);
+    if (report.failedSubmissionIds.length > 0) throw new UnsealFailed(report.failedSubmissionIds);
+    // Pass 2: the writes. A failure here propagates, so the transaction (ours or the caller's) rolls back.
+    for (const change of planned) {
+      const remaining = Object.keys(change.remaining).length > 0;
+      await tx.clubFormSubmission.update({
+        where: { id: change.id },
+        data: {
+          answers: change.plain as Prisma.InputJsonValue,
+          sealedSensitiveAnswers: remaining ? sealSensitiveAnswers(change.id, change.remaining) : null,
+          hasSensitiveAnswers: remaining,
+        },
+      });
     }
     if (execute && report.submissionsMoved > 0) {
       await writeAuditLog({
+        actorUserId,
         action: "CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED",
         entityType: "ClubFormTemplate",
         entityId: template.id,
@@ -142,7 +150,8 @@ async function unsealOneTemplate(client: Client, templateKey: string, keys: Read
   };
 
   try {
-    return "$transaction" in client ? await client.$transaction(apply, RESEAL_TRANSACTION) : await apply(client);
+    // A dry run writes nothing, so it needs no transaction.
+    return execute && "$transaction" in client ? await client.$transaction(apply, RESEAL_TRANSACTION) : await apply(client as Prisma.TransactionClient);
   } catch (error) {
     if (error instanceof UnsealFailed) {
       return {

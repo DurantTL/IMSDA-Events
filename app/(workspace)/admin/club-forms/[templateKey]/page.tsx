@@ -77,6 +77,7 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
             key={`${view.key}-${view.version}-${view.draftUpdatedAt ?? "published"}`}
             lockedBirthDateKeys={view.lockedBirthDateKeys}
             lockedSensitiveKeys={view.lockedSensitiveKeys}
+            plainByDecisionKeys={view.plainByDecisionKeys}
             publishedKeys={view.published.definition.sections.flatMap((section) => section.fields.map((field) => field.key))}
             submissionCount={view.submissionCount}
             templateKey={view.key}

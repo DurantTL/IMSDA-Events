@@ -73,8 +73,9 @@ export default async function StaffClubFormsPage({
           <p>
             Submitted forms by club.{" "}
             {viewer.sensitiveAnswers
-              ? "You can read health, conduct, physician and emergency-contact answers; each time you open a form that has them, it is recorded. "
-              : "Health, conduct, physician and emergency-contact answers show as Restricted for your role. "}
+              ? "You can read health and conduct answers; each time you open a form that has them, it is recorded. "
+              : "Health and conduct answers show as Restricted for your role. "}
+            Emergency contact and physician and clinic answers on the Off-Premises Permission Slip and the Transportation Passenger List are plain, so everyone who can see those forms sees them.{" "}
             {viewer.systemAdmin || viewer.clubsAdministrator
               ? `As a ${viewer.systemAdmin ? "system administrator" : "Clubs Administrator"} you can also read birth dates.`
               : "Birth dates show as Restricted: only the club's own director and deputies, system administrators and Clubs Administrators can read them."}

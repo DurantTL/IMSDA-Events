@@ -1046,8 +1046,14 @@ For attendees of **club events** only:
 - **medications** show "Not collected". The encrypted Health record (#611) will
   add them.
 
+**Superseded by Addendum G (2026-11-07) for the slip's `emergency_contact_phone`
+and the passenger list's `passenger_N_emergency_contact`: those answers are now
+plain, so this view reads them from the plain answers and no longer needs to
+decrypt anything for them. The paragraph below remains true only for sealed
+answers that other forms may still hold.**
+
 Nothing else is shown or returned. A club form's sealed answers have to be
-decrypted as one object, so the physician and clinic fields are decrypted in
+decrypted as one object, so the physician and clinic fields were decrypted in
 memory with the rest. Every key except the ones listed above is dropped from
 that object immediately after decrypting: it is never shown, returned, logged
 or kept, and no other registration answer is shown.
@@ -1250,7 +1256,7 @@ Nothing else in this ADR changes.
   kept the seed's key loses exactly these keys from its sensitive list on the
   next sync; a staff copy under another key is untouched.
 - **Existing submissions.** `npm run club-forms:unseal-emergency` (dry run by
-  default; `-- --execute` to apply) moves these answers from the sealed value
+  default; `-- --execute --actor <email>` to apply, the actor recorded on the audit row) moves these answers from the sealed value
   into the plain answers, keeps every other sealed answer sealed, and drops the
   sealed value when nothing sensitive is left. It is idempotent, runs per
   template in one transaction under the template row lock, and audits

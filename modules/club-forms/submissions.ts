@@ -27,6 +27,7 @@ import {
   type ClubFormActor,
   type ClubFormsViewer,
 } from "@/modules/club-forms/domain";
+import { emergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import { assertClubFormTemplateCurrent, lockClubFormTemplateForWrite } from "@/modules/club-forms/template-lock";
@@ -452,6 +453,13 @@ export async function getSubmissionForViewer(
   const restricted = new Set(restrictedFieldKeys(viewer, row.organizationId, template));
   const reveal = viewerCanRevealSensitive(viewer, row.organizationId);
   const revealBirthDates = viewerCanRevealBirthDates(viewer, row.organizationId);
+  // Between a deploy and the human-run `npm run club-forms:unseal-emergency`, an older submission still holds the
+  // emergency answers inside its sealed value. A viewer who cannot open it sees Restricted, not a blank (ADR 0005 Addendum G).
+  if (!reveal && row.hasSensitiveAnswers) {
+    for (const key of emergencyPlainKeys(template.key)) {
+      if ((row.answers as Record<string, unknown>)[key] === undefined) restricted.add(key);
+    }
+  }
 
   // A plain answer under a sensitive key (stored before that key became sensitive) counts too: never an unaudited view.
   const sensitiveKeys = new Set(template.sensitiveFieldKeys);

@@ -183,7 +183,7 @@ export async function loadProtectionHistory(
   // The emergency keys the owner made plain on 2026-11-07 (plain-emergency.ts) are not locked sensitive in a copy edited in the app.
   const earlier = rows.map((row) => (template.key ? withoutEmergencyPlainKeys(template.key, row.sensitiveFieldKeys) : row.sensitiveFieldKeys));
   return {
-    everSensitiveKeys: union(template.sensitiveFieldKeys, ...earlier),
+    everSensitiveKeys: union(template.key ? withoutEmergencyPlainKeys(template.key, template.sensitiveFieldKeys) : template.sensitiveFieldKeys, ...earlier),
     everBirthDateKeys: union(template.birthDateFieldKeys, ...rows.map((row) => row.birthDateFieldKeys)),
     hasSubmissions: submissionCount > 0,
     publishedFieldKeys: allFields(published).map((field) => field.key),

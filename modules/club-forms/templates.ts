@@ -13,7 +13,7 @@ import {
 import { parseAlertRecipients } from "@/modules/club-forms/alert-recipients";
 import { normalizeRequirement, type ClubFormRequirementValue, type RequiredRoleType } from "@/modules/club-forms/required-domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
-import { emergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
+import { emergencyPlainKeys, sectionNotesWithPlainEmergencyText, withoutEmergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import { resealClubFormSubmissions } from "@/modules/club-forms/reseal";
 import { recordClubFormTemplateVersion } from "@/modules/club-forms/versions";
 import { logError, logInfo } from "@/lib/logger";
@@ -150,11 +150,17 @@ async function sealSeedKeysForCustomized(client: Client, seed: Seed, templateId:
     // seed's key: exactly those keys stop being sensitive. The answers move out of the sealed value with the
     // operator script (`npm run club-forms:unseal-emergency`), never here.
     const declassified = locked.sensitiveFieldKeys.filter((key) => emergencyPlainKeys(seed.key).includes(key) && !seed.sensitiveFieldKeys.includes(key));
-    if (newlySensitive.length === 0 && newlyBirthDate.length === 0 && declassified.length === 0) return;
+    // The same decision changes the slip's medical note (only while it still reads as the old seed text) and must not
+    // survive in an unpublished draft: a draft that lists these keys as sensitive would seal them again on publish.
+    const noteChange = sectionNotesWithPlainEmergencyText(seed.key, locked.sectionNotes);
+    const draftChange = strippedEmergencyDraft(seed.key, locked.draft);
+    if (newlySensitive.length === 0 && newlyBirthDate.length === 0 && declassified.length === 0 && !noteChange && !draftChange) return;
     await resealClubFormSubmissions(tx, templateId, newlySensitive);
     await tx.clubFormTemplate.update({
       where: { id: templateId },
       data: {
+        ...(noteChange ? { sectionNotes: noteChange as unknown as Prisma.InputJsonValue } : {}),
+        ...(draftChange ? { draft: draftChange as unknown as Prisma.InputJsonValue } : {}),
         sensitiveFieldKeys: [...new Set([...locked.sensitiveFieldKeys.filter((key) => !declassified.includes(key)), ...newlySensitive])],
         birthDateFieldKeys: [...new Set([...locked.birthDateFieldKeys, ...newlyBirthDate])],
       },
@@ -165,6 +171,17 @@ async function sealSeedKeysForCustomized(client: Client, seed: Seed, templateId:
   };
   if ("$transaction" in client) await client.$transaction(apply, RESEAL_TRANSACTION);
   else await apply(client);
+}
+
+/** A stored draft without the decided keys in its sensitive list, and with the old slip note swapped; null when nothing changes. */
+function strippedEmergencyDraft(templateKey: string, draft: unknown): Record<string, unknown> | null {
+  if (!draft || typeof draft !== "object" || Array.isArray(draft)) return null;
+  const record = draft as Record<string, unknown>;
+  const keys = Array.isArray(record.sensitiveFieldKeys) ? (record.sensitiveFieldKeys as string[]) : [];
+  const stripped = withoutEmergencyPlainKeys(templateKey, keys);
+  const notes = sectionNotesWithPlainEmergencyText(templateKey, record.sectionNotes);
+  if (stripped.length === keys.length && !notes) return null;
+  return { ...record, sensitiveFieldKeys: stripped, ...(notes ? { sectionNotes: notes } : {}) };
 }
 
 function versionSpec(seed: Seed, definition: RegistrationFormDefinition) {

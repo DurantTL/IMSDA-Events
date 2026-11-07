@@ -99,6 +99,18 @@ const client = {
   },
 };
 
+// The allowance of 2026-11-07 is off for this file's fixtures, which model a slip that seals these keys; the tests
+// that exercise the allowance itself switch it on.
+const allowance = vi.hoisted(() => ({ on: false }));
+vi.mock("@/modules/club-forms/plain-emergency", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/modules/club-forms/plain-emergency")>();
+  return {
+    ...real,
+    emergencyPlainKeys: (key: string) => (allowance.on ? real.emergencyPlainKeys(key) : []),
+    withoutEmergencyPlainKeys: (key: string, keys: readonly string[]) => (allowance.on ? real.withoutEmergencyPlainKeys(key, keys) : [...keys]),
+  };
+});
+
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ SECRET_ENCRYPTION_KEY: "a-synthetic-encryption-key-for-club-form-tests" }) }));
@@ -110,6 +122,7 @@ import { Prisma } from "@prisma/client";
 import { createClubFormTemplate, discardClubFormDraft, getClubFormBuilderView, publishClubFormDraft, saveClubFormDraft } from "@/modules/club-forms/builder";
 import { setFieldFlag, updateField, removeField, addField } from "@/components/club-form-builder-state";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
+import { SLIP_MEDICAL_NOTE_AFTER, SLIP_MEDICAL_NOTE_BEFORE } from "@/modules/club-forms/plain-emergency";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 import { allFields, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
@@ -171,6 +184,7 @@ const seedActivityLabel = allFields(registrationFormDefinitionSchema.parse(slipS
 const idOf = (spec: ClubFormDraftSpec, key: string) => allFields(spec.definition).find((field) => field.key === key)!.id;
 
 beforeEach(() => {
+  allowance.on = false;
   state.templates.splice(0);
   state.versions.splice(0);
   state.submissions.splice(0);
@@ -386,7 +400,10 @@ describe("old submissions render against their own version (#712)", () => {
 });
 
 describe("the sync leaves edited templates alone (#712)", () => {
+  beforeEach(() => { allowance.on = true; });
+
   it("skips a template that was edited in the app, and reports it", async () => {
+    allowance.on = true;
     const published = await currentSpec();
     await saveClubFormDraft(slipSeed.key, { draft: updateField(published, idOf(published, "activity"), { label: "Synthetic label" }), baseVersion: slipSeed.version }, "admin-1", now);
     await publishClubFormDraft(slipSeed.key, { baseVersion: slipSeed.version }, "admin-1", now);
@@ -396,14 +413,15 @@ describe("the sync leaves edited templates alone (#712)", () => {
     const { skipped, refused } = await syncClubFormTemplates(client as never, { continueOnRefusal: true });
     expect(skipped).toEqual([{ key: slipSeed.key, reason: "edited in the app" }]);
     expect(refused).toEqual([]);
-    // Only the owner's 2026-11-07 decision reaches an edited copy: its emergency keys stop being sensitive; nothing else changes.
+    // The publish above already dropped the emergency keys (the builder never keeps them sensitive); the sync changes nothing more.
     expect(state.templates[0].sensitiveFieldKeys).toEqual([]);
-    expect(JSON.stringify({ ...state.templates[0], sensitiveFieldKeys: SEALED_SLIP_KEYS })).toBe(before);
+    expect(JSON.stringify(state.templates[0])).toBe(before);
     // The other seeds are still created.
     expect(state.templates.length).toBe(clubFormTemplateSeeds.length);
   });
 
   it("drops exactly the emergency keys from an edited copy's sensitive list and keeps the others (owner decision, 2026-11-07)", async () => {
+    allowance.on = true;
     state.templates[0].customizedAt = now;
     state.templates[0].sensitiveFieldKeys = [...SEALED_SLIP_KEYS, "activity"];
     state.submissions.push({ id: "sub-1", templateId: "tpl-slip", answers: { child_name: "Riley Sample" }, sealedSensitiveAnswers: sealSensitiveAnswers("sub-1", { physician_name: "Dr. Synthetic Physician" }), hasSensitiveAnswers: true, templateVersion: slipSeed.version });
@@ -415,6 +433,30 @@ describe("the sync leaves edited templates alone (#712)", () => {
     // Run again: nothing more changes.
     await syncClubFormTemplates(client as never, { continueOnRefusal: true });
     expect(state.templates[0].sensitiveFieldKeys).toEqual(["activity"]);
+  });
+
+  it("swaps the old slip medical note on an edited copy, and leaves a note staff wrote alone (owner decision, 2026-11-07)", async () => {
+    allowance.on = true;
+    state.templates[0].customizedAt = now;
+    state.templates[0].sectionNotes = { ...(state.templates[0].sectionNotes as object), sec_medical: [SLIP_MEDICAL_NOTE_BEFORE] };
+    await syncClubFormTemplates(client as never, { continueOnRefusal: true });
+    expect((state.templates[0].sectionNotes as Record<string, string[]>).sec_medical).toEqual([SLIP_MEDICAL_NOTE_AFTER]);
+    state.templates[0].sectionNotes = { sec_medical: ["Staff wrote this note."] };
+    await syncClubFormTemplates(client as never, { continueOnRefusal: true });
+    expect((state.templates[0].sectionNotes as Record<string, string[]>).sec_medical).toEqual(["Staff wrote this note."]);
+  });
+
+  it("strips the emergency keys and the old note from a stored draft of an edited copy", async () => {
+    allowance.on = true;
+    const published = await currentSpec();
+    state.templates[0].customizedAt = now;
+    state.templates[0].draft = { ...published, sensitiveFieldKeys: [...SEALED_SLIP_KEYS, "activity"], sectionNotes: { sec_medical: [SLIP_MEDICAL_NOTE_BEFORE] } };
+    state.templates[0].draftUpdatedAt = now;
+    state.templates[0].draftBaseVersion = state.templates[0].version;
+    await syncClubFormTemplates(client as never, { continueOnRefusal: true });
+    const draft = state.templates[0].draft as unknown as { sensitiveFieldKeys: string[]; sectionNotes: Record<string, string[]> };
+    expect(draft.sensitiveFieldKeys).toEqual(["activity"]);
+    expect(draft.sectionNotes.sec_medical).toEqual([SLIP_MEDICAL_NOTE_AFTER]);
   });
 
   it("still applies a seed update when a draft is pending: the form stays fillable and the draft goes stale", async () => {
@@ -478,6 +520,7 @@ describe("the sync leaves edited templates alone (#712)", () => {
       expect(published.name).toBeTruthy();
   }));
   it("publishing seals only keys newly sensitive against the stored list, not the seed-merged one", async () => withSeedSealing(async () => {
+      allowance.on = false; // this one is about the sealing mechanics, which the builder allowance would pre-empt
       const published = await currentSpec();
       const key = SEALED_SLIP_KEYS[0];
       // Stored list lacks the key (the sync has not run); the draft keeps it sensitive. Publish must seal it.
@@ -717,5 +760,34 @@ describe("the roster setting is saved and published with the form (#721)", () =>
     const copy = await createClubFormTemplate({ name: "Copied slip", copyFromKey: slipSeed.key }, "admin-1", now);
     const row = state.templates.find((template) => template.key === copy.key)!;
     expect(row.rosterMapping === undefined || row.rosterMapping === Prisma.DbNull).toBe(true);
+  });
+});
+
+describe("the builder and the emergency keys (owner decision, 2026-11-07)", () => {
+  beforeEach(() => { allowance.on = true; state.templates[0].sensitiveFieldKeys = []; });
+
+  it("will not save or publish a draft that marks them sensitive, and does not seal anything", async () => {
+    const published = await currentSpec();
+    state.submissions.push({ id: "sub-1", templateId: "tpl-slip", answers: { physician_name: "Dr. Synthetic Physician" }, sealedSensitiveAnswers: null, hasSensitiveAnswers: false, templateVersion: slipSeed.version });
+    const saved = await saveClubFormDraft(slipSeed.key, { draft: { ...published, sensitiveFieldKeys: ["physician_name", "activity"] }, baseVersion: slipSeed.version }, "admin-1", now);
+    expect(saved.warnings).toEqual([]);
+    expect((state.templates[0].draft as unknown as { sensitiveFieldKeys: string[] }).sensitiveFieldKeys).toEqual(["activity"]);
+    // A draft stored before the decision still lists them: publish drops them too.
+    (state.templates[0].draft as unknown as { sensitiveFieldKeys: string[] }).sensitiveFieldKeys = ["physician_name", "activity"];
+    await publishClubFormDraft(slipSeed.key, { baseVersion: slipSeed.version }, "admin-1", now);
+    expect(state.templates[0].sensitiveFieldKeys).toEqual(["activity"]);
+    expect(state.submissions[0].sealedSensitiveAnswers).toBeNull();
+    expect(state.submissions[0].answers).toEqual({ physician_name: "Dr. Synthetic Physician" });
+  });
+
+  it("tells the builder page which keys are plain by decision and hides them from a stored draft", async () => {
+    const published = await currentSpec();
+    state.templates[0].draft = { ...published, sensitiveFieldKeys: ["physician_name"] };
+    state.templates[0].draftUpdatedAt = now;
+    state.templates[0].draftBaseVersion = state.templates[0].version;
+    const view = await getClubFormBuilderView(slipSeed.key);
+    expect(view.plainByDecisionKeys).toEqual(SEALED_SLIP_KEYS);
+    expect(view.draft?.sensitiveFieldKeys).toEqual([]);
+    expect(view.lockedSensitiveKeys).toEqual([]);
   });
 });

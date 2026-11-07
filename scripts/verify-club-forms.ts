@@ -981,13 +981,18 @@ async function main() {
     assert(listAfterSync.version === listSeed.version && listAfterSync.sensitiveFieldKeys.length === 0, "the passenger list is at its new version with no sensitive keys");
     assert(JSON.stringify(await rawRows([onlyEmergency.id, roster.id, birthForm.id])) === JSON.stringify(before), "the sync moved no answer");
 
+    // Between the sync and the script an Area Coordinator sees Restricted for the still-sealed answers, not a blank.
+    const waiting = await submissions.getSubmissionForViewer(area, onlyEmergency.id);
+    assert(waiting.restrictedKeys.includes("physician_name") && !("physician_name" in waiting.answers), "before the script runs, a viewer who cannot open the sealed value sees Restricted for the emergency answers");
+    await expectCode(emergency.unsealEmergencyAnswers(prisma, { execute: true }), "INVALID_TEMPLATE", "an executed run needs an actor");
+
     const dry = await emergency.unsealEmergencyAnswers(prisma);
     const dryRows = dry.templates.filter((item) => [SLIP, PASSENGERS].includes(item.templateKey));
     assert(dryRows.every((item) => item.status === "DRY_RUN") && dryRows.every((item) => item.submissionsMoved >= 1), "the dry run reports what it would move");
     assert(JSON.stringify(await rawRows([onlyEmergency.id, roster.id, birthForm.id])) === JSON.stringify(before), "the dry run changes nothing");
     assert(await prisma.auditLog.count({ where: { action: "CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED", entityId: { in: [slipAfterSync.id, listAfterSync.id] }, createdAt: { gte: reqAuditSince } } }) === 0, "the dry run writes no audit row");
 
-    const done = await emergency.unsealEmergencyAnswers(prisma, { execute: true });
+    const done = await emergency.unsealEmergencyAnswers(prisma, { execute: true, actorUserId: users.sysAdmin });
     assert(done.templates.filter((item) => [SLIP, PASSENGERS].includes(item.templateKey)).every((item) => item.status === "DONE"), "the run completes");
     const movedSlip = await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: onlyEmergency.id } });
     const slipAnswersNow = movedSlip.answers as Record<string, unknown>;
@@ -999,15 +1004,16 @@ async function main() {
     assert(staffRowAfter.text === before.find((row) => row.id === birthForm.id)!.text, "another form's sealed answers are untouched");
     const unsealAudit = await prisma.auditLog.findMany({ where: { action: "CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED", entityId: { in: [slipAfterSync.id, listAfterSync.id] }, createdAt: { gte: reqAuditSince } } });
     assert(unsealAudit.length === 2 && JSON.stringify(unsealAudit).indexOf(SECRET_PHYSICIAN) < 0 && JSON.stringify(unsealAudit).indexOf(PASSENGER_CONTACT) < 0, "each template is audited once, with counts and no answer");
+    assert(unsealAudit.every((entry) => entry.actorUserId === users.sysAdmin), "the audit rows name the user who ran it");
 
     const afterRun = await rawRows([onlyEmergency.id, roster.id, birthForm.id]);
-    const again = await emergency.unsealEmergencyAnswers(prisma, { execute: true });
+    const again = await emergency.unsealEmergencyAnswers(prisma, { execute: true, actorUserId: users.sysAdmin });
     assert(again.templates.every((item) => item.submissionsMoved === 0) && JSON.stringify(await rawRows([onlyEmergency.id, roster.id, birthForm.id])) === JSON.stringify(afterRun), "a second run changes nothing");
 
     // Everyone who can see the form sees the answers; the other sealed answer stays Restricted; the CSV has the columns.
     const areaPlain = await submissions.getSubmissionForViewer(area, onlyEmergency.id);
     assert(areaPlain.answers.physician_name === SECRET_PHYSICIAN && areaPlain.answers.emergency_contact_phone === SECRET_PHONE, "an Area Coordinator now reads the physician and emergency answers");
-    assert(areaPlain.restrictedKeys.join() === "activity" && !("activity" in areaPlain.answers), "the other sealed answer is still Restricted for an Area Coordinator");
+    assert(areaPlain.restrictedKeys.includes("activity") && !areaPlain.restrictedKeys.includes("physician_name") && !areaPlain.restrictedKeys.includes("emergency_contact_phone") && !("activity" in areaPlain.answers), "the other sealed answer is still Restricted for an Area Coordinator");
     const areaList = await submissions.getSubmissionForViewer(area, roster.id);
     assert(areaList.answers.passenger_1_emergency_contact === PASSENGER_CONTACT && areaList.restrictedKeys.length === 0, "an Area Coordinator reads the passenger emergency contact");
     const planCsv = await csv.buildClubFormsCsv(eventAdmin, { templateKey: PASSENGERS });

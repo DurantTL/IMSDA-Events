@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   submissions: [] as Sub[],
   audit: [] as Array<Record<string, unknown>>,
   failOnUpdateOf: null as string | null,
+  lockCalls: 0,
 }));
 
 const client = {
@@ -25,7 +26,7 @@ const client = {
       Object.assign(state.submissions.find((row) => row.id === where.id)!, data);
     },
   },
-  $queryRaw: async () => [],
+  $queryRaw: async () => { state.lockCalls += 1; return []; },
   $transaction: async (work: (tx: unknown) => unknown) => {
     const snapshot = structuredClone({ s: state.submissions, a: state.audit });
     try {
@@ -60,6 +61,7 @@ const report = (result: Awaited<ReturnType<typeof unsealEmergencyAnswers>>, key:
 
 beforeEach(() => {
   state.failOnUpdateOf = null;
+  state.lockCalls = 0;
   state.audit.length = 0;
   state.templates.splice(0, state.templates.length,
     { id: "tpl-slip", key: "off_premises_permission_slip", sensitiveFieldKeys: [], version: 3, birthDateFieldKeys: [], customizedAt: null, draftUpdatedAt: null },
@@ -82,6 +84,31 @@ beforeEach(() => {
 });
 
 describe("unsealing the emergency answers (owner decision, 2026-11-07)", () => {
+  it("takes no row lock in a dry run, and one lock per template when executing", async () => {
+    await unsealEmergencyAnswers(client as never);
+    expect(state.lockCalls).toBe(0);
+    await unsealEmergencyAnswers(client as never, { execute: true, actorUserId: "user-1" });
+    expect(state.lockCalls).toBe(2);
+  });
+
+  it("records the acting user on the audit row, and refuses to execute without one", async () => {
+    await expect(unsealEmergencyAnswers(client as never, { execute: true })).rejects.toThrow(/--actor/);
+    expect(state.audit).toEqual([]);
+    await unsealEmergencyAnswers(client as never, { execute: true, actorUserId: "user-7" });
+    expect(state.audit.every((entry) => entry.actorUserId === "user-7")).toBe(true);
+  });
+
+  it("writes nothing when one value is unreadable, even inside a caller's transaction that cannot roll back", async () => {
+    state.submissions.push({ id: "s0", templateId: "tpl-slip", answers: {}, sealedSensitiveAnswers: "v1.not.a.value", hasSensitiveAnswers: true });
+    const before = structuredClone(state.submissions.filter((row) => row.templateId === "tpl-slip"));
+    // A client with no $transaction of its own stands for a transaction client the caller owns.
+    const inCallersTransaction = Object.fromEntries(Object.entries(client).filter(([name]) => name !== "$transaction"));
+    const result = await unsealEmergencyAnswers(inCallersTransaction as never, { execute: true, actorUserId: "user-1" });
+    expect(result.templates.find((item) => item.templateKey === "off_premises_permission_slip")?.status).toBe("FAILED");
+    expect(state.submissions.filter((row) => row.templateId === "tpl-slip")).toEqual(before);
+    expect(state.audit.filter((entry) => (entry.metadata as { templateKey: string }).templateKey === "off_premises_permission_slip")).toEqual([]);
+  });
+
   it("changes nothing in a dry run, and says what it would move", async () => {
     const before = structuredClone(state.submissions);
     const result = await unsealEmergencyAnswers(client as never);
@@ -93,7 +120,7 @@ describe("unsealing the emergency answers (owner decision, 2026-11-07)", () => {
   });
 
   it("moves only the decided keys, keeps every other answer sealed, and drops an emptied sealed value", async () => {
-    const result = await unsealEmergencyAnswers(client as never, { execute: true });
+    const result = await unsealEmergencyAnswers(client as never, { execute: true, actorUserId: "user-1" });
     expect(report(result, "off_premises_permission_slip")).toMatchObject({ status: "DONE", submissionsMoved: 2, answersMoved: 3, sealedDropped: 1 });
 
     expect(find("s1")).toMatchObject({ sealedSensitiveAnswers: null, hasSensitiveAnswers: false });
@@ -115,10 +142,10 @@ describe("unsealing the emergency answers (owner decision, 2026-11-07)", () => {
   });
 
   it("is idempotent: a second run changes nothing and reports nothing to move", async () => {
-    await unsealEmergencyAnswers(client as never, { execute: true });
+    await unsealEmergencyAnswers(client as never, { execute: true, actorUserId: "user-1" });
     const after = structuredClone(state.submissions);
     state.audit.length = 0;
-    const again = await unsealEmergencyAnswers(client as never, { execute: true });
+    const again = await unsealEmergencyAnswers(client as never, { execute: true, actorUserId: "user-1" });
     expect(state.submissions).toEqual(after);
     expect(state.audit).toEqual([]);
     expect(report(again, "off_premises_permission_slip")).toMatchObject({ submissionsMoved: 0, answersMoved: 0, sealedDropped: 0 });
@@ -126,7 +153,7 @@ describe("unsealing the emergency answers (owner decision, 2026-11-07)", () => {
   });
 
   it("audits ids-free counts per template and never an answer", async () => {
-    await unsealEmergencyAnswers(client as never, { execute: true });
+    await unsealEmergencyAnswers(client as never, { execute: true, actorUserId: "user-1" });
     expect(state.audit.map((entry) => entry.action)).toEqual(["CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED", "CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED"]);
     expect(state.audit[0]).toMatchObject({ entityType: "ClubFormTemplate", entityId: "tpl-slip", metadata: { templateKey: "off_premises_permission_slip", scanned: 3, submissionsMoved: 2, answersMoved: 3, sealedDropped: 1 } });
     const text = JSON.stringify(state.audit);
@@ -136,7 +163,7 @@ describe("unsealing the emergency answers (owner decision, 2026-11-07)", () => {
   it("refuses to run while the template still lists the keys as sensitive, and changes nothing", async () => {
     state.templates[0].sensitiveFieldKeys = ["physician_name"];
     const before = structuredClone(state.submissions);
-    const result = await unsealEmergencyAnswers(client as never, { execute: true });
+    const result = await unsealEmergencyAnswers(client as never, { execute: true, actorUserId: "user-1" });
     expect(report(result, "off_premises_permission_slip")).toMatchObject({ status: "NOT_SYNCED", submissionsMoved: 0 });
     expect(find("s1")).toEqual(before.find((row) => row.id === "s1"));
     // The other template is still done.
@@ -146,7 +173,7 @@ describe("unsealing the emergency answers (owner decision, 2026-11-07)", () => {
   it("leaves a template untouched when one sealed value cannot be read", async () => {
     state.submissions.push({ id: "s0", templateId: "tpl-slip", answers: {}, sealedSensitiveAnswers: "v1.not.a.value", hasSensitiveAnswers: true });
     const before = structuredClone(state.submissions.filter((row) => row.templateId === "tpl-slip"));
-    const result = await unsealEmergencyAnswers(client as never, { execute: true });
+    const result = await unsealEmergencyAnswers(client as never, { execute: true, actorUserId: "user-1" });
     expect(report(result, "off_premises_permission_slip")).toMatchObject({ status: "FAILED", failedSubmissionIds: ["s0"] });
     expect(state.submissions.filter((row) => row.templateId === "tpl-slip")).toEqual(before);
     expect(state.audit.filter((entry) => (entry.metadata as { templateKey: string }).templateKey === "off_premises_permission_slip")).toEqual([]);
@@ -155,7 +182,7 @@ describe("unsealing the emergency answers (owner decision, 2026-11-07)", () => {
   it("rolls the template back when a write fails part way", async () => {
     state.failOnUpdateOf = "s2";
     const before = structuredClone(state.submissions.filter((row) => row.templateId === "tpl-slip"));
-    await expect(unsealEmergencyAnswers(client as never, { execute: true })).rejects.toThrow("synthetic failure");
+    await expect(unsealEmergencyAnswers(client as never, { execute: true, actorUserId: "user-1" })).rejects.toThrow("synthetic failure");
     expect(state.submissions.filter((row) => row.templateId === "tpl-slip")).toEqual(before);
   });
 

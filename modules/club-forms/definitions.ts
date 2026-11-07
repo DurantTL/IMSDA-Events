@@ -1,5 +1,6 @@
 import type { RosterMapping } from "@/modules/club-forms/roster-mapping";
 import { buildYearNominationTemplate, tltApplicationTemplate, type FormTemplate, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { SLIP_MEDICAL_NOTE_AFTER } from "@/modules/club-forms/plain-emergency";
 
 /**
  * The seeded club form templates (the first four, #610; six more, #1221) (#610, with the field-level specs from
@@ -346,7 +347,7 @@ const permissionSlip: ClubFormTemplateSeed = {
     sec_permission: [
       "I hereby give my permission for my child to participate in the pre-planned activity named below, on the date given.",
     ],
-    sec_medical: ["Medical and emergency information. The club keeps the paper form; this copy is a backup, so anyone who can open this form can read these answers."],
+    sec_medical: [SLIP_MEDICAL_NOTE_AFTER],
   },
   definition: {
     title: "Iowa-Missouri Conference, Pathfinder/Adventurer Club, Permission Slip for Off-Premises Activities",

@@ -27,7 +27,7 @@ themselves. Every form is off until a system administrator turns it on.
 - `links.ts`, `link-email.ts`: private links and their email.
 - `access.ts`: turns a session into a viewer (club leader, Area Coordinator,
   conference staff).
-- `csv.ts`: the staff CSV, non-sensitive columns only (the emergency and physician/clinic answers above are plain, so they are in it).
+- `csv.ts`: the staff CSV. Sensitive columns are absent; plain answers, including the emergency and physician/clinic ones, are in it.
 - `plain-emergency.ts`, `unseal-emergency.ts`: the 2026-11-07 decision (fixed key list) and the human-run script that moves existing answers out of the sealed value.
 
 ## Who sees what
@@ -159,11 +159,24 @@ physician/clinic keys of the Off-Premises Permission Slip and the Transportation
 Passenger List (`plain-emergency.ts`, a fixed list, not a setting). The sync
 applies it to the template (and to a copy edited in the app that kept the key);
 existing answers are then moved out of each sealed value by the human-run
-`npm run club-forms:unseal-emergency` (dry run by default, `-- --execute` to
-apply; idempotent; audit rows hold counts only). Run it after
-`npm run club-forms:sync`. Until it has run, an old submission's emergency
-answers are still inside its sealed value, so only viewers who may open sealed
-answers see them. Changing only
+`npm run club-forms:unseal-emergency` (dry run by default; idempotent; audit rows
+hold counts and the acting user's id only).
+
+**Runbook, after the deploy that carries this change:**
+
+1. `npm run club-forms:sync` (the deploy entrypoint already runs it).
+2. `npm run club-forms:unseal-emergency` (dry run: takes no lock, changes
+   nothing, prints counts and any `NOT_SYNCED` / `FAILED` template).
+3. `npm run club-forms:unseal-emergency -- --execute --actor <your account email>`
+   (the actor is required and is recorded on the audit row).
+4. Run step 3 again to confirm it moves 0.
+
+Until step 3 has run, an old submission's emergency answers are still inside its
+sealed value: viewers who may open sealed answers see them, and everyone else
+sees `Restricted` for them rather than a blank. The builder does not offer to
+make these keys sensitive again, and a draft or a copy edited in the app that
+still lists them has them removed (the sync does it for stored drafts; save and
+publish do it too). Changing only
 the birth-date class needs no re-seal, since both classes are sealed.
 
 The re-seal runs in the **sync step**, `npm run club-forms:sync`, which

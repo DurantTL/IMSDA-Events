@@ -184,6 +184,30 @@ describe("what everyone who can see the form gets", () => {
   });
 });
 
+describe("between the deploy and the unseal script", () => {
+  const view = (answers: Record<string, unknown>, hasSensitiveAnswers: boolean) => ({
+    id: "sub-1", organizationId: "club-a", clubYear: "2026-27", rosterMemberId: null, subjectName: "Riley Sample", status: "SUBMITTED",
+    submittedAt: new Date("2026-10-05T15:00:00Z"), enteredVia: "ATTENDEE", unlistedClubName: null, answers,
+    sealedSensitiveAnswers: null, hasSensitiveAnswers, templateVersion: slip.version, organization: { name: "Example Pathfinders" }, template: row(slip),
+  });
+
+  it("shows Restricted, not a blank, to a viewer who cannot open the sealed value that still holds the answers", async () => {
+    mocks.templateFindUnique.mockResolvedValue(row(slip));
+    mocks.submissionFindFirst.mockResolvedValue(view({ child_name: "Riley Sample" }, true));
+    const seen = await getSubmissionForViewer(areaCoordinator, "sub-1");
+    expect([...seen.restrictedKeys].sort()).toEqual([...OLD_SLIP_KEYS].sort());
+    expect(seen.answers).not.toHaveProperty("physician_name");
+  });
+
+  it("does not restrict a key that already has its plain answer, or a submission with nothing sealed", async () => {
+    mocks.templateFindUnique.mockResolvedValue(row(slip));
+    mocks.submissionFindFirst.mockResolvedValue(view({ child_name: "Riley Sample", physician_name: "Dr. Plain" }, true));
+    expect((await getSubmissionForViewer(areaCoordinator, "sub-1")).restrictedKeys).not.toContain("physician_name");
+    mocks.submissionFindFirst.mockResolvedValue(view({ child_name: "Riley Sample" }, false));
+    expect((await getSubmissionForViewer(areaCoordinator, "sub-1")).restrictedKeys).toEqual([]);
+  });
+});
+
 describe("the staff CSV", () => {
   const exportRows = [{
     clubYear: "2026-27", subjectName: "Riley Sample", templateVersion: 3, status: "SUBMITTED", submittedAt: new Date("2026-10-30T12:00:00Z"), enteredVia: "LINK",

@@ -32,7 +32,7 @@ async function main() {
   const { syncClubFormTemplates } = await import("../modules/club-forms/templates");
   const prisma = getPrisma();
   try {
-    const { refused, skipped, staleDrafts } = await syncClubFormTemplates(prisma, { continueOnRefusal: true });
+    const { refused, skipped, staleDrafts, updated } = await syncClubFormTemplates(prisma, { continueOnRefusal: true });
     for (const item of skipped) console.log(`SKIPPED ${item.key}: ${item.reason}; the code's version is not applied.`);
     for (const item of staleDrafts) console.log(`UPDATED ${item.key}: draft is now stale`);
     const rows = await prisma.clubFormTemplate.findMany({ orderBy: { sortOrder: "asc" }, select: { key: true, version: true, enabled: true } });
@@ -44,7 +44,14 @@ async function main() {
       return;
     }
     console.log("Club form templates are in sync.");
-    console.log("If this run updated the Off-Premises Permission Slip or the Transportation Passenger List, now run: npm run club-forms:unseal-emergency (dry run), then with -- --execute.");
+    // Only when it matters: a version of one of the two forms was applied just now, or one of them still has answers sealed.
+    const { EMERGENCY_PLAIN_KEYS } = await import("../modules/club-forms/plain-emergency");
+    const emergencyKeys = Object.keys(EMERGENCY_PLAIN_KEYS);
+    const versionChanged = updated.some((item) => !item.created && emergencyKeys.includes(item.key));
+    const stillSealed = versionChanged ? 0 : await prisma.clubFormSubmission.count({ where: { template: { key: { in: emergencyKeys } }, sealedSensitiveAnswers: { not: null } } });
+    if (versionChanged || stillSealed > 0) {
+      console.log("The Off-Premises Permission Slip and the Transportation Passenger List now keep emergency and physician answers plain. Move the existing ones with: npm run club-forms:unseal-emergency (dry run), then npm run club-forms:unseal-emergency -- --execute --actor <your account email>.");
+    }
   } finally {
     await prisma.$disconnect();
   }
