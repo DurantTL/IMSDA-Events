@@ -6,6 +6,7 @@ import {
   markCurrentTab,
   railItems,
   staffPlaceFor,
+  withClubYear,
   type AreaTab,
   type RailItem,
   type StaffAreaViewer,
@@ -120,14 +121,14 @@ export function buildStaffNavigation(input: StaffNavigationInput): StaffNavigati
   const rail = railItems(viewer, eventTabs[0]?.href ?? null).map((item) => ({
     ...item,
     // Events opens the selected event for staff with no Events row; Home and the rest keep the event they were in.
-    href: item.area === "clubs" ? item.href : carry(item.href),
+    href: item.area === "clubs" ? withClubYear(item.href, viewer.clubYear) : carry(item.href),
   }));
   const areaRow: AreaTab[] = place.inEvent
     ? []
     : markCurrentTab(areaTabs(place.area, viewer), place).map((tab) => ({
       ...tab,
-      href: carry(tab.href),
-      views: tab.views?.map((view) => ({ ...view, href: carry(view.href) })),
+      href: place.area === "clubs" ? withClubYear(tab.href, viewer.clubYear) : carry(tab.href),
+      views: tab.views?.map((view) => ({ ...view, href: place.area === "clubs" ? withClubYear(view.href, viewer.clubYear) : carry(view.href) })),
     }));
   const rowTabs: Array<EventTab | AreaTab> = place.inEvent ? eventTabs : areaRow;
 

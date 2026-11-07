@@ -516,8 +516,8 @@ textarea:focus-visible {
 
 .skip-link {
   position: fixed;
-  top: 10px;
-  left: 10px;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: max(10px, env(safe-area-inset-left, 0px));
   z-index: 100;
   border-radius: 10px;
   background: white;
@@ -1681,7 +1681,7 @@ textarea:focus-visible {
   overflow-y: auto;
   place-items: center;
   background: rgba(0, 35, 54, 0.52);
-  padding: 22px;
+  padding: max(22px, env(safe-area-inset-top, 0px)) max(22px, env(safe-area-inset-right, 0px)) max(22px, env(safe-area-inset-bottom, 0px)) max(22px, env(safe-area-inset-left, 0px));
   backdrop-filter: blur(3px);
 }
 
@@ -2466,7 +2466,7 @@ body:has(.auth-page) { padding-bottom: 0; }
   .checkin-hero { display: block; border-radius: 20px; padding: 22px; }
   .hero-capacity { margin-top: 20px; }
   .record-grid { grid-template-columns: 1fr; }
-  .mobile-nav { position: fixed; inset: auto 0 0; z-index: 40; display: flex; min-height: 67px; border-top: 1px solid var(--line); background: white; padding: 4px 4px max(4px, env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(0, 59, 92, 0.07); }
+  .mobile-nav { position: fixed; inset: auto 0 0; z-index: 40; display: flex; min-height: calc(67px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: white; padding: 4px max(4px, env(safe-area-inset-right, 0px)) max(4px, env(safe-area-inset-bottom, 0px)) max(4px, env(safe-area-inset-left, 0px)); box-shadow: 0 -8px 24px rgba(0, 59, 92, 0.07); }
   /* Five equal-width tabs (#711), six for finance staff (#890): each is a 44px+ target; labels are short and never ellipsized. */
   .mobile-nav a { position: relative; display: flex; min-width: 0; min-height: 52px; flex: 1 1 0; padding: 4px 2px 2px; align-items: center; justify-content: center; flex-direction: column; gap: 3px; border-radius: 10px; color: #566a75; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 700; line-height: 1.1; text-decoration: none; }
   .mobile-nav a span { max-width: 100%; white-space: nowrap; }
@@ -3662,6 +3662,10 @@ body:has(.auth-page) { padding-bottom: 0; }
   right: 0;
   left: 0;
   z-index: 200;
+  /* Edge to edge, with the content kept clear of a landscape notch (insets are 0 elsewhere). */
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  box-sizing: border-box;
   display: flex;
   height: var(--picker-height, 100dvh);
   flex-direction: column;
@@ -10034,10 +10038,11 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .more-launcher-sidebar { display: none; }
   /* Phone: a bottom sheet above the tab bar. */
   .more-launcher-tab {
-    inset: auto 0 calc(67px + env(safe-area-inset-bottom, 0px));
+    inset: auto env(safe-area-inset-right, 0px) calc(67px + env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 0px);
     width: auto;
     max-width: none;
     max-height: min(72vh, calc(100vh - 120px));
+    max-height: min(72dvh, calc(100dvh - 120px - env(safe-area-inset-top, 0px)));
     border-radius: 18px 18px 0 0;
     padding-bottom: 6px;
   }
@@ -10703,6 +10708,8 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   .public-registration-attendee.is-sheet {
     position: fixed;
     inset: 0;
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
     z-index: 60;
     display: flex;
     flex-direction: column;
@@ -11142,7 +11149,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   display: grid;
   place-items: center;
   background: rgba(4, 12, 18, 0.82);
-  padding: 12px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
 }
 .event-gallery-dialog {
   display: grid;
@@ -13282,6 +13289,32 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 /* The status word is already worded (#1453): do not capitalize every word of it. */
 .detail-grid strong.status-word-value { text-transform: none; }
 
+/* Phones, iPad split view and the keyboard (#1566, docs/RESPONSIVE.md). The page runs edge to edge (viewport-fit=cover in
+   app/layout.tsx), so a notch or rounded corner is a safe-area inset: the body keeps content clear of it, and each fixed
+   bar pads by it. All zero in an ordinary browser tab. */
+body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); padding-top: env(safe-area-inset-top, 0px); }
+/* A field scrolled into view stops above the fixed bottom bar and a pinned save bar, never under them. */
+@media (max-width: 800px) {
+  html:has(.mobile-nav) { scroll-padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+}
+/* While a text field has focus on a phone the keyboard owns the bottom of the screen: the bottom bar slides out of the way (the script
+   in components/staff-keyboard-watch.tsx sets data-keyboard), a pinned save bar rejoins the page flow instead of covering the field. */
+@media (max-width: 800px) {
+  /* Slid off the bottom, not display:none: it stays focusable, so a dialog that closes while the keyboard is up can still give focus back to More (the watch then brings the bar back). */
+  html[data-keyboard="open"] .mobile-nav { transform: translateY(calc(100% + 12px)); box-shadow: none; }
+  /* The body keeps its bar-height bottom padding while the bar is away, so focusing a field never changes the page height. */
+  html[data-keyboard="open"] .event-savebar.is-pinned { position: static; }
+  html[data-keyboard="open"] .more-launcher-scrim { inset: 0; }
+  html[data-keyboard="open"] .more-launcher-tab { bottom: env(safe-area-inset-bottom, 0px); max-height: calc(100dvh - 24px); }
+}
+/* The More sheet's head: a visible label and Close, kept in view while a long list scrolls inside the sheet. */
+.more-launcher-tab { padding-top: 0; }
+.more-launcher-head { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -16px 8px; border-bottom: 1px solid var(--line); background: var(--card); padding: 12px 16px 8px; }
+.more-launcher-head h2 { margin: 0; color: var(--imsda-navy); font-size: 1.15rem; }
+.more-launcher-close { display: inline-flex; width: auto; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; cursor: pointer; }
+.more-launcher-close:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.more-launcher-sidebar .more-launcher-head { display: none; }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */
@@ -13499,7 +13532,7 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 @media (max-width: 767px) {
   .fb-shell[data-inspector="closed"] .fb-sidebar { display: none; }
   .fb-shell[data-inspector="open"] .fb-main { display: none; }
-  .fb-shell[data-inspector="open"] .fb-sidebar { position: fixed; inset: 0; z-index: 50; flex: 1 1 auto; box-sizing: border-box; width: 100%; max-width: none; max-height: none; border: 0; border-radius: 0; }
+  .fb-shell[data-inspector="open"] .fb-sidebar { position: fixed; inset: 0; padding-right: env(safe-area-inset-right, 0px); padding-left: env(safe-area-inset-left, 0px); z-index: 50; flex: 1 1 auto; box-sizing: border-box; width: 100%; max-width: none; max-height: none; border: 0; border-radius: 0; }
   .fb-shell[data-inspector="open"] .fb-resize-handle { display: none; }
   .fb-shell[data-inspector="open"] .fb-inspector-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); background: var(--card); padding: 8px 12px; }
   .fb-inspector-title { flex: 1 1 auto; margin: 0; min-width: 0; color: var(--imsda-navy); font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; text-align: center; }
@@ -13576,7 +13609,7 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
    and Preview bar, full-screen sheets for settings, Add question and Move. New rules only, all prefixed fb-; no existing rule or
    shared font size is changed. Every control is at least 44px; small text is 0.875rem or larger. */
 .fb-inspector-note, .fb-inspector-notices { display: none; }
-.fb-phone-sheet { position: fixed; z-index: 200; right: 0; left: 0; }
+.fb-phone-sheet { position: fixed; z-index: 200; right: 0; left: 0; box-sizing: border-box; padding-right: env(safe-area-inset-right, 0px); padding-left: env(safe-area-inset-left, 0px); }
 .fb-phone-sheet-full { top: var(--picker-top, 0px); height: var(--picker-height, 100dvh); }
 .fb-phone-sheet-menu { top: 0; bottom: 0; }
 .fb-phone-sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 43, 69, 0.42); }

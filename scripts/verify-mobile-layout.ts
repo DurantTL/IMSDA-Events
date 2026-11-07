@@ -3225,7 +3225,9 @@ function layoutSnapshotInPage() {
   const rects: Record<string, [number, number, number, number]> = {};
   const all = Array.from(document.body.querySelectorAll("*"));
   all.forEach((el, index) => {
-    if (el.closest('[role="listbox"], .sr-only, .back-to-top-button, script, style')) return;
+    // The phone bottom bar (.mobile-nav) is fixed chrome that slides away while a text field has focus (#1566), so a field
+    // taking focus moves the bar's links on purpose; that is not the page shifting.
+    if (el.closest('[role="listbox"], .sr-only, .back-to-top-button, .mobile-nav, script, style')) return;
     const style = getComputedStyle(el);
     if (style.display === "none" || style.visibility === "hidden" || style.position === "fixed") return;
     const rect = el.getBoundingClientRect();

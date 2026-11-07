@@ -26,6 +26,7 @@ import { StaffRail } from "@/components/staff-rail";
 import { StaffTabRow } from "@/components/staff-tab-row";
 import { StaffViewStrip } from "@/components/staff-view-strip";
 import { StaffPhoneBar } from "@/components/staff-phone-bar";
+import { StaffKeyboardWatch } from "@/components/staff-keyboard-watch";
 import { buildStaffNavigation } from "@/components/staff-navigation-model";
 import { staffAreaMeta } from "@/components/staff-areas";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
@@ -284,6 +285,7 @@ export function AppShell({
   return (
     <div className={`app-shell ${styles.shell}`}>
       <a className="skip-link" href="#workspace-content">Skip to main content</a>
+      <StaffKeyboardWatch />
       <header className={styles.topbar} data-shell-region>
         <BrandLink guarded className={styles.brand} wordmark={<span className={styles.brandText}><strong>{PRODUCT_NAME}</strong><small>Events</small></span>} />
         <div className={styles.search}>

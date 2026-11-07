@@ -53,7 +53,7 @@
   background: linear-gradient(180deg, var(--imsda-navy) 0%, var(--imsda-navy-deep) 100%);
   color: #fff;
 }
-.rail ul { position: sticky; top: 0; display: grid; gap: 4px; margin: 0; padding: 12px 8px; list-style: none; }
+.rail ul { position: sticky; top: 0; display: grid; gap: 4px; margin: 0; padding: 12px 8px; list-style: none; /* On a short screen (a landscape phone) the rail scrolls inside itself, so no area is cut off below the fold (#1566). */ max-height: 100vh; max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain; }
 .railItem {
   display: grid;
   min-height: 64px;
@@ -226,7 +226,7 @@
 }
 .dialog:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; }
 @media (max-width: 800px) {
-  .dialog { inset: auto 0 0; border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .dialog { inset: auto env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
 }
 @media (min-width: 801px) {
   .dialog { top: 50%; left: 50%; width: min(620px, 92vw); border-radius: var(--radius-modal); transform: translate(-50%, -50%); }

@@ -204,6 +204,20 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
   ],
 };
 
+/**
+ * The Clubs area's links keep the club year the viewer picked, on every page of the area: the pages that do not read `?year=`
+ * ignore it, and carrying it means a tab that passes through one (Applications, Leaders) cannot quietly turn the year back
+ * into the current one (#1566). With no year chosen the link is unchanged.
+ */
+export function withClubYear(href: string, year: string | null): string {
+  if (!year) return href;
+  const [pathAndQuery, hash] = href.split("#");
+  const [path, query] = pathAndQuery.split("?");
+  const params = new URLSearchParams(query);
+  params.set("year", year);
+  return `${path}?${params}${hash ? `#${hash}` : ""}`;
+}
+
 function withYear(href: string, viewer: StaffAreaViewer) {
   return clubsAdminHrefForYear(href, viewer.clubYear);
 }
