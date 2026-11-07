@@ -8,8 +8,8 @@
  * - Real memberships combine: staff on a GENERAL event keep exactly that membership there.
  * - The event list: club events are listed for a Clubs Administrator (and not for a plain staff account), archived ones
  *   only when asked for; `clubEvents: "exclude"` lists the person's own assignments only.
- * - Audit: an action on a club event writes `actorRole: CLUBS_ADMINISTRATOR`; not on a general event, not for a
- *   system administrator.
+ * - Audit: every write path (writeAuditLog, a direct create or createMany inside a transaction) on a club event writes
+ *   `actorRole: CLUBS_ADMINISTRATOR`; not on a general event, not for a system administrator.
  * Uses fictitious rows it creates and removes itself.
  *
  *   npm run test:clubs-admin-club-events
@@ -66,6 +66,7 @@ async function main() {
   const { listArchivedEventsForUser } = await import("../modules/events/archive-repository");
   const { listActiveEventPermissionsForUser } = await import("../modules/access/membership-repository");
   const { writeAuditLog } = await import("../modules/audit/audit-service");
+  const { getPrisma } = await import("../lib/prisma");
 
   await cleanup();
   await prisma.user.createMany({
@@ -117,6 +118,19 @@ async function main() {
   assert((await metadataOf("CACE_CLUB"))?.actorRole === "CLUBS_ADMINISTRATOR", "an action on a club event records the Clubs Administrator role");
   assert((await metadataOf("CACE_CAMP"))?.actorRole === undefined, "an action on a general event does not");
   assert((await metadataOf("CACE_SYSTEM"))?.actorRole === undefined, "a system administrator's action does not");
+  // A direct create inside a transaction (as the tag, promo code and registration repositories write their audit rows) and a
+  // createMany get the marker too, and the actor's own metadata is kept.
+  await getPrisma().$transaction(async (tx) => {
+    await tx.auditLog.create({ data: { eventId: clubEventId, actorUserId: clubsAdminId, action: "CACE_DIRECT", entityType: "Tag", entityId: id("tag"), correlationId: id("c1"), summary: "Check entry.", metadata: { name: "x" } } });
+    await tx.auditLog.createMany({ data: [
+      { eventId: clubEventId, actorUserId: clubsAdminId, action: "CACE_MANY", entityType: "Tag", entityId: id("tag"), correlationId: id("c2"), summary: "Check entry." },
+      { eventId: campEventId, actorUserId: clubsAdminId, action: "CACE_MANY_CAMP", entityType: "Tag", entityId: id("tag"), correlationId: id("c3"), summary: "Check entry." },
+    ] });
+  });
+  const direct = await metadataOf("CACE_DIRECT");
+  assert(direct?.actorRole === "CLUBS_ADMINISTRATOR" && direct?.name === "x", "a direct create in a transaction records the role and keeps its metadata");
+  assert((await metadataOf("CACE_MANY"))?.actorRole === "CLUBS_ADMINISTRATOR", "a createMany row on a club event records the role");
+  assert((await metadataOf("CACE_MANY_CAMP"))?.actorRole === undefined, "a createMany row on a general event does not");
 
   // ---- Revoke: the very next lookup ----
   await prisma.clubsAdministratorGrant.update({ where: { userId: clubsAdminId }, data: { revokedAt: new Date() } });

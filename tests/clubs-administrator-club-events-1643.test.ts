@@ -62,7 +62,7 @@ import { requirePermission, effectivePermissions, AccessDeniedError, type Sessio
 import { clubsAdministratorPermissions, findEffectiveMembership } from "@/modules/access/club-event-access";
 import { listActiveEventPermissionsForUser, listActiveEventRolesForUser } from "@/modules/access/membership-repository";
 import { eventPermissions, rolePermissions } from "@/modules/access/permissions";
-import { writeAuditLog } from "@/modules/audit/audit-service";
+import { withClubsAdministratorMarker } from "@/modules/audit/clubs-administrator-marker";
 import { findActiveMembership } from "@/modules/events/repository";
 
 const CLUB = "event-club";
@@ -156,35 +156,42 @@ describe("event permissions for a Clubs Administrator (#1643)", () => {
   });
 });
 
-describe("the audit entry (#1643)", () => {
+describe("the audit marker (#1643)", () => {
+  const mark = (row: Record<string, unknown>) => withClubsAdministratorMarker(row, fakeClient() as never);
+  const row = (eventId: string | undefined, actorUserId: string | undefined, metadata?: unknown) => ({ eventId, actorUserId, action: "X", entityType: "Event", summary: "s", metadata });
+
   it("records actorRole CLUBS_ADMINISTRATOR for an action on a club event reached through the role", async () => {
-    await writeAuditLog({ eventId: CLUB, actorUserId: clubsAdmin.id, action: "EVENT_SETTINGS_UPDATED", entityType: "Event", summary: "Changed a setting.", metadata: { field: "capacity" } });
-    expect(db.auditRows[0].metadata).toEqual({ field: "capacity", actorRole: "CLUBS_ADMINISTRATOR" });
+    expect((await mark(row(CLUB, clubsAdmin.id, { field: "capacity" }))).metadata).toEqual({ field: "capacity", actorRole: "CLUBS_ADMINISTRATOR" });
   });
 
-  it("adds the marker when the entry had no metadata", async () => {
-    await writeAuditLog({ eventId: CLUB, actorUserId: clubsAdmin.id, action: "X", entityType: "Event", summary: "Did something." });
-    expect(db.auditRows[0].metadata).toEqual({ actorRole: "CLUBS_ADMINISTRATOR" });
+  it("adds the marker when the row had no metadata, and keeps the rest of the row", async () => {
+    expect(await mark(row(CLUB, clubsAdmin.id))).toEqual({ ...row(CLUB, clubsAdmin.id), metadata: { actorRole: "CLUBS_ADMINISTRATOR" } });
   });
 
   it("does not mark a non-club event, a system administrator, a revoked grant, or a real event administrator", async () => {
-    await writeAuditLog({ eventId: CAMP, actorUserId: clubsAdmin.id, action: "X", entityType: "Event", summary: "s", metadata: { a: 1 } });
+    const out: unknown[] = [];
+    out.push((await mark(row(CAMP, clubsAdmin.id, { a: 1 }))).metadata);
     db.users[0].globalRole = "SYSTEM_ADMIN";
-    await writeAuditLog({ eventId: CLUB, actorUserId: clubsAdmin.id, action: "X", entityType: "Event", summary: "s", metadata: { a: 2 } });
+    out.push((await mark(row(CLUB, clubsAdmin.id, { a: 2 }))).metadata);
     db.users[0].globalRole = null;
     db.grants[0].revokedAt = new Date();
-    await writeAuditLog({ eventId: CLUB, actorUserId: clubsAdmin.id, action: "X", entityType: "Event", summary: "s", metadata: { a: 3 } });
+    out.push((await mark(row(CLUB, clubsAdmin.id, { a: 3 }))).metadata);
     db.grants[0].revokedAt = null;
     db.memberships = [{ eventId: CLUB, userId: clubsAdmin.id, role: "EVENT_ADMIN", status: "ACTIVE", permissions: [] }];
-    await writeAuditLog({ eventId: CLUB, actorUserId: clubsAdmin.id, action: "X", entityType: "Event", summary: "s", metadata: { a: 4 } });
-    expect(db.auditRows.map((row) => row.metadata)).toEqual([{ a: 1 }, { a: 2 }, { a: 3 }, { a: 4 }]);
+    out.push((await mark(row(CLUB, clubsAdmin.id, { a: 4 }))).metadata);
+    expect(out).toEqual([{ a: 1 }, { a: 2 }, { a: 3 }, { a: 4 }]);
   });
 
-  it("keeps an actorRole the caller already set, and entries with no event or actor", async () => {
-    await writeAuditLog({ eventId: CLUB, actorUserId: clubsAdmin.id, action: "X", entityType: "Event", summary: "s", metadata: { actorRole: "CLUBS_ADMINISTRATOR", n: 1 } });
-    await writeAuditLog({ actorUserId: clubsAdmin.id, action: "X", entityType: "User", summary: "s", metadata: { n: 2 } });
-    await writeAuditLog({ eventId: CLUB, action: "X", entityType: "Event", summary: "s" });
-    expect(db.auditRows.map((row) => row.metadata)).toEqual([{ actorRole: "CLUBS_ADMINISTRATOR", n: 1 }, { n: 2 }, undefined]);
+  it("keeps an actorRole already set, and rows with no event or actor", async () => {
+    expect((await mark(row(CLUB, clubsAdmin.id, { actorRole: "CLUBS_ADMINISTRATOR", n: 1 }))).metadata).toEqual({ actorRole: "CLUBS_ADMINISTRATOR", n: 1 });
+    expect((await mark(row(undefined, clubsAdmin.id, { n: 2 }))).metadata).toEqual({ n: 2 });
+    expect((await mark(row(CLUB, undefined))).metadata).toBeUndefined();
+  });
+
+  it("writes the row unmarked when the lookup fails", async () => {
+    const broken = { clubsAdministratorGrant: { findFirst: async () => { throw new Error("lookup failed"); } } };
+    const input = row(CLUB, clubsAdmin.id, { n: 3 });
+    expect(await withClubsAdministratorMarker(input, broken as never)).toBe(input);
   });
 });
 
