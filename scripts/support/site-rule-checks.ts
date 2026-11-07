@@ -18,6 +18,7 @@
  *    Sterling Volunteers state of a roster person (Clear, Not in compliance, No record): they describe a person, not a
  *    record. The coordinator's gap flags ("No director", "No roster yet", "Missing 1 earlier month", "Late 2
  *    records") are L4 "Missing"/"Late" flags too. Event availability ("Open", "Registration closed", ...) and a form's "Done" are not record statuses either.
+ *    Info labels (money, account type, publishing, system health with its color; see `infoLabelKind`) are accepted too.
  *    A chip's detail after " · " ("Draft saved · 2 chosen") is ignored; its first words are the word. Anything else is
  *    reported as a failure naming the word.
  *  - B13 looks for clock times ("3:15 PM"): each must sit next to a Central label (CT, CDT, CST: the site prints the short
@@ -57,6 +58,45 @@ const L4_FLAGS = ["Missing", "Late", "To review", "No director", "No roster yet"
  */
 const AVAILABILITY_WORDS = ["Open", "Closed", "Registration opens soon", "Registration closed", "Not open for clubs yet", "Done"];
 const NOT_A_RECORD_STATUS = [...Object.values(clubDirectorRoleLabels), "Clear", "Not in compliance", "No record", "No record yet", "Your club", "View only"];
+
+/**
+ * B12 info labels (Caleb, Nov 7, 2026): chips that say something other than the state of a record. Allowed next to the
+ * status words, but only in these shapes, so a stray word still fails.
+ *  - money: "$350 due", "Paid in full", "No charge";
+ *  - account type: "Staff login", "Website account", "Two-step on", "Two-step not set up";
+ *  - publishing: "Published" (with a date after it), "Draft", "Active", "Inactive", "No unpublished changes";
+ *  - system health: exactly "OK" (green), "Check soon" (amber, the gold chip), "Needs attention" (red, the coral chip), in
+ *    that order of severity; the System report's tally chips ("3 need attention") use the same words and colors. The
+ *    System report also says "Unavailable" and "Count only" (neutral) for a reading that has no verdict, never OK.
+ */
+export const HEALTH_LABELS = [
+  { word: "OK", color: "green" },
+  { word: "Check soon", color: "gold" },
+  { word: "Needs attention", color: "coral" },
+] as const;
+const MONEY_LABELS = [/^\$[\d,]+(\.\d{2})? due$/i, /^paid in full$/i, /^no charge$/i];
+const ACCOUNT_LABELS = ["staff login", "website account", "two-step on", "two-step not set up"];
+const PUBLISHING_LABELS = [/^published( .+)?$/i, /^draft$/i, /^active$/i, /^inactive$/i, /^no unpublished changes$/i];
+const READING_LABELS = [/^unavailable$/i, /^count only$/i, /^\d+ unavailable$/i, /^\d+ count only$/i];
+const HEALTH_TALLY = /^\d+ (ok|check soon|need attention)$/i;
+
+/** The family of an info label, or null when the chip is not one (the word before any " · " detail is what counts). */
+export function infoLabelKind(chip: string): "money" | "account" | "publishing" | "health" | "reading" | null {
+  const word = chip.split(" · ")[0]!.trim();
+  if (MONEY_LABELS.some((pattern) => pattern.test(word))) return "money";
+  if (ACCOUNT_LABELS.includes(word.toLowerCase())) return "account";
+  if (PUBLISHING_LABELS.some((pattern) => pattern.test(word))) return "publishing";
+  if (HEALTH_LABELS.some((label) => label.word === word) || HEALTH_TALLY.test(word)) return "health";
+  if (READING_LABELS.some((pattern) => pattern.test(word))) return "reading";
+  return null;
+}
+
+/** The color a health chip must have (green, gold = amber, coral = red), or null for a chip that is not a health word. */
+export function requiredHealthColor(chip: string): string | null {
+  const word = chip.split(" · ")[0]!.trim().toLowerCase().replace(/^\d+ /, "");
+  const found = HEALTH_LABELS.find((label) => label.word.toLowerCase() === word) ?? (word === "need attention" ? HEALTH_LABELS[2] : null);
+  return found ? found.color : null;
+}
 
 export const clean = (text: string) => text.replace(/\[es\]\s*/g, "").replace(/\s+/g, " ").trim();
 
@@ -140,6 +180,8 @@ const bodyText = (page: Page) => async () => (await page.evaluate(() => document
 
 type Scan = {
   chips: string[];
+  /** The color class (green, gold, coral, neutral, or none) of each chip, in the same order as `chips`. */
+  chipColors: string[];
   badTimes: string[];
   times: number;
   tables: number;
@@ -155,7 +197,9 @@ async function scanPage(page: Page): Promise<Scan> {
       return box.width > 0 && box.height > 0 && style.visibility !== "hidden" && style.display !== "none";
     };
     const squash = (text: string) => text.replace(/\[es\]\s*/g, "").replace(/\s+/g, " ").trim();
-    const chips = [...document.querySelectorAll(".status-chip")].filter(visible).map((chip) => squash(chip.textContent ?? ""));
+    const chipElements = [...document.querySelectorAll(".status-chip")].filter(visible);
+    const chips = chipElements.map((chip) => squash(chip.textContent ?? ""));
+    const chipColors = chipElements.map((chip) => ["green", "gold", "coral", "neutral"].find((color) => chip.classList.contains(color)) ?? "none");
 
     const timePattern = /\b(1[0-2]|0?[1-9]):[0-5]\d\s?(am|pm)\b/i;
     const badTimes: string[] = [];
@@ -206,7 +250,7 @@ async function scanPage(page: Page): Promise<Scan> {
       }
       notSet.push({ text: own.slice(0, 100), fixLinks: fixLinks.slice(0, 3), asksWho: whoPattern.test(squash(container.textContent ?? "")) });
     }
-    return { chips, badTimes, times, tables: tables.length, wideTables, notSet };
+    return { chips, chipColors, badTimes, times, tables: tables.length, wideTables, notSet };
   });
 }
 
@@ -222,9 +266,16 @@ export async function checkPage(page: Page, rec: Recorder, name: string, options
     const wordOf = (chip: string) => chip.split(" · ")[0]!.trim().toLowerCase();
     // "Missing 1 earlier month" and "Late 2 records" are the L4 flags with a count.
     const flagged = (word: string) => /^(missing|late) /.test(word);
-    const bad = [...new Set(scan.chips.filter((chip) => !accepted.includes(wordOf(chip)) && !flagged(wordOf(chip)) && !APPROVED_STATUS_WORDS.some((word) => wordOf(chip).startsWith(`${word.toLowerCase()} `))))];
+    // Info labels (money, account type, publishing, system health) are allowed in their own shapes; a health word must
+    // also carry its color.
+    const wrongColor = scan.chips.flatMap((chip, index) => {
+      const required = requiredHealthColor(chip);
+      return required && scan.chipColors[index] !== required ? [`${chip} (should be ${required})`] : [];
+    });
+    const bad = [...new Set(scan.chips.filter((chip) => !accepted.includes(wordOf(chip)) && infoLabelKind(chip) === null && !flagged(wordOf(chip)) && !APPROVED_STATUS_WORDS.some((word) => wordOf(chip).startsWith(`${word.toLowerCase()} `))))];
     const words = [...new Set(scan.chips)].join(", ");
-    if (bad.length === 0) rec.record(name, "B12", "status chip words", "pass", `chips: ${words}`);
+    if (bad.length === 0 && wrongColor.length > 0) rec.record(name, "B12", "status chip words", "fail", `health chip with the wrong color: ${[...new Set(wrongColor)].map((entry) => `"${entry}"`).join(", ")} (all chips: ${words})`);
+    else if (bad.length === 0) rec.record(name, "B12", "status chip words", "pass", `chips: ${words}`);
     else rec.record(name, "B12", "status chip words", "fail", `chip word(s) outside the approved list: ${bad.map((word) => `"${word}"`).join(", ")} (all chips: ${words})`);
   }
 
