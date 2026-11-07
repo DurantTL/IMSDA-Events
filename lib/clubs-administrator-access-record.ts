@@ -8,11 +8,12 @@ import { currentRequestScopedSet } from "@/lib/request-scoped-set";
  * connection inside the caller's transaction).
  *
  * Where it is kept:
- * - Route handlers wrapped by `withRequestContext`: in a request-scoped set (AsyncLocalStorage, opened by `runWithRequestContext`), which follows the
- *   request through every await, transaction callback and repository.
- * - Server components and server actions: in a React `cache()` set, which React scopes to the one request render.
- * - Anywhere else (a handler not wrapped by `withRequestContext`, a script, a background job): nothing is kept, so a
- *   row is written unmarked. Outside a React render `cache()` does not memoize, so it can never leak between requests.
+ * - Route handlers wrapped by `withRequestContext` (including `mealRoute`): in a request-scoped set (AsyncLocalStorage,
+ *   opened by `runWithRequestContext`), which follows the request through every await, transaction callback and repository.
+ * - Server components, within one render: in a React `cache()` set, which React scopes to that render.
+ * - Anywhere else (a handler not wrapped by `withRequestContext`, a server action (none exist today; Next runs them outside a
+ *   render, so `cache()` returns a new set on every call), a script, a background job): nothing is kept, so a row is written
+ *   unmarked. A missing marker therefore does not prove the access came from a real staff membership.
  */
 const renderScoped = cache(() => new Set<string>());
 

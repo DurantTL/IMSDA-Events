@@ -216,6 +216,13 @@ describe("the audit marker (#1643)", () => {
   it("makes no database query", () => {
     const source = readFileSync(join(process.cwd(), "modules/audit/clubs-administrator-marker.ts"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     expect(source).not.toMatch(/getPrisma|await |client\.|async /);
+    // The extension in lib/prisma.ts: no await and no call except the marker and `query(...)`.
+    const prismaSource = readFileSync(join(process.cwd(), "lib/prisma.ts"), "utf8");
+    const block = prismaSource.slice(prismaSource.indexOf("auditLog: {"), prismaSource.indexOf("}) as unknown as PrismaClient"));
+    expect(block).toContain("withClubsAdministratorMarker");
+    expect(block).not.toMatch(/\bawait\b|\bimport\(|\bbase\b|\btx\b/);
+    const calls = [...block.matchAll(/([A-Za-z_$][\w$.]*)\(/g)].map((match) => match[1]);
+    expect(calls.filter((name) => !["create", "createMany", "query", "withClubsAdministratorMarker", "Array.isArray", "args.data.map"].includes(name))).toEqual([]);
   });
 });
 

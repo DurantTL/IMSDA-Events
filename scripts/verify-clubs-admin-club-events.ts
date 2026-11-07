@@ -16,6 +16,7 @@
  *
  *   npm run test:clubs-admin-club-events
  */
+import { spawnSync } from "node:child_process";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
 
@@ -147,22 +148,18 @@ async function main() {
   assert((await metadataOf("CACE_MANY"))?.actorRole === "CLUBS_ADMINISTRATOR", "a createMany row on a club event records the role");
   assert((await metadataOf("CACE_MANY_CAMP"))?.actorRole === undefined, "a createMany row on a general event does not");
 
-  // ---- No pool wait: an audited transaction on a one-connection pool finishes at once (the marker runs no query). ----
+  // ---- No pool wait: the app's own client on a one-connection pool, in a child process (the marker runs no query). ----
   {
-    const single = new PrismaClient({ datasources: { db: { url: `${process.env.DATABASE_URL}${process.env.DATABASE_URL?.includes("?") ? "&" : "?"}connection_limit=1&pool_timeout=3` } } });
-    const { withClubsAdministratorMarker } = await import("../modules/audit/clubs-administrator-marker");
-    const started = Date.now();
-    await inRequest(async () => {
-      await requirePermission(session(clubsAdminId), clubEventId, "CONFIGURE_EVENT", findActiveMembership);
-      // The app's extension, on a one-connection client, as `lib/prisma.ts` builds it.
-      const extended = single.$extends({ query: { auditLog: { async create({ args, query }) { return query({ ...args, data: withClubsAdministratorMarker(args.data) }); } } } });
-      await Promise.all([1, 2, 3].map((n) => extended.$transaction(async (tx) => {
-        await tx.auditLog.create({ data: { eventId: clubEventId, actorUserId: clubsAdminId, action: `CACE_POOL_${n}`, entityType: "Tag", entityId: id("tag"), correlationId: id(`p${n}`), summary: "Check entry." } });
-      }, { timeout: 5000 })));
+    const url = `${process.env.DATABASE_URL}${process.env.DATABASE_URL?.includes("?") ? "&" : "?"}connection_limit=1&pool_timeout=3`;
+    const child = spawnSync("npx", ["tsx", "--require", "./scripts/support/allow-server-only.cjs", "scripts/support/clubs-admin-pool-child.ts"], {
+      env: { ...process.env, DATABASE_URL: url, CACE_USER_ID: clubsAdminId, CACE_EVENT_ID: clubEventId },
+      encoding: "utf8",
+      timeout: 60_000,
     });
-    await single.$disconnect();
-    assert(Date.now() - started < 3000, "audited transactions on a one-connection pool do not wait for a second connection");
-    assert((await metadataOf("CACE_POOL_1"))?.actorRole === "CLUBS_ADMINISTRATOR", "a write on the one-connection pool is marked");
+    assert(child.status === 0, `the one-connection child finished (status ${child.status}): ${child.stderr}`);
+    const result = JSON.parse(child.stdout.trim().split("\n").at(-1) ?? "{}") as { ms: number; marked: boolean[] };
+    assert(result.ms < 3000, `audited transactions on a one-connection pool do not wait for a second connection (took ${result.ms} ms)`);
+    assert(result.marked.length === 3 && result.marked.every(Boolean), "every audited write on the one-connection pool is marked");
   }
 
   // ---- Revoke: the very next lookup ----

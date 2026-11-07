@@ -447,9 +447,10 @@ birth dates need their own protection.
    check remembers that for the request and the database client adds the marker to
    every audit write for that person and event, whichever repository writes the
    row, with no extra query (so it cannot hold up a transaction). It is kept for
-   route handlers that run inside the request context and for server components
-   and actions within one render; a write outside those (a script or background
-   job) is not marked. An `actorRole` a caller already set is kept. The Events
+   route handlers wrapped in `withRequestContext` (including `mealRoute`) and for
+   server components within one render; a write outside those (a server action,
+   of which none exist today, a script or a background job) is not marked, so a
+   missing marker does not prove the access came from a real staff assignment. An `actorRole` a caller already set is kept. The Events
    Administrator surfaces (the Events Administrator dashboard, its sidebar pill
    and the Events header) stay keyed to real Event Administrator assignments by
    design, so they do not appear for this role; Club administration remains a
