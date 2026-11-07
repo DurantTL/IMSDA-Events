@@ -46,6 +46,10 @@ const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
   // The Billing responsibility page's own counts, from one read.
   billingUnrecorded: async (context) => (await billing(context)).unrecordedCount,
   billingOutdated: async (context) => (await billing(context)).outdatedCount,
+  billingUnresolved: async (context) => (await billing(context)).summary.unresolvedCount,
+  billingNeedsContact: async (context) => (await billing(context)).summary.needsContactCount,
+  // The pages' own test for "This event is not billed to organizations" (billing mode is not deferred organization invoicing).
+  billedToOrganizations: async (context) => ((await billing(context)).isDeferred ? 1 : 0),
   attendanceApproved: async ({ eventId }) => ((await hasApprovedReconciliation(eventId)) ? 1 : 0),
   // Exact server cents, as the Scholarship fund page shows its balance.
   scholarshipBalanceCents: async ({ eventId }) => (await getFundView(eventId)).summary.balanceCents,

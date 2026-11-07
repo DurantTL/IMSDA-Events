@@ -91,7 +91,7 @@ describe("More money tools model (#1575)", () => {
     expect(neededMoneyMetrics(nobody)).toEqual([]);
     expect(buildMoneyToolsView(nobody, "evt_1", {}).groups).toEqual([]);
     expect(neededMoneyMetrics(finance).sort()).toEqual(
-      (["churchFlags", "ledgerDifferences", "policyVersions", "policyInEffect", "draftInvoices", "scholarshipBalanceCents", "billingUnrecorded", "billingOutdated", "attendanceApproved"] as MoneyMetricKey[]).sort(),
+      (["churchFlags", "ledgerDifferences", "policyVersions", "policyInEffect", "draftInvoices", "scholarshipBalanceCents", "billingUnrecorded", "billingOutdated", "billingUnresolved", "billingNeedsContact", "billedToOrganizations", "attendanceApproved"] as MoneyMetricKey[]).sort(),
     );
   });
 
@@ -117,28 +117,46 @@ describe("More money tools model (#1575)", () => {
   });
 
   it("says its status in words, and a card with no honest number has no chip", () => {
-    const zero = allMetrics(finance, 0);
+    const zero = { ...allMetrics(finance, 0), billedToOrganizations: 1 };
     expect(statusOf(staffPageTitles.churchOwed, zero)).toEqual({ tone: "ok", text: "Nothing waiting" });
     expect(statusOf(staffPageTitles.churchOwed, { churchFlags: 1 })).toEqual({ tone: "warn", text: "1 needs the finance office" });
     expect(statusOf(staffPageTitles.churchOwed, { churchFlags: 3 })).toEqual({ tone: "warn", text: "3 need the finance office" });
     expect(statusOf(staffPageTitles.ledgerCheck, { ledgerDifferences: 2 })).toEqual({ tone: "warn", text: "2 to check" });
     expect(statusOf(staffPageTitles.invoices, zero)).toEqual({ tone: "ok", text: "No drafts open" });
-    expect(statusOf(staffPageTitles.invoices, { draftInvoices: 1 })).toEqual({ tone: "review", text: "1 draft open" });
-    expect(statusOf(staffPageTitles.invoices, { draftInvoices: 4 })).toEqual({ tone: "review", text: "4 drafts open" });
+    expect(statusOf(staffPageTitles.invoices, { ...zero, draftInvoices: 1 })).toEqual({ tone: "review", text: "1 draft open" });
+    expect(statusOf(staffPageTitles.invoices, { ...zero, draftInvoices: 4 })).toEqual({ tone: "review", text: "4 drafts open" });
     expect(statusOf(staffPageTitles.scholarshipFund, { scholarshipBalanceCents: 123456 })).toEqual({ tone: "draft", text: "Balance $1,234.56" });
     expect(statusOf(staffPageTitles.scholarshipFund, { scholarshipBalanceCents: 0 })?.text).toBe("Balance $0.00");
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 0, policyInEffect: 0 })).toEqual({ tone: "draft", text: "No rules set" });
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 2, policyInEffect: 0 })).toEqual({ tone: "soon", text: "None in effect yet" });
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 2, policyInEffect: 1 })).toEqual({ tone: "ok", text: "In effect" });
     expect(statusOf(staffPageTitles.squarePayments, allMetrics(finance, 1))).toBeNull();
-    expect(statusOf(staffPageTitles.billingResponsibility, zero)).toEqual({ tone: "ok", text: "All recorded" });
-    expect(statusOf(staffPageTitles.billingResponsibility, { billingUnrecorded: 3, billingOutdated: 0 })).toEqual({ tone: "review", text: "3 to record" });
-    expect(statusOf(staffPageTitles.billingResponsibility, { billingUnrecorded: 0, billingOutdated: 1 })).toEqual({ tone: "warn", text: "1 out of date" });
-    expect(statusOf(staffPageTitles.billingResponsibility, { billingUnrecorded: 2, billingOutdated: 1 })).toEqual({ tone: "review", text: "2 to record, 1 out of date" });
-    expect(statusOf(staffPageTitles.attendanceReconciliation, { attendanceApproved: 1 })).toEqual({ tone: "ok", text: "Approved" });
-    expect(statusOf(staffPageTitles.attendanceReconciliation, { attendanceApproved: 0 })).toEqual({ tone: "draft", text: "Not approved yet" });
+    const billing = (extra: MoneyMetricValues) => statusOf(staffPageTitles.billingResponsibility, { ...zero, ...extra });
+    expect(billing({})).toEqual({ tone: "ok", text: "All recorded" });
+    expect(billing({ billingUnrecorded: 3 })).toEqual({ tone: "review", text: "3 to record" });
+    expect(billing({ billingOutdated: 1 })).toEqual({ tone: "warn", text: "1 out of date" });
+    expect(billing({ billingUnresolved: 5 })).toEqual({ tone: "warn", text: "5 unresolved" });
+    expect(billing({ billingNeedsContact: 1 })).toEqual({ tone: "warn", text: "1 needs a billing contact" });
+    expect(billing({ billingNeedsContact: 3 })).toEqual({ tone: "warn", text: "3 need a billing contact" });
+    expect(billing({ billingUnrecorded: 2, billingUnresolved: 1 })).toEqual({ tone: "warn", text: "1 unresolved, 2 to record" });
+    // Never the ok word while the page itself warns.
+    for (const key of ["billingUnrecorded", "billingOutdated", "billingUnresolved", "billingNeedsContact"] as const) expect(billing({ [key]: 1 })?.tone, key).not.toBe("ok");
+    const attendance = (extra: MoneyMetricValues) => statusOf(staffPageTitles.attendanceReconciliation, { ...zero, ...extra });
+    expect(attendance({ attendanceApproved: 1 })).toEqual({ tone: "draft", text: "Approved version on file" });
+    expect(attendance({ attendanceApproved: 0 })).toEqual({ tone: "review", text: "Not approved yet" });
     // One unreadable number makes the whole Billing responsibility card unavailable.
-    expect(statusOf(staffPageTitles.billingResponsibility, { billingUnrecorded: 0, billingOutdated: null })).toEqual(UNAVAILABLE_STATUS);
+    expect(billing({ billingOutdated: null })).toEqual(UNAVAILABLE_STATUS);
+    expect(billing({ billingUnresolved: null })).toEqual(UNAVAILABLE_STATUS);
+    expect(billing({ billedToOrganizations: null })).toEqual(UNAVAILABLE_STATUS);
     expect(statusOf(staffPageTitles.attendanceReconciliation, {})).toEqual(UNAVAILABLE_STATUS);
+  });
+
+  it("shows a neutral Not used for this event on an event not billed to organizations", () => {
+    const notBilled = { ...allMetrics(finance, 0), billedToOrganizations: 0, draftInvoices: 0, attendanceApproved: 0 };
+    for (const title of [staffPageTitles.invoices, staffPageTitles.billingResponsibility, staffPageTitles.attendanceReconciliation]) {
+      expect(statusOf(title, notBilled), title).toEqual({ tone: "draft", text: "Not used for this event" });
+    }
+    // The other cards are not affected.
+    expect(statusOf(staffPageTitles.churchOwed, notBilled)?.text).toBe("Nothing waiting");
   });
 });

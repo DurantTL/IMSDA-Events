@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CHURCH_PROMO_GROUP_KEY_PREFIX } from "@/modules/promo-codes/church-invoice";
 
 vi.mock("server-only", () => ({}));
 
@@ -22,8 +23,7 @@ describe("open invoice draft count (#1575)", () => {
     await countOpenInvoiceDrafts("evt_1");
     const args = prisma.invoice.findMany.mock.calls[0][0];
     expect(args.where.eventId).toBe("evt_1");
-    expect(args.where.NOT).toEqual({ groupKey: { startsWith: expect.stringContaining("") } });
-    expect(args.where.NOT.groupKey.startsWith.length).toBeGreaterThan(0);
+    expect(args.where.NOT).toEqual({ groupKey: { startsWith: CHURCH_PROMO_GROUP_KEY_PREFIX } });
     expect(args.select.versions.where).toEqual({ status: { not: "DISCARDED" } });
     expect(args.select.versions.take).toBe(1);
   });

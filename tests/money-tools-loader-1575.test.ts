@@ -43,7 +43,7 @@ beforeEach(() => {
   countOpenInvoiceDrafts.mockReset();
   countOpenInvoiceDrafts.mockResolvedValue(2);
   getBillingResponsibilityView.mockReset();
-  getBillingResponsibilityView.mockResolvedValue({ unrecordedCount: 4, outdatedCount: 1 });
+  getBillingResponsibilityView.mockResolvedValue({ isDeferred: true, unrecordedCount: 4, outdatedCount: 1, summary: { unresolvedCount: 2, needsContactCount: 3 } });
   hasApprovedReconciliation.mockReset();
   hasApprovedReconciliation.mockResolvedValue(true);
 });
@@ -51,7 +51,7 @@ beforeEach(() => {
 describe("More money tools loaders (#1575)", () => {
   it("reads each number for the one event, with the counts the pages use", async () => {
     const values = await loadMoneyToolMetrics(finance, "evt_1", now);
-    expect(values).toEqual({ churchFlags: 1, ledgerDifferences: 3, policyVersions: 2, policyInEffect: 1, draftInvoices: 2, scholarshipBalanceCents: 250000, billingUnrecorded: 4, billingOutdated: 1, attendanceApproved: 1 });
+    expect(values).toEqual({ churchFlags: 1, ledgerDifferences: 3, policyVersions: 2, policyInEffect: 1, draftInvoices: 2, scholarshipBalanceCents: 250000, billingUnrecorded: 4, billingOutdated: 1, billingUnresolved: 2, billingNeedsContact: 3, billedToOrganizations: 1, attendanceApproved: 1 });
     expect(countOpenChurchSponsorFlags).toHaveBeenCalledWith("evt_1");
     expect(reconcileRegistrationLedger).toHaveBeenCalledWith(prisma, { eventId: "evt_1" });
     expect(countOpenInvoiceDrafts).toHaveBeenCalledWith("evt_1");
@@ -78,7 +78,12 @@ describe("More money tools loaders (#1575)", () => {
     getBillingResponsibilityView.mockRejectedValue(new Error("down"));
     hasApprovedReconciliation.mockRejectedValue(new Error("down"));
     const values = await loadMoneyToolMetrics(finance, "evt_1", now);
-    expect(values).toMatchObject({ billingUnrecorded: null, billingOutdated: null, attendanceApproved: null, churchFlags: 1 });
+    expect(values).toMatchObject({ billingUnrecorded: null, billingOutdated: null, billingUnresolved: null, billingNeedsContact: null, billedToOrganizations: null, attendanceApproved: null, churchFlags: 1 });
+  });
+
+  it("reads an event not billed to organizations as not used, from the billing view's own flag", async () => {
+    getBillingResponsibilityView.mockResolvedValue({ isDeferred: false, unrecordedCount: 0, outdatedCount: 0, summary: { unresolvedCount: 0, needsContactCount: 0 } });
+    expect((await loadMoneyToolMetrics(finance, "evt_1", now)).billedToOrganizations).toBe(0);
   });
 
   it("does not read a saved but not-yet-effective policy as in effect", async () => {

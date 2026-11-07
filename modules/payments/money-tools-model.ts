@@ -16,7 +16,7 @@ import { UNAVAILABLE_STATUS, type CardStatus, type HubBody, type HubCard, type H
  *   from data nobody read.
  * - Every card is a link and carries `?event=`. Nothing here writes, refunds, matches or changes a record.
  */
-export type MoneyMetricKey = "churchFlags" | "ledgerDifferences" | "policyVersions" | "policyInEffect" | "draftInvoices" | "scholarshipBalanceCents" | "billingUnrecorded" | "billingOutdated" | "attendanceApproved";
+export type MoneyMetricKey = "churchFlags" | "ledgerDifferences" | "policyVersions" | "policyInEffect" | "draftInvoices" | "scholarshipBalanceCents" | "billingUnrecorded" | "billingOutdated" | "billingUnresolved" | "billingNeedsContact" | "billedToOrganizations" | "attendanceApproved";
 
 /** `null` is "could not be read"; a missing key is "not asked for". */
 export type MoneyMetricValues = Partial<Record<MoneyMetricKey, number | null>>;
@@ -39,6 +39,10 @@ type CardDef = {
   status?: (read: Reader) => CardStatus;
 };
 
+/** The words the three invoicing pages' empty state replaces with "This event is not billed to organizations". */
+const notUsed: CardStatus = { tone: "draft", text: "Not used for this event" };
+const usedFor = (read: Reader) => read("billedToOrganizations")! > 0;
+
 const count = (n: number, tone: CardStatus["tone"], text: string): CardStatus => ({ tone, text: `${n} ${text}` });
 
 const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
@@ -50,8 +54,8 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         title: staffPageTitles.invoices,
         description: "Draft, review and send what churches and groups are billed after the event.",
         gate: finance,
-        metrics: ["draftInvoices"],
-        status: (read) => (read("draftInvoices")! > 0 ? count(read("draftInvoices")!, "review", read("draftInvoices") === 1 ? "draft open" : "drafts open") : { tone: "ok", text: "No drafts open" }),
+        metrics: ["billedToOrganizations", "draftInvoices"],
+        status: (read) => !usedFor(read) ? notUsed : (read("draftInvoices")! > 0 ? count(read("draftInvoices")!, "review", read("draftInvoices") === 1 ? "draft open" : "drafts open") : { tone: "ok", text: "No drafts open" }),
       },
       {
         href: "/finance/church-owed",
@@ -67,12 +71,22 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         title: staffPageTitles.billingResponsibility,
         description: "Who each registration is billed to, and the ones that still need an answer.",
         gate: finance,
-        metrics: ["billingUnrecorded", "billingOutdated"],
+        metrics: ["billedToOrganizations", "billingUnrecorded", "billingOutdated", "billingUnresolved", "billingNeedsContact"],
         status: (read) => {
+          if (!usedFor(read)) return notUsed;
           const unrecorded = read("billingUnrecorded")!;
           const outdated = read("billingOutdated")!;
-          if (unrecorded === 0 && outdated === 0) return { tone: "ok", text: "All recorded" };
-          return { tone: unrecorded > 0 ? "review" : "warn", text: [unrecorded > 0 ? `${unrecorded} to record` : null, outdated > 0 ? `${outdated} out of date` : null].filter(Boolean).join(", ") };
+          const unresolved = read("billingUnresolved")!;
+          const needsContact = read("billingNeedsContact")!;
+          if (unrecorded + outdated + unresolved + needsContact === 0) return { tone: "ok", text: "All recorded" };
+          const parts = [
+            unresolved > 0 ? `${unresolved} unresolved` : null,
+            needsContact > 0 ? `${needsContact} ${needsContact === 1 ? "needs" : "need"} a billing contact` : null,
+            unrecorded > 0 ? `${unrecorded} to record` : null,
+            outdated > 0 ? `${outdated} out of date` : null,
+          ].filter(Boolean);
+          // The page marks unresolved registrations, missing contacts and (via its notes) out-of-date records as warnings.
+          return { tone: unrecorded > 0 && unresolved + needsContact + outdated === 0 ? "review" : "warn", text: parts.join(", ") };
         },
       },
     ],
@@ -100,8 +114,9 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         title: staffPageTitles.attendanceReconciliation,
         description: "Who attended and what each church is billed for, before invoices go out.",
         gate: finance,
-        metrics: ["attendanceApproved"],
-        status: (read) => (read("attendanceApproved")! > 0 ? { tone: "ok", text: "Approved" } : { tone: "draft", text: "Not approved yet" }),
+        metrics: ["billedToOrganizations", "attendanceApproved"],
+        // "Approved version on file" is neutral: whether the facts have changed since is not read here.
+        status: (read) => !usedFor(read) ? notUsed : (read("attendanceApproved")! > 0 ? { tone: "draft", text: "Approved version on file" } : { tone: "review", text: "Not approved yet" }),
       },
     ],
   },
