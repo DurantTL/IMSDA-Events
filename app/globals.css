@@ -516,8 +516,8 @@ textarea:focus-visible {
 
 .skip-link {
   position: fixed;
-  top: 10px;
-  left: 10px;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: max(10px, env(safe-area-inset-left, 0px));
   z-index: 100;
   border-radius: 10px;
   background: white;
@@ -1681,7 +1681,7 @@ textarea:focus-visible {
   overflow-y: auto;
   place-items: center;
   background: rgba(0, 35, 54, 0.52);
-  padding: 22px;
+  padding: max(22px, env(safe-area-inset-top, 0px)) max(22px, env(safe-area-inset-right, 0px)) max(22px, env(safe-area-inset-bottom, 0px)) max(22px, env(safe-area-inset-left, 0px));
   backdrop-filter: blur(3px);
 }
 
@@ -3659,8 +3659,8 @@ body:has(.auth-page) { padding-bottom: 0; }
 .searchable-select-picker {
   position: fixed;
   top: var(--picker-top, 0px);
-  right: 0;
-  left: 0;
+  right: env(safe-area-inset-right, 0px);
+  left: env(safe-area-inset-left, 0px);
   z-index: 200;
   display: flex;
   height: var(--picker-height, 100dvh);
@@ -10703,7 +10703,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   html.has-attendee-sheet, html.has-attendee-sheet body { overflow: hidden; }
   .public-registration-attendee.is-sheet {
     position: fixed;
-    inset: 0;
+    inset: 0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
     z-index: 60;
     display: flex;
     flex-direction: column;
@@ -11143,7 +11143,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   display: grid;
   place-items: center;
   background: rgba(4, 12, 18, 0.82);
-  padding: 12px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
 }
 .event-gallery-dialog {
   display: grid;
@@ -13291,10 +13291,11 @@ body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-are
 @media (max-width: 800px) {
   html:has(.mobile-nav) { scroll-padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 }
-/* While a text field has focus on a phone the keyboard owns the bottom of the screen: the bottom bar steps aside (the script
+/* While a text field has focus on a phone the keyboard owns the bottom of the screen: the bottom bar slides out of the way (the script
    in components/staff-keyboard-watch.tsx sets data-keyboard), a pinned save bar rejoins the page flow instead of covering the field. */
 @media (max-width: 800px) {
-  html[data-keyboard="open"] .mobile-nav { display: none; }
+  /* Slid off the bottom, not display:none: it stays focusable, so a dialog that closes while the keyboard is up can still give focus back to More (the watch then brings the bar back). */
+  html[data-keyboard="open"] .mobile-nav { transform: translateY(calc(100% + 12px)); box-shadow: none; }
   html[data-keyboard="open"] body { padding-bottom: env(safe-area-inset-bottom, 0px); }
   html[data-keyboard="open"] .event-savebar.is-pinned { position: static; }
   html[data-keyboard="open"] .more-launcher-scrim { inset: 0; }
@@ -13525,7 +13526,7 @@ body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-are
 @media (max-width: 767px) {
   .fb-shell[data-inspector="closed"] .fb-sidebar { display: none; }
   .fb-shell[data-inspector="open"] .fb-main { display: none; }
-  .fb-shell[data-inspector="open"] .fb-sidebar { position: fixed; inset: 0; z-index: 50; flex: 1 1 auto; box-sizing: border-box; width: 100%; max-width: none; max-height: none; border: 0; border-radius: 0; }
+  .fb-shell[data-inspector="open"] .fb-sidebar { position: fixed; inset: 0 env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px); z-index: 50; flex: 1 1 auto; box-sizing: border-box; width: 100%; max-width: none; max-height: none; border: 0; border-radius: 0; }
   .fb-shell[data-inspector="open"] .fb-resize-handle { display: none; }
   .fb-shell[data-inspector="open"] .fb-inspector-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); background: var(--card); padding: 8px 12px; }
   .fb-inspector-title { flex: 1 1 auto; margin: 0; min-width: 0; color: var(--imsda-navy); font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; text-align: center; }
@@ -13602,7 +13603,7 @@ body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-are
    and Preview bar, full-screen sheets for settings, Add question and Move. New rules only, all prefixed fb-; no existing rule or
    shared font size is changed. Every control is at least 44px; small text is 0.875rem or larger. */
 .fb-inspector-note, .fb-inspector-notices { display: none; }
-.fb-phone-sheet { position: fixed; z-index: 200; right: 0; left: 0; }
+.fb-phone-sheet { position: fixed; z-index: 200; right: env(safe-area-inset-right, 0px); left: env(safe-area-inset-left, 0px); }
 .fb-phone-sheet-full { top: var(--picker-top, 0px); height: var(--picker-height, 100dvh); }
 .fb-phone-sheet-menu { top: 0; bottom: 0; }
 .fb-phone-sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 43, 69, 0.42); }

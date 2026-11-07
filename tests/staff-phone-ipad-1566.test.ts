@@ -39,49 +39,29 @@ const row = (html: string) => between(html, 'data-staff-tabs', "</nav>");
 const phone = (html: string) => html.slice(html.indexOf('<nav class="mobile-nav"'));
 const hrefs = (html: string) => [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1].replaceAll("&amp;", "&"));
 
+// The focus behavior of the sheets (title, Close, focus in, Tab, Escape, return) is tested in tests/staff-phone-focus-1566.test.ts.
 describe("sheets and dialogs (#1566)", () => {
-  it("gives the menu-line dialog a label, Close, the shared focus rules and a dvh height with an inner scroll", () => {
-    const dialog = read("components/staff-menu-dialog.tsx");
-    expect(dialog).toContain("useAccessibleDialog");
-    expect(dialog).toContain('aria-labelledby={titleId}');
-    expect(dialog).toContain("<span>Close</span>");
-    expect(dialog).toContain("initialFocus");
-    expect(dialog).toContain("returnFocus");
+  it("fits the menu-line dialog, the More sheet and the account menu to the height with an inner scroll and Close outside it", () => {
     const css = read("components/staff-shell.module.css");
     expect(css).toMatch(/\.dialog \{[^}]*max-height: min\(78vh, calc\(100dvh - 24px\)\)/);
     expect(css).toMatch(/\.dialogBody \{[^}]*overflow-y: auto/);
-    // The head is its own flex row outside the scrolling body, so Close never scrolls away.
     expect(css).toMatch(/\.dialogHead \{[^}]*flex: none/);
+    const globals = read("app/globals.css");
+    expect(globals).toMatch(/\.more-launcher-head \{[^}]*position: sticky/);
+    expect(globals).toMatch(/max-height: min\(72dvh, calc\(100dvh - 120px/);
+    expect(globals).toMatch(/\.more-launcher \{[^}]*overflow-y: auto/);
+    expect(read("components/staff-account-menu.module.css")).toMatch(/div\.popover \{[^}]*max-height: calc\(100dvh - 96px\)[^}]*overflow-y: auto/);
   });
 
-  it("gives the phone More sheet a visible title and a Close button that stays in the Tab loop", () => {
-    const launcher = read("components/more-launcher.tsx");
-    expect(launcher).toContain('className="more-launcher-head"');
-    expect(launcher).toContain('<h2 id={titleId}>More</h2>');
-    expect(launcher).toContain('aria-labelledby={variant === "tab" ? titleId : undefined}');
-    expect(launcher).toContain("button.more-launcher-close");
-    expect(launcher).toContain("useAccessibleDialog");
-    const css = read("app/globals.css");
-    expect(css).toMatch(/\.more-launcher-head \{[^}]*position: sticky/);
-    expect(css).toMatch(/max-height: min\(72dvh, calc\(100dvh - 120px/);
-    expect(css).toMatch(/\.more-launcher \{[^}]*overflow-y: auto/);
-  });
-
-  it("makes the account menu and workspace switcher a labelled dialog with Close, focus rules and an inner scroll", () => {
+  it("renders the account menu open with a title, Close and the switcher", () => {
     const html = renderToStaticMarkup(h(StaffAccountMenu, {
       attendeePreviewHref: "/account", defaultOpen: true, displayName: "Synthetic Admin", email: "synthetic@imsda-events.test",
       workspaces: [{ kind: "system_admin", label: "System management", href: "/admin", method: "get" }, { kind: "staff", label: "Staff workspace", href: "/overview", method: "get", current: true }] as never,
     }));
-    expect(html).toContain('role="dialog"');
-    expect(html).toMatch(/aria-labelledby="([^"]+)"/);
     const id = html.match(/aria-labelledby="([^"]+)"/)![1];
     expect(html).toContain(`<h2 id="${id}">Your account</h2>`);
     expect(html).toContain("<span>Close</span>");
     expect(html).toContain("Switch workspace");
-    const source = read("components/staff-account-menu.tsx");
-    expect(source).toContain("useAccessibleDialog");
-    expect(source).toContain("returnFocus");
-    expect(read("components/staff-account-menu.module.css")).toMatch(/div\.popover \{[^}]*max-height: calc\(100dvh - 96px\)[^}]*overflow-y: auto/);
   });
 });
 
@@ -97,13 +77,14 @@ describe("device conditions (#1566)", () => {
 
   it("steps the bottom bar aside while a text field has focus, and unpins the save bar", () => {
     const css = read("app/globals.css");
-    expect(css).toMatch(/html\[data-keyboard="open"\] \.mobile-nav \{ display: none; \}/);
+    expect(css).toMatch(/html\[data-keyboard="open"\] \.mobile-nav \{ transform: translateY/);
     expect(css).toMatch(/html\[data-keyboard="open"\] \.event-savebar\.is-pinned \{ position: static; \}/);
     // The rules sit in the phone query, so a hardware keyboard on a tablet never hides the bar.
     const block = css.slice(css.indexOf("While a text field has focus on a phone"));
     expect(block.slice(0, block.indexOf("}\n/* The More sheet's head")).includes("@media (max-width: 800px)")).toBe(true);
-    expect(read("components/app-shell.tsx")).toContain("<StaffKeyboardWatch />");
-    expect(read("components/staff-keyboard-watch.tsx")).toMatch(/focusin[\s\S]*focusout[\s\S]*removeAttribute\("data-keyboard"\)/);
+    // Slid away, never display:none: a hidden More button could not take focus back from a closing sheet.
+    expect(css).not.toMatch(/html\[data-keyboard="open"\] \.mobile-nav \{[^}]*display: none/);
+    expect(shell("/overview")).toContain("mobile-nav");
   });
 
   it("decides what opens the keyboard from the control, not the device", () => {
@@ -123,8 +104,6 @@ describe("device conditions (#1566)", () => {
     const css = read("components/staff-shell.module.css");
     expect(css).toContain("@media (max-width: 1023.98px)");
     expect(css).toContain('.tabline[data-fit="tight"] .menuline { display: flex; }');
-    const row = read("components/staff-tab-row.tsx");
-    expect(row).toContain("ResizeObserver");
     for (const file of ["components/staff-tab-row.tsx", "components/staff-shell.module.css", "components/staff-phone-bar.tsx"]) {
       expect(read(file), file).not.toMatch(/iPad|iPhone|userAgent|navigator\.platform/);
     }

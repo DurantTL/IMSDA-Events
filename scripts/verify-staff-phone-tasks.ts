@@ -254,12 +254,12 @@ const tasks: Task[] = [
       await page.keyboard.type(" x");
       if (isPhone(width)) {
         check(await page.evaluate(() => document.documentElement.getAttribute("data-keyboard") === "open"), "a focused field marks the keyboard open");
-        check(await page.evaluate(() => getComputedStyle(document.querySelector("nav.mobile-nav")!).display === "none"), "the bottom bar steps aside while typing");
+        check(await page.evaluate(() => document.querySelector("nav.mobile-nav")!.getBoundingClientRect().top >= window.innerHeight), "the bottom bar steps aside while typing");
         // A tap on the page body (outside any field) hands the bottom back.
         await page.locator("main.workspace h1").first().click();
         await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
         await page.waitForTimeout(150);
-        check(await page.evaluate(() => getComputedStyle(document.querySelector("nav.mobile-nav")!).display !== "none"), "the bottom bar returns when the field loses focus");
+        check(await page.evaluate(() => document.querySelector("nav.mobile-nav")!.getBoundingClientRect().top < window.innerHeight), "the bottom bar returns when the field loses focus");
       }
       const target = isPhone(width) ? page.locator('nav.mobile-nav a:has-text("Events")') : page.locator('#primary-navigation a:has-text("Events")');
       await target.first().click();
@@ -458,7 +458,7 @@ const tasks: Task[] = [
       await page.keyboard.type("x");
       const typing = await page.evaluate(() => {
         const save = document.querySelector(".event-savebar");
-        return { keyboard: document.documentElement.getAttribute("data-keyboard"), barHidden: getComputedStyle(document.querySelector("nav.mobile-nav") as Element).display === "none", savePosition: save ? getComputedStyle(save).position : "none" };
+        return { keyboard: document.documentElement.getAttribute("data-keyboard"), barHidden: (document.querySelector("nav.mobile-nav") as Element).getBoundingClientRect().top >= window.innerHeight, savePosition: save ? getComputedStyle(save).position : "none" };
       });
       check(typing.keyboard === "open" && typing.barHidden, "while typing, the bottom bar is out of the way");
       check(typing.savePosition !== "fixed", "the save bar is never fixed over a focused field");
