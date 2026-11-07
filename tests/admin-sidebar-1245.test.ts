@@ -175,7 +175,7 @@ describe("the Clubs destination groups", () => {
     expect(off).not.toContain("/admin/clubs/health-import");
   });
 
-  it("adds ?year= to the year-aware links only when the URL has one", () => {
+  it("adds ?year= to the Clubs links when the URL has one", () => {
     expect(clubsAdminHrefForYear("/admin/clubs/summary?view=points#points", "2025-26")).toBe("/admin/clubs/summary?view=points&year=2025-26#points");
     expect(clubsAdminHrefForYear("/admin/clubs/reports/year-end", "2025-26")).toBe("/admin/clubs/reports/year-end?year=2025-26");
     expect(clubsAdminHrefForYear("/admin/clubs", "2025-26")).toBe("/admin/clubs?year=2025-26");
@@ -187,7 +187,9 @@ describe("the Clubs destination groups", () => {
     const nav = tabsOf(render({ user: staff, adminRoleView: view }));
     expect(nav).toContain('href="/admin/clubs/summary?year=2025-26"');
     expect(nav).toContain('href="/admin/clubs/summary?view=records&amp;year=2025-26#monthly-records"');
-    expect(nav).toContain('href="/admin/clubs/leaders"');
+    // Since #1566 every Clubs-area link carries the year, including pages that do not read it (Leaders), so passing through
+    // one never resets the chosen year to the current one.
+    expect(nav).toContain('href="/admin/clubs/leaders?year=2025-26"');
   });
 });
 
