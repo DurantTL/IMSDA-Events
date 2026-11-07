@@ -21,6 +21,9 @@
 .brandText small { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .search { flex: 1 1 280px; min-width: 0; max-width: 460px; margin-left: 24px; }
 .search :global(.destination-search-empty) { color: var(--muted); }
+/* The matches open over the page, not in the header's flow: an open list grew the header by hundreds of pixels and moved the page under the pointer. */
+.search :global(.destination-search-list) { position: absolute; z-index: 40; top: 100%; right: 0; left: 0; max-height: min(60dvh, 26rem); margin-top: 6px; box-shadow: 0 12px 28px rgba(0, 43, 69, 0.18); }
+.search :global(.destination-search-empty) { position: absolute; z-index: 40; top: 100%; right: 0; left: 0; margin: 6px 0 0; border: 1px solid var(--line); border-radius: var(--field-radius); background: var(--card); padding: 10px 12px; box-shadow: 0 12px 28px rgba(0, 43, 69, 0.18); }
 .topActions { display: flex; min-width: 0; align-items: center; gap: 8px; margin-left: auto; }
 .topLink {
   display: inline-flex;
