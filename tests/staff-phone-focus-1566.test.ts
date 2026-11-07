@@ -96,6 +96,8 @@ describe("the More sheet with the keyboard watch (#1566)", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  // jsdom loads no stylesheet, so this proves the focus and keyboard-mark sequence only. That the bar stays focusable while
+  // the mark is set (no display:none) is guarded by the CSS check in tests/staff-phone-ipad-1566.test.ts.
   it("Escape from the focused search box twice closes it, clears the keyboard mark and puts focus on the More button", async () => {
     const { trigger, panel } = await openSheet();
     const search = panel.querySelector<HTMLInputElement>("input.more-launcher-search-input")!;
