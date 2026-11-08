@@ -334,7 +334,12 @@ const hubDefs: Record<HubKey, HubDef> = {
             // The tile above already says how many need attention and how many could not be read; the card adds only what it does not.
             statusBesideFigures: (read) => {
               const toConfirm = read("readinessToConfirm");
-              return toConfirm !== null && toConfirm > 0 && !(read("readinessAttention")! > 0) && !(read("readinessUnknown")! > 0) ? { tone: "soon", text: `${toConfirm} to confirm` } : null;
+              // The tile has no "to confirm" figure, so an unreadable one is still said here, never hidden.
+              if (toConfirm === null) return UNAVAILABLE_STATUS;
+              const attention = read("readinessAttention");
+              const unknown = read("readinessUnknown");
+              const tileSpeaks = attention === null || attention > 0 || unknown === null || unknown > 0;
+              return toConfirm > 0 && !tileSpeaks ? { tone: "soon", text: `${toConfirm} to confirm` } : null;
             },
             status: (read) => {
               const attention = read("readinessAttention")!;

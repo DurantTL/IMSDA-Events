@@ -144,8 +144,8 @@ describe("Admin hub model (#1569)", () => {
     }
     // Readiness: one unreadable half is enough to stop "All ready".
     const partial = cardsOf("catalogs", system, { ...allMetrics("catalogs", system, 0), readinessToConfirm: null }).find((card) => card.title === "System readiness");
-    // The tile already carries the attention and unreadable numbers, so the card says nothing rather than "All ready" (#1733).
-    expect(partial?.status ?? null).toBeNull();
+    // The tile has no "to confirm" figure, so the card says it could not be read, and never "All ready" (#1733).
+    expect(partial?.status).toEqual({ tone: "draft", text: "Unavailable" });
     expect(cardsOf("catalogs", system, { ...allMetrics("catalogs", system, 0), readinessToConfirm: 2 }).find((card) => card.title === "System readiness")?.status).toEqual({ tone: "soon", text: "2 to confirm" });
   });
 
