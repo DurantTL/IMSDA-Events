@@ -14,6 +14,9 @@ export function clubTeacherApiError(error: unknown, action: string) {
   if (error instanceof SyntaxError) return Response.json({ error: "INVALID_JSON", message: "The request is not valid JSON." }, { status: 400, headers: noStore });
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status, headers: noStore });
   if (error instanceof RosterAccessError) return Response.json({ error: error.code, message: error.message }, { status: error.status, headers: noStore });
+  if (error instanceof ClubTeacherError && error.code === "NOT_PERMITTED") {
+    return Response.json({ error: error.code, message: error.message }, { status: 403, headers: noStore });
+  }
   if (error instanceof ClubTeacherError) {
     const status = error.code === "EVENT_NOT_FOUND" || error.code === "NOT_AVAILABLE" || error.code === "NOT_A_CLUB_EVENT" ? 404 : 422;
     return Response.json({ error: error.code, message: error.message }, { status, headers: noStore });

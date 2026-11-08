@@ -10,8 +10,7 @@ import { NeedsAttention, StatusComplete } from "@/components/needs-attention";
 import { classChoiceReadiness, readinessSummaryText } from "@/modules/honors/class-readiness";
 import { ClubHonorsNote } from "@/components/club-honors-note";
 import { ClubTeachersCard } from "@/components/club-teachers-card";
-import { loadClubTeacherStep } from "@/modules/club-teachers/repository";
-import { logError } from "@/lib/logger";
+import { loadClubTeacherStepOrNull } from "@/modules/club-teachers/repository";
 import { ClubClassPicker } from "@/components/club-class-picker";
 import { ClubPassQr } from "@/components/club-pass-qr";
 import { clubPassIsAvailable } from "@/modules/checkin/club-pass-token";
@@ -144,12 +143,7 @@ export default async function ClubEventRegistrationPage({
   });
 
   // The optional Club teachers step (#1681): shown only while the event's tool is on and has a rule. A failed read hides the step, never the page.
-  const teacherStep = showingTeam && !workspace.problem
-    ? await loadClubTeacherStep(organizationId, eventId).catch((error: unknown) => {
-      logError("Club teachers step read failed", error, { eventId });
-      return null;
-    })
-    : null;
+  const teacherStep = showingTeam && !workspace.problem ? await loadClubTeacherStepOrNull(organizationId, eventId) : null;
 
   return (
     <>

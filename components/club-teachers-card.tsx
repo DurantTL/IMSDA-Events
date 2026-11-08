@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { GraduationCap } from "lucide-react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { teacherRuleSummary } from "@/modules/club-teachers/domain";
 import type { ClubTeacherStep } from "@/modules/club-teachers/repository";
@@ -58,6 +59,7 @@ export function ClubTeachersCard({ canEdit, eventId, initialStep, organizationId
         return;
       }
       setStep(result.step);
+      setPicks(Object.fromEntries(result.step.teachers.map((teacher) => [teacher.memberId, { honorName: teacher.honorName, locationId: teacher.locationId ?? "" }])));
       setMessage({ tone: "ok", text: savedMessage() });
     } catch {
       setMessage({ tone: "error", text: notSavedMessage("Check your connection and try Save again.") });
@@ -67,6 +69,12 @@ export function ClubTeachersCard({ canEdit, eventId, initialStep, organizationId
   }
 
   const named = Object.keys(picks).length;
+  // Unsaved: the picks differ from what was last saved.
+  const dirty = named !== step.teachers.length || step.teachers.some((teacher) => {
+    const pick = picks[teacher.memberId];
+    return !pick || pick.honorName !== teacher.honorName || pick.locationId !== (teacher.locationId ?? "");
+  });
+  useUnsavedChangesGuard(dirty && !saving, "You have unsaved teachers. Leave this page and discard them?");
   return (
     <section aria-labelledby="club-teachers-heading" className="public-manage-card" data-testid="club-teachers-card">
       <div className="public-manage-card-heading">
@@ -119,7 +127,7 @@ export function ClubTeachersCard({ canEdit, eventId, initialStep, organizationId
           <button className="primary-button" disabled={saving} onClick={save} type="button">{saving ? "Saving…" : `Save teachers (${named})`}</button>
         </div>
       ) : (
-        <p className="field-help">Only a director or deputy can change this.</p>
+        <p className="field-help">Only a club director, deputy or registrar can change this.</p>
       )}
       {message && <FormMessage message={message.text} tone={message.tone === "ok" ? "success" : "error"} />}
     </section>

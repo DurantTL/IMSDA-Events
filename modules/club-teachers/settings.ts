@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
-import { requirePermission, type MembershipLookup, type Session } from "@/modules/access/authorization";
+import { requireEventMembership, AccessDeniedError, type MembershipLookup, type Session } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { currentAreaCoordinator, isAreaCoordinator } from "@/modules/organizations/area-coordinators";
 import { ClubTeacherError, auditActor, getTeacherRule, ruleFromRow, type TeacherActor } from "@/modules/club-teachers/repository";
@@ -12,9 +12,11 @@ import { eventModuleDefinition, scopedToggleModuleKeys } from "@/modules/event-m
  * Who may switch the optional Club teachers tool on or off and set its rule (#1681). This is a separate, narrow path
  * beside the system-administrator-only module service (`modules/event-modules/service.ts`), which is left exactly as
  * it was. It acts on ONE module key (`scopedToggleModuleKeys`) and on club events only:
- *   - staff: an Event Admin of the event, an active Clubs Administrator (who holds that role on every club event) or a
- *     system administrator, through the same MANAGE_REGISTRATION check the club tools use;
- *   - an active Area Coordinator, on any club event they can see in Club events, after the second sign-in step.
+ *   - staff: a system administrator, an Event Admin of the event, or an active Clubs Administrator (who holds the
+ *     Event Admin role on every club event), the same people `resolveClubOversight` admits. A Registration Manager
+ *     cannot. Staff may also set it up on a club event that is not published yet;
+ *   - an active Area Coordinator, on any published club event they can see in Club events, after the second sign-in
+ *     step. They may not choose to block registrations ("require"): that stays with staff.
  * An Area Coordinator gains no other write: not module requests, not events, not club records.
  */
 
@@ -28,9 +30,12 @@ export function teacherToolActor(actor: TeacherSettingsActor): TeacherActor {
   return actor.kind === "staff" ? { userId: actor.userId } : { accountId: actor.accountId };
 }
 
-/** Staff access, decided by the shared event permission check. Returns the actor for the change. */
+/** Staff access: a system administrator or an Event Admin (the Clubs Administrator is one on club events). Returns the actor. */
 export async function requireStaffTeacherToolAccess(session: Session, eventId: string, lookup: MembershipLookup): Promise<TeacherSettingsActor> {
-  const access = await requirePermission(session, eventId, "MANAGE_REGISTRATION", lookup);
+  const access = await requireEventMembership(session, eventId, lookup);
+  if (access.user.globalRole !== "SYSTEM_ADMIN" && access.membership?.role !== "EVENT_ADMIN") {
+    throw new AccessDeniedError("Your event role doesn't include this. Ask your event administrator if you need access.", 403, "PERMISSION_DENIED");
+  }
   return { kind: "staff", userId: access.user.id };
 }
 
@@ -43,11 +48,20 @@ export async function requireAreaCoordinatorTeacherActor(): Promise<TeacherSetti
 
 export type TeacherToolState = { enabled: boolean; rule: TeacherRule | null; eventName: string };
 
-/** The state shown to whoever may change it. The event must be a club event a coordinator would see in Club events. */
-export async function loadTeacherToolState(eventId: string): Promise<TeacherToolState> {
+/** Who is asking decides which club events exist for them: staff also see unpublished ones, a coordinator only published. */
+async function toolEvent(eventId: string, scope: TeacherSettingsActor["kind"]) {
+  const event = await getPrisma().event.findFirst({
+    where: { id: eventId, archivedAt: null, audience: "CLUB", ...(scope === "area-coordinator" ? { isPublished: true } : {}) },
+    select: { id: true, name: true },
+  });
+  if (!event) throw new ClubTeacherError("EVENT_NOT_FOUND", "That club event could not be found. It may be archived or not a club event.");
+  return event;
+}
+
+/** The state shown to whoever may change it. */
+export async function loadTeacherToolState(eventId: string, scope: TeacherSettingsActor["kind"]): Promise<TeacherToolState> {
+  const event = await toolEvent(eventId, scope);
   const prisma = getPrisma();
-  const event = await prisma.event.findFirst({ where: { id: eventId, isPublished: true, archivedAt: null, audience: "CLUB" }, select: { id: true, name: true } });
-  if (!event) throw new ClubTeacherError("EVENT_NOT_FOUND", "That club event could not be found.");
   const [row, rule] = await Promise.all([
     prisma.eventModule.findUnique({ where: { eventId_moduleKey: { eventId, moduleKey } }, select: { id: true } }),
     getTeacherRule(eventId),
@@ -66,8 +80,11 @@ export async function applyTeacherSettings(actor: TeacherSettingsActor, eventId:
     throw new ClubTeacherError("NOT_AVAILABLE", "That could not be found.");
   }
   const prisma = getPrisma();
-  const event = await prisma.event.findFirst({ where: { id: eventId, isPublished: true, archivedAt: null, audience: "CLUB" }, select: { id: true } });
-  if (!event) throw new ClubTeacherError("EVENT_NOT_FOUND", "That club event could not be found.");
+  await toolEvent(eventId, actor.kind);
+  // Blocking registrations is staff's choice (#1681): a coordinator can neither turn it on nor change it.
+  if (actor.kind === "area-coordinator" && input.rule?.requireTeachers === true) {
+    throw new ClubTeacherError("NOT_PERMITTED", "Only the Clubs Administrator or event staff can require teachers before a club registers.");
+  }
   const who = auditActor(teacherToolActor(actor));
   const title = eventModuleDefinition(moduleKey).title;
   const audit = (action: string, summary: string, extra: Record<string, string | number | boolean | null>) => ({
@@ -81,10 +98,13 @@ export async function applyTeacherSettings(actor: TeacherSettingsActor, eventId:
   });
   await prisma.$transaction(async (tx) => {
     if (input.rule) {
+      // A coordinator saves the numbers only; "require" keeps whatever staff set.
+      const { requireTeachers, ...numbers } = input.rule;
+      const data = actor.kind === "staff" ? { ...numbers, requireTeachers } : numbers;
       const saved = await tx.clubTeacherRule.upsert({
         where: { eventId },
-        create: { eventId, ...input.rule, ...(actor.kind === "staff" ? { updatedByUserId: actor.userId } : { updatedByAccountId: actor.accountId }) },
-        update: { ...input.rule, updatedByUserId: actor.kind === "staff" ? actor.userId : null, updatedByAccountId: actor.kind === "area-coordinator" ? actor.accountId : null },
+        create: { eventId, ...data, ...(actor.kind === "staff" ? { updatedByUserId: actor.userId } : { updatedByAccountId: actor.accountId }) },
+        update: { ...data, updatedByUserId: actor.kind === "staff" ? actor.userId : null, updatedByAccountId: actor.kind === "area-coordinator" ? actor.accountId : null },
       });
       const rule = ruleFromRow(saved);
       await writeAuditLog(audit("CLUB_TEACHER_RULE_SET", `Set the ${title} rule.`, { ...rule }), tx);
@@ -97,5 +117,5 @@ export async function applyTeacherSettings(actor: TeacherSettingsActor, eventId:
       if (removed.count > 0) await writeAuditLog(audit("EVENT_MODULE_DISABLED", `Turned off the ${title} module.`, {}), tx);
     }
   });
-  return loadTeacherToolState(eventId);
+  return loadTeacherToolState(eventId, actor.kind);
 }

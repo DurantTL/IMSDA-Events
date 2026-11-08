@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { formatPersonName } from "@/lib/person-name";
 import { getTeacherRule } from "@/modules/club-teachers/repository";
 import { teacherStatus, type TeacherRule, type TeacherStatus } from "@/modules/club-teachers/domain";
 
@@ -70,7 +71,7 @@ export async function loadTeacherSummary(eventId: string): Promise<TeacherSummar
       status: teacherStatus(rule ?? { baseTeachers: 0, largerClubOver: null, largerClubTeachers: 0, requireTeachers: false }, club.headcount, named.length),
       teachers: named
         .map((teacher) => ({
-          name: teacher.rosterMember.person ? `${teacher.rosterMember.person.lastName}, ${teacher.rosterMember.person.firstName}` : "Unnamed person",
+          name: formatPersonName(teacher.rosterMember.person ?? {}, "sorted") || "Unnamed person",
           honorName: teacher.honorName ?? "",
           // A teacher's own preference wins; otherwise the weekend the club registered for.
           siteId: siteName.has(teacher.locationId ?? "") ? teacher.locationId : siteName.has(club.locationId ?? "") ? club.locationId : null,

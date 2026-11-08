@@ -59,6 +59,7 @@ async function refused(run: () => Promise<unknown>, message: string, code?: stri
 
 async function cleanup() {
   const eventIds = [ids.event, ids.general, ids.other];
+  await prisma.eventMembership.deleteMany({ where: { eventId: { in: eventIds } } });
   await prisma.clubEventTeacher.deleteMany({ where: { eventId: { in: eventIds } } });
   await prisma.auditLog.deleteMany({ where: { eventId: { in: eventIds } } });
   await prisma.event.deleteMany({ where: { id: { in: eventIds } } });
@@ -114,6 +115,18 @@ async function main() {
   await refused(() => applyTeacherSettings(acActor, ids.general, { enabled: true }), "a general event is refused", "EVENT_NOT_FOUND");
   await refused(() => requireStaffTeacherToolAccess({ user: staff }, ids.event, findActiveMembership), "staff with no role on the event are refused", "EVENT_ACCESS_DENIED");
   await requireStaffTeacherToolAccess({ user: admin }, ids.event, findActiveMembership);
+  // A Registration Manager cannot switch it; an Event Admin can.
+  await prisma.eventMembership.create({ data: { eventId: ids.event, userId: ids.staff, role: "REGISTRATION_MANAGER" } });
+  await refused(() => requireStaffTeacherToolAccess({ user: staff }, ids.event, findActiveMembership), "a Registration Manager is refused", "PERMISSION_DENIED");
+  await prisma.eventMembership.update({ where: { eventId_userId: { eventId: ids.event, userId: ids.staff } }, data: { role: "EVENT_ADMIN" } });
+  await requireStaffTeacherToolAccess({ user: staff }, ids.event, findActiveMembership);
+  await prisma.eventMembership.delete({ where: { eventId_userId: { eventId: ids.event, userId: ids.staff } } });
+  // An unpublished club event: staff can set it up, a coordinator cannot see it.
+  await prisma.event.update({ where: { id: ids.other }, data: { isPublished: false } });
+  await refused(() => applyTeacherSettings(acActor, ids.other, { enabled: true }), "a coordinator cannot reach an unpublished event", "EVENT_NOT_FOUND");
+  assert((await applyTeacherSettings({ kind: "staff", userId: ids.admin }, ids.other, { enabled: true })).enabled, "staff can set up an unpublished club event");
+  await prisma.eventModule.deleteMany({ where: { eventId: ids.other } });
+  await prisma.event.update({ where: { id: ids.other }, data: { isPublished: true } });
   assert(await prisma.eventModule.count({ where: { eventId: { in: [ids.event, ids.general] } } }) === 0, "refused calls changed nothing");
 
   // An Area Coordinator turns it on: nothing changes for clubs until a rule is saved.
@@ -141,8 +154,14 @@ async function main() {
   assert(named && named.status.met && named.warning === null && named.teachers.length === 1, "one teacher meets the base number");
   await setClubTeachers(ids.clubB, ids.event, { accountId: ids.ac }, { teachers: [{ rosterMemberId: adultB.memberId, honorName: null, locationId: null }] });
 
+  // Require is staff's choice: a coordinator cannot turn it on, and saving the numbers leaves the stored value alone.
+  await refused(() => applyTeacherSettings(acActor, ids.event, { rule: { ...rule, requireTeachers: true } }), "a coordinator cannot require teachers", "NOT_PERMITTED");
+  assert(!(await prisma.clubTeacherRule.findUniqueOrThrow({ where: { eventId: ids.event } })).requireTeachers, "the refused call changed nothing");
+  await applyTeacherSettings({ kind: "staff", userId: ids.admin }, ids.event, { rule: { ...rule, requireTeachers: true } });
+  await applyTeacherSettings(acActor, ids.event, { rule: { ...rule, baseTeachers: 1, requireTeachers: false } });
+  assert((await prisma.clubTeacherRule.findUniqueOrThrow({ where: { eventId: ids.event } })).requireTeachers, "a coordinator saving the numbers keeps staff's require setting");
+
   // Require: below the number blocks at submit, and a bigger club needs more.
-  await applyTeacherSettings(acActor, ids.event, { rule: { ...rule, requireTeachers: true } });
   await assertTeachersMeetRule(ids.event, ids.clubA, 3);
   await refused(() => assertTeachersMeetRule(ids.event, ids.clubA, 4), "a club of four needs two teachers when require is on", "TEACHERS_REQUIRED");
   await setClubTeachers(ids.clubA, ids.event, { accountId: ids.ac }, { teachers: [{ rosterMemberId: adultA.memberId, honorName: "Knot Tying", locationId: ids.siteOne }, { rosterMemberId: staffA.memberId, honorName: null, locationId: ids.siteTwo }] });

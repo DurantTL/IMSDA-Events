@@ -8,3 +8,4 @@
 .check input { width: 24px; height: 24px; flex: none; }
 .help { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
 .panel button { min-height: 44px; }
+.error { color: var(--coral); font-weight: 600; }

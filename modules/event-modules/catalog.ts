@@ -157,8 +157,8 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
 
 /**
  * Modules an Area Coordinator may switch on or off for a club event they can see (#1681), besides the Clubs
- * Administrator and event staff. Every other module stays system administrator only (`service.ts`); this list is the
- * one place the narrower, scoped path (`modules/club-teachers/toggle.ts`) is allowed to act, so adding a module to it
+ * Administrator and event administrators. Such a tool is never asked for through the feature-request list. Every other module stays system administrator only (`service.ts`); this list is the
+ * one place the narrower, scoped path (`modules/club-teachers/settings.ts`) is allowed to act, so adding a module to it
  * is a deliberate decision, never a side effect of adding it to the catalog.
  */
 export const scopedToggleModuleKeys: readonly EventModuleKey[] = ["club-teachers"];

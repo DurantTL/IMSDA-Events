@@ -2,6 +2,8 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { logError } from "@/lib/logger";
+import { formatPersonName } from "@/lib/person-name";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { isModuleEnabled } from "@/modules/event-modules/service";
@@ -16,7 +18,7 @@ import {
 
 export class ClubTeacherError extends Error {
   constructor(
-    public readonly code: "NOT_AVAILABLE" | "MEMBER_INVALID" | "LOCATION_INVALID" | "TEACHERS_REQUIRED" | "EVENT_NOT_FOUND" | "NOT_A_CLUB_EVENT",
+    public readonly code: "NOT_AVAILABLE" | "MEMBER_INVALID" | "LOCATION_INVALID" | "TEACHERS_REQUIRED" | "NOT_PERMITTED" | "EVENT_NOT_FOUND" | "NOT_A_CLUB_EVENT",
     message: string,
   ) {
     super(message);
@@ -72,7 +74,7 @@ export type ClubTeacherStep = {
 };
 
 function personName(person: { firstName: string; lastName: string } | null): string {
-  return person ? `${person.lastName}, ${person.firstName}`.trim() : "Unnamed person";
+  return formatPersonName(person ?? {}, "sorted") || "Unnamed person";
 }
 
 async function clubEvent(eventId: string) {
@@ -127,6 +129,16 @@ export async function loadClubTeacherStep(organizationId: string, eventId: strin
     teachers,
     locations,
   };
+}
+
+/** The step for a registration page: a failed read hides the step and never the page. */
+export async function loadClubTeacherStepOrNull(organizationId: string, eventId: string): Promise<ClubTeacherStep | null> {
+  try {
+    return await loadClubTeacherStep(organizationId, eventId);
+  } catch (error) {
+    logError("Club teachers step read failed", error, { eventId });
+    return null;
+  }
 }
 
 /** Replaces the club's named teachers. Only the club's own active adults and staff, and only this event's own sites. */

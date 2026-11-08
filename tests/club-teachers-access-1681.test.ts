@@ -34,10 +34,17 @@ describe("club teachers access (#1681)", () => {
     expect(settings).toContain("viaAreaCoordinator");
   });
 
-  it("gives staff the same MANAGE_REGISTRATION check the other club tools use, and the browser request origin check", () => {
-    expect(settings).toContain('requirePermission(session, eventId, "MANAGE_REGISTRATION", lookup)');
+  it("gives staff the system administrator / Event Admin check (so a Registration Manager cannot), and the request origin check", () => {
+    expect(settings).toContain('access.membership?.role !== "EVENT_ADMIN"');
+    expect(settings).not.toContain("MANAGE_REGISTRATION");
     expect(staffRoute).toContain("rejectCrossOriginRequest");
     expect(acRoute).toContain("rejectCrossOriginRequest");
+  });
+
+  it("never lets a coordinator require teachers or change the stored value", () => {
+    expect(settings).toContain('input.rule?.requireTeachers === true');
+    expect(settings).toContain('"NOT_PERMITTED"');
+    expect(settings).toContain('actor.kind === "staff" ? { ...numbers, requireTeachers } : numbers');
   });
 
   it("blocks a registration only through the one check that does nothing unless the tool is on and set to require", () => {
