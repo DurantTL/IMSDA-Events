@@ -28,9 +28,6 @@ export function EventPointsByClub({ rows, clubYear }: { rows: readonly EventPoin
   if (rows.length === 0) return null;
   const sorted = sortRows(rows, sort.key, sort.dir, accessors);
   const slice = paginate(sorted, page, PAGE_SIZE);
-  const header = (column: Column, label: string) => (
-    <SortableHeader active={sort.key === column} direction={sort.dir} label={label} onSort={() => sort.toggle(column, column === "points" ? "desc" : "asc")} />
-  );
   return (
     <section aria-labelledby="event-points-heading" className={styles.section}>
       <h3 className={styles.heading} id="event-points-heading">Event points, {clubYear}</h3>
@@ -41,9 +38,9 @@ export function EventPointsByClub({ rows, clubYear }: { rows: readonly EventPoin
           <caption className="sr-only">Event points by club and event for {clubYear}</caption>
           <thead role="rowgroup">
             <tr role="row">
-              {header("club", "Club")}
-              {header("event", "Event")}
-              {header("points", "Points")}
+              <SortableHeader active={sort.key === "club"} direction={sort.dir} label="Club" onSort={() => sort.toggle("club", "club" === "points" ? "desc" : "asc")} />
+              <SortableHeader active={sort.key === "event"} direction={sort.dir} label="Event" onSort={() => sort.toggle("event", "event" === "points" ? "desc" : "asc")} />
+              <SortableHeader active={sort.key === "points"} direction={sort.dir} label="Points" onSort={() => sort.toggle("points", "points" === "points" ? "desc" : "asc")} />
             </tr>
           </thead>
           <tbody role="rowgroup">

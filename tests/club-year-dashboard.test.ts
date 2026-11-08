@@ -127,6 +127,7 @@ const reportYear = (reports: Array<{ reportMonth: string; status: string; totalP
     updatedAt: new Date().toISOString(),
   })),
   registrationOnTime: false,
+  eventPoints: { total: 0, awards: [] },
 });
 
 beforeEach(() => {
