@@ -141,7 +141,10 @@ async function loadSubjects(eventId: string): Promise<Subjects> {
     clubs.set(row.organizationId, { name: row.organization.name, wantsRibbons: wants });
     for (const attendee of row.registration.attendees) {
       const role = record(attendee.formResponses).attendee_type;
-      // Staff and children do not compete as Pathfinders.
+      // Who is offered as a "Pathfinder": every attendee on a club registration except those typed Staff or Child. That
+      // includes TLTs (teen leaders in training) and anyone whose registration form has no attendee type. Adults on staff
+      // and children are left out. A Pathfinder's score is tied to the registration attendee, so removing that attendee
+      // from the registration deletes their score (database cascade); the club's own scores are not affected.
       if (role === "Staff" || role === "Child") continue;
       people.set(attendee.id, { name: formatPersonName(attendee.person, "display") || "Unnamed person", organizationId: row.organizationId });
     }
@@ -332,6 +335,11 @@ async function saveScoredEvent(actor: CamporeeActor, eventId: string, input: Par
   const prisma = getPrisma();
   const normalizedName = normalizeScoredEventName(built.value.name);
   const published = await isPublished(eventId);
+  // Once results are published, a change to a scored event (its name, ribbon places or bands) changes what directors see:
+  // only those who may correct a score after publishing can make it. It is audited below like a score correction.
+  if (published && !scoringCapabilities(actor).canCorrectAfterPublish) {
+    throw new CamporeeScoringError("NOT_PERMITTED", "Results are published. Only the Clubs Administrator or event administrators can change a scored event now.");
+  }
   const data = {
     name: built.value.name,
     normalizedName,
@@ -344,7 +352,17 @@ async function saveScoredEvent(actor: CamporeeActor, eventId: string, input: Par
   };
   const clash = await prisma.camporeeScoredEvent.findFirst({ where: { eventId, normalizedName, ...(input.id ? { id: { not: input.id } } : {}) }, select: { id: true } });
   if (clash) throw new CamporeeScoringError("INVALID", "Another scored event already has that name.", "name");
-  await prisma.$transaction(async (tx) => {
+  try {
+    await writeScoredEvent(actor, eventId, input, data, published);
+  } catch (error) {
+    // Two saves with the same name at once: the unique index answers, and the person gets the same message as the check above.
+    if ((error as { code?: string }).code === "P2002") throw new CamporeeScoringError("INVALID", "Another scored event already has that name.", "name");
+    throw error;
+  }
+}
+
+async function writeScoredEvent(actor: CamporeeActor, eventId: string, input: { id?: string }, data: Omit<Prisma.CamporeeScoredEventUncheckedCreateInput, "eventId">, published: boolean) {
+  await getPrisma().$transaction(async (tx) => {
     if (input.id) {
       const existing = await tx.camporeeScoredEvent.findFirst({ where: { id: input.id, eventId }, select: { id: true, kind: true, unit: true, higherWins: true, _count: { select: { scores: true } } } });
       if (!existing) throw new CamporeeScoringError("NOT_FOUND", "That scored event could not be found.");

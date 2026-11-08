@@ -242,6 +242,12 @@ async function main() {
   // After publishing: only staff administrators correct, and it is audited with ids and numbers only.
   await refused(() => score(acActor, "Canoe race", ids.clubA, "55"), "a coordinator cannot correct after publishing", "NOT_PERMITTED");
   await refused(() => score(managerActor, "Canoe race", ids.clubA, "55"), "a Registration Manager cannot correct after publishing", "NOT_PERMITTED");
+  await refused(() => act(acActor, { action: "saveScoredEvent", scoredEvent: { ...events[1]!, id: idOf("Canoe race"), ribbonPlaces: 3 } }), "a coordinator cannot change a scored event after publishing", "NOT_PERMITTED");
+  await refused(() => act(managerActor, { action: "saveScoredEvent", scoredEvent: { ...events[1]!, id: idOf("Canoe race"), ribbonPlaces: 3 } }), "a Registration Manager cannot change a scored event after publishing", "NOT_PERMITTED");
+  await act(adminActor, { action: "saveScoredEvent", scoredEvent: { ...events[1]!, id: idOf("Canoe race"), ribbonPlaces: 3 } });
+  const changed = await prisma.auditLog.findMany({ where: { eventId: ids.event, action: "CAMPOREE_SCORED_EVENT_CHANGED" } });
+  assert(changed.length === 1 && (changed[0]!.metadata as { afterPublish?: boolean }).afterPublish === true, "an administrator's change after publishing is audited");
+  await act(adminActor, { action: "saveScoredEvent", scoredEvent: { ...events[1]!, id: idOf("Canoe race"), ribbonPlaces: 2 } });
   await score(adminActor, "Canoe race", ids.clubA, "40");
   await score(adminActor, "Canoe race", ids.clubA, "40");
   const corrections = await prisma.auditLog.findMany({ where: { eventId: ids.event, action: "CAMPOREE_SCORE_CORRECTED_AFTER_PUBLISH" } });

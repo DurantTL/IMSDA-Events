@@ -11382,7 +11382,8 @@ model CamporeeScoredEvent {
 }
 
 /// A club's or a Pathfinder's score in one scored event (#1676). A Pathfinder score points at the registration attendee, so
-/// a name is read from the registration and never copied here.
+/// a name is read from the registration and never copied here. Removing that attendee from the registration deletes their
+/// score (cascade); a club's own scores are not affected.
 model CamporeeScore {
   id                 String   @id @default(cuid())
   scoredEventId      String

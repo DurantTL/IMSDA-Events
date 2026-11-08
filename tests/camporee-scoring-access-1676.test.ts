@@ -46,6 +46,12 @@ describe("camporee scoring access (#1676)", () => {
     expect(service).toContain("CAMPOREE_SCORE_CORRECTED_AFTER_PUBLISH");
   });
 
+  it("refuses a scored-event change after publishing unless the caller may correct after publishing", () => {
+    expect(service).toContain("published && !scoringCapabilities(actor).canCorrectAfterPublish");
+    expect(service).toContain("can change a scored event now");
+    expect(service).toContain('"P2002"');
+  });
+
   it("writes no name to the audit log and reads a director's club from the verified portal access", () => {
     expect(service).toContain("Ids and numbers only");
     const page = read("app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx");

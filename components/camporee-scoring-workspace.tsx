@@ -1,8 +1,12 @@
 "use client";
 
+import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { CamporeeResultsView } from "@/components/camporee-results-view";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
+import { SearchClearButton } from "@/components/search-clear-button";
+import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
+import { useConfirm } from "@/components/use-confirm";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
@@ -52,7 +56,8 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
 
   const [scoredEventId, setScoredEventId] = useState(initial.scoredEvents[0]?.id ?? "");
   const [subjectId, setSubjectId] = useState("");
-  const [find, setFind] = useState("");
+  const find = useClientSearch();
+  const { confirm, confirmDialog } = useConfirm();
   const [value, setValue] = useState("");
   const [entryErrors, setEntryErrors] = useState<Record<string, string>>({});
   const { ref: entrySummaryRef, items: entrySummaryItems, show: showEntrySummary, clear: clearEntrySummary } = useFormErrorSummary();
@@ -179,14 +184,14 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
 
   const subjects = useMemo(() => {
     if (!selected) return [];
-    const needle = find.trim().toLowerCase();
+    const needle = find.term.trim().toLowerCase();
     if (selected.kind === "CLUB") {
       return state.clubs.filter((club) => !needle || club.name.toLowerCase().includes(needle)).map((club) => ({ id: club.organizationId, label: club.name }));
     }
     return state.people
       .filter((person) => !needle || person.name.toLowerCase().includes(needle) || person.clubName.toLowerCase().includes(needle))
       .map((person) => ({ id: person.attendeeId, label: `${person.name} (${person.clubName})` }));
-  }, [selected, state.clubs, state.people, find]);
+  }, [selected, state.clubs, state.people, find.term]);
 
   const entryFor = (eventId: string, subject: string) => state.entries.find((entry) => entry.scoredEventId === eventId && entry.subjectId === subject);
   const published = state.publishedAt !== null;
@@ -215,7 +220,7 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
     void send({ action: "saveScore", entry: { scoredEventId: selected.id, subjectId, value: value.trim() } }, "entry", "entry", "", () => {
       setSubjectId("");
       setValue("");
-      setFind("");
+      find.setValue("");
     });
   }
 
@@ -255,7 +260,10 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
                 <button
                   className={published ? "secondary-button" : "primary-button"}
                   disabled={busy !== null}
-                  onClick={() => send({ action: published ? "unpublish" : "publish" }, "publish", "publish", published ? "Results are hidden from clubs again." : "Directors can now see their club's results.")}
+                  onClick={async () => {
+                    if (published && !(await confirm({ title: "Take results back", body: "Club directors will no longer see their club's results until you publish again. Scores are kept.", confirmLabel: "Take results back", destructive: true }))) return;
+                    await send({ action: published ? "unpublish" : "publish" }, "publish", "publish", published ? "Results are hidden from clubs again." : "Directors can now see their club's results.");
+                  }}
                   type="button"
                 >
                   {busy === "publish" ? "Saving…" : published ? "Take results back" : "Publish results"}
@@ -280,10 +288,14 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
                       <span className={styles.muted}>{kindLabels[event.kind]} · {unitLabels[event.unit]} · {event.higherWins ? "Higher wins" : "Lower wins"}</span>
                       <span className={styles.muted}>{ribbonRuleSummary(event)}. {event.scoreCount} {event.scoreCount === 1 ? "score" : "scores"} entered.</span>
                     </span>
-                    {caps.canDefine && (
+                    {caps.canDefine && (!published || caps.canCorrectAfterPublish) && (
                       <span className={styles.actions}>
                         <button className="secondary-button" disabled={busy !== null} onClick={() => startDraft(editDraft(event.id)!)} type="button">Edit<span className="sr-only">: {event.name}</span></button>
-                        <button className="secondary-button" disabled={busy !== null || published} onClick={() => send({ action: "deleteScoredEvent", id: event.id }, "definition", `delete-${event.id}`, "Removed.", () => setScoredEventId((current) => (current === event.id ? "" : current)))} type="button">
+                        <button className="secondary-button" disabled={busy !== null || published} onClick={async () => {
+                          const scores = `${event.scoreCount} ${event.scoreCount === 1 ? "score" : "scores"}`;
+                          if (!(await confirm({ title: `Remove ${event.name}`, body: `This deletes the scored event and its ${scores}. This can't be undone.`, confirmLabel: `Remove ${event.name}`, destructive: true }))) return;
+                          await send({ action: "deleteScoredEvent", id: event.id }, "definition", `delete-${event.id}`, "Removed.", (next) => setScoredEventId((current) => (current === event.id ? next.scoredEvents[0]?.id ?? "" : current)));
+                        }} type="button">
                           {busy === `delete-${event.id}` ? "Saving…" : "Remove"}<span className="sr-only">: {event.name}</span>
                         </button>
                       </span>
@@ -293,7 +305,8 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
               </ul>
             )}
             {caps.canDefine && !draft && <div className={styles.actions}><button className="secondary-button" disabled={busy !== null} onClick={() => startDraft(blankDraft)} type="button">Add a scored event</button></div>}
-            {published && caps.canDefine && state.scoredEvents.length > 0 && <p className={styles.help}>To remove a scored event, take results back first.</p>}
+            {published && caps.canDefine && caps.canCorrectAfterPublish && state.scoredEvents.length > 0 && <p className={styles.help}>To remove a scored event, take results back first. Changes to a scored event after publishing are recorded in the audit log.</p>}
+            {published && caps.canDefine && !caps.canCorrectAfterPublish && <p className={styles.help}>Results are published, so only the Clubs Administrator or event staff can change a scored event now.</p>}
             {draft && (
               <form className={styles.form} noValidate onSubmit={saveDefinition}>
                 {definitionSummaryItems.length > 0 && <FormErrorSummary items={definitionSummaryItems} ref={definitionSummaryRef} />}
@@ -381,16 +394,21 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
                 {entrySummaryItems.length > 0 && <FormErrorSummary items={entrySummaryItems} ref={entrySummaryRef} />}
                 <label className={styles.field} htmlFor={fieldIds.event}>
                   Scored event
-                  <select disabled={busy !== null} id={fieldIds.event} onChange={(event) => { setScoredEventId(event.target.value); setSubjectId(""); setValue(""); setFind(""); setEntryErrors({}); clearEntrySummary(); }} value={scoredEventId}>
+                  <select disabled={busy !== null} id={fieldIds.event} onChange={(event) => { setScoredEventId(event.target.value); setSubjectId(""); setValue(""); find.setValue(""); setEntryErrors({}); clearEntrySummary(); }} value={scoredEventId}>
                     {state.scoredEvents.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}
                   </select>
                 </label>
                 {selected && (
                   <>
-                    <label className={styles.field} htmlFor="camporee-score-find">
-                      {selected.kind === "CLUB" ? "Find a club" : "Find a Pathfinder or club"}
-                      <input autoComplete="off" disabled={busy !== null} id="camporee-score-find" onChange={(event) => setFind(event.target.value)} type="search" value={find} />
-                    </label>
+                    <div>
+                      <label className="search-field">
+                        <Search aria-hidden="true" size={18} />
+                        <span className="sr-only">{selected.kind === "CLUB" ? "Find a club" : "Find a Pathfinder or club"}</span>
+                        <input {...find.inputProps} autoComplete="off" disabled={busy !== null} id="camporee-score-find" placeholder={selected.kind === "CLUB" ? "Find a club" : "Find a Pathfinder or club"} />
+                        <SearchClearButton onClear={() => find.setValue("")} visible={find.value !== ""} />
+                      </label>
+                      <SearchResultStatus message={`${subjects.length} ${subjects.length === 1 ? "match" : "matches"} listed.`} />
+                    </div>
                     <label className={styles.field} htmlFor={fieldIds.subject}>
                       {selected.kind === "CLUB" ? "Club" : "Pathfinder"}
                       <select aria-describedby={entryErrors[fieldIds.subject] ? `${fieldIds.subject}-error` : undefined} aria-invalid={entryErrors[fieldIds.subject] ? true : undefined} disabled={busy !== null} id={fieldIds.subject} onChange={(event) => pickSubject(event.target.value)} value={subjectId}>
@@ -408,7 +426,11 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
                     <div className={styles.actions}>
                       <button className="primary-button" disabled={busy !== null} type="submit">{busy === "entry" ? "Saving…" : "Save score"}</button>
                       {subjectId && entryFor(selected.id, subjectId) && (
-                        <button className="secondary-button" disabled={busy !== null} onClick={() => send({ action: "saveScore", entry: { scoredEventId: selected.id, subjectId, value: null } }, "entry", "remove", "Score removed.", () => { setSubjectId(""); setValue(""); })} type="button">
+                        <button className="secondary-button" disabled={busy !== null} onClick={async () => {
+                          const who = subjects.find((subject) => subject.id === subjectId)?.label ?? "this entry";
+                          if (!(await confirm({ title: "Remove this score", body: `This deletes the ${selected.name} score for ${who}.`, confirmLabel: "Remove this score", destructive: true }))) return;
+                          await send({ action: "saveScore", entry: { scoredEventId: selected.id, subjectId, value: null } }, "entry", "remove", "Score removed.", () => { setSubjectId(""); setValue(""); });
+                        }} type="button">
                           {busy === "remove" ? "Saving…" : "Remove this score"}
                         </button>
                       )}
@@ -424,6 +446,7 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
           <CamporeeResultsView results={state.results} />
         </>
       )}
+      {confirmDialog}
     </div>
   );
 }
