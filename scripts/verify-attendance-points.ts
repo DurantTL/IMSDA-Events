@@ -25,7 +25,8 @@ import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import type { AuthenticatedUser } from "@/modules/access/authorization";
 import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
-import { getClubReportYear } from "@/modules/club-reports/repository";
+import { yearToDate } from "@/modules/club-reports/domain";
+import { getClubReportYear, listClubReportsForYear } from "@/modules/club-reports/repository";
 import { loadClubEventPoints } from "@/modules/event-points/awards";
 import {
   AttendancePointsError,
@@ -220,7 +221,7 @@ async function main() {
   const acView = await view(ids.camporee, acActor);
   assert(acView.clubs.every((entry) => entry.people === null), "a coordinator sees no people");
   assert(!JSON.stringify(acView).includes("Pointsample") && !JSON.stringify(acView).includes("Ada"), "no name reaches a coordinator's view");
-  assert(acView.basis === "CHECK_IN" && acView.usesCheckIn, "the camporee is counted from check-in");
+  assert(acView.basis === "CHECK_IN" && acView.usesCheckIn && acView.checkedIn === 6, "the camporee is counted from check-in, and six check-ins were found");
   await refused(() => act(acActor, { action: "markChild", attendeeId: d.Fay!, marked: true }), "a coordinator cannot mark", "NOT_PERMITTED");
   await refused(() => act(acActor, { action: "override", organizationId: ids.clubB, outcome: "AWARD", reason: "Late arrival" }), "a coordinator cannot override", "NOT_PERMITTED");
   await refused(() => act(acActor, { action: "apply" }), "a coordinator cannot apply", "NOT_PERMITTED");
@@ -257,10 +258,16 @@ async function main() {
   assert(club(await view(), ids.clubA).earns && club(await view(), ids.clubA).override === null, "taking the override away lets the rules decide again");
   assert(await prisma.auditLog.count({ where: { eventId: ids.camporee, action: { in: ["ATTENDANCE_POINTS_OVERRIDE_SET", "ATTENDANCE_POINTS_OVERRIDE_REMOVED"] } } }) === 3, "each override change is audited");
 
-  // Apply: before the event starts is refused; after, staff apply once.
+  // A coordinator sees that staff decided, never the free-text reason; staff see it.
+  const acOverridden = club(await view(ids.camporee, acActor), ids.clubB);
+  assert(acOverridden.reason === "Staff awarded the points." && acOverridden.override?.reason === "" && !JSON.stringify(await view(ids.camporee, acActor)).includes("check-in closed"), "a coordinator does not see the override reason");
+  assert(club(await view(), ids.clubB).override?.reason.includes("check-in closed"), "staff see the override reason");
+
+  // Apply: before the event has ended is refused; after, staff apply once.
   await act(adminActor, { action: "switch", enabled: true }, ids.future);
   await act(adminActor, { action: "saveSettings", points: 300, requiresPathfinders: false }, ids.future);
-  await refused(() => act(adminActor, { action: "apply" }, ids.future), "nothing can be applied before the event starts", "INVALID");
+  await refused(() => act(adminActor, { action: "apply" }, ids.future), "nothing can be applied before the event has ended", "INVALID");
+  assert((await view(ids.future)).eventEnded === false && (await view(ids.camporee)).eventEnded, "the view says whether the event has ended");
   await act(adminActor, { action: "switch", enabled: false }, ids.future);
   const applied = await act(adminActor, { action: "apply" });
   assert(applied.appliedAt !== null, "an administrator applied the points");
@@ -280,11 +287,14 @@ async function main() {
   const summary = (await getAreaClubsSummary(CLUB_YEAR, new Date("2026-11-08T12:00:00Z"), { backgroundChecks: false })).filter((entry) => clubIds.includes(entry.id));
   const summaryA = summary.find((entry) => entry.id === ids.clubA)!;
   const summaryD = summary.find((entry) => entry.id === ids.clubD)!;
+  const yearRows = (await listClubReportsForYear(CLUB_YEAR)).filter((entry) => clubIds.includes(entry.id));
+  assert(yearRows.find((entry) => entry.id === ids.clubA)!.eventPoints === 1500 && yearRows.find((entry) => entry.id === ids.clubD)!.eventPoints === 0, "the Monthly Records grid carries the event points for Year to date");
+  assert(yearToDate(Object.values(yearRows.find((entry) => entry.id === ids.clubA)!.reports), false, 1500) === summaryA.totalPoints, "Year to date equals the points board total");
   assert(summaryA.eventPoints === 1500 && summaryA.totalPoints === 1500 && summaryA.reportPoints === 0, "the Area summary adds the event points to A's total and leaves report points alone");
   assert(summaryA.eventAwards.length === 1 && summaryA.eventAwards[0]!.eventName === "Points Spring Camporee" && summaryA.eventAwards[0]!.points === 1500, "the points board shows the event as the reason");
   assert(summaryD.eventPoints === 0 && summaryD.totalPoints === 0, "a club that earned nothing has nothing added");
   const directorYear = await getClubReportYear(ids.clubA, CLUB_YEAR);
-  assert(directorYear.eventPoints.total === 1500 && directorYear.eventPoints.awards[0]!.eventName === "Points Spring Camporee" && directorYear.reports.length === 0, "the director sees the event points for their own club only");
+  assert(directorYear.eventPoints.total === 1500 && directorYear.eventPoints.awards[0]!.eventName === "Points Spring Camporee" && directorYear.eventPoints.awards[0]!.eventId === ids.camporee && directorYear.reports.length === 0, "the director sees the event points for their own club only");
   assert((await getClubReportYear(ids.clubD, CLUB_YEAR)).eventPoints.total === 0, "another club's director sees none");
   assert(JSON.stringify(directorYear).includes("Pointsample") === false, "no person is named on the director's points");
 

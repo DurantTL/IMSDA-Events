@@ -17,6 +17,8 @@ import { EventPointsByClub } from "@/components/event-points-by-club";
 import { serverSort } from "@/lib/list-sort";
 import { areaPointsCsv, areaSummaryCsv, eventAwardRows, registrationPointsOf, summarizeClub } from "@/modules/club-reports/area-summary-domain";
 import { COORDINATOR_RANKING_DEFAULT_SORT, COORDINATOR_RANKING_SORT_COLUMNS, rankingFirstDirection } from "@/modules/club-reports/area-table-sort";
+import { ClubReportsConference } from "@/components/club-reports-conference";
+import { clubYearReportCsv } from "@/modules/club-reports/csv";
 import { yearToDate } from "@/modules/club-reports/domain";
 
 /**
@@ -30,7 +32,7 @@ const report = { reportMonth: "2026-09", status: "SUBMITTED" as const, totalPoin
 const input = (id: string, name: string, extra: Partial<Parameters<typeof summarizeClub>[0]> = {}) => ({
   id, name, church: "Sample Church", directors: [], rosterSize: 10, registrationOnTime: true, backgroundChecks: noChecks, reports: [report], ...extra,
 });
-const withEvents = summarizeClub(input("a", "Alpha Club", { attendancePoints: { total: 1700, awards: [{ eventName: "Sample Spring Camporee", points: 1500 }, { eventName: "Sample Leadership Weekend", points: 200 }] } }), "2026-27", now);
+const withEvents = summarizeClub(input("a", "Alpha Club", { attendancePoints: { total: 1700, awards: [{ eventId: "e1", eventName: "Sample Spring Camporee", points: 1500 }, { eventId: "e2", eventName: "Sample Leadership Weekend", points: 200 }] } }), "2026-27", now);
 const without = summarizeClub(input("b", "Beta Club"), "2026-27", now);
 
 describe("the club points total", () => {
@@ -51,9 +53,28 @@ describe("the club points total", () => {
 
   it("lists one row per club and event, with the event as the reason", () => {
     expect(eventAwardRows([withEvents, without])).toEqual([
-      { clubId: "a", clubName: "Alpha Club", eventName: "Sample Leadership Weekend", points: 200 },
-      { clubId: "a", clubName: "Alpha Club", eventName: "Sample Spring Camporee", points: 1500 },
+      { clubId: "a", clubName: "Alpha Club", eventId: "e2", eventName: "Sample Leadership Weekend", points: 200 },
+      { clubId: "a", clubName: "Alpha Club", eventId: "e1", eventName: "Sample Spring Camporee", points: 1500 },
     ]);
+  });
+});
+
+describe("Year to date matches the points boards", () => {
+  it("adds event points to the Monthly Records CSV's Year to date and not to its monthly or registration columns", () => {
+    const row = { name: "Alpha Club", church: "Sample Church", registrationOnTime: true, reports: { "2026-09": { totalPoints: 200, onTime: true } } };
+    const last = (csv: string) => csv.trim().split(/\r?\n/)[1]!.replaceAll('"', "").split(",");
+    const plain = last(clubYearReportCsv("2026-27", [row], now));
+    const events = last(clubYearReportCsv("2026-27", [{ ...row, eventPoints: 1700 }], now));
+    expect(Number(plain.at(-1))).toBe(1700);
+    expect(Number(events.at(-1))).toBe(3400);
+    expect(withEvents.totalPoints).toBe(3400);
+    expect(events[events.length - 3]).toBe("1500");
+  });
+
+  it("shows the same Year to date in the staff grid", () => {
+    const club = { id: "a", name: "Alpha Club", church: "", registrationOnTime: true, eventPoints: 1700, joinedOn: null, reports: { "2026-09": { totalPoints: 200, onTime: true, reviewed: false } } };
+    const html = renderToStaticMarkup(createElement(ClubReportsConference, { clubYear: "2026-27", initialClubs: [club], now: "2026-11-08T12:00:00Z" }));
+    expect(html).toContain("3,400");
   });
 });
 

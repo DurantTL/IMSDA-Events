@@ -300,7 +300,7 @@ export async function reopenClubReport(organizationId: string, reportMonth: stri
  */
 export async function listClubReportsForYear(clubYear: string) {
   const prisma = getPrisma();
-  const [clubs, reports, standings] = await Promise.all([
+  const [clubs, reports, standings, eventPoints] = await Promise.all([
     prisma.organization.findMany({
       where: { type: "CLUB", isActive: true },
       orderBy: { name: "asc" },
@@ -311,6 +311,8 @@ export async function listClubReportsForYear(clubYear: string) {
       select: { organizationId: true, reportMonth: true, totalPoints: true, onTimePoints: true, firstSubmittedAt: true, reviewedAt: true },
     }),
     prisma.clubYearStanding.findMany({ where: { clubYear }, select: { organizationId: true, registrationOnTime: true } }),
+    // Attendance points applied for events (#1677), so Year to date matches the points boards.
+    loadClubEventPoints(clubYear),
   ]);
   const onTimeByClub = new Map(standings.map((standing) => [standing.organizationId, standing.registrationOnTime]));
   return clubs.map((club) => ({
@@ -318,6 +320,8 @@ export async function listClubReportsForYear(clubYear: string) {
     name: club.name,
     church: club.parentOrganization?.name ?? "",
     registrationOnTime: onTimeByClub.get(club.id) ?? false,
+    /** Attendance points from events (#1677), part of Year to date. A count only. */
+    eventPoints: eventPoints.get(club.id)?.total ?? 0,
     /** The day it joined, for a club made through a new-club application; null otherwise. */
     joinedOn: clubJoinedOn(club),
     reports: Object.fromEntries(reports

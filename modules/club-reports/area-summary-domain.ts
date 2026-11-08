@@ -70,8 +70,8 @@ export type AreaClubSummary = {
 /** One row per club and event for the points board's "Event points" list (#1677), by club name then event. */
 export function eventAwardRows(clubs: ReadonlyArray<Pick<AreaClubSummary, "id" | "name" | "eventAwards">>) {
   return clubs
-    .flatMap((club) => club.eventAwards.map((award) => ({ clubId: club.id, clubName: club.name, eventName: award.eventName, points: award.points })))
-    .sort((a, b) => a.clubName.localeCompare(b.clubName) || a.eventName.localeCompare(b.eventName));
+    .flatMap((club) => club.eventAwards.map((award) => ({ clubId: club.id, clubName: club.name, eventId: award.eventId, eventName: award.eventName, points: award.points })))
+    .sort((a, b) => a.clubName.localeCompare(b.clubName) || a.eventName.localeCompare(b.eventName) || a.eventId.localeCompare(b.eventId));
 }
 
 /** The yearly registration points: what is left of the total after report points and event points. */

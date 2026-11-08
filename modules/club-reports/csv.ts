@@ -5,6 +5,8 @@ type ClubYearRow = {
   name: string;
   church: string;
   registrationOnTime: boolean;
+  /** Attendance points from events (#1677), part of Year to date; left out means none. */
+  eventPoints?: number;
   joinedOn?: string | null;
   reports: Record<string, { totalPoints: number; onTime: boolean }>;
 };
@@ -27,7 +29,7 @@ export function clubYearReportCsv(clubYear: string, clubs: readonly ClubYearRow[
       ...cells,
       club.registrationOnTime ? 1500 : 0,
       cells.filter((cell) => cell === "missing").length,
-      yearToDate(Object.values(club.reports), club.registrationOnTime),
+      yearToDate(Object.values(club.reports), club.registrationOnTime, club.eventPoints ?? 0),
     ]);
   }
   return toCsv(rows);

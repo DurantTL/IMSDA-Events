@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { formatPersonName } from "@/lib/person-name";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -7,6 +8,7 @@ import { clubYearFor } from "@/modules/club-rosters/domain";
 import {
   ATTENDANCE_POINTS_MAX,
   evaluateClub,
+  isDirectorRole,
   type ClubOverride,
   type PointsBasis,
   type PointsCapabilities,
@@ -170,7 +172,7 @@ async function loadClubPeople(eventId: string): Promise<ClubPeople[]> {
         id: attendee.id,
         name: formatPersonName(attendee.person, "display") || "Unnamed person",
         role: resolveRole(responses.attendee_type, member),
-        isDirector: Boolean(member && /director/i.test(member.role)),
+        isDirector: Boolean(member && isDirectorRole(member.role)),
         age: ageFrom(responses.attendee_age),
         checkedIn: attendee.checkIns.length > 0,
         marked: marked.has(attendee.id),
@@ -209,11 +211,13 @@ export type AttendancePointsView = {
   enabled: boolean;
   capabilities: PointsCapabilities;
   usesCheckIn: boolean;
+  /** People with an active check-in, for "Based on check-in (N checked in)". */
+  checkedIn: number;
   basis: PointsBasis;
   settings: { points: number; requiresPathfinders: boolean } | null;
   appliedAt: string | null;
-  /** False before the event starts: nothing can be applied yet. */
-  eventStarted: boolean;
+  /** False until the event has ended: nothing can be applied before then. */
+  eventEnded: boolean;
   clubs: ReviewClub[];
   totals: { clubsReviewed: number; clubsEarning: number; points: number };
 };
@@ -227,7 +231,7 @@ export async function loadAttendancePointsView(eventId: string, actor: Attendanc
     scopedModuleIsOn(eventId, moduleKey),
     prisma.attendancePointsSetting.findUnique({ where: { eventId } }),
     prisma.checkIn.count({ where: { eventId, undoneAt: null } }),
-    prisma.event.findUnique({ where: { id: eventId }, select: { startsAt: true } }),
+    prisma.event.findUnique({ where: { id: eventId }, select: { endsAt: true } }),
     prisma.attendancePointsOverride.findMany({ where: { eventId }, select: { organizationId: true, outcome: true, reason: true } }),
     prisma.clubEventPointAward.findMany({ where: { eventId }, select: { organizationId: true, points: true } }),
   ]);
@@ -238,10 +242,11 @@ export async function loadAttendancePointsView(eventId: string, actor: Attendanc
     enabled,
     capabilities,
     usesCheckIn,
+    checkedIn: checkIns,
     basis,
     settings: setting ? { points: setting.points, requiresPathfinders: setting.requiresPathfinders } : null,
     appliedAt: setting?.appliedAt?.toISOString() ?? null,
-    eventStarted: !eventRow || eventRow.startsAt <= now,
+    eventEnded: !eventRow || eventRow.endsAt <= now,
   };
   if (!setting) return { ...base, clubs: [], totals: { clubsReviewed: 0, clubsEarning: 0, points: 0 } };
 
@@ -261,10 +266,11 @@ export async function loadAttendancePointsView(eventId: string, actor: Attendanc
       pathfinders: verdict.pathfinders,
       computedEarns: verdict.computed.earns,
       computedReason: verdict.computed.reason,
-      override: verdict.override,
+      // A staff override's free-text reason is for staff: an Area Coordinator only sees that staff decided.
+      override: verdict.override && !capabilities.canSeeNames ? { outcome: verdict.override.outcome, reason: "" } : verdict.override,
       earns: verdict.earns,
       points: verdict.points,
-      reason: verdict.reason,
+      reason: verdict.override && !capabilities.canSeeNames ? `Staff ${verdict.override.outcome === "AWARD" ? "awarded" : "withheld"} the points.` : verdict.reason,
       appliedPoints: appliedByClub.get(club.organizationId) ?? null,
       people: capabilities.canSeeNames
         ? club.people.map((person) => {
@@ -313,6 +319,16 @@ function auditEntry(actor: AttendancePointsActor, eventId: string, action: strin
 }
 
 const lockedMessage = "These points are applied. Undo them first to change anything.";
+
+/**
+ * Inside a write's own transaction: refuses when the points are applied. The update takes a lock on the setting row, so an
+ * apply running at the same moment finishes first and this write then sees it (or this one finishes before the apply starts).
+ */
+async function assertNotAppliedIn(tx: Prisma.TransactionClient, eventId: string) {
+  await tx.attendancePointsSetting.updateMany({ where: { eventId, appliedAt: null }, data: { updatedAt: new Date() } });
+  const setting = await tx.attendancePointsSetting.findUnique({ where: { eventId }, select: { appliedAt: true } });
+  if (setting?.appliedAt) throw new AttendancePointsError("NOT_PERMITTED", lockedMessage);
+}
 
 /**
  * Applies one action and returns the new state. Each action checks who the caller is and what they may do, then the
@@ -374,6 +390,7 @@ async function saveSettings(actor: AttendancePointsActor, eventId: string, point
   const existing = await prisma.attendancePointsSetting.findUnique({ where: { eventId }, select: { points: true, requiresPathfinders: true } });
   if (existing && existing.points === points && existing.requiresPathfinders === requiresPathfinders) return;
   await prisma.$transaction(async (tx) => {
+    await assertNotAppliedIn(tx, eventId);
     await tx.attendancePointsSetting.upsert({ where: { eventId }, create: { eventId, points, requiresPathfinders }, update: { points, requiresPathfinders } });
     await writeAuditLog(auditEntry(actor, eventId, "ATTENDANCE_POINTS_SETTINGS_SAVED", "AttendancePointsSetting", eventId, "Saved the attendance points for the event.", {
       points,
@@ -396,6 +413,7 @@ async function markChild(actor: AttendancePointsActor, eventId: string, attendee
   if (marked === person.marked) return;
   const organizationId = people.find((club) => club.people.some((candidate) => candidate.id === attendeeId))!.organizationId;
   await prisma.$transaction(async (tx) => {
+    await assertNotAppliedIn(tx, eventId);
     if (marked) await tx.attendancePointsMark.create({ data: { eventId, attendeeId, setByUserId: actor.kind === "staff" ? actor.userId : null } });
     else await tx.attendancePointsMark.deleteMany({ where: { eventId, attendeeId } });
     await writeAuditLog(auditEntry(actor, eventId, marked ? "ATTENDANCE_POINTS_CHILD_MARKED" : "ATTENDANCE_POINTS_CHILD_UNMARKED", "AttendancePointsMark", attendeeId, marked ? "Marked a registered person as an Area Coordinator's child." : "Took the Area Coordinator's child mark off a registered person.", { attendeeId, organizationId }), tx);
@@ -415,6 +433,7 @@ async function setOverride(actor: AttendancePointsActor, eventId: string, organi
   if (outcome === null) {
     if (!existing) return;
     await prisma.$transaction(async (tx) => {
+      await assertNotAppliedIn(tx, eventId);
       await tx.attendancePointsOverride.deleteMany({ where: { eventId, organizationId } });
       await writeAuditLog(auditEntry(actor, eventId, "ATTENDANCE_POINTS_OVERRIDE_REMOVED", "AttendancePointsOverride", organizationId, "Took an attendance points override off a club.", { organizationId, before: existing.outcome }), tx);
     });
@@ -422,6 +441,7 @@ async function setOverride(actor: AttendancePointsActor, eventId: string, organi
   }
   if (existing && existing.outcome === outcome && existing.reason === reason.trim()) return;
   await prisma.$transaction(async (tx) => {
+    await assertNotAppliedIn(tx, eventId);
     await tx.attendancePointsOverride.upsert({
       where: { eventId_organizationId: { eventId, organizationId } },
       create: { eventId, organizationId, outcome, reason: reason.trim(), setByUserId: actor.kind === "staff" ? actor.userId : null },
@@ -436,17 +456,22 @@ async function applyPoints(actor: AttendancePointsActor, eventId: string) {
   const view = await loadAttendancePointsView(eventId, actor);
   if (!view.settings) throw new AttendancePointsError("INVALID", "Set the points first.");
   if (view.appliedAt) throw new AttendancePointsError("NOT_PERMITTED", "These points are already applied.");
-  if (!view.eventStarted) throw new AttendancePointsError("INVALID", "The event hasn't started yet. Apply the points after the event.");
+  if (!view.eventEnded) throw new AttendancePointsError("INVALID", "The event hasn't ended yet. Apply the points after the event.");
   const winners = view.clubs.filter((club) => club.earns);
   if (winners.length === 0) throw new AttendancePointsError("INVALID", "No club earned points, so there is nothing to apply. Override a club if one should.");
   const event = await getPrisma().event.findUniqueOrThrow({ where: { id: eventId }, select: { name: true, startsAt: true } });
   const clubYear = clubYearFor(event.startsAt);
   const userId = actor.kind === "staff" ? actor.userId : null;
-  const points = view.settings.points;
   await prisma.$transaction(async (tx) => {
-    // The guard row: only one apply wins when two run at once.
+    // The guard row: only one apply wins when two run at once. It also re-reads the points inside the transaction, so a
+    // save that landed after the review above can't be applied with the old value.
     const claimed = await tx.attendancePointsSetting.updateMany({ where: { eventId, appliedAt: null }, data: { appliedAt: new Date(), appliedByUserId: userId } });
     if (claimed.count === 0) throw new AttendancePointsError("NOT_PERMITTED", "These points are already applied.");
+    const current = await tx.attendancePointsSetting.findUniqueOrThrow({ where: { eventId }, select: { points: true, requiresPathfinders: true } });
+    if (current.points !== view.settings!.points || current.requiresPathfinders !== view.settings!.requiresPathfinders) {
+      throw new AttendancePointsError("INVALID", "The points changed while you were applying them. Review the clubs and try again.");
+    }
+    const points = current.points;
     await tx.clubEventPointAward.createMany({
       data: winners.map((club) => ({
         eventId,

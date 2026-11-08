@@ -1,4 +1,5 @@
 import { Trophy } from "lucide-react";
+import styles from "@/components/club-event-points.module.css";
 import type { ClubEventPoints } from "@/modules/event-points/domain";
 
 /**
@@ -13,10 +14,11 @@ export function ClubEventPointsList({ eventPoints, clubYear }: { eventPoints: Cl
         <p className="public-registration-eyebrow">Points for attending events</p>
         <h2 id="club-event-points-heading"><Trophy aria-hidden="true" size={20} /> Event points, {clubYear}</h2>
       </div>
-      <ul className="public-manage-club-list">
+      <ul className={styles.list}>
         {eventPoints.awards.map((award) => (
-          <li key={award.eventName}>
-            <span translate="no">{award.eventName}</span>: <strong>{award.points.toLocaleString("en-US")} points</strong>
+          <li className={styles.row} key={award.eventId}>
+            <span className={styles.event} translate="no">{award.eventName}</span>
+            <strong className={styles.points}>{award.points.toLocaleString("en-US")} points</strong>
           </li>
         ))}
       </ul>

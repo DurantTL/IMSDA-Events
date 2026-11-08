@@ -1,0 +1,4 @@
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.event { min-width: 0; overflow-wrap: anywhere; }
+.points { white-space: nowrap; }

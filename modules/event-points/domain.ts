@@ -14,10 +14,21 @@ import { z } from "zod";
 export const ATTENDANCE_POINTS_MAX = 100_000;
 
 export type PointsBasis = "CHECK_IN" | "REGISTRATION";
-export const basisLabels: Record<PointsBasis, string> = {
-  CHECK_IN: "Counted from check-in",
-  REGISTRATION: "Counted from registration (this event did not use check-in)",
-};
+/** How people were counted, in words. On the check-in basis it says how many check-ins were found. */
+export function basisText(basis: PointsBasis, checkedIn: number): string {
+  return basis === "CHECK_IN"
+    ? `Based on check-in (${checkedIn.toLocaleString("en-US")} checked in)`
+    : "Based on registration (this event did not use check-in)";
+}
+
+/**
+ * Roster roles that mean a director. The roster's role is free text with no option list, so only these exact values
+ * (ignoring case and spacing) count; "Director of music" or "Assistant to the director" do not.
+ */
+const directorRoles = new Set(["director", "club director", "deputy director", "deputy"]);
+export function isDirectorRole(role: string | null | undefined): boolean {
+  return directorRoles.has((role ?? "").trim().replace(/\s+/g, " ").toLowerCase());
+}
 
 export type PointsRole = "Pathfinder" | "TLT" | "Staff" | "Child";
 
@@ -195,4 +206,4 @@ export type PointsCapabilities = {
 };
 
 /** The points a club holds for events in a club year, with the event as the reason. Counts only, never people. */
-export type ClubEventPoints = { total: number; awards: Array<{ eventName: string; points: number }> };
+export type ClubEventPoints = { total: number; awards: Array<{ eventId: string; eventName: string; points: number }> };

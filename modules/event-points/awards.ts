@@ -11,13 +11,13 @@ export async function loadClubEventPoints(clubYear: string, organizationIds?: re
   const rows = await getPrisma().clubEventPointAward.findMany({
     where: { clubYear, ...(organizationIds ? { organizationId: { in: [...organizationIds] } } : {}) },
     orderBy: [{ appliedAt: "asc" }, { eventName: "asc" }],
-    select: { organizationId: true, eventName: true, points: true },
+    select: { organizationId: true, eventId: true, eventName: true, points: true },
   });
   const byClub = new Map<string, ClubEventPoints>();
   for (const row of rows) {
     const club = byClub.get(row.organizationId) ?? { total: 0, awards: [] };
     club.total += row.points;
-    club.awards.push({ eventName: row.eventName, points: row.points });
+    club.awards.push({ eventId: row.eventId, eventName: row.eventName, points: row.points });
     byClub.set(row.organizationId, club);
   }
   return byClub;

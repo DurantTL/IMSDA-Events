@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   attendancePointsActionSchema,
+  basisText,
   evaluateClub,
+  isDirectorRole,
   judgePeople,
   parsePointsText,
   type PointsPerson,
@@ -178,5 +180,17 @@ describe("the points typed and sent", () => {
     expect(attendancePointsActionSchema.safeParse({ action: "apply", organizationId: "c1" }).success).toBe(false);
     expect(attendancePointsActionSchema.safeParse({ action: "switch", enabled: true, moduleKey: "merchandise" }).success).toBe(false);
     expect(attendancePointsActionSchema.safeParse({ action: "publish" }).success).toBe(false);
+  });
+});
+
+describe("director roles and the basis words", () => {
+  it("matches only exact director roles on the roster, not any free text containing the word", () => {
+    for (const role of ["Director", " club  director ", "Deputy Director", "deputy"]) expect(isDirectorRole(role), role).toBe(true);
+    for (const role of ["Director of music", "Assistant to the director", "Directory", "", null, "Staff"]) expect(isDirectorRole(role), String(role)).toBe(false);
+  });
+
+  it("says how many check-ins were found on the check-in basis", () => {
+    expect(basisText("CHECK_IN", 1234)).toBe("Based on check-in (1,234 checked in)");
+    expect(basisText("REGISTRATION", 0)).toMatch(/registration/);
   });
 });
