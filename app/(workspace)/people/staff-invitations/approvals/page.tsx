@@ -47,6 +47,7 @@ export default async function StaffApprovalsPage({ searchParams }: { searchParam
         </div>
       </div>
       <StaffApprovalQueue counts={approvals.counts} eventId={event.id} rows={approvals.rows} />
+      <p className="quiet-copy"><Link href={`/people/review-queues?event=${encodeURIComponent(event.id)}`}>Back to Review queues</Link></p>
     </section>
   );
 }

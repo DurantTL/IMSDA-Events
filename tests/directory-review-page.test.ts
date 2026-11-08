@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RegistrationRecord } from "@/modules/registrations/repository";
+import { buildReviewQueuesView } from "@/modules/registrations/review-queues-model";
 
 const dependencies = vi.hoisted(() => ({
   resolveEventContext: vi.fn(),
@@ -53,7 +54,7 @@ describe("directory review page access (#482)", () => {
   });
 });
 
-describe("people workspace directory review link (#482)", () => {
+describe("people workspace directory review link (#482, #1574)", () => {
   const render = (canEdit: boolean) => renderToStaticMarkup(createElement(PeopleWorkspace, {
     eventId: "event-1",
     eventSlug: "synthetic-camporee",
@@ -64,8 +65,14 @@ describe("people workspace directory review link (#482)", () => {
     canEmail: false,
   }));
 
-  it("shows the link only with the permission the page itself requires", () => {
-    expect(render(true)).toContain("/people/directory-review?event=event-1");
-    expect(render(false)).not.toContain("/people/directory-review");
+  it("reaches the directory review through the one Review queues item, whose card keeps the page's own permission", () => {
+    for (const canEdit of [true, false]) {
+      const html = render(canEdit);
+      expect(html).toContain("/people/review-queues?event=event-1");
+      expect(html).not.toContain("/people/directory-review");
+    }
+    const card = (permissions: Array<"MANAGE_REGISTRATION" | "VIEW_SENSITIVE_DATA">) => buildReviewQueuesView({ permissions, audience: "GENERAL" }, "event-1", {}).groups.flatMap((group) => group.cards).map((entry) => entry.href);
+    expect(card(["MANAGE_REGISTRATION"])).toContain("/people/directory-review?event=event-1");
+    expect(card(["VIEW_SENSITIVE_DATA"])).not.toContain("/people/directory-review?event=event-1");
   });
 });

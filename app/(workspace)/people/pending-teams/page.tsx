@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { PendingTeamsReview } from "@/components/pending-teams-review";
@@ -52,6 +53,7 @@ export default async function PendingTeamsPage({ searchParams }: { searchParams:
       ) : (
         <PendingTeamsReview canAddClub={canAddClub} clubs={clubs} eventId={event.id} sponsors={sponsors} teams={teams} timeZone={event.timezone} />
       )}
+      <p className="quiet-copy"><Link href={`/people/review-queues?event=${encodeURIComponent(event.id)}`}>Back to Review queues</Link></p>
     </section>
   );
 }

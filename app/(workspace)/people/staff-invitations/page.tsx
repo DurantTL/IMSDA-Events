@@ -64,6 +64,7 @@ export default async function StaffInvitationsPage({ searchParams }: { searchPar
         total={list.total}
         totalAll={list.totalAll}
       />
+      <p className="quiet-copy"><Link href={`/people/review-queues?event=${encodeURIComponent(event.id)}`}>Back to Review queues</Link></p>
     </section>
   );
 }

@@ -126,21 +126,22 @@ describe("Registrations: search, then Start registration, then Actions", () => {
     expect(menuOf(render({ canEdit: true, canEmail: true, canReviewPeopleMatches: true }))).toContain('href="/people/matches"');
   });
 
-  it("groups exports, duplicates, directory review and bulk email under one Actions menu", () => {
+  it("groups exports, the review queues link and bulk email under one Actions menu", () => {
     const html = render({ canEdit: true, canEmail: true });
     const menu = html.slice(html.indexOf('class="actions-menu"'), html.indexOf("</details>", html.indexOf('class="actions-menu"')));
     expect(menu).toContain("Actions");
-    expect(menu).toContain("Find duplicates");
-    expect(menu).toContain("Directory review");
+    // The queues are cards on one page now (#1574), so the menu has one item for them.
+    expect(menu).toContain("Review queues");
+    expect(menu).toContain('href="/people/review-queues?event=');
+    for (const gone of ["Find duplicates", "Directory review", "Teams waiting for a club", "Staff invitations", "Responsible adults"]) expect(menu).not.toContain(gone);
     expect(menu).toContain("Download CSV");
     expect(menu).toContain("Email selected");
     // Nothing is ticked, so bulk email is present but cannot be used.
     expect(menu).toMatch(/<button[^>]*disabled[^>]*>[\s\S]*Email selected/);
     // None of those sit outside the menu any more.
     const outside = html.replace(menu, "");
-    expect(outside).not.toContain("Find duplicates");
+    expect(outside).not.toContain("Review queues");
     expect(outside).not.toContain("Download CSV");
-    expect(outside).not.toContain("Directory review");
   });
 
   it("leaves out what the viewer cannot use, and keeps the Actions menu for the exports", () => {
