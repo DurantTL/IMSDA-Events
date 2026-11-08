@@ -107,8 +107,8 @@ const menuRoutes: readonly Menu[] = [
   ["/imports", "Event", "More directory", "People & clubs", "Imports"],
   ["/staff", "Event", "More directory", "People & clubs", "Team"],
   ["/more/promo-codes", "Event", "More directory", "Sales & content", "Promo codes"],
-  // /more is a real page (Event modules and activity), not a redirect: the launcher trigger and the launcher footer open it.
-  ["/more", "Event", "Event sidebar", "Event tools", "More"],
+  // /more is the Event setup page (grouped cards, then module controls and activity), not a redirect: the Event setup tab, the launcher trigger and the launcher footer open it.
+  ["/more", "Event", "Event sidebar", "Event setup", "Event setup"],
   // More directory cards
   ["/more/honors", "Event", "More directory", "Event tools", "Honors Weekend classes"],
   ["/more/meals", "Event", "More directory", "Sales & content", "Meals"],
@@ -294,7 +294,7 @@ export const reachabilityContexts: readonly DestinationSearchContext[] = [
   { isSystemAdmin: false, selectedEventId: "event_synthetic", permissions: ["MANAGE_KITCHEN_COUNTS"], clubOversight: false, clubEvent: false, clubFormsAccess: false },
 ];
 
-/** Entry points that are not search destinations: the More page (Event modules and activity) opens from the launcher trigger and, for staff who are not system administrators, from the launcher footer. */
+/** Entry points that are not search destinations: the Event setup page (module controls and activity) opens from the launcher trigger and, for staff who are not system administrators, from the launcher footer. */
 export function launcherEntryPaths(): string[] {
   return launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, eventQuery: "" }).map((link) => pathOf(link.href));
 }

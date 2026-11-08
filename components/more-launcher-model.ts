@@ -108,7 +108,7 @@ export function launcherFooterLinks({
 }): LauncherFooterLink[] {
   const features: LauncherFooterLink = { key: "event-features", label: "Event features", href: `/more/features${eventQuery}` };
   if (isSystemAdmin) return [features];
-  const links: LauncherFooterLink[] = [features, { key: "event-modules", label: "Event modules and activity", href: `/more${eventQuery}` }];
+  const links: LauncherFooterLink[] = [features, { key: "event-modules", label: "Event setup and activity", href: `/more${eventQuery}` }];
   if (requestsEnabled && canRequestFeature) {
     links.push({ key: "request-feature", label: "Request a feature", href: `/more${eventQuery}#request-a-feature` });
   }

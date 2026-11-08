@@ -346,7 +346,7 @@ export function MoreLauncherPanel({
           onKeyDown={onConfirmKeyDown}
         >
           <h3 id="more-launcher-confirm-title">Turn off {eventModuleDefinition(confirming.moduleKey as Parameters<typeof eventModuleDefinition>[0]).title}?</h3>
-          <p id="more-launcher-confirm-body">Its pages and links are hidden for this event. The data is kept, and you can turn it back on from Event modules.</p>
+          <p id="more-launcher-confirm-body">Its pages and links are hidden for this event. The data is kept, and you can turn it back on from Event features.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="more-launcher-confirm-actions button-pair">
             <button className="secondary-button" type="button" ref={cancelRef} onClick={cancelConfirm} disabled={busy}>Cancel</button>
