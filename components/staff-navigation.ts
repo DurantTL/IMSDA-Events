@@ -157,6 +157,7 @@ export const staffPageTitles = {
   eventHealth: "Event health information",
   clubAssignments: "Club assignments",
   clubTeachers: "Club teachers",
+  camporeeScoring: "Camporee scoring",
   teamResults: "Team results",
   teamForm: "Team form",
   eventContent: "Public content",
@@ -210,6 +211,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/information-forms/responses", "prefix", staffPageTitles.formResponses],
   ["/more/club-assignments", "prefix", staffPageTitles.clubAssignments],
   ["/more/club-teachers", "prefix", staffPageTitles.clubTeachers],
+  ["/more/camporee-scoring", "prefix", staffPageTitles.camporeeScoring],
   ["/more/team-results", "prefix", staffPageTitles.teamResults],
   ["/more/event-health", "prefix", staffPageTitles.eventHealth],
   ["/more/event-content", "prefix", staffPageTitles.eventContent],
@@ -733,6 +735,7 @@ export function buildMoreDirectoryCards({
     },
     { key: "club-assignments", group: "people-access", allowed: clubEvent && canManageClubAssignments(permissions), href: `/more/club-assignments${eventQuery}`, icon: Tent, title: "Club assignments", description: "Set each registered club's campsite, duty, and activity, then email directors after review.", cta: "Assign clubs" },
     { key: "club-teachers", group: "people-access", allowed: clubEvent && clubOversight, href: `/more/club-teachers${eventQuery}`, icon: GraduationCap, title: "Club teachers", description: "Ask each club who is teaching, count teachers per weekend and club, and warn clubs below the number.", cta: "Open club teachers" },
+    { key: "camporee-scoring", group: "people-access", allowed: clubEvent && (clubOversight || has("MANAGE_REGISTRATION")), href: `/more/camporee-scoring${eventQuery}`, icon: Trophy, title: "Camporee scoring", description: "Enter scores for each camporee event, rank clubs and Pathfinders, list ribbons for clubs that asked, and publish results to directors.", cta: "Open camporee scoring" },
     { key: "event-patches", group: "setup", allowed: clubEvent && has("CONFIGURE_EVENT"), href: `/more/event-patches${eventQuery}`, icon: Trophy, title: "Event patches", description: "Link the patch or pin a club event gives, so directors are suggested it for every member who attended.", cta: "Link patches" },
     { key: "emergency-plans", group: "setup", allowed: has("VIEW_EVENT"), href: `/more/emergency-plan${eventQuery}`, icon: Siren, title: "Emergency plan", description: "Assembly locations, shelters, procedures, and escalation contacts, published in numbered versions and printable for paper.", cta: "Open emergency plan" },
     // Club forms (#610) belong to no event: system administrators, Clubs Administrators and Event Admins of a current event only.

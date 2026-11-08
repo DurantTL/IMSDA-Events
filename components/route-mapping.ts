@@ -122,6 +122,7 @@ const menuRoutes: readonly Menu[] = [
   ["/more/clubs", "Event", "More directory", "People & clubs", "This event's clubs"],
   ["/more/club-assignments", "Event", "More directory", "People & clubs", "Club assignments"],
   ["/more/club-teachers", "Event", "More directory", "People & clubs", "Club teachers"],
+  ["/more/camporee-scoring", "Event", "More directory", "People & clubs", "Camporee scoring"],
   ["/more/event-patches", "Event", "More directory", "Event tools", "Event patches"],
   ["/more/emergency-plan", "Event", "More directory", "Event tools", "Emergency plan"],
   ["/more/club-forms", "Event", "More directory", "People & clubs", "Club forms"],

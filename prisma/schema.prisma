@@ -1743,6 +1743,9 @@ model Event {
   id                   String             @id @default(cuid())
   clubTeacherRule      ClubTeacherRule?
   clubTeachers         ClubEventTeacher[]
+  camporeeScoredEvents CamporeeScoredEvent[]
+  camporeeScores       CamporeeScore[]
+  camporeeScoringState CamporeeScoringState?
   healthSnapshots      HealthRecordSnapshot[]
   healthSnapshotHolds  HealthSnapshotHold[]
   slug                 String             @unique
@@ -2707,6 +2710,7 @@ model UserPersonLink {
  */
 model Organization {
   clubEventTeachers ClubEventTeacher[]
+  camporeeScores    CamporeeScore[]
   clubOptionalFeatures ClubOptionalFeature[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
@@ -3634,6 +3638,7 @@ model RegistrationWaitlistEntry {
 model RegistrationAttendee {
   id              String   @id @default(cuid())
   teamPermission  ClubTeamMemberPermission?
+  camporeeScores  CamporeeScore[]
   eventId         String
   registrationId  String
   personId        String
@@ -11325,4 +11330,90 @@ model ClubEventTeacher {
 
   @@unique([eventId, organizationId, rosterMemberId])
   @@index([eventId, locationId])
+}
+
+/// Camporee scoring (#1676): what a scored event scores.
+enum CamporeeScoreKind {
+  /// One score per club (a relay, a campsite inspection).
+  CLUB
+  /// One place or score per Pathfinder (stilts, seed identification).
+  PATHFINDER
+}
+
+enum CamporeeScoreUnit {
+  POINTS
+  FEET
+  /// Stored as hundredths of a second.
+  TIME
+}
+
+enum CamporeeRibbonMode {
+  /// Ribbons for the first places (1st to `ribbonPlaces`), ties sharing a place.
+  PLACES
+  /// Ribbons by score band: each band is a label and the score that earns it.
+  BANDS
+}
+
+/// One scored event of a camporee, such as the canoe race or the telephone verse (#1676). Defined per event by whoever may
+/// switch the "camporee-scoring" module on. Turning the module off keeps this row and every score below.
+model CamporeeScoredEvent {
+  id             String             @id @default(cuid())
+  eventId        String
+  name           String
+  normalizedName String
+  kind           CamporeeScoreKind
+  unit           CamporeeScoreUnit  @default(POINTS)
+  /// True: the highest score wins. False: the lowest wins (a time, a golf-style count).
+  higherWins     Boolean            @default(true)
+  ribbonMode     CamporeeRibbonMode @default(PLACES)
+  /// PLACES mode: ribbons for 1st through this place (1 to 3).
+  ribbonPlaces   Int                @default(3)
+  /// BANDS mode: `[{ "label": "Blue", "thresholdHundredths": 9000 }, ...]`, best band first.
+  ribbonBands    Json               @default("[]")
+  sortOrder      Int                @default(0)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  event  Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  scores CamporeeScore[]
+
+  @@unique([eventId, normalizedName])
+  @@index([eventId, sortOrder])
+}
+
+/// A club's or a Pathfinder's score in one scored event (#1676). A Pathfinder score points at the registration attendee, so
+/// a name is read from the registration and never copied here.
+model CamporeeScore {
+  id                 String   @id @default(cuid())
+  scoredEventId      String
+  eventId            String
+  organizationId     String
+  /// The organization id for a club score, the registration attendee id for a Pathfinder score: one score per subject.
+  subjectId          String
+  attendeeId         String?
+  /// Points or feet times 100, or a time in hundredths of a second.
+  valueHundredths    Int
+  enteredByUserId    String?
+  enteredByAccountId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  scoredEvent  CamporeeScoredEvent   @relation(fields: [scoredEventId], references: [id], onDelete: Cascade)
+  event        Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  attendee     RegistrationAttendee? @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+
+  @@unique([scoredEventId, subjectId])
+  @@index([eventId, organizationId])
+}
+
+/// Whether the event's camporee results are published to club directors (#1676). Scores are corrected freely until then;
+/// a change after publishing is audited.
+model CamporeeScoringState {
+  eventId           String    @id
+  publishedAt       DateTime?
+  publishedByUserId String?
+  updatedAt         DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }

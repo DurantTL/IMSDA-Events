@@ -1,0 +1,25 @@
+.workspace { display: grid; gap: 22px; }
+.section { display: grid; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.state { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.heading { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.form { display: grid; gap: 14px; max-width: 560px; }
+.field { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.field input, .field select { min-height: 44px; width: 100%; font-size: 1rem; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.check input { width: 24px; height: 24px; flex: none; }
+.help { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.error { color: var(--coral); font-weight: 600; }
+.bands { display: grid; gap: 10px; }
+.band { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: start; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.item { border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.itemText { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.workspace button { min-height: 44px; }
+.entryValue { font-weight: 700; }
+@media (max-width: 560px) {
+  .band { grid-template-columns: 1fr; }
+  .actions > button { flex: 1 1 140px; }
+}

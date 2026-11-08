@@ -17,6 +17,7 @@ export const eventModuleKeys = [
   "public-content",
   "emergency-plans",
   "club-teachers",
+  "camporee-scoring",
 ] as const;
 
 export type EventModuleKey = (typeof eventModuleKeys)[number];
@@ -153,15 +154,27 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
     routes: ["/more/club-teachers", "/account/area-clubs/events"],
     features: ["club-teacher-step"],
   },
+  {
+    key: "camporee-scoring",
+    cardKey: "camporee-scoring",
+    title: "Camporee scoring",
+    description: "Enter scores for each camporee event, rank clubs and Pathfinders with ties, list ribbons for the clubs that asked for them, and publish results to club directors.",
+    appliesTo: "club-audience",
+    launcherGroup: "people-access",
+    alwaysOn: false,
+    offByDefault: true,
+    routes: ["/more/camporee-scoring", "/account/area-clubs/events"],
+    features: ["camporee-scoring-step"],
+  },
 ];
 
 /**
  * Modules an Area Coordinator may switch on or off for a club event they can see (#1681), besides the Clubs
  * Administrator and event administrators. Such a tool is never asked for through the feature-request list. Every other module stays system administrator only (`service.ts`); this list is the
- * one place the narrower, scoped path (`modules/club-teachers/settings.ts`) is allowed to act, so adding a module to it
+ * one place the narrower, scoped path (`modules/event-modules/scoped-toggle.ts`, used by Club teachers and Camporee scoring) is allowed to act, so adding a module to it
  * is a deliberate decision, never a side effect of adding it to the catalog.
  */
-export const scopedToggleModuleKeys: readonly EventModuleKey[] = ["club-teachers"];
+export const scopedToggleModuleKeys: readonly EventModuleKey[] = ["club-teachers", "camporee-scoring"];
 
 const definitionsByKey = new Map<string, EventModuleDefinition>(
   eventModuleCatalog.map((definition) => [definition.key, definition]),
