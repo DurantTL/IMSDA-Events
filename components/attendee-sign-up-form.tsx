@@ -35,9 +35,12 @@ import {
  */
 export function AttendeeSignUpForm({
   initialEmail = "",
+  invited = false,
   securityCheck = null,
 }: {
   initialEmail?: string;
+  /** Arrived from a club or Area Coordinator invite: the email help speaks to that. */
+  invited?: boolean;
   securityCheck?: SecurityCheckConfig;
 }) {
   const check = useRef<SecurityCheckHandle>(null);
@@ -201,8 +204,9 @@ export function AttendeeSignUpForm({
         />
       </label>
       <p className="field-help">
-        Use the address your registrations were made with. That is what connects them to your
-        account — nothing else does.
+        {invited
+          ? "Use the address your invite was sent to. That is what connects the invite to your account."
+          : "Use the address your registrations were made with. That is what connects them to your account — nothing else does."}
       </p>
       <label>
         Password

@@ -94,8 +94,18 @@ export type ClubInviteRecord = Awaited<ReturnType<typeof listClubInvites>>[numbe
  * account's own verified email matching the invite, not by anything the link
  * carries, so nothing here is a secret to protect.
  */
-export function clubInviteSignUpUrl(email: string) {
+/** Which invite a sign-up link came from; the sign-up page words itself for that person. */
+export type SignUpInviteKind = "club" | "area";
+
+/** The sign-up page's `invite` parameter, or null for anything else. */
+export function signUpInviteKind(value: unknown): SignUpInviteKind | null {
+  return value === "club" || value === "area" ? value : null;
+}
+
+export function clubInviteSignUpUrl(email: string, invite: SignUpInviteKind | null = null) {
   const url = new URL("/account/sign-up", getServerEnv().APP_BASE_URL);
+  // Not a secret: it only switches the sign-up page's wording to the invited person's (`signUpInviteKind`).
+  if (invite) url.searchParams.set("invite", invite);
   url.hash = `email=${encodeURIComponent(email.trim().toLowerCase())}`;
   return url.toString();
 }
@@ -126,7 +136,7 @@ function inviteSource(value: string): ClubInviteSource {
   return value === "CLUB" || value === "APPLICATION" || value === "PEOPLE" ? value : "IMPORT";
 }
 
-function inviteEmail(rawInput: {
+export function clubInviteEmailContent(rawInput: {
   name: string;
   email: string;
   clubName: string;
@@ -138,7 +148,8 @@ function inviteEmail(rawInput: {
   const input = rawInput.source === "APPLICATION" || rawInput.source === "PEOPLE"
     ? { ...rawInput, name: neutralizePlaceholders(rawInput.name), clubName: neutralizePlaceholders(rawInput.clubName) }
     : rawInput;
-  const signUpUrl = clubInviteSignUpUrl(input.email);
+  const signUpUrl = clubInviteSignUpUrl(input.email, "club");
+  const signInUrl = new URL("/account/sign-in", getServerEnv().APP_BASE_URL).toString();
   const role = clubDirectorRoleLabels[input.role].toLocaleLowerCase("en-US");
   const invitedBy = input.source === "CLUB"
     ? `${input.clubName}'s director or deputy has invited you as the club's ${role} on IMAdventist.`
@@ -147,9 +158,17 @@ function inviteEmail(rawInput: {
       : input.source === "PEOPLE"
         ? `The Iowa-Missouri Conference has invited you as ${input.clubName}'s ${role} on IMAdventist.`
         : `The Iowa-Missouri Conference has set up ${input.clubName} on IMAdventist and invited you as the club's ${role}.`;
-  const context = input.source !== "IMPORT"
-    ? "Once you accept, you'll see this club under My club when you sign in."
-    : "Your club's roster from this year's registration is already there. Please add each person's birth date as you go; until then they're marked \"birth date needed\".";
+  // What this role does first, in the words of the club pages (Roster, Club events, Monthly Records).
+  const firstSteps = input.role === "REPORTER"
+    ? ["- Open Monthly Records to fill in and submit the club's report each month."]
+    : input.role === "REGISTRAR"
+      ? ["- Open Roster to add new members, and Club events to choose who is going to each event."]
+      : input.source === "IMPORT"
+        ? [
+          "- Open Roster and look it over. It came from this year's club registration.",
+          "- Add each person's birth date and gender. Anyone still missing details is listed under \"Details needed\".",
+        ]
+        : ["- Open Roster to check your members, and Club events to register for events."];
   // Club-created (#425) and application (#817) invites expire; a staff import invite (reusing this flow, #376) never did.
   const expiryLine = input.source !== "IMPORT" ? [`This invite expires in ${CLUB_INVITE_LIFETIME_DAYS} days.`, ""] : [];
   return {
@@ -158,16 +177,29 @@ function inviteEmail(rawInput: {
       `Hello ${input.name.trim() || "there"},`,
       "",
       invitedBy,
+      "IMAdventist is where your club keeps its roster and registers for conference events.",
+      "",
+      "Setting up takes about 10 minutes. Keep this email open and your phone nearby.",
       "",
       "To accept:",
-      `1. New to IMAdventist? Create your account at ${signUpUrl}`,
-      `   Already have one? Sign in at ${new URL("/account/sign-in", getServerEnv().APP_BASE_URL).toString()}`,
-      `2. Use this email address: ${input.email}`,
-      "3. On your account page, choose Accept next to the club invite.",
+      `1. Create your account: ${signUpUrl}`,
+      `   Use this email address: ${input.email}. Your invite is tied to it.`,
+      "   Your password needs at least 14 characters. A short sentence works well.",
+      "2. Type in the six-digit code we email you. It works for 20 minutes, in the same browser where you signed up.",
+      "3. On your account page, find \"You're invited to manage a club\" and choose Accept.",
+      "4. Turn on two-step sign-in when asked. Club pages hold young people's records, so it's required.",
+      "   We recommend \"This phone or computer\": you confirm it's you with your fingerprint, face or PIN instead of typing a code.",
       "",
-      context,
+      `Already have an IMAdventist account? Sign in at ${signInUrl} with this email address, then do steps 3 and 4.`,
+      "If you're asked for an emailed code, choose Send a new code.",
+      "",
+      "What to do first:",
+      ...firstSteps,
+      "- Help guides with pictures are under Help on your account page.",
       "",
       ...expiryLine,
+      "Questions? Ask your Area Coordinator, or contact the Iowa-Missouri Conference youth department.",
+      "",
       "If you weren't expecting this, you can ignore it. Nothing happens unless you accept.",
       "",
       "IMAdventist",
@@ -201,7 +233,7 @@ export async function sendClubInvites(
   const correlationId = randomUUID();
   const messageIds: string[] = [];
   for (const invite of invites) {
-    const content = inviteEmail({
+    const content = clubInviteEmailContent({
       name: invite.name,
       email: invite.email,
       clubName: invite.organization.name,
@@ -337,7 +369,7 @@ export async function createClubTeamInvite(
   if (open) throw new ClubInviteError("INVITE_ALREADY_OPEN", "There's already a pending invite for that email.");
 
   const name = input.name?.trim() ?? "";
-  const content = inviteEmail({ name, email, clubName: club.name, role: input.role, source: "CLUB" });
+  const content = clubInviteEmailContent({ name, email, clubName: club.name, role: input.role, source: "CLUB" });
   const correlationId = randomUUID();
 
   return prisma.$transaction(async (tx) => {
@@ -400,7 +432,7 @@ export async function createApplicationDirectorInvite(
     select: { id: true },
   });
   if (!canSend) return { inviteId: invite.id, messageId: null as string | null };
-  const content = inviteEmail({ name, email, clubName: input.clubName, role: "DIRECTOR", source: "APPLICATION" });
+  const content = clubInviteEmailContent({ name, email, clubName: input.clubName, role: "DIRECTOR", source: "APPLICATION" });
   const messageId = await queueClubInviteMessage(tx, { id: invite.id, email, name }, content);
   await tx.clubInvite.update({ where: { id: invite.id }, data: { lastMessageId: messageId } });
   return { inviteId: invite.id, messageId: messageId as string | null };
@@ -451,7 +483,7 @@ export async function createPeopleClubInvite(
   });
   let messageId: string | null = null;
   if (canSend) {
-    const content = inviteEmail({ name, email, clubName: input.clubName, role: input.role, source: "PEOPLE" });
+    const content = clubInviteEmailContent({ name, email, clubName: input.clubName, role: input.role, source: "PEOPLE" });
     messageId = await queueClubInviteMessage(tx, { id: invite.id, email, name }, content);
     await tx.clubInvite.update({ where: { id: invite.id }, data: { lastMessageId: messageId } });
   }
@@ -502,7 +534,7 @@ export async function resendClubTeamInvite(organizationId: string, inviteId: str
       throw new ClubInviteError("INVITE_RESEND_TOO_SOON", `Wait at least ${CLUB_INVITE_RESEND_COOLDOWN_MINUTES} minutes between resends.`);
     }
 
-    const content = inviteEmail({ name: invite.name, email: invite.email, clubName: invite.organization.name, role: invite.role, source: "CLUB" });
+    const content = clubInviteEmailContent({ name: invite.name, email: invite.email, clubName: invite.organization.name, role: invite.role, source: "CLUB" });
 
     const guarded = await tx.clubInvite.updateMany({
       where: { id: invite.id, status: { in: [...OPEN_INVITE_STATUSES] } },

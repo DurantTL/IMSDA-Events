@@ -411,10 +411,14 @@ async function spendVerificationRecord(
   });
   if (!claimed) return { outcome: "rejected" };
 
+  // The code just typed back was emailed to this address and is bound to this browser's
+  // pending sign-up: the same proof as the emailed sign-in code, so this session has passed
+  // that step. A new director or Area Coordinator who accepts an invite right after signing up
+  // then goes straight to two-step setup instead of being asked for a second code.
   return {
     outcome: "verified",
     accountId: record.accountId,
-    session: await createAttendeeSession(record.accountId, userAgent),
+    session: await createAttendeeSession(record.accountId, userAgent, { emailCodeVerifiedAt: now }),
   };
 }
 

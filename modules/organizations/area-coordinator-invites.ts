@@ -47,21 +47,37 @@ const OPEN_STATUSES = ["PENDING", "SENT"] as const;
 
 function inviteEmailContent(rawInput: { name: string; email: string }) {
   const name = neutralizePlaceholders(rawInput.name.trim());
-  const signUpUrl = clubInviteSignUpUrl(rawInput.email);
+  const signUpUrl = clubInviteSignUpUrl(rawInput.email, "area");
+  const signInUrl = new URL("/account/sign-in", getServerEnv().APP_BASE_URL).toString();
   return {
     subject: "You're invited to be an Area Coordinator on IMAdventist",
     bodyText: [
       `Hello ${name || "there"},`,
       "",
-      "The Iowa-Missouri Conference has invited you as an Area Coordinator on IMAdventist. Area Coordinators see every club, view only (ages, not birth dates).",
+      "The Iowa-Missouri Conference has invited you as an Area Coordinator on IMAdventist, where clubs keep their rosters and register for conference events.",
+      "",
+      "Setting up takes about 10 minutes. Keep this email open and your phone nearby.",
       "",
       "To accept:",
-      `1. New to IMAdventist? Create your account at ${signUpUrl}`,
-      `   Already have one? Sign in at ${new URL("/account/sign-in", getServerEnv().APP_BASE_URL).toString()}`,
-      `2. Use this email address: ${rawInput.email}`,
-      "3. On your account page, choose Accept next to the Area Coordinator invite.",
+      `1. Create your account: ${signUpUrl}`,
+      `   Use this email address: ${rawInput.email}. Your invite is tied to it.`,
+      "   Your password needs at least 14 characters. A short sentence works well.",
+      "2. Type in the six-digit code we email you. It works for 20 minutes, in the same browser where you signed up.",
+      "3. On your account page, find \"You're invited to be an Area Coordinator\" and choose Accept.",
+      "4. Turn on two-step sign-in when asked. Club pages hold young people's records, so it's required.",
+      "   We recommend \"This phone or computer\": you confirm it's you with your fingerprint, face or PIN instead of typing a code.",
+      "",
+      `Already have an IMAdventist account? Sign in at ${signInUrl} with this email address, then do steps 3 and 4.`,
+      "If you're asked for an emailed code, choose Send a new code.",
+      "",
+      "What you'll see:",
+      "- Club coordination: every club, view only, with ages but not birth dates.",
+      "- Each club's Monthly Records, points and club event registrations, all in one place.",
+      "- Help guides with pictures are under Help on your account page.",
       "",
       `This invite expires in ${CLUB_INVITE_LIFETIME_DAYS} days.`,
+      "",
+      "Questions? Contact the Iowa-Missouri Conference youth department.",
       "",
       "If you weren't expecting this, you can ignore it. Nothing happens unless you accept.",
       "",
