@@ -29,8 +29,14 @@ import {
   clubRosterAttendeeTypeLabels,
   clubRosterGenderLabels,
   clubRosterStatusLabels,
+  clubChurchMemberLabels,
+  clubSchoolGradeLabels,
+  clubSchoolGrades,
+  clubSchoolTypeLabels,
+  CHURCH_MEMBER_LABEL,
   defaultRosterRole,
   rosterSectionOf,
+  schoolGradeOrder,
 } from "@/modules/club-rosters/domain";
 import {
   GUARDIAN_SLOTS,
@@ -46,6 +52,7 @@ import {
   applyRosterFilters,
   clearedRosterFilters,
   ROSTER_DETAILS_NEEDED_FILTER,
+  ROSTER_NO_GRADE_FILTER,
   rosterColumns,
   rosterDetailsNeededItems,
   rosterDetailsSummary,
@@ -69,7 +76,7 @@ type RosterResponse = {
 };
 
 /** Every column of the roster except Actions sorts (#1458); the sort lives in the address as `?sort=&dir=`, name A to Z by default. */
-const ROSTER_SORT_COLUMNS = ["name", "age", "birthDate", "type", "class", "details", "gender", "screening"] as const;
+const ROSTER_SORT_COLUMNS = ["name", "age", "birthDate", "type", "class", "grade", "details", "gender", "school", "churchMember", "screening"] as const;
 type RosterSortColumn = typeof ROSTER_SORT_COLUMNS[number];
 const ROSTER_DEFAULT_SORT: SortState<RosterSortColumn> = { key: "name", dir: "asc" };
 /** Whether the address names the name column (or no column), so its direction is the name direction. */
@@ -80,8 +87,11 @@ const rosterSortLabels: Record<RosterSortColumn, { label: string; kind: SortKind
   birthDate: { label: "birth date", kind: "date" },
   type: { label: "type", kind: "text" },
   class: { label: "current class", kind: "text" },
+  grade: { label: "grade", kind: "number" },
   details: { label: "details needed", kind: "number" },
   gender: { label: "gender", kind: "text" },
+  school: { label: "school", kind: "text" },
+  churchMember: { label: "Seventh-day Adventist church membership", kind: "text" },
   screening: { label: "Sterling Volunteers status", kind: "text" },
 };
 
@@ -145,7 +155,14 @@ function ClubRosterWorkspaceInner({
   guardians: initialGuardians,
   guardiansOnly = false,
   sectionsStartClosed = false,
+  schoolDetails = false,
 }: {
+  /**
+   * School type and church membership (#1668): true only where the caller loaded them, which is the club's own roster
+   * (director, deputy, registrar) and the system administrator's Open club page. Area Coordinators and event managers
+   * never get it, so nothing about either field is rendered for them.
+   */
+  schoolDetails?: boolean;
   /** Directors and deputies only; a registrar enters birth dates but sees ages (#375). */
   canSeeBirthDates: boolean;
   clubYear: string;
@@ -237,6 +254,10 @@ function ClubRosterWorkspaceInner({
   const [detailsRaw, setDetailsRaw] = useAddressParam("filter", detailsNeededFirst ? ROSTER_DETAILS_NEEDED_FILTER : "");
   const detailsOnly = detailsRaw === ROSTER_DETAILS_NEEDED_FILTER;
   const [showGender, setShowGender] = useState(false);
+  const [showSchool, setShowSchool] = useState(false);
+  /** The grade filter (#1664) lives in the address too (`?grade=`). */
+  const [gradeRaw, setGradeRaw] = useAddressParam("grade", "");
+  const gradeFilter = gradeRaw === ROSTER_NO_GRADE_FILTER || Object.hasOwn(clubSchoolGradeLabels, gradeRaw) ? gradeRaw : "";
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   /** The request never reached the server (blocked, offline): the list on screen may be out of date, so offer Reload (#1445). */
@@ -388,21 +409,24 @@ function ClubRosterWorkspaceInner({
   const { visible, needDetailsCount } = applyRosterFilters(population, {
     query,
     detailsOnly,
+    grade: gradeFilter,
     keepForCompliance: complianceFilter && complianceStatuses
       ? (member) => complianceStatuses[member.id]?.state === complianceFilterState[complianceFilter]
       : null,
   });
-  const filtersActive = query.trim() !== "" || detailsOnly || complianceFilterOn;
+  const filtersActive = query.trim() !== "" || detailsOnly || complianceFilterOn || gradeFilter !== "";
   // The shared count wording (rule B1, #1458); the filters in force follow it.
   const countText = pagerText({ from: visible.length ? 1 : 0, to: visible.length, total: population.length }, "people", "person");
-  const resultText = `${countText}${detailsOnly ? ", Details needed" : ""}${query.trim() ? `, name contains ${query.trim()}` : ""}`;
+  const gradeFilterText = gradeFilter === ROSTER_NO_GRADE_FILTER ? "No grade given" : gradeFilter ? clubSchoolGradeLabels[gradeFilter as keyof typeof clubSchoolGradeLabels] : "";
+  const resultText = `${countText}${detailsOnly ? ", Details needed" : ""}${gradeFilterText ? `, ${gradeFilterText}` : ""}${query.trim() ? `, name contains ${query.trim()}` : ""}`;
   function clearFilters() {
     const cleared = clearedRosterFilters();
     // One history entry for the whole clearing, so Back brings every filter back; the address no longer says what the page is not showing.
-    writeAddressParams({ q: null, filter: null, compliance: null }, "push");
+    writeAddressParams({ q: null, filter: null, compliance: null, grade: null }, "push");
     search.setValue(cleared.query);
     setDetailsRaw("");
     setComplianceRaw("");
+    setGradeRaw(cleared.grade);
   }
   /** Each person's accessible name: just the name, or the name with what tells two people of that name apart. */
   const personLabels = rosterPersonLabels(members, {
@@ -413,6 +437,7 @@ function ClubRosterWorkspaceInner({
   const columns = rosterColumns({
     birthDatesShown: Boolean(birthDates),
     showGender,
+    showSchool: schoolDetails && showSchool,
     hasScreening: Boolean(complianceStatuses),
     hasRowActions: !readOnly || canEditGuardians || showHonors,
   });
@@ -426,8 +451,11 @@ function ClubRosterWorkspaceInner({
     birthDate: (member) => birthDates?.[member.id],
     type: (member) => clubRosterAttendeeTypeLabels[member.attendeeType],
     class: (member) => (member.classLevel ? clubClassLevelLabels[member.classLevel] : null),
+    grade: (member) => schoolGradeOrder(member.schoolGrade),
     details: (member) => rosterDetailsNeededItems(member).length,
     gender: (member) => (member.gender ? clubRosterGenderLabels[member.gender] : null),
+    school: (member) => (member.schoolType ? clubSchoolTypeLabels[member.schoolType] : null),
+    churchMember: (member) => (member.churchMember ? clubChurchMemberLabels[member.churchMember] : null),
     screening: (member) => (complianceStatuses?.[member.id] ? complianceLabel(complianceStatuses[member.id]!) : null),
   };
   const sortPeople = (people: RosterMemberRecord[]) => {
@@ -454,7 +482,7 @@ function ClubRosterWorkspaceInner({
   savedChoices.split("|").forEach((value, index) => {
     if (value === "open" || value === "closed") remembered[index === 0 ? "STAFF" : "MEMBERS"] = value === "open";
   });
-  const filterSignature = `${query}|${detailsOnly}|${complianceFilter ?? ""}`;
+  const filterSignature = `${query}|${detailsOnly}|${complianceFilter ?? ""}|${gradeFilter}`;
   const [filterChoice, setFilterChoice] = useState<{ signature: string; open: Partial<Record<SectionKey, boolean>> }>({ signature: "", open: {} });
   const [hashOpen, setHashOpen] = useState<SectionKey[]>([]);
   const sectionOfPerson = useRef(new Map<string, SectionKey>());
@@ -553,7 +581,7 @@ function ClubRosterWorkspaceInner({
     const stillShown = Boolean(next)
       && (showInactive || next!.status === "ACTIVE")
       && (!complianceFilter || !complianceStatuses || complianceStatuses[member.id]?.state === complianceFilterState[complianceFilter])
-      && applyRosterFilters([next!], { query, detailsOnly, keepForCompliance: null }).visible.length === 1;
+      && applyRosterFilters([next!], { query, detailsOnly, grade: gradeFilter, keepForCompliance: null }).visible.length === 1;
     if (stillShown) return;
     focusRequest.current = { id: member.id, order: renderedOrder };
     setFocusTick((tick) => tick + 1);
@@ -660,6 +688,11 @@ function ClubRosterWorkspaceInner({
       attendeeType,
       role: String(form.get("role") ?? ""),
       classLevel: String(form.get("classLevel") ?? "") || null,
+      // Grade, school type and church membership (#1664, #1668) are a Pathfinder's own; the fields are only shown for Youth.
+      ...(attendeeType === "YOUTH" ? { schoolGrade: String(form.get("schoolGrade") ?? "") || null } : {}),
+      ...(attendeeType === "YOUTH" && schoolDetails
+        ? { schoolType: String(form.get("schoolType") ?? "") || null, churchMember: String(form.get("churchMember") ?? "") || null }
+        : {}),
       gender: String(form.get("gender") ?? "") || null,
       ...(guardianSlots ? { guardians: guardianSlots } : {}),
     };
@@ -849,11 +882,29 @@ function ClubRosterWorkspaceInner({
               >
                 Show gender
               </button>
+              {schoolDetails && (
+                <button
+                  aria-pressed={showSchool}
+                  className={`secondary-button ${styles.rosterFilterButton}`}
+                  onClick={() => setShowSchool((current) => !current)}
+                  type="button"
+                >
+                  Show school details
+                </button>
+              )}
             </div>
           </div>
           <p className="field-help" id="roster-details-help">
-            Details needed lists people missing a gender, current class, role or type. Each row says what to add.
+            Details needed lists people missing a gender, current class, grade, role or type. Each row says what to add.
           </p>
+          <div className={styles.rosterGradeFilter}>
+            <label htmlFor="roster-grade-filter">Grade</label>
+            <select id="roster-grade-filter" onChange={(event) => setGradeRaw(event.target.value)} value={gradeFilter}>
+              <option value="">All grades</option>
+              {clubSchoolGrades.map((grade) => <option key={grade} value={grade}>{clubSchoolGradeLabels[grade]}</option>)}
+              <option value={ROSTER_NO_GRADE_FILTER}>No grade given</option>
+            </select>
+          </div>
           <div className={styles.rosterResultLine}>
             <p id="roster-result-text" tabIndex={-1}>
               {countText}
@@ -953,6 +1004,9 @@ function ClubRosterWorkspaceInner({
                               case "birthDate": return <SortableHeader active={activeSort.key === "birthDate"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Birth date" onSort={() => rosterSort.toggle("birthDate")} />;
                               case "type": return <SortableHeader active={activeSort.key === "type"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Type" onSort={() => rosterSort.toggle("type")} />;
                               case "class": return <SortableHeader active={activeSort.key === "class"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Current class" onSort={() => rosterSort.toggle("class")} />;
+                              case "grade": return <SortableHeader active={activeSort.key === "grade"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Grade" onSort={() => rosterSort.toggle("grade")} />;
+                              case "school": return <SortableHeader active={activeSort.key === "school"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="School" onSort={() => rosterSort.toggle("school")} />;
+                              case "churchMember": return <SortableHeader active={activeSort.key === "churchMember"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label={CHURCH_MEMBER_LABEL} onSort={() => rosterSort.toggle("churchMember")} />;
                               case "details": return <SortableHeader active={activeSort.key === "details"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Details" onSort={() => rosterSort.toggle("details")} />;
                               case "gender": return <SortableHeader active={activeSort.key === "gender"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Gender" onSort={() => rosterSort.toggle("gender")} />;
                               case "screening": return <SortableHeader active={activeSort.key === "screening"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Sterling Volunteers" onSort={() => rosterSort.toggle("screening")} />;
@@ -1022,6 +1076,9 @@ function ClubRosterWorkspaceInner({
                                 case "birthDate": return <td {...cardCell("Birth date")} key={column} translate="no">{birthDates?.[member.id] ?? "—"}</td>;
                                 case "type": return <td {...cardCell("Type")} key={column}>{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>;
                                 case "class": return <td {...cardCell("Current class")} key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : "—"}</td>;
+                                case "grade": return <td {...cardCell("Grade")} key={column}>{member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "—"}</td>;
+                                case "school": return <td {...cardCell("School")} key={column}>{member.schoolType ? clubSchoolTypeLabels[member.schoolType] : "—"}</td>;
+                                case "churchMember": return <td {...cardCell(CHURCH_MEMBER_LABEL)} key={column}>{member.churchMember ? clubChurchMemberLabels[member.churchMember] : "—"}</td>;
                                 case "details": return (
                                   <td {...cardCell("Details")} className="roster-card-flags" key={column}>
                                     {/* The flex layout lives on this wrapper: a td that is itself flex stops being a table cell and drifts out of line (#435). */}
@@ -1195,6 +1252,33 @@ function ClubRosterWorkspaceInner({
               ))}
             </select>
           </label>
+          {formType === "YOUTH" && (
+            <label>
+              Grade
+              <select defaultValue={editing?.schoolGrade ?? ""} name="schoolGrade">
+                <option value="">Not given</option>
+                {clubSchoolGrades.map((grade) => <option key={grade} value={grade}>{clubSchoolGradeLabels[grade]}</option>)}
+              </select>
+            </label>
+          )}
+          {formType === "YOUTH" && schoolDetails && (
+            <>
+              <label>
+                School
+                <select defaultValue={editing?.schoolType ?? ""} name="schoolType">
+                  <option value="">Not given</option>
+                  {Object.entries(clubSchoolTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <label>
+                {CHURCH_MEMBER_LABEL}
+                <select defaultValue={editing?.churchMember ?? ""} name="churchMember">
+                  <option value="">Not given</option>
+                  {Object.entries(clubChurchMemberLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+            </>
+          )}
           <label>
             Role (optional)
             {/* Left blank, youth save as "Pathfinder"; staff and adults stay blank (#424). */}

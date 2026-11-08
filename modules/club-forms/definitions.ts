@@ -45,6 +45,13 @@ export type ClubFormTemplateSeed = {
   /** Birth-date fields: sensitive, and readable only by the club's leaders and system administrators. */
   birthDateFieldKeys: string[];
   staffOnlyFieldKeys: string[];
+  /**
+   * School type and church membership answers (#1668): readable only by the club's own director and deputy and by
+   * system administrators. Not "sensitive" (they must stay mappable to the roster), but restricted like it for every
+   * other viewer (`restrictedFieldKeys`) and left out of the staff CSV unless the viewer is a system administrator.
+   * Read from the code's seed by template key, so a copy edited in the app keeps the restriction.
+   */
+  schoolDetailFieldKeys?: string[];
   printLayout: "STANDARD" | "PASSENGER_LIST";
   /**
    * The pre-filled "Add to roster" mapping (#721), always off here: an
@@ -106,7 +113,8 @@ const membershipApplication: ClubFormTemplateSeed = {
   key: "pathfinder_membership_application",
   name: "Pathfinder Club Membership Application",
   description: "An applicant's membership application with the parent or guardian's approval, waiver and signatures.",
-  version: 3,
+  // v4 (#1664, #1668): optional School type and church membership questions; grade, school type and church membership also copy to the roster.
+  version: 4,
   sortOrder: 10,
   fillMode: "FAMILY",
   printLayout: "STANDARD",
@@ -116,7 +124,16 @@ const membershipApplication: ClubFormTemplateSeed = {
   rosterMapping: {
     enabled: false,
     rosterType: "YOUTH",
-    fields: { fullName: "full_name", birthDate: "birth_date", gender: "gender", classLevel: "ay_class" },
+    fields: {
+      fullName: "full_name",
+      birthDate: "birth_date",
+      gender: "gender",
+      classLevel: "ay_class",
+      // v4: the form's 5th to 12th grade answers map to the roster's grade; the two new questions are optional.
+      schoolGrade: "grade",
+      schoolType: "school_type",
+      churchMember: "church_member",
+    },
     guardians: [
       { name: "father_guardian_signature", relationshipLabel: "Father or guardian", phone: "phone" },
       { name: "mother_guardian_signature", relationshipLabel: "Mother or guardian" },
@@ -124,6 +141,7 @@ const membershipApplication: ClubFormTemplateSeed = {
   },
   sensitiveFieldKeys: ["birth_date"],
   birthDateFieldKeys: ["birth_date"],
+  schoolDetailFieldKeys: ["school_type", "church_member"],
   // v2 (#719): the fee amounts are entered by the club, so a private-link filler never sees them. Signing dates fill in automatically in the same version.
   staffOnlyFieldKeys: ["registration_fee", "club_dues", "insurance_fee"],
   sectionNotes: {
@@ -165,8 +183,10 @@ const membershipApplication: ClubFormTemplateSeed = {
         text("zip", "ZIP", true),
         text("school", "School"),
         field("grade", "Grade", "SELECT", true, { options: ["5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th"] }),
+        field("school_type", "School type", "SELECT", false, { options: ["Adventist school", "Public school", "Homeschool", "Other"] }),
         churchField(true),
         churchOther(),
+        field("church_member", "Is the Pathfinder a member of the Seventh-day Adventist church?", "RADIO", false, { options: ["Yes", "No", "Not sure"] }),
         yesNo("been_pathfinder", "I have been a Pathfinder", true),
         text("been_pathfinder_where", "Where?", false, whenYes("been_pathfinder")),
         yesNo("dad_master_guide", "Dad is a Master Guide"),

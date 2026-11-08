@@ -99,7 +99,7 @@ describe("who may see a submission with no club (#1229)", () => {
     expect(viewerCanRevealSensitive(staff, null)).toBe(true);
     expect(viewerCanRevealBirthDates(staff, null)).toBe(false);
     expect(viewerCanRevealBirthDates(admin, null)).toBe(true);
-    const keys = { sensitiveFieldKeys: ["health", "dob"], birthDateFieldKeys: ["dob"] };
+    const keys = { key: "a_form", sensitiveFieldKeys: ["health", "dob"], birthDateFieldKeys: ["dob"] };
     expect(restrictedFieldKeys(leader, null, keys).sort()).toEqual(["dob", "health"]);
   });
 

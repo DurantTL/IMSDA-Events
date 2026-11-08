@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Prisma } from "@prisma/client";
+import type { ClubRosterChurchMember, ClubRosterSchoolGrade, ClubRosterSchoolType, Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { lockClubOrders } from "@/modules/club-orders/repository";
@@ -53,6 +53,9 @@ const memberSelect = {
   attendeeType: true,
   role: true,
   classLevel: true,
+  schoolGrade: true,
+  schoolType: true,
+  churchMember: true,
   reportedAge: true,
   gender: true,
   sealedBirthDate: true,
@@ -69,7 +72,8 @@ function ageFrom(member: StoredMember, onDate: string) {
   return member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), onDate) : null;
 }
 
-function serializeMember(member: StoredMember, today: string) {
+/** `includeSchoolDetails` (#1668): school type and church membership go only to the club's leaders and system administrators, never Area Coordinators or event managers. Left out, the keys are absent, not null. */
+function serializeMember(member: StoredMember, today: string, includeSchoolDetails = false) {
   return {
     id: member.id,
     /** Links a row to the member's class history (#791). */
@@ -79,6 +83,9 @@ function serializeMember(member: StoredMember, today: string) {
     attendeeType: member.attendeeType,
     role: member.role,
     classLevel: member.classLevel,
+    /** School grade (#1664): shown wherever the class level is. */
+    schoolGrade: member.schoolGrade,
+    ...(includeSchoolDetails ? { schoolType: member.schoolType, churchMember: member.churchMember } : {}),
     gender: member.gender,
     status: member.status,
     source: member.source,
@@ -91,7 +98,14 @@ function serializeMember(member: StoredMember, today: string) {
 }
 
 /** `personId` is optional so records built without it (fixtures, older callers) still fit; the class history link needs it. */
-export type RosterMemberRecord = Omit<ReturnType<typeof serializeMember>, "personId"> & { personId?: string | null };
+export type RosterMemberRecord = Omit<ReturnType<typeof serializeMember>, "personId" | "schoolGrade" | "schoolType" | "churchMember"> & {
+  personId?: string | null;
+  /** Optional on the type so older fixtures still fit; `listRoster` always sets it. */
+  schoolGrade?: ClubRosterSchoolGrade | null;
+  /** Present only for a viewer allowed to see it (#1668). */
+  schoolType?: ClubRosterSchoolType | null;
+  churchMember?: ClubRosterChurchMember | null;
+};
 
 function audit(
   tx: Prisma.TransactionClient,
@@ -121,14 +135,14 @@ function nameKey(firstName: string, lastName: string) {
 }
 
 /** Everyone on the club's roster for the year except removed rows, sorted by name. */
-export async function listRoster(organizationId: string, clubYear: string, now = new Date()) {
+export async function listRoster(organizationId: string, clubYear: string, now = new Date(), options: { includeSchoolDetails?: boolean } = {}) {
   const members = await getPrisma().clubRosterMember.findMany({
     where: { organizationId, clubYear, status: { not: "REMOVED" } },
     select: memberSelect,
   });
   const today = calendarDateOf(now);
   return members
-    .map((member) => serializeMember(member, today))
+    .map((member) => serializeMember(member, today, options.includeSchoolDetails === true))
     .sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName) || a.id.localeCompare(b.id));
 }
 
@@ -246,6 +260,10 @@ export async function addRosterMemberInTransaction(
       attendeeType: input.attendeeType,
       role: input.role,
       classLevel: input.classLevel,
+      // Grade, school type and church membership (#1664, #1668) belong to a youth member only.
+      ...(input.attendeeType === "YOUTH"
+        ? { schoolGrade: input.schoolGrade ?? null, schoolType: input.schoolType ?? null, churchMember: input.churchMember ?? null }
+        : {}),
       gender: input.gender,
       sealedBirthDate: sealBirthDate(input.birthDate),
       source: options.source ?? "DIRECTOR",
@@ -337,12 +355,21 @@ export async function updateRosterMember(
     if ((input.firstName !== undefined || input.lastName !== undefined) && member.personId) {
       await tx.person.update({ where: { id: member.personId }, data: { firstName, lastName } });
     }
+    // Grade, school type and church membership (#1664, #1668) are a youth's own: a member who is not (or is
+    // no longer) youth keeps none of them, so moving someone to staff clears what the roster held.
+    const schoolInput = { schoolGrade: input.schoolGrade, schoolType: input.schoolType, churchMember: input.churchMember };
+    const schoolChanges: Prisma.ClubRosterMemberUncheckedUpdateInput = finalType === "YOUTH"
+      ? Object.fromEntries(Object.entries(schoolInput).filter(([, value]) => value !== undefined))
+      : typeChanged || Object.values(schoolInput).some((value) => value !== undefined)
+        ? { schoolGrade: null, schoolType: null, churchMember: null }
+        : {};
     await tx.clubRosterMember.update({
       where: { id: memberId },
       data: {
         ...(input.attendeeType === undefined ? {} : { attendeeType: input.attendeeType }),
         ...(role === undefined ? {} : { role }),
         ...(input.classLevel === undefined ? {} : { classLevel: input.classLevel }),
+        ...schoolChanges,
         ...(input.gender === undefined ? {} : { gender: input.gender }),
         ...(input.status === undefined ? {} : { status: input.status }),
         ...(input.birthDate === undefined ? {} : { sealedBirthDate: sealBirthDate(input.birthDate), reportedAge: null }),
@@ -373,7 +400,7 @@ export async function updateRosterMember(
 
 /**
  * Erases one roster row the way ADR 0005 Addendum A section 6 requires:
- * birth date, gender, role, class, reported age, the person link, and
+ * birth date, gender, role, class, school grade, school type, church membership, reported age, the person link, and
  * any leftover willing-to-drive flag (unused since #544) all go, and the row is marked removed. Shared by a club
  * removing someone (`removeRosterMember`) and a completed transfer (#489)
  * leaving its sending row behind, so the two can never drift apart. Clearing
@@ -408,6 +435,10 @@ export async function eraseRosterRow(tx: Prisma.TransactionClient, memberId: str
       gender: null,
       role: "",
       classLevel: null,
+      // School grade, school type and church membership (#1664, #1668) are erased with the rest.
+      schoolGrade: null,
+      schoolType: null,
+      churchMember: null,
       reportedAge: null,
       personId: null,
       // The column is unused since #544; an erased row never keeps a leftover value.

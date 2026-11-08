@@ -119,7 +119,7 @@ describe("which club year a roster shows (#541)", () => {
 describe("the club roster page's ?year= view (#541)", () => {
   it("an old year offers no edit, import, remove, birth-date, or transfer control", async () => {
     const { html, elements, workspace } = await renderPage("2025-26");
-    expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2025-26");
+    expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2025-26", expect.any(Date), { includeSchoolDetails: true });
     expect(workspace).toMatchObject({ clubYear: "2025-26", readOnly: true, canSeeBirthDates: false, headingActions: undefined, honorsPopup: { canRecord: false } });
     expect(elements.some((element) => element.type === ClubTransfersPanel)).toBe(false);
 
@@ -138,7 +138,7 @@ describe("the club roster page's ?year= view (#541)", () => {
 
   it("the current year keeps every control", async () => {
     const { html, workspace } = await renderPage();
-    expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2026-27");
+    expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2026-27", expect.any(Date), { includeSchoolDetails: true });
     expect(workspace).toMatchObject({ clubYear: "2026-27", readOnly: false, canSeeBirthDates: true });
     expect(html).toContain("Add to roster");
     expect(html).toMatch(/aria-label="Edit Robin Fixture"/);
@@ -151,7 +151,7 @@ describe("the club roster page's ?year= view (#541)", () => {
 
   it("an invalid year falls back to the current, editable year", async () => {
     const { workspace } = await renderPage("1999-00");
-    expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2026-27");
+    expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2026-27", expect.any(Date), { includeSchoolDetails: true });
     expect(workspace).toMatchObject({ clubYear: "2026-27", readOnly: false });
   });
 });

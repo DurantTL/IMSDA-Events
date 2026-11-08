@@ -1,6 +1,7 @@
 import { liveJson } from "@/lib/live-list-response";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
+import { rosterSchoolDetailsVisible } from "@/modules/club-rosters/school-details-access";
 import { readRosterJson, rosterApiError } from "@/modules/club-rosters/api-errors";
 import { contactsRosterYear } from "@/modules/club-rosters/domain";
 import { requireGuardianEditor, rosterGuardiansForAccess } from "@/modules/club-rosters/guardians-access";
@@ -11,12 +12,12 @@ import { withRequestContext } from "@/lib/request-context";
 
 type RouteContext = { params: Promise<{ organizationId: string; memberId: string }> };
 
-async function roster(access: Parameters<typeof rosterGuardiansForAccess>[0], organizationId: string, request: Request) {
+async function roster(access: Parameters<typeof rosterGuardiansForAccess>[0] & Parameters<typeof rosterSchoolDetailsVisible>[0], organizationId: string, request: Request) {
   // The current year, or next year when `?year=` names it (#959): the contacts screen on next year's roster.
   const clubYear = contactsRosterYear(new URL(request.url).searchParams.get("year"));
   // Guardian contacts (#510) ride along for a director or deputy only.
   const guardians = await rosterGuardiansForAccess(access, organizationId, clubYear);
-  return { clubYear, members: await listRoster(organizationId, clubYear), ...(guardians ? { guardians } : {}) };
+  return { clubYear, members: await listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: rosterSchoolDetailsVisible(access) }), ...(guardians ? { guardians } : {}) };
 }
 
 async function patchHandler(request: Request, context: RouteContext) {

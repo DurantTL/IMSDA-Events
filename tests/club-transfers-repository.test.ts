@@ -238,7 +238,7 @@ describe("completing a transfer", () => {
     db.memberTransfer.findFirst.mockResolvedValue(null);
     db.clubRosterMember.findUnique.mockResolvedValue({
       id: "row-ada", organizationId: "club-a", clubYear: "2026-27", personId: "person-ada", attendeeType: "YOUTH", role: "Pathfinder",
-      classLevel: "FRIEND", reportedAge: null, gender: "FEMALE", sealedBirthDate: "v1.sealed", willingToDrive: false, status: "ACTIVE",
+      classLevel: "FRIEND", schoolGrade: "GRADE_6", schoolType: "HOMESCHOOL", churchMember: "YES", reportedAge: null, gender: "FEMALE", sealedBirthDate: "v1.sealed", willingToDrive: false, status: "ACTIVE",
     });
     db.clubRosterMember.findFirst.mockResolvedValue(null);
     db.clubRosterMember.create.mockResolvedValue({ id: "row-new" });
@@ -250,12 +250,12 @@ describe("completing a transfer", () => {
     await acceptTransfer("club-a", "transfer-1", directorA, now);
     expect(db.clubRosterMember.update).toHaveBeenCalledWith({
       where: { id: "row-ada" },
-      data: { status: "REMOVED", removedAt: now, sealedBirthDate: null, gender: null, role: "", classLevel: null, reportedAge: null, personId: null, willingToDrive: false },
+      data: { status: "REMOVED", removedAt: now, sealedBirthDate: null, gender: null, role: "", classLevel: null, schoolGrade: null, schoolType: null, churchMember: null, reportedAge: null, personId: null, willingToDrive: false },
     });
     // Guardian contacts (#510) stay with the sending membership: they are deleted, never copied to the receiving row.
     expect(db.clubRosterGuardian.deleteMany).toHaveBeenCalledWith({ where: { rosterMemberId: "row-ada" } });
     expect(db.clubRosterMember.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ organizationId: "club-b", personId: "person-ada", sealedBirthDate: "v1.sealed", source: "TRANSFER", createdByAccountId: "account-a" }),
+      data: expect.objectContaining({ organizationId: "club-b", personId: "person-ada", sealedBirthDate: "v1.sealed", source: "TRANSFER", createdByAccountId: "account-a", schoolGrade: "GRADE_6", schoolType: "HOMESCHOOL", churchMember: "YES" }),
     }));
     expect(order).toEqual(["erase", "create"]);
     // Nothing about registrations moves here; the member's open registrations are only looked up to queue.

@@ -162,6 +162,7 @@ async function seedBefore527(clubYear: string) {
     await db.person.create({ data: { id: ids.person(person.key), firstName: person.firstName, lastName: person.lastName, normalizedEmail: person.email ?? null }, select: { id: true } });
     await db.clubRosterMember.create({
       data: { id: ids.member(person.key), organizationId: ids.club, clubYear, personId: ids.person(person.key), attendeeType: "ADULT", source: "DIRECTOR" },
+      select: { id: true },
     });
     if (person.check) {
       await db.$executeRaw`

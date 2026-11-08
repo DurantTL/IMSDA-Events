@@ -2,7 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { clubFormClubLabel, formatClubFormAnswer, type ClubFormsViewer } from "@/modules/club-forms/domain";
+import { clubFormClubLabel, formatClubFormAnswer, schoolDetailFieldKeysFor, viewerCanSeeSchoolDetails, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { getClubFormTemplateForStaff } from "@/modules/club-forms/templates";
 import { exportColumnsAcrossVersions, listClubFormTemplateVersions } from "@/modules/club-forms/versions";
@@ -26,6 +26,8 @@ export async function buildClubFormsCsv(
   // A key that was sensitive in any version stays out of the file.
   const versions = await listClubFormTemplateVersions(template, prisma);
   const sensitive = new Set(versions.flatMap((version) => version.sensitiveFieldKeys));
+  // School type and church membership (#1668) are in the file only for a system administrator.
+  if (!viewerCanSeeSchoolDetails(viewer, null)) for (const key of schoolDetailFieldKeysFor(template.key)) sensitive.add(key);
   const columns = exportColumnsAcrossVersions(versions, sensitive);
 
   const rows = await prisma.clubFormSubmission.findMany({

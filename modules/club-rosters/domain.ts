@@ -71,6 +71,87 @@ export type ClubClassLevel = keyof typeof clubClassLevelLabels;
 
 export const clubClassLevels = Object.keys(clubClassLevelLabels) as ClubClassLevel[];
 
+/**
+ * School grade (#1664), in school order. `NOT_IN_SCHOOL` is a real answer (a child not yet in school, or finished),
+ * so it counts as "grade given" and is never flagged as missing.
+ */
+export const clubSchoolGradeLabels = {
+  GRADE_K: "Kindergarten",
+  GRADE_1: "1st grade",
+  GRADE_2: "2nd grade",
+  GRADE_3: "3rd grade",
+  GRADE_4: "4th grade",
+  GRADE_5: "5th grade",
+  GRADE_6: "6th grade",
+  GRADE_7: "7th grade",
+  GRADE_8: "8th grade",
+  GRADE_9: "9th grade",
+  GRADE_10: "10th grade",
+  GRADE_11: "11th grade",
+  GRADE_12: "12th grade",
+  NOT_IN_SCHOOL: "Not in school",
+} as const;
+
+export type ClubSchoolGrade = keyof typeof clubSchoolGradeLabels;
+
+export const clubSchoolGrades = Object.keys(clubSchoolGradeLabels) as ClubSchoolGrade[];
+
+/** School type (#1668): for the club's leaders and system administrators only, never Area Coordinators. */
+export const clubSchoolTypeLabels = {
+  ADVENTIST_SCHOOL: "Adventist school",
+  PUBLIC_SCHOOL: "Public school",
+  HOMESCHOOL: "Homeschool",
+  OTHER: "Other",
+} as const;
+
+export type ClubSchoolType = keyof typeof clubSchoolTypeLabels;
+
+export const clubSchoolTypes = Object.keys(clubSchoolTypeLabels) as ClubSchoolType[];
+
+/** Seventh-day Adventist church membership (#1668), same visibility as school type. */
+export const clubChurchMemberLabels = {
+  YES: "Yes",
+  NO: "No",
+  NOT_SURE: "Not sure",
+} as const;
+
+export type ClubChurchMember = keyof typeof clubChurchMemberLabels;
+
+export const clubChurchMembers = Object.keys(clubChurchMemberLabels) as ClubChurchMember[];
+
+/** The plain label of the church membership question, wherever it is asked or shown. */
+export const CHURCH_MEMBER_LABEL = "Seventh-day Adventist church member";
+
+/**
+ * A grade typed or chosen as text (#1664): "K", "Kindergarten", "5", "5th", "5th grade", "Grade 5", "not in school" /
+ * "none". Null when it is not a grade from K to 12. Used by the roster CSV and the membership application mapping.
+ */
+export function schoolGradeFromText(value: string): ClubSchoolGrade | null {
+  const wanted = value.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!wanted) return null;
+  if (/^(not in school|none|n\/a|no school|not enrolled)$/.test(wanted)) return "NOT_IN_SCHOOL";
+  if (/^(k|kg|kindergarten)$/.test(wanted)) return "GRADE_K";
+  const match = /^(?:grade\s*)?(\d{1,2})(?:st|nd|rd|th)?(?:\s*grade)?$/.exec(wanted);
+  if (!match) return null;
+  const number = Number(match[1]);
+  return number >= 1 && number <= 12 ? (`GRADE_${number}` as ClubSchoolGrade) : null;
+}
+
+/** Grade order (K first, Not in school last) for sorting; null when there is no grade. */
+export function schoolGradeOrder(grade: string | null | undefined): number | null {
+  const index = clubSchoolGrades.indexOf(grade as ClubSchoolGrade);
+  return index === -1 ? null : index;
+}
+
+/**
+ * Moves a grade up one school year for the year rollover (#1664). K to 1st ... 11th to 12th. 12th stays 12th (the
+ * director reviews and removes graduates), and Not in school stays as it is. A missing grade stays missing.
+ */
+export function nextSchoolGrade(grade: ClubSchoolGrade | null): ClubSchoolGrade | null {
+  if (!grade || grade === "NOT_IN_SCHOOL" || grade === "GRADE_12") return grade;
+  return clubSchoolGrades[clubSchoolGrades.indexOf(grade) + 1]!;
+}
+
 /** The roster screen's two lists (#375): staff and adults, and the club's members. */
 export type RosterSection = "STAFF" | "MEMBERS";
 
@@ -319,6 +400,7 @@ export const rosterFieldLabels = {
   birthDate: "Birth date",
   gender: "Gender",
   classLevel: "Current class",
+  schoolGrade: "Grade",
   role: "Role",
   attendeeType: "Type",
 } as const;
@@ -327,6 +409,8 @@ type MissingFieldMember = {
   attendeeType: string | null | undefined;
   role: string | null | undefined;
   classLevel: string | null | undefined;
+  /** School grade (#1664). Optional on the type so a caller that has no grade yet never flags everyone; every roster reader passes it. */
+  schoolGrade?: string | null | undefined;
   gender: string | null | undefined;
   /** Whether a sealed birth date exists, without opening it. */
   birthDateNeeded: boolean;
@@ -344,6 +428,9 @@ export function missingRosterFields(member: MissingFieldMember): string[] {
   if (!member.gender) missing.push(rosterFieldLabels.gender);
   // Only youth are in a class; staff and adults are usually "None" (#424).
   if (member.attendeeType === "YOUTH" && !member.classLevel) missing.push(rosterFieldLabels.classLevel);
+  // Grade (#1664) is youth only. A caller that does not carry the field at all (undefined) says nothing; null is "not given".
+  // School type and church membership (#1668) are optional and are never flagged.
+  if (member.attendeeType === "YOUTH" && member.schoolGrade === null) missing.push(rosterFieldLabels.schoolGrade);
   // A blank role only matters for youth; staff and adults show their type.
   if (member.attendeeType === "YOUTH" && !member.role) missing.push(rosterFieldLabels.role);
   if (!member.attendeeType) missing.push(rosterFieldLabels.attendeeType);

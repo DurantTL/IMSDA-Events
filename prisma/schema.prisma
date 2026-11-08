@@ -743,6 +743,39 @@ enum ClubRosterGender {
   MALE
 }
 
+/// A youth's school grade on the roster (#1664). Not in school is its own choice.
+enum ClubRosterSchoolGrade {
+  GRADE_K
+  GRADE_1
+  GRADE_2
+  GRADE_3
+  GRADE_4
+  GRADE_5
+  GRADE_6
+  GRADE_7
+  GRADE_8
+  GRADE_9
+  GRADE_10
+  GRADE_11
+  GRADE_12
+  NOT_IN_SCHOOL
+}
+
+/// The kind of school a youth attends (#1668). Visible to the club and system administrators only.
+enum ClubRosterSchoolType {
+  ADVENTIST_SCHOOL
+  PUBLIC_SCHOOL
+  HOMESCHOOL
+  OTHER
+}
+
+/// Whether a youth is a Seventh-day Adventist church member (#1668).
+enum ClubRosterChurchMember {
+  YES
+  NO
+  NOT_SURE
+}
+
 /// REMOVED means the club took the person off: birth date and personal
 /// fields are erased and the row stays only as history.
 enum ClubRosterStatus {
@@ -5952,6 +5985,12 @@ model ClubRosterMember {
   attendeeType         ClubRosterAttendeeType
   role                 String                 @default("")
   classLevel           ClubClassLevel?
+  /// School grade (#1664), youth only. Optional; a missing one is listed under "Details needed".
+  schoolGrade          ClubRosterSchoolGrade?
+  /// School type (#1668). Optional, never flagged as missing. Not shown to Area Coordinators.
+  schoolType           ClubRosterSchoolType?
+  /// Seventh-day Adventist church member (#1668). Optional, never flagged as missing. Not shown to Area Coordinators.
+  churchMember         ClubRosterChurchMember?
   /// Age as a form reported it (#376), for people imported without a birth
   /// date. Shown with "birth date needed" until the director adds one.
   reportedAge          Int?

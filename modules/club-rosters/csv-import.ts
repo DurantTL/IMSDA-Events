@@ -1,11 +1,12 @@
 import { classLevelFrom } from "@/modules/club-imports/domain";
-import type { ClubClassLevel } from "@/modules/club-rosters/domain";
+import type { ClubClassLevel, ClubSchoolGrade } from "@/modules/club-rosters/domain";
 import {
   clubRosterAttendeeTypeLabels,
   missingRosterFields,
   parseRosterBirthDateInput,
   rosterFieldLabels,
   rosterRoleOrDefault,
+  schoolGradeFromText,
 } from "@/modules/club-rosters/domain";
 import { parseCsvMatrix } from "@/modules/imports/csv-parser";
 import { toCsv } from "@/modules/reporting/csv";
@@ -21,7 +22,7 @@ import { formatPersonName } from "@/lib/person-name";
  * file (no birth dates), only what the file says and what will happen.
  */
 
-export const ROSTER_CSV_HEADERS = ["First name", "Last name", "Birth date", "Type", "Current class", "Role", "Gender"] as const;
+export const ROSTER_CSV_HEADERS = ["First name", "Last name", "Birth date", "Type", "Current class", "Grade", "Role", "Gender"] as const;
 export const MAX_ROSTER_CSV_ROWS = 500;
 export const MAX_ROSTER_CSV_BYTES = 200_000;
 
@@ -39,6 +40,8 @@ export type RosterCsvRow = {
   birthDate?: string;
   attendeeType?: AttendeeType;
   classLevel?: ClubClassLevel | null;
+  /** School grade (#1664). Undefined means the cell was blank: keep what's on file. */
+  schoolGrade?: ClubSchoolGrade;
   role?: string;
   gender?: "FEMALE" | "MALE" | null;
   problems: string[];
@@ -56,6 +59,8 @@ const headerKeys: Record<string, keyof Omit<RosterCsvRow, "line" | "problems">> 
   class: "classLevel",
   classlevel: "classLevel",
   currentclass: "classLevel",
+  grade: "schoolGrade",
+  schoolgrade: "schoolGrade",
   role: "role",
   gender: "gender",
 };
@@ -107,6 +112,10 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
         const level = value.toLowerCase() === "none" ? null : classLevelFrom(value);
         if (level !== null || value.toLowerCase() === "none") row.classLevel = level;
         else row.problems.push(`Class "${value}" isn't a Pathfinder class level.`);
+      } else if (key === "schoolGrade") {
+        const grade = schoolGradeFromText(value);
+        if (grade) row.schoolGrade = grade;
+        else row.problems.push(`Grade "${value}" isn't K, 1 to 12, or Not in school.`);
       } else if (key === "role") {
         row.role = value.slice(0, 60);
       } else if (key === "gender") {
@@ -125,7 +134,7 @@ function nameKey(firstName: string, lastName: string) {
   return formatPersonName({ firstName, lastName }).replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 }
 
-const csvFieldOrder = ["birthDate", "attendeeType", "classLevel", "role", "gender"] as const;
+const csvFieldOrder = ["birthDate", "attendeeType", "classLevel", "schoolGrade", "role", "gender"] as const;
 
 /** The roster's fields (#424) an empty CSV cell left blank on this row. */
 export function missingRosterCsvFields(row: RosterCsvRow): string[] {
@@ -155,6 +164,7 @@ function addMessage(row: RosterCsvRow) {
     attendeeType,
     role,
     classLevel: row.classLevel ?? null,
+    schoolGrade: row.schoolGrade ?? null,
     gender: row.gender ?? null,
     birthDateNeeded: !row.birthDate,
   });

@@ -7,7 +7,7 @@
  * an invite, registered the club or ordered a supply) left behind and creates the fixtures again, so every run starts from
  * the same state and gives the same pictures. LOCAL USE ONLY: callers run `assertWalkthroughSafety` first.
  */
-import type { ClubFormRequirement, Prisma, PrismaClient } from "@prisma/client";
+import type { ClubFormRequirement, Prisma, PrismaClient, ClubRosterSchoolGrade } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./local-only-guard";
 
 export const W = "walkthrough";
@@ -245,7 +245,7 @@ export async function createWalkthroughFixtures(prisma: PrismaClient) {
       data: {
         organizationId: walkthroughIds.club, clubYear, personId: person.id,
         attendeeType: staff ? "STAFF" : "YOUTH", role: staff ? "Counselor" : "Pathfinder", classLevel: staff ? null : levels[index % levels.length],
-        reportedAge: staff ? 34 : 10 + (index % 5), gender: index % 2 === 0 ? "FEMALE" : "MALE", source: "DIRECTOR",
+        reportedAge: staff ? 34 : 10 + (index % 5), schoolGrade: staff ? null : (`GRADE_${5 + (index % 5)}` as ClubRosterSchoolGrade), gender: index % 2 === 0 ? "FEMALE" : "MALE", source: "DIRECTOR",
       },
     });
   }
@@ -331,7 +331,7 @@ export async function createWalkthroughFixtures(prisma: PrismaClient) {
     for (const [index, [firstName, lastName]] of club.people.entries()) {
       const person = await prisma.person.create({ data: { id: `${W}_person_a${clubIndex}_${index + 1}`, firstName, lastName } });
       await prisma.clubRosterMember.create({
-        data: { organizationId: club.id, clubYear, personId: person.id, attendeeType: "YOUTH", role: "Pathfinder", classLevel: levels[index % levels.length], reportedAge: 10 + (index % 5), gender: index % 2 === 0 ? "FEMALE" : "MALE", source: "DIRECTOR" },
+        data: { organizationId: club.id, clubYear, personId: person.id, attendeeType: "YOUTH", role: "Pathfinder", classLevel: levels[index % levels.length], reportedAge: 10 + (index % 5), schoolGrade: `GRADE_${5 + (index % 5)}` as ClubRosterSchoolGrade, gender: index % 2 === 0 ? "FEMALE" : "MALE", source: "DIRECTOR" },
       });
     }
     for (const monthIndex of club.filed) await fileReport(club.id, club.director?.name ?? "Sample Director", monthIndex, 25, 10, "Fellowship hall");
