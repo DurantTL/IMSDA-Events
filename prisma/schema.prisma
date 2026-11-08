@@ -6081,6 +6081,24 @@ model ClubRosterExportFormat {
   @@unique([organizationId, name])
 }
 
+/// A saved column layout for a club event's attendee report (#1671). One per template-or-event scope, audience and
+/// name. `scopeKey` is `template:<id>` for an event made from an event template (so the layout follows the template) or
+/// `event:<id>` for any other event. `audience` keeps staff and Area Coordinator layouts apart. `columns` holds column
+/// keys in order and nothing else: never a name, an answer or any other data. The creator ids are plain references.
+model ClubReportColumnLayout {
+  id                 String   @id @default(cuid())
+  scopeKey           String
+  audience           String
+  name               String
+  columns            Json
+  createdByUserId    String?
+  createdByAccountId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([scopeKey, audience, name])
+}
+
 /// A director confirming that a club started its next club year's roster by
 /// carrying last year's people forward (#414). One row per club and target
 /// year (the unique key makes a repeat refuse cleanly), recording counts only:

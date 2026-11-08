@@ -86,6 +86,7 @@ const allowList: Record<string, { tables: number; reason: string }> = {
   "components/club-import-workspace.tsx": { tables: 2, reason: fits },
   "components/club-screen-tables.tsx": { tables: 2, reason: fits },
   "components/club-supply-catalog-workspace.tsx": { tables: 1, reason: fits },
+  "components/club-report-column-builder.tsx": { tables: 1, reason: fits },
   "components/communications-workspace.tsx": { tables: 2, reason: fits },
   "components/csv-import-dialog.tsx": { tables: 1, reason: fits },
   "components/eadventist-import-workspace.tsx": { tables: 1, reason: fits },
