@@ -53,7 +53,9 @@ describe("FormsCreateSection", () => {
     expect(html).toContain("<h3");
     expect(html).toContain('aria-labelledby="forms-create-registration-label forms-create-registration-title"');
     expect(html).toContain('aria-labelledby="forms-create-event-information-label forms-create-event-information-title"');
-    expect(html).not.toContain("styles.button");
+    // Every action uses the shared button look (L5): two submit buttons and two links.
+    expect([...html.matchAll(/<button[^>]*class="primary-button/g)]).toHaveLength(2);
+    expect([...html.matchAll(/<a[^>]*class="primary-button/g)]).toHaveLength(2);
   });
 
   it("shows Unavailable instead of the select when events could not be read", () => {
