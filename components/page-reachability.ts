@@ -133,22 +133,41 @@ export const reviewedPages: Readonly<Record<string, ReviewedPage>> = {
   "/account/clubs/choose": { kind: "linked", parent: "/account", linkedIn: "modules/club-forms/public-index-domain.ts", link: "/account/clubs/choose?to=", why: "Opened from the public club forms index for a director who has several clubs; the page takes a fixed target key, never a path." },
   [`${club}/class-tracking/[personId]`]: { kind: "linked", parent: `${club}/class-tracking`, linkedIn: "components/club-earned-awards-workspace.tsx", link: "href={`${classHistoryBase}/", why: "A member's class history, from Class tracking and the roster (director and deputy)." },
   [`${club}/events/[eventId]`]: { kind: "linked", parent: `${club}/events`, linkedIn: "modules/club-rosters/home-view.ts", link: "`${base}/events/${event.id}`", why: "One club event, from the club home and the Club events list." },
-  [`${club}/events/[eventId]/packet`]: { kind: "linked", parent: `${club}/events/[eventId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx", link: "/packet", why: "The club's event packet, from the event page." },
-  [`${club}/events/[eventId]/schedule`]: { kind: "linked", parent: `${club}/events/[eventId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx", link: "/schedule", why: "Everyone's classes by session, from the event page." },
-  [`${club}/events/[eventId]/team-form`]: { kind: "linked", parent: `${club}/events/[eventId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx", link: "/team-form${teamQuery}", why: "The team form, from the event page." },
-  [`${club}/events/[eventId]/team-form/blank`]: { kind: "linked", parent: `${club}/events/[eventId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx", link: "/team-form/blank", why: "A blank team form to mail or email, from the event page." },
-  [`${club}/exports/class-tracking`]: { kind: "linked", parent: `${club}/class-tracking`, linkedIn: "modules/club-rosters/portal-nav.ts", link: "alsoMatchPrefix: `${base}/exports/class-tracking`", why: "The class export page; its tab (Class tracking) stays lit and the page's own export controls open it." },
-  [`${club}/exports/honors`]: { kind: "linked", parent: `${club}/honors`, linkedIn: "components/club-honors-workspace.tsx", link: "/exports/honors", why: "The honors export, from the Honors page." },
-  [`${club}/forms/[templateKey]/new`]: { kind: "linked", parent: `${club}/forms`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/forms/page.tsx", link: "}/new`", why: "Start a form button on the Forms page (director and deputy)." },
-  [`${club}/forms/outings/new`]: { kind: "linked", parent: `${club}/forms`, linkedIn: "components/club-outings-section.tsx", link: "/outings/new", why: "New outing slip, in the Forms page's outing section (#1731); the page checks the director and deputy role." },
+  [`${club}/events/[eventId]/packet`]: { kind: "linked", parent: `${club}/events/[eventId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx", link: "/events/${eventId}/packet${teamQuery}", why: "The club's event packet, from the event page." },
+  [`${club}/events/[eventId]/schedule`]: { kind: "linked", parent: `${club}/events/[eventId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx", link: "/events/${eventId}/schedule`", why: "Everyone's classes by session, from the event page." },
+  [`${club}/events/[eventId]/team-form`]: { kind: "linked", parent: `${club}/events/[eventId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx", link: "href={`${eventBase}/team-form${teamQuery}`}", why: "The team form, from the event page." },
+  [`${club}/events/[eventId]/team-form/blank`]: { kind: "linked", parent: `${club}/events/[eventId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/page.tsx", link: "href={`${eventBase}/team-form/blank`}", why: "A blank team form to mail or email, from the event page." },
+  [`${club}/exports/class-tracking`]: { kind: "linked", parent: `${club}/class-tracking`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/class-tracking/page.tsx", link: "exportPrintHref={`/account/clubs/${organizationId}/exports/class-tracking`}", why: "The print and export page, opened from Class tracking's export controls." },
+  [`${club}/exports/honors`]: { kind: "linked", parent: `${club}/honors`, linkedIn: "components/club-honors-workspace.tsx", link: "href={`${base}/exports/honors`}", why: "The honors export, from the Honors page." },
+  [`${club}/forms/[templateKey]/new`]: { kind: "linked", parent: `${club}/forms`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/forms/page.tsx", link: "href={`${base}/${template.key}/new`}", why: "Start a form button on the Forms page (director and deputy)." },
+  [`${club}/forms/outings/new`]: { kind: "linked", parent: `${club}/forms`, linkedIn: "components/club-outings-section.tsx", link: "href={`${base}/outings/new`}", why: "New outing slip, in the Forms page's outing section (#1731); the page checks the director and deputy role." },
   [`${club}/forms/outings/[outingId]`]: { kind: "linked", parent: `${club}/forms`, linkedIn: "components/club-outing-tables.tsx", link: "/outings/${row.id}", why: "Open on each outing in the Forms page's outing list." },
-  [`${club}/forms/outings/[outingId]/print`]: { kind: "linked", parent: `${club}/forms/outings/[outingId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/forms/outings/[outingId]/page.tsx", link: "/print", why: "Print, on the outing page." },
+  [`${club}/forms/outings/[outingId]/print`]: { kind: "linked", parent: `${club}/forms/outings/[outingId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/forms/outings/[outingId]/page.tsx", link: "href={`${base}/outings/${outingId}/print`}", why: "Print, on the outing page." },
   [`${club}/forms/submissions/[submissionId]`]: { kind: "linked", parent: `${club}/forms`, linkedIn: "components/club-forms-lists.tsx", link: "/submissions/${row.id}", why: "Open on each submitted form in the Forms page." },
-  [`${club}/forms/submissions/[submissionId]/roster`]: { kind: "linked", parent: `${club}/forms/submissions/[submissionId]`, linkedIn: "components/club-form-roster-add.tsx", link: "/roster", why: "Adding a form's person to the roster, from the submission page." },
-  [`${club}/orders/print`]: { kind: "linked", parent: `${club}/orders`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/orders/page.tsx", link: "/orders/print", why: "Print, on the Orders page." },
+  [`${club}/forms/submissions/[submissionId]/roster`]: { kind: "linked", parent: `${club}/forms/submissions/[submissionId]`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/forms/submissions/[submissionId]/page.tsx", link: "href={`${base}/submissions/${submissionId}/roster`}", why: "Add to roster, on the submission page, for a form whose template allows it (director and deputy)." },
+  [`${club}/orders/print`]: { kind: "linked", parent: `${club}/orders`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/orders/page.tsx", link: "printHref={`/account/clubs/${organizationId}/orders/print`}", why: "Print, on the Orders page." },
   [`${club}/reports/year-end/[year]`]: { kind: "linked", parent: `${club}/records`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/records/page.tsx", link: "/reports/year-end/${year}", why: "The Year-End Report, from Monthly Records (submitting reports only)." },
-  [`${club}/roster/[memberId]/health`]: { kind: "linked", parent: `${club}/roster`, linkedIn: "components/club-roster-workspace.tsx", link: "/health", why: "One member's health record, from the roster (director and deputy); protected data, so no menu entry." },
-  [`${club}/roster/export`]: { kind: "linked", parent: `${club}/roster`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx", link: "/roster/export", why: "Build a roster export, on the roster page." },
+  [`${club}/roster/[memberId]/health`]: { kind: "linked", parent: `${club}/roster`, linkedIn: "components/club-roster-workspace.tsx", link: "/roster/${encodeURIComponent(member.id)}/health`", why: "One member's health record, from the roster (director and deputy); protected data, so no menu entry." },
+  [`${club}/roster/export`]: { kind: "linked", parent: `${club}/roster`, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx", link: "href={`/account/clubs/${organizationId}/roster/export`}", why: "Build a roster export, on the roster page." },
   [`${club}/roster/next-year`]: { kind: "linked", parent: `${club}/roster`, linkedIn: "components/club-next-year-offer.tsx", link: "/roster/next-year", why: "Start next year's roster, offered on the club home and roster." },
-  [`${club}/roster-health`]: { kind: "linked", parent: club, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/page.tsx", link: "/roster-health", why: "The Roster health card on the club home and an Open roster health button on the Roster page, shown only to the director and deputy while the club has the feature on (#1731); Club settings links it too." },
+  [`${club}/roster-health`]: { kind: "linked", parent: club, linkedIn: "app/(public)/account/(portal)/clubs/[organizationId]/page.tsx", link: "href={`${base}/roster-health`}", why: "The Roster health card on the club home and an Open roster health button on the Roster page, shown only to the director and deputy while the club has the feature on (#1731); Club settings links it too." },
 };
+
+/** Source lines that can hold a real link: not an import, a re-export or a comment. */
+function codeLines(source: string): string {
+  return source
+    .split("\n")
+    .filter((line) => !/^\s*(import\b|export\b[^=(]*\bfrom\b|\} from\b|\/\/|\*|\/\*)/.test(line))
+    .join("\n");
+}
+
+/** Whether a reviewed entry's link text is still drawn by the file, ignoring imports and comments (an import path is not a link). */
+export function linkIsDrawn(source: string, link: string): boolean {
+  return codeLines(source).includes(link);
+}
+
+/** Whether a page only redirects or answers not found: it calls one of them and returns no markup. */
+export function pageOnlyRedirects(source: string): boolean {
+  const code = codeLines(source);
+  return /\b(?:redirect|permanentRedirect|notFound)\(/.test(code) && !/return\s*\(?\s*</.test(code) && !/=>\s*\(?\s*</.test(code);
+}

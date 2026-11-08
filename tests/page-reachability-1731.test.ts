@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { linkedRoutesBySource, pageRoots, reviewedPages, routeOfPageFile, unreachablePages } from "@/components/page-reachability";
+import { linkIsDrawn, linkedRoutesBySource, pageOnlyRedirects, pageRoots, reviewedPages, routeOfPageFile, unreachablePages } from "@/components/page-reachability";
 import { unmappedDynamicPages } from "@/components/route-mapping";
 import { buildMoreDirectoryCards } from "@/components/staff-navigation";
 import { eventPermissions } from "@/modules/access/permissions";
@@ -66,17 +66,33 @@ describe("every staff and club page has a place (#1731)", () => {
       expect(all.has(route), `${route} is in a menu now; remove it from reviewedPages`).toBe(false);
       expect(entry.why.length, route).toBeGreaterThan(10);
       if (entry.kind === "redirect") {
-        expect(read(file!), `${route} should only redirect`).toMatch(/\b(?:redirect|notFound)\(/);
+        expect(pageOnlyRedirects(read(file!)), `${route} should only redirect or answer not found`).toBe(true);
       } else {
         expect(pages, `${route} parent ${entry.parent}`).toContain(entry.parent);
         expect(entry.parent, route).not.toBe(route);
         expect(existsSync(join(process.cwd(), entry.linkedIn)), `${entry.linkedIn} exists`).toBe(true);
         expect(entry.linkedIn, `${route} must not be linked from itself`).not.toBe(file);
-        expect(read(entry.linkedIn), `${entry.linkedIn} should link ${route}`).toContain(entry.link);
+        expect(linkIsDrawn(read(entry.linkedIn), entry.link), `${entry.linkedIn} should draw the link to ${route}`).toBe(true);
+        expect((entry.link.match(/\//g) ?? []).length >= 2 || /href/i.test(entry.link), `${route} link text must be a full path or href, not one word`).toBe(true);
       }
     }
     // The staff dynamic pages keep their reasons in the route mapping, and no page is in both lists.
     for (const route of Object.keys(unmappedDynamicPages)) expect(route in reviewedPages, route).toBe(false);
+  });
+});
+
+describe("the reviewed entries check real links (#1731)", () => {
+  it("ignores an import line, a comment and a re-export when looking for a link", () => {
+    const source = 'import { x } from "@/modules/club-features/roster-health";\n// href={`${base}/roster-health`}\nexport const y = 1;\n';
+    expect(linkIsDrawn(source, "/roster-health")).toBe(false);
+    expect(linkIsDrawn(source, "href={`${base}/roster-health`}")).toBe(false);
+    expect(linkIsDrawn(`${source}<a href={\`\${base}/roster-health\`} />`, "href={`${base}/roster-health`}")).toBe(true);
+  });
+
+  it("does not take a normal page for a redirect-only page", () => {
+    expect(pageOnlyRedirects('import { redirect } from "next/navigation";\nexport default async function P() { redirect("/x"); }')).toBe(true);
+    expect(pageOnlyRedirects('export default function P() { if (!ok) redirect("/x"); return (\n <main>Hi</main>\n); }')).toBe(false);
+    expect(pageOnlyRedirects('export default function P() { return <main>Hi</main>; }')).toBe(false);
   });
 });
 
