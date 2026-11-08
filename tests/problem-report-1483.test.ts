@@ -41,6 +41,19 @@ describe("page path", () => {
     expect(sanitizePagePath("/club-forms/short/next")).toBe("/club-forms/[redacted]");
     expect(sanitizePagePath("/reset-password/aaaaaaaaaaaaaaaaaaaaaaaaaaaa")).toBe("/reset-password/[redacted]");
   });
+  it("cuts everything after health-records, pass, pay and clubs/register", () => {
+    expect(sanitizePagePath("/health-records/abc/def")).toBe("/health-records/[redacted]");
+    expect(sanitizePagePath("/pass/ticket-1/qr")).toBe("/pass/[redacted]");
+    expect(sanitizePagePath("/pay/inv-77/card")).toBe("/pay/[redacted]");
+    expect(sanitizePagePath("/clubs/register/some-token/next")).toBe("/clubs/register/[redacted]");
+    expect(sanitizePagePath("/clubs/forms")).toBe("/clubs/forms");
+    expect(sanitizePagePath("/register/womens-retreat-2026")).toBe("/register/womens-retreat-2026");
+  });
+  it("redacts a UUID segment and any segment with an email address", () => {
+    expect(sanitizePagePath("/people/3f2b8c1e-9a4d-4e6f-8b1a-2c3d4e5f6a7b/edit")).toBe("/people/[redacted]/edit");
+    expect(sanitizePagePath("/lookup/sam@example.test")).toBe("/lookup/[redacted]");
+    expect(sanitizePagePath("/lookup/sam%40example.test/x")).toBe("/lookup/[redacted]/x");
+  });
   it("keeps a long readable form slug", () => {
     expect(sanitizePagePath("/register/womens-retreat-2026/womens-retreat-registration")).toBe("/register/womens-retreat-2026/womens-retreat-registration");
   });

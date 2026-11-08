@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { HoneypotField } from "@/components/honeypot-field";
@@ -58,6 +58,13 @@ export function ProblemReportSection() {
   const [emailError, setEmailError] = useState("");
   const [attempted, setAttempted] = useState(false);
   const messageRef = useRef<HTMLTextAreaElement>(null);
+  // Which field to focus once its error has rendered; `n` makes a repeat of the same field fire again.
+  const [focusRequest, setFocusRequest] = useState<{ field: "message" | "email"; n: number } | null>(null);
+  useEffect(() => {
+    if (!focusRequest) return;
+    (focusRequest.field === "message" ? messageRef.current : document.getElementById("problem-report-email"))?.focus();
+  }, [focusRequest]);
+  const focusField = (field: "message" | "email") => setFocusRequest((current) => ({ field, n: (current?.n ?? 0) + 1 }));
   const [reference, setReference] = useState("");
 
   async function loadConfig() {
@@ -85,11 +92,11 @@ export function ProblemReportSection() {
     setEmailError("");
     if (message.trim().length < PROBLEM_REPORT_MESSAGE_MIN) {
       setMessageError(PROBLEM_REPORT_MESSAGE_REQUIRED_TEXT);
-      messageRef.current?.focus();
+      focusField("message");
       return;
     }
     if (email.trim() && emailBlockingMessage("Email", email)) {
-      document.getElementById("problem-report-email")?.focus();
+      focusField("email");
       return;
     }
     if (!check.current?.require("Send report")) return;
@@ -114,8 +121,8 @@ export function ProblemReportSection() {
         if (check.current?.isRejection(body)) return;
         const text = body.message ?? PROBLEM_REPORT_FAILED_TEXT;
         // A field problem lands next to its field.
-        if (body.field === "message") { setMessageError(text); messageRef.current?.focus(); }
-        else if (body.field === "email") { setEmailError(text); document.getElementById("problem-report-email")?.focus(); }
+        if (body.field === "message") { setMessageError(text); focusField("message"); }
+        else if (body.field === "email") { setEmailError(text); focusField("email"); }
         else setError(text);
         return;
       }

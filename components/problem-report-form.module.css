@@ -10,6 +10,11 @@
   gap: 4px;
   color: var(--imsda-navy);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 400;
+}
+
+/* Only the question is bold; a field error keeps the shared field-error look (coral, semibold). */
+.label > label {
   font-weight: 700;
 }
 

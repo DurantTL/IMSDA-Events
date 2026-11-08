@@ -26,7 +26,13 @@ export const problemReportStatusLabel = { OPEN: "Submitted", RESOLVED: "Complete
 /** A long segment is kept only when it reads as a lowercase hyphenated slug ("womens-retreat-registration"); any other long run of letters, digits, "_" or "-" looks like a token. */
 const TOKENISH_SEGMENT = /^[A-Za-z0-9_-]{20,}$/;
 const READABLE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
-const PRIVATE_PREFIX = /^(club-forms|manage|unsubscribe|staff-invite|staff-invitations)$/;
+const PRIVATE_PREFIX = /^(club-forms|manage|unsubscribe|staff-invite|staff-invitations|health-records|pass|pay)$/;
+const UUID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** `/clubs/register/<anything>` is a private club registration link, so everything after it is cut too. */
+const isPrivateFolder = (segments: string[], index: number) =>
+  PRIVATE_PREFIX.test(segments[index] ?? "") || (segments[index] === "register" && segments[index - 1] === "clubs");
+/** An email address (typed or percent-encoded) or a UUID in a path is personal or private whatever its length. */
+const isPersonalSegment = (segment: string) => segment.includes("@") || /%40/i.test(segment) || UUID_SEGMENT.test(segment);
 
 /**
  * The page path only: no origin, no query values (they can hold a name, an email or a code) and no hash. A path segment that
@@ -44,11 +50,11 @@ export function sanitizePagePath(value: string): string {
   const segments = pathname.split("/");
   const kept: string[] = [];
   for (const [index, segment] of segments.entries()) {
-    if (index > 0 && PRIVATE_PREFIX.test(segments[index - 1] ?? "")) {
+    if (index > 0 && segment !== "" && isPrivateFolder(segments, index - 1)) {
       kept.push("[redacted]");
       break;
     }
-    kept.push(index > 0 && TOKENISH_SEGMENT.test(segment) && !READABLE_SLUG.test(segment) ? "[redacted]" : segment);
+    kept.push(index > 0 && (isPersonalSegment(segment) || (TOKENISH_SEGMENT.test(segment) && !READABLE_SLUG.test(segment))) ? "[redacted]" : segment);
   }
   return kept.join("/").slice(0, 300);
 }

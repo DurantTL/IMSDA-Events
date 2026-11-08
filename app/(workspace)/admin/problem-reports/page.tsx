@@ -7,6 +7,7 @@ import { logError } from "@/lib/logger";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { problemReportStatusLabel } from "@/modules/support/problem-report-domain";
 import { countOpenProblemReports, listProblemReports } from "@/modules/support/problem-reports";
+import { ProblemReportsStatusProvider } from "@/components/problem-reports-status";
 import { EmptyState } from "@/components/empty-state";
 import { ProblemReportResolveButton } from "@/components/problem-report-resolve-button";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
@@ -40,6 +41,7 @@ export default async function ProblemReportsPage() {
   return (
     <section className={`page-stack ${systemStyles.workspace}`}>
       <AdminSectionHeaderFor path="/admin/problem-reports" section="system" />
+      <ProblemReportsStatusProvider>
       <section className="panel" aria-labelledby="problem-reports-heading">
         <div className={systemStyles.sectionHeading}>
           <div>
@@ -86,6 +88,7 @@ export default async function ProblemReportsPage() {
           </ul>
         )}
       </section>
+      </ProblemReportsStatusProvider>
     </section>
   );
 }
