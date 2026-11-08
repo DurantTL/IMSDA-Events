@@ -150,7 +150,7 @@ function detail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
   };
 }
 
-const renderDetail = (value: InvoiceDetail, canFinalize = false) => renderToStaticMarkup(createElement(InvoiceDetailView, { eventId: "event-1", detail: value, canFinalize, viewerName: "Tess Treasurer" }));
+const renderDetail = (value: InvoiceDetail, canFinalize = false) => renderToStaticMarkup(createElement(InvoiceDetailView, { eventId: "event-1", eventName: "Spring Camporee 2027", detail: value, canFinalize, viewerName: "Tess Treasurer" }));
 
 describe("Church promo code invoice detail", () => {
   it("shows the sponsored registrations and the total, never a reconciliation, and offers finalizing only with the permission", () => {

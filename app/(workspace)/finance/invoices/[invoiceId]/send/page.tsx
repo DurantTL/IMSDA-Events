@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { InvoiceSendView } from "@/components/invoice-send";
 import { resolveEventContext } from "@/modules/events/selection";
+import type { SettlementStatus } from "@/modules/invoices/delivery-domain";
 import { getInvoiceSendPreview } from "@/modules/invoices/delivery-repository";
+import { loadEventLedger } from "@/modules/invoices/ledger-repository";
 import { InvoiceError } from "@/modules/invoices/repository";
 
 export const metadata: Metadata = { title: "Send invoice" };
@@ -29,5 +31,13 @@ export default async function SendInvoicePage({ params, searchParams }: { params
   }
   // The version must belong to the invoice in the URL, as well as to the event.
   if (preview.invoiceId !== invoiceId) notFound();
-  return <InvoiceSendView preview={preview} viewerName={user.displayName} />;
+  // Payment status for the header only (read-only); a failed read says it is unavailable.
+  let settlement: SettlementStatus | "UNAVAILABLE" = "UNAVAILABLE";
+  try {
+    const [ledger] = await loadEventLedger(event.id, { invoiceId });
+    if (ledger) settlement = ledger.settlement;
+  } catch {
+    settlement = "UNAVAILABLE";
+  }
+  return <InvoiceSendView preview={preview} settlement={settlement} viewerName={user.displayName} />;
 }

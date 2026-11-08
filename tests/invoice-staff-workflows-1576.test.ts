@@ -67,9 +67,9 @@ describe("invoice record headers (#1576)", () => {
       versions: [shown], discarded: [], shown, snapshot, change: null, needsFinalizePermission: false, currentContact: contact, contactChanged: false, amountsOutOfDate: false, churchDraftStale: false,
       hasOpenDraft: false, liveFinalized: shown, reconciliationFreshness: "CURRENT", approvedReconciliationVersionId: "recon-1",
     };
-    const markup = renderToStaticMarkup(createElement(InvoiceDetailView, { eventId: "event-1", detail, canFinalize: false, viewerName: "Tess Treasurer" }));
+    const markup = renderToStaticMarkup(createElement(InvoiceDetailView, { eventId: "event-1", eventName: "Renamed Camporee", detail, canFinalize: false, viewerName: "Tess Treasurer" }));
     const header = markup.slice(0, markup.indexOf('aria-label="Invoice summary"'));
-    expect(header).toContain("Event Spring Camporee 2027");
+    expect(header).toContain("Event Renamed Camporee");
     expect(header).toContain("Billed to Church One");
     expect(header).toContain("SC27-0001");
     expect(header).toContain("Finalized");
@@ -90,5 +90,44 @@ describe("invoice record headers (#1576)", () => {
     expect(markup).toContain("SC27-0001");
     expect(markup).toContain('href="/finance/invoices/i1?event=event-1&amp;version=v1"');
     expect(markup).toContain("Back to the invoice");
+  });
+
+  const detailFor = (shown: InvoiceVersionSummary) => ({
+    invoice: { id: "i1", groupKey: "organization:church-1", baseNumber: "SC27-0001", invoiceGrouping: "PER_CHURCH", partyKind: "ORGANIZATION" },
+    versions: [shown], discarded: [], shown, change: null, needsFinalizePermission: false, currentContact: contact, contactChanged: false, amountsOutOfDate: false, churchDraftStale: false,
+    hasOpenDraft: shown.status === "DRAFT", liveFinalized: shown.status === "FINALIZED" ? shown : null, reconciliationFreshness: "CURRENT", approvedReconciliationVersionId: "recon-1",
+    snapshot: { schema: 1, event: { id: "event-1", name: "Old name" }, groupKey: "organization:church-1", groupTitle: "Church One", invoiceGrouping: "PER_CHURCH", party: { kind: "ORGANIZATION", id: "church-1", name: "Church One" }, clubId: null, reconciliation: { versionId: "recon-1", versionNumber: 2, ruleVersion: "attended-v1" }, lines: [], totals: { registered: 0, checkedIn: 0, noShow: 0, billable: 0, amountDueCents: 10000 } },
+  }) as unknown as InvoiceDetail;
+  const ledgerFor = (settlement: string) => ({ invoiceId: "i1", settlement, live: { id: "v1", number: "SC27-0001", status: "FINALIZED", posting: null }, versions: [{ id: "v1", number: "SC27-0001", status: "FINALIZED", posting: null }], payments: [], figures: { amountDueCents: 10000, paidCents: 5000, outstandingCents: 5000, overpaidCents: 0 }, postingCount: 0 }) as never;
+
+  it("the detail header carries the payment status in words for a finalized invoice", () => {
+    for (const [settlement, words] of [["PARTIALLY_PAID", "Partly paid"], ["PAID", "Paid"]] as const) {
+      const markup = renderToStaticMarkup(createElement(InvoiceDetailView, { eventId: "event-1", eventName: "Renamed", detail: detailFor(version()), canFinalize: false, viewerName: "T", ledger: ledgerFor(settlement) }));
+      const header = markup.slice(0, markup.indexOf('aria-label="Invoice summary"'));
+      expect(header).toContain(words);
+      expect(header).toContain("Finalized");
+    }
+  });
+
+  it("a draft header has no payment status and says the number is assigned when finalized", () => {
+    const draft = { ...version(), status: "DRAFT", number: null, finalizedAt: null, finalizedByName: null, receivable: null } as InvoiceVersionSummary;
+    const markup = renderToStaticMarkup(createElement(InvoiceDetailView, { eventId: "event-1", eventName: "Renamed", detail: detailFor(draft), canFinalize: false, viewerName: "T", ledger: ledgerFor("UNPAID") }));
+    const header = markup.slice(0, markup.indexOf('aria-label="Invoice summary"'));
+    expect(header).toContain("Draft");
+    expect(header).toContain("Number assigned when finalized");
+    expect(header).not.toContain("Unpaid");
+  });
+
+  it("the send header shows payment status once and the number once", () => {
+    const preview = {
+      eventId: "event-1", eventName: "Renamed", invoiceId: "i1",
+      version: { id: "v1", number: "SC27-0001", status: "FINALIZED", amountDueCents: 10000, organizationName: "Church One", finalizedAt: "2026-10-04T12:00:00.000Z" },
+      canSend: false, blockedReason: null, newerVersion: null, snapshotContact: contact, currentContact: contact, contactChanged: false, recipients: [], recipientsFingerprint: "fp",
+      subject: "s", body: "b", sender: { name: "Sender", email: null, replyTo: null }, deliveryMode: "EXTERNAL_EMAIL", pdf: { filename: "f.pdf", exists: true, sha256: null }, history: [], isResend: false,
+    } satisfies SendPreview;
+    const markup = renderToStaticMarkup(createElement(InvoiceSendView, { preview, viewerName: "T", settlement: "PARTIALLY_PAID" }));
+    expect(markup).toContain("Partly paid");
+    expect(markup.match(/SC27-0001/g)?.length).toBe(1);
+    expect(renderToStaticMarkup(createElement(InvoiceSendView, { preview, viewerName: "T", settlement: "UNAVAILABLE" }))).toContain("Payment status unavailable");
   });
 });

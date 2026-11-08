@@ -29,6 +29,6 @@ export default async function InvoicePage({ params, searchParams }: { params: Pr
   const flags = (await listOpenChurchSponsorFlags(event.id)).filter((flag) => flag.invoiceVersionId !== null && versionIds.has(flag.invoiceVersionId));
   return <>
     <ChurchSponsorFlags eventId={event.id} flags={flags} />
-    <InvoiceDetailView canFinalize={permissions.includes("FINALIZE_INVOICES")} deliveries={deliveries} detail={detail} eventId={event.id} ledger={ledger ?? null} viewerName={user.displayName} />
+    <InvoiceDetailView canFinalize={permissions.includes("FINALIZE_INVOICES")} deliveries={deliveries} detail={detail} eventId={event.id} eventName={event.name} ledger={ledger ?? null} viewerName={user.displayName} />
   </>;
 }

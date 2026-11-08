@@ -1,5 +1,6 @@
 import { DiscardControl, FinalizeControl, ManualLinesPanel, RegenerateControl, ReviseForm } from "@/components/invoice-controls";
 import { InvoiceDeliveryPanel, InvoiceLedgerPanel } from "@/components/invoice-ledger";
+import { settlementLabel } from "@/modules/invoices/delivery-domain";
 import { StatusBadge, displayNumber, invoiceMoney, invoiceWhen } from "@/components/invoices";
 import { basisLabel } from "@/modules/attendance-reconciliation/domain";
 import type { InvoiceLine } from "@/modules/invoices/domain";
@@ -14,6 +15,7 @@ import type { InvoiceDetail, InvoiceVersionSummary } from "@/modules/invoices/re
  */
 export function InvoiceDetailView({
   eventId,
+  eventName,
   detail,
   canFinalize,
   viewerName,
@@ -21,6 +23,8 @@ export function InvoiceDetailView({
   deliveries = [],
 }: {
   eventId: string;
+  /** The event's current name, as the shell shows it; the snapshot's name below is history. */
+  eventName: string;
   detail: InvoiceDetail;
   canFinalize: boolean;
   viewerName: string;
@@ -43,9 +47,10 @@ export function InvoiceDetailView({
           <h2>{shown.groupTitle}</h2>
           <p>
             <StatusBadge status={shown.status} /> {displayNumber({ number: shown.number, baseNumber: detail.invoice.baseNumber, revision: shown.revision })}
+            {!isDraft && ledger && <> <span className="count-badge billing-readiness">{settlementLabel(ledger.settlement)}</span></>}
             {" "}· {invoiceMoney(shown.amountDueCents)}{shown.amountDueCents === 0 ? " (nothing owed)" : ""}
           </p>
-          <p><small>Event {snapshot.event.name} · Billed to {shown.organizationName}</small></p>
+          <p><small>Event {eventName} · Billed to {shown.organizationName}</small></p>
         </div>
         <div className="page-intro-actions">
           {isChurchCodes

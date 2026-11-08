@@ -122,7 +122,7 @@ function detail(overrides: Partial<InvoiceDetail> = {}): InvoiceDetail {
   };
 }
 
-const renderDetail = (value: InvoiceDetail, canFinalize = false) => renderToStaticMarkup(createElement(InvoiceDetailView, { eventId: "event-1", detail: value, canFinalize, viewerName: "Tess Treasurer" }));
+const renderDetail = (value: InvoiceDetail, canFinalize = false) => renderToStaticMarkup(createElement(InvoiceDetailView, { eventId: "event-1", eventName: "Spring Camporee 2027", detail: value, canFinalize, viewerName: "Tess Treasurer" }));
 
 describe("Invoice detail", () => {
   it("shows the snapshot: contact, lines, people, charges not tied to a person, credits, promo and the total", () => {
