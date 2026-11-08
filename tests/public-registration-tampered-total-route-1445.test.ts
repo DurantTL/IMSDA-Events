@@ -45,7 +45,7 @@ const form = registrationFormDefinitionSchema.parse({
 const SERVER_TOTAL_CENTS = 5000 + 2 * 1500;
 const KEY = "5b0c8c4e-6f6d-4f6b-9f7e-0f1e2d3c4b5a";
 const AMOUNT_KEYS = ["total", "totalAmount", "totalCents", "subtotalCents", "amount", "amountCents", "price", "priceCents", "fee", "processingFeeCents", "discount", "discountAmountCents", "balanceCents"];
-const fake = Object.fromEntries(AMOUNT_KEYS.map((key) => [key, 1]));
+const fake = Object.fromEntries(AMOUNT_KEYS.map((key) => [key, key.includes("iscount") ? -500 : 1]));
 const context = { params: Promise.resolve({ eventSlug: "summer-retreat", formSlug: "attendee" }) };
 
 function post(body: unknown) {
@@ -74,14 +74,15 @@ describe("registration route with a tampered total (#1445, P1)", () => {
     expect(mocks.submit).not.toHaveBeenCalled();
   });
 
-  it("answers with the server's total when amount keys ride inside the answers", async () => {
-    const response = await post({ versionId: "v1", idempotencyKey: KEY, responses: { ticket: "Standard", shirts: 2, payment_method: "Pay later", ...fake, ticket_price: 1 }, website: "" });
-    expect(response.status).toBe(201);
-    const { confirmation } = await response.json();
-    expect(confirmation.totalAmountCents).toBe(SERVER_TOTAL_CENTS);
-    // What reached the pricing function still prices the same, and the made-up answers are not kept.
+  it("prices the answers from the form's own prices, and reports amount keys in them as unknown fields", async () => {
+    const answers = { ticket: "Standard", shirts: 2, payment_method: "Pay later", ...fake, ticket_price: 1 };
+    const body = { versionId: "v1", idempotencyKey: KEY, responses: answers, website: "" };
+    // The route passes the answers on; the repository then refuses them (422 UNKNOWN_FIELD, see the browser journey).
+    expect((await post(body)).status).toBe(201);
     const sent = mocks.submit.mock.calls[0][2] as PublicRegistrationInput;
     const prepared = preparePublicRegistration(form, sent, { timeZone: "America/Chicago", now: new Date("2026-11-01T18:00:00Z") });
+    const unknown = prepared.issues.filter((issue) => issue.code === "UNKNOWN_FIELD").map((issue) => issue.key).sort();
+    expect(unknown).toEqual([...AMOUNT_KEYS, "ticket_price"].sort());
     expect(prepared.calculation.totalCents).toBe(SERVER_TOTAL_CENTS);
     for (const key of AMOUNT_KEYS) expect(Object.keys(prepared.responses)).not.toContain(key);
   });

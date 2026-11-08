@@ -38,6 +38,7 @@ import { createServer, type Server } from "node:http";
 import { randomBytes } from "node:crypto";
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
+import { processingFeeForSubtotal } from "@/modules/forms/definition";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
 import { BLOCK_FILTERS, PREVIEW_FAILS_INIT_SCRIPT, STRICT_STORAGE_INIT_SCRIPT, blockedBy, type BlockMode } from "./support/privacy-block-lists";
 import {
@@ -72,10 +73,14 @@ const timeout = 30_000;
 
 const prisma = new PrismaClient();
 
-/** What a registration with the seeded form costs on the server: $50.00 ticket + 2 shirts at $15.00, 10% off. */
-const SERVER_RECORDED_TOTAL = "$72.00";
-/** The $72.00 subtotal plus the card fee the form's own rate makes of it (2.9% + 30 cents, passed to the registrant). */
-const SERVER_CARD_CHARGE = "$74.46";
+const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+/** What a registration with the seeded form costs on the server: $50.00 ticket + 2 shirts at $15.00, 10% off (`expected`). */
+const SERVER_RECORDED_TOTAL = dollars(expected.totalPayLaterCents);
+/** That subtotal plus the card fee the form's own rate makes of it (2.9% + 30 cents, passed to the registrant), by the shared fee function. */
+const SERVER_CARD_CHARGE = dollars(expected.totalPayLaterCents + processingFeeForSubtotal(
+  { enabled: true, currency: "USD", paymentMethodFieldKey: "payment_method", cardOptionValue: "Credit / debit card", percentageBasisPoints: 290, fixedFeeCents: 30, passFeeToRegistrant: true },
+  expected.totalPayLaterCents,
+));
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -397,6 +402,15 @@ const TAMPERED_AMOUNT_KEYS = ["total", "totalAmount", "totalCents", "subtotalCen
  * carries them inside `responses`: refused too (422, not a field on the form). Neither stores anything. Request 3 goes
  * out as the page built it. The recorded total, the stored total and the card amount must be the server's.
  */
+/** After a refused submit: the page shows its error and offers the submit again (it also starts the next try on a new key). */
+async function readyToRetry(page: Page) {
+  await page.locator(".public-registration-error-summary").first().waitFor();
+  const submit = page.getByRole("button", { name: "Submit registration" }).first();
+  await submit.waitFor();
+  for (let i = 0; i < 100 && !(await submit.isEnabled()); i += 1) await page.waitForTimeout(100);
+  assert(await submit.isEnabled(), "The page did not offer the submit again after the refusal.");
+}
+
 async function publicRegistrationTamperedTotal({ browser, mode, tracker, browserName }: Parameters<Journey["run"]>[0]) {
   await clearRateLimits();
   const context = await newContext(browser, mode, tracker, browserName);
@@ -405,7 +419,8 @@ async function publicRegistrationTamperedTotal({ browser, mode, tracker, browser
     const page: Page = await context.newPage();
     watch(page, tracker);
     const email = `pbx.tamper.${randomBytes(4).toString("hex")}@example.test`;
-    const fake = Object.fromEntries(TAMPERED_AMOUNT_KEYS.map((key) => [key, key.toLowerCase().includes("cents") ? 1 : 0.01]));
+    // Plainly wrong values: a total of one cent, a negative discount.
+    const fake = Object.fromEntries(TAMPERED_AMOUNT_KEYS.map((key) => [key, key.toLowerCase().includes("discount") ? -500 : key.toLowerCase().includes("cents") ? 1 : 0.01]));
     const sent: { status: number; keys: string[] }[] = [];
     await page.route(/\/api\/public\/events\/[^/]+\/forms\/[^/]+\/registrations$/, async (route: any) => {
       const request = route.request();
@@ -429,6 +444,7 @@ async function publicRegistrationTamperedTotal({ browser, mode, tracker, browser
     assert(!sent[0].keys.some((key) => TAMPERED_AMOUNT_KEYS.includes(key)), `The page itself sent an amount key: ${sent[0].keys.join(", ")}`);
     assert(sent[0].status === 400, `A body with a total at the top was answered ${sent[0].status}, expected the refusal 400.`);
     assert((await stored()) === 0, "A registration was stored from a body carrying a tampered total.");
+    await readyToRetry(page);
 
     // The page offers the submit again; the retry carries the amount keys inside the answers.
     await page.getByRole("button", { name: "Submit registration" }).first().click();
@@ -436,6 +452,7 @@ async function publicRegistrationTamperedTotal({ browser, mode, tracker, browser
     const second = sent[1] as { status: number } | undefined;
     assert(second && second.status === 422, `Amount keys inside the answers were answered ${second?.status}, expected the refusal 422.`);
     assert((await stored()) === 0, "A registration was stored from answers carrying a tampered total.");
+    await readyToRetry(page);
 
     // The third request is the page's own, sent unchanged: the server's numbers.
     await page.getByRole("button", { name: "Submit registration" }).first().click();
