@@ -108,6 +108,8 @@
 }
 .pickerShell svg { position: absolute; right: 10px; pointer-events: none; }
 .pickerPhoneLabel { display: none; }
+.archivedLink { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; gap: 6px; color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.archivedIcon { display: none; }
 
 /* ---------- the one row of tabs, and its menu line ---------- */
 .tabline { position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 8px; border-bottom: 1px solid var(--line); }
@@ -304,6 +306,10 @@
   .pickerShell select option { color: var(--ink); }
   .pickerShell .pickerPhoneLabel { position: absolute; left: 12px; display: block; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; pointer-events: none; white-space: nowrap; }
   .pickerShell select { width: 9.5rem; }
+  /* On a phone Archived events is a 44px icon link beside the switcher (named by its aria-label), so the row stays one row. */
+  .eventTools { gap: 0; }
+  .archivedText { display: none; }
+  .archivedIcon { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -206,7 +206,7 @@ Each Admin tab (Events, Clubs, People, Forms, Catalogs and settings) opens its o
 | Event features (`/more/features`) | A card in the Basics group of Event setup (the tab has no view strip) |
 | Event module requests (`/admin/feature-requests`) | The Event module requests section of the System administration dashboard (`/admin`); it is the page's own title now |
 | Club invites, Import clubs, Import health records, Sterling Volunteers | Views of the Clubs tabs New club applications and Club administration |
-| Archived events (`/archived-events`) | Events tab for system administrators and Event Administrators, and the event switcher's last choice, "Archived events…", for everyone else (#1734) |
+| Archived events (`/archived-events`) | Events tab for system administrators and Event Administrators, and the event bar's Archived events link beside the switcher (an icon on a phone, #1734), for everyone else |
 
 ## Event setup (#1586)
 

@@ -70,12 +70,24 @@ describe("the tab row component", () => {
 describe("the phone header search", () => {
   it("is a 44px icon button named Find a page or task that opens the same search", () => {
     const markup = renderToStaticMarkup(createElement(StaffHeaderSearch, { destinations: [], inputId: "destination-search-input" }));
+    expect(markup).toMatch(/aria-controls="destination-search-input-wrap"/);
+    expect(markup).toContain(`id="destination-search-input-wrap"`);
     expect(markup).toMatch(/<button[^>]*aria-label="Find a page or task"[^>]*aria-expanded="false"/);
     expect(markup).toContain('id="destination-search-input"');
     const css = read("components/staff-shell.module.css");
     expect(css).toMatch(/\.searchToggle \{[^}]*min-width: 44px; min-height: 44px/);
     expect(css).toMatch(/@media \(max-width: 800px\) \{[\s\S]*\.searchToggle \{ display: inline-flex;/);
     expect(css).toMatch(/\.search\[data-open="true"\] \{ display: block;/);
+  });
+});
+
+describe("the phone search row's closing rules", () => {
+  const source = read("components/staff-header-search.tsx");
+  it("closes on a route change, on a window wider than the phone, and on Escape with focus back on the button", () => {
+    expect(source).toContain("const open = openPath === pathname;");
+    expect(source).toContain('matchMedia("(min-width: 801px)")');
+    expect(source).toMatch(/event\.key !== "Escape"/);
+    expect(source).toContain("toggleRef.current?.focus()");
   });
 });
 
@@ -87,11 +99,14 @@ describe("the event bar on a phone", () => {
     defaultEventId: "evt_one",
   }, createElement("p", null, "content")));
 
-  it("moves Archived events into the event switcher, once, as its last choice", () => {
-    expect(markup).not.toContain('href="/archived-events"');
+  it("keeps Archived events beside the switcher as a link, never a select option that arrowing could trigger", () => {
     const select = markup.slice(markup.indexOf('id="event-picker"'), markup.indexOf("</select>", markup.indexOf('id="event-picker"')));
-    expect(select.match(/Archived events/g)).toHaveLength(1);
-    expect(select.trimEnd().endsWith("Archived events…</option>")).toBe(true);
+    expect(select).not.toContain("Archived events");
+    expect(markup.match(/href="\/archived-events"/g)).toHaveLength(1);
+    expect(markup).toMatch(/<a(?=[^>]*href="\/archived-events")(?=[^>]*aria-label="Archived events")/);
+    const css = read("components/staff-shell.module.css");
+    expect(css).toMatch(/\.archivedLink \{[^}]*min-width: 44px; min-height: 44px/);
+    expect(css).toMatch(/\.archivedText \{ display: none; \}/);
   });
 
   it("puts the name and Switch event on one row without repeating the name in the switcher on a phone", () => {

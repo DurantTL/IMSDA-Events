@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { DestinationSearch } from "@/components/destination-search";
 import type { SearchDestination } from "@/components/destination-search-model";
@@ -11,7 +12,31 @@ import styles from "./staff-shell.module.css";
  * same search on its own row under the header (#1734). Wide screens always show the box; the button is hidden there.
  */
 export function StaffHeaderSearch({ destinations, inputId }: { destinations: readonly SearchDestination[]; inputId: string }) {
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  // The row is open only on the page it was opened on, so a route change closes it without an effect.
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const open = openPath === pathname;
+  const setOpen = (next: boolean) => setOpenPath(next ? pathname : null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const wrapId = `${inputId}-wrap`;
+
+  // A window wider than the phone (where the box is always shown) closes the row too.
+  useEffect(() => {
+    const wide = window.matchMedia("(min-width: 801px)");
+    const onChange = () => { if (wide.matches) setOpenPath(null); };
+    wide.addEventListener("change", onChange);
+    return () => wide.removeEventListener("change", onChange);
+  }, []);
+
+  // Escape with nothing left to undo (no typed words, no open list) closes the row and hands focus back to the button.
+  function onKeyDownCapture(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Escape" || !open || event.nativeEvent.isComposing) return;
+    const field = event.target;
+    if (field instanceof HTMLInputElement && (field.value !== "" || field.getAttribute("aria-expanded") === "true")) return;
+    event.preventDefault();
+    setOpen(false);
+    toggleRef.current?.focus();
+  }
 
   function toggle() {
     const next = !open;
@@ -22,15 +47,16 @@ export function StaffHeaderSearch({ destinations, inputId }: { destinations: rea
 
   return (
     <>
-      <div className={styles.search} data-open={open ? "true" : "false"}>
+      <div className={styles.search} id={wrapId} data-open={open ? "true" : "false"} onKeyDownCapture={onKeyDownCapture}>
         <DestinationSearch destinations={destinations} inputId={inputId} onNavigated={() => setOpen(false)} />
       </div>
       <button
         type="button"
+        ref={toggleRef}
         className={`secondary-button ${styles.searchToggle}`}
         aria-label="Find a page or task"
         aria-expanded={open}
-        aria-controls={inputId}
+        aria-controls={wrapId}
         onClick={toggle}
       >
         {open ? <X aria-hidden="true" size={20} /> : <Search aria-hidden="true" size={20} />}
