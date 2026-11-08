@@ -157,8 +157,8 @@ const staffTextFloorExceptions: Array<{ selector: string; reason: string }> = [
   { selector: ".badge-sheet", reason: "the badge print preview shows the printed label at its real print size (Avery sheets are drawn in inches)" },
   { selector: ".sr-only, .visually-hidden", reason: "visually hidden text is not shown" },
 ];
-/** Uppercase, letter-spaced labels (eyebrows, sidebar group labels) may be 12px: they read larger than lowercase text of the same size. */
-const upperLabelFloorPx = 12;
+/** Uppercase, letter-spaced labels (eyebrows, sidebar group labels, table headers) are held to the same 14px floor as other staff text (#1732). */
+const upperLabelFloorPx = staffTextFloorPx;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
