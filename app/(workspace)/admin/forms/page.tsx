@@ -17,6 +17,7 @@ import { listEventsForUser } from "@/modules/events/repository";
 import { buildFormCreateEvents } from "@/modules/forms-hub/create-choices";
 import { FormsCreateSection } from "@/components/forms-create/forms-create-section";
 import { filterFormsHubRows, type FormsHubRow, formsHubKindLabels, parseFormsHubFilters } from "@/modules/forms-hub/rows";
+import { EmptyState } from "@/components/empty-state";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
@@ -63,6 +64,7 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
   }));
   const all = await loadFormsHub();
   const filtered = filterFormsHubRows(all, filters);
+  const filtering = Boolean(filters.kind || filters.status || filters.q);
   // The hub is loaded whole, so the whole filtered list is sorted before it is paged (#1458); the default is the hub's own order.
   const sorting = serverSort<FormSortColumn>("/admin/forms", params, FORM_SORT_COLUMNS, { key: null, dir: "asc" });
   const sorted = sorting.order.key ? sortRows(filtered, sorting.order.key, sorting.order.dir, formAccessors) : filtered;
@@ -98,9 +100,12 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
           {typeof params.sort === "string" && sorting.order.key && (<><input name="sort" type="hidden" value={sorting.order.key} /><input name="dir" type="hidden" value={sorting.order.dir} /></>)}
           <button className="secondary-button" type="submit">Filter</button>
         </SearchAsYouTypeForm>
+        {filtering && <p><Link className="secondary-button forms-hub-link" href="/admin/forms">Clear filters</Link></p>}
         <ListPager hrefFor={(page) => searchPageHref("/admin/forms", params, page)} label="Form pages" noun={filtered.length === all.length ? "forms" : `matching forms (${all.length} in total)`} nounOne={filtered.length === all.length ? "form" : `matching form (${all.length} in total)`} part="count" slice={slice} />
         {filtered.length === 0 ? (
-          <p className="quiet-copy">No forms match.</p>
+          <EmptyState announce={false} title={filtering ? "No forms match" : "No forms yet"} action={{ label: "Clear filters", href: "/admin/forms" }} actionClass="secondary-button" canCreate={filtering}>
+            {!filtering ? "There are no club, general information or event information forms yet. Use Create a form above to start one." : "No form matches this kind, status or name. Clear the filters to see every form."}
+          </EmptyState>
         ) : (
           <div className="report-table-wrap">
             {sorting.order.key && <SortOrderNote>{sortOrderText(formSortLabels[sorting.order.key].label, sorting.order.dir, formSortLabels[sorting.order.key].kind)}</SortOrderNote>}

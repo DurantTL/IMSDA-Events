@@ -76,6 +76,17 @@ describe("All forms page access", () => {
     expect(html).not.toContain('name="event"');
   });
 
+  it("offers Clear filters on a filtered list and a next step when nothing matches (B2, B4)", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
+    mocks.load.mockResolvedValue([]);
+    const filtered = renderToStaticMarkup(await AdminFormsPage({ searchParams: Promise.resolve({ q: "nothing-like-this" }) }));
+    expect(filtered).toContain("No forms match");
+    expect([...filtered.matchAll(/href="\/admin\/forms">Clear filters/g)].length).toBeGreaterThanOrEqual(1);
+    const unfiltered = renderToStaticMarkup(await AdminFormsPage({ searchParams: Promise.resolve({}) }));
+    expect(unfiltered).toContain("No forms yet");
+    expect(unfiltered).not.toContain("Clear filters");
+  });
+
   it("loads for a system administrator", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
     await AdminFormsPage({ searchParams: Promise.resolve({ kind: "CLUB" }) });
