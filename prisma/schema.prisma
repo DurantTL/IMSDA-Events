@@ -11088,3 +11088,27 @@ model EventLifecycleTransition {
 
   @@index([eventId, createdAt])
 }
+
+enum ProblemReportStatus {
+  OPEN
+  RESOLVED
+}
+
+/// A problem someone sent from the Forms help popup (#1483). `number` is the reference they are given ("P-<number>").
+/// `message` and `email` are what the person typed and are kept out of logs, audit metadata and the alert webhook.
+/// `details` holds only the page path with query values stripped and device facts (see modules/support/problem-report-domain.ts),
+/// never form contents, cookies or tokens. `userId` is a plain id with no foreign key so deleting an account never touches a report.
+model ProblemReport {
+  id               String              @id @default(cuid())
+  number           Int                 @unique @default(autoincrement())
+  message          String
+  email            String?
+  userId           String?
+  status           ProblemReportStatus @default(OPEN)
+  details          Json?
+  resolvedByUserId String?
+  resolvedAt       DateTime?
+  createdAt        DateTime            @default(now())
+
+  @@index([status, createdAt])
+}

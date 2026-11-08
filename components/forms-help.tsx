@@ -4,6 +4,7 @@ import { CircleHelp, X } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "@/components/forms-help.module.css";
+import { ProblemReportSection } from "@/components/problem-report-form";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { telHref, type FormsHelpContact } from "@/modules/system-admin/forms-help-contact";
 
@@ -61,7 +62,7 @@ export function FormsHelpRow({ contact, align = "start" }: { contact: FormsHelpC
   );
 }
 
-/** The three collapsed sections. Exported so the content can be tested without opening the dialog. */
+/** The four collapsed sections (the last is Report a problem, #1483). Exported so the content can be tested without opening the dialog. */
 export function FormsHelpSections({ contact }: { contact: FormsHelpContact }) {
   return (
     <div className={styles.sections}>
@@ -97,6 +98,7 @@ export function FormsHelpSections({ contact }: { contact: FormsHelpContact }) {
           <p><a href={telHref(contact.phone)} translate="no">{contact.phone}</a></p>
         </div>
       </details>
+      <ProblemReportSection />
     </div>
   );
 }

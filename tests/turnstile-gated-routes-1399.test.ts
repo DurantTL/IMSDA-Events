@@ -20,6 +20,7 @@ const routes: Array<[string, string, "email-code" | "public-form"]> = [
   ["app/api/public/club-form-applications/[templateKey]/route.ts", "clubApplication", "public-form"],
   ["app/api/public/registration-recovery/route.ts", "registrationRecovery", "public-form"],
   ["app/api/public/information-forms/route.ts", "informationForm", "public-form"],
+  ["app/api/support/problem-reports/route.ts", "problemReport", "public-form"],
 ];
 
 describe("gated routes", () => {
@@ -46,6 +47,7 @@ describe("gated routes", () => {
     ["app/api/public/club-form-applications/[templateKey]/route.ts", /openApplicationSubmitSchema\.parse\(/, ["modules/club-forms/open-applications-domain.ts"]],
     ["app/api/public/information-forms/route.ts", /bodySchema\.safeParse\(/, ["app/api/public/information-forms/route.ts"]],
     ["app/api/public/registration-recovery/route.ts", /requestSchema\.parse\(/, ["app/api/public/registration-recovery/route.ts"]],
+    ["app/api/support/problem-reports/route.ts", /problemReportInputSchema\.parse\(/, ["modules/support/problem-report-domain.ts"]],
   ];
 
   it.each(honeypotRoutes)("%s checks its honeypot before requireTurnstile (#1480)", (path, parseCall, schemaFiles) => {

@@ -277,6 +277,7 @@ export default async function SystemAdminPage({
         </div>
         {moduleRequests === null && <Unavailable what="The feature-request list" />}
         <p><Link className={styles.fullReport} href="/admin/feature-requests">Review feature requests <ArrowRight aria-hidden="true" size={14} /></Link></p>
+        <p><Link className={styles.fullReport} href="/admin/problem-reports">Problem reports from Forms help <ArrowRight aria-hidden="true" size={14} /></Link></p>
       </section>
 
       <section className={styles.primaryColumn} id="upcoming-events" aria-labelledby="upcoming-events-heading">
