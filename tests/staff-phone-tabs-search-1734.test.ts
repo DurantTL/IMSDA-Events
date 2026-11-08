@@ -78,6 +78,8 @@ describe("the phone header search", () => {
     expect(css).toMatch(/\.searchToggle \{[^}]*min-width: 44px; min-height: 44px/);
     expect(css).toMatch(/@media \(max-width: 800px\) \{[\s\S]*\.searchToggle \{ display: inline-flex;/);
     expect(css).toMatch(/\.search\[data-open="true"\] \{ display: block;/);
+    // An icon in the header row (the global phone rule makes .secondary-button full width), so its width is pinned.
+    expect(css).toMatch(/\.topbar \.searchToggle \{[^}]*flex: none; width: 44px;/);
   });
 });
 
