@@ -25,7 +25,7 @@ export function basisText(basis: PointsBasis, checkedIn: number): string {
  * Roster roles that mean a director. The roster's role is free text with no option list, so only these exact values
  * (ignoring case and spacing) count; "Director of music" or "Assistant to the director" do not.
  */
-const directorRoles = new Set(["director", "club director", "deputy director", "deputy"]);
+const directorRoles = new Set(["director", "club director", "deputy director", "deputy", "associate director", "assistant director", "co-director"]);
 export function isDirectorRole(role: string | null | undefined): boolean {
   return directorRoles.has((role ?? "").trim().replace(/\s+/g, " ").toLowerCase());
 }

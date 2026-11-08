@@ -451,8 +451,18 @@ async function setOverride(actor: AttendancePointsActor, eventId: string, organi
   });
 }
 
+/** A cheap fingerprint of the staff overrides and marks, so apply can tell if one changed after the review it used. */
+async function overridesAndMarksFingerprint(db: Pick<ReturnType<typeof getPrisma>, "attendancePointsOverride" | "attendancePointsMark">, eventId: string): Promise<string> {
+  const [overrides, marks] = await Promise.all([
+    db.attendancePointsOverride.aggregate({ where: { eventId }, _count: { _all: true }, _max: { updatedAt: true } }),
+    db.attendancePointsMark.aggregate({ where: { eventId }, _count: { _all: true }, _max: { createdAt: true } }),
+  ]);
+  return [overrides._count._all, overrides._max.updatedAt?.toISOString() ?? "", marks._count._all, marks._max.createdAt?.toISOString() ?? ""].join("|");
+}
+
 async function applyPoints(actor: AttendancePointsActor, eventId: string) {
   const prisma = getPrisma();
+  const reviewed = await overridesAndMarksFingerprint(prisma, eventId);
   const view = await loadAttendancePointsView(eventId, actor);
   if (!view.settings) throw new AttendancePointsError("INVALID", "Set the points first.");
   if (view.appliedAt) throw new AttendancePointsError("NOT_PERMITTED", "These points are already applied.");
@@ -470,6 +480,11 @@ async function applyPoints(actor: AttendancePointsActor, eventId: string) {
     const current = await tx.attendancePointsSetting.findUniqueOrThrow({ where: { eventId }, select: { points: true, requiresPathfinders: true } });
     if (current.points !== view.settings!.points || current.requiresPathfinders !== view.settings!.requiresPathfinders) {
       throw new AttendancePointsError("INVALID", "The points changed while you were applying them. Review the clubs and try again.");
+    }
+    // Override and mark writes lock the same setting row, so once the claim holds it nothing new can land; anything that
+    // landed after the review above means the club list may be stale.
+    if ((await overridesAndMarksFingerprint(tx, eventId)) !== reviewed) {
+      throw new AttendancePointsError("INVALID", "A club's override or mark changed while you were applying. Review the clubs and try again.");
     }
     const points = current.points;
     await tx.clubEventPointAward.createMany({

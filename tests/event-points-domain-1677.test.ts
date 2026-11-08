@@ -185,7 +185,7 @@ describe("the points typed and sent", () => {
 
 describe("director roles and the basis words", () => {
   it("matches only exact director roles on the roster, not any free text containing the word", () => {
-    for (const role of ["Director", " club  director ", "Deputy Director", "deputy"]) expect(isDirectorRole(role), role).toBe(true);
+    for (const role of ["Director", " club  director ", "Deputy Director", "deputy", "Associate Director", "assistant director", "Co-Director"]) expect(isDirectorRole(role), role).toBe(true);
     for (const role of ["Director of music", "Assistant to the director", "Directory", "", null, "Staff"]) expect(isDirectorRole(role), String(role)).toBe(false);
   });
 
