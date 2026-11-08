@@ -1188,21 +1188,35 @@ export async function checkClubFormOutingSendRateLimit(request: Request, actorKe
 export type ClubFormOutingRecipientLimit = { allowed: true } | { allowed: false; reason: "ADDRESS" | "CLUB_DAY" };
 
 /**
- * One family's address in an outing send (#1672): the tightest limit stays per address (a parent is never mailed over and
- * over), and the club has a daily allowance sized for a roster. The addresses are guardians on this club's own roster,
- * which is what makes the bigger club allowance safe. Says which limit was hit.
+ * One family's address in an outing send (#1672). A family is one address: it is charged once per send, however many
+ * children share it (`familySize` children get their links if it passes). The address is held to 3 sends an hour for the
+ * same outing, so a resend can't be used to mail a parent over and over, and to 12 an hour in all, across outings. Only an
+ * address that passes is charged against the club's daily allowance (one for each child), so a refused address never uses
+ * club budget. The addresses are guardians on this club's own roster, which is what makes the bigger allowance safe.
+ * Says which limit was hit.
  */
-export async function checkClubFormOutingRecipientRateLimit(organizationId: string, recipientEmail: string): Promise<ClubFormOutingRecipientLimit> {
+export async function checkClubFormOutingRecipientRateLimit(
+  organizationId: string,
+  outingId: string,
+  recipientEmail: string,
+  familySize = 1,
+): Promise<ClubFormOutingRecipientLimit> {
   const configuration = getRateLimitConfiguration();
   const club = hashRateLimitIdentifier("club-form-outing-club", organizationId, configuration);
+  const outing = hashRateLimitIdentifier("club-form-outing-id", outingId, configuration);
   const recipient = hashRateLimitIdentifier("club-form-link-recipient", recipientEmail.trim().toLowerCase(), configuration);
-  const outcome = await evaluate([
-    { policy: "club-form.outing-recipient.club-day", limit: OUTING_SLIPS_PER_CLUB_DAY, windowSeconds: oneDay, identifierHashes: [club] },
-    { policy: "club-form.outing-recipient.address", limit: 3, windowSeconds: oneHour, identifierHashes: [recipient] },
+  const address = await evaluate([
+    { policy: "club-form.outing-recipient.address-outing", limit: 3, windowSeconds: oneHour, identifierHashes: [recipient, outing] },
+    { policy: "club-form.outing-recipient.address", limit: 12, windowSeconds: oneHour, identifierHashes: [recipient] },
   ], configuration);
-  if (outcome.allowed) return { allowed: true };
-  const denied = outcome.decisions.find((decision) => !decision.allowed) as { policy?: string } | undefined;
-  return { allowed: false, reason: denied?.policy === "club-form.outing-recipient.club-day" ? "CLUB_DAY" : "ADDRESS" };
+  if (!address.allowed) return { allowed: false, reason: "ADDRESS" };
+  for (let child = 0; child < Math.max(1, familySize); child += 1) {
+    const day = await evaluate([
+      { policy: "club-form.outing-recipient.club-day", limit: OUTING_SLIPS_PER_CLUB_DAY, windowSeconds: oneDay, identifierHashes: [club] },
+    ], configuration);
+    if (!day.allowed) return { allowed: false, reason: "CLUB_DAY" };
+  }
+  return { allowed: true };
 }
 
 /**

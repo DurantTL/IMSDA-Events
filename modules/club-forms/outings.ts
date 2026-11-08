@@ -184,7 +184,7 @@ export async function getOutingTracking(viewer: ClubFormsViewer, organizationId:
     clubYear: row.clubYear,
     details: outing.details,
     /** The details as read-only rows, with the slip's own labels for activity, date and ride-with. */
-    detailRows: outingDetailRows(outing.details, registrationFormDefinitionSchema.parse(row.template.definition)),
+    detailRows: outingDetailRows(outing.details, registrationFormDefinitionSchema.safeParse(row.template.definition).data ?? null),
     questions: outing.questions,
     members,
     counts,
@@ -239,7 +239,7 @@ export async function sendOuting(
   organizationId: string,
   outingId: string,
   rawInput: unknown,
-  options: { allowRecipient?: (email: string) => Promise<ClubFormOutingRecipientLimit> } = {},
+  options: { allowRecipient?: (email: string, familySize: number) => Promise<ClubFormOutingRecipientLimit> } = {},
   now = new Date(),
 ) {
   leaderOnly(viewer, organizationId);
@@ -264,6 +264,7 @@ export async function sendOuting(
   });
   const messageIds: string[] = [];
   const results: OutingSendResult[] = [];
+  const pending: Array<{ memberId: string; name: string; email: string }> = [];
   for (const memberId of memberIds) {
     const member = known.get(memberId);
     if (!member) {
@@ -291,34 +292,45 @@ export async function sendOuting(
       done("NO_PARENT_EMAIL");
       continue;
     }
-    const limit = options.allowRecipient ? await options.allowRecipient(email) : null;
-    if (limit && !limit.allowed) {
-      done(limit.reason === "CLUB_DAY" ? "CLUB_LIMIT" : "RATE_LIMITED");
-      continue;
-    }
-    try {
-      const created = await createClubFormLink(viewer, {
-        organizationId,
-        templateKey: OUTING_TEMPLATE_KEY,
-        recipientEmail: email,
-        rosterMemberId: memberId,
-        outingId: row.id,
-        resend: input.resend,
-        ...(input.expiresInDays ? { expiresInDays: input.expiresInDays } : {}),
-      }, now);
-      messageIds.push(created.messageId);
-      done("SENT");
-    } catch (error) {
-      // Another send for this member got in first (a double click): the link already made stands.
-      if (error instanceof ClubFormError && (error.code === "OUTING_ALREADY_SENT" || error.code === "OUTING_ALREADY_SIGNED")) {
-        done(error.code === "OUTING_ALREADY_SIGNED" ? "ALREADY_SIGNED" : "ALREADY_SENT");
+    pending.push({ memberId, name, email });
+  }
+  // A family is one address: it is charged once per send, however many children share it, and all of them get their links
+  // when it passes. Siblings on one guardian email are the normal case, not a burst.
+  const families = new Map<string, typeof pending>();
+  for (const entry of pending) families.set(entry.email, [...(families.get(entry.email) ?? []), entry]);
+  for (const [email, children] of families) {
+    const limit = options.allowRecipient ? await options.allowRecipient(email, children.length) : null;
+    for (const { memberId, name } of children) {
+      const done = (outcome: OutingSendOutcome) => results.push({ memberId, name, outcome });
+      if (limit && !limit.allowed) {
+        done(limit.reason === "CLUB_DAY" ? "CLUB_LIMIT" : "RATE_LIMITED");
         continue;
       }
-      // A closed outing, a switched-off slip or email not set up stops the whole send; any other problem is that member's alone.
-      if (error instanceof ClubFormError && ["OUTING_CLOSED", "OUTING_NOT_FOUND", "TEMPLATE_NOT_FOUND", "EMAIL_NOT_CONFIGURED", "FORM_UNAVAILABLE", "FORBIDDEN"].includes(error.code)) throw error;
-      done("FAILED");
+      try {
+        const created = await createClubFormLink(viewer, {
+          organizationId,
+          templateKey: OUTING_TEMPLATE_KEY,
+          recipientEmail: email,
+          rosterMemberId: memberId,
+          outingId: row.id,
+          resend: input.resend,
+          ...(input.expiresInDays ? { expiresInDays: input.expiresInDays } : {}),
+        }, now);
+        messageIds.push(created.messageId);
+        done("SENT");
+      } catch (error) {
+        // Another send for this member got in first (a double click): the link already made stands.
+        if (error instanceof ClubFormError && (error.code === "OUTING_ALREADY_SENT" || error.code === "OUTING_ALREADY_SIGNED")) {
+          done(error.code === "OUTING_ALREADY_SIGNED" ? "ALREADY_SIGNED" : "ALREADY_SENT");
+          continue;
+        }
+        // A closed outing, a switched-off slip or email not set up stops the whole send; any other problem is that member's alone.
+        if (error instanceof ClubFormError && ["OUTING_CLOSED", "OUTING_NOT_FOUND", "TEMPLATE_NOT_FOUND", "EMAIL_NOT_CONFIGURED", "FORM_UNAVAILABLE", "FORBIDDEN"].includes(error.code)) throw error;
+        done("FAILED");
+      }
     }
   }
+  results.sort((left, right) => memberIds.indexOf(left.memberId) - memberIds.indexOf(right.memberId));
   return { results, messageIds, sent: results.filter((result) => result.outcome === "SENT").length };
 }
 

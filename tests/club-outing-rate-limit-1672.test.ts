@@ -44,8 +44,8 @@ beforeEach(() => {
 describe("an outing send and the real limiter (#1672)", () => {
   it("lets a 35-family send through the route, every address allowed", async () => {
     const outcomes: unknown[] = [];
-    mocks.sendOuting.mockImplementation(async (_viewer, _org, _outing, _body, options: { allowRecipient: (email: string) => Promise<unknown> }) => {
-      for (let family = 1; family <= 35; family += 1) outcomes.push(await options.allowRecipient(`parent${family}@example.test`));
+    mocks.sendOuting.mockImplementation(async (_viewer, _org, _outing, _body, options: { allowRecipient: (email: string, familySize: number) => Promise<unknown> }) => {
+      for (let family = 1; family <= 35; family += 1) outcomes.push(await options.allowRecipient(`parent${family}@example.test`, 1));
       return { sent: 35, messageIds: [], results: [] };
     });
     const response = await SEND(request(), context());
@@ -56,19 +56,39 @@ describe("an outing send and the real limiter (#1672)", () => {
 
   it("holds each address to 3 an hour, and says it is the address", async () => {
     const results = [];
-    for (let attempt = 0; attempt < 4; attempt += 1) results.push(await checkClubFormOutingRecipientRateLimit("club-a", "Parent@Example.test"));
+    for (let attempt = 0; attempt < 4; attempt += 1) results.push(await checkClubFormOutingRecipientRateLimit("club-a", "outing-1", "Parent@Example.test"));
     expect(results.map((result) => result.allowed)).toEqual([true, true, true, false]);
     expect(results[3]).toEqual({ allowed: false, reason: "ADDRESS" });
-    expect(outingSendOutcomeText.RATE_LIMITED).toMatch(/address already got 3 slips/);
+    expect(outingSendOutcomeText.RATE_LIMITED).toMatch(/3 times in the last hour, or 12 slips in all/);
+  });
+
+  it("holds an address to 12 an hour across outings", async () => {
+    const results = [];
+    for (let outing = 1; outing <= 13; outing += 1) results.push((await checkClubFormOutingRecipientRateLimit("club-a", `outing-${outing}`, "parent@example.test")).allowed);
+    expect(results.slice(0, 12).every(Boolean)).toBe(true);
+    expect(results[12]).toBe(false);
+  });
+
+  it("does not charge the club's day to an address that was refused", async () => {
+    const clubDay = () => [...counts].filter(([key]) => key.startsWith("club-form.outing-recipient.club-day")).reduce((total, [, used]) => total + used, 0);
+    for (let attempt = 0; attempt < 3; attempt += 1) await checkClubFormOutingRecipientRateLimit("club-a", "outing-1", "parent@example.test");
+    expect(clubDay()).toBe(3);
+    for (let attempt = 0; attempt < 5; attempt += 1) expect(await checkClubFormOutingRecipientRateLimit("club-a", "outing-1", "parent@example.test")).toEqual({ allowed: false, reason: "ADDRESS" });
+    expect(clubDay()).toBe(3);
+  });
+
+  it("charges a family's club budget once for each child", async () => {
+    await checkClubFormOutingRecipientRateLimit("club-a", "outing-1", "parent@example.test", 4);
+    expect([...counts].filter(([key]) => key.startsWith("club-form.outing-recipient.club-day")).reduce((total, [, used]) => total + used, 0)).toBe(4);
   });
 
   it("holds a club to a daily allowance sized for a roster, and says it is the club's", async () => {
     expect(OUTING_SLIPS_PER_CLUB_DAY).toBe(OUTING_SLIPS_PER_DAY);
     let last;
-    for (let family = 1; family <= OUTING_SLIPS_PER_CLUB_DAY + 1; family += 1) last = await checkClubFormOutingRecipientRateLimit("club-a", `family${family}@example.test`);
+    for (let family = 1; family <= OUTING_SLIPS_PER_CLUB_DAY + 1; family += 1) last = await checkClubFormOutingRecipientRateLimit("club-a", "outing-1", `family${family}@example.test`);
     expect(last).toEqual({ allowed: false, reason: "CLUB_DAY" });
     // Another club is untouched.
-    expect(await checkClubFormOutingRecipientRateLimit("club-b", "family1@example.test")).toEqual({ allowed: true });
+    expect(await checkClubFormOutingRecipientRateLimit("club-b", "outing-1", "family1@example.test")).toEqual({ allowed: true });
     expect(outingSendOutcomeText.CLUB_LIMIT).toContain(String(OUTING_SLIPS_PER_DAY));
   });
 

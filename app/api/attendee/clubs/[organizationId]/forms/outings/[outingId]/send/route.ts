@@ -14,7 +14,7 @@ type RouteContext = { params: Promise<{ organizationId: string; outingId: string
 /**
  * Sends an outing's slip to the chosen members' parents (#1672), or sends it again (`resend`). Each family gets its own
  * single-use private link in its own email, through the same link flow as any club form link. The send is rate limited
- * once as an action, and each family by its address (3 an hour) and the club (400 slips a day), not by the one-at-a-time
+ * once as an action, and each family once per send by its address (3 an hour for one outing, 12 in all) and, if that passes, the club (400 slips a day), not by the one-at-a-time
  * limits of a typed link. Emails are delivered after the response; the outbox sweep retries a failure.
  */
 async function postHandler(request: Request, context: RouteContext) {
@@ -33,7 +33,7 @@ async function postHandler(request: Request, context: RouteContext) {
       );
     }
     const { results, messageIds, sent } = await sendOuting(viewer, organizationId, outingId, await readClubFormJson(request), {
-      allowRecipient: (email) => checkClubFormOutingRecipientRateLimit(organizationId, email),
+      allowRecipient: (email, familySize) => checkClubFormOutingRecipientRateLimit(organizationId, outingId, email, familySize),
     });
     if (messageIds.length > 0) {
       after(async () => {

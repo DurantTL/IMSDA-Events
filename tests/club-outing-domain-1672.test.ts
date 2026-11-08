@@ -178,7 +178,7 @@ describe("how an outing reads to a parent and the director", () => {
     expect(rows.find((row) => row.label === "On the date of")?.value).toBe("November 21–23, 2026");
   });
 
-  it("takes the labels from the template, so an edited label follows and a removed field leaves its row out", () => {
+  it("takes the labels from the template, so an edited label follows, and falls back to a plain label when there is none", () => {
     const edited = {
       ...slip.definition,
       sections: slip.definition.sections.map((section) => ({
@@ -188,7 +188,10 @@ describe("how an outing reads to a parent and the director", () => {
     };
     const rows = outingDetailRows(parseOutingInput({ details, questions: [] }).details, edited);
     expect(rows[0]).toEqual({ label: "Edited activity wording", value: "Canoe trip" });
-    expect(rows.some((row) => row.value === details.transportation)).toBe(false);
+    // A template with no ride-with field (or no readable definition) still shows the row, under a plain label.
+    expect(rows.find((row) => row.value === details.transportation)?.label).toBe("Transportation and who your child rides with");
+    const plain = outingDetailRows(parseOutingInput({ details, questions: [] }).details, null);
+    expect(plain.slice(0, 2)).toEqual([{ label: "Activity", value: "Canoe trip" }, { label: "Date", value: "November 21, 2026" }]);
   });
 
   it("reads each link as signed, not yet or link expired", () => {

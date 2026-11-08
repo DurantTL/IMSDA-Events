@@ -199,18 +199,23 @@ export function outingDateLabel(details: Pick<OutingDetails, "startDate" | "endD
 export type OutingDetailRow = { label: string; value: string };
 
 /** The slip's own labels for its three typed fields, read from the template's definition (never written here). */
-export function outingPresetLabels(definition: RegistrationFormDefinition): Partial<Record<keyof typeof OUTING_PRESET_KEYS, string>> {
-  const labels = new Map(definition.sections.flatMap((section) => section.fields.map((field) => [field.key, field.label] as const)));
-  const pick = (key: string) => labels.get(key);
-  return { activity: pick(OUTING_PRESET_KEYS.activity), date: pick(OUTING_PRESET_KEYS.date), rideWith: pick(OUTING_PRESET_KEYS.rideWith) };
+export function outingPresetLabels(definition: RegistrationFormDefinition | null): Partial<Record<keyof typeof OUTING_PRESET_KEYS, string>> {
+  const labels = new Map((definition?.sections ?? []).flatMap((section) => section.fields.map((field) => [field.key, field.label] as const)));
+  // The template's own wording; a plain default only when the template has no such field (or no readable definition).
+  const pick = (key: string, fallback: string) => labels.get(key) ?? fallback;
+  return {
+    activity: pick(OUTING_PRESET_KEYS.activity, "Activity"),
+    date: pick(OUTING_PRESET_KEYS.date, "Date"),
+    rideWith: pick(OUTING_PRESET_KEYS.rideWith, "Transportation and who your child rides with"),
+  };
 }
 
 /**
  * The details as read-only label and value rows, for the parent's page, the director's pages and the print view. The
- * three the slip already asks use the template's own labels (a template that no longer has one leaves that row out);
+ * three the slip already asks use the template's own labels (a plain default label if the template has no such field);
  * the extra rows (times, cost, what to bring, the note) have their own. Empty ones are left out.
  */
-export function outingDetailRows(details: OutingDetails, definition: RegistrationFormDefinition): OutingDetailRow[] {
+export function outingDetailRows(details: OutingDetails, definition: RegistrationFormDefinition | null): OutingDetailRow[] {
   const labels = outingPresetLabels(definition);
   const rows: Array<{ label: string | undefined; value: string }> = [
     { label: labels.activity, value: details.activity },
@@ -244,7 +249,7 @@ export const outingSendOutcomeText: Record<OutingSendOutcome, string> = {
   ALREADY_SENT: "Already sent: use Resend to send again",
   NO_PARENT_EMAIL: "No parent email on the roster",
   NOT_ELIGIBLE: "Not a youth member",
-  RATE_LIMITED: "This parent's address already got 3 slips in the last hour: try again later",
+  RATE_LIMITED: "This parent's address was sent this outing's slip 3 times in the last hour, or 12 slips in all: try again later",
   CLUB_LIMIT: `Your club's daily limit of ${OUTING_SLIPS_PER_DAY} slips is used up: try again tomorrow`,
   NOT_FOUND: "Not on the roster",
   FAILED: "Could not be sent",

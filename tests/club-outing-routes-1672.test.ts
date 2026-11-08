@@ -103,15 +103,15 @@ describe("the outing routes (#1672)", () => {
   });
 
   it("send charges the action once, charges each address, and delivers the queued emails after the response", async () => {
-    mocks.sendOuting.mockImplementation(async (_viewer, _org, _outing, _body, options: { allowRecipient: (email: string) => Promise<unknown> }) => {
-      await options.allowRecipient("parent@example.test");
+    mocks.sendOuting.mockImplementation(async (_viewer, _org, _outing, _body, options: { allowRecipient: (email: string, familySize: number) => Promise<unknown> }) => {
+      await options.allowRecipient("parent@example.test", 2);
       return { sent: 1, messageIds: ["message-1"], results: [{ memberId: "member-1", name: "Riley Sample", outcome: "SENT" }] };
     });
     const response = await SEND(post({ memberIds: ["member-1"] }), outing());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ sent: 1 });
     expect(mocks.checkClubFormOutingSendRateLimit).toHaveBeenCalledWith(expect.any(Request), "acct-1", "club-a");
-    expect(mocks.checkClubFormOutingRecipientRateLimit).toHaveBeenCalledWith("club-a", "parent@example.test");
+    expect(mocks.checkClubFormOutingRecipientRateLimit).toHaveBeenCalledWith("club-a", "outing-1", "parent@example.test", 2);
     expect(mocks.after).toHaveBeenCalledTimes(1);
     await mocks.after.mock.calls[0][0]();
     expect(mocks.processAccountEmailQueue).toHaveBeenCalledWith({ messageIds: ["message-1"], limit: 1 });

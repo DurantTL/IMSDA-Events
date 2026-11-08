@@ -48,7 +48,20 @@ const client = {
   $transaction: (work: (tx: unknown) => unknown) => work(client),
 };
 
+const limiterCounts = vi.hoisted(() => new Map<string, number>());
+
 vi.mock("server-only", () => ({}));
+vi.mock("@/modules/rate-limit/repository", () => ({
+  enforceRateLimitRules: async (rules: Array<{ policy: string; limit: number; subjectHash: string }>) => {
+    const decisions = rules.map((rule) => {
+      const key = `${rule.policy}:${rule.subjectHash}`;
+      const used = (limiterCounts.get(key) ?? 0) + 1;
+      limiterCounts.set(key, used);
+      return { policy: rule.policy, allowed: used <= rule.limit, limit: rule.limit, remaining: Math.max(0, rule.limit - used), count: used, windowSeconds: 3600, resetAfterSeconds: 60 };
+    });
+    return { allowed: decisions.every((decision) => decision.allowed), decisions };
+  },
+}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
 vi.mock("@/lib/env", () => ({
   getServerEnv: () => ({ SECRET_ENCRYPTION_KEY: "a-synthetic-encryption-key-for-club-form-tests", APP_BASE_URL: "https://events.imsda.test" }),
@@ -63,6 +76,7 @@ import { hashOpaqueToken } from "@/modules/access/tokens";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
 import { isClubFormsRole, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { resolveClubFormLinkForFill, submitClubFormViaLink } from "@/modules/club-forms/links";
+import { checkClubFormOutingRecipientRateLimit } from "@/modules/rate-limit/service";
 import { closeOuting, createOuting, getOutingForCopy, getOutingTracking, listOutings, sendOuting } from "@/modules/club-forms/outings";
 
 const now = new Date("2026-11-10T15:00:00Z");
@@ -164,6 +178,7 @@ function outingLink(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  limiterCounts.clear();
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(now);
@@ -179,7 +194,7 @@ beforeEach(() => {
   mocks.queryRaw.mockReset();
   mocks.queryRaw.mockResolvedValue([]);
   mocks.outingCreate.mockResolvedValue({ id: "outing-1" });
-  mocks.outingFindFirst.mockImplementation(async ({ where }: { where: { id: string; organizationId: string } }) => (where.id === "outing-1" && where.organizationId === "club-a" ? outingRow() : null));
+  mocks.outingFindFirst.mockImplementation(async ({ where }: { where: { id: string; organizationId: string } }) => (["outing-1", "outing-2"].includes(where.id) && where.organizationId === "club-a" ? outingRow({ id: where.id }) : null));
   mocks.outingFindMany.mockResolvedValue([]);
   mocks.outingUpdate.mockResolvedValue({});
   let linkNumber = 0;
@@ -373,7 +388,7 @@ describe("sending to the chosen families (#1672)", () => {
     mocks.rosterFindMany.mockResolvedValue([member("member-1", "Riley", ["pat.one@example.test"])]);
     const allowRecipient = vi.fn(async () => ({ allowed: false as const, reason: "ADDRESS" as const }));
     const result = await send({ memberIds: ["member-1"] }, { allowRecipient });
-    expect(allowRecipient).toHaveBeenCalledWith("pat.one@example.test");
+    expect(allowRecipient).toHaveBeenCalledWith("pat.one@example.test", 1);
     expect(result.results[0].outcome).toBe("RATE_LIMITED");
     const club = await send({ memberIds: ["member-1"] }, { allowRecipient: async () => ({ allowed: false as const, reason: "CLUB_DAY" as const }) });
     expect(club.results[0].outcome).toBe("CLUB_LIMIT");
@@ -396,6 +411,47 @@ describe("sending to the chosen families (#1672)", () => {
     const { createClubFormLink } = await import("@/modules/club-forms/links");
     await expect(createClubFormLink(areaCoordinator, { organizationId: "club-a", templateKey: "off_premises_permission_slip", recipientEmail: "pat.one@example.test", outingId: "outing-1" }, now))
       .rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});
+
+describe("sending with the real limiter (#1672)", () => {
+  const siblings = (count: number) => Array.from({ length: count }, (_, n) => member(`sib-${n + 1}`, `Child${n + 1}`, ["family@example.test"]));
+  const sendTo = (outingId: string, ids: string[], resend = false) => sendOuting(director, "club-a", outingId, { memberIds: ids, resend }, {
+    allowRecipient: (email, size) => checkClubFormOutingRecipientRateLimit("club-a", outingId, email, size),
+  }, now);
+
+  it("gives four siblings on one guardian address a link each in one send", async () => {
+    mocks.rosterFindMany.mockResolvedValue(siblings(4));
+    const result = await sendTo("outing-1", ["sib-1", "sib-2", "sib-3", "sib-4"]);
+    expect(result.results.map((entry) => entry.outcome)).toEqual(["SENT", "SENT", "SENT", "SENT"]);
+    expect(mocks.linkCreate).toHaveBeenCalledTimes(4);
+    expect(mocks.outboxCreate).toHaveBeenCalledTimes(4);
+  });
+
+  it("sends two outings back to back to two siblings, every slip going through", async () => {
+    mocks.rosterFindMany.mockResolvedValue(siblings(2));
+    for (const outingId of ["outing-1", "outing-2"]) {
+      const result = await sendTo(outingId, ["sib-1", "sib-2"]);
+      expect(result.results.map((entry) => entry.outcome)).toEqual(["SENT", "SENT"]);
+    }
+    expect(mocks.linkCreate).toHaveBeenCalledTimes(4);
+  });
+
+  it("refuses a fourth resend of the same outing to one address in an hour, in plain words", async () => {
+    mocks.rosterFindMany.mockResolvedValue(siblings(2));
+    const outcomes = [];
+    for (let attempt = 0; attempt < 4; attempt += 1) outcomes.push((await sendTo("outing-1", ["sib-1", "sib-2"], true)).results.map((entry) => entry.outcome));
+    expect(outcomes.slice(0, 3)).toEqual([["SENT", "SENT"], ["SENT", "SENT"], ["SENT", "SENT"]]);
+    expect(outcomes[3]).toEqual(["RATE_LIMITED", "RATE_LIMITED"]);
+    expect(mocks.linkCreate).toHaveBeenCalledTimes(6);
+  });
+
+  it("charges the club budget only for a family that went through", async () => {
+    mocks.rosterFindMany.mockResolvedValue(siblings(2));
+    for (let attempt = 0; attempt < 5; attempt += 1) await sendTo("outing-1", ["sib-1", "sib-2"], true);
+    const clubDay = [...limiterCounts].filter(([key]) => key.startsWith("club-form.outing-recipient.club-day")).reduce((total, [, used]) => total + used, 0);
+    // Three sends passed, two children each; the two refused sends used none.
+    expect(clubDay).toBe(6);
   });
 });
 
@@ -426,6 +482,12 @@ describe("tracking and closing (#1672)", () => {
     expect(tracking.members[0]).toMatchObject({ state: "EXPIRED", withdrawnAt: "2026-11-09T00:00:00.000Z" });
     // The slip's own labels come with the tracking data, for the page and the print view.
     expect(tracking.detailRows.map((row) => row.label)).toContain("On the date of");
+  });
+
+  it("still opens the tracking data when the stored slip definition can't be read, with plain labels", async () => {
+    mocks.outingFindFirst.mockResolvedValue(outingRow({ template: { definition: { broken: true } } }));
+    const tracking = await getOutingTracking(director, "club-a", "outing-1", now);
+    expect(tracking.detailRows.slice(0, 2).map((row) => row.label)).toEqual(["Activity", "Date"]);
   });
 
   it("closing withdraws every link still open and audits counts", async () => {
