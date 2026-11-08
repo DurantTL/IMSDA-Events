@@ -248,6 +248,11 @@ describe("event tabs (#1565)", () => {
     expect(place("/more/promo-codes")).toEqual({ tab: "money", view: "promo" });
     expect(place(kitchenCountsPath)).toEqual({ tab: "reports", view: "kitchen-counts" });
     expect(place("/more/reports/packets")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports/printouts")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports/clubs")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports/clubs/packet/org_1")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports/clubs/team-form/level")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports")).toEqual({ tab: "reports", view: "operational" });
     expect(place("/more/lodging")).toEqual({ tab: "setup", view: "all-tools" });
     expect(place("/more/event-settings")).toEqual({ tab: "setup", view: "settings" });
     expect(place("/registration-builder")).toEqual({ tab: "setup", view: "registration-form" });

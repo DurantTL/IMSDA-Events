@@ -35,6 +35,7 @@ import {
   Users,
   UsersRound,
   WalletCards,
+  Printer,
   Wrench,
 } from "lucide-react";
 import { kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
@@ -147,6 +148,7 @@ export const staffPageTitles = {
   clubReports: "Club event reports",
   groupedPackets: "Grouped event packets",
   operationalReports: "Operational reports",
+  printouts: "Printouts",
   clubMonthlyReport: "Club Monthly Record",
   clubMonthlyReports: "Review monthly records",
   clubs: "Clubs",
@@ -209,6 +211,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/reports/clubs/check-in-book", "prefix", staffPageTitles.checkInBook],
   ["/more/reports/clubs", "prefix", staffPageTitles.clubReports],
   ["/more/reports/packets", "prefix", staffPageTitles.groupedPackets],
+  ["/more/reports/printouts", "prefix", staffPageTitles.printouts],
   ["/more/reports", "prefix", staffPageTitles.operationalReports],
   ["/more/features", "prefix", staffPageTitles.eventFeatures],
   ["/more", "exact", staffPageTitles.eventModules],
@@ -409,6 +412,7 @@ export const navigation: readonly NavigationItem[] = [
   { href: "/staff", label: staffPageTitles.team, icon: UserCog, requiredPermission: "MANAGE_STAFF", sidebarParent: "/more" },
   { href: "/more/promo-codes", label: staffPageTitles.promoCodes, icon: TicketPercent, requiredPermission: "MANAGE_FINANCE", sidebarParent: "/finance" },
   { href: "/finance/tools", label: staffPageTitles.moreMoneyTools, icon: Wrench, requiredPermission: "MANAGE_FINANCE", sidebarParent: "/finance" },
+  { href: "/more/reports/printouts", label: staffPageTitles.printouts, icon: Printer, requiredPermission: "VIEW_REPORTS", sidebarParent: "/more/reports" },
   {
     href: "/more",
     label: staffPageTitles.more,

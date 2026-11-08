@@ -59,7 +59,7 @@ export default async function EventPacketsPage({
           <p>Print a cover and one operational packet per church, club, household, or registration group.</p>
         </div>
         <div className="intro-actions">
-          <Link className="secondary-button" href={`/more/reports?${eventQuery}`}>Back to reports</Link>
+          <Link className="secondary-button" href={`/more/reports/printouts?${eventQuery}`}>Back to Printouts</Link>
           <PrintReportButton label={query.group ? "Print this packet" : "Print all packets"} />
         </div>
       </div>
