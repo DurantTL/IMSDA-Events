@@ -8,7 +8,7 @@ import { withRequestContext } from "@/lib/request-context";
 
 /**
  * Staff switch the Club teachers tool on or off and set its rule (#1681): Event Admins, active Clubs Administrators
- * (on club events) and system administrators, through the club tools' MANAGE_REGISTRATION check. Audited.
+ * (an Event Admin on club events) and system administrators; Registration Managers are refused. Audited.
  */
 async function putHandler(request: Request, context: { params: Promise<{ eventId: string }> }) {
   const originError = rejectCrossOriginRequest(request);
