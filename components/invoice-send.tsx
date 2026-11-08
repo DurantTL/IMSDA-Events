@@ -17,7 +17,7 @@ export function InvoiceSendView({ preview, viewerName, settlement = null }: { pr
           <p className="eyebrow">Invoice</p>
           <h2>{preview.isResend ? "Resend" : "Send"} {version.number}</h2>
           <p>
-            <StatusBadge status={version.status} />{settlement && <> <span className="count-badge billing-readiness">{settlement === "UNAVAILABLE" ? "Payment status unavailable" : settlementLabel(settlement)}</span></>} · {invoiceMoney(version.amountDueCents)} · finalized {invoiceWhen(version.finalizedAt)}
+            <StatusBadge status={version.status} />{settlement && version.status === "FINALIZED" && <> <span className="count-badge billing-readiness">{settlement === "UNAVAILABLE" ? "Payment status unavailable" : settlementLabel(settlement)}</span></>} · {invoiceMoney(version.amountDueCents)} · finalized {invoiceWhen(version.finalizedAt)}
           </p>
           <p><small>Event {preview.eventName} · Billed to {version.organizationName}</small></p>
         </div>

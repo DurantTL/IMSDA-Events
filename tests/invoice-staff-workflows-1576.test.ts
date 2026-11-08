@@ -130,4 +130,35 @@ describe("invoice record headers (#1576)", () => {
     expect(markup.match(/SC27-0001/g)?.length).toBe(1);
     expect(renderToStaticMarkup(createElement(InvoiceSendView, { preview, viewerName: "T", settlement: "UNAVAILABLE" }))).toContain("Payment status unavailable");
   });
+
+  it("shows Unpaid and Nothing due once, and no payment word on a replaced version or a draft", () => {
+    const render = (shown: InvoiceVersionSummary, settlement: string, liveId = "v1") => {
+      const ledger = { ...(ledgerFor(settlement) as object), live: { id: liveId, number: "SC27-0001", status: "FINALIZED", posting: null } } as never;
+      const markup = renderToStaticMarkup(createElement(InvoiceDetailView, { eventId: "event-1", eventName: "Renamed", detail: detailFor(shown), canFinalize: false, viewerName: "T", ledger }));
+      return markup.slice(0, markup.indexOf('aria-label="Invoice summary"'));
+    };
+    expect(render(version(), "UNPAID")).toContain("Unpaid");
+    const zero = render({ ...version(), amountDueCents: 0 }, "NOTHING_DUE");
+    expect(zero).toContain("Nothing due");
+    expect(zero).not.toContain("nothing owed");
+    const replaced = { ...version(), status: "SUPERSEDED" } as InvoiceVersionSummary;
+    const header = render(replaced, "PARTIALLY_PAID", "v2");
+    expect(header).toContain("Superseded");
+    expect(header).not.toMatch(/Partly paid|Unpaid|Paid/);
+  });
+
+  it("the send header shows no payment word for a replaced version or without a status", () => {
+    const base = {
+      eventId: "event-1", eventName: "Renamed", invoiceId: "i1",
+      version: { id: "v1", number: "SC27-0001", status: "SUPERSEDED", amountDueCents: 10000, organizationName: "Church One", finalizedAt: "2026-10-04T12:00:00.000Z" },
+      canSend: false, blockedReason: "replaced", newerVersion: null, snapshotContact: contact, currentContact: contact, contactChanged: false, recipients: [], recipientsFingerprint: "fp",
+      subject: "s", body: "b", sender: { name: "Sender", email: null, replyTo: null }, deliveryMode: "EXTERNAL_EMAIL", pdf: { filename: "f.pdf", exists: true, sha256: null }, history: [], isResend: false,
+    } satisfies SendPreview;
+    const markup = renderToStaticMarkup(createElement(InvoiceSendView, { preview: base, viewerName: "T", settlement: "PARTIALLY_PAID" }));
+    expect(markup).toContain("Superseded");
+    expect(markup).not.toMatch(/Partly paid|unavailable/);
+    const live = { ...base, version: { ...base.version, status: "FINALIZED" as const } };
+    expect(renderToStaticMarkup(createElement(InvoiceSendView, { preview: live, viewerName: "T", settlement: null }))).not.toMatch(/Partly paid|Unpaid|unavailable/);
+    expect(renderToStaticMarkup(createElement(InvoiceSendView, { preview: live, viewerName: "T", settlement: "UNPAID" }))).toContain("Unpaid");
+  });
 });

@@ -5,6 +5,7 @@ import { InvoiceSendView } from "@/components/invoice-send";
 import { resolveEventContext } from "@/modules/events/selection";
 import type { SettlementStatus } from "@/modules/invoices/delivery-domain";
 import { getInvoiceSendPreview } from "@/modules/invoices/delivery-repository";
+import { logError } from "@/lib/logger";
 import { loadEventLedger } from "@/modules/invoices/ledger-repository";
 import { InvoiceError } from "@/modules/invoices/repository";
 
@@ -31,12 +32,14 @@ export default async function SendInvoicePage({ params, searchParams }: { params
   }
   // The version must belong to the invoice in the URL, as well as to the event.
   if (preview.invoiceId !== invoiceId) notFound();
-  // Payment status for the header only (read-only); a failed read says it is unavailable.
-  let settlement: SettlementStatus | "UNAVAILABLE" = "UNAVAILABLE";
+  // Payment status for the header only (read-only). It describes the live version, so only the live one shows it;
+  // no finalized version means no badge, and a failed read says it is unavailable.
+  let settlement: SettlementStatus | "UNAVAILABLE" | null = null;
   try {
     const [ledger] = await loadEventLedger(event.id, { invoiceId });
-    if (ledger) settlement = ledger.settlement;
-  } catch {
+    if (ledger && ledger.live.id === preview.version.id) settlement = ledger.settlement;
+  } catch (error) {
+    logError("Invoice send payment status could not load", error);
     settlement = "UNAVAILABLE";
   }
   return <InvoiceSendView preview={preview} settlement={settlement} viewerName={user.displayName} />;

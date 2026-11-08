@@ -35,6 +35,8 @@ export function InvoiceDetailView({
   const { shown, snapshot, versions, change } = detail;
   const isDraft = shown.status === "DRAFT";
   const contact = shown.contact;
+  // Payment status is worked out from the live version, so it is shown in the header only when the live version is the one shown.
+  const showSettlement = !isDraft && ledger !== null && shown.id === ledger.live.id;
   const finalizeAllowed = canFinalize || !detail.needsFinalizePermission;
   // A church's promo code invoice (#399) has no reconciliation: it is stale when its lines no longer match the redemptions.
   const isChurchCodes = snapshot.kind === "CHURCH_PROMO_CODES";
@@ -47,8 +49,8 @@ export function InvoiceDetailView({
           <h2>{shown.groupTitle}</h2>
           <p>
             <StatusBadge status={shown.status} /> {displayNumber({ number: shown.number, baseNumber: detail.invoice.baseNumber, revision: shown.revision })}
-            {!isDraft && ledger && <> <span className="count-badge billing-readiness">{settlementLabel(ledger.settlement)}</span></>}
-            {" "}· {invoiceMoney(shown.amountDueCents)}{shown.amountDueCents === 0 ? " (nothing owed)" : ""}
+            {showSettlement && <> <span className="count-badge billing-readiness">{settlementLabel(ledger.settlement)}</span></>}
+            {" "}· {invoiceMoney(shown.amountDueCents)}{shown.amountDueCents === 0 && !showSettlement ? " (nothing owed)" : ""}
           </p>
           <p><small>Event {eventName} · Billed to {shown.organizationName}</small></p>
         </div>
