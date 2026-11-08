@@ -215,6 +215,8 @@ export type DeliveryHistoryEntry = {
 
 export type SendPreview = {
   eventId: string;
+  /** The event's name, for the record header on the send page. */
+  eventName: string;
   invoiceId: string;
   version: { id: string; number: string; status: "FINALIZED" | "SUPERSEDED"; amountDueCents: number; organizationName: string; finalizedAt: string };
   /** False when the version cannot be sent (a revision replaced it). `blockedReason` says why. */
@@ -395,6 +397,7 @@ export async function getInvoiceSendPreview(eventId: string, versionId: string):
   const documentRow = await prisma.invoiceVersionDocument.findUniqueOrThrow({ where: { id: document.id }, select: { paymentInstructions: true } });
   return {
     eventId,
+    eventName: version.event.name,
     invoiceId: version.invoiceId,
     version: { id: version.id, number: version.number, status: version.status, amountDueCents: version.amountDueCents, organizationName: version.organizationName, finalizedAt: version.finalizedAt.toISOString() },
     canSend: !superseded,

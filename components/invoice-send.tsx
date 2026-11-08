@@ -1,5 +1,5 @@
 import { SendInvoiceForm } from "@/components/invoice-ledger-controls";
-import { invoiceMoney, invoiceWhen } from "@/components/invoices";
+import { StatusBadge, invoiceMoney, invoiceWhen } from "@/components/invoices";
 import { deliveryStatusLabel } from "@/modules/invoices/delivery-domain";
 import type { SendPreview } from "@/modules/invoices/delivery-repository";
 
@@ -16,7 +16,10 @@ export function InvoiceSendView({ preview, viewerName }: { preview: SendPreview;
         <div>
           <p className="eyebrow">Invoice</p>
           <h2>{preview.isResend ? "Resend" : "Send"} {version.number}</h2>
-          <p>{version.organizationName} · {invoiceMoney(version.amountDueCents)} · finalized {invoiceWhen(version.finalizedAt)}</p>
+          <p>
+            <StatusBadge status={version.status} /> {version.number} · {invoiceMoney(version.amountDueCents)} · finalized {invoiceWhen(version.finalizedAt)}
+          </p>
+          <p><small>Event {preview.eventName} · Billed to {version.organizationName}</small></p>
         </div>
         <div className="page-intro-actions">
           <a className="secondary-button" href={`/finance/invoices/${preview.invoiceId}?event=${preview.eventId}&version=${version.id}`}>Back to the invoice</a>

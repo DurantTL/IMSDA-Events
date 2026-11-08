@@ -45,6 +45,7 @@ export function InvoiceDetailView({
             <StatusBadge status={shown.status} /> {displayNumber({ number: shown.number, baseNumber: detail.invoice.baseNumber, revision: shown.revision })}
             {" "}· {invoiceMoney(shown.amountDueCents)}{shown.amountDueCents === 0 ? " (nothing owed)" : ""}
           </p>
+          <p><small>Event {snapshot.event.name} · Billed to {shown.organizationName}</small></p>
         </div>
         <div className="page-intro-actions">
           {isChurchCodes
