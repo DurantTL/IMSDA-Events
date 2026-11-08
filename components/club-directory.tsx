@@ -3,12 +3,12 @@ import { ArrowRight, UsersRound } from "lucide-react";
 import { clubDirectoryClubHref, type ClubDirectoryRow } from "@/modules/club-reports/club-directory-domain";
 import styles from "./club-directory.module.css";
 
-/** Both staff entry points use the same clearly labelled, year-aware club cards. */
-export function ClubDirectoryCards({ clubs, clubYear, monthLabel }: { clubs: readonly ClubDirectoryRow[]; clubYear: string; monthLabel: string }) {
+/** Both staff entry points use the same clearly labelled, year-aware club cards. `returnTo` is the exact directory URL the club page's back link returns to (#1587). */
+export function ClubDirectoryCards({ clubs, clubYear, monthLabel, returnTo }: { clubs: readonly ClubDirectoryRow[]; clubYear: string; monthLabel: string; returnTo?: string }) {
   return (
     <ul className={styles.grid} aria-label="Clubs">
       {clubs.map((club) => {
-        const href = clubDirectoryClubHref(club.id, clubYear);
+        const href = clubDirectoryClubHref(club.id, clubYear, returnTo);
         return (
           <li className={styles.card} key={club.id}>
             <div className={styles.identity}>

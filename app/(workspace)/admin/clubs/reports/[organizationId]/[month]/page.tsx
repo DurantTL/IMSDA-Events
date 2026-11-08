@@ -5,7 +5,7 @@ import { ClubReportForm } from "@/components/club-report-form";
 import { ClubReportReview } from "@/components/club-report-review";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { allowedReturnTo } from "@/lib/return-to";
+import { clubPageReturnHref } from "@/modules/club-reports/club-page-links";
 import { getPrisma } from "@/lib/prisma";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { ON_TIME_POINTS, formatDueDate, isLockedForClub, isReportMonth, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
@@ -43,11 +43,11 @@ export default async function StaffClubReportPage({
   const [report, rosterPrefill, review] = await Promise.all([getClubReport(organizationId, month), reportPrefill(organizationId, now), getClubReportReview(organizationId, month)]);
   const prefill = { ...rosterPrefill, averageAttendance: null, honors: [] };
   const clubYear = clubYearFor(new Date(`${month}-15T12:00:00Z`));
-  const clubHref = `/admin/organizations/${organizationId}/club`;
-  const viaParent = allowedReturnTo(from, [clubHref], "") === clubHref;
+  const parentHref = clubPageReturnHref(from, organizationId);
+  const viaParent = parentHref !== null;
   return (
     <section className="page-stack">
-      <AdminPageHeader path={`/admin/clubs/reports/${organizationId}/${month}`} year={clubYear} parentName={club.name} viaParent={viaParent} back={viaParent ? undefined : { href: `/admin/clubs/reports?year=${clubYear}`, label: "Back to Review monthly records" }} />
+      <AdminPageHeader path={`/admin/clubs/reports/${organizationId}/${month}`} year={clubYear} parentName={club.name} viaParent={viaParent} back={parentHref ? { href: parentHref, label: `Back to ${club.name}` } : { href: `/admin/clubs/reports?year=${clubYear}`, label: "Back to Review monthly records" }} />
       <div className="page-intro"><div><p className="eyebrow">Monthly Record</p><h2 translate="no">{club.name}</h2></div></div>
       {report?.status === "SUBMITTED" && (
         <section className="panel club-report-review-panel" aria-labelledby="club-report-review-heading">

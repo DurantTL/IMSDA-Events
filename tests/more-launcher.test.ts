@@ -135,11 +135,11 @@ describe("launcher footer", () => {
     ]);
   });
 
-  it("offers an Event Admin Event features, Event modules and activity plus Request a feature, now that requests exist (#741 slice 3, #965)", () => {
+  it("offers an Event Admin Event features, Event setup and activity plus Request a feature, now that requests exist (#741 slice 3, #965)", () => {
     expect(moduleRequestsEnabled).toBe(true);
     expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, eventQuery: "?event=event_1" })).toEqual([
       { key: "event-features", label: "Event features", href: "/more/features?event=event_1" },
-      { key: "event-modules", label: "Event modules and activity", href: "/more?event=event_1" },
+      { key: "event-modules", label: "Event setup and activity", href: "/more?event=event_1" },
       { key: "request-feature", label: "Request a feature", href: "/more?event=event_1#request-a-feature" },
     ]);
     // Anyone who may not request gets no link, and a system administrator turns modules on directly.
@@ -148,8 +148,8 @@ describe("launcher footer", () => {
   });
 
   it("is ready to offer Request a feature, only where permitted, once the flag is on", () => {
-    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event modules and activity", "Request a feature"]);
-    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: false, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event modules and activity"]);
+    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event setup and activity", "Request a feature"]);
+    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: false, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event setup and activity"]);
   });
 });
 
@@ -201,14 +201,14 @@ describe("launcher panel markup", () => {
     expect(markup).toContain('href="/more/club-forms?event=event_1"');
   });
 
-  it("shows Event features to everyone, the old Manage event modules link to no one, and Event modules and activity to staff who are not system administrators", () => {
+  it("shows Event features to everyone, the old Manage event modules link to no one, and Event setup and activity to staff who are not system administrators", () => {
     expect(render(true)).toContain('data-footer="event-features"');
     expect(render(true)).toContain(">Event features<");
     expect(render(true)).toContain('href="/more/features?event=event_1"');
     expect(render(true)).not.toContain("Manage event modules");
     expect(render(false)).toContain(">Event features<");
     expect(render(false)).not.toContain("Manage event modules");
-    expect(render(false)).toContain(">Event modules and activity<");
+    expect(render(false)).toContain(">Event setup and activity<");
     expect(render(false)).toContain('href="/more?event=event_1"');
     expect(render(false)).not.toContain("Request a feature");
     expect(render(true)).not.toContain("Request a feature");
@@ -480,7 +480,7 @@ describe("launcher search and sidebar duplicates (#967)", () => {
   it("drops footer links that are sidebar items on desktop by exact path, and keeps every footer link on the phone", () => {
     const links = [
       { key: "event-features", label: "Synthetic features", href: "/more/features?event=event_1" },
-      { key: "event-modules", label: "Event modules and activity", href: "/more?event=event_1" },
+      { key: "event-modules", label: "Event setup and activity", href: "/more?event=event_1" },
     ];
     expect(omitSidebarFooterLinks(links, new Set(["/more/features"])).map((link) => link.key)).toEqual(["event-modules"]);
     expect(omitSidebarFooterLinks(links, new Set(["/more/featuresx"])).map((link) => link.key)).toEqual(["event-features", "event-modules"]);

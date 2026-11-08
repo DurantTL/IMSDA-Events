@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { summarizeClub } from "@/modules/club-reports/area-summary-domain";
+import { clubDirectoryClubHref, clubSummaryHref } from "@/modules/club-reports/club-directory-domain";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), allowed: vi.fn(), clubs: vi.fn(), events: vi.fn(), newYear: vi.fn() }));
 vi.mock("server-only", () => ({}));
@@ -40,7 +41,9 @@ describe("staff club directory page", () => {
     const html = await render({ year: "2024-25" });
     expect(html.match(/Open club /g)).toHaveLength(12);
     // 2024-25 is a year the directory offers, and the club page opens it (#1304).
-    expect(html).toContain('href="/admin/organizations/club-0/club?year=2024-25"');
+    const returnTo = clubSummaryHref({ clubYear: "2024-25" });
+    expect(html).toContain(`href="${clubDirectoryClubHref("club-0", "2024-25", returnTo).replaceAll("&", "&amp;")}"`);
+    expect(html).toContain("club?year=2024-25&amp;from=%2Fadmin%2Fclubs%2Fsummary%3Fyear%3D2024-25");
     expect(html).toContain("Cedar Church"); expect(html).toContain("roster members");
     expect(html).toContain("Showing 1–12 of 15 active clubs");
     expect(html).not.toContain("<table"); expect(mocks.events).not.toHaveBeenCalled();

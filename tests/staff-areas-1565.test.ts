@@ -254,9 +254,10 @@ describe("event tabs (#1565)", () => {
     expect(place("/more/reports/clubs/packet/org_1")).toEqual({ tab: "reports", view: "printouts" });
     expect(place("/more/reports/clubs/team-form/level")).toEqual({ tab: "reports", view: "printouts" });
     expect(place("/more/reports")).toEqual({ tab: "reports", view: "operational" });
-    expect(place("/more/lodging")).toEqual({ tab: "setup", view: "all-tools" });
-    expect(place("/more/event-settings")).toEqual({ tab: "setup", view: "settings" });
-    expect(place("/registration-builder")).toEqual({ tab: "setup", view: "registration-form" });
+    // Event setup is one grouped page with no views (#1586): every setup page lights the tab and no view.
+    expect(place("/more/lodging")).toEqual({ tab: "setup", view: "setup" });
+    expect(place("/more/event-settings")).toEqual({ tab: "setup", view: "setup" });
+    expect(place("/registration-builder")).toEqual({ tab: "setup", view: "setup" });
     const marked = markCurrentEventTab(buildEventTabs(context(everyPermission)), place("/finance", "filter=BALANCE"));
     expect(marked.filter((tab) => tab.current).map((tab) => tab.key)).toEqual(["money"]);
     expect(marked.flatMap((tab) => tab.views.filter((view) => view.current).map((view) => view.key))).toEqual(["balances"]);

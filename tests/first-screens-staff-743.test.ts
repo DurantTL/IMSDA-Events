@@ -218,15 +218,14 @@ describe("More: compact groups and the optional task search", () => {
     mocks.moduleState.mockResolvedValue({ stored, effective: stored, dataPresent: new Set(), dataForced: new Set() });
   });
 
-  it("puts the search before the groups and names every card and tool for the filter", async () => {
+  it("draws Event setup as card groups, with no task search: every setup page is a card (#1586)", async () => {
     const html = renderToStaticMarkup(await MorePage({ searchParams: Promise.resolve({ event: "event_1" }) }));
-    expect(before(html, 'role="search"', 'id="more-task-groups"')).toBe(true);
-    const container = html.slice(html.indexOf('id="more-task-groups"'));
-    expect(container).toContain('data-task-group="true"');
-    expect(container).toMatch(/data-task-name="Public content"/);
-    expect(container).toMatch(/data-task-name="Merchandise"/);
-    // Tools (the phone list) are filterable too, and a viewer-allowed set only: a card that is not shown has no name here.
-    expect(container).toMatch(/<a class="panel foundation-card" data-task-name="Event settings"/);
+    expect(html).not.toContain('role="search"');
+    expect(html).not.toContain('id="more-task-groups"');
+    expect(html).toContain('data-testid="admin-hub-event-setup"');
+    expect(html).toContain(">Public content</span>");
+    expect(html).toContain(">Merchandise</span>");
+    expect(html).toContain(">Event settings</span>");
   });
 
   it("renders no search when the viewer has no card or tool to search", async () => {

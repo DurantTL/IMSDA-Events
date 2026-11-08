@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { AdminHub } from "@/components/admin-hub";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { EventActivityPanel } from "@/components/event-activity-panel";
 import { EventModuleToggle } from "@/components/event-module-toggle";
-import { MoreTaskSearch } from "@/components/more-task-search";
 import {
   applicabilityLabels,
   buildEventModulesView,
   buildRequestPanel,
-  groupEnabledModules,
   healthStripState,
 } from "@/components/event-modules-page-model";
-import { buildMoreDirectoryCards, moreDirectoryGroupLabels, moreDirectoryGroupOrder, staffPageTitles } from "@/components/staff-navigation";
+import { buildEventSetupView, eventSetupEmptyCopy } from "@/components/event-setup-model";
+import { buildMoreDirectoryCards, staffPageTitles } from "@/components/staff-navigation";
 import { resolveStaffViewer } from "@/modules/club-forms/access";
 import { listRecentAuditActivity } from "@/modules/audit/audit-service";
 import { eventModuleDefinition, type EventModuleKey } from "@/modules/event-modules/catalog";
@@ -28,12 +27,12 @@ import { canAccessOperationalHealth, operationalHealthAccessFor } from "@/module
 import { getOperationalHealth } from "@/modules/operations/repository";
 
 /**
- * `/more` is the Event modules page (#741): which features this event uses and,
- * for a system administrator, the switch. The tab keeps its staff name, "More"
- * (#685); the page title is "Event modules" (#810), once as the shell's H1 and
- * once as the hidden duplicate H2 every staff page carries.
+ * `/more` is the Event setup page (#1586, #741): everything the event is set up with as grouped cards, each opening its own
+ * page, then the module controls that have no page of their own (health strip, change-of-type leftovers, modules that are
+ * off, the request form and the activity trail). The page title is "Event setup", once as the shell's H1 and once as the
+ * hidden duplicate H2 every staff page carries. Each module's on/off switch lives on Event features, a card here.
  */
-export const metadata: Metadata = { title: staffPageTitles.eventModules };
+export const metadata: Metadata = { title: staffPageTitles.eventSetup };
 
 export default async function MorePage({ searchParams }: { searchParams: Promise<{ event?: string; activity?: string }> }) {
   const { event: requested, activity: activityFilter } = await searchParams;
@@ -85,15 +84,14 @@ export default async function MorePage({ searchParams }: { searchParams: Promise
     ? healthStripState((await getOperationalHealth(event.id, operationalHealthAccessFor(permissions))).summary)
     : null;
 
+  const setup = buildEventSetupView({ eventName: event.name, eventQuery, permissions, view });
+  const featuresShown = setup.groups.some((group) => group.cards.some((card) => card.href.startsWith("/more/features")));
+
   return (
     <section className="page-stack event-modules-page">
-      <StaffPageHeader
-        description={`The tools and modules for ${event.name}, with requests for more and the recent activity trail.`}
-        primary={permissions.includes("CONFIGURE_EVENT")
-          ? <Link className="secondary-button" href={`/more/features${eventQuery}`}>Event features</Link>
-          : undefined}
-      />
-      {!view.canToggle && <p className="quiet-copy">Only a system administrator turns modules on or off. These are the ones this event uses.</p>}
+      <AdminHub view={setup} />
+      {setup.groups.length === 0 && <p className="quiet-copy">{eventSetupEmptyCopy}</p>}
+      {!view.canToggle && setup.groups.length > 0 && <p className="quiet-copy">Only a system administrator turns modules on or off.{featuresShown ? " Event features shows what this event uses." : ""}</p>}
 
       {health && (
         <section className="event-modules-health" data-state={health.state} aria-label="Event health">
@@ -102,33 +100,6 @@ export default async function MorePage({ searchParams }: { searchParams: Promise
           <Link className="secondary-button" href={`/more/health${eventQuery}`}>Operational health</Link>
         </section>
       )}
-
-      {view.enabled.length === 0 && <p className="quiet-copy">No optional features are turned on for this event.</p>}
-      {/* Optional task search (#743): filters the cards and tools below by name, in the browser. */}
-      {/* The search decides in the browser whether enough tasks are drawn to be worth showing (phone and desktop show different lists). */}
-      {(view.enabled.length + view.tools.length) > 0 && <MoreTaskSearch containerId="more-task-groups" />}
-      <div className="more-task-groups" id="more-task-groups">
-      {groupEnabledModules(view.enabled).map(({ group, entries }) => (
-        <section aria-label={moreDirectoryGroupLabels[group]} className="foundation-group" data-task-group key={group}>
-          <h2 className="foundation-group-label">{moreDirectoryGroupLabels[group]}</h2>
-          <div className="foundation-grid">
-            {entries.map(({ definition, card, canToggle, dataReason }) => (
-              <article className="panel foundation-card event-module-card" data-module={definition.key} data-task-name={card.title} key={definition.key}>
-                <Link className="event-module-card-link" href={card.href}>
-                  <span><card.icon aria-hidden="true" size={21} /></span>
-                  <h3>{card.title}</h3>
-                  <p>{card.description}</p>
-                  <small>{card.cta}</small>
-                </Link>
-                {canToggle && (
-                  <EventModuleToggle enabled eventId={event.id} moduleKey={definition.key} title={definition.title} />
-                )}
-                {dataReason && <p className="quiet-copy event-module-reason">{dataReason}</p>}
-              </article>
-            ))}
-          </div>
-        </section>
-      ))}
 
       {view.leftOver.length > 0 && (
         <section className="panel event-modules-leftover" aria-label="Left over from a change of event type">
@@ -195,32 +166,6 @@ export default async function MorePage({ searchParams }: { searchParams: Promise
           </div>
         </section>
       )}
-
-      {/* Phone fallback (#741): the launcher is a bottom sheet there, but this page keeps every universal tool too, so nothing depends on scripts. Hidden on desktop by CSS. */}
-      {view.tools.length > 0 && (
-        <section aria-label="All tools" className="more-page-tools" data-task-group>
-          <h2 className="foundation-group-label">All tools</h2>
-          {moreDirectoryGroupOrder
-            .map((group) => ({ group, tools: view.tools.filter((card) => card.group === group) }))
-            .filter(({ tools }) => tools.length > 0)
-            .map(({ group, tools }) => (
-              <section aria-label={moreDirectoryGroupLabels[group]} className="foundation-group" data-task-group key={group}>
-                <h3 className="foundation-group-label">{moreDirectoryGroupLabels[group]}</h3>
-                <div className="foundation-grid">
-                  {tools.map((card) => (
-                    <Link className="panel foundation-card" data-task-name={card.title} href={card.href} key={card.key}>
-                      <span><card.icon aria-hidden="true" size={21} /></span>
-                      <h3>{card.title}</h3>
-                      <p>{card.description}</p>
-                      <small>{card.cta}</small>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            ))}
-        </section>
-      )}
-      </div>
 
       {permissions.includes("VIEW_REPORTS") && <EventActivityPanel eventId={event.id} kind={kind} selection={activity} showAll={showAllActivity} />}
       {process.env.NODE_ENV !== "production" && <section className="panel review-gate"><div><p className="eyebrow">Testing status</p><h2>This local workspace uses test data</h2><p>Changes stay in the local IMAdventist database. Live card charging and external delivery remain off until their configured test connections are ready.</p></div><span className="review-badge">Local testing</span></section>}
