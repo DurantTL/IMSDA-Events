@@ -138,14 +138,14 @@ describe("the Clubs destination groups", () => {
   it("lights Club summary, Points and Club events on their views, one tab and one place (#1304, #1565)", () => {
     const view = { held: ["CLUBS_ADMIN" as const], active: "CLUBS_ADMIN" as const, counts: {}, healthImport: true };
     const phone = (markup: string) => markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
-    const lit: Record<string, string[]> = { "view=events": ["Club summary"], "view=points": ["Points"], "view=records": ["Monthly Records"] };
+    const lit: Record<string, string[]> = { "view=events": ["Club summary"], "view=points": ["Monthly Records"], "view=records": ["Monthly Records"] };
     for (const [search, tab] of Object.entries(lit)) {
       navigation.pathname = "/admin/clubs/summary"; navigation.search = search;
       const markup = render({ user: staff, adminRoleView: view });
-      // Points is in the Reports row, so the page is in Reports and the Clubs row is not drawn; the rest stay in Clubs.
-      if (search === "view=points") expect(markup).toContain('aria-label="Reports"');
-      else expect(currentOf(markup), search).toEqual(tab);
-      // Exactly one phone item is lit: Clubs for the Clubs pages, More for Points (a Reports page, no bar item of its own).
+      // Points is a view of the Monthly Records tab (#1588), so it stays in Clubs with that view marked.
+      expect(currentOf(markup), search).toEqual(tab);
+      if (search === "view=points") expect(markup).toMatch(/aria-current="page" href="\/admin\/clubs\/summary\?view=points#points"/);
+      // Exactly one phone item is lit: Clubs for the Clubs pages, Points included (#1588).
       expect(phone(markup).match(/aria-current="(?:page|true)"/g) ?? [], search).toHaveLength(1);
     }
   });

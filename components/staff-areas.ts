@@ -10,6 +10,7 @@ import {
 import { adminHubs, clubsAdminRecordsHref, systemNavGroups } from "@/components/system-navigation";
 import { type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import { maxTabsPerRow, maxViewsPerTab } from "@/components/staff-event-tabs";
+import { RECORDS_VIEW_PATH } from "@/modules/club-reports/record-return-domain";
 import { needsYouTabCount } from "@/modules/system-admin/home-needs-model";
 
 /**
@@ -71,12 +72,17 @@ export const homeDestinations = {
   comingUp: { href: "/home/coming-up", label: "Coming up" },
 } as const;
 
+const reviewMonthlyRecordsHref = "/admin/clubs/reports";
+const clubPointsHref = "/admin/clubs/summary?view=points#points";
+
 const registered: readonly Registered[] = [
   ...systemNavGroups.flatMap((group) => group.items.map(({ href, label }) => ({ href, label }))),
   ...clubsAdminGroups.flatMap((group) => group.items.map(({ href, label }) => ({ href, label }))),
   { href: clubsAdminHomeItem.href, label: clubsAdminHomeItem.label },
   { href: eventsAdminHomeItem.href, label: eventsAdminHomeItem.label },
   { href: "/admin", label: "System administration" },
+  // The review queue of the Monthly records tab (#1588): a view of that tab, named as the queue it is.
+  { href: reviewMonthlyRecordsHref, label: "Review monthly records" },
   ...Object.values(homeDestinations),
   ...Object.values(adminHubs).map(({ href, label }) => ({ href, label })),
 ];
@@ -163,7 +169,17 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
     },
     { key: "leaders", destination: "/admin/clubs/leaders", visible: clubs },
     { key: "transfers", destination: "/admin/clubs/transfers", visible: clubs },
-    { key: "monthly-records", destination: clubsAdminRecordsHref, visible: clubs },
+    {
+      key: "monthly-records",
+      destination: clubsAdminRecordsHref,
+      visible: clubs,
+      // Each view is a page that checks Clubs administration itself, so each is gated the same way (#1588).
+      views: [
+        { href: clubsAdminRecordsHref, label: "Monthly Records", visible: clubs },
+        { href: reviewMonthlyRecordsHref, label: "Review monthly records", visible: clubs },
+        { href: clubPointsHref, label: "Points", visible: clubs },
+      ],
+    },
   ],
   people: [
     { key: "people-access", destination: "/admin/people", visible: eitherClubsOrSys },
@@ -172,7 +188,7 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
   reports: [
     { key: "monthly-records", destination: clubsAdminRecordsHref, visible: clubs },
     { key: "year-end", destination: "/admin/clubs/reports/year-end", visible: clubs },
-    { key: "points", destination: "/admin/clubs/summary?view=points#points", visible: clubs },
+    { key: "points", destination: clubPointsHref, visible: clubs },
     { key: "analytics", destination: "/admin/analytics", visible: sys },
     { key: "system-report", destination: "/admin/system-report", visible: sys },
   ],
@@ -298,10 +314,16 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
 
   if (pathname === "/admin/clubs") return place("clubs", "club-administration", "/admin/clubs");
   if (under(pathname, "/admin/clubs/reports/year-end")) return place("reports", "year-end");
-  if (under(pathname, "/admin/clubs/reports")) return place("clubs", "monthly-records");
+  // The review queue and a single club's record are the Review view of the Monthly records tab (#1588); a record opened from
+  // the Monthly Records view (a `from` naming that page) keeps that view lit instead.
+  if (under(pathname, "/admin/clubs/reports")) {
+    const fromRecords = pathname !== reviewMonthlyRecordsHref && (params.get("from") ?? "").startsWith(`${RECORDS_VIEW_PATH}?`);
+    return place("clubs", "monthly-records", fromRecords ? clubsAdminRecordsHref : reviewMonthlyRecordsHref);
+  }
   if (under(pathname, "/admin/clubs/summary")) {
-    if (view === "points") return place("reports", "points");
-    if (view === "records") return place("clubs", "monthly-records");
+    // Points and Monthly Records are two views of one tab, so one area lights for both (the Reports row still lists Points).
+    if (view === "points") return place("clubs", "monthly-records", clubPointsHref);
+    if (view === "records") return place("clubs", "monthly-records", clubsAdminRecordsHref);
     return place("clubs", "club-summary", view === "events" ? "/admin/clubs/summary?view=events#club-events" : "/admin/clubs/summary");
   }
   if (under(pathname, "/admin/clubs/applications")) return place("clubs", "applications", "/admin/clubs/applications");
