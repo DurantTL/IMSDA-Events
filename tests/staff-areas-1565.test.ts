@@ -94,6 +94,8 @@ describe("staff areas (#1565)", () => {
     const hrefs = [...railItems(editor, null).map((item) => item.href), ...staffAreaOrder.flatMap((area) => areaTabs(area, editor).flatMap((tab) => [tab.href, ...(tab.views ?? []).map((view) => view.href)]))];
     expect(hrefs.length).toBeGreaterThan(2);
     for (const href of hrefs) expect(opensWithoutEvent(href), href).toBe(true);
+    // An editor who is also a Clubs administrator keeps the hub (the layout exemption is for editors with no admin role).
+    expect(areaTabs("admin", { ...editor, held: ["CLUBS_ADMIN"], activeRole: "CLUBS_ADMIN" }).find((tab) => tab.key === "hub-catalogs")?.href).toBe("/admin/hubs/catalogs");
     // The admin tab still lights on the page it opens.
     expect(staffPlaceFor("/admin/site-content")).toMatchObject({ area: "admin", tab: "hub-catalogs" });
   });

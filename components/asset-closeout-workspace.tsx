@@ -26,7 +26,7 @@ const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? 
 const when = (iso: string | null) => (iso ? formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" }) : "");
 
 
-export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canManageMoney, canConfigure, canUpdateFacility }: {
+export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canManageMoney, canConfigure, canUpdateFacility, canOpenDesk }: {
   eventId: string;
   eventName: string;
   report: CloseoutReport;
@@ -34,6 +34,8 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
   canManageMoney: boolean;
   canConfigure: boolean;
   canUpdateFacility: boolean;
+  /** The issue desk (/check-in/assets) needs MANAGE_CHECK_IN; without it a holder is plain text (#1735). */
+  canOpenDesk: boolean;
 }) {
   const router = useRouter();
   const base = `/api/events/${encodeURIComponent(eventId)}/assets`;
@@ -60,7 +62,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     finally { setBusy(false); }
   }
 
-  const deskHref = (attendeeId: string | null) => (attendeeId ? `/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(attendeeId)}` : null);
+  const deskHref = (attendeeId: string | null) => (canOpenDesk && attendeeId ? `/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(attendeeId)}` : null);
   const holder = (row: { holderLabel: string; deskAttendeeId: string | null }) => { const href = deskHref(row.deskAttendeeId); return href ? <a href={href}>{row.holderLabel}</a> : <>{row.holderLabel}</>; };
   const download = (section: string) => <p><ExportLink className="secondary-button report-download" href={csv(section)}>Download CSV</ExportLink></p>;
   const ctx: TableContext = { holder, download, canManageMoney, busy, post };
