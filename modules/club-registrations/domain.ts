@@ -178,6 +178,13 @@ export function guestIsChild(guest: GuestTypeInput) {
   return guestAttendeeType(guest) === "UNDERAGE";
 }
 
+export const CHILD_GUEST_NO_ROLE_MESSAGE = "This form has no Child role, so a child who isn't a Pathfinder can't be added. Choose Pathfinder or Adult.";
+
+/** Whether the form's role question has a Child (or Underage) option, so a child can be shown as Child and kept out of the Pathfinder counts. */
+export function formOffersChildRole(definition: RegistrationFormDefinition) {
+  return Object.keys(guestOwnedRole(definition, { age: 0, guestType: "UNDERAGE" })).length > 0;
+}
+
 export const CHILD_GUEST_TEAM_MESSAGE = "Teams register team members and coaches only, so a child who isn't a Pathfinder can't be added to a team.";
 
 /**

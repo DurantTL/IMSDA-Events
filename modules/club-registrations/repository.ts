@@ -25,6 +25,8 @@ import {
   guestIsChild,
   guestOwnedRole,
   CHILD_GUEST_TEAM_MESSAGE,
+  CHILD_GUEST_NO_ROLE_MESSAGE,
+  formOffersChildRole,
   attendeeAgeKey,
   guestsFromJson,
   rosterAgeSaveOffFromJson,
@@ -1220,6 +1222,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
         }
         // A child who isn't a Pathfinder (#1666) is never added to a team: teams take team members and coaches only.
         if (teamSettings && guestIsChild(guest)) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
+        if (guestIsChild(guest) && !formOffersChildRole(definition as RegistrationFormDefinition)) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_NO_ROLE_MESSAGE);
         // An extra person's typed age is their age on the event's age date (#809).
         const role = teamRoleFor({ responses: attendee.responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: guest.age });
         resolved.set(attendee.clientId, {
@@ -1660,10 +1663,15 @@ export async function amendClubRegistration(
     const current = currentByGuestId.get(guestId)!;
     const snapshot = recordFromJson(current.profileSnapshot);
     const clientId = clubGuestClientId(guestId);
-    const responses = withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses));
-    assertSeminarPicksUnchanged(current, responses);
-    if (betweenLevelsOnly) assertBetweenLevelsAnswers(recordFromJson(current.formResponses), responses);
     const ageOnEventDate = typeof snapshot.ageOnEventDate === "number" ? snapshot.ageOnEventDate : null;
+    // A child who isn't a Pathfinder keeps the Child role, whatever the client sent (#1666).
+    const childRole = snapshot.temporaryAttendeeType === "UNDERAGE" ? guestOwnedRole(definition, { age: ageOnEventDate ?? 0, guestType: "UNDERAGE" }) : {};
+    const responses = {
+      ...withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses)),
+      ...childRole,
+    };
+    assertSeminarPicksUnchanged(current, responses);
+    if (betweenLevelsOnly) assertBetweenLevelsAnswers(recordFromJson(current.formResponses), responses, Object.keys(childRole));
     amendmentAttendees.push({ attendeeId: current.id, clientId, responses });
     const guestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: ageOnEventDate });
     serverOptions.set(clientId, {
@@ -1696,6 +1704,7 @@ export async function amendClubRegistration(
     const person: RosterPerson = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
     const clientId = clubGuestClientId(guest.id);
     if (teamSettings && guestIsChild(guest)) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
+    if (guestIsChild(guest) && !formOffersChildRole(definition)) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_NO_ROLE_MESSAGE);
     const ownedRole = guestOwnedRole(definition, guest);
     const responses = {
       ...(input.attendeeResponses[clientId] ?? {}),

@@ -27,6 +27,7 @@ import {
   guestAttendeeType,
   guestIsChild,
   GUEST_TYPES,
+  formOffersChildRole,
   MAX_CLUB_GUESTS,
   rosterOwnedResponses,
   rosterRolePrefill,
@@ -80,6 +81,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
 
   const registered = workspace.registration.attendees;
   const offRoster = useMemo(() => registered.filter((attendee) => attendee.offRoster), [registered]);
+  const offersChild = formOffersChildRole(workspace.experience.form.definition);
   const existingGuests = useMemo(() => registered.filter((attendee) => attendee.temporary && attendee.guestId), [registered]);
   const registeredByMemberId = useMemo(() => new Map(
     registered.flatMap((attendee) => attendee.clubRosterMemberId && !attendee.offRoster ? [[attendee.clubRosterMemberId, attendee] as const] : []),
@@ -163,10 +165,14 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
     const chosenType = String(data.get("guestType") ?? "");
     if (!firstName || !lastName) return setError("Enter a first and last name.");
     if (!Number.isInteger(age) || age < 0 || age > 120) return setError("Enter their age as a whole number.");
-    const guestType = GUEST_TYPES.find((candidate) => candidate === chosenType);
-    if (!guestType) return setError("Choose Pathfinder, Adult, or Child.");
-    if (guestType === "ADULT" && age < 18) return setError("An adult must be 18 or older. Choose Child or Pathfinder for someone younger.");
-    if (guestType !== "ADULT" && age >= 18) return setError("Someone 18 or older is registered as an Adult.");
+    const teamRules = workspace.teams.settings;
+    // An event with team rules (Pathfinder Bible Experience) has no choice: the type comes from the age, as it always has.
+    const guestType = teamRules ? undefined : GUEST_TYPES.find((candidate) => candidate === chosenType);
+    if (!teamRules) {
+      if (!guestType) return setError("Choose Pathfinder, Adult, or Child.");
+      if (guestType === "ADULT" && age < 18) return setError("An adult must be 18 or older. Choose Child or Pathfinder for someone younger.");
+      if (guestType !== "ADULT" && age >= 18) return setError("Someone 18 or older is registered as an Adult.");
+    }
     const emailCheck = inlineFieldProblem("Email", "email", email, undefined, true);
     if (emailCheck.blocking) {
       setGuestEmailProblem(emailCheck.message);
@@ -177,7 +183,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
     setError("");
     setGuestEmailProblem("");
     setAddingGuest(false);
-    setNewGuests((current) => [...current, { id: id.slice(0, 24), firstName, lastName, age, email: email || null, guestType }]);
+    setNewGuests((current) => [...current, { id: id.slice(0, 24), firstName, lastName, age, email: email || null, ...(guestType ? { guestType } : {}) }]);
   }
 
   const goingCount = selectedMemberIds.length + keptOffRosterIds.length + keptGuestIds.length + newGuests.length;
@@ -487,16 +493,18 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
               <label>First name<input autoComplete="off" maxLength={80} name="firstName" required /></label>
               <label>Last name<input autoComplete="off" maxLength={80} name="lastName" required /></label>
               <label>{workspace.event.ageAsOf ? `Age on ${formatCalendarDate(workspace.event.ageDate)}` : "Age at the event"}<input {...ageInputAttributes} name="age" required type="number" /></label>
-              <label>
-                Who is this?
-                <select defaultValue="" name="guestType" required>
-                  <option disabled value="">Choose one</option>
-                  <option value="YOUTH">Pathfinder</option>
-                  <option value="ADULT">Adult</option>
-                  {!workspace.teams.settings && <option value="UNDERAGE">Child (not a Pathfinder)</option>}
-                </select>
-                {!workspace.teams.settings && <small className="field-help">A child isn&apos;t counted as a Pathfinder and doesn&apos;t take a class seat.</small>}
-              </label>
+              {!workspace.teams.settings && (
+                <label>
+                  Who is this?
+                  <select defaultValue="" name="guestType" required>
+                    <option disabled value="">Choose one</option>
+                    <option value="YOUTH">Pathfinder</option>
+                    <option value="ADULT">Adult</option>
+                    {offersChild && <option value="UNDERAGE">Child (not a Pathfinder)</option>}
+                  </select>
+                  {offersChild && <small className="field-help">A child isn&apos;t counted as a Pathfinder and doesn&apos;t take a class seat.</small>}
+                </label>
+              )}
               <label>Email (optional)<input aria-invalid={guestEmailProblem ? true : undefined} autoComplete="off" inputMode="email" maxLength={254} name="email" onBlur={(event) => setGuestEmailProblem(inlineFieldProblem("Email", "email", event.currentTarget.value.trim(), undefined, true).message)} type="email" />{guestEmailProblem && <small className="field-error" role="alert">{guestEmailProblem}</small>}</label>
             </div>
             <div className="club-registration-toolbar">
