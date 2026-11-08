@@ -1409,7 +1409,8 @@ async function runDeliveryLoop(
       // Only a row with an HTML snapshot is flattened; a pre-HTML text-only row goes out word for word. Every text part
       // ends with the same footer block as the HTML (#1443), continuing the unsubscribe block when there is one.
       const bodyTextForSend = appendEmailPlainTextFooter(
-        (parts.bodyHtml ? markdownToPlainText : (text: string) => text)(unsubscribe
+        // A problem report copy quotes a person's own words, so its text part is never flattened as Markdown (#1715).
+        (parts.bodyHtml && message.templateKey !== "PROBLEM_REPORT_COPY" ? markdownToPlainText : (text: string) => text)(unsubscribe
           ? `${preparedBody.bodyText}\n\n--\nTo stop getting event announcements, or change what you get: ${unsubscribe.pageUrl}`
           : preparedBody.bodyText),
         layout,
@@ -1657,6 +1658,10 @@ async function prepareAccountEmailBody(
   // The System report's test email (#1383): a fixed plain body with no sentinel and no account; never rewrite it.
   if (input.templateKey === "SYSTEM_TEST_EMAIL") {
     return { bodyText: input.bodyText };
+  }
+  // The copy of a problem report (#1715) holds the person's own words: never replace anything in it.
+  if (input.templateKey === "PROBLEM_REPORT_COPY") {
+    return { bodyText: input.bodyText, bodyHtml: input.bodyHtml ?? null };
   }
   // Module request email (#741) carries free text and no sentinel: never replace anything in it.
   if (input.templateKey?.startsWith("MODULE_REQUEST_")) {

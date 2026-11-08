@@ -134,7 +134,17 @@ export type SecurityCheckFallback =
  */
 export async function requireTurnstile(
   request: Request,
-  { action, token, fallback }: { action: TurnstileAction; token?: string | null; fallback?: SecurityCheckFallback },
+  { action, token, fallback, onVerified }: {
+    action: TurnstileAction;
+    token?: string | null;
+    fallback?: SecurityCheckFallback;
+    /**
+     * Called only when the request carried a token that Siteverify accepted: never when the check is off (skip mode) and
+     * never when the #1480 fallback let a token-less request through. A route uses it to hold back a side effect, such as
+     * an email to a typed address, from a request that was not really verified (#1715).
+     */
+    onVerified?: () => void;
+  },
 ): Promise<Response | null> {
   const submittedToken = token ?? request.headers.get(TURNSTILE_TOKEN_HEADER);
   let verdict: TurnstileVerdict;
@@ -154,7 +164,10 @@ export async function requireTurnstile(
     logError("Turnstile check could not run", error);
     verdict = { ok: false, code: "security_check_failed" };
   }
-  if (verdict.ok) return null;
+  if (verdict.ok) {
+    if (!verdict.skipped) onVerified?.();
+    return null;
+  }
   return Response.json(
     {
       error: verdict.code,
