@@ -304,7 +304,7 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
                 ))}
               </ul>
             )}
-            {caps.canDefine && !draft && <div className={styles.actions}><button className="secondary-button" disabled={busy !== null} onClick={() => startDraft(blankDraft)} type="button">Add a scored event</button></div>}
+            {caps.canDefine && (!published || caps.canCorrectAfterPublish) && !draft && <div className={styles.actions}><button className="secondary-button" disabled={busy !== null} onClick={() => startDraft(blankDraft)} type="button">Add a scored event</button></div>}
             {published && caps.canDefine && caps.canCorrectAfterPublish && state.scoredEvents.length > 0 && <p className={styles.help}>To remove a scored event, take results back first. Changes to a scored event after publishing are recorded in the audit log.</p>}
             {published && caps.canDefine && !caps.canCorrectAfterPublish && <p className={styles.help}>Results are published, so only the Clubs Administrator or event staff can change a scored event now.</p>}
             {draft && (
