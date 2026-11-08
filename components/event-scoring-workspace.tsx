@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { CamporeeResultsView } from "@/components/camporee-results-view";
+import { EventScoringResultsView } from "@/components/event-scoring-results-view";
 import { FormErrorSummary, summaryMessage, useFormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
 import { SearchClearButton } from "@/components/search-clear-button";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
@@ -25,9 +25,9 @@ import {
   type ScoreKind,
   type ScoreUnit,
   type ScoredEventInput,
-} from "@/modules/camporee-scoring/domain";
-import type { CamporeeScoringState } from "@/modules/camporee-scoring/service";
-import styles from "@/components/camporee-scoring-workspace.module.css";
+} from "@/modules/event-scoring/domain";
+import type { EventScoringView } from "@/modules/event-scoring/service";
+import styles from "@/components/event-scoring-workspace.module.css";
 
 type Message = { tone: "success" | "error"; text: string };
 type Section = "switch" | "publish" | "definition" | "entry";
@@ -36,15 +36,15 @@ type Draft = { id: string | null; name: string; kind: ScoreKind; unit: ScoreUnit
 
 const blankDraft: Draft = { id: null, name: "", kind: "CLUB", unit: "POINTS", higherWins: true, ribbonMode: "PLACES", ribbonPlaces: 3, bands: [] };
 
-const fieldIds = { name: "camporee-def-name", kind: "camporee-def-kind", unit: "camporee-def-unit", bands: "camporee-def-bands", event: "camporee-score-event", subject: "camporee-score-subject", value: "camporee-score-value" };
-const bandId = (index: number, part: "label" | "threshold") => `camporee-band-${index}-${part}`;
+const fieldIds = { name: "scoring-def-name", kind: "scoring-def-kind", unit: "scoring-def-unit", bands: "scoring-def-bands", event: "scoring-score-event", subject: "scoring-score-subject", value: "scoring-score-value" };
+const bandId = (index: number, part: "label" | "threshold") => `scoring-band-${index}-${part}`;
 
 /**
  * Camporee scoring (#1676) for an Area Coordinator (coordinator portal) and for staff (More). Same workspace, different
  * endpoint: the server decides who may do each action. Off hides everything but the switch and keeps the data.
  * Works on a phone: single column, 44px controls, native pickers.
  */
-export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: string; initial: CamporeeScoringState }) {
+export function EventScoringWorkspace({ endpoint, initial }: { endpoint: string; initial: EventScoringView }) {
   const [state, setState] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [messages, setMessages] = useState<Partial<Record<Section, Message>>>({});
@@ -64,12 +64,12 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
 
   const selected = state.scoredEvents.find((event) => event.id === scoredEventId) ?? null;
 
-  async function send(body: object, section: Section, busyKey: string, done: string, after?: (next: CamporeeScoringState) => void) {
+  async function send(body: object, section: Section, busyKey: string, done: string, after?: (next: EventScoringView) => void) {
     setBusy(busyKey);
     setMessages((current) => ({ ...current, [section]: undefined }));
     try {
       const response = await fetch(endpoint, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const result = await response.json().catch(() => ({})) as { state?: CamporeeScoringState; message?: string; field?: string };
+      const result = await response.json().catch(() => ({})) as { state?: EventScoringView; message?: string; field?: string };
       if (!response.ok || !result.state) {
         const text = result.message ?? "Try again.";
         if (result.field && section === "definition") setDefinitionErrors({ [result.field === "kind" ? fieldIds.kind : result.field === "name" ? fieldIds.name : fieldIds.bands]: text });
@@ -138,7 +138,7 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
     return found;
   }
 
-  const definitionLabels = (id: string) => id === fieldIds.name ? "Event name" : id.startsWith("camporee-band-") ? "Ribbon band" : "Ribbon bands";
+  const definitionLabels = (id: string) => id === fieldIds.name ? "Event name" : id.startsWith("scoring-band-") ? "Ribbon band" : "Ribbon bands";
 
   function saveDefinition(event: React.FormEvent) {
     event.preventDefault();
@@ -231,9 +231,9 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
   const message = (section: Section) => messages[section] && <FormMessage message={messages[section]!.text} tone={messages[section]!.tone} />;
 
   return (
-    <div className={styles.workspace} data-testid="camporee-scoring-workspace">
-      <section aria-labelledby="camporee-switch" className={styles.section}>
-        <h3 className={styles.heading} id="camporee-switch">Camporee scoring is {state.enabled ? "on" : "off"}</h3>
+    <div className={styles.workspace} data-testid="event-scoring-workspace">
+      <section aria-labelledby="scoring-switch" className={styles.section}>
+        <h3 className={styles.heading} id="scoring-switch">Camporee scoring is {state.enabled ? "on" : "off"}</h3>
         <div className={styles.row}>
           <p className={styles.state} role="status">
             {state.enabled ? "Scores can be entered now. Clubs see nothing until results are published." : "Clubs see nothing, and scoring is hidden. Anything already entered is kept."}
@@ -250,8 +250,8 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
 
       {state.enabled && (
         <>
-          <section aria-labelledby="camporee-publish" className={styles.section}>
-            <h3 className={styles.heading} id="camporee-publish">Results for clubs</h3>
+          <section aria-labelledby="scoring-publish" className={styles.section}>
+            <h3 className={styles.heading} id="scoring-publish">Results for clubs</h3>
             <div className={styles.row}>
               <p className={styles.state} role="status">
                 {published ? `Results were published ${when}. Each club director sees only their own club's results.` : "Results are not published. Club directors see nothing yet. Scores can be corrected freely until you publish."}
@@ -275,8 +275,8 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
             {message("publish")}
           </section>
 
-          <section aria-labelledby="camporee-events" className={styles.section}>
-            <h3 className={styles.heading} id="camporee-events">Scored events</h3>
+          <section aria-labelledby="scoring-events" className={styles.section}>
+            <h3 className={styles.heading} id="scoring-events">Scored events</h3>
             {state.scoredEvents.length === 0 ? (
               <p className={styles.help}>No scored events yet.{caps.canDefine ? " Add the first one, such as the canoe race or the telephone verse." : " Ask an Area Coordinator, the Clubs Administrator or your event administrator to add them."}</p>
             ) : (
@@ -328,23 +328,23 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
                     {scoreUnits.map((unit) => <option key={unit} value={unit}>{unitLabels[unit]}</option>)}
                   </select>
                 </label>
-                <label className={styles.field} htmlFor="camporee-def-direction">
+                <label className={styles.field} htmlFor="scoring-def-direction">
                   Which score wins
-                  <select disabled={busy !== null} id="camporee-def-direction" onChange={(event) => change({ higherWins: event.target.value === "higher" })} value={draft.higherWins ? "higher" : "lower"}>
+                  <select disabled={busy !== null} id="scoring-def-direction" onChange={(event) => change({ higherWins: event.target.value === "higher" })} value={draft.higherWins ? "higher" : "lower"}>
                     <option value="higher">Higher score wins</option>
                     <option value="lower">Lower score wins (a time, for example)</option>
                   </select>
                 </label>
-                <label className={styles.field} htmlFor="camporee-def-ribbons">
+                <label className={styles.field} htmlFor="scoring-def-ribbons">
                   Ribbons
-                  <select disabled={busy !== null} id="camporee-def-ribbons" onChange={(event) => change({ ribbonMode: event.target.value as RibbonMode })} value={draft.ribbonMode}>
+                  <select disabled={busy !== null} id="scoring-def-ribbons" onChange={(event) => change({ ribbonMode: event.target.value as RibbonMode })} value={draft.ribbonMode}>
                     {ribbonModes.map((mode) => <option key={mode} value={mode}>{ribbonModeLabels[mode]}</option>)}
                   </select>
                 </label>
                 {draft.ribbonMode === "PLACES" ? (
-                  <label className={styles.field} htmlFor="camporee-def-places">
+                  <label className={styles.field} htmlFor="scoring-def-places">
                     Ribbons go to
-                    <select disabled={busy !== null} id="camporee-def-places" onChange={(event) => change({ ribbonPlaces: Number(event.target.value) })} value={draft.ribbonPlaces}>
+                    <select disabled={busy !== null} id="scoring-def-places" onChange={(event) => change({ ribbonPlaces: Number(event.target.value) })} value={draft.ribbonPlaces}>
                       <option value={1}>1st place only</option>
                       <option value={2}>1st and 2nd place</option>
                       <option value={3}>1st, 2nd and 3rd place</option>
@@ -383,8 +383,8 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
             {!draft && message("definition")}
           </section>
 
-          <section aria-labelledby="camporee-entry" className={styles.section}>
-            <h3 className={styles.heading} id="camporee-entry">Enter a score</h3>
+          <section aria-labelledby="scoring-entry" className={styles.section}>
+            <h3 className={styles.heading} id="scoring-entry">Enter a score</h3>
             {state.scoredEvents.length === 0 ? (
               <p className={styles.help}>Add a scored event first, then enter scores here.</p>
             ) : !canEnterNow ? (
@@ -404,7 +404,7 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
                       <label className="search-field">
                         <Search aria-hidden="true" size={18} />
                         <span className="sr-only">{selected.kind === "CLUB" ? "Find a club" : "Find a Pathfinder or club"}</span>
-                        <input {...find.inputProps} autoComplete="off" disabled={busy !== null} id="camporee-score-find" placeholder={selected.kind === "CLUB" ? "Find a club" : "Find a Pathfinder or club"} />
+                        <input {...find.inputProps} autoComplete="off" disabled={busy !== null} id="scoring-score-find" placeholder={selected.kind === "CLUB" ? "Find a club" : "Find a Pathfinder or club"} />
                         <SearchClearButton onClear={() => find.setValue("")} visible={find.value !== ""} />
                       </label>
                       <SearchResultStatus message={`${subjects.length} ${subjects.length === 1 ? "match" : "matches"} listed.`} />
@@ -443,7 +443,7 @@ export function CamporeeScoringWorkspace({ endpoint, initial }: { endpoint: stri
             )}
           </section>
 
-          <CamporeeResultsView results={state.results} />
+          <EventScoringResultsView results={state.results} />
         </>
       )}
       {confirmDialog}

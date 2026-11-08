@@ -1,8 +1,8 @@
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { camporeeApiError } from "@/modules/camporee-scoring/api-errors";
-import { camporeeActionSchema } from "@/modules/camporee-scoring/domain";
-import { applyCamporeeAction, requireStaffScoringAccess } from "@/modules/camporee-scoring/service";
+import { eventScoringApiError } from "@/modules/event-scoring/api-errors";
+import { eventScoringActionSchema } from "@/modules/event-scoring/domain";
+import { applyEventScoringAction, requireStaffScoringAccess } from "@/modules/event-scoring/service";
 import { findActiveMembership } from "@/modules/events/repository";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -17,11 +17,11 @@ async function putHandler(request: Request, context: { params: Promise<{ eventId
   try {
     const { eventId } = await context.params;
     const actor = await requireStaffScoringAccess(await getCurrentSession(), eventId, findActiveMembership);
-    const input = camporeeActionSchema.parse(await request.json());
-    const state = await applyCamporeeAction(actor, eventId, input);
+    const input = eventScoringActionSchema.parse(await request.json());
+    const state = await applyEventScoringAction(actor, eventId, input);
     return Response.json({ state }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    return camporeeApiError(error, "Saving Camporee scoring");
+    return eventScoringApiError(error, "Saving Camporee scoring");
   }
 }
 

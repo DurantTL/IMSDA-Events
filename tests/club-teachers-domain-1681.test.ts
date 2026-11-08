@@ -75,6 +75,6 @@ describe("club teachers module (#1681)", () => {
   });
 
   it("is one of the only modules the scoped (Area Coordinator) path may switch (Camporee scoring is the other, #1676)", () => {
-    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "camporee-scoring"]);
+    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "event-scoring"]);
   });
 });

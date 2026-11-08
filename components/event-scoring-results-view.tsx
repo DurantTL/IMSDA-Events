@@ -1,13 +1,13 @@
-import { ordinal, type ClubAwards, type CamporeeResults, type EventResult } from "@/modules/camporee-scoring/domain";
-import styles from "@/components/camporee-results-view.module.css";
+import { ordinal, type ClubAwards, type EventScoringResults, type EventResult } from "@/modules/event-scoring/domain";
+import styles from "@/components/event-scoring-results-view.module.css";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** One scored event's ranking: place, name, score, and the ribbon the entry earns (only where its club asked for ribbons). */
 function EventRanking({ event, showClub }: { event: EventResult; showClub: boolean }) {
   return (
-    <section aria-labelledby={`camporee-result-${event.id}`}>
-      <h4 className={styles.subheading} id={`camporee-result-${event.id}`}><span translate="no">{event.name}</span></h4>
+    <section aria-labelledby={`scoring-result-${event.id}`}>
+      <h4 className={styles.subheading} id={`scoring-result-${event.id}`}><span translate="no">{event.name}</span></h4>
       <p className={styles.muted}>{event.ribbonRule}. {event.higherWins ? "Highest score wins." : "Lowest score wins."}</p>
       {event.rows.length === 0 ? (
         <p className={styles.muted}>No scores entered yet.</p>
@@ -58,24 +58,24 @@ function RibbonList({ club }: { club: ClubAwards }) {
  * Rankings, the ribbon list per club and the trophy and award counts, for staff and Area Coordinators. Lists, not tables,
  * so it reads on a phone. Every ribbon appears only for a club that said yes to ribbons on registration.
  */
-export function CamporeeResultsView({ results }: { results: CamporeeResults }) {
+export function EventScoringResultsView({ results }: { results: EventScoringResults }) {
   return (
-    <div className={styles.results} data-testid="camporee-results">
+    <div className={styles.results} data-testid="scoring-results">
       <p className={styles.counts}>
         <span><strong>{results.trophies}</strong> {results.trophies === 1 ? "trophy" : "trophies"} (1st places)</span>
         <span><strong>{results.ribbonsTotal}</strong> {results.ribbonsTotal === 1 ? "ribbon" : "ribbons"} for clubs that asked</span>
         {results.ribbonCounts.map((count) => <span key={count.award}>{plural(count.count, count.award)}</span>)}
       </p>
-      <section aria-labelledby="camporee-rankings">
-        <h3 className={styles.heading} id="camporee-rankings">Rankings</h3>
+      <section aria-labelledby="scoring-rankings">
+        <h3 className={styles.heading} id="scoring-rankings">Rankings</h3>
         {results.events.length === 0 ? (
           <p className={styles.muted}>No scored events yet. Add one above, then enter scores.</p>
         ) : (
           <div className={styles.results}>{results.events.map((event) => <EventRanking event={event} key={event.id} showClub />)}</div>
         )}
       </section>
-      <section aria-labelledby="camporee-ribbons">
-        <h3 className={styles.heading} id="camporee-ribbons">Ribbons by club</h3>
+      <section aria-labelledby="scoring-ribbons">
+        <h3 className={styles.heading} id="scoring-ribbons">Ribbons by club</h3>
         {results.clubs.length === 0 ? (
           <p className={styles.muted}>No club has registered yet. Clubs appear here once their registration is submitted.</p>
         ) : (
@@ -87,9 +87,9 @@ export function CamporeeResultsView({ results }: { results: CamporeeResults }) {
 }
 
 /** One club's own published results. Only this club's rows are ever passed in. */
-export function CamporeeClubResults({ awards, events }: { awards: ClubAwards | null; events: EventResult[] }) {
+export function EventScoringClubResults({ awards, events }: { awards: ClubAwards | null; events: EventResult[] }) {
   return (
-    <div className={styles.results} data-testid="camporee-club-results">
+    <div className={styles.results} data-testid="scoring-club-results">
       {events.length === 0 ? (
         <p className={styles.muted}>Your club has no scores in these results.</p>
       ) : (

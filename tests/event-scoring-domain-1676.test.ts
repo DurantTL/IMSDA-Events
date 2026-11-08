@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildResults,
   buildScoredEventDefinition,
-  camporeeActionSchema,
+  eventScoringActionSchema,
   formatScore,
   ordinal,
   parseScoreText,
@@ -12,7 +12,7 @@ import {
   scoreInputText,
   scoredEventInputSchema,
   type ScoredEventDefinition,
-} from "@/modules/camporee-scoring/domain";
+} from "@/modules/event-scoring/domain";
 import { creationModuleKeys, defaultModuleKeys, eventModuleDefinition, moduleApplies, scopedToggleModuleKeys } from "@/modules/event-modules/catalog";
 
 const clubs = new Map([
@@ -31,21 +31,21 @@ const verse: ScoredEventDefinition = { id: "e-verse", name: "Telephone verse", k
 
 describe("camporee scoring is an optional tool (#1676)", () => {
   it("is off by default for every event and applies to club events only", () => {
-    expect(eventModuleDefinition("camporee-scoring").offByDefault).toBe(true);
-    expect(defaultModuleKeys("CLUB")).not.toContain("camporee-scoring");
-    expect(moduleApplies("camporee-scoring", { audience: "CLUB" })).toBe(true);
-    expect(moduleApplies("camporee-scoring", { audience: "GENERAL" })).toBe(false);
+    expect(eventModuleDefinition("event-scoring").offByDefault).toBe(true);
+    expect(defaultModuleKeys("CLUB")).not.toContain("event-scoring");
+    expect(moduleApplies("event-scoring", { audience: "CLUB" })).toBe(true);
+    expect(moduleApplies("event-scoring", { audience: "GENERAL" })).toBe(false);
   });
 
   it("can be turned on when an event is created, and is left off otherwise (the Spring Camporee template)", () => {
-    expect(creationModuleKeys("CLUB")).not.toContain("camporee-scoring");
-    expect(creationModuleKeys("CLUB", [])).not.toContain("camporee-scoring");
-    expect(creationModuleKeys("CLUB", ["camporee-scoring"])).toContain("camporee-scoring");
-    expect(creationModuleKeys("GENERAL", ["camporee-scoring"])).not.toContain("camporee-scoring");
+    expect(creationModuleKeys("CLUB")).not.toContain("event-scoring");
+    expect(creationModuleKeys("CLUB", [])).not.toContain("event-scoring");
+    expect(creationModuleKeys("CLUB", ["event-scoring"])).toContain("event-scoring");
+    expect(creationModuleKeys("GENERAL", ["event-scoring"])).not.toContain("event-scoring");
   });
 
   it("is switchable by the narrow path beside Club teachers, and by no other", () => {
-    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "camporee-scoring"]);
+    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "event-scoring"]);
   });
 });
 
@@ -102,11 +102,11 @@ describe("scored event definitions (#1676)", () => {
   });
 
   it("takes one request shape per action and nothing else", () => {
-    expect(camporeeActionSchema.safeParse({ action: "switch", enabled: true }).success).toBe(true);
-    expect(camporeeActionSchema.safeParse({ action: "publish" }).success).toBe(true);
-    expect(camporeeActionSchema.safeParse({ action: "saveScore", entry: { scoredEventId: "e", subjectId: "s", value: null } }).success).toBe(true);
-    expect(camporeeActionSchema.safeParse({ action: "switch", enabled: true, moduleKey: "merchandise" }).success).toBe(false);
-    expect(camporeeActionSchema.safeParse({ action: "grantPoints" }).success).toBe(false);
+    expect(eventScoringActionSchema.safeParse({ action: "switch", enabled: true }).success).toBe(true);
+    expect(eventScoringActionSchema.safeParse({ action: "publish" }).success).toBe(true);
+    expect(eventScoringActionSchema.safeParse({ action: "saveScore", entry: { scoredEventId: "e", subjectId: "s", value: null } }).success).toBe(true);
+    expect(eventScoringActionSchema.safeParse({ action: "switch", enabled: true, moduleKey: "merchandise" }).success).toBe(false);
+    expect(eventScoringActionSchema.safeParse({ action: "grantPoints" }).success).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
-import { camporeeApiError } from "@/modules/camporee-scoring/api-errors";
-import { camporeeActionSchema } from "@/modules/camporee-scoring/domain";
-import { applyCamporeeAction, requireAreaCoordinatorScoringActor } from "@/modules/camporee-scoring/service";
+import { eventScoringApiError } from "@/modules/event-scoring/api-errors";
+import { eventScoringActionSchema } from "@/modules/event-scoring/domain";
+import { applyEventScoringAction, requireAreaCoordinatorScoringActor } from "@/modules/event-scoring/service";
 import { withRequestContext } from "@/lib/request-context";
 
 /**
@@ -15,11 +15,11 @@ async function putHandler(request: Request, context: { params: Promise<{ eventId
   try {
     const actor = await requireAreaCoordinatorScoringActor();
     const { eventId } = await context.params;
-    const input = camporeeActionSchema.parse(await request.json());
-    const state = await applyCamporeeAction(actor, eventId, input);
+    const input = eventScoringActionSchema.parse(await request.json());
+    const state = await applyEventScoringAction(actor, eventId, input);
     return Response.json({ state }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
-    return camporeeApiError(error, "Saving Camporee scoring");
+    return eventScoringApiError(error, "Saving Camporee scoring");
   }
 }
 

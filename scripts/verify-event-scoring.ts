@@ -14,7 +14,7 @@
  *
  * Uses fictitious rows it creates and removes itself. Nothing is sent.
  *
- *   npm run test:camporee-scoring
+ *   npm run test:event-scoring
  */
 import { randomUUID } from "node:crypto";
 import { loadEnvConfig } from "@next/env";
@@ -22,21 +22,21 @@ import { PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import type { AuthenticatedUser } from "@/modules/access/authorization";
-import type { ScoredEventInput } from "@/modules/camporee-scoring/domain";
+import type { ScoredEventInput } from "@/modules/event-scoring/domain";
 import {
-  CamporeeScoringError,
-  applyCamporeeAction,
-  loadCamporeeScoringState,
-  loadDirectorCamporeeResults,
+  EventScoringError,
+  applyEventScoringAction,
+  loadEventScoringView,
+  loadDirectorEventScoringResults,
   requireStaffScoringAccess,
-  type CamporeeActor,
-} from "@/modules/camporee-scoring/service";
+  type EventScoringActor,
+} from "@/modules/event-scoring/service";
 import { requireStaffToggleAccess } from "@/modules/event-modules/scoped-toggle";
 import { findActiveMembership } from "@/modules/events/repository";
 
 loadEnvConfig(process.cwd());
 assertLocalDatabase(process.env, "run this verification");
-fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-camporee-scoring-synthetic-key-not-a-secret");
+fillBlankSyntheticEnv("SECRET_ENCRYPTION_KEY", "verify-event-scoring-synthetic-key-not-a-secret");
 
 const prisma = new PrismaClient();
 const P = `cs1676_${randomUUID().slice(0, 8)}`;
@@ -138,16 +138,16 @@ async function main() {
   // Another event's attendee cannot be scored here.
   const elsewhere = await register(ids.other, ids.clubA, "Yes", [{ name: "Ada", type: "Pathfinder" }]);
 
-  const acActor: CamporeeActor = { kind: "area-coordinator", accountId: ids.ac };
-  const adminActor: CamporeeActor = { kind: "staff", userId: ids.admin, administrator: true };
-  const managerActor: CamporeeActor = { kind: "staff", userId: ids.manager, administrator: false };
-  const state = (actor: CamporeeActor = adminActor) => loadCamporeeScoringState(ids.event, actor);
-  const act = (actor: CamporeeActor, action: Parameters<typeof applyCamporeeAction>[2], eventId = ids.event) => applyCamporeeAction(actor, eventId, action);
+  const acActor: EventScoringActor = { kind: "area-coordinator", accountId: ids.ac };
+  const adminActor: EventScoringActor = { kind: "staff", userId: ids.admin, administrator: true };
+  const managerActor: EventScoringActor = { kind: "staff", userId: ids.manager, administrator: false };
+  const state = (actor: EventScoringActor = adminActor) => loadEventScoringView(ids.event, actor);
+  const act = (actor: EventScoringActor, action: Parameters<typeof applyEventScoringAction>[2], eventId = ids.event) => applyEventScoringAction(actor, eventId, action);
 
   // Off by default: nothing can be defined or entered, and the card is hidden.
-  assert(!(await state()).enabled && await prisma.eventModule.count({ where: { eventId: ids.event, moduleKey: "camporee-scoring" } }) === 0, "off by default");
+  assert(!(await state()).enabled && await prisma.eventModule.count({ where: { eventId: ids.event, moduleKey: "event-scoring" } }) === 0, "off by default");
   await refused(() => act(adminActor, { action: "saveScoredEvent", scoredEvent: { name: "Early", kind: "CLUB", unit: "POINTS", higherWins: true, ribbonMode: "PLACES", ribbonPlaces: 3, ribbonBands: [] } }), "nothing can be defined while off", "NOT_AVAILABLE");
-  assert(await loadDirectorCamporeeResults(ids.clubA, ids.event) === null, "a director sees nothing while off");
+  assert(await loadDirectorEventScoringResults(ids.clubA, ids.event) === null, "a director sees nothing while off");
 
   // Who may switch it.
   await refused(() => act({ kind: "area-coordinator", accountId: ids.plain }, { action: "switch", enabled: true }), "an account with no grant is refused", "NOT_AVAILABLE");
@@ -169,7 +169,7 @@ async function main() {
   await act(acActor, { action: "switch", enabled: true });
   const onAudit = await prisma.auditLog.findMany({ where: { eventId: ids.event, action: "EVENT_MODULE_ENABLED" } });
   assert(onAudit.length === 1 && (onAudit[0]!.metadata as { actorAttendeeAccountId?: string; moduleKey?: string }).actorAttendeeAccountId === ids.ac, "the switch is audited with the coordinator's account");
-  assert((onAudit[0]!.metadata as { moduleKey?: string }).moduleKey === "camporee-scoring", "the audit names the module");
+  assert((onAudit[0]!.metadata as { moduleKey?: string }).moduleKey === "event-scoring", "the audit names the module");
 
   // Scored events.
   const events: ScoredEventInput[] = [
@@ -189,7 +189,7 @@ async function main() {
   assert(defined.people.length === 4 && !defined.people.some((person) => person.name.startsWith("Dot")), "staff are not offered as Pathfinders");
 
   // Score entry: only this event's registered clubs and Pathfinders.
-  const score = (actor: CamporeeActor, scoredEvent: string, subjectId: string, value: string | null) => act(actor, { action: "saveScore", entry: { scoredEventId: idOf(scoredEvent), subjectId, value } });
+  const score = (actor: EventScoringActor, scoredEvent: string, subjectId: string, value: string | null) => act(actor, { action: "saveScore", entry: { scoredEventId: idOf(scoredEvent), subjectId, value } });
   await refused(() => score(acActor, "Stilts", a.Dot!, "10"), "a staff member cannot be scored as a Pathfinder", "INVALID");
   await refused(() => score(acActor, "Stilts", elsewhere.Ada!, "10"), "another event's attendee cannot be scored", "INVALID");
   await refused(() => score(acActor, "Canoe race", ids.general, "1:00"), "an unregistered club cannot be scored", "INVALID");
@@ -204,9 +204,9 @@ async function main() {
   await score(acActor, "Telephone verse", ids.clubA, "91");
   await score(acActor, "Telephone verse", ids.clubC, "60");
   await score(acActor, "Telephone verse", ids.clubC, "75");
-  assert(await prisma.camporeeScore.count({ where: { eventId: ids.event } }) === 8, "one score per subject: a correction replaces");
+  assert(await prisma.activityScore.count({ where: { eventId: ids.event } }) === 8, "one score per subject: a correction replaces");
   await refused(() => act(adminActor, { action: "saveScoredEvent", scoredEvent: { ...events[0]!, id: idOf("Stilts"), unit: "POINTS" } }), "the unit cannot change once scores exist", "INVALID");
-  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: { in: ["CAMPOREE_SCORE_CORRECTED_AFTER_PUBLISH", "CAMPOREE_SCORE_REMOVED_AFTER_PUBLISH"] } } }) === 0, "scores before publishing are not audited one by one");
+  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: { in: ["EVENT_SCORING_SCORE_CORRECTED_AFTER_PUBLISH", "EVENT_SCORING_SCORE_REMOVED_AFTER_PUBLISH"] } } }) === 0, "scores before publishing are not audited one by one");
 
   // Rankings, ties, ribbons, awards.
   const results = (await state()).results;
@@ -225,19 +225,19 @@ async function main() {
   // Publishing is for staff administrators only.
   await refused(() => act(acActor, { action: "publish" }), "a coordinator cannot publish", "NOT_PERMITTED");
   await refused(() => act(managerActor, { action: "publish" }), "a Registration Manager cannot publish", "NOT_PERMITTED");
-  assert(await loadDirectorCamporeeResults(ids.clubA, ids.event) === null, "a director sees nothing before publishing");
+  assert(await loadDirectorEventScoringResults(ids.clubA, ids.event) === null, "a director sees nothing before publishing");
   assert((await act(adminActor, { action: "publish" })).publishedAt !== null, "an administrator published");
   await act(adminActor, { action: "publish" });
-  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: "CAMPOREE_RESULTS_PUBLISHED" } }) === 1, "publishing audits once");
+  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: "EVENT_SCORING_RESULTS_PUBLISHED" } }) === 1, "publishing audits once");
 
   // A director sees only their own club.
-  const mine = await loadDirectorCamporeeResults(ids.clubC, ids.event);
+  const mine = await loadDirectorEventScoringResults(ids.clubC, ids.event);
   assert(mine && mine.events.length === 3 && mine.events.every((event) => event.rows.every((row) => row.organizationId === ids.clubC)), "a director sees only their own rows");
   const text = JSON.stringify(mine);
   assert(!text.includes("Ada") && !text.includes("Bea") && !text.includes(`Club A ${P}`) && !text.includes(`Club B ${P}`), "no other club or Pathfinder appears in a director's results");
-  const bOnly = await loadDirectorCamporeeResults(ids.clubB, ids.event);
+  const bOnly = await loadDirectorEventScoringResults(ids.clubB, ids.event);
   assert(bOnly && bOnly.awards && !bOnly.awards.wantsRibbons && bOnly.awards.ribbons.length === 0, "a club that said no sees scores, no ribbon list");
-  assert(await loadDirectorCamporeeResults(ids.clubD, ids.event) === null || (await loadDirectorCamporeeResults(ids.clubD, ids.event))!.events.length === 0, "a club with no entries sees no scores");
+  assert(await loadDirectorEventScoringResults(ids.clubD, ids.event) === null || (await loadDirectorEventScoringResults(ids.clubD, ids.event))!.events.length === 0, "a club with no entries sees no scores");
 
   // After publishing: only staff administrators correct, and it is audited with ids and numbers only.
   await refused(() => score(acActor, "Canoe race", ids.clubA, "55"), "a coordinator cannot correct after publishing", "NOT_PERMITTED");
@@ -245,37 +245,37 @@ async function main() {
   await refused(() => act(acActor, { action: "saveScoredEvent", scoredEvent: { ...events[1]!, id: idOf("Canoe race"), ribbonPlaces: 3 } }), "a coordinator cannot change a scored event after publishing", "NOT_PERMITTED");
   await refused(() => act(managerActor, { action: "saveScoredEvent", scoredEvent: { ...events[1]!, id: idOf("Canoe race"), ribbonPlaces: 3 } }), "a Registration Manager cannot change a scored event after publishing", "NOT_PERMITTED");
   await act(adminActor, { action: "saveScoredEvent", scoredEvent: { ...events[1]!, id: idOf("Canoe race"), ribbonPlaces: 3 } });
-  const changed = await prisma.auditLog.findMany({ where: { eventId: ids.event, action: "CAMPOREE_SCORED_EVENT_CHANGED" } });
+  const changed = await prisma.auditLog.findMany({ where: { eventId: ids.event, action: "EVENT_SCORING_ACTIVITY_CHANGED" } });
   assert(changed.length === 1 && (changed[0]!.metadata as { afterPublish?: boolean }).afterPublish === true, "an administrator's change after publishing is audited");
   await act(adminActor, { action: "saveScoredEvent", scoredEvent: { ...events[1]!, id: idOf("Canoe race"), ribbonPlaces: 2 } });
   await score(adminActor, "Canoe race", ids.clubA, "40");
   await score(adminActor, "Canoe race", ids.clubA, "40");
-  const corrections = await prisma.auditLog.findMany({ where: { eventId: ids.event, action: "CAMPOREE_SCORE_CORRECTED_AFTER_PUBLISH" } });
+  const corrections = await prisma.auditLog.findMany({ where: { eventId: ids.event, action: "EVENT_SCORING_SCORE_CORRECTED_AFTER_PUBLISH" } });
   assert(corrections.length === 1, "a correction after publishing is audited once (a repeat of the same score changes nothing)");
   const meta = corrections[0]!.metadata as { before?: number; after?: number; subjectId?: string };
   assert(meta.before === 6250 && meta.after === 4000 && meta.subjectId === ids.clubA, "the audit has the ids and the before and after");
   await score(adminActor, "Canoe race", ids.clubB, null);
-  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: "CAMPOREE_SCORE_REMOVED_AFTER_PUBLISH" } }) === 1, "removing a score after publishing is audited");
+  assert(await prisma.auditLog.count({ where: { eventId: ids.event, action: "EVENT_SCORING_SCORE_REMOVED_AFTER_PUBLISH" } }) === 1, "removing a score after publishing is audited");
   await refused(() => act(adminActor, { action: "deleteScoredEvent", id: idOf("Stilts") }), "a scored event cannot be removed while published", "NOT_PERMITTED");
 
   // Off hides it and keeps the data; back on, it is all still there.
   await act(acActor, { action: "switch", enabled: false });
-  assert(await loadDirectorCamporeeResults(ids.clubC, ids.event) === null, "off: a director sees nothing");
+  assert(await loadDirectorEventScoringResults(ids.clubC, ids.event) === null, "off: a director sees nothing");
   await refused(() => score(adminActor, "Stilts", c.Cy!, "30"), "off: scores cannot be entered", "NOT_AVAILABLE");
-  assert(await prisma.camporeeScore.count({ where: { eventId: ids.event } }) === 7 && await prisma.camporeeScoredEvent.count({ where: { eventId: ids.event } }) === 3, "off keeps every score and scored event");
+  assert(await prisma.activityScore.count({ where: { eventId: ids.event } }) === 7 && await prisma.scoredActivity.count({ where: { eventId: ids.event } }) === 3, "off keeps every score and scored event");
   assert((await state()).results.events.length === 3, "the staff view still reads them");
   await act(adminActor, { action: "switch", enabled: true });
-  assert((await loadDirectorCamporeeResults(ids.clubC, ids.event))?.events.length === 3, "back on: results are still published");
-  assert((await act(adminActor, { action: "unpublish" })).publishedAt === null && await loadDirectorCamporeeResults(ids.clubC, ids.event) === null, "unpublishing hides results from directors again");
+  assert((await loadDirectorEventScoringResults(ids.clubC, ids.event))?.events.length === 3, "back on: results are still published");
+  assert((await act(adminActor, { action: "unpublish" })).publishedAt === null && await loadDirectorEventScoringResults(ids.clubC, ids.event) === null, "unpublishing hides results from directors again");
 
   // No name reached the audit log, and no points were touched.
   const logs = await prisma.auditLog.findMany({ where: { eventId: ids.event } });
   assert(!logs.some((row) => /Scoresample|Ada|Bea|Club [ABCD]/.test(`${row.summary} ${JSON.stringify(row.metadata)}`)), "no name is written to the audit log");
-  void CamporeeScoringError;
-  console.log("camporee scoring: all checks passed");
+  void EventScoringError;
+  console.log("event scoring: all checks passed");
 }
 
-function nobodyActor(): CamporeeActor {
+function nobodyActor(): EventScoringActor {
   return { kind: "area-coordinator", accountId: ids.revoked };
 }
 

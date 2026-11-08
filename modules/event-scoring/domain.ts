@@ -237,7 +237,7 @@ export type ClubAwards = {
   ribbons: RibbonLine[];
 };
 
-export type CamporeeResults = {
+export type EventScoringResults = {
   events: EventResult[];
   clubs: ClubAwards[];
   /** First places across every event, ties counted for each winner: the trophies to order. */
@@ -252,7 +252,7 @@ export type CamporeeResults = {
  * is no longer registered is left out. Trophies count first places for every club; ribbons are listed only for clubs that
  * answered yes, and the others still appear with their scores.
  */
-export function buildResults(definitions: readonly ScoredEventDefinition[], scores: readonly ScoreRecord[], subjects: ResultSubjects): CamporeeResults {
+export function buildResults(definitions: readonly ScoredEventDefinition[], scores: readonly ScoreRecord[], subjects: ResultSubjects): EventScoringResults {
   const awardsByClub = new Map<string, ClubAwards>();
   const awardFor = (organizationId: string): ClubAwards | null => {
     const club = subjects.clubs.get(organizationId);
@@ -315,7 +315,7 @@ export function buildResults(definitions: readonly ScoredEventDefinition[], scor
  * One club's own results: only the rows of that club, in each event it has an entry in, with the place it earned among all
  * entries. Another club's names and scores are never in what this returns.
  */
-export function resultsForClub(results: CamporeeResults, organizationId: string): { events: EventResult[]; awards: ClubAwards | null } {
+export function resultsForClub(results: EventScoringResults, organizationId: string): { events: EventResult[]; awards: ClubAwards | null } {
   const events = results.events
     .map((event) => ({ ...event, rows: event.rows.filter((row) => row.organizationId === organizationId) }))
     .filter((event) => event.rows.length > 0);
@@ -337,7 +337,7 @@ export type ScoreEntryInput = z.infer<typeof scoreEntrySchema>;
  * One request shape for every action, so a staff route and an Area Coordinator route share a handler. The server decides
  * which actions the caller may take.
  */
-export const camporeeActionSchema = z.discriminatedUnion("action", [
+export const eventScoringActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("switch"), enabled: z.boolean() }).strict(),
   z.object({ action: z.literal("saveScoredEvent"), scoredEvent: scoredEventInputSchema }).strict(),
   z.object({ action: z.literal("deleteScoredEvent"), id: z.string().trim().min(1).max(64) }).strict(),
@@ -345,4 +345,4 @@ export const camporeeActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("publish") }).strict(),
   z.object({ action: z.literal("unpublish") }).strict(),
 ]);
-export type CamporeeAction = z.infer<typeof camporeeActionSchema>;
+export type EventScoringAction = z.infer<typeof eventScoringActionSchema>;
