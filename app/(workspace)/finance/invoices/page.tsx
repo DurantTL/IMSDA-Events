@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { staffPageTitles } from "@/components/staff-navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { FinanceReportPanel } from "@/components/invoice-ledger";
 import { Invoices } from "@/components/invoices";
@@ -6,7 +7,7 @@ import { resolveEventContext } from "@/modules/events/selection";
 import { getInvoiceFinanceReport } from "@/modules/invoices/ledger-repository";
 import { getInvoicesView } from "@/modules/invoices/repository";
 
-export const metadata: Metadata = { title: "Invoices" };
+export const metadata: Metadata = { title: staffPageTitles.invoices };
 export const dynamic = "force-dynamic";
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {

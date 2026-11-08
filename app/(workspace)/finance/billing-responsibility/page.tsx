@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { staffPageTitles } from "@/components/staff-navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { BillingResponsibility } from "@/components/billing-responsibility";
 import { LocationFilter } from "@/components/location-filter";
@@ -6,7 +7,7 @@ import { getBillingResponsibilityView } from "@/modules/billing-responsibility/r
 import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { resolveEventContext } from "@/modules/events/selection";
 
-export const metadata: Metadata = { title: "Billing responsibility" };
+export const metadata: Metadata = { title: staffPageTitles.billingResponsibility };
 
 export default async function BillingResponsibilityPage({ searchParams }: { searchParams: Promise<{ event?: string; location?: string }> }) {
   const { event: requested, location: requestedLocation } = await searchParams;

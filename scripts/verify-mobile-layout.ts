@@ -327,6 +327,8 @@ const pages: PageSpec[] = [
   staff("finance-scholarship-fund", "/finance/scholarship-fund"),
   staff("finance-cancellation-policy", "/finance/cancellation-policy"),
   staff("finance-square-payments", "/finance/square-payments"),
+  // More money tools (#1575): the other finance pages as grouped cards. The Refunds view is the cancellation queue, audited below as cancellation-staff-queue.
+  { ...staff("finance-tools", "/finance/tools"), expectText: /Invoices and churches/ },
   staff("lodging", "/more/lodging"),
   staff("lodging-requests", "/more/lodging/requests"),
   staff("lodging-assignments", "/more/lodging/assignments"),

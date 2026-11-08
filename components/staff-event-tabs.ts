@@ -1,4 +1,5 @@
 import { kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
+import { moneyToolPaths } from "@/modules/payments/money-tools-model";
 import { canAccessOperationalHealth } from "@/modules/operations/access";
 import {
   canShowMoreLauncher,
@@ -117,12 +118,15 @@ export const eventTabSpecs: readonly TabSpec[] = [
     key: "money",
     label: "Money",
     owns: ["/finance", "/more/promo-codes", "/more/ledger-health"],
-    // Payments and Refunds live here and never in an Events tab row. Refunds are recorded from a payment on the Payments page;
-    // a separate Refunds view waits for its own page (#1575), so it is not listed.
+    // Five views at most, in this order: Payments, Balances due, Refunds, Promo codes, More money tools (#1575). Refunds opens the
+    // cancellation-request queue (a decision there records it only; carrying one out is its own named action). Every other finance
+    // page is reached from the More money tools cards, which light that view as their parent.
     views: [
-      { key: "payments", label: staffPageTitles.payments, href: "/finance", visible: byNav("/finance"), alsoOwns: ["/finance/church-owed", "/finance/billing-responsibility", "/finance/attendance-reconciliation", "/finance/scholarship-fund", "/finance/invoices", "/finance/cancellation-policy", "/finance/cancellation-requests", "/finance/square-payments", "/more/ledger-health"] },
+      { key: "payments", label: staffPageTitles.payments, href: "/finance", visible: byNav("/finance") },
       { key: "balances", label: "Balances due", href: "/finance?filter=BALANCE", visible: byNav("/finance"), filter: "BALANCE" },
+      { key: "refunds", label: "Refunds", href: "/finance/cancellation-requests", visible: byNav("/finance") },
       { key: "promo", label: staffPageTitles.promoCodes, href: "/more/promo-codes", visible: byNav("/more/promo-codes") },
+      { key: "more-tools", label: staffPageTitles.moreMoneyTools, href: "/finance/tools", visible: byNav("/finance/tools"), alsoOwns: moneyToolPaths },
     ],
   },
   {
