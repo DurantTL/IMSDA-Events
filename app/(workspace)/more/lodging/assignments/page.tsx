@@ -31,7 +31,8 @@ export default async function LodgingAssignmentsPage({ searchParams }: { searchP
   }
   return (
     <>
-      <BackLink href={`/more/lodging?event=${encodeURIComponent(event.id)}`} variant="staff">Back to lodging</BackLink>
+      {/* The Lodging page is for event administrators (CONFIGURE_EVENT, as it checks), so others get no link to a closed page (#1735). */}
+      {permissions.includes("CONFIGURE_EVENT") ? <BackLink href={`/more/lodging?event=${encodeURIComponent(event.id)}`} variant="staff">Back to lodging</BackLink> : null}
       <LodgingAssignmentsWorkspace
         eventName={event.name}
         initialView={view}

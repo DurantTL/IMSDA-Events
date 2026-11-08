@@ -11,6 +11,7 @@ import {
   type StaffArea,
   type StaffAreaViewer,
 } from "@/components/staff-areas";
+import { opensWithoutEvent } from "@/components/no-event-paths";
 import { buildEventTabs, currentEventPlace, eventTabSpecs, markCurrentEventTab, maxTabsPerRow, maxViewsPerTab, reservedTabWouldShow, type EventTabsContext } from "@/components/staff-event-tabs";
 import { buildHubView } from "@/modules/system-admin/admin-hubs-model";
 import { commonTaskHrefs } from "@/modules/system-admin/home-model";
@@ -85,7 +86,16 @@ describe("staff areas (#1565)", () => {
     ]);
     // A site content editor reaches only the site content page.
     expect(visibleAreas(viewers.editor)).toEqual(["home", "admin"]);
-    expect(areaTabs("admin", viewers.editor)[0].href).toBe("/admin/hubs/catalogs");
+    expect(areaTabs("admin", viewers.editor)[0].href).toBe("/admin/site-content");
+  });
+
+  it("never gives a site content editor with no events a link that ends at /no-access (#1735)", () => {
+    const editor = viewers.editor;
+    const hrefs = [...railItems(editor, null).map((item) => item.href), ...staffAreaOrder.flatMap((area) => areaTabs(area, editor).flatMap((tab) => [tab.href, ...(tab.views ?? []).map((view) => view.href)]))];
+    expect(hrefs.length).toBeGreaterThan(2);
+    for (const href of hrefs) expect(opensWithoutEvent(href), href).toBe(true);
+    // The admin tab still lights on the page it opens.
+    expect(staffPlaceFor("/admin/site-content")).toMatchObject({ area: "admin", tab: "hub-catalogs" });
   });
 
   it("shows the waiting count on New club applications only when it is above zero", () => {
