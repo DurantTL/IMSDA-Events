@@ -190,8 +190,8 @@ describe("the rail and the event picker (#1565, from #741 slice 4)", () => {
 });
 
 describe("phone bar (#1565, from the phone tabs of #741 slice 4)", () => {
-  it("is Home, Check-in, More for an event admin with no admin role: Events is the same page as Home there", () => {
-    expect(phoneTabs(eventAdmin).labels).toEqual(["Home", "Check-in", "More"]);
+  it("is Home, Events, Check-in, More for an event admin with no admin role: Home is its own page (#1568), Events opens the event", () => {
+    expect(phoneTabs(eventAdmin).labels).toEqual(["Home", "Events", "Check-in", "More"]);
   });
 
   it("is Home, Events, Check-in, Clubs, More for a system admin", () => {
@@ -199,10 +199,10 @@ describe("phone bar (#1565, from the phone tabs of #741 slice 4)", () => {
   });
 
   it("hides items the viewer may not open, keeping the order", () => {
-    expect(phoneTabs({ permissions: rolePermissions.CHECK_IN_STAFF }).labels).toEqual(["Home", "Check-in", "More"]);
-    expect(phoneTabs({ permissions: rolePermissions.FINANCE_MANAGER }).labels).toEqual(["Home", "More"]);
-    expect(phoneTabs({ permissions: rolePermissions.READ_ONLY_STAFF }).labels).toEqual(["Home"]);
-    expect(phoneTabs({ permissions: rolePermissions.KITCHEN_STAFF }).labels).toEqual(["Home"]);
+    expect(phoneTabs({ permissions: rolePermissions.CHECK_IN_STAFF }).labels).toEqual(["Home", "Events", "Check-in", "More"]);
+    expect(phoneTabs({ permissions: rolePermissions.FINANCE_MANAGER }).labels).toEqual(["Home", "Events", "More"]);
+    expect(phoneTabs({ permissions: rolePermissions.READ_ONLY_STAFF }).labels).toEqual(["Home", "Events"]);
+    expect(phoneTabs({ permissions: rolePermissions.KITCHEN_STAFF }).labels).toEqual(["Home", "Events"]);
   });
 
   it("selects More on a page no bar item owns, and the bar item on its own pages", () => {
@@ -210,7 +210,8 @@ describe("phone bar (#1565, from the phone tabs of #741 slice 4)", () => {
     expect(phoneTabs({ ...eventAdmin, pathname: "/staff" }).active).toEqual(["More"]);
     expect(phoneTabs({ ...eventAdmin, pathname: "/check-in" }).active).toEqual(["Check-in"]);
     expect(phoneTabs({ ...eventAdmin, pathname: "/check-in/badges" }).active).toEqual(["Check-in"]);
-    expect(phoneTabs({ ...eventAdmin, pathname: "/overview" }).active).toEqual(["Home"]);
+    expect(phoneTabs({ ...eventAdmin, pathname: "/overview" }).active).toEqual(["Events"]);
+    expect(phoneTabs({ ...eventAdmin, pathname: "/home" }).active).toEqual(["Home"]);
     expect(phoneTabs({ ...systemAdmin, pathname: "/admin/clubs" }).active).toEqual(["Clubs"]);
     expect(mobileActiveTabHref("/more/health")).toBe("/more");
     expect(mobileNavigationLabels["/overview"]).toBe("Home");

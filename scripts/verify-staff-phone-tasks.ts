@@ -483,7 +483,7 @@ const tasks: Task[] = [
     async run(page, width) {
       await go(page, `/check-in${eventQuery}`);
       const links = await shellLinks(page);
-      const allowed = (href: string) => ["/check-in", "/overview", "/more", "/help", "/profile", "/people", "/archived-events"].some((prefix) => href === prefix || href.startsWith(`${prefix}/`));
+      const allowed = (href: string) => ["/check-in", "/overview", "/more", "/help", "/home", "/profile", "/people", "/archived-events"].some((prefix) => href === prefix || href.startsWith(`${prefix}/`));
       const outside = links.filter((href) => !allowed(href));
       check(outside.length === 0, `every shell link is one check-in staff may open (${outside.join(", ") || "none outside"})`);
       for (const forbidden of ["/finance", "/communications", "/registration-builder", "/admin", "/imports"]) {
@@ -510,12 +510,13 @@ const tasks: Task[] = [
     async run(page, width) {
       await go(page, `/more/kitchen-report/counts${eventQuery}`);
       const links = await shellLinks(page);
-      const kitchenOnly = links.filter((href) => !href.startsWith("/more/kitchen-report") && !href.startsWith("/help") && !href.startsWith("/profile") && !href.startsWith("/archived-events"));
-      check(kitchenOnly.length === 0, `every shell link is the kitchen counts, Help or the profile (${kitchenOnly.join(", ") || "none outside"})`);
+      const kitchenOnly = links.filter((href) => !href.startsWith("/more/kitchen-report") && !href.startsWith("/help") && !href.startsWith("/home") && !href.startsWith("/profile") && !href.startsWith("/archived-events"));
+      check(kitchenOnly.length === 0, `every shell link is the kitchen counts, Home, Help or the profile (${kitchenOnly.join(", ") || "none outside"})`);
       check(links.some((href) => href.startsWith("/more/kitchen-report/counts")), "Kitchen counts is there");
       if (isPhone(width)) {
         const bar: string[] = await page.locator("nav.mobile-nav a").allInnerTexts();
-        check(!bar.some((text) => /Clubs|Check-in|Events/.test(text)), `the bottom bar has no Clubs, Check-in or Events (${bar.map((text) => text.trim()).join(", ")})`);
+        // Home (#1568) is its own page; Events opens the kitchen counts, the only event page they have.
+        check(!bar.some((text) => /Clubs|Check-in/.test(text)), `the bottom bar has no Clubs or Check-in (${bar.map((text) => text.trim()).join(", ")})`);
       }
       await go(page, `/people${eventQuery}`);
       const body = (await page.locator("main.workspace").first().innerText()).toLowerCase();

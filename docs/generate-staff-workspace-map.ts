@@ -47,10 +47,10 @@ function placeOf(route: string, query = "") {
   const tabs = areaTabs(place.area, everything);
   const tab = tabs.find((candidate) => candidate.key === place.tab);
   const view = tab?.views?.find((candidate) => candidate.key === place.view);
-  const phone = place.area === "home" ? "bar: Home" : place.area === "events" ? "bar: Events" : place.area === "clubs" ? "bar: Clubs" : "More, Areas";
+  const phone = place.area === "home" ? (place.tab ? "bar: Home" : "More")  : place.area === "events" ? "bar: Events" : place.area === "clubs" ? "bar: Clubs" : "More, Areas";
   return {
     area: staffAreaMeta[place.area].label,
-    tab: tab?.label ?? (place.tab ? place.tab : "none (Help, Profile and pages no tab lists light no rail item)"),
+    tab: tab?.label ?? (place.tab ? place.tab : "none (Help, Profile and pages no tab lists light Home and no tab)"),
     view: view?.label ?? "",
     phone,
     menu,
@@ -63,9 +63,9 @@ const text = [
   "",
   "Generated with `npx tsx docs/generate-staff-workspace-map.ts`. This is the staff-only subset for #1558, not a second runtime registry or a decision to build a whole-system site-map page.",
   "",
-  "The staff shell is a branded header, an icon rail of the areas a person can reach (Events, Clubs, People, Reports, Admin; Home waits for its own pages in #1568), and below it that area's one row of tabs, or inside an event the event's tabs (Event home, Registrations, Check-in, Communications, Money, Reports, Event setup). Views inside a tab are a button strip. Below 1024px, or when a row would not fit, a row is a menu line (\"<Area> menu\" or \"Event menu\"). There is no sidebar. Each page belongs to exactly one place for the \"where you are\" marking; a page that two tabs list is the same page, and the area named here owns the marking.",
+  "The staff shell is a branded header, an icon rail of the areas a person can reach (Home, Events, Clubs, People, Reports, Admin), and below it that area's one row of tabs, or inside an event the event's tabs (Event home, Registrations, Check-in, Communications, Money, Reports, Event setup). Views inside a tab are a button strip. Below 1024px, or when a row would not fit, a row is a menu line (\"<Area> menu\" or \"Event menu\"). There is no sidebar. Each page belongs to exactly one place for the \"where you are\" marking; a page that two tabs list is the same page, and the area named here owns the marking.",
   "",
-  "A role's tab row lists only the pages that role may open; every route keeps its server guard, and menu and search visibility keep their existing role, grant and module predicates. Record pages open through their existing parent links. Help and Profile light no rail item. No URL changes: aliases and redirects stay as they were.",
+  "A role's tab row lists only the pages that role may open; every route keeps its server guard, and menu and search visibility keep their existing role, grant and module predicates. Record pages open through their existing parent links. Help and Profile light Home on the rail and no tab. No URL changes: aliases and redirects stay as they were.",
   "",
   "| Route | Previously reached from | Rail area | Tab | View | Phone | Menu line | Note | Source |",
   "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -94,6 +94,14 @@ for (const [route, query] of [
 
 text.push(
   "",
+  "## Home (#1568)",
+  "",
+  "Home is on the rail for every staff viewer and has two tabs. **Needs you** (`/home`) is the work waiting for the person, one section per admin role they hold, built from the same reads as the role pills so the numbers agree; every item links to the page that does the work, a read that failed says \"Unavailable\" (never zero or \"Nothing waiting\"), and \"Nothing needs you right now\" shows only when every read worked and found nothing. The tab's count is the held roles' counts added up, shown only when every held role's count was read. **Coming up** (`/home/coming-up`) lists the upcoming events the person can open, soonest first, each linking to its event home. Help and Profile also light Home but no tab. The phone bar's Home slot opens `/home`; where people land after sign-in is unchanged (the role switcher's decision, #108).",
+  "",
+  "## Club administration (#1568)",
+  "",
+  "`/admin/clubs` keeps its key numbers, with Review applications as the one main action, and lists every destination of the Clubs area as a card with its own status, in card groups (Clubs, Records and points, Applications, Club events and forms, People, Catalogs and imports). A card is a link only and is drawn only for a page the person can open; a number that cannot be read shows \"Unavailable\". Below the cards the page keeps New clubs (with its approve buttons), Registered clubs, Club events and Quick actions as they were. The Clubs tab Club administration overview lights as before.",
+  "",
   "## Admin hub pages (#1569)",
   "",
   "Each Admin tab (Events, Clubs, People, Forms, Catalogs and settings) opens its own hub page under `/admin/hubs/`: a few key numbers, one main action, then a card for each destination with its own status. A card is a link only and is drawn only for a destination the person can open; a number that cannot be read shows \"Unavailable\", never zero. The hub lists every destination of its group, so the Forms and Catalogs tabs have no view buttons. The pages a hub links to keep their own area for the marking (for example Create an event is in Events); the Admin pages with no hub of their own light the Forms or Catalogs and settings tab. System administration (`/admin`) keeps the task directory and the Common tasks. Break-glass and legal-hold counts are not shown on the People hub: that page asks for the health privacy acknowledgment first.",
@@ -114,7 +122,6 @@ text.push(
   "",
   "## Left out until built",
   "",
-  "- Home (Needs you, Coming up): #1568 builds the pages; until then the rail has no Home item and the phone bar's Home slot opens the person's main dashboard.",
   "- Events > All events: there is no in-shell list of all events yet. Staff open an event from the Events row's \"Open an event\" picker or the dashboards, and switch from the event bar.",
   "- Money > Refunds and More money tools (#1575), Registrations > Review queues (#1574), Event setup groups (#1571 and the setup issues), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).",
   "",

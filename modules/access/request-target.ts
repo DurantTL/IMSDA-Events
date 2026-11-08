@@ -8,6 +8,7 @@ export const requestTargetPrefixes = [
   "/community",
   "/finance",
   "/help",
+  "/home",
   "/imports",
   "/information-forms",
   "/more",

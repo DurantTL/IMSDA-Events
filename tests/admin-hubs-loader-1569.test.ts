@@ -33,7 +33,8 @@ const getSystemReadiness = vi.fn();
 const attentionSummary = vi.fn();
 vi.mock("@/modules/system-admin/readiness-repository", () => ({ getSystemReadiness: (...args: unknown[]) => { calls.push("readiness"); return getSystemReadiness(...args); } }));
 
-const { loadHubMetrics } = await import("@/modules/system-admin/admin-hubs-repository");
+const { loadHubMetrics, lateRecordCount } = await import("@/modules/system-admin/admin-hubs-repository");
+const { chooseReportMonth } = await import("@/modules/club-reports/club-directory-domain");
 
 const system = { isSystemAdmin: true, clubsAdmin: true, siteContentEditor: false };
 const clubsAdmin = { isSystemAdmin: false, clubsAdmin: true, siteContentEditor: false };
@@ -109,5 +110,26 @@ describe("Admin hub loaders (#1569)", () => {
     expect(calls).not.toContain("formsHub");
     expect(calls).toContain("clubForms");
     expect(await loadHubMetrics("catalogs", { isSystemAdmin: false, clubsAdmin: false, siteContentEditor: true }, now)).toEqual({});
+  });
+
+  it("reads the club summary for the picked club year, and not twice when the page already read it (#1568)", async () => {
+    const pastYear = "2024-25";
+    const month = chooseReportMonth(pastYear, now);
+    getAreaClubsSummary.mockResolvedValue([
+      { id: "c1", months: [{ month, status: "LATE", points: 1 }] },
+      { id: "c2", months: [{ month, status: "LATE", points: 1 }] },
+      { id: "c3", months: [{ month, status: "SUBMITTED", points: 1 }] },
+    ]);
+    const picked = await loadHubMetrics("club-administration", clubsAdmin, now, { clubYear: pastYear });
+    expect(getAreaClubsSummary).toHaveBeenCalledWith(pastYear, now, { backgroundChecks: false });
+    expect(picked).toMatchObject({ lateRecords: 2 });
+    expect(lateRecordCount(await getAreaClubsSummary(pastYear), pastYear, now)).toBe(2);
+
+    getAreaClubsSummary.mockClear();
+    calls.length = 0;
+    const known = await loadHubMetrics("club-administration", clubsAdmin, now, { clubYear: pastYear, known: { clubs: 7, lateRecords: null, applicationsWaiting: 9 } });
+    expect(getAreaClubsSummary).not.toHaveBeenCalled();
+    expect(calls).not.toContain("applications");
+    expect(known).toMatchObject({ lateRecords: null, applicationsWaiting: 9, openTransfers: 1 });
   });
 });

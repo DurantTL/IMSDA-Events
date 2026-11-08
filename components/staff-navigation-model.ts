@@ -13,7 +13,6 @@ import {
   type StaffPlace,
 } from "@/components/staff-areas";
 import { buildEventTabs, currentEventPlace, markCurrentEventTab, type EventTab, type EventTabKey } from "@/components/staff-event-tabs";
-import { adminRoleLanding } from "@/modules/access/admin-roles-domain";
 import { phoneBarItems, type PhoneBarItem } from "@/components/staff-phone-bar-model";
 import {
   buildMoreDirectoryCards,
@@ -133,8 +132,7 @@ export function buildStaffNavigation(input: StaffNavigationInput): StaffNavigati
   const rowTabs: Array<EventTab | AreaTab> = place.inEvent ? eventTabs : areaRow;
 
   // The phone: Home, Events, Check-in, Clubs and More. More lists "This event" first inside an event, then the other areas.
-  const homeHref = viewer.held.length > 0 ? carry(adminRoleLanding(activeRole)) : undefined;
-  const onBar = new Set(phoneBarItems({ rail, eventTabs, moreHref: "/help", homeHref }).map((item) => item.href));
+  const onBar = new Set(phoneBarItems({ rail, eventTabs, moreHref: "/help" }).map((item) => item.href));
   const areaItems = rail.filter((item) => !onBar.has(item.href));
   const launcherSections: LauncherSection[] = [
     ...(place.inEvent && eventTabs.length > 0
@@ -151,7 +149,6 @@ export function buildStaffNavigation(input: StaffNavigationInput): StaffNavigati
   const phoneItems = phoneBarItems({
     rail,
     eventTabs,
-    homeHref,
     moreHref: moreHasContent ? (showMore && selectedEventId ? `/more${eventQuery}` : withCurrentEvent("/help", selectedEventId)) : null,
   });
 

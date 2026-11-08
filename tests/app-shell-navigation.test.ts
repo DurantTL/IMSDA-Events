@@ -66,10 +66,10 @@ describe("application shell navigation (#1565)", () => {
     expect(markup.match(/data-staff-tabs="true"/g)).toHaveLength(1);
   });
 
-  it("gives a system administrator all six areas, and event-only staff just Events", () => {
-    expect(railLabels(render(["VIEW_EVENT"], admin))).toEqual(["Events", "Clubs", "People", "Reports", "Admin"]);
+  it("gives a system administrator all six areas, and event-only staff just Home and Events", () => {
+    expect(railLabels(render(["VIEW_EVENT"], admin))).toEqual(["Home", "Events", "Clubs", "People", "Reports", "Admin"]);
     const eventOnly = render(["VIEW_EVENT"], staff);
-    expect(railLabels(eventOnly)).toEqual(["Events"]);
+    expect(railLabels(eventOnly)).toEqual(["Home", "Events"]);
     expect(eventOnly).not.toContain("System management");
     expect(rail(eventOnly)).not.toContain('href="/admin');
   });

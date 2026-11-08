@@ -127,7 +127,7 @@ describe("scope stays visible and never moves with a tab (#1566)", () => {
     const links = [...hrefs(rail(html)), ...hrefs(row(html)), ...hrefs(phone(html))];
     expect(links.length).toBeGreaterThan(10);
     for (const href of links) {
-      // The phone's Clubs and Home slots open the Clubs and role pages, which never carried an event.
+      // The phone's Clubs slot opens the Clubs pages, which never carried an event.
       if (/^\/admin\/clubs/.test(href) || href === "/admin" || href.startsWith("/events-admin")) continue;
       if (href.startsWith("/help")) continue;
       expect(href, href).toContain("event=synthetic_event");
@@ -188,8 +188,8 @@ describe("deep pages light their parent tab, rail area and phone item (#1566)", 
     for (const [path, expected] of deep) {
       const html = shell(path);
       const litRail = rail(html).match(/aria-current="true"/g) ?? [];
-      // Help belongs to Home, which has no rail item; every other page lights exactly one area.
-      expect(litRail.length, `${path} rail`).toBe(expected.area === "home" ? 0 : 1);
+      // Every page lights exactly one area; Help belongs to Home (#1568 put Home on the rail).
+      expect(litRail.length, `${path} rail`).toBe(1);
       expect([...phone(html).matchAll(/<a class="active"[^>]*>.*?<span>([^<]+)<\/span>/g)].map((match) => match[1]), `${path} phone`).toEqual([expected.bar]);
       if (expected.area !== "home") {
         const lit = row(html).match(/aria-current="(?:page|true)"/g) ?? [];

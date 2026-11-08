@@ -56,31 +56,35 @@ describe("staff areas (#1565)", () => {
 
   it("counts the tabs a system administrator sees in each area", () => {
     const system = viewers.system;
-    // Home has no pages until #1568, so no tabs and no rail item (menus never list planned work).
-    expect(keys("home", system)).toEqual([]);
+    // Home (#1568): Needs you and Coming up.
+    expect(keys("home", system)).toEqual(["needs-you", "coming-up"]);
     expect(keys("events", system)).toEqual(["calendar", "create", "copy", "templates", "archived"]);
     expect(keys("clubs", system)).toEqual(["club-administration", "club-summary", "clubs-and-churches", "applications", "leaders", "transfers", "monthly-records"]);
     expect(keys("people", system)).toEqual(["people-access", "break-glass"]);
     expect(keys("reports", system)).toEqual(["monthly-records", "year-end", "points", "analytics", "system-report"]);
     expect(keys("admin", system)).toEqual(["system-administration", "hub-events", "hub-clubs", "hub-people", "hub-forms", "hub-catalogs"]);
-    expect(visibleAreas(system)).toEqual(["events", "clubs", "people", "reports", "admin"]);
+    expect(visibleAreas(system)).toEqual(["home", "events", "clubs", "people", "reports", "admin"]);
   });
 
   it("filters the rail and the rows by role", () => {
-    expect(visibleAreas(viewers.clubs)).toEqual(["events", "clubs", "people", "reports", "admin"]);
+    expect(visibleAreas(viewers.clubs)).toEqual(["home", "events", "clubs", "people", "reports", "admin"]);
     expect(keys("clubs", viewers.clubs)).not.toContain("clubs-and-churches");
     expect(keys("people", viewers.clubs)).toEqual(["people-access"]);
     expect(keys("admin", viewers.clubs)).toEqual(["hub-forms", "hub-catalogs"]);
     expect(keys("events", viewers.events)).toEqual(["event-administration", "archived"]);
     // Reports owns no page an Event Administrator can reach, so it is not on their rail; Events opens Event administration.
     expect(keys("reports", viewers.events)).toEqual([]);
-    expect(visibleAreas(viewers.events)).toEqual(["events"]);
-    expect(railItems(viewers.events, null)[0]).toMatchObject({ area: "events", href: "/events-admin" });
+    expect(visibleAreas(viewers.events)).toEqual(["home", "events"]);
+    expect(railItems(viewers.events, null).map((item) => item.area)).toEqual(["home", "events"]);
+    expect(railItems(viewers.events, null)[1]).toMatchObject({ area: "events", href: "/events-admin" });
     // Plain event staff: only their event tabs, so only the Events item.
-    expect(visibleAreas(viewers.staff)).toEqual(["events"]);
-    expect(railItems(viewers.staff, "/overview?event=e1")).toEqual([expect.objectContaining({ area: "events", href: "/overview?event=e1" })]);
+    expect(visibleAreas(viewers.staff)).toEqual(["home", "events"]);
+    expect(railItems(viewers.staff, "/overview?event=e1")).toEqual([
+      expect.objectContaining({ area: "home", href: "/home" }),
+      expect.objectContaining({ area: "events", href: "/overview?event=e1" }),
+    ]);
     // A site content editor reaches only the site content page.
-    expect(visibleAreas(viewers.editor)).toEqual(["admin"]);
+    expect(visibleAreas(viewers.editor)).toEqual(["home", "admin"]);
     expect(areaTabs("admin", viewers.editor)[0].href).toBe("/admin/hubs/catalogs");
   });
 
@@ -120,6 +124,8 @@ describe("staff areas (#1565)", () => {
       ["/event-setup/copy", "", "events", "copy"],
       ["/admin/event-templates/abc", "", "events", "templates"],
       ["/admin/feature-requests", "", "admin", "hub-events"],
+      ["/home", "", "home", "needs-you"],
+      ["/home/coming-up", "", "home", "coming-up"],
       ["/help", "", "home", null],
       ["/profile", "", "home", null],
     ];

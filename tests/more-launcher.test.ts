@@ -340,7 +340,10 @@ describe("launcher in the shell", () => {
     expect(markup).not.toContain('class="sidebar"');
     expect(markup).toContain('href="/more?event=event_1"');
     const tabs = markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
-    expect(tabs.match(/<a /g)).toHaveLength(3);
+    // Home (#1568), Events, Check-in and More: Home is its own page now, so it no longer folds into Events.
+    expect(tabs.match(/<a /g)).toHaveLength(4);
+    expect(tabs.indexOf('href="/home?event=event_1"')).toBeGreaterThan(-1);
+    expect(tabs.indexOf('href="/home?event=event_1"')).toBeLessThan(tabs.indexOf("/overview?event=event_1"));
     expect(tabs.lastIndexOf("/more?event=event_1")).toBeGreaterThan(tabs.lastIndexOf("/check-in?event=event_1"));
     expect(tabs).toContain('aria-haspopup="dialog"');
   });

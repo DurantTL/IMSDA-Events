@@ -207,6 +207,9 @@ export function AppShell({
     ? { kind: "system" as const, kindLabel: "Clubs", label: "Clubs administration", detail: "All clubs" }
     : isProfileRoute
     ? { kind: "profile" as const, kindLabel: "Account", label: "Your account", detail: "Not tied to an event" }
+    // Home (#1568) spans every event and role the person holds, so it names no single event.
+    : place.area === "home" && (pathname === "/home" || pathname.startsWith("/home/"))
+    ? { kind: "profile" as const, kindLabel: "Home", label: "Your work", detail: "Across your events and roles" }
     : place.inEvent
     ? { kind: "event" as const, kindLabel: "Event", label: selectedEvent?.name?.trim() || "No event selected", detail: "Event workspace" }
     : isSystemRoute && isSystemAdmin

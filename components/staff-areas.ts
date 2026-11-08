@@ -10,6 +10,7 @@ import {
 import { adminHubs, clubsAdminRecordsHref, systemNavGroups } from "@/components/system-navigation";
 import { type AdminRole, type AdminRoleCounts } from "@/modules/access/admin-roles-domain";
 import { maxTabsPerRow, maxViewsPerTab } from "@/components/staff-event-tabs";
+import { needsYouTabCount } from "@/modules/system-admin/home-needs-model";
 
 /**
  * The six staff areas of the icon rail and each area's one row of tabs (#1565), built from the existing registries
@@ -64,12 +65,19 @@ export type AreaTab = {
 
 type Registered = { href: string; label: string };
 
+/** Home's two pages (#1568): the one place their names are written; the tabs, the pages and the tests look them up here. */
+export const homeDestinations = {
+  needsYou: { href: "/home", label: "Needs you" },
+  comingUp: { href: "/home/coming-up", label: "Coming up" },
+} as const;
+
 const registered: readonly Registered[] = [
   ...systemNavGroups.flatMap((group) => group.items.map(({ href, label }) => ({ href, label }))),
   ...clubsAdminGroups.flatMap((group) => group.items.map(({ href, label }) => ({ href, label }))),
   { href: clubsAdminHomeItem.href, label: clubsAdminHomeItem.label },
   { href: eventsAdminHomeItem.href, label: eventsAdminHomeItem.label },
   { href: "/admin", label: "System administration" },
+  ...Object.values(homeDestinations),
   ...Object.values(adminHubs).map(({ href, label }) => ({ href, label })),
 ];
 
@@ -105,9 +113,12 @@ const waitingClubApplications = (v: StaffAreaViewer) => v.counts.CLUBS_ADMIN;
  * list planned work). Left out for that reason: Events > "All events" (no in-shell all-events list yet).
  */
 export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
-  // Home waits for its own pages (#1568: Needs you, Coming up). Menus never list planned work, so it has no tabs and no rail item;
-  // the phone bar's Home slot opens the person's main dashboard instead.
-  home: [],
+  // Home (#1568): the work waiting for this person, then the events coming up. Every staff viewer has both; each page reads
+  // only what the viewer may already see. The badge is the held roles' counts the shell read, only when every one was read.
+  home: [
+    { key: "needs-you", destination: homeDestinations.needsYou.href, visible: () => true, count: (v) => needsYouTabCount(v.held, v.counts) },
+    { key: "coming-up", destination: homeDestinations.comingUp.href, visible: () => true },
+  ],
   events: [
     { key: "event-administration", destination: eventsAdminHomeItem.href, visible: events },
     { key: "calendar", destination: "/admin/calendar", visible: sys },
@@ -237,11 +248,11 @@ function ownedTabs(area: StaffArea, viewer: StaffAreaViewer): AreaTab[] {
 }
 
 /**
- * The rail: an area shows when at least one of its tabs is a page it owns. Home is not on the rail until its pages exist
- * (#1568). Events also shows for staff with events (their event tabs).
+ * The rail: an area shows when at least one of its tabs is a page it owns. Home shows for every staff viewer (its two
+ * pages are open to all staff, #1568). Events also shows for staff with events (their event tabs).
  */
 export function visibleAreas(viewer: StaffAreaViewer): StaffArea[] {
-  return staffAreaOrder.filter((area) => area !== "home" && (ownedTabs(area, viewer).length > 0 || (area === "events" && viewer.hasEvents)));
+  return staffAreaOrder.filter((area) => (ownedTabs(area, viewer).length > 0 || (area === "events" && viewer.hasEvents)));
 }
 
 /** The pages inside an event: the event tabs, not the Events area's own row. */
@@ -259,13 +270,15 @@ function under(pathname: string, path: string) {
 
 /**
  * The one place a page lives: its rail area, its tab in that area's row and the view inside it. A page two areas both
- * list belongs to one of them for the marking: Monthly Records to Clubs, Event administration to Events. Help and
- * Profile belong to Home, so the rail never lights an area the page is not in.
+ * list belongs to one of them for the marking: Monthly Records to Clubs, Event administration to Events. Home's pages,
+ * Help and Profile belong to Home (Help and Profile with no tab), so the rail never lights an area the page is not in.
  */
 export function staffPlaceFor(pathname: string, params: { get(name: string): string | null } = { get: () => null }): StaffPlace {
   const view = params.get("view");
   const place = (area: StaffArea, tab: string | null, viewKey: string | null = null): StaffPlace => ({ area, tab, view: viewKey, inEvent: false });
 
+  if (pathname === homeDestinations.comingUp.href) return place("home", "coming-up");
+  if (pathname === homeDestinations.needsYou.href) return place("home", "needs-you");
   if (under(pathname, "/help") || under(pathname, "/profile")) return place("home", null);
   if (isEventScopedPath(pathname)) return { area: "events", tab: null, view: null, inEvent: true };
 

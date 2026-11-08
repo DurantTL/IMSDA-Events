@@ -87,7 +87,7 @@ export function firstPathSegment(pathname: string): string {
  */
 export const staffWorkspaceSections = [
   "admin", "admin-role", "community", "overview", "people", "finance", "check-in", "communications", "more", "imports", "registration-builder",
-  "event-setup", "events-admin", "archived-events", "staff", "profile", "help", "information-forms", "select-event", "no-access", "api",
+  "event-setup", "events-admin", "archived-events", "staff", "profile", "help", "information-forms", "select-event", "no-access", "api", "home",
 ] as const;
 
 export function isStaffWorkspacePath(pathname: string): boolean {

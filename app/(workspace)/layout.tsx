@@ -41,7 +41,8 @@ async function isHelpRequest(): Promise<boolean> {
     const target = (await headers()).get(REQUEST_TARGET_HEADER) ?? "";
     const path = target.split("?", 1)[0].split("#", 1)[0].replace(/\/+$/, "");
     // The site content editor (#111) is open to a staff member with no event; the page itself checks the grant.
-    return path === "/help" || path.startsWith("/help/") || path === "/admin/site-content" || path.startsWith("/admin/site-content/");
+    // Home (#1568) is open to every staff member; both pages handle having no event or no admin role.
+    return path === "/help" || path.startsWith("/help/") || path === "/home" || path.startsWith("/home/") || path === "/admin/site-content" || path.startsWith("/admin/site-content/");
   } catch {
     return false;
   }

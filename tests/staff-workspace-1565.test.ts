@@ -128,15 +128,16 @@ describe("the phone bar's where-you-are (#1565)", () => {
   it("keeps Events its own slot for an Events Administrator, lit on event pages and Events pages, never Home", () => {
     for (const path of ["/overview", "/finance", "/archived-events", "/events-admin"]) {
       const html = shell(path, events);
-      // Home (/events-admin) and Events open the same page, so Home gives way: one bar link per page.
-      expect([...phone(html).matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]), path).not.toContain("Home");
+      // Home opens /home (#1568), its own page, so Home and Events never share a link: one bar link per page.
+      expect([...phone(html).matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]), path).toContain("Home");
       const hrefs = [...phone(html).matchAll(/<a [^>]*href="([^"?]+)/g)].map((match) => match[1]);
       expect(hrefs.filter((href) => href === "/events-admin"), path).toHaveLength(1);
       expect(lit(html), path).toEqual(["Events"]);
     }
   });
 
-  it("drops Home for a Clubs Administrator, whose Home and Clubs open the same page: one /admin/clubs item", () => {
+  it("lights Home on its own pages, and keeps one item per page for a Clubs Administrator", () => {
+    for (const path of ["/home", "/home/coming-up"]) expect(lit(shell(path, events)), path).toEqual(["Home"]);
     const html = shell("/admin/clubs", { roles: ["CLUBS_ADMIN"], admin: false, withEvents: false });
     const hrefs = [...phone(html).matchAll(/<a [^>]*href="([^"?]+)/g)].map((match) => match[1]);
     expect(hrefs.filter((href) => href === "/admin/clubs")).toHaveLength(1);
@@ -207,7 +208,7 @@ describe("the kitchen-only view (#1029, #1565)", () => {
     expect(row(html)).toContain(`href="${kitchenCountsPath}?event=synthetic_event"`);
     expect(row(html)).not.toContain("/overview");
     expect(row(html)).not.toContain("/people");
-    expect(html.slice(html.indexOf('aria-label="Mobile navigation"')).match(/<span>[^<]+<\/span>/g)).toEqual(["<span>Home</span>"]);
+    expect(html.slice(html.indexOf('aria-label="Mobile navigation"')).match(/<span>[^<]+<\/span>/g)).toEqual(["<span>Home</span>", "<span>Events</span>"]);
   });
 });
 
