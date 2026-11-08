@@ -54,6 +54,10 @@ describe("staff UI foundations (#981 batch 1)", () => {
     expect(css).toMatch(/\.report-table thead th \{[^}]*max\(var\(--type-label-floor/);
   });
 
+  it("holds the staff event pickers, which render outside .app-shell, to 14px labels (#1732)", () => {
+    expect(css).toMatch(/\.select-event-card \.eyebrow,\s*\.select-event-card \.auth-brand > span small \{ font-size: 0\.875rem; \}/);
+  });
+
   it("declares the staff and label floors only on .app-shell, so club, account and public pages keep 12px meta text", () => {
     for (const token of ["--type-staff-floor", "--type-label-floor"]) {
       const declarations = [...css.matchAll(new RegExp(`${token}:\\s*[^;]+;`, "g"))];

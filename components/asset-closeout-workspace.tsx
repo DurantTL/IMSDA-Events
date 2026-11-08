@@ -191,7 +191,7 @@ function ExceptionsTable({ ctx, rows }: { ctx: TableContext; rows: ExceptionRow[
 
 /** A short fixed list (one row per asset kind, a reconciliation tally), so not sortable (#1458). */
 function TypesTable({ rows }: { rows: TypeReconciliation[] }) {
-  return <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-tablet">
+  return <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-wide">
     <caption className="sr-only">Units issued, returned, lost, damaged and still out, by kind</caption>
     <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">Went out</th><th role="columnheader" scope="col">Returned</th><th role="columnheader" scope="col">Lost</th><th role="columnheader" scope="col">Damaged</th><th role="columnheader" scope="col">Withdrawn in error</th><th role="columnheader" scope="col">Replaced, unaccounted</th><th role="columnheader" scope="col">Still out</th><th role="columnheader" scope="col">Reconciles</th></tr></thead>
     <tbody role="rowgroup">{rows.map((row) => <tr role="row" key={row.typeId}>

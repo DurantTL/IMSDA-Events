@@ -1803,6 +1803,9 @@ body:has(.auth-page) { padding-bottom: 0; }
 .auth-brand > span small { display: block; }
 .auth-brand > span strong { letter-spacing: 0.08em; }
 .auth-brand > span small { color: var(--muted); font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.62rem); font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+/* #1732: the staff event pickers sit outside .app-shell, so their uppercase labels take the staff 14px here (club and public sign-in keep the 12px floor). */
+.select-event-card .eyebrow,
+.select-event-card .auth-brand > span small { font-size: 0.875rem; }
 .auth-heading { margin-bottom: 22px; }
 .auth-heading h1 { margin: 3px 0 7px; color: var(--ink); font-size: 1.75rem; line-height: 1.15; }
 .auth-heading > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.75rem); line-height: 1.6; }
