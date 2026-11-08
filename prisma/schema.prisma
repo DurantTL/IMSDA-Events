@@ -678,6 +678,10 @@ enum MessageTemplateKey {
   HONOR_WATCH_SUMMARY
   /// The one plain test email a system administrator sends from the System report (#1383), to one typed address. No event, no attendee data, no links. Not an event template.
   SYSTEM_TEST_EMAIL
+  /// A club submitted a conference order for patches and pins (#1688): one internal email to the conference orders address. Club, church, director, items, quantities and total; no member data. Not an event template.
+  CONFERENCE_CLUB_ORDER_SUBMITTED
+  /// The confirmation of a conference club order (#1688): one email to the club's director. Not an event template.
+  CONFERENCE_CLUB_ORDER_CONFIRMATION
 }
 
 enum MessageTemplateStatus {
@@ -1679,6 +1683,8 @@ model PlatformSettings {
   emailHelpPhone            String?            @default("(515) 223-1197")
   /// Where "a new club applied" notices go (#817), e.g. the youth department administrative assistant. Blank means no notice is sent; applications still wait in the queue.
   newClubApplicationEmail   String?
+  /// Where a conference club order (patches and pins, #1688) is emailed. Blank uses the youth department address, youth@imsda.org.
+  conferenceOrdersEmail     String?
   /// The one-sign-in switch (#554, ADR 0013). OFF by default; nothing reads it yet.
   /// Later slices put the unified sign-in and role-aware landing behind it.
   unifiedSignInEnabled      Boolean            @default(false)
@@ -1846,6 +1852,10 @@ model Event {
   lifecycleState       EventLifecycleState?
   /// Bumped by every lifecycle transition; the transition is a conditional update on it, so two at once cannot both win.
   lifecycleVersion     Int                @default(0)
+  /// True on the one hidden "Conference club orders" billing event per club year (#1688): it only holds the church invoices for
+  /// filled conference club orders. It is archived and unpublished when made, so no picker, calendar or public page lists it,
+  /// and it is never offered for registration. Staff reach its invoices through Club orders, never through an event list.
+  isBillingContainer   Boolean            @default(false)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -1853,6 +1863,7 @@ model Event {
   /// The calendar items this event was set up from or linked to (#445). Several items can share one registration
   /// event (#1086): different dates or sites of one event, or a snow date.
   calendarEntryLinks                  CalendarEntry[]    @relation("CalendarEntryLinkedEvent")
+  conferenceClubOrders                ConferenceClubOrder[]
   calendarMatchDismissals             CalendarEventMatchDismissal[] @relation("CalendarMatchDismissalEvent")
   archivedBy                          User?              @relation("EventArchivedBy", fields: [archivedByUserId], references: [id], onDelete: SetNull)
 
@@ -2764,6 +2775,8 @@ model Organization {
   clubSupplyStock    ClubSupplyStock[]
   clubOrderNeeds     ClubOrderNeed[]
   clubOrderBatches   ClubSupplyOrderBatch[]
+  conferenceClubOrders ConferenceClubOrder[] @relation("ConferenceClubOrderClub")
+  conferenceClubOrdersBilled ConferenceClubOrder[] @relation("ConferenceClubOrderChurch")
   clubOrderListLines ClubOrderListLine[]
   clubOrderHonorLines ClubOrderHonorLine[]
   memberClassCompletions MemberClassCompletion[]
@@ -5598,6 +5611,13 @@ enum ClubSupplySection {
   MASTER_AWARDS
 }
 
+/// Who supplies a catalog item (#1688). AdventSource items go on a club's AdventSource order list; conference items
+/// (the shoulder patches and pin) are ordered from the youth department and billed to the club's church.
+enum ClubSupplier {
+  ADVENTSOURCE
+  CONFERENCE
+}
+
 /// A conference-wide club supply catalog item (#531): one AdventSource order
 /// line, one row per size. Identity is section plus normalized name; catalog
 /// numbers repeat in the real data (Good Conduct Stars, belts, every
@@ -5617,10 +5637,15 @@ model ClubSupplyItem {
   /// The honor this row is the patch for, when an honor-section row's name
   /// matches an existing `Honor`.
   honorId        String?
+  /// Who supplies it (#1688). Only CONFERENCE items can be ordered from the youth department; AdventSource exports never include them.
+  supplier       ClubSupplier      @default(ADVENTSOURCE)
+  /// The conference's price per unit, in cents (#1688). Set by staff; only a CONFERENCE item has one. A change never alters a submitted order (lines keep their own copy).
+  unitPriceCents Int?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
   honor Honor?            @relation(fields: [honorId], references: [id], onDelete: SetNull)
+  conferenceOrderLines ConferenceClubOrderLine[]
   stock ClubSupplyStock[]
   orderNeeds ClubOrderNeed[]
   orderLines ClubSupplyOrderLine[]
@@ -5815,6 +5840,72 @@ model ClubSupplyOrderLine {
   item  ClubSupplyItem       @relation(fields: [itemId], references: [id], onDelete: Restrict)
 
   @@unique([batchId, itemId])
+  @@index([itemId])
+}
+
+/// Where a conference club order stands (#1688). A director may cancel only while SUBMITTED; staff fill or cancel it.
+enum ConferenceClubOrderStatus {
+  SUBMITTED
+  FILLED
+  CANCELLED
+}
+
+/// One club's order for conference-supplied patches and pins (#1688), sent to the youth department and billed to the club's
+/// sponsoring church on that club year's billing container event (`Event.isBillingContainer`) once filled. The church and the
+/// totals are copied at submit time, so a later change of church, name or price never alters the order.
+model ConferenceClubOrder {
+  id                    String                    @id @default(cuid())
+  organizationId        String
+  /// The sponsoring church the club had when it submitted: who is billed.
+  churchId              String
+  /// The billing container event of the club year the order was submitted in.
+  eventId               String
+  clubYear              String
+  status                ConferenceClubOrderStatus @default(SUBMITTED)
+  /// How many Pathfinder shoulder patches the club wants to exchange (the sheet's "patches to exchange").
+  patchesToExchange     Int                       @default(0)
+  /// The items total at submit time, in cents. Postage is separate.
+  itemsTotalCents       Int
+  /// Entered by staff when the order is filled; billed as its own line. Null until filled.
+  postageCents          Int?
+  submittedAt           DateTime                  @default(now())
+  submittedByAccountId  String?
+  /// Set instead of `submittedByAccountId` for a staff "act as" director (#442).
+  submittedByUserId     String?
+  filledAt              DateTime?
+  filledByUserId        String?
+  addedToStock          Boolean                   @default(false)
+  cancelledAt           DateTime?
+  cancelledReason       String?
+  cancelledByAccountId  String?
+  cancelledByUserId     String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  club   Organization @relation("ConferenceClubOrderClub", fields: [organizationId], references: [id], onDelete: Restrict)
+  church Organization @relation("ConferenceClubOrderChurch", fields: [churchId], references: [id], onDelete: Restrict)
+  event  Event         @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  lines  ConferenceClubOrderLine[]
+
+  @@index([organizationId, status])
+  @@index([churchId, eventId, status])
+  @@index([status, submittedAt])
+}
+
+/// One item on a conference club order (#1688), with the name and unit price as they were when it was submitted.
+model ConferenceClubOrderLine {
+  id             String   @id @default(cuid())
+  orderId        String
+  itemId         String
+  itemName       String
+  quantity       Int
+  unitPriceCents Int
+  createdAt      DateTime @default(now())
+
+  order ConferenceClubOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item  ClubSupplyItem      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, itemId])
   @@index([itemId])
 }
 
@@ -8269,6 +8360,8 @@ enum InvoiceVersionBasis {
   CONTACT_ONLY_COPY
   /// Built from what a church's sponsored promo codes covered on a GENERAL event (#399): no reconciliation behind it.
   CHURCH_PROMO_CODES
+  /// Built from the conference club orders (patches and pins) the youth department filled for a church's clubs, on that club year's billing container event (#1688): no reconciliation behind it.
+  CLUB_ORDERS
 }
 
 /// What is owed on one finalized invoice version. OPEN until the version is superseded by a revision.

@@ -65,6 +65,11 @@ npm run form-templates:sync
 echo "[entrypoint] Syncing seeded event content (npm run event-content:sync)..."
 npm run event-content:sync
 
+# Make sure the three conference-supplied patches and pins (#1688) are in the club supply
+# catalog. It only adds a missing item and never changes a price staff set.
+echo "[entrypoint] Syncing conference supply items (npm run conference-supplies:sync)..."
+npm run conference-supplies:sync
+
 if [ "${RUN_DB_SEED}" = "true" ]; then
   echo "[entrypoint] RUN_DB_SEED is no longer supported. Fictitious demo data is local-only;" >&2
   echo "[entrypoint] use 'npm run admin:create' to create a real administrator." >&2

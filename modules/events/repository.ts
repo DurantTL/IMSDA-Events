@@ -65,6 +65,8 @@ export async function listEventsForUser(
     select: {
       id: true,
       archivedAt: true,
+      /** The hidden Conference club orders billing event (#1688): pickers that list archived events leave it out. */
+      isBillingContainer: true,
       lifecycleState: true,
       slug: true,
       name: true,

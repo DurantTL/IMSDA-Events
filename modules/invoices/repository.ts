@@ -31,6 +31,8 @@ import {
 } from "@/modules/invoices/domain";
 import { CHURCH_PROMO_GROUP_KEY_PREFIX, churchDraftIsStale, churchIdOfPromoGroupKey } from "@/modules/promo-codes/church-invoice";
 import { loadChurchInvoiceInputs } from "@/modules/promo-codes/church-invoice-facts";
+import { CLUB_ORDERS_GROUP_KEY_PREFIX, churchIdOfClubOrdersGroupKey } from "@/modules/club-orders/conference-orders";
+import { loadClubOrdersInvoiceInputs } from "@/modules/club-orders/conference-invoice-facts";
 import {
   MANUAL_LINES_MAX,
   fingerprintWithManualLines,
@@ -149,8 +151,29 @@ async function requireDeferredEvent(client: Client, eventId: string) {
   return event;
 }
 
-/** The invoices of a church's promo codes (#399) are not part of an event's reconciliation invoicing: the draft run and the screens leave them out. */
-const notChurchPromoInvoice = { NOT: { groupKey: { startsWith: CHURCH_PROMO_GROUP_KEY_PREFIX } } } satisfies Prisma.InvoiceWhereInput;
+/**
+ * The invoices of a church's promo codes (#399) and of its conference club orders (#1688) are not part of an event's
+ * reconciliation invoicing: the draft run and the screens leave them out.
+ */
+const notChurchPromoInvoice = {
+  AND: [
+    { NOT: { groupKey: { startsWith: CHURCH_PROMO_GROUP_KEY_PREFIX } } },
+    { NOT: { groupKey: { startsWith: CLUB_ORDERS_GROUP_KEY_PREFIX } } },
+  ],
+} satisfies Prisma.InvoiceWhereInput;
+
+/** The church an invoice without a reconciliation belongs to, from its group key: a promo code invoice (#399) or a club orders invoice (#1688). */
+export function churchIdOfLinkedGroupKey(groupKey: string) {
+  return churchIdOfPromoGroupKey(groupKey) ?? churchIdOfClubOrdersGroupKey(groupKey);
+}
+
+/** What such an invoice is built from now, by its group key. Null when the key is neither kind or the event or church is gone. */
+async function loadChurchBasisInputs(client: Client, eventId: string, groupKey: string) {
+  const promoChurchId = churchIdOfPromoGroupKey(groupKey);
+  if (promoChurchId) return loadChurchInvoiceInputs(client, eventId, promoChurchId);
+  const ordersChurchId = churchIdOfClubOrdersGroupKey(groupKey);
+  return ordersChurchId ? loadClubOrdersInvoiceInputs(client, eventId, ordersChurchId) : null;
+}
 
 export function contactOfGroup(group: BillingGroup | undefined | null): InvoiceContact | null {
   if (!group) return null;
@@ -651,8 +674,11 @@ export async function discardInvoiceDraft(input: { eventId: string; invoiceId: s
   const prisma = getPrisma();
   return prisma.$transaction(async (tx) => {
     await lockReconciliationEvent(tx, input.eventId);
-    // A church's promo code draft (#399) can be thrown away like any other; it needs no deferred-invoice event.
-    const churchInvoice = await tx.invoice.findFirst({ where: { id: input.invoiceId, eventId: input.eventId, groupKey: { startsWith: CHURCH_PROMO_GROUP_KEY_PREFIX } }, select: { id: true } });
+    // A church's promo code draft (#399) or conference club orders draft (#1688) can be thrown away like any other; it needs no deferred-invoice event.
+    const churchInvoice = await tx.invoice.findFirst({
+      where: { id: input.invoiceId, eventId: input.eventId, OR: [{ groupKey: { startsWith: CHURCH_PROMO_GROUP_KEY_PREFIX } }, { groupKey: { startsWith: CLUB_ORDERS_GROUP_KEY_PREFIX } }] },
+      select: { id: true },
+    });
     if (!churchInvoice) await requireDeferredEvent(tx, input.eventId);
     const invoice = await requireInvoice(tx, input.eventId, input.invoiceId);
     const draft = invoice.versions[0];
@@ -852,7 +878,7 @@ export async function finalizeInvoiceVersion(input: {
       // A church's promo code invoice (#399) is finalized by the same named person with the same permission, on an
       // attendee-paid event; every other invoice needs the event to bill organizations after the event.
       if (!version) throw new InvoiceError("That invoice version does not belong to this event.", "VERSION_NOT_FOUND");
-      const churchBasis = version.basis === "CHURCH_PROMO_CODES";
+      const churchBasis = version.basis === "CHURCH_PROMO_CODES" || version.basis === "CLUB_ORDERS";
       if (!churchBasis) assertDeferred(event);
       const used = await tx.invoiceVersion.findUnique({ where: { finalizeIdempotencyKey: input.idempotencyKey }, select: { id: true } });
       if (used && used.id !== version.id) {
@@ -884,16 +910,20 @@ export async function finalizeInvoiceVersion(input: {
       let billing: Awaited<ReturnType<typeof getBillingResponsibilityView>> | null = null;
       let churchContact: InvoiceContact | null = null;
       if (churchBasis) {
-        // Rebuilt now from the church's redemptions: a draft that is not what the lines say now is never frozen into an invoice.
-        const churchId = churchIdOfPromoGroupKey(invoice.groupKey);
-        const inputs = churchId ? await loadChurchInvoiceInputs(tx, input.eventId, churchId) : null;
+        // Rebuilt now from the church's redemptions (or its filled club orders, #1688): a draft that is not what the lines say now is never frozen into an invoice.
+        const inputs = await loadChurchBasisInputs(tx, input.eventId, invoice.groupKey);
         if (
           !inputs
           || !inputs.event.eligible
           || inputs.figures.amountsFingerprint !== version.amountsFingerprint
           || inputs.figures.amountDueCents !== version.amountDueCents
         ) {
-          throw new InvoiceError("The church's promo code redemptions changed after this draft was made. Refresh the draft from the church report first.", "DRAFT_STALE");
+          throw new InvoiceError(
+            version.basis === "CLUB_ORDERS"
+              ? "The filled club orders changed after this draft was made. Refresh the draft from Conference club orders first."
+              : "The church's promo code redemptions changed after this draft was made. Refresh the draft from the church report first.",
+            "DRAFT_STALE",
+          );
         }
         churchContact = inputs.contact;
       } else if (needsPermission) {
@@ -1274,10 +1304,9 @@ export async function getInvoiceDetail(eventId: string, invoiceId: string, optio
   let approvedId: string | null = null;
   let amountsOutOfDate = false;
   let churchDraftStale = false;
-  const churchId = churchIdOfPromoGroupKey(invoice.groupKey);
-  if (churchId) {
-    // A church's promo code invoice (#399): the contact is the church's own, and it is out of date when the lines now differ.
-    const inputs = await loadChurchInvoiceInputs(prisma, eventId, churchId);
+  if (churchIdOfLinkedGroupKey(invoice.groupKey)) {
+    // A church's promo code invoice (#399) or conference club orders invoice (#1688): the contact is the church's own, and it is out of date when the lines now differ.
+    const inputs = await loadChurchBasisInputs(prisma, eventId, invoice.groupKey);
     currentContact = inputs?.contact ?? null;
     if (liveFinalized && inputs) amountsOutOfDate = inputs.figures.amountsFingerprint !== liveFinalized.amountsFingerprint;
     // Stale when the lines or the contact differ: the same two checks finalizing makes (DRAFT_STALE, CONTACT_STALE).

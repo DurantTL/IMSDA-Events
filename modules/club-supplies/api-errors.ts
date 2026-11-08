@@ -16,7 +16,7 @@ export function clubSupplyApiError(error: unknown, action: string) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status });
   }
   if (error instanceof ClubSupplyError) {
-    return Response.json({ error: error.code, message: error.message }, { status: error.code === "ITEM_NOT_FOUND" ? 404 : 409 });
+    return Response.json({ error: error.code, message: error.message }, { status: error.code === "ITEM_NOT_FOUND" ? 404 : error.code === "INVALID_PRICE" ? 400 : 409 });
   }
   logError(`${action} failed`, error);
   return Response.json(

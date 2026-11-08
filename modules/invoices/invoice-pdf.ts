@@ -279,7 +279,9 @@ export async function renderInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arr
   w.text(
     input.snapshot.kind === "CHURCH_PROMO_CODES"
       ? `${input.snapshot.totals.registered} sponsored ${input.snapshot.totals.registered === 1 ? "registration" : "registrations"}`
-      : `${input.snapshot.totals.billable} billable of ${input.snapshot.totals.registered} registered`,
+      : input.snapshot.kind === "CLUB_ORDERS"
+        ? `${input.snapshot.totals.registered} club ${input.snapshot.totals.registered === 1 ? "order" : "orders"}`
+        : `${input.snapshot.totals.billable} billable of ${input.snapshot.totals.registered} registered`,
     { size: 9, color: MUTED },
   );
   if (layout.totalCents === 0) w.text("Nothing is owed on this invoice.", { size: 9, color: MUTED });

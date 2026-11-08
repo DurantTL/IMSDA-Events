@@ -12,3 +12,9 @@ export const clubSupplyItemActiveSchema = z.object({ isActive: z.boolean() }).st
 export const clubStockQuantitySchema = z.object({
   quantityOnHand: z.number().int("Enter a whole number.").min(0, "Enter 0 or more.").max(100_000, "Enter 100,000 or fewer."),
 }).strict();
+
+/** Who supplies an item and, for the conference, its price in dollars and cents as typed (#1688); the route turns it into cents. */
+export const clubSupplyItemOrderingSchema = z.object({
+  supplier: z.enum(["ADVENTSOURCE", "CONFERENCE"]),
+  unitPrice: z.string().max(20).nullable().optional(),
+}).strict();

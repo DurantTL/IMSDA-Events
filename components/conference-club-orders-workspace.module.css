@@ -1,0 +1,20 @@
+/* Conference club orders for youth department staff (#1688). Built to hold at 390px: 44px targets, 16px inputs, no sideways scroll. */
+.page { display: grid; gap: 16px; }
+.block { display: grid; gap: 10px; }
+.block h2, .block h3 { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 800; line-height: 1.35; }
+.intro { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
+.list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.card { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 11px 12px; }
+.head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.head strong { color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.lines { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.muted { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
+.fillForm { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.field { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.input { width: 130px; max-width: 100%; min-height: 44px; border: 1px solid var(--field-border); border-radius: var(--radius-sm); background: var(--card); padding: 8px; font-size: 16px; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.check input { width: 22px; height: 22px; flex: 0 0 auto; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.actions :global(.primary-button), .actions :global(.secondary-button), .fillForm :global(.primary-button), .fillForm :global(.secondary-button) { min-height: 44px; min-width: 44px; }
+.billRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 9px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.billRow a { display: inline-flex; align-items: center; min-height: 44px; }

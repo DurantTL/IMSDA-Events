@@ -151,6 +151,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/admin/organizations/directory", "/admin/organizations", "app/(workspace)/admin/organizations/page.tsx"],
   ["/admin/organizations/map-locations", "/admin/organizations/directory", "app/(workspace)/admin/organizations/directory/page.tsx"],
   ["/admin/clubs/reports/year-end", "/admin/clubs/reports", "app/(workspace)/admin/clubs/reports/page.tsx"],
+  ["/admin/club-supplies/conference-orders", "/admin/club-supplies", "components/club-supply-catalog-workspace.tsx"],
   ["/check-in/assets", "/check-in", "components/check-in-workspace.tsx"],
   ["/check-in/badges", "/check-in", "components/check-in-workspace.tsx"],
   ["/check-in/passes", "/check-in", "components/check-in-workspace.tsx"],

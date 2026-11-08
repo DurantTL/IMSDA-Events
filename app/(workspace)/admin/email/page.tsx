@@ -75,6 +75,7 @@ export default async function EmailPage() {
           supportContact: settings.supportContact,
           securityAlertEmail: settings.securityAlertEmail,
           newClubApplicationEmail: settings.newClubApplicationEmail,
+          conferenceOrdersEmail: settings.conferenceOrdersEmail,
         }}
         embedded
         events={eventLists}
