@@ -12,7 +12,7 @@ import {
 } from "@/modules/system-admin/platform-settings";
 
 /**
- * Notification switches and the three alert addresses are global, so they are
+ * Notification switches and the four alert and order addresses are global, so they are
  * gated on the global role directly (the same rule as platform settings): there
  * is no event to scope them to.
  */
@@ -38,6 +38,7 @@ async function currentAddresses() {
     supportContact: settings.supportContact,
     securityAlertEmail: settings.securityAlertEmail,
     newClubApplicationEmail: settings.newClubApplicationEmail,
+    conferenceOrdersEmail: settings.conferenceOrdersEmail,
   };
 }
 
@@ -49,15 +50,15 @@ const switchBodySchema = z.object({
 }).strict();
 
 /**
- * All three keys must be sent, blank to clear one. The address schema alone treats a missing key as blank, so a partial
+ * All four keys must be sent, blank to clear one. The address schema alone treats a missing key as blank, so a partial
  * request (or a client that forgot one) would silently clear a saved address.
  */
-const addressKeys = ["supportContact", "securityAlertEmail", "newClubApplicationEmail"] as const;
+const addressKeys = ["supportContact", "securityAlertEmail", "newClubApplicationEmail", "conferenceOrdersEmail"] as const;
 const addressesBodySchema = z.object({
   addresses: z.record(z.string(), z.unknown())
     .refine(
       (value) => addressKeys.every((key) => key in value),
-      "Send all three addresses; leave one blank to clear it.",
+      "Send all four addresses; leave one blank to clear it.",
     )
     .pipe(platformAddressesInputSchema),
 }).strict();

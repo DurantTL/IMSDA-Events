@@ -1,4 +1,4 @@
-import { clubClassLevelLabels, clubRosterGenderLabels } from "@/modules/club-rosters/domain";
+import { clubClassLevelLabels, clubRosterGenderLabels, clubSchoolGradeLabels } from "@/modules/club-rosters/domain";
 import { guardianColumnParts, type RosterExportColumn } from "@/modules/club-rosters/export-columns";
 import type { GuardianRecord } from "@/modules/club-rosters/guardians-domain";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
@@ -50,6 +50,8 @@ function rosterExportCell(
       return member.gender ? clubRosterGenderLabels[member.gender] : "";
     case "classLevel":
       return member.classLevel ? clubClassLevelLabels[member.classLevel] : "";
+    case "schoolGrade":
+      return member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "";
     case "role":
       return member.role || "";
     default:

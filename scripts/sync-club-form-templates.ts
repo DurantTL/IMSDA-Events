@@ -27,12 +27,37 @@ import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
+/** 1 when any submission on the two forms still holds an emergency key in its sealed value (or cannot be checked), else 0. Opened here, never printed. */
+async function countStillSealed(
+  prisma: import("@prisma/client").PrismaClient,
+  templateKeys: string[],
+  keysByTemplate: Readonly<Record<string, readonly string[]>>,
+) {
+  const { openSensitiveAnswers } = await import("../modules/club-forms/sealed-answers");
+  const rows = await prisma.clubFormSubmission.findMany({
+    where: { template: { key: { in: templateKeys } }, sealedSensitiveAnswers: { not: null } },
+    select: { id: true, sealedSensitiveAnswers: true, template: { select: { key: true } } },
+  });
+  let count = 0;
+  for (const row of rows) {
+    try {
+      const held = Object.keys(openSensitiveAnswers(row.id, row.sealedSensitiveAnswers!));
+      if (held.some((key) => keysByTemplate[row.template.key]?.includes(key))) count += 1;
+    } catch {
+      // Unsure (wrong or missing key): count it, so the reminder still prints. The unseal script reports the details.
+      count += 1;
+    }
+    if (count > 0) break; // Only used as a yes/no check.
+  }
+  return count;
+}
+
 async function main() {
   const { getPrisma } = await import("../lib/prisma");
   const { syncClubFormTemplates } = await import("../modules/club-forms/templates");
   const prisma = getPrisma();
   try {
-    const { refused, skipped, staleDrafts } = await syncClubFormTemplates(prisma, { continueOnRefusal: true });
+    const { refused, skipped, staleDrafts, updated } = await syncClubFormTemplates(prisma, { continueOnRefusal: true });
     for (const item of skipped) console.log(`SKIPPED ${item.key}: ${item.reason}; the code's version is not applied.`);
     for (const item of staleDrafts) console.log(`UPDATED ${item.key}: draft is now stale`);
     const rows = await prisma.clubFormTemplate.findMany({ orderBy: { sortOrder: "asc" }, select: { key: true, version: true, enabled: true } });
@@ -44,6 +69,14 @@ async function main() {
       return;
     }
     console.log("Club form templates are in sync.");
+    // Only when it matters: a version of one of the two forms was applied just now, or one of them still has answers sealed.
+    const { EMERGENCY_PLAIN_KEYS } = await import("../modules/club-forms/plain-emergency");
+    const emergencyKeys = Object.keys(EMERGENCY_PLAIN_KEYS);
+    const versionChanged = updated.some((item) => !item.created && emergencyKeys.includes(item.key));
+    const stillSealed = versionChanged ? 0 : await countStillSealed(prisma, emergencyKeys, EMERGENCY_PLAIN_KEYS);
+    if (versionChanged || stillSealed > 0) {
+      console.log("The Off-Premises Permission Slip and the Transportation Passenger List now keep emergency and physician answers plain. Move the existing ones with: npm run club-forms:unseal-emergency (dry run), then npm run club-forms:unseal-emergency -- --execute --actor <your account email>.");
+    }
   } finally {
     await prisma.$disconnect();
   }

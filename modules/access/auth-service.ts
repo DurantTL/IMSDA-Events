@@ -3,8 +3,8 @@ import "server-only";
 import type { AccountTokenPurpose, GlobalRole } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { hashPassword, spendPasswordCheck, verifyPassword } from "@/modules/access/passwords";
-import { createDatabaseSession } from "@/modules/access/session-store";
-import { mfaGateFor } from "@/modules/access/mfa-rules";
+import { createDatabaseSession, revokeDatabaseSession } from "@/modules/access/session-store";
+import { mfaGateFor, mfaSubjectFromUser } from "@/modules/access/mfa-rules";
 import { createOpaqueToken, hashOpaqueToken } from "@/modules/access/tokens";
 import { linkAttendeeSideAtActivation } from "@/modules/account-merge/staff-attendee-link";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -60,6 +60,7 @@ export async function authenticateWithPassword(
       accountStatus: true,
       globalRole: true,
       memberships: { where: { status: "ACTIVE" }, select: { role: true } },
+      clubsAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { status: true } },
       passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
       credential: {
@@ -82,26 +83,71 @@ export async function authenticateWithPassword(
 
   if (!(await checkPasswordWithLockout(user.credential, user.id, password))) return null;
 
-  const subject = {
-    globalRole: user.globalRole,
-    activeEventRoles: user.memberships.map((membership) => membership.role),
-  };
-  const gate = mfaGateFor(subject, user.mfaEnrollment);
-  // A passkey is this account's second factor: sign in with it, not by
-  // enrolling a new authenticator on the strength of the password (#429).
-  if (gate.kind === "enrol" && user.passkeys.length > 0) {
-    return { outcome: "passkey_required", userId: user.id };
-  }
-  if (gate.kind !== "not_required") {
-    return { outcome: "mfa", userId: user.id, gate: gate.kind };
-  }
+  return finishPasswordSignIn(user, userAgent);
+}
 
-  return {
-    outcome: "session",
-    userId: user.id,
-    globalRole: user.globalRole,
-    session: await createDatabaseSession(user.id, userAgent),
+type SignInFacts = {
+  id: string;
+  globalRole: GlobalRole | null;
+  memberships: ReadonlyArray<{ role: string }>;
+  clubsAdministratorGrant: { revokedAt: Date | null } | null;
+  mfaEnrollment: { status: "PENDING" | "ACTIVE" } | null;
+  passkeys: ReadonlyArray<{ id: string }>;
+};
+
+/**
+ * Turns a correct password into a gate or a session. The roles read before the
+ * (slow) password check can be stale by now: a Clubs Administrator grant, an
+ * event membership or a system administrator grant may have landed in between.
+ * So the roles, enrolment and passkeys are read again immediately before the
+ * session is minted and the gate is recomputed from that fresh read, the same
+ * way `passkeys.ts` re-reads before minting. A password-only session is never
+ * created for an account that has become two-step-required.
+ */
+async function finishPasswordSignIn(earlier: SignInFacts, userAgent: string | null): Promise<PasswordAuthentication | null> {
+  const gateFor = (facts: SignInFacts) => mfaGateFor(mfaSubjectFromUser(facts), facts.mfaEnrollment);
+  const earlierGate = gateFor(earlier);
+  const gateResult = (facts: SignInFacts, gate: ReturnType<typeof gateFor>): PasswordAuthentication | null => {
+    // A passkey is this account's second factor: sign in with it, not by
+    // enrolling a new authenticator on the strength of the password (#429).
+    if (gate.kind === "enrol" && facts.passkeys.length > 0) return { outcome: "passkey_required", userId: facts.id };
+    if (gate.kind !== "not_required") return { outcome: "mfa", userId: facts.id, gate: gate.kind };
+    return null;
   };
+  // Only a "not required" decision can lead to a session; the others never mint one, so no re-read is needed.
+  const gated = gateResult(earlier, earlierGate);
+  if (gated) return gated;
+
+  // Fail closed: an account that vanished mid sign-in gets no session.
+  const user = await readSignInFacts(earlier.id);
+  if (!user) return null;
+  const fresh = gateResult(user, gateFor(user));
+  if (fresh) return fresh;
+
+  const session = await createDatabaseSession(user.id, userAgent);
+  // A grant can still commit between that read and the insert. Check once more; if the account has become
+  // two-step-required, end the session just made and hand back the gate, so no password-only session escapes.
+  const after = await readSignInFacts(user.id);
+  const afterGate = after ? gateResult(after, gateFor(after)) : null;
+  if (!after || afterGate) {
+    await revokeDatabaseSession(session.token);
+    return after ? afterGate : null;
+  }
+  return { outcome: "session", userId: user.id, globalRole: after.globalRole, session };
+}
+
+async function readSignInFacts(userId: string): Promise<SignInFacts | null> {
+  return getPrisma().user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      globalRole: true,
+      memberships: { where: { status: "ACTIVE" }, select: { role: true } },
+      clubsAdministratorGrant: { select: { revokedAt: true } },
+      mfaEnrollment: { select: { status: true } },
+      passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
+    },
+  });
 }
 
 type LockableCredential = {
@@ -186,7 +232,8 @@ async function countPasswordMiss(credential: LockableCredential, userId: string)
 export type StaffPasswordCheck =
   | { kind: "unavailable" }
   | { kind: "wrong"; countMiss: () => Promise<void> }
-  | { kind: "ok"; complete: (userAgent: string | null) => Promise<PasswordAuthentication> };
+  /** `complete` is null when the account vanished mid sign-in: refused, never a session. */
+  | { kind: "ok"; complete: (userAgent: string | null) => Promise<PasswordAuthentication | null> };
 
 /**
  * The staff password check for the single sign-in (#554 slice c): the same
@@ -205,6 +252,7 @@ export async function checkStaffPasswordNoCount(email: string, password: string)
       accountStatus: true,
       globalRole: true,
       memberships: { where: { status: "ACTIVE" }, select: { role: true } },
+      clubsAdministratorGrant: { select: { revokedAt: true } },
       mfaEnrollment: { select: { status: true } },
       passkeys: { where: { revokedAt: null }, select: { id: true }, take: 1 },
       credential: {
@@ -222,20 +270,7 @@ export async function checkStaffPasswordNoCount(email: string, password: string)
   if (result === "wrong") return { kind: "wrong", countMiss: () => countPasswordMiss(credential, user.id) };
   return {
     kind: "ok",
-    complete: async (userAgent) => {
-      const gate = mfaGateFor(
-        { globalRole: user.globalRole, activeEventRoles: user.memberships.map((membership) => membership.role) },
-        user.mfaEnrollment,
-      );
-      if (gate.kind === "enrol" && user.passkeys.length > 0) return { outcome: "passkey_required", userId: user.id };
-      if (gate.kind !== "not_required") return { outcome: "mfa", userId: user.id, gate: gate.kind };
-      return {
-        outcome: "session",
-        userId: user.id,
-        globalRole: user.globalRole,
-        session: await createDatabaseSession(user.id, userAgent),
-      };
-    },
+    complete: (userAgent) => finishPasswordSignIn(user, userAgent),
   };
 }
 

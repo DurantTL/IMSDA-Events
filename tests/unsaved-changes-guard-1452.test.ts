@@ -13,11 +13,9 @@ const root = join(__dirname, "..");
 
 const allowlist: Record<string, string> = {
   "app/(public)/account/(portal)/clubs/[organizationId]/exports/class-tracking/page.tsx": "search or filter",
-  "app/(public)/account/(portal)/clubs/[organizationId]/forms/page.tsx": "search or filter",
   "app/(public)/unsubscribe/[token]/page.tsx": "action button only, no typed fields",
   "app/(workspace)/admin/system-report/email-tester-card.tsx": "one field",
   "app/(workspace)/check-in/badges/page.tsx": "search or filter",
-  "app/(workspace)/more/club-forms/page.tsx": "search or filter",
   "app/(workspace)/more/reports/clubs/check-in-book/page.tsx": "search or filter",
   "components/attendee-pass-grid.tsx": "action button only, no typed fields",
   "components/attendee-password-reset-form.tsx": "sign-in",

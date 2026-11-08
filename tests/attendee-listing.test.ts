@@ -212,8 +212,8 @@ describe("field resolution over the built-in templates", () => {
     camp_meeting_export: { dietary: "dietary_restrictions", church: "church_name", churchOther: "church_other" },
     honors_weekend: { dietary: "dietary_needs", church: "church_name", churchOther: "church_name_other" },
     pbe_registration: { church: "church_name", churchOther: "church_name_other" },
-    leadership_weekend: { dietary: "dietary_needs", church: "church_name", churchOther: "church_name_other" },
-    tlt_retreat: { dietary: "dietary_needs" },
+    leadership_weekend: { dietary: "dietary_needs", allergy: "food_allergies", church: "church_name", churchOther: "church_name_other" },
+    tlt_retreat: { dietary: "dietary_needs", allergy: "food_allergies" },
     outdoor_school: { dietary: "dietary_needs" },
     hispanic_institute: { church: "church_name", churchOther: "church_name_other" },
     tlt_application: { meal: "meal_preference" },
@@ -255,6 +255,10 @@ describe("no-needs answers", () => {
     for (const text of ["Vegan", "Gluten Free", "Both", "synthetic: no peanuts", "Vegan; Gluten Free"]) {
       expect(hasDietaryNeeds(text), text).toBe(true);
     }
+    for (const text of ["No allergies", "No food allergies", "No known allergies", "No known food allergy", "None known", "NKA", "nkfa", "Nope"]) {
+      expect(hasDietaryNeeds(text), text).toBe(false);
+    }
+    for (const text of ["No nuts", "No allergies except shellfish", "Allergic to eggs"]) expect(hasDietaryNeeds(text), text).toBe(true);
     expect(hasDietaryNeeds("None; Neither")).toBe(false);
     expect(hasDietaryNeeds("No  needs")).toBe(false);
     expect(hasDietaryNeeds("  none \t needed ; N/A")).toBe(false);
@@ -362,5 +366,43 @@ describe("task view presets (#1307)", () => {
     expect(parseAttendeeListingQuery(new URLSearchParams("view=checkin&sort=phone")).sort).toBeNull();
     expect(parseAttendeeListingQuery(new URLSearchParams("view=checkin&sort=church&dir=desc"))).toMatchObject({ sort: "church", direction: "desc" });
     expect(parseAttendeeListingQuery(new URLSearchParams("sort=phone")).sort).toBe("phone");
+  });
+});
+
+describe("food allergy and diet answers on Leadership Weekend and TLT Retreat (#1665)", () => {
+  for (const key of ["leadership_weekend", "tlt_retreat"]) {
+    it(`${key}: meal type comes from the diet choices, and the staff column drops None parts`, () => {
+      const definition = templateDefinition(key);
+      const rows = build([registration("D1", "CONFIRMED", [
+        attendee("d1", "A", "Synthetic", { food_allergies: "None", dietary_needs: ["Vegan"] }),
+        attendee("d2", "B", "Synthetic", { food_allergies: "No allergies", dietary_needs: ["Gluten-free"] }),
+        attendee("d3", "C", "Synthetic", { food_allergies: "Peanuts", dietary_needs: ["Vegetarian"] }),
+        attendee("d4", "D", "Synthetic", { food_allergies: "None", dietary_needs: ["Dairy-free"] }),
+        attendee("d5", "E", "Synthetic", { food_allergies: "None", dietary_needs: ["Vegan", "Dairy-free"] }),
+        attendee("d6", "F", "Synthetic", { food_allergies: "None" }),
+      ], {}, definition)]);
+      expect(rows.map((row) => row.mealCategory)).toEqual(["vegan", "gluten_free", "vegetarian", "other", "other", "regular"]);
+      expect(rows.map((row) => row.mealPreference)).toEqual(["Vegan", "Gluten-free", "Vegetarian", "Other", "Other", "Regular"]);
+      expect(rows.map((row) => row.dietaryNeeds)).toEqual(["Vegan", "Gluten-free", "Peanuts; Vegetarian", "Dairy-free", "Vegan; Dairy-free", "None"]);
+      expect(rows.map((row) => row.hasDietaryNeeds)).toEqual([true, true, true, true, true, false]);
+      const counts = Object.fromEntries(mealTotals(rows).map((entry) => [entry.value, entry.count]));
+      expect(counts).toMatchObject({ vegan: 1, gluten_free: 1, vegetarian: 1, other: 2, regular: 1, none: 0 });
+    });
+  }
+
+  it("a builder-made None choice in the diet list is no special meal", () => {
+    const definition = structuredClone(templateDefinition("tlt_retreat")) as { sections: Array<{ fields: Array<{ key: string; options?: string[] }> }> };
+    const dietary = definition.sections.flatMap((section) => section.fields).find((field) => field.key === "dietary_needs")!;
+    dietary.options = [...(dietary.options ?? []), "None"];
+    const rows = build([registration("N1", "CONFIRMED", [
+      attendee("n1", "H", "Synthetic", { food_allergies: "None", dietary_needs: ["None"] }),
+      attendee("n2", "I", "Synthetic", { food_allergies: "None", dietary_needs: ["None", "Vegan"] }),
+    ], {}, definition as unknown as Record<string, unknown>)]);
+    expect(rows.map((row) => row.mealCategory)).toEqual(["regular", "vegan"]);
+  });
+
+  it("a form with a meal_preference question keeps reading it", () => {
+    const [row] = build([registration("M1", "CONFIRMED", [attendee("m1", "G", "Synthetic", { meal_preference: "Vegan", dietary_needs: "Peanut allergy" })], {}, templateDefinition("womens_retreat_export"))]);
+    expect(row.mealCategory).toBe("vegan");
   });
 });

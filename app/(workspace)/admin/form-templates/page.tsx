@@ -37,7 +37,7 @@ const templateSortLabels: Record<TemplateSortColumn, { label: string; kind: Sort
 export default async function AdminFormTemplatesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const templates = await listFormTemplateLibrary();
   const sorting = serverSort<TemplateSortColumn>("/admin/form-templates", await searchParams, TEMPLATE_SORT_COLUMNS, { key: null, dir: "asc" });
   const sortedTemplates = sorting.order.key ? sortRows(templates, sorting.order.key, sorting.order.dir, templateAccessors) : templates;

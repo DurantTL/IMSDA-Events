@@ -31,7 +31,7 @@ export default async function HealthAccessPage() {
   // non-administrator's refusal is audited the same way. Whatever the refusal, the answer is the no-access page.
   const viewer = await requireSnapshotAdminViewer("LIST_BREAK_GLASS", null, { flagOptional: true }).catch(async (error: unknown) => {
     if (error instanceof AccessDeniedError && error.status === 401) redirect(await staffLoginRedirectPath());
-    if (error instanceof HealthRecordError && (error.code === "FORBIDDEN" || error.code === "NOT_FOUND")) redirect("/no-access");
+    if (error instanceof HealthRecordError && (error.code === "FORBIDDEN" || error.code === "NOT_FOUND")) redirect("/no-access?from=health-access");
     throw error;
   });
   if (healthRecordsEnabled() && !(await hasAcknowledgedHealthPrivacy(viewer))) {

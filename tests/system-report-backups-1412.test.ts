@@ -27,7 +27,7 @@ describe("System report R2 backup rows (#1412)", () => {
   it("shows a fresh database backup as ok with time and size, and files as info", () => {
     const [database, files] = offsiteBackupFields(checked(), NOW);
     expect(database).toMatchObject({ state: "ok", checkedAt: "2026-10-31T03:12:00.000Z" });
-    expect(database.resultText).toContain("2026-10-31 03:12 UTC, 4.0 MB");
+    expect(database.resultText).toContain("Oct 30, 2026, 10:12 PM CDT, 4.0 MB");
     expect(files.state).toBe("info");
     expect(files.resultText).toContain("2.0 GB");
   });

@@ -73,6 +73,7 @@ async function addPerson(organizationId: string, index: number, type: "YOUTH" | 
   return addRosterMember(organizationId, from, {
     firstName: names[index]!, lastName: "Carryfwd", birthDate: birthDates[index]!, attendeeType: type,
     role: type === "YOUTH" ? "Pathfinder" : "Counselor", classLevel: type === "YOUTH" ? "RANGER" : null, gender: "FEMALE",
+    schoolGrade: type === "YOUTH" ? "GRADE_7" : null, schoolType: type === "YOUTH" ? "HOMESCHOOL" : null, churchMember: type === "YOUTH" ? "NOT_SURE" : null,
   }, actor);
 }
 
@@ -126,7 +127,7 @@ async function main() {
   const sealedBefore = await prisma.clubRosterMember.findMany({ where: { id: { in: [a[0]!.memberId, a[1]!.memberId] } }, select: { id: true, sealedBirthDate: true, personId: true } });
   const result = await carryRosterForward(clubs.a, {
     confirm: true,
-    people: [{ memberId: a[0]!.memberId, attendeeType: "STAFF" }, { memberId: a[1]!.memberId, attendeeType: "YOUTH", classLevel: "VOYAGER" }],
+    people: [{ memberId: a[0]!.memberId, attendeeType: "STAFF" }, { memberId: a[1]!.memberId, attendeeType: "YOUTH", classLevel: "VOYAGER", schoolGrade: "GRADE_8" }],
   }, actor, august);
   assert(result.carried === 2 && result.leftBehind === 1 && result.typeChanged === 1 && result.alreadyThere === 0, "two carried, one left behind, one type changed");
   const carried = await prisma.clubRosterMember.findMany({ where: { organizationId: clubs.a, clubYear: to }, orderBy: { createdAt: "asc" } });
@@ -139,7 +140,12 @@ async function main() {
   }
   const toStaff = carried.find((row) => row.personId === sealedBefore.find((candidate) => candidate.id === a[0]!.memberId)!.personId)!;
   assert(toStaff.attendeeType === "STAFF" && toStaff.role === "" && toStaff.classLevel === null, "a Pathfinder who becomes staff loses the Pathfinder role and class");
+  assert(toStaff.schoolGrade === null && toStaff.schoolType === null && toStaff.churchMember === null, "a Pathfinder who becomes staff loses grade, school type and church membership (#1664, #1668)");
   const stayed = carried.find((row) => row.attendeeType === "YOUTH")!;
+  assert(stayed.schoolGrade === "GRADE_8", "the reviewed new grade is saved on the new year's row");
+  assert(stayed.schoolType === "HOMESCHOOL" && stayed.churchMember === "NOT_SURE", "school type and church membership carry over unchanged");
+  assert((await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: a[1]!.memberId } })).schoolGrade === "GRADE_7", "last year's grade is untouched (nothing moves up on its own)");
+  assert(result.gradesChanged === 1, "one grade changed in the review");
   assert(stayed.role === "Pathfinder" && stayed.classLevel === "VOYAGER" && stayed.status === "ACTIVE", "a youth keeps their role and takes the new class");
   assert(!carried.some((row) => row.personId === a[2]!.personId), "the unticked person was not carried");
   assert((await prisma.person.count({ where: { id: a[2]!.personId } })) === 1, "the person who left still has their record until the club removes them");

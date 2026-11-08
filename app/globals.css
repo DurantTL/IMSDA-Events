@@ -1890,9 +1890,9 @@ body:has(.auth-page) { padding-bottom: 0; }
 .staff-form { margin-top: 15px; }
 .forbidden-state { display: grid; min-height: 360px; place-items: center; align-content: center; text-align: center; }
 .forbidden-state > span { display: grid; width: 58px; height: 58px; margin-bottom: 16px; place-items: center; border-radius: 17px; background: var(--imsda-purple-soft); color: var(--imsda-purple); }
-.forbidden-state :is(h1, h2) { margin: 3px 0 7px; }
+.forbidden-state :is(h1, h2) { margin: 3px 0 7px; overflow-wrap: anywhere; }
 .forbidden-state h1 { color: var(--ink); font-size: 1.5em; font-weight: 700; letter-spacing: -0.02em; }
-.forbidden-state > p:not(.eyebrow) { max-width: 500px; margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.72rem); }
+.forbidden-state > p:not(.eyebrow) { max-width: 500px; margin: 0; overflow-wrap: anywhere; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.72rem); }
 .forbidden-state .forbidden-state-action { margin-top: 16px; }
 
 .import-top-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr); gap: 12px; }
@@ -8276,7 +8276,7 @@ a.calendar-year-day:hover { background: #eef3f6; }
 .calendar-search input { width: 100%; min-height: 46px; font-size: max(var(--type-body-floor, 0px), 1rem); }
 .calendar-filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-items: end; gap: 10px; }
 .calendar-filter-row > label { min-width: 0; }
-.calendar-filter-row select { width: 100%; }
+.calendar-filter-row select { width: 100%; min-height: 44px; }
 .calendar-edit-dialog .form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .calendar-admin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .calendar-admin-actions input { width: 150px; border: 1px solid var(--field-border); border-radius: 10px; padding: 8px 10px; font-size: max(var(--type-body-floor, 0px), 0.76rem); }
@@ -8725,6 +8725,7 @@ a.calendar-year-day:hover { background: #eef3f6; }
 .club-form-send { display: grid; gap: 10px; }
 .club-form-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 12px; }
 .club-form-filter label { display: grid; gap: 4px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; }
+.club-form-filter select { min-height: 44px; }
 /* #719: the form column takes the hero's width and gutters (it is also a .public-manage-layout, which
    is two columns wide for the other private pages, so it is made one column here). The field grid
    inside each card stays at a comfortable reading width and only pairs fields when there is room. */

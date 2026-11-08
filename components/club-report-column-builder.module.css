@@ -1,0 +1,69 @@
+/* Club report column chooser (#1671). Staff text stays at or above the 14px floor; every control is at least 44px tall. */
+.builder { display: grid; gap: 16px; min-width: 0; }
+
+.heading { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+
+.sub { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.group { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+
+.groupTitle { margin: 0; padding: 0; font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.choice input { width: 20px; height: 20px; flex: 0 0 auto; }
+
+.order { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; counter-reset: column; }
+
+.orderRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 44px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.orderRow::before { counter-increment: column; content: counter(column) "."; min-width: 24px; }
+
+.orderName { flex: 1 1 140px; min-width: 0; }
+
+.small {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.layouts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.layoutItem { display: flex; align-items: center; gap: 4px; }
+
+.saveRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+
+.saveRow label { display: grid; gap: 4px; flex: 1 1 220px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.saveRow input[type="text"] { min-height: 44px; }
+
+.printChoice { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+
+.previewWrap { overflow-x: auto; max-width: 100%; }
+
+.previewTable { border-collapse: collapse; width: 100%; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.previewTable th,
+.previewTable td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+
+.message { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.fieldError { color: var(--coral); font-weight: 700; }

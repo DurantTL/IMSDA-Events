@@ -294,7 +294,7 @@ describe("the staff overview's roster year (#541)", () => {
 
   it("shows another year's roster read-only, with no birth-date reveal", async () => {
     const props = rosterProps(await staffOverview("2025-26"));
-    expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2025-26", expect.any(Date));
+    expect(mocks.listRoster).toHaveBeenCalledWith("club-1", "2025-26", expect.any(Date), { includeSchoolDetails: false });
     expect(mocks.clubRosterComplianceStatuses).toHaveBeenCalledWith("club-1", "2025-26", { includeNotes: true });
     expect(mocks.listClubHonorsPage).toHaveBeenCalledWith("club-1", "2025-26");
     // Reports stay on the current club year.

@@ -213,6 +213,12 @@ export function CoordinatorClubEvents({
               <Link className="secondary-button" href={`/account/area-clubs/kitchen/${encodeURIComponent(event.id)}`}>
                 Kitchen report<span className="sr-only">: {event.name}</span>
               </Link>
+              <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}`}>
+                Club teachers<span className="sr-only">: {event.name}</span>
+              </Link>
+              <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/report`}>
+                Attendee report<span className="sr-only">: {event.name}</span>
+              </Link>
               {healthEventIds?.includes(event.id) && (
                 <Link className="secondary-button" href={areaHealthHref(event.id)}>
                   Health information<span className="sr-only">: {event.name}</span>

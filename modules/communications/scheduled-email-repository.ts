@@ -6,6 +6,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { effectivePermissions } from "@/modules/access/authorization";
+import { findEffectiveMembership } from "@/modules/access/club-event-access";
 import {
   AUDIENCE_QUERY_VERSION,
   AudienceFilterNotAvailableError,
@@ -991,10 +992,8 @@ export async function loadApproverPermissions(client: Client, userId: string | n
   if (!user || user.accountStatus !== "ACTIVE") return [];
   const authUser = { id: user.id, email: user.email, displayName: user.displayName, globalRole: user.globalRole };
   if (user.globalRole === "SYSTEM_ADMIN") return effectivePermissions(authUser, null);
-  const membership = await client.eventMembership.findUnique({
-    where: { eventId_userId: { eventId, userId } },
-    select: { eventId: true, userId: true, role: true, status: true, permissions: true },
-  });
+  // Includes an active Clubs Administrator's EVENT_ADMIN role on a club event (#1643).
+  const membership = await findEffectiveMembership(client, userId, eventId);
   if (!membership || membership.status !== "ACTIVE") return [];
   return effectivePermissions(authUser, membership);
 }

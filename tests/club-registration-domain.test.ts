@@ -198,6 +198,25 @@ describe("extra people not on the roster (#388)", () => {
     expect(guestIsAdult({ age: 17 })).toBe(false);
     expect(guestIsAdult({ age: 18 })).toBe(true);
   });
+
+  it("takes the director's Pathfinder, Adult or Child choice, and falls back to age for a guest saved without one (#1666)", async () => {
+    const { clubGuestSchema, guestsFromJson, guestAttendeeType, guestIsChild, guestOwnedRole } = await import("@/modules/club-registrations/domain");
+    const base = { id: "abc123def", firstName: "Robin", lastName: "Visitor", email: null };
+    expect(guestAttendeeType({ age: 4 })).toBe("YOUTH");
+    expect(guestAttendeeType({ age: 30 })).toBe("ADULT");
+    expect(guestAttendeeType({ age: 4, guestType: "UNDERAGE" })).toBe("UNDERAGE");
+    expect(guestIsChild({ age: 4, guestType: "UNDERAGE" })).toBe(true);
+    expect(guestIsChild({ age: 4 })).toBe(false);
+    expect(clubGuestSchema.safeParse({ ...base, age: 4, guestType: "UNDERAGE" }).success).toBe(true);
+    expect(clubGuestSchema.safeParse({ ...base, age: 17, guestType: "ADULT" }).success).toBe(false);
+    expect(clubGuestSchema.safeParse({ ...base, age: 18, guestType: "UNDERAGE" }).success).toBe(false);
+    expect(clubGuestSchema.safeParse({ ...base, age: 4, guestType: "STAFF" }).success).toBe(false);
+    // A saved draft with and without the choice both load.
+    expect(guestsFromJson([{ ...base, age: 9 }, { ...base, id: "def456abc", age: 3, guestType: "UNDERAGE" }])).toHaveLength(2);
+    const definition = form([field("first_name"), field("last_name"), field("attendee_type", "RADIO", "ATTENDEE", ["Pathfinder", "TLT", "Staff", "Child"])]);
+    expect(guestOwnedRole(definition, { age: 4, guestType: "UNDERAGE" })).toEqual({ attendee_type: "Child" });
+    expect(guestOwnedRole(definition, { age: 4 })).toEqual({});
+  });
 });
 
 describe("club and church directory lock (#482)", () => {

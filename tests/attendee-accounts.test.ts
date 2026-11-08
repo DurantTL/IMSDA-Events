@@ -638,6 +638,20 @@ describe("spending a verification code", () => {
     expect(dependencies.createAttendeeSession).toHaveBeenCalledOnce();
   });
 
+  it("counts the sign-up code as this session's emailed sign-in code, so an invite accepted next goes straight to two-step setup", async () => {
+    prisma.attendeeAccountToken.findUnique.mockResolvedValue(liveToken());
+
+    await verifyAttendeeEmail({ pendingToken: "pending", code, userAgent: null });
+
+    expect(dependencies.createAttendeeSession).toHaveBeenCalledWith(
+      expect.any(String),
+      null,
+      { emailCodeVerifiedAt: expect.any(Date) },
+    );
+    // Only the emailed-code step: the second factor (passkey or authenticator) is never implied.
+    expect(dependencies.createAttendeeSession.mock.calls[0]?.[2]).not.toHaveProperty("secondFactorVerifiedAt");
+  });
+
   it("rejects the right code presented without the token that asked for it", async () => {
     // The unknown token is what a forwarded code looks like: the recipient has
     // the secret from the inbox but not the browser handle. This is the case a

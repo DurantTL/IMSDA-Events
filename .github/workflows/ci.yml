@@ -244,6 +244,8 @@ jobs:
       - run: npm run test:retry-failed
       # Real-database check of module requests: one pending per event and module under concurrent submits, approve enables in one transaction, decline needs a reason, audit holds ids only, and free text cannot become an email placeholder (#741).
       - run: npm run test:module-requests
+      # Real-database check of the optional Club teachers tool (#1681): who may switch it, on with no rule changes nothing for clubs, a warning that never blocks unless "require" is on, adults and staff of the club only, off keeps the teachers, and an event without the tool is untouched.
+      - run: npm run test:club-teachers
       - run: npm run test:honor-class-requirements
       # Real-database check of the Honors Weekend class waitlist (#831): join order, offers to the
       # next in line (one director emailed per offer), accept once, an unaccepted offer passing on
@@ -266,6 +268,9 @@ jobs:
       # Real-database check of archiving an event (#635): permissions, audit rows with ids only, no other row
       # changed, hidden from staff lists, the public page and calendar, registration closed, unarchive restores it.
       - run: npm run test:event-archive
+      # Real-database check that a Clubs Administrator is the event administrator of every club event and only club events
+      # (#1643): permissions, revoke at once, the event list, and the audit role marker.
+      - run: npm run test:clubs-admin-club-events
       - run: npm run test:event-lifecycle
       # Real-database check of PBE advancement inside one event (#945): 1st and 2nd per Area advance (a tie advances
       # both), staff overrides are audited with ids only and survive a recompute, the Conference list, results and
@@ -344,6 +349,9 @@ jobs:
       # syncing, order/stock math, receiving, awarding never below zero, and
       # an idempotent Honors Weekend write-back (#487).
       - run: npm run test:club-orders
+      # Real-database check of conference club orders (#1688): a club orders patches and pins, the youth department fills the
+      # order, it becomes lines on the sponsoring church's invoice on the hidden billing event, and AdventSource never sees it.
+      - run: npm run test:conference-club-orders
       # Real-database check of uniform ordering on the club order layer: bulk
       # needs, order math with stock and extras, receive/issue, "already has
       # one", a combined honors + uniforms batch, and double-tap safety (#497).

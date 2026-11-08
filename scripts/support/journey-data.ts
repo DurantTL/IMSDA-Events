@@ -10,7 +10,7 @@
  * Part B (area coordinator) adds its own accounts through `seedAccount()` and its own clubs through `seedClub()`
  * with the same `JourneyWorld`, so cleanup stays in one place.
  */
-import { Prisma, type PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient, type ClubRosterSchoolGrade } from "@prisma/client";
 
 export const JOURNEY_PREFIX = "journeycheck";
 
@@ -110,7 +110,7 @@ export async function seedDirector(prisma: PrismaClient, world: JourneyWorld, ke
       data: {
         organizationId: director.clubId, clubYear, personId,
         attendeeType: index === 4 ? "STAFF" : "YOUTH", role: index === 4 ? "Counselor" : "Pathfinder",
-        classLevel: index === 4 ? null : "FRIEND", reportedAge: index === 4 ? 34 : 11 + index, gender: index % 2 === 0 ? "FEMALE" : "MALE", source: "DIRECTOR",
+        classLevel: index === 4 ? null : "FRIEND", reportedAge: index === 4 ? 34 : 11 + index, schoolGrade: index === 4 ? null : (`GRADE_${6 + index}` as ClubRosterSchoolGrade), gender: index % 2 === 0 ? "FEMALE" : "MALE", source: "DIRECTOR",
       },
     });
   }

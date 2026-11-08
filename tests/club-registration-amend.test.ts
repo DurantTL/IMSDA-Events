@@ -299,7 +299,7 @@ const baseEdit = () => ({
   selectedMemberIds: ["m1"],
   keptGuestIds: [] as string[],
   keptOffRosterAttendeeIds: [] as string[],
-  newGuests: [] as Array<{ id: string; firstName: string; lastName: string; age: number; email: string | null }>,
+  newGuests: [] as Array<{ id: string; firstName: string; lastName: string; age: number; email: string | null; guestType?: "YOUTH" | "ADULT" | "UNDERAGE" }>,
   attendeeResponses: {} as Record<string, Record<string, unknown>>,
   rosterAges: {} as Record<string, number>,
   saveAgeToRosterIds: [] as string[],
@@ -736,6 +736,69 @@ describe("club registration edit (H3b, #366)", () => {
 
     // 1 person × $9 − 1 person fed × $9 = $0, floored (never negative).
     expect(prisma.registration.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ totalAmount: 0 }) }));
+  });
+});
+
+describe("a child added for the event only, on an edit (#1666)", () => {
+  const roleDefinition: TestDefinition = {
+    ...baseDefinition,
+    sections: baseDefinition.sections.map((section) => section.id === "roster"
+      ? { ...section, fields: [...section.fields, { id: "a_role", key: "attendee_type", label: "Roster role", helpText: "", type: "RADIO", scope: "ATTENDEE", required: false, options: ["Pathfinder", "TLT", "Staff", "Child"] }] }
+      : section),
+  };
+  const kid = { id: "guestkid001", firstName: "Robin", lastName: "Visitor", age: 4, email: null, guestType: "UNDERAGE" as const };
+  const childGuest = () => {
+    const guest = attendee("attendee-kid", "unused", "Robin", "Visitor", 4, {}, { attendee_type: "Child" });
+    guest.profileSnapshot = {
+      firstName: "Robin", lastName: "Visitor", email: null, phone: null, source: "CLUB_REGISTRATION",
+      clubOrganizationId: "club-1", ageOnEventDate: 4, temporary: true, temporaryAttendeeType: "UNDERAGE", clubGuestId: "guestkid001",
+    };
+    return guest;
+  };
+
+  it("stores a new child as Underage with the Child role, whatever role the client sent", async () => {
+    const { prisma } = fixture({ definition: roleDefinition });
+    await amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(),
+      keptOffRosterAttendeeIds: ["attendee-m2"],
+      newGuests: [kid],
+      attendeeResponses: { "guest:guestkid001": { attendee_type: "Pathfinder" } },
+    }, beforeDeadline);
+    const created = prisma.registrationAttendee.create.mock.calls[0]![0].data;
+    expect(created.profileSnapshot).toMatchObject({ ageOnEventDate: 4, temporary: true, temporaryAttendeeType: "UNDERAGE", clubGuestId: "guestkid001" });
+    expect(created.formResponses).toMatchObject({ attendee_type: "Child" });
+  });
+
+  it("keeps a registered child Underage and forces the Child role even if the client changes it", async () => {
+    const { prisma } = fixture({ definition: roleDefinition, attendees: [attendee("attendee-m1", "m1", "Alex", "Sample", 11), childGuest()] });
+    await amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(),
+      keptGuestIds: ["guestkid001"],
+      attendeeResponses: { "guest:guestkid001": { attendee_type: "Pathfinder" } },
+    }, beforeDeadline);
+    const kept = updateFor(prisma, "attendee-kid")!;
+    expect(kept.profileSnapshot).toMatchObject({ temporaryAttendeeType: "UNDERAGE", clubGuestId: "guestkid001" });
+    expect(kept.formResponses).toMatchObject({ attendee_type: "Child" });
+  });
+
+  it("refuses a new child on an event with team rules", async () => {
+    const { prisma } = fixture({ definition: roleDefinition });
+    prisma.eventTeamSettings.findUnique.mockResolvedValue(({
+      eventId: "event-1", allowMultipleTeams: true, minTeamMembers: null, maxTeamMembers: null, maxAlternates: 0,
+      ageAsOf: null, maxMemberAge: null, booksLine: "", levelInfo: [],
+    }) as never);
+    await expect(amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(), keptOffRosterAttendeeIds: ["attendee-m2"], newGuests: [kid],
+    }, beforeDeadline)).rejects.toMatchObject({ code: "ATTENDEES_INVALID" });
+    expect(prisma.registrationAttendee.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a new child on a form with no Child role", async () => {
+    const { prisma } = fixture();
+    await expect(amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(), keptOffRosterAttendeeIds: ["attendee-m2"], newGuests: [kid],
+    }, beforeDeadline)).rejects.toMatchObject({ code: "ATTENDEES_INVALID" });
+    expect(prisma.registrationAttendee.create).not.toHaveBeenCalled();
   });
 });
 

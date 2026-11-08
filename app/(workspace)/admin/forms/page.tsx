@@ -53,7 +53,7 @@ const formSortLabels: Record<FormSortColumn, { label: string; kind: SortKind }> 
 export default async function AdminFormsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const params = await searchParams;
   const one = (value: string | string[] | undefined) => (typeof value === "string" ? value : undefined);
   const filters = parseFormsHubFilters({ kind: one(params.kind), status: one(params.status), q: one(params.q) });

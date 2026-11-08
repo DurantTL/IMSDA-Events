@@ -27,6 +27,14 @@ import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
 import { fillDefinition, definitionForLink, allFields, parseClubFormTemplate } from "@/modules/club-forms/domain";
 import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
 
+/**
+ * The seeded slip no longer lists sensitive keys (owner decision, 2026-11-07). The protection rules are the same for
+ * any sensitive field, so these tests use a copy of it where staff marked the physician and emergency answers sensitive.
+ */
+function sealedSlipSpec(): ClubFormDraftSpec {
+  return { ...seedSpec("off_premises_permission_slip"), sensitiveFieldKeys: ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"] };
+}
+
 function seedSpec(key: string): ClubFormDraftSpec {
   const seed = clubFormTemplateSeeds.find((candidate) => candidate.key === key)!;
   return specFromRecord({
@@ -134,7 +142,7 @@ describe("the draft check uses the shared form schema (#712)", () => {
 });
 
 describe("the sensitive-flag protection rules (#712)", () => {
-  const slip = () => seedSpec("off_premises_permission_slip");
+  const slip = () => sealedSlipSpec();
   const sensitiveKey = () => slip().sensitiveFieldKeys[0];
   const fieldIdFor = (spec: ClubFormDraftSpec, key: string) => allFields(spec.definition).find((field) => field.key === key)!.id;
 
@@ -202,7 +210,7 @@ describe("the sensitive-flag protection rules (#712)", () => {
 
 describe("copying and creating (#712)", () => {
   it("copies a published version, dropping hidden fields and their flags", () => {
-    const published = seedSpec("off_premises_permission_slip");
+    const published = sealedSlipSpec();
     const key = published.sensitiveFieldKeys[0];
     const field = allFields(published.definition).find((candidate) => candidate.key === key)!;
     const hidden = setFieldFlag(published, field.id, "hidden", true);
@@ -216,7 +224,7 @@ describe("copying and creating (#712)", () => {
   });
 
   it("keeps the copied sensitive flags", () => {
-    const copy = copySpec(seedSpec("off_premises_permission_slip"), "Synthetic Copy");
+    const copy = copySpec(sealedSlipSpec(), "Synthetic Copy");
     expect(copy.sensitiveFieldKeys.length).toBeGreaterThan(0);
   });
 

@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function SiteContentPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (!(await canManageSiteContent(user))) redirect("/no-access");
+  if (!(await canManageSiteContent(user))) redirect("/no-access?from=site-content");
   const [state, events] = await Promise.all([getSiteContentAdminState(), listFeaturableEvents(conferenceToday())]);
 
   return (

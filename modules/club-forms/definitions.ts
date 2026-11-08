@@ -1,5 +1,6 @@
 import type { RosterMapping } from "@/modules/club-forms/roster-mapping";
 import { buildYearNominationTemplate, tltApplicationTemplate, type FormTemplate, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { SLIP_MEDICAL_NOTE_AFTER } from "@/modules/club-forms/plain-emergency";
 
 /**
  * The seeded club form templates (the first four, #610; six more, #1221) (#610, with the field-level specs from
@@ -44,6 +45,13 @@ export type ClubFormTemplateSeed = {
   /** Birth-date fields: sensitive, and readable only by the club's leaders and system administrators. */
   birthDateFieldKeys: string[];
   staffOnlyFieldKeys: string[];
+  /**
+   * School type and church membership answers (#1668): readable only by the club's own director and deputy and by
+   * system administrators. Not "sensitive" (they must stay mappable to the roster), but restricted like it for every
+   * other viewer (`restrictedFieldKeys`) and left out of the staff CSV unless the viewer is a system administrator.
+   * Read from the code's seed by template key, so a copy edited in the app keeps the restriction.
+   */
+  schoolDetailFieldKeys?: string[];
   printLayout: "STANDARD" | "PASSENGER_LIST";
   /**
    * The pre-filled "Add to roster" mapping (#721), always off here: an
@@ -105,7 +113,8 @@ const membershipApplication: ClubFormTemplateSeed = {
   key: "pathfinder_membership_application",
   name: "Pathfinder Club Membership Application",
   description: "An applicant's membership application with the parent or guardian's approval, waiver and signatures.",
-  version: 3,
+  // v4 (#1664, #1668): optional School type and church membership questions; grade, school type and church membership also copy to the roster.
+  version: 4,
   sortOrder: 10,
   fillMode: "FAMILY",
   printLayout: "STANDARD",
@@ -115,7 +124,16 @@ const membershipApplication: ClubFormTemplateSeed = {
   rosterMapping: {
     enabled: false,
     rosterType: "YOUTH",
-    fields: { fullName: "full_name", birthDate: "birth_date", gender: "gender", classLevel: "ay_class" },
+    fields: {
+      fullName: "full_name",
+      birthDate: "birth_date",
+      gender: "gender",
+      classLevel: "ay_class",
+      // v4: the form's 5th to 12th grade answers map to the roster's grade; the two new questions are optional.
+      schoolGrade: "grade",
+      schoolType: "school_type",
+      churchMember: "church_member",
+    },
     guardians: [
       { name: "father_guardian_signature", relationshipLabel: "Father or guardian", phone: "phone" },
       { name: "mother_guardian_signature", relationshipLabel: "Mother or guardian" },
@@ -123,6 +141,7 @@ const membershipApplication: ClubFormTemplateSeed = {
   },
   sensitiveFieldKeys: ["birth_date"],
   birthDateFieldKeys: ["birth_date"],
+  schoolDetailFieldKeys: ["school_type", "church_member"],
   // v2 (#719): the fee amounts are entered by the club, so a private-link filler never sees them. Signing dates fill in automatically in the same version.
   staffOnlyFieldKeys: ["registration_fee", "club_dues", "insurance_fee"],
   sectionNotes: {
@@ -164,8 +183,10 @@ const membershipApplication: ClubFormTemplateSeed = {
         text("zip", "ZIP", true),
         text("school", "School"),
         field("grade", "Grade", "SELECT", true, { options: ["5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th"] }),
+        field("school_type", "School type", "SELECT", false, { options: ["Adventist school", "Public school", "Homeschool", "Other"] }),
         churchField(true),
         churchOther(),
+        field("church_member", "Is the Pathfinder a member of the Seventh-day Adventist church?", "RADIO", false, { options: ["Yes", "No", "Not sure"] }),
         yesNo("been_pathfinder", "I have been a Pathfinder", true),
         text("been_pathfinder_where", "Where?", false, whenYes("been_pathfinder")),
         yesNo("dad_master_guide", "Dad is a Master Guide"),
@@ -334,18 +355,19 @@ const permissionSlip: ClubFormTemplateSeed = {
   key: "off_premises_permission_slip",
   name: "Off-Premises Permission Slip",
   description: "A parent or guardian's permission for a child to take part in one off-premises club activity, with medical and emergency details.",
-  version: 2,
+  // v3: the physician, clinic and emergency contact answers are plain (owner decision, 2026-11-07; see plain-emergency.ts).
+  version: 3,
   sortOrder: 30,
   fillMode: "FAMILY",
   printLayout: "STANDARD",
-  sensitiveFieldKeys: ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"],
+  sensitiveFieldKeys: [],
   birthDateFieldKeys: [],
   staffOnlyFieldKeys: [],
   sectionNotes: {
     sec_permission: [
       "I hereby give my permission for my child to participate in the pre-planned activity named below, on the date given.",
     ],
-    sec_medical: ["Medical and emergency information. Only the club's director and deputies, and conference staff with sensitive-data access, can read these answers."],
+    sec_medical: [SLIP_MEDICAL_NOTE_AFTER],
   },
   definition: {
     title: "Iowa-Missouri Conference, Pathfinder/Adventurer Club, Permission Slip for Off-Premises Activities",
@@ -404,11 +426,12 @@ const passengerList: ClubFormTemplateSeed = {
   key: "transportation_passenger_list",
   name: "Transportation Passenger List",
   description: "A roll-call sheet for one trip: contacts, up to 20 passengers with emergency contacts, and printable roll-call columns 1 to 5.",
-  version: 1,
+  // v2: the emergency contact answers are plain (owner decision, 2026-11-07; see plain-emergency.ts).
+  version: 2,
   sortOrder: 40,
   fillMode: "CLUB",
   printLayout: "PASSENGER_LIST",
-  sensitiveFieldKeys: Array.from({ length: 20 }, (_, index) => `passenger_${index + 1}_emergency_contact`),
+  sensitiveFieldKeys: [],
   birthDateFieldKeys: [],
   staffOnlyFieldKeys: [],
   sectionNotes: {
@@ -590,7 +613,7 @@ const photoRelease: ClubFormTemplateSeed = {
   key: "pathfinder_photo_video_release",
   name: "Pathfinder Club Photo and Video Release",
   description: "A parent or guardian's photo and video release for a minor, sent by the director as a private link.",
-  version: 1,
+  version: 2,
   sortOrder: 100,
   fillMode: "FAMILY",
   printLayout: "STANDARD",
@@ -602,7 +625,7 @@ const photoRelease: ClubFormTemplateSeed = {
     // split at a sentence break; the two joined with one space are the original text.
     sec_release: [
       "I hereby grant permission and authorize the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs the irrevocable right to use, reproduce and publish photographs and videos taken of me and/or the undersigned minor children, and our names, for use for all purposes, in any form, and in any and all media, including, without limitation, printed publications, websites, and outreach purposes, in any manner or in any medium. I understand that such photographs and video recordings of me may be placed on the Internet. I release the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs from any expectation of confidentiality for the undersigned minor children and myself and attest that I am the parent or legal guardian of the children listed below and that I have the authority to consent and allow the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs to use their photographs, videos, and names.",
-      "I acknowledge that since participation is voluntary, neither the minor children nor I will receive any financial compensation. I agree that participation in any publication and website produced by the Iowa-Missouri Conference of Seventhday Adventists and its affiliated Pathfinder Clubs confers no rights of ownership to me whatsoever and I hereby waive the right to approve the final product. I release the Iowa-Missouri Conference of Seventh-day Adventists, its affiliated Pathfinder Clubs, its contractors, and its employees from liability for any claims by me or any third party in connection with my participation or the participation of the undersigned minor children. I agree that all such portraits, pictures, photographs, video and audio recordings, and any reproductions thereof, and all plates, negatives, recording tape and digital files are and shall remain the property of the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs. This release is binding on me and my heirs, assigns and personal representatives."
+      "I acknowledge that since participation is voluntary, neither the minor children nor I will receive any financial compensation. I agree that participation in any publication and website produced by the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs confers no rights of ownership to me whatsoever and I hereby waive the right to approve the final product. I release the Iowa-Missouri Conference of Seventh-day Adventists, its affiliated Pathfinder Clubs, its contractors, and its employees from liability for any claims by me or any third party in connection with my participation or the participation of the undersigned minor children. I agree that all such portraits, pictures, photographs, video and audio recordings, and any reproductions thereof, and all plates, negatives, recording tape and digital files are and shall remain the property of the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs. This release is binding on me and my heirs, assigns and personal representatives."
     ],
   },
   definition: {

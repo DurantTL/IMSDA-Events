@@ -33,7 +33,7 @@ const statuses: Array<{ value: DirectoryStatusFilter; label: string }> = [
 export default async function OrganizationDirectoryPage({ searchParams }: { searchParams: Promise<{ kind?: string; status?: string; q?: string; page?: string; sort?: string; dir?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   const params = await searchParams;
   const kind = kinds.find((candidate) => candidate === params.kind) ?? null;

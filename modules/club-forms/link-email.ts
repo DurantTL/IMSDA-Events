@@ -20,13 +20,22 @@ export function clubFormLinkPath(token: string) {
   return `/club-forms/${encodeURIComponent(token)}`;
 }
 
-export function clubFormLinkEmailContent(input: { clubName: string; formName: string; days: number; expiresOn: string }) {
+export function clubFormLinkEmailContent(input: {
+  clubName: string;
+  formName: string;
+  days: number;
+  expiresOn: string;
+  /** An outing permission slip (#1672): the activity and date the parent is asked to sign for. */
+  outing?: { activity: string; dateLabel: string };
+}) {
   return {
-    subject: `A form to fill in for ${input.clubName}`,
+    subject: input.outing ? `Permission slip for ${input.outing.activity} with ${input.clubName}` : `A form to fill in for ${input.clubName}`,
     bodyText: [
       "Hello,",
       "",
-      `${input.clubName} has asked you to fill in this form: ${input.formName}.`,
+      input.outing
+        ? `${input.clubName} has asked you to review and sign a permission slip for ${input.outing.activity} on ${input.outing.dateLabel}.`
+        : `${input.clubName} has asked you to fill in this form: ${input.formName}.`,
       "",
       "Open your private link:",
       "",

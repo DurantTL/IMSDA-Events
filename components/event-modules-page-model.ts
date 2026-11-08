@@ -7,6 +7,7 @@ import {
   canEnableForEvent,
   dataDrivenReasons,
   eventModuleCatalog,
+  scopedToggleModuleKeys,
   type EventModuleApplicability,
   type EventModuleDefinition,
   type EventModuleKey,
@@ -223,7 +224,8 @@ export function buildRequestPanel({
   if (!canRequest) return [];
   const latest = latestRequestPerModule(requests);
   return eventModuleCatalog
-    .filter((definition) => !effective.has(definition.key) && canEnableForEvent(definition.key, audience, dataPresent))
+    // A scoped tool (Club teachers, #1681) is switched on by its own people, never asked for through the office.
+    .filter((definition) => !scopedToggleModuleKeys.includes(definition.key) && !effective.has(definition.key) && canEnableForEvent(definition.key, audience, dataPresent))
     .map((definition) => {
       const newest = latest.get(definition.key);
       return { definition, latest: newest, canRequest: canRequestAgain(newest) };

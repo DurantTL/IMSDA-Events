@@ -5,7 +5,7 @@
  * `locations.ts` and `enrollment-repository.ts`; nothing here repeats them.
  */
 import { z } from "zod";
-import { clubAttendeeClientId, clubGuestClientId, guestIsAdult } from "@/modules/club-registrations/domain";
+import { clubAttendeeClientId, clubGuestClientId, guestAttendeeType, type ClubGuestType } from "@/modules/club-registrations/domain";
 import type { ClubClassLevel } from "@/modules/club-rosters/domain";
 import { consumesClassSeat, selectionProblem, type SelectableOffering } from "@/modules/honors/enrollment-domain";
 import { sessionVisibleAtLocation } from "@/modules/honors/locations";
@@ -42,7 +42,7 @@ export type PickingAttendee = {
 export function pickingAttendees(input: {
   roster: ReadonlyArray<{ memberId: string; firstName: string; lastName: string; ageOnEventDate: number | null; attendeeType: PickingAttendee["attendeeType"] }>;
   selectedMemberIds: readonly string[];
-  guests: ReadonlyArray<{ id: string; firstName: string; lastName: string; age: number }>;
+  guests: ReadonlyArray<{ id: string; firstName: string; lastName: string; age: number; guestType?: ClubGuestType | undefined }>;
   /** Ages typed in for roster people with no birth date (#639), by roster member id. */
   rosterAges?: Readonly<Record<string, number>>;
   /** Roster class levels and completed prerequisite honors, by roster member id (#832). */
@@ -60,9 +60,9 @@ export function pickingAttendees(input: {
     classLevel: input.memberRequirements?.[person.memberId]?.classLevel ?? null,
     completedHonorIds: input.memberRequirements?.[person.memberId]?.completedHonorIds ?? [],
   }));
-  // Extra people count as adults from 18, as the registration itself decides.
+  // Extra people count as adults from 18 unless the director chose Child (no class seat), as the registration itself decides.
   const guests = input.guests.map((guest) => {
-    const attendeeType = guestIsAdult(guest) ? "ADULT" as const : "YOUTH" as const;
+    const attendeeType = guestAttendeeType(guest);
     return {
       clientId: clubGuestClientId(guest.id),
       firstName: guest.firstName,

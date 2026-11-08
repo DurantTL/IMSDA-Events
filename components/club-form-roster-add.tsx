@@ -19,6 +19,11 @@ import {
   clubRosterAttendeeTypeLabels,
   clubRosterGenderLabels,
   defaultRosterRole,
+  CHURCH_MEMBER_LABEL,
+  clubChurchMemberLabels,
+  clubSchoolGradeLabels,
+  clubSchoolGrades,
+  clubSchoolTypeLabels,
 } from "@/modules/club-rosters/domain";
 import {
   GUARDIAN_SLOTS,
@@ -126,6 +131,14 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
         attendeeType: String(form.get("attendeeType") ?? "YOUTH"),
         role: String(form.get("role") ?? ""),
         classLevel: String(form.get("classLevel") ?? "") || null,
+        // Grade, school type and church membership (#1664, #1668): a Pathfinder's own, copied from the form for the director to check.
+        ...(String(form.get("attendeeType") ?? "YOUTH") === "YOUTH"
+          ? {
+            schoolGrade: String(form.get("schoolGrade") ?? "") || null,
+            schoolType: String(form.get("schoolType") ?? "") || null,
+            churchMember: String(form.get("churchMember") ?? "") || null,
+          }
+          : {}),
         gender: String(form.get("gender") ?? "") || null,
         guardians,
       },
@@ -208,6 +221,31 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
               {Object.entries(clubClassLevelLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
+          {formType === "YOUTH" && (
+            <>
+              <label>
+                Grade
+                <select defaultValue={prefill.schoolGrade ?? ""} name="schoolGrade">
+                  <option value="">Not given</option>
+                  {clubSchoolGrades.map((grade) => <option key={grade} value={grade}>{clubSchoolGradeLabels[grade]}</option>)}
+                </select>
+              </label>
+              <label>
+                School
+                <select defaultValue={prefill.schoolType ?? ""} name="schoolType">
+                  <option value="">Not given</option>
+                  {Object.entries(clubSchoolTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <label>
+                {CHURCH_MEMBER_LABEL}
+                <select defaultValue={prefill.churchMember ?? ""} name="churchMember">
+                  <option value="">Not given</option>
+                  {Object.entries(clubChurchMemberLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+            </>
+          )}
           <label>
             Role (optional)
             <input defaultValue={prefill.role} maxLength={60} name="role" placeholder={defaultRosterRole(formType)} />

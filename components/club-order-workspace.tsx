@@ -94,7 +94,7 @@ export function orderSectionLinks(hasWaiting: boolean, readOnly = false): { id: 
 /** The picker's items (#1324): active items not already listed. With a query it keeps those found by name, item number, size or linked honor name; the picker passes none and the shared search box narrows by the label (#1553). */
 export function filterPickerItems(stock: readonly ClubStockRow[], listed: ReadonlySet<string>, query: string) {
   const matches = makeSearchMatcher(query);
-  return stock.filter((row) => row.isActive && !listed.has(row.itemId) && matches([row.name, row.catalogNumber, row.sizeLabel, row.honorName]));
+  return stock.filter((row) => row.isActive && row.supplier !== "CONFERENCE" && !listed.has(row.itemId) && matches([row.name, row.catalogNumber, row.sizeLabel, row.honorName]));
 }
 
 /** Shown beside an honor with no catalog item (#1330). */

@@ -31,12 +31,12 @@ import { RosterOperationError } from "@/modules/club-rosters/repository";
 
 // Synthetic people only.
 const csv = [
-  "First name,Last name,Birth date,Type,Current class,Role,Gender",
-  "Alex,Sample,5/20/2014,Pathfinder,Friend,,F",
-  "Jordan,Example,,Staff,,Counselor,",
-  "Casey,Tester,,,,,",
-  "Riley,,2013-01-02,,,,",
-  "Sam,Sample,not a date,,,,",
+  "First name,Last name,Birth date,Type,Current class,Grade,Role,Gender",
+  "Alex,Sample,5/20/2014,Pathfinder,Friend,7th,,F",
+  "Jordan,Example,,Staff,,,Counselor,",
+  "Casey,Tester,,,,,,",
+  "Riley,,2013-01-02,,,,,",
+  "Sam,Sample,not a date,,,,,",
 ].join("\n");
 
 const ctx = { params: Promise.resolve({ organizationId: "club-1" }) };
@@ -58,7 +58,7 @@ beforeEach(() => {
 
 describe("roster CSV (#384, #424)", () => {
   it("offers a template with the roster's columns and nothing else", () => {
-    expect(rosterCsvTemplate().trim()).toBe('"First name","Last name","Birth date","Type","Current class","Role","Gender"');
+    expect(rosterCsvTemplate().trim()).toBe('"First name","Last name","Birth date","Type","Current class","Grade","Role","Gender"');
   });
 
   it("reads Excel-style and short-year dates, names, and labels", () => {
@@ -85,9 +85,9 @@ describe("roster CSV (#384, #424)", () => {
     // Alex: birth date, type, class, and gender are filled in; only role is blank.
     expect(missingRosterCsvFields(alex)).toEqual(["Role"]);
     // Jordan: type and role are filled in; birth date, class, and gender are blank.
-    expect(missingRosterCsvFields(jordan)).toEqual(["Birth date", "Current class", "Gender"]);
+    expect(missingRosterCsvFields(jordan)).toEqual(["Birth date", "Current class", "Grade", "Gender"]);
     // Casey: everything but the name is blank.
-    expect(missingRosterCsvFields(casey)).toEqual(["Birth date", "Type", "Current class", "Role", "Gender"]);
+    expect(missingRosterCsvFields(casey)).toEqual(["Birth date", "Type", "Current class", "Grade", "Role", "Gender"]);
   });
 
   it("plans adds and updates by name, and skips what it can't do", () => {
@@ -102,7 +102,7 @@ describe("roster CSV (#384, #424)", () => {
     // A new youth with a blank role: the default is named, and nothing is left missing.
     expect(plan[0].message).toBe("Will be added. Will default: Role → Pathfinder.");
     // An update keeps what's on file for blank cells, so they're "blank in file", not missing.
-    expect(plan[1].message).toBe("Will update what the file fills in. Blank in file: Birth date, Current class, Gender (kept as on file).");
+    expect(plan[1].message).toBe("Will update what the file fills in. Blank in file: Birth date, Current class, Grade, Gender (kept as on file).");
     // Skipped rows say why, without a missing-fields list on top.
     expect(plan[2].message).toBe("New people need a birth date.");
     expect(plan[4].message).toMatch(/isn't a date/);
@@ -111,14 +111,14 @@ describe("roster CSV (#384, #424)", () => {
 
   it("names the defaults a new row gets by type, and only what's still missing (#424)", () => {
     const file = [
-      "First name,Last name,Birth date,Type,Current class,Role,Gender",
-      "Kit,Blank,4/17/14,,,,",
-      "Lee,Staffer,3/2/1980,Staff,,,M",
-      "Mo,Adult,3/2/1981,Adult,,Deacon,F",
+      "First name,Last name,Birth date,Type,Current class,Grade,Role,Gender",
+      "Kit,Blank,4/17/14,,,,,",
+      "Lee,Staffer,3/2/1980,Staff,,,,M",
+      "Mo,Adult,3/2/1981,Adult,,,Deacon,F",
     ].join("\n");
     const plan = planRosterImport(parseRosterCsv(file, 2026), []);
     expect(plan.map((step) => step.action)).toEqual(["ADD", "ADD", "ADD"]);
-    expect(plan[0].message).toBe("Will be added. Will default: Type → Youth, Role → Pathfinder. Missing: Gender, Current class.");
+    expect(plan[0].message).toBe("Will be added. Will default: Type → Youth, Role → Pathfinder. Missing: Gender, Current class, Grade.");
     // Staff don't get Pathfinder, need a class, or need a role (they show their type).
     expect(plan[1].message).toBe("Will be added.");
     expect(plan[2].message).toBe("Will be added.");
@@ -126,9 +126,9 @@ describe("roster CSV (#384, #424)", () => {
 
   it("saves a staff row's blank role as blank, and a blank type as a Pathfinder youth (#424)", async () => {
     const file = [
-      "First name,Last name,Birth date,Type,Current class,Role,Gender",
-      "Kit,Blank,4/17/2014,,,,",
-      "Lee,Staffer,3/2/1980,Staff,,,M",
+      "First name,Last name,Birth date,Type,Current class,Grade,Role,Gender",
+      "Kit,Blank,4/17/2014,,,,,",
+      "Lee,Staffer,3/2/1980,Staff,,,,M",
     ].join("\n");
     mocks.listRoster.mockResolvedValue([]);
     const response = await POST(request({ csv: file, confirm: true }), ctx);

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   clubPortalComplianceReminderCounts: vi.fn(),
   listUpcomingDeadlines: vi.fn(),
   listSubmissionsForViewer: vi.fn(),
+  loadRosterHealthCounts: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -33,6 +34,7 @@ vi.mock("@/modules/club-reports/repository", () => ({ getClubReportYear: mocks.g
 vi.mock("@/modules/background-checks/repository", () => ({ clubPortalComplianceReminderCounts: mocks.clubPortalComplianceReminderCounts }));
 vi.mock("@/modules/club-forms/submissions", () => ({ listSubmissionsForViewer: mocks.listSubmissionsForViewer }));
 vi.mock("@/modules/calendar/deadline-list", () => ({ listUpcomingDeadlines: mocks.listUpcomingDeadlines }));
+vi.mock("@/modules/club-features/roster-health", () => ({ loadRosterHealthCounts: mocks.loadRosterHealthCounts }));
 
 import { rosterRowMissingFields } from "@/modules/club-rosters/domain";
 import ClubHomePage from "@/app/(public)/account/(portal)/clubs/[organizationId]/page";
@@ -88,6 +90,8 @@ beforeEach(() => {
   mocks.listSubmissionsForViewer.mockResolvedValue([]);
   mocks.listDirectedClubs.mockResolvedValue([]);
   mocks.getCurrentAttendee.mockResolvedValue({ account: null });
+  // Off by default (#1709): a club that has not switched roster health flags on gets nothing back.
+  mocks.loadRosterHealthCounts.mockResolvedValue(null);
 });
 afterEach(() => vi.useRealTimers());
 
@@ -476,5 +480,49 @@ describe("Home read-only notice by year (#959)", () => {
   it("does not offer that to a registrar, who has no guardian access", async () => {
     mocks.getRosterAccessStateForPage.mockResolvedValue(access("REGISTRAR"));
     expect(await home({ year: "2027-28" })).not.toContain("emergency contacts");
+  });
+});
+
+describe("Home roster health counts (#1709, optional)", () => {
+  const counts = { people: 3, flagged: 2, byFlag: { OUTDATED: 0, NO_EMERGENCY_CONTACT: 2, NO_HEALTH_RECORD: 1, NO_PHOTO_RELEASE: 0, NO_STERLING_CHECK: 0 } };
+
+  it("shows nothing new for a club that has not switched it on", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    const html = await home();
+    expect(html).not.toContain("Roster health");
+    expect(html).not.toContain("roster-health");
+    expect(html).not.toContain("Could not load");
+  });
+
+  it("shows the counts and a link to the list when the club has switched it on", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    mocks.loadRosterHealthCounts.mockResolvedValue({ counts, notChecked: [] });
+    const html = await home();
+    expect(html).toContain("Roster health");
+    expect(html).toContain("People with something to check");
+    expect(html).toContain(`href="${base}/roster-health"`);
+    expect(mocks.loadRosterHealthCounts).toHaveBeenCalledWith("club-1", leaderCapabilities, expect.any(Date));
+  });
+
+  it("asks for the counts with the viewer's own capabilities, so a registrar is handed none", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("REGISTRAR"));
+    await home();
+    expect(mocks.loadRosterHealthCounts).toHaveBeenCalledWith("club-1", clubCapabilities("REGISTRAR"), expect.any(Date));
+  });
+
+  it("names roster health as unavailable when it fails, and the rest of Home still renders", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    mocks.loadRosterHealthCounts.mockRejectedValue(new Error("boom"));
+    const html = await home();
+    expect(html).toContain("Roster health");
+    expect(html).toContain("Your club this year");
+  });
+
+  it("is not on a read-only past year", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(access("DIRECTOR"));
+    mocks.loadRosterHealthCounts.mockResolvedValue({ counts, notChecked: [] });
+    const html = await home({ year: "2025-26" });
+    expect(html).not.toContain("People with something to check");
+    expect(mocks.loadRosterHealthCounts).not.toHaveBeenCalled();
   });
 });

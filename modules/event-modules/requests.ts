@@ -14,6 +14,7 @@ import {
   dataForcedModuleKeys,
   eventModuleDefinition,
   isEventModuleKey,
+  scopedToggleModuleKeys,
   type EventModuleKey,
 } from "@/modules/event-modules/catalog";
 import {
@@ -75,6 +76,7 @@ export async function createModuleRequest(
   }
   const { user } = await requirePermission({ user: actor ?? null }, eventId, "CONFIGURE_EVENT", findActiveMembership);
   if (!isEventModuleKey(moduleKey)) throw new EventModuleError("That module does not exist.", "UNKNOWN_MODULE");
+  if (scopedToggleModuleKeys.includes(moduleKey)) throw new EventModuleError("That tool is switched on by Area Coordinators, the Clubs Administrator or event administrators, not requested.", "NOT_APPLICABLE");
   const key: EventModuleKey = moduleKey;
   const reason = cleanReason(reasonInput, MODULE_REQUEST_REASON_MAX, "A reason");
   const officeEmail = await conferenceOfficeAddress();

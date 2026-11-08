@@ -21,4 +21,28 @@ describe("noAccessCopy (#1411 E6)", () => {
     }
     expect(noAccessCopy({ from: "other", hasEvents: true, email }).showEvents).toBe(true);
   });
+
+  it("tells a Clubs Administrator that System management needs a system administrator, with a way back to Club administration (from=system only)", () => {
+    for (const hasEvents of [false, true]) {
+      const copy = noAccessCopy({ from: "system", hasEvents, email, clubsAdmin: true });
+      expect(copy.heading).toBe("System management needs a system administrator");
+      expect(copy.whoToAsk).toBe("an IMSDA system administrator");
+      expect(copy.showClubs).toBe(true);
+      expect(`${copy.heading} ${copy.body}`).not.toContain("event assignment");
+      expect(copy.body).not.toMatch(/\bask\b/i);
+    }
+    const setup = noAccessCopy({ from: "event-setup", hasEvents: false, email, clubsAdmin: true });
+    expect(setup.heading).toContain("Creating events needs a system administrator");
+    expect(setup.showClubs).toBe(true);
+  });
+
+  it("does not give the System management copy to a Clubs Administrator for any other reason", () => {
+    expect(noAccessCopy({ from: null, hasEvents: true, email, clubsAdmin: true }).heading).toBe("This page needs a system administrator");
+    expect(noAccessCopy({ from: null, hasEvents: true, email, clubsAdmin: true }).showClubs).toBeUndefined();
+  });
+
+  it("leaves event staff copy unchanged", () => {
+    expect(noAccessCopy({ from: null, hasEvents: false, email, clubsAdmin: false }).heading).toBe("No events are assigned");
+    expect(noAccessCopy({ from: null, hasEvents: true, email }).showClubs).toBeUndefined();
+  });
 });

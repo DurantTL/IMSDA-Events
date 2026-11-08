@@ -19,7 +19,7 @@ import {
 } from "@/modules/attendance-reconciliation/domain";
 
 export type InvoiceVersionStatus = "DRAFT" | "FINALIZED" | "SUPERSEDED" | "DISCARDED";
-export type InvoiceVersionBasis = "RECONCILIATION" | "CONTACT_ONLY_COPY" | "CHURCH_PROMO_CODES";
+export type InvoiceVersionBasis = "RECONCILIATION" | "CONTACT_ONLY_COPY" | "CHURCH_PROMO_CODES" | "CLUB_ORDERS";
 export type InvoiceReceivableStatus = "OPEN" | "SUPERSEDED";
 
 export const INVOICE_SNAPSHOT_SCHEMA = 1;
@@ -123,15 +123,18 @@ export type InvoiceLine = {
 
 export type InvoiceSnapshot = {
   schema: typeof INVOICE_SNAPSHOT_SCHEMA;
-  /** Set on a church's promo code invoice (#399), whose lines are redemptions rather than registrations with attendance. Absent on every other invoice. */
-  kind?: "CHURCH_PROMO_CODES";
+  /**
+   * Set on a church's promo code invoice (#399), whose lines are redemptions rather than registrations with attendance, and on a
+   * church's conference club orders invoice (#1688), whose lines are filled orders. Absent on every other invoice.
+   */
+  kind?: "CHURCH_PROMO_CODES" | "CLUB_ORDERS";
   event: { id: string; name: string };
   groupKey: string;
   groupTitle: string;
   invoiceGrouping: "PER_CHURCH" | "PER_CLUB";
   party: { kind: "ORGANIZATION" | "PERSON"; id: string | null; name: string };
   clubId: string | null;
-  /** The approved reconciliation the lines came from; null on a church promo code invoice, which has none. */
+  /** The approved reconciliation the lines came from; null on a church promo code or conference club orders invoice, which has none. */
   reconciliation: { versionId: string; versionNumber: number; ruleVersion: string } | null;
   lines: InvoiceLine[];
   totals: { registered: number; checkedIn: number; noShow: number; billable: number; amountDueCents: number };

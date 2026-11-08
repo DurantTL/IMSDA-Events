@@ -17,7 +17,7 @@ export default async function GeneralInformationFormResponsesPage({ params, sear
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const { formId } = await params;
   const { response, cursor } = await searchParams;
   const data = await loadInformationFormResponsesPage({ scope: "GENERAL" }, formId, { responseId: response, cursor });

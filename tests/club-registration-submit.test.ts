@@ -294,6 +294,47 @@ describe("club registration submit", () => {
     expect(tx.clubRosterMember.updateMany).not.toHaveBeenCalled();
   });
 
+  describe("a child added for the event only (#1666)", () => {
+    const roleField = field("a_role", "attendee_type", "Roster role", "RADIO", "ATTENDEE", true);
+    const childForm = () => definition([{ ...roleField, options: ["Pathfinder", "TLT", "Staff", "Child"] }]);
+    const childGuest = { id: "guestkid001", firstName: "Robin", lastName: "Visitor", age: 4, email: null, guestType: "UNDERAGE" };
+    const childInput = {
+      ...baseInput,
+      attendees: [
+        { clientId: "member:m1", responses: { attendee_type: "Pathfinder" } },
+        { clientId: "guest:guestkid001", responses: { attendee_type: "Pathfinder" } },
+      ],
+    };
+
+    it("registers a child as Underage with the Child role, whatever role the client sent, and no adult check", async () => {
+      const tx = fixture({ form: childForm() });
+      tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [childGuest] });
+      tx.person.create.mockResolvedValue({ id: "person-kid" });
+      await submit(childInput);
+      const data = tx.registrationAttendee.create.mock.calls[1]![0].data;
+      expect(data.profileSnapshot).toMatchObject({ ageOnEventDate: 4, temporary: true, temporaryAttendeeType: "UNDERAGE" });
+      expect(data.formResponses).toMatchObject({ attendee_type: "Child", attendee_age: "4" });
+    });
+
+    it("keeps a guest saved before the choice existed on the type their age gives", async () => {
+      const tx = fixture({ form: childForm() });
+      tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [{ id: "guestkid001", firstName: "Robin", lastName: "Visitor", age: 9, email: null }] });
+      tx.person.create.mockResolvedValue({ id: "person-kid" });
+      await submit(childInput);
+      const data = tx.registrationAttendee.create.mock.calls[1]![0].data;
+      expect(data.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH" });
+      expect(data.formResponses).toMatchObject({ attendee_type: "Pathfinder" });
+    });
+
+    it("refuses a child on an event with team rules (Pathfinder Bible Experience takes no guests of this kind)", async () => {
+      const tx = fixture({ form: childForm() });
+      tx.eventTeamSettings.findUnique.mockResolvedValue(teamRulesRow());
+      tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [childGuest] });
+      await expect(submit(childInput, clubTeam("Bible Bees"))).rejects.toMatchObject({ code: "CLUB_ATTENDEES_INVALID" });
+      expect(tx.registration.create).not.toHaveBeenCalled();
+    });
+  });
+
   it("uses the age typed in for a roster person with no birth date, from the saved draft (#639)", async () => {
     const tx = fixture();
     tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [], rosterAges: { m3: 13, m1: 99 } });

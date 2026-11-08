@@ -101,6 +101,8 @@ export const EMAIL_HEADER_RULES: Record<MessageTemplateKey, EmailHeaderRule> = {
   HONOR_INSTRUCTOR_CLASS_CHANGE: "general",
   HONOR_WATCH_SUMMARY: "general",
   SYSTEM_TEST_EMAIL: "general",
+  CONFERENCE_CLUB_ORDER_SUBMITTED: "club",
+  CONFERENCE_CLUB_ORDER_CONFIRMATION: "club",
 };
 
 /** The header context for a template. An unknown key (a row from a newer version) is general, never an error. */
@@ -195,6 +197,8 @@ export const EMAIL_WHY_LINES: Record<MessageTemplateKey, string> = {
   HONOR_INSTRUCTOR_CLASS_CHANGE: "You got this because you teach an Honors class and asked to hear about changes right away.",
   HONOR_WATCH_SUMMARY: "You got this because you are on the Honors watch list for an event.",
   SYSTEM_TEST_EMAIL: "You got this because a system administrator sent a test email to this address.",
+  CONFERENCE_CLUB_ORDER_SUBMITTED: "You got this because you are on the list for conference club orders (patches and pins).",
+  CONFERENCE_CLUB_ORDER_CONFIRMATION: "You got this because you are the director of a club that ordered patches and pins from the conference.",
 };
 
 const GENERIC_WHY = "You got this because of something you did on IMAdventist.";

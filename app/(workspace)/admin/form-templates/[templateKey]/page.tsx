@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function FormTemplateEditorPage({ params }: { params: Promise<{ templateKey: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const { templateKey } = await params;
   const opened = await getFormTemplateForEditor(templateKey).then(
     (found) => ({ view: found, unreadable: false }),

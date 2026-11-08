@@ -1,0 +1,13 @@
+cd /home/user/IMSDA-Events
+export DATABASE_URL='postgresql://imsda:imsda_dev@localhost:5432/imsda_events?schema=public'
+export MANAGE_LINK_DERIVATION_SECRET=ci-only-manage-link-derivation-secret-0000000
+export ATTENDEE_PASS_SIGNING_SECRET=ci-only-attendee-pass-signing-secret-000000
+export RATE_LIMIT_HASH_SECRET=ci-only-rate-limit-hash-secret-0000000000
+export OUTBOX_SWEEP_TOKEN=ci-only-outbox-sweep-token-000000000000
+export SECRET_ENCRYPTION_KEY=ci-only-secret-encryption-key-00000000000
+export ACCOUNT_EMAIL_SENDER_ADDRESS=events@ci.example.test
+export RESEND_API_KEY=ci-placeholder-never-sent
+export RESEND_API_URL=http://127.0.0.1:3999
+export SQUARE_ENVIRONMENT=sandbox SQUARE_APPLICATION_ID=sandbox-sq0idb-synthetic SQUARE_LOCATION_ID=LSYNTHETIC SQUARE_ACCESS_TOKEN=synthetic-token-never-used SQUARE_WEBHOOK_SIGNATURE_KEY=synthetic-signature-key-0000 SQUARE_WEBHOOK_NOTIFICATION_URL=https://events.example.test/api/webhooks/square
+nohup npm run start -- -p 3000 > $1/app.log 2>&1 &
+APP_BASE_URL=http://localhost:3002 TURNSTILE_SITE_KEY=1x00000000000000000000AA TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA TURNSTILE_ALLOWED_HOSTNAMES=localhost nohup npm run start -- -p 3002 > $1/app-turnstile.log 2>&1 &

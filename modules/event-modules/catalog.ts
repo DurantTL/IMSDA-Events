@@ -16,6 +16,7 @@ export const eventModuleKeys = [
   "attendee-community",
   "public-content",
   "emergency-plans",
+  "club-teachers",
 ] as const;
 
 export type EventModuleKey = (typeof eventModuleKeys)[number];
@@ -40,6 +41,11 @@ export type EventModuleDefinition = {
   cardKey: string;
   /** On for every event with no stored row; cannot be turned off. */
   alwaysOn: boolean;
+  /**
+   * Stays off for a new club event even though it applies to club events (#1681): an optional tool someone switches on
+   * for themselves. Defaults and the "which features" step both leave it off until it is asked for.
+   */
+  offByDefault?: boolean;
   /** Routes the module's entry points open. Listing a route here grants nothing. */
   routes: readonly string[];
   /** Named features that follow the module. */
@@ -135,7 +141,27 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
     routes: ["/more/emergency-plan"],
     features: ["emergency-reference-sheet"],
   },
+  {
+    key: "club-teachers",
+    cardKey: "club-teachers",
+    title: "Club teachers",
+    description: "Ask each club who from the club is teaching, count teachers per weekend and club, and warn clubs below the number.",
+    appliesTo: "club-audience",
+    launcherGroup: "people-access",
+    alwaysOn: false,
+    offByDefault: true,
+    routes: ["/more/club-teachers", "/account/area-clubs/events"],
+    features: ["club-teacher-step"],
+  },
 ];
+
+/**
+ * Modules an Area Coordinator may switch on or off for a club event they can see (#1681), besides the Clubs
+ * Administrator and event administrators. Such a tool is never asked for through the feature-request list. Every other module stays system administrator only (`service.ts`); this list is the
+ * one place the narrower, scoped path (`modules/club-teachers/settings.ts`) is allowed to act, so adding a module to it
+ * is a deliberate decision, never a side effect of adding it to the catalog.
+ */
+export const scopedToggleModuleKeys: readonly EventModuleKey[] = ["club-teachers"];
 
 const definitionsByKey = new Map<string, EventModuleDefinition>(
   eventModuleCatalog.map((definition) => [definition.key, definition]),
@@ -178,7 +204,7 @@ export function moduleApplies(key: EventModuleKey, context: EventModuleContext):
  */
 export function defaultModuleKeys(audience: "GENERAL" | "CLUB"): EventModuleKey[] {
   return eventModuleCatalog
-    .filter((entry) => entry.alwaysOn || (entry.appliesTo === "club-audience" && audience === "CLUB"))
+    .filter((entry) => entry.alwaysOn || (entry.appliesTo === "club-audience" && audience === "CLUB" && !entry.offByDefault))
     .map((entry) => entry.key);
 }
 

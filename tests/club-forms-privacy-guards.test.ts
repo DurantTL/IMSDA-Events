@@ -41,22 +41,29 @@ describe("club forms stay apart from the places sensitive answers must never go 
       .sort();
     // The write paths (which only set it), the one audited read, the re-seal step a template version bump runs,
     // the coordinator health view (#658, ADR 0005 Addendum C), which audits before it opens two emergency fields,
-    // and the sealed-column registry (#1516), which only names the column so key rotation can re-seal it in place.
+    // the sealed-column registry (#1516), which only names the column so key rotation can re-seal it in place,
+    // and the human-run step that moves the 2026-11-07 emergency answers out of the sealed value (ADR 0005 Addendum G).
     expect(readers).toEqual([
       "modules/club-forms/links.ts",
       "modules/club-forms/open-applications.ts",
       "modules/club-forms/reseal.ts",
       "modules/club-forms/submissions.ts",
+      "modules/club-forms/unseal-emergency.ts",
       "modules/coordinator-health/repository.ts",
       "modules/security/sealed-columns.ts",
     ]);
   });
 
-  it("opens sealed answers only in the audited read and the re-seal step", () => {
+  it("opens sealed answers only in the audited read, the re-seal step and the operator unseal step", () => {
     const openers = [...sourceFiles("modules"), ...sourceFiles("app"), ...sourceFiles("components")]
       .filter((file) => /openSensitiveAnswers\(/.test(read(file)) && !file.endsWith("sealed-answers.ts"))
       .sort();
-    expect(openers).toEqual(["modules/club-forms/reseal.ts", "modules/club-forms/submissions.ts", "modules/coordinator-health/repository.ts"]);
+    expect(openers).toEqual([
+      "modules/club-forms/reseal.ts",
+      "modules/club-forms/submissions.ts",
+      "modules/club-forms/unseal-emergency.ts",
+      "modules/coordinator-health/repository.ts",
+    ]);
   });
 
   it("never logs a request body, an answers object or a token", () => {

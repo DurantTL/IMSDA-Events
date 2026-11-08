@@ -1,0 +1,121 @@
+/**
+ * Mock run hands-on checks for recent work (Nov 6, 2026): Act as Area Coordinator and its portal button,
+ * Monthly Records naming, Calendar admin filters. Synthetic data, local app only.
+ * Run like role-walk (docs/WEEKLY-MOCK-RUN.md, step 5). Replace or extend these checks each week with that week's merged work.
+ */
+import { loadEnvConfig } from "@next/env";
+import fs from "node:fs";
+import path from "node:path";
+
+const REPO = "/home/user/IMSDA-Events";
+loadEnvConfig(REPO);
+const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), "out", "features");
+fs.mkdirSync(OUT, { recursive: true });
+const log = (...a: unknown[]) => console.log(...a);
+
+async function main() {
+  const J = await import(`${REPO}/scripts/support/browser-journeys`);
+  J.guardLocal();
+  const playwright = await J.loadPlaywright();
+  const browser = await J.launch(playwright, "chromium");
+  const staffTokens: string[] = [];
+  for (const width of [1280, 390]) {
+    log(`\n===== ${width}`);
+    const cookie = await J.mintStaffSession(staffTokens, "system@imsda-events.test");
+    const context = await J.newContext(browser, { translate: false, cookie, width });
+    const page = await context.newPage();
+    const errs: string[] = [];
+    page.on("pageerror", (e: Error) => errs.push(e.message.slice(0, 160)));
+    page.on("response", (r: { status(): number; url(): string }) => { if (r.status() >= 500) errs.push(`${r.status()} ${r.url()}`); });
+    const shot = (name: string) => page.screenshot({ path: path.join(OUT, `${name}-${width}.png`), fullPage: false });
+
+    // 1. Act as Area Coordinator from /admin/clubs
+    await page.goto(`${J.baseUrl}/admin/clubs`, { waitUntil: "load" });
+    const actBtn = page.getByRole("button", { name: /Act as Area Coordinator/ });
+    log("act-as button visible:", await actBtn.isVisible().catch(() => false));
+    if (await actBtn.isVisible().catch(() => false)) {
+      await actBtn.click();
+      await page.waitForTimeout(800);
+      await shot("actas-dialog");
+      const dialog = page.getByRole("dialog");
+      log("dialog text:", (await dialog.innerText().catch(() => "(no dialog)")).replace(/\s+/g, " ").slice(0, 400));
+      const confirm = dialog.getByRole("button", { name: /start|act as|confirm|continue/i }).first();
+      if (await confirm.isVisible().catch(() => false)) {
+        await confirm.click();
+        await page.waitForTimeout(2000);
+        await shot("actas-result");
+        const portal = page.getByRole("link", { name: /Open the Area Coordinator portal/ }).first();
+        log("portal button visible after start:", await portal.isVisible().catch(() => false));
+        const banner = await page.locator("[class*=act-as], [data-testid*=act-as], [role=status]").allInnerTexts().catch(() => []);
+        log("banner-ish text:", banner.map((t: string) => t.replace(/\s+/g, " ").slice(0, 160)));
+        // the banner on another staff page
+        await page.goto(`${J.baseUrl}/admin`, { waitUntil: "load" });
+        const bannerPortal = page.getByRole("link", { name: /Open the Area Coordinator portal/ });
+        log("banner portal links on /admin:", await bannerPortal.count());
+        await shot("actas-banner-admin");
+        if (await bannerPortal.count()) {
+          await bannerPortal.first().click();
+          await page.waitForLoadState("load"); await page.waitForTimeout(1500);
+          log("after portal click url:", page.url().replace(J.baseUrl, ""), "h1:", await page.locator("h1").allInnerTexts());
+          await shot("actas-portal");
+          log("portal page text head:", (await page.locator("main").innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 400));
+          const stop = page.getByRole("button", { name: /Stop acting/ }).first();
+          log("stop acting visible in portal:", await stop.isVisible().catch(() => false));
+          log("portal button inside portal:", await page.getByRole("link", { name: /Open the Area Coordinator portal/ }).count());
+          if (await stop.isVisible().catch(() => false)) {
+            await stop.click(); await page.waitForTimeout(800);
+            const d = page.getByRole("dialog");
+            if (await d.isVisible().catch(() => false)) { await d.getByRole("button", { name: /Stop/ }).last().click().catch(() => undefined); }
+            await page.waitForTimeout(2000);
+            log("after stop url:", page.url().replace(J.baseUrl, ""));
+            await shot("actas-stopped");
+          }
+        }
+      }
+    }
+
+    // 2. Monthly Records naming
+    await page.goto(`${J.baseUrl}/admin/clubs`, { waitUntil: "load" });
+    const mrLinks = await page.getByRole("link", { name: /^Monthly Records$/ }).evaluateAll((els: HTMLAnchorElement[]) => els.map((a) => `${a.getAttribute("href")} visible=${a.offsetParent !== null}`));
+    log("Monthly Records links on /admin/clubs:", mrLinks);
+    await page.goto(`${J.baseUrl}/admin/clubs/summary?view=records#monthly-records`, { waitUntil: "load" });
+    await page.waitForTimeout(800);
+    log("summary records h1/h2:", await page.locator("h1, h2").allInnerTexts().then((t: string[]) => t.slice(0, 6)));
+    log("aria-current:", await page.locator("[aria-current=page]").allInnerTexts());
+    await shot("monthly-records-tab");
+    await page.goto(`${J.baseUrl}/admin/clubs/reports`, { waitUntil: "load" });
+    log("review page h1/h2:", await page.locator("h1, h2").allInnerTexts().then((t: string[]) => t.slice(0, 4)), "title:", await page.title());
+    log("back link:", await page.getByRole("link", { name: /Back to Monthly Records/ }).count());
+    log("aria-current on review:", await page.locator("[aria-current=page]").allInnerTexts());
+    await shot("review-monthly-records");
+
+    // 3. Calendar admin filters
+    for (const q of ["", "?category=Youth", "?category=__none__"]) {
+      const reqs: string[] = [];
+      const onReq = (r: { url(): string }) => { if (/\/api\/.*calendar/.test(r.url())) reqs.push(r.url().replace(J.baseUrl, "")); };
+      page.on("request", onReq);
+      await page.goto(`${J.baseUrl}/admin/calendar${q}`, { waitUntil: "load" });
+      await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => undefined);
+      page.off("request", onReq);
+      const summary = await page.locator("main").innerText().then((t: string) => t.replace(/\s+/g, " ").slice(0, 300)).catch(() => "");
+      const rows = await page.locator("main table tbody tr, main [data-testid*=row], main li").count();
+      log(`calendar ${q || "(none)"}: api calls`, reqs, "rows", rows, "|", summary);
+      await shot(`calendar-admin${q.replace(/[^a-z_]/gi, "-")}`);
+    }
+    const selects = await page.locator("main select").evaluateAll((els: HTMLSelectElement[]) => els.map((s) => `${s.name || s.id}: ${[...s.options].map((o) => o.text).slice(0, 14).join("/")}`));
+    log("calendar selects:", selects);
+    // feed category select
+    const feedTab = page.getByRole("tab", { name: /Imported calendars/ }).or(page.getByRole("link", { name: /Imported calendars/ })).first();
+    if (await feedTab.isVisible().catch(() => false)) {
+      await feedTab.click(); await page.waitForTimeout(1500);
+      const sel = await page.locator("select").evaluateAll((els: HTMLSelectElement[]) => els.map((s) => `${(s.labels?.[0]?.innerText ?? s.name)}: ${[...s.options].map((o) => o.text).join("/")}`));
+      log("imported calendars selects:", sel);
+      await shot("calendar-feeds");
+    } else log("Imported calendars tab not found");
+    log("errors:", errs);
+    await context.close();
+  }
+  await browser.close();
+  await J.revokeStaffSessions(staffTokens);
+}
+main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });

@@ -47,6 +47,16 @@ function fieldOf(formKey: string, fieldKey: string) {
   if (!field) throw new Error(`${formKey} has no ${fieldKey} field`);
   return field;
 }
+/** The kitchen questions both retreat forms ask (#1665): a required allergy answer and an optional four-choice diet. */
+function expectFoodAllergyAndDiet(formKey: string) {
+  const allergies = fieldOf(formKey, "food_allergies");
+  expect(allergies).toMatchObject({ type: "TEXT", required: true, sensitive: true, filterable: false });
+  const diet = fieldOf(formKey, "dietary_needs");
+  expect(diet).toMatchObject({ type: "MULTISELECT", required: false, sensitive: true, filterable: false });
+  expect(diet.options).toEqual(["Vegetarian", "Vegan", "Dairy-free", "Gluten-free"]);
+  expect(JSON.stringify(definitionOf(formKey))).not.toMatch(/Both|Neither/);
+}
+
 /** Test-submits a form the way the public page does: directory choices hydrated, then validated and priced. */
 function submit(key: string, responses: Record<string, unknown>, now = new Date("2027-01-15T18:00:00Z"), attendees?: Array<{ clientId: string; responses: Record<string, unknown> }>) {
   const definition = withDirectoryOptions(definitionOf(key), directory);
@@ -89,7 +99,8 @@ describe("the #606 form templates", () => {
   it("asks nothing about driving and collects no free-text medical details", () => {
     for (const key of allKeys) {
       expect(JSON.stringify(getFormTemplate(key)), key).not.toMatch(/driv|vehicle|license/i);
-      for (const field of fieldsOf(key)) {
+      // Food allergies are allowed on these forms (#1665); #408 only forbids free-text medical notes.
+      for (const field of fieldsOf(key).filter((entry) => entry.key !== "food_allergies")) {
         expect(`${field.key} ${field.label}`, `${key} ${field.key}`).not.toMatch(/medical|allerg|insurance|condition|medication|diagnos/i);
         if (/health/i.test(field.key)) expect(field.type).toBe("CHECKBOX");
       }
@@ -111,15 +122,23 @@ describe("Pathfinder Leadership Weekend", () => {
   const leader = {
     first_name: "Sam", last_name: "Sample", gender: "Male", email: "leader@example.test", club_position: "Counselor", phone: "515-555-0100", years_as_leader: 3,
     pathfinder_club: "Sample Trail Pathfinders", church_name: "Sample Hills SDA Church", training_track: "Master Guide", induction: "No", teaching_class: "No",
-    lodging: "Tent or Camper", church_billing_acknowledgment: true,
+    lodging: "Tent or Camper", food_allergies: "None", church_billing_acknowledgment: true,
   };
 
   it("has the eight tracks, the three lodging choices and the vegetarian meal checkboxes", () => {
     expect(fieldOf(key, "training_track").options).toHaveLength(8);
     expect(fieldOf(key, "lodging").options).toEqual(["Tent or Camper", "Youth Cabin", "Child under 10"]);
     expect(fieldOf(key, "meals").options).toEqual(["Friday Supper", "Sabbath Breakfast", "Sabbath Lunch", "Sabbath Supper", "Sunday Breakfast"]);
-    expect(fieldOf(key, "dietary_needs").options).toEqual(["Vegan", "Gluten Free"]);
+    expectFoodAllergyAndDiet(key);
     expect(fieldOf(key, "mailing_address").required).toBe(false);
+  });
+
+  it("requires a food allergy answer and accepts free text with any mix of the four diets", () => {
+    const missing: Record<string, unknown> = { ...leader };
+    delete missing.food_allergies;
+    expect(submit(key, missing).isValid).toBe(false);
+    expect(submit(key, { ...leader, food_allergies: "Synthetic shellfish allergy", dietary_needs: ["Vegetarian", "Gluten-free"] }).isValid).toBe(true);
+    expect(submit(key, { ...leader, dietary_needs: ["Gluten Free"] }).isValid).toBe(false);
   });
 
   it("charges the early-bird prices until August 24 and the regular prices from then, with the child price unchanged", () => {
@@ -154,13 +173,13 @@ describe("TLT Retreat", () => {
   const key = "tlt_retreat";
   const participant = {
     first_name: "Tay", last_name: "Sample", email: "tlt@example.test", tlt_year: "Year 2", club_name: "Sample Trail Pathfinders",
-    club_director_name: "Alex Sample", club_director_email: "director@example.test", dietary_needs: "Neither",
+    club_director_name: "Alex Sample", club_director_email: "director@example.test", food_allergies: "None",
     application_approved_acknowledgment: true, health_record_acknowledgment: true, chaperone_acknowledgment: true,
   };
 
-  it("has the six TLT years and the four dietary choices, and is free", () => {
+  it("has the six TLT years and the food allergy and diet questions, and is free", () => {
     expect(fieldOf(key, "tlt_year").options).toEqual(["Year 1", "Year 2", "Year 3", "Year 4", "Staff/Chaperone", "Area Coordinator/Teacher"]);
-    expect(fieldOf(key, "dietary_needs").options).toEqual(["Vegan", "Gluten Free", "Both", "Neither"]);
+    expectFoodAllergyAndDiet(key);
     expect(JSON.stringify(definitionOf(key))).not.toMatch(/priceCents|choicePricesCents|CALCULATED/);
     const starter = starterEventTemplates.find((entry) => entry.starterKey === key)!;
     expect(starter).toMatchObject({ audience: "GENERAL", billingMode: "ATTENDEE_PAY" });
@@ -177,6 +196,14 @@ describe("TLT Retreat", () => {
     }
     expect(fieldOf(key, "recommendation_forms")).toMatchObject({ required: false, options: ["Yes", "N/A"] });
     expect(submit(key, { ...participant, recommendation_forms: "Yes" }).isValid).toBe(true);
+  });
+
+  it("requires a food allergy answer, takes free text, and accepts any mix of the four diets", () => {
+    const missing: Record<string, unknown> = { ...participant };
+    delete missing.food_allergies;
+    expect(submit(key, missing).isValid).toBe(false);
+    expect(submit(key, { ...participant, food_allergies: "Synthetic peanut allergy", dietary_needs: ["Vegan", "Dairy-free"] }).isValid).toBe(true);
+    expect(submit(key, { ...participant, dietary_needs: ["Both"] }).isValid).toBe(false);
   });
 
   it("lets an Area Coordinator or teacher skip the club and director, and nobody else", () => {
@@ -511,7 +538,7 @@ describe("number checks (#606)", () => {
     const leader = {
       first_name: "Sam", last_name: "Sample", gender: "Male", email: "leader@example.test", club_position: "Counselor", phone: "515-555-0100", years_as_leader: 3,
       pathfinder_club: "Sample Trail Pathfinders", church_name: "Sample Hills SDA Church", training_track: "Master Guide", induction: "No", teaching_class: "No",
-      lodging: "Tent or Camper", church_billing_acknowledgment: true,
+      lodging: "Tent or Camper", food_allergies: "None", church_billing_acknowledgment: true,
     };
     expect(submit(key, leader).isValid).toBe(true);
     expect(submit(key, { ...leader, years_as_leader: 2.5 }).isValid).toBe(false);

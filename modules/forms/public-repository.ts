@@ -192,7 +192,7 @@ export type ClubSubmissionContext = {
       // the created attendee's profileSnapshot as `clubGuestId` so a later
       // reopen-and-amend (H3b, #366) can match this attendee back to the
       // same extra person instead of creating a duplicate.
-      guest?: { email: string | null; attendeeType: "ADULT" | "YOUTH"; guestId: string };
+      guest?: { email: string | null; attendeeType: "ADULT" | "YOUTH" | "UNDERAGE"; guestId: string };
     }>;
   }>;
 };

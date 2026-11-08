@@ -18,6 +18,7 @@ import {
 } from "@/modules/invoices/repository";
 import { invoiceActionSchema } from "@/modules/invoices/schemas";
 import { churchOfPromoInvoice, prepareChurchCodeInvoiceDraft } from "@/modules/promo-codes/church-invoice-repository";
+import { churchOfClubOrdersInvoice, prepareClubOrdersInvoiceDraft } from "@/modules/club-orders/conference-invoice-repository";
 import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 
@@ -63,6 +64,9 @@ async function postHandler(request: Request, context: RouteContext) {
         // A church's promo code draft (#399) is rebuilt from its redemptions, not from a reconciliation.
         const churchId = await churchOfPromoInvoice(eventId, body.invoiceId);
         if (churchId) return Response.json(await prepareChurchCodeInvoiceDraft({ eventId, churchId, actorUserId, requireDraft: true }));
+        // A church's conference club orders invoice (#1688) is rebuilt from its filled orders.
+        const ordersChurchId = await churchOfClubOrdersInvoice(eventId, body.invoiceId);
+        if (ordersChurchId) return Response.json(await prepareClubOrdersInvoiceDraft({ eventId, churchId: ordersChurchId, actorUserId, requireDraft: true }));
         return Response.json(await regenerateInvoiceDraft({ eventId, invoiceId: body.invoiceId, actorUserId }));
       }
       case "discard":
@@ -73,6 +77,11 @@ async function postHandler(request: Request, context: RouteContext) {
           // Only a change to the redemptions revises a church promo code invoice (#399); a contact-only revision is not offered yet.
           if (body.mode === "CONTACT_ONLY") throw new InvoiceError("A church promo code invoice is revised from the church report when its redemptions change.", "CHURCH_CODE_INVOICE_UNSUPPORTED");
           return Response.json(await prepareChurchCodeInvoiceDraft({ eventId, churchId, actorUserId, revisionReason: body.reason }));
+        }
+        const ordersChurchId = await churchOfClubOrdersInvoice(eventId, body.invoiceId);
+        if (ordersChurchId) {
+          if (body.mode === "CONTACT_ONLY") throw new InvoiceError("A conference club orders invoice is revised from Conference club orders when more orders are filled.", "CHURCH_CODE_INVOICE_UNSUPPORTED");
+          return Response.json(await prepareClubOrdersInvoiceDraft({ eventId, churchId: ordersChurchId, actorUserId, revisionReason: body.reason }));
         }
         return Response.json(await reviseInvoice({ eventId, invoiceId: body.invoiceId, mode: body.mode, reason: body.reason, actorUserId }));
       }

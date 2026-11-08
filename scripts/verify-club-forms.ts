@@ -25,7 +25,17 @@
  *   hash, single use holds when many submits race (exactly one submission),
  *   expiry, withdrawal, a link that lost its email delivery, a submit racing a
  *   withdrawal, another club's link, and the real rate limits;
- * - the staff CSV has no sensitive column and no sensitive text.
+ * - the staff CSV has no sensitive column and no sensitive text;
+ * - the emergency contact and physician/clinic answers of the slip and the
+ *   passenger list are plain (owner decision, 2026-11-07): the sync applies the
+ *   new versions, `unsealEmergencyAnswers` (dry run, then execute, then again)
+ *   moves existing answers out of the sealed value and keeps everything else
+ *   sealed, and Area Coordinators, staff and the CSV read them;
+ * - outing permission slips (#1672): off until a system administrator turns the slip
+ *   on, refused birth-date and medical questions, a director's send to the chosen
+ *   family's own link (the migration's table and column on a real database), the
+ *   parent's read-only details and server-set answers, the club's questions in the
+ *   view an Area Coordinator opens, who has signed, and closing withdrawing links.
  *
  * Uses fictitious rows it creates and removes itself.
  *
@@ -52,6 +62,7 @@ const accounts = { a: `${P}_acct_a`, b: `${P}_acct_b`, area: `${P}_acct_area` };
 const SLIP = "off_premises_permission_slip";
 const STAFF_FORM = "pathfinder_staff_service_information";
 const PASSENGERS = "transportation_passenger_list";
+const LEGACY_SLIP_SENSITIVE = ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"];
 const templateKeys = [SLIP, STAFF_FORM, PASSENGERS, "pathfinder_membership_application"];
 const BUILDER_PREFIX = "cf712_";
 const TLT_APPLICATION = "club_tlt_application";
@@ -80,12 +91,13 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest("hex
 async function cleanup() {
   const links = await prisma.clubFormLink.findMany({ where: { organizationId: { in: clubIds } }, select: { id: true, messageId: true } });
   const submissions = await prisma.clubFormSubmission.findMany({ where: { organizationId: { in: clubIds } }, select: { id: true } });
+  const outingRows = await prisma.clubFormOuting.findMany({ where: { organizationId: { in: clubIds } }, select: { id: true } });
   const applications = await prisma.clubFormSubmission.findMany({ where: { idempotencyKey: { startsWith: applicationKeyPrefix } }, select: { id: true } });
   const templates = await prisma.clubFormTemplate.findMany({ where: { OR: [{ key: { in: [...templateKeys, TLT_APPLICATION, CAN_COLLECTING] } }, { key: { startsWith: BUILDER_PREFIX } }] }, select: { id: true } });
   await prisma.auditLog.deleteMany({
     where: {
       OR: [
-        { entityId: { in: [...links, ...submissions, ...applications].map((row) => row.id) } },
+        { entityId: { in: [...links, ...submissions, ...applications, ...outingRows].map((row) => row.id) } },
         { actorUserId: { in: Object.values(users) } },
         { entityId: { in: templates.map((row) => row.id) }, entityType: "ClubFormTemplate", actorUserId: { in: Object.values(users) } },
       ],
@@ -94,6 +106,7 @@ async function cleanup() {
   await prisma.clubFormSubmission.deleteMany({ where: { OR: [{ organizationId: { in: clubIds } }, { idempotencyKey: { startsWith: applicationKeyPrefix } }] } });
   await prisma.clubFormOpenLinkYear.deleteMany({ where: { template: { key: TLT_APPLICATION } } });
   await prisma.clubFormLink.deleteMany({ where: { organizationId: { in: clubIds } } });
+  await prisma.clubFormOuting.deleteMany({ where: { organizationId: { in: clubIds } } });
   await prisma.messageOutbox.deleteMany({ where: { OR: [{ id: { in: links.flatMap((link) => (link.messageId ? [link.messageId] : [])) } }, { recipientEmail: { endsWith: `@${emailDomain}` } }] } });
   await prisma.rateLimitBucket.deleteMany({ where: { policy: { startsWith: "club-form." } } });
   // Templates made in the builder (#712) belong to this script: remove them with their versions.
@@ -102,6 +115,11 @@ async function cleanup() {
   await prisma.clubFormTemplate.deleteMany({ where: { id: { in: builderTemplateIds } } });
   // Templates are shared rows: leave them, but switch every one back off.
   await prisma.clubFormTemplate.updateMany({ where: { key: { in: [...templateKeys, TLT_APPLICATION, CAN_COLLECTING] } }, data: { enabled: false, enabledAt: null, enabledByUserId: null, requirement: "NOT_REQUIRED", requiredRoles: [], requirementChangedAt: null, requirementChangedByUserId: null } });
+  // The slip's stored keys follow the code's seed again (this script lists the old ones while it runs).
+  const { clubFormTemplateSeeds: codeSeeds } = await import("../modules/club-forms/definitions");
+  for (const seed of codeSeeds.filter((candidate) => [SLIP, PASSENGERS].includes(candidate.key))) {
+    await prisma.clubFormTemplate.updateMany({ where: { key: seed.key }, data: { sensitiveFieldKeys: seed.sensitiveFieldKeys, customizedAt: null } });
+  }
   // "Who fills it in" is the sync's again: back to the code's default, with no staff change recorded (#1229).
   const { clubFormTemplateSeeds } = await import("../modules/club-forms/definitions");
   for (const seed of clubFormTemplateSeeds.filter((candidate) => [TLT_APPLICATION, CAN_COLLECTING].includes(candidate.key))) {
@@ -203,6 +221,10 @@ async function main() {
   );
   for (const key of templateKeys) await templates.setClubFormTemplateEnabled(key, true, users.admin);
   assert((await templates.listEnabledClubFormTemplates()).filter((row) => templateKeys.includes(row.key)).length === 4, "an enabled form shows to clubs");
+  // The seeded slip's physician and emergency answers are plain (owner decision, 2026-11-07). The sealing, audit and
+  // restriction rules below are the same for any sensitive key, so until section 12 the stored slip row lists the old
+  // keys, as a copy edited in the app that still seals them would. Section 12 runs the real decision end to end.
+  await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { sensitiveFieldKeys: LEGACY_SLIP_SENSITIVE } });
   const slipRow = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: SLIP } });
   assert(slipRow.enabledByUserId === users.admin && slipRow.enabledAt, "who turned it on and when is recorded");
   assert(await prisma.auditLog.count({ where: { action: "CLUB_FORM_TEMPLATE_ENABLED", entityId: slipRow.id, actorUserId: users.admin } }) === 1, "turning a form on is audited once");
@@ -784,6 +806,12 @@ async function main() {
     assert(discarded.draft === null && discarded.draftBaseVersion === null, "discarding clears a stale draft");
 
     // A customized template ignores the code's definition, but a key the code added as sensitive is still sealed.
+    // The seeded slip no longer lists sensitive keys (2026-11-07), so for this check the seed lists the old ones, as a code seed adding a key would.
+    const { clubFormTemplateSeeds: seedsInCode } = await import("../modules/club-forms/definitions");
+    const slipSeedInCode = seedsInCode.find((seed) => seed.key === SLIP)! as { sensitiveFieldKeys: string[] };
+    const realSeedKeys = slipSeedInCode.sensitiveFieldKeys;
+    slipSeedInCode.sensitiveFieldKeys = LEGACY_SLIP_SENSITIVE;
+    try {
     await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { customizedAt: new Date(), sensitiveFieldKeys: original.sensitiveFieldKeys.filter((key) => key !== "physician_name") } });
     const plainStored = await prisma.clubFormSubmission.create({
       data: {
@@ -795,6 +823,9 @@ async function main() {
     const sealedNow = await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: plainStored.id } });
     assert(!(sealedNow.answers as Record<string, unknown>).physician_name && sealedNow.sealedSensitiveAnswers !== null && sealed.openSensitiveAnswers(plainStored.id, sealedNow.sealedSensitiveAnswers).physician_name === SECRET_PHYSICIAN, "the sync seals a key the code added for a template edited in the app");
     assert((await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: SLIP } })).sensitiveFieldKeys.includes("physician_name"), "the stored sensitive keys gained the code's key");
+    } finally {
+      slipSeedInCode.sensitiveFieldKeys = realSeedKeys;
+    }
   } finally {
     await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { name: original.name, version: original.version, customizedAt: original.customizedAt, sensitiveFieldKeys: original.sensitiveFieldKeys, draft: Prisma.DbNull, draftUpdatedAt: null, draftBaseVersion: null } });
   }
@@ -923,6 +954,169 @@ async function main() {
   // Club forms and links block deleting a club.
   const deletion = await orgRepository.getOrganizationDeletionCheck(clubs.a);
   assert(deletion.blockers.some((blocker) => /club form/i.test(blocker) && /private link/i.test(blocker)), "the club deletion check counts club forms and links");
+
+  // 13. Emergency and physician answers are plain (owner decision, 2026-11-07; ADR 0005 Addendum G) --------------
+  {
+    const emergency = await import("../modules/club-forms/unseal-emergency");
+    const { clubFormTemplateSeeds: seeds } = await import("../modules/club-forms/definitions");
+    const slipSeed = seeds.find((seed) => seed.key === SLIP)!;
+    const listSeed = seeds.find((seed) => seed.key === PASSENGERS)!;
+    const OLD_PASSENGER_KEYS = Array.from({ length: 20 }, (_, index) => `passenger_${index + 1}_emergency_contact`);
+    const PASSENGER_CONTACT = "Pat Verify (515) 555-0123";
+    const rawRows = async (ids: string[]) => prisma.$queryRaw<Array<{ id: string; text: string }>>`SELECT s.id, s::text AS text FROM "ClubFormSubmission" s WHERE s.id IN (${Prisma.join(ids)}) ORDER BY s.id`;
+
+    // The state before the decision: the slip is a copy edited in the app that seals the five keys and one more
+    // (so a sealed answer remains afterwards), the passenger list is the old version 1 that seals the contacts.
+    await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { customizedAt: new Date(), sensitiveFieldKeys: [...LEGACY_SLIP_SENSITIVE, "activity"] } });
+    await prisma.clubFormTemplate.update({ where: { key: PASSENGERS }, data: { sensitiveFieldKeys: OLD_PASSENGER_KEYS } });
+    const onlyEmergency = await submissions.saveClubFormSubmission(directorA, { organizationId: clubs.a, templateKey: SLIP, answers: { ...slipAnswers, activity: "Hike" }, submit: true });
+    const roster = await submissions.saveClubFormSubmission(directorA, {
+      organizationId: clubs.a, templateKey: PASSENGERS, answers: { contact_name: "Dana Verify", contact_cell: "515-555-0120", driver_name: "Drew Verify", driver_cell: "515-555-0121", passenger_1_name: "Riley Verify", passenger_1_emergency_contact: PASSENGER_CONTACT }, submit: true,
+    });
+    const before = await rawRows([onlyEmergency.id, roster.id, birthForm.id]);
+    assert(before.every((row) => !row.text.includes(SECRET_PHYSICIAN) && !row.text.includes(PASSENGER_CONTACT)), "before the change the emergency answers are sealed");
+    await prisma.clubFormTemplate.update({ where: { key: PASSENGERS }, data: { version: listSeed.version - 1 } });
+
+    // The script refuses while a template still lists the keys, and the dry run changes nothing.
+    const early = await emergency.unsealEmergencyAnswers(prisma);
+    assert(early.templates.find((item) => item.templateKey === SLIP)?.status === "NOT_SYNCED", "the script waits for the sync on a template that still seals the keys");
+    const syncResult = await templates.syncClubFormTemplates(prisma, { continueOnRefusal: true });
+    assert(syncResult.refused.length === 0, "the sync applies the change without refusing");
+    const slipAfterSync = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: SLIP } });
+    assert(slipAfterSync.sensitiveFieldKeys.join() === "activity", "a copy edited in the app loses exactly the emergency keys and keeps the others");
+    const listAfterSync = await prisma.clubFormTemplate.findUniqueOrThrow({ where: { key: PASSENGERS } });
+    assert(listAfterSync.version === listSeed.version && listAfterSync.sensitiveFieldKeys.length === 0, "the passenger list is at its new version with no sensitive keys");
+    assert(JSON.stringify(await rawRows([onlyEmergency.id, roster.id, birthForm.id])) === JSON.stringify(before), "the sync moved no answer");
+
+    // Between the sync and the script an Area Coordinator sees Restricted for the still-sealed answers, not a blank.
+    const waiting = await submissions.getSubmissionForViewer(area, onlyEmergency.id);
+    assert(waiting.restrictedKeys.includes("physician_name") && !("physician_name" in waiting.answers), "before the script runs, a viewer who cannot open the sealed value sees Restricted for the emergency answers");
+    await expectCode(emergency.unsealEmergencyAnswers(prisma, { execute: true }), "INVALID_TEMPLATE", "an executed run needs an actor");
+
+    const dry = await emergency.unsealEmergencyAnswers(prisma);
+    const dryRows = dry.templates.filter((item) => [SLIP, PASSENGERS].includes(item.templateKey));
+    assert(dryRows.every((item) => item.status === "DRY_RUN") && dryRows.every((item) => item.submissionsMoved >= 1), "the dry run reports what it would move");
+    assert(JSON.stringify(await rawRows([onlyEmergency.id, roster.id, birthForm.id])) === JSON.stringify(before), "the dry run changes nothing");
+    assert(await prisma.auditLog.count({ where: { action: "CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED", entityId: { in: [slipAfterSync.id, listAfterSync.id] }, createdAt: { gte: reqAuditSince } } }) === 0, "the dry run writes no audit row");
+
+    const done = await emergency.unsealEmergencyAnswers(prisma, { execute: true, actorUserId: users.sysAdmin });
+    assert(done.templates.filter((item) => [SLIP, PASSENGERS].includes(item.templateKey)).every((item) => item.status === "DONE"), "the run completes");
+    const movedSlip = await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: onlyEmergency.id } });
+    const slipAnswersNow = movedSlip.answers as Record<string, unknown>;
+    assert(slipAnswersNow.physician_name === SECRET_PHYSICIAN && slipAnswersNow.emergency_contact_phone === SECRET_PHONE, "the slip's answers are now plain");
+    assert(movedSlip.hasSensitiveAnswers && movedSlip.sealedSensitiveAnswers !== null && JSON.stringify(sealed.openSensitiveAnswers(movedSlip.id, movedSlip.sealedSensitiveAnswers)) === JSON.stringify({ activity: "Hike" }), "only the other sealed answer stays sealed");
+    const movedList = await prisma.clubFormSubmission.findUniqueOrThrow({ where: { id: roster.id } });
+    assert((movedList.answers as Record<string, unknown>).passenger_1_emergency_contact === PASSENGER_CONTACT && movedList.sealedSensitiveAnswers === null && !movedList.hasSensitiveAnswers, "the passenger contact is plain and the emptied sealed value is dropped");
+    const staffRowAfter = (await rawRows([birthForm.id]))[0];
+    assert(staffRowAfter.text === before.find((row) => row.id === birthForm.id)!.text, "another form's sealed answers are untouched");
+    const unsealAudit = await prisma.auditLog.findMany({ where: { action: "CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED", entityId: { in: [slipAfterSync.id, listAfterSync.id] }, createdAt: { gte: reqAuditSince } } });
+    assert(unsealAudit.length === 2 && JSON.stringify(unsealAudit).indexOf(SECRET_PHYSICIAN) < 0 && JSON.stringify(unsealAudit).indexOf(PASSENGER_CONTACT) < 0, "each template is audited once, with counts and no answer");
+    assert(unsealAudit.every((entry) => entry.actorUserId === users.sysAdmin), "the audit rows name the user who ran it");
+
+    const afterRun = await rawRows([onlyEmergency.id, roster.id, birthForm.id]);
+    const again = await emergency.unsealEmergencyAnswers(prisma, { execute: true, actorUserId: users.sysAdmin });
+    assert(again.templates.every((item) => item.submissionsMoved === 0) && JSON.stringify(await rawRows([onlyEmergency.id, roster.id, birthForm.id])) === JSON.stringify(afterRun), "a second run changes nothing");
+
+    // Everyone who can see the form sees the answers; the other sealed answer stays Restricted; the CSV has the columns.
+    const areaPlain = await submissions.getSubmissionForViewer(area, onlyEmergency.id);
+    assert(areaPlain.answers.physician_name === SECRET_PHYSICIAN && areaPlain.answers.emergency_contact_phone === SECRET_PHONE, "an Area Coordinator now reads the physician and emergency answers");
+    assert(areaPlain.restrictedKeys.join() === "activity" && !("activity" in areaPlain.answers), "the other sealed answer is still Restricted for an Area Coordinator");
+    const areaList = await submissions.getSubmissionForViewer(area, roster.id);
+    assert(areaList.answers.passenger_1_emergency_contact === PASSENGER_CONTACT && areaList.restrictedKeys.length === 0, "an Area Coordinator reads the passenger emergency contact");
+    const planCsv = await csv.buildClubFormsCsv(eventAdmin, { templateKey: PASSENGERS });
+    assert(planCsv.csv.includes(PASSENGER_CONTACT) && planCsv.csv.includes("Passenger 1 emergency contact"), "the CSV carries the passenger emergency contacts");
+    const slipExport = await csv.buildClubFormsCsv(eventAdmin, { templateKey: SLIP });
+    assert(slipExport.csv.includes(SECRET_PHYSICIAN) && slipExport.csv.includes("Physician's name") && !slipExport.csv.includes("Hike"), "the slip CSV carries the physician and emergency answers but not the sealed activity");
+
+    // Put the shared rows back as the sync leaves them.
+    await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { customizedAt: null, sensitiveFieldKeys: slipSeed.sensitiveFieldKeys } });
+  }
+
+  // 12. Outing permission slips (#1672) --------------------------------------
+  {
+    const outings = await import("../modules/club-forms/outings");
+    const outingInput = {
+      details: { activity: "Verify canoe trip", startDate: "2026-11-21", endDate: "", departureTime: "08:30", returnTime: "16:45", transportation: "Church van", cost: "$15", whatToBring: "Lunch", note: "" },
+      questions: [
+        { label: "Can your child swim?", type: "YES_NO", required: true, options: [] },
+        { label: "T-shirt size", type: "CHOICE", required: false, options: ["Small", "Medium", "Large"] },
+      ],
+    };
+    await templates.setClubFormTemplateEnabled(SLIP, false, users.admin);
+    await expectCode(outings.createOuting(directorA, clubs.a, outingInput), "SLIP_TEMPLATE_OFF", "an outing can't be created while the slip is off");
+    assert((await outings.getOutingSlipAvailability()).enabled === false, "the director's page can tell the slip is off");
+    await templates.setClubFormTemplateEnabled(SLIP, true, users.admin);
+    await expectCode(outings.createOuting(directorA, clubs.a, { ...outingInput, questions: [{ label: "Child's birth date", type: "TEXT", required: false, options: [] }] }), "VALIDATION_FAILED", "a birth-date question is refused");
+    await expectCode(outings.createOuting(directorA, clubs.a, { ...outingInput, questions: [{ label: "Any medical conditions?", type: "YES_NO", required: false, options: [] }] }), "VALIDATION_FAILED", "a medical question is refused");
+    assert(await prisma.clubFormOuting.count({ where: { organizationId: clubs.a } }) === 0, "a refused outing writes nothing");
+
+    const created = await outings.createOuting(directorA, clubs.a, outingInput);
+    const outingRow = await prisma.clubFormOuting.findUniqueOrThrow({ where: { id: created.outingId } });
+    assert(outingRow.organizationId === clubs.a && outingRow.status === "OPEN" && outingRow.clubYear === clubYear, "the outing belongs to the club and year");
+    await expectCode(outings.createOuting(directorB, clubs.a, outingInput), "FORBIDDEN", "another club's director can't create one for this club");
+    await expectCode(outings.getOutingTracking(directorB, clubs.b, created.outingId), "OUTING_NOT_FOUND", "another club's outing id is not found");
+    for (const viewer of [area, sysAdmin, eventAdmin]) {
+      await expectCode(outings.getOutingTracking(viewer, clubs.a, created.outingId), "FORBIDDEN", "only the club's director and deputy manage an outing");
+      await expectCode(outings.sendOuting(viewer, clubs.a, created.outingId, { memberIds: [rileyRow.id] }), "FORBIDDEN", "only the club's director and deputy send an outing");
+    }
+
+    // A member with no parent email is reported, not sent; with one, the family gets its own link.
+    const none = await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id] });
+    assert(none.sent === 0 && none.results[0].outcome === "NO_PARENT_EMAIL", "a member with no parent email on the roster is skipped");
+    await prisma.clubRosterGuardian.create({ data: { rosterMemberId: rileyRow.id, position: 1, name: "Pat Verify", relationship: "Parent", email: `Outing.Parent@${emailDomain}` } });
+    const sent = await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id, otherClubRow.id] });
+    assert(sent.sent === 1 && sent.results.find((row) => row.memberId === otherClubRow.id)?.outcome === "NOT_FOUND", "the other club's member is not found");
+    const outingLink = await prisma.clubFormLink.findFirstOrThrow({ where: { outingId: created.outingId } });
+    assert(outingLink.organizationId === clubs.a && outingLink.rosterMemberId === rileyRow.id && outingLink.recipientEmail === `outing.parent@${emailDomain}`, "the link is the family's own, to the roster's parent email");
+    assert((await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id] })).results[0].outcome === "ALREADY_SENT", "a live link is not sent twice without Resend");
+    assert(!(await links.listClubFormLinks(directorA, clubs.a)).some((row) => row.id === outingLink.id), "an outing's links are not in the ordinary private links list");
+
+    const outingMessage = await prisma.messageOutbox.findUniqueOrThrow({ where: { id: outingLink.messageId! } });
+    assert(outingMessage.recipientEmail === `outing.parent@${emailDomain}` && outingMessage.bodyTextSnapshot.includes("Verify canoe trip"), "one email goes to the one family and names the outing");
+    const outingPrepared = await linkEmail.prepareClubFormLinkBodyForDelivery({ messageId: outingLink.messageId!, bodyText: outingMessage.bodyTextSnapshot, now });
+    const outingToken = /\/club-forms\/([A-Za-z0-9_-]+)/.exec(outingPrepared.bodyText)![1];
+
+    // The parent's page: the details are read-only text, the slip's own sections are untouched, the club's questions are asked.
+    const parentView = await links.resolveClubFormLinkForFill(outingToken);
+    assert(parentView.outing?.detailRows.some((row) => row.value === "Verify canoe trip") === true, "the parent sees the outing's details");
+    const parentKeys = parentView.form.definition.sections.flatMap((section) => section.fields.map((field) => field.key));
+    assert(!["activity", "activity_date", "ride_with"].some((key) => parentKeys.includes(key)), "the parent has no field to type the three details");
+    assert(parentKeys.includes("outing_q_1") && parentKeys.includes("outing_q_2") && parentKeys.includes("emergency_contact_phone") && parentKeys.includes("parent_signature"), "the club's questions and the slip's required fields are asked");
+    const parentAnswers: Record<string, unknown> = { ...slipAnswers };
+    for (const key of ["activity", "activity_date", "ride_with", "physician_name"]) delete parentAnswers[key];
+    await expectCode(links.submitClubFormViaLink(outingToken, { ...parentAnswers, emergency_contact_phone: "" }), "VALIDATION_FAILED", "the slip's required sections are still required");
+    await expectCode(links.submitClubFormViaLink(outingToken, { ...parentAnswers, outing_q_2: "Medium" }), "VALIDATION_FAILED", "the club's required question is still required");
+    await links.submitClubFormViaLink(outingToken, { ...parentAnswers, outing_q_1: "Yes", outing_q_2: "Medium", activity: "Something else", ride_with: "A stranger" });
+    const outingSubmission = await prisma.clubFormSubmission.findFirstOrThrow({ where: { linkId: outingLink.id } });
+    const storedAnswers = outingSubmission.answers as Record<string, unknown>;
+    assert(storedAnswers.activity === "Verify canoe trip" && storedAnswers.activity_date === "2026-11-21" && storedAnswers.ride_with === "Church van", "the three details are the outing's, not the parent's");
+    assert(storedAnswers.outing_q_1 === "Yes" && storedAnswers.outing_q_2 === "Medium", "the club's answers are kept");
+
+    // Who has signed, what an Area Coordinator and the director read, and resend after a signature.
+    const tracking = await outings.getOutingTracking(directorA, clubs.a, created.outingId);
+    assert(tracking.counts.SIGNED === 1 && tracking.members[0].state === "SIGNED" && tracking.members[0].submissionId === outingSubmission.id, "the tracking list shows the family as signed");
+    assert(!JSON.stringify(tracking).includes(emailDomain), "the tracking data holds no email address");
+    assert((await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id], resend: true })).results[0].outcome === "ALREADY_SIGNED", "a signed family is never sent again");
+    const areaView = await submissions.getSubmissionForViewer(area, outingSubmission.id);
+    assert(areaView.template.definition.sections.some((section) => section.id === "sec_outing_questions") && areaView.answers.outing_q_1 === "Yes", "an Area Coordinator reads the signed slip with the club's questions");
+    assert((await outings.listOutings(directorA, clubs.a)).find((row) => row.id === created.outingId)?.counts.SIGNED === 1, "the Forms tab list counts the signed slip");
+
+    // Copy, then close: a close withdraws every link still open, and signed slips stay.
+    const copy = await outings.getOutingForCopy(directorA, clubs.a, created.outingId);
+    assert(copy.details.startDate === "" && copy.questions.length === 2, "a copy keeps the details and questions and leaves the dates empty");
+    const second = await outings.createOuting(directorA, clubs.a, { ...outingInput, details: { ...outingInput.details, activity: "Verify campout" } });
+    const secondSent = await outings.sendOuting(directorA, clubs.a, second.outingId, { memberIds: [rileyRow.id] });
+    assert(secondSent.sent === 1, "a second outing can be sent to the same member");
+    const secondLink = await prisma.clubFormLink.findFirstOrThrow({ where: { outingId: second.outingId } });
+    const secondMessage = await prisma.messageOutbox.findUniqueOrThrow({ where: { id: secondLink.messageId! } });
+    const secondPrepared = await linkEmail.prepareClubFormLinkBodyForDelivery({ messageId: secondLink.messageId!, bodyText: secondMessage.bodyTextSnapshot, now });
+    const secondToken = /\/club-forms\/([A-Za-z0-9_-]+)/.exec(secondPrepared.bodyText)![1];
+    assert((await outings.closeOuting(directorA, clubs.a, second.outingId)).closedLinks === 1, "closing withdraws the open link");
+    await expectCode(links.resolveClubFormLinkForFill(secondToken), "LINK_UNAVAILABLE", "a closed outing's link can't be opened");
+    await expectCode(links.submitClubFormViaLink(secondToken, { ...parentAnswers, outing_q_1: "Yes" }), "LINK_UNAVAILABLE", "a closed outing's link can't be submitted");
+    await expectCode(outings.sendOuting(directorA, clubs.a, second.outingId, { memberIds: [rileyRow.id] }), "OUTING_CLOSED", "a closed outing sends nothing");
+    assert(await prisma.clubFormSubmission.count({ where: { linkId: outingLink.id } }) === 1, "the signed slip stays after other outings close");
+  }
 
   console.log("Club forms verification passed.");
 }

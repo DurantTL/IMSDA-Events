@@ -201,9 +201,34 @@ describe("act-as routes for a Clubs Administrator (#1232)", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
-  it("never starts acting as an Area Coordinator: that stays system-administrator only", async () => {
+  it("starts acting as an Area Coordinator (2026-11-06), recording who and in which role, with the 2-hour window", async () => {
+    const response = await routes[0][1]();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ href: "/account/area-clubs/overview" });
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ userId: "clubs-1", staffSessionId: "staff-session-3", role: "AREA_COORDINATOR", organizationId: null }),
+    }));
+    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({
+      action: "ACT_AS_AREA_COORDINATOR",
+      actorUserId: "clubs-1",
+      metadata: { actorRole: "CLUBS_ADMINISTRATOR" },
+    });
+    const data = mocks.create.mock.calls[0]![0].data as { startedAt: Date; expiresAt: Date };
+    expect(data.expiresAt.getTime() - data.startedAt.getTime()).toBe(2 * 3_600_000);
+  });
+
+  it("refuses an Area Coordinator start once the grant is revoked, and for an event administrator or other staff", async () => {
+    mocks.grantFindFirst.mockResolvedValue(null);
+    expect((await routes[0][1]()).status).toBe(403);
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "event-1", email: "e@example.test", displayName: "Event", globalRole: "EVENT_ADMIN" }, sessionId: "s9" });
     expect((await routes[0][1]()).status).toBe(403);
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("records a system administrator's Area Coordinator start without the Clubs Administrator marker", async () => {
+    mocks.getCurrentSession.mockResolvedValue(admin);
+    expect((await routes[0][1]()).status).toBe(200);
+    expect(mocks.writeAuditLog.mock.calls[0]![0].metadata).not.toHaveProperty("actorRole");
   });
 
   it("stops acting, and lands on a page a Clubs Administrator can open", async () => {

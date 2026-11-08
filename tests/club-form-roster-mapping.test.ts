@@ -55,7 +55,7 @@ describe("the seeded mappings (#721)", () => {
   });
 
   it("bump the version so the sync brings stored templates up to date", () => {
-    expect(membership.version).toBe(3);
+    expect(membership.version).toBe(4);
     expect(staffForm.version).toBe(4);
   });
 

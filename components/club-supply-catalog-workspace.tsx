@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ExportLink } from "@/components/export-link";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useMemo, useState } from "react";
@@ -10,6 +11,8 @@ import type { ClubSupplyImportSummary, MergedNumberConflict, RepeatedCatalogNumb
 import { type ClubSupplySection, clubSupplySectionLabels, clubSupplySections } from "@/modules/club-supplies/domain";
 import type { ClubSupplyItemRecord } from "@/modules/club-supplies/repository";
 import { EmptyState } from "@/components/empty-state";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import { Money } from "@/components/exact-value";
 
 type PreviewStep = {
   line: number;
@@ -63,6 +66,15 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
   const [section, setSection] = useState<ClubSupplySection | "">("");
   const search = useClientSearch();
   const [toggling, setToggling] = useState<string | null>(null);
+  // Who supplies an item and its price (#1688): the one item being edited, and what has been typed.
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draftSupplier, setDraftSupplier] = useState<"ADVENTSOURCE" | "CONFERENCE">("ADVENTSOURCE");
+  const [draftPrice, setDraftPrice] = useState("");
+  const [priceError, setPriceError] = useState("");
+  // A changed supplier or price that is not saved yet.
+  const editedItem = editing ? items.find((item) => item.id === editing) : undefined;
+  const originalPrice = editedItem?.unitPriceCents == null ? "" : (editedItem.unitPriceCents / 100).toFixed(2);
+  useUnsavedChangesGuard(Boolean(editedItem) && (draftSupplier !== editedItem!.supplier || (draftSupplier === "CONFERENCE" && draftPrice.trim() !== originalPrice)));
 
   async function send(body: Record<string, unknown>) {
     const response = await fetch("/api/admin/club-supplies/import", {
@@ -144,6 +156,42 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
     }
   }
 
+  function startEditing(item: ClubSupplyItemRecord) {
+    setEditing(item.id);
+    setDraftSupplier(item.supplier);
+    setDraftPrice(item.unitPriceCents === null ? "" : (item.unitPriceCents / 100).toFixed(2));
+    setPriceError("");
+    setError("");
+    setNotice("");
+  }
+
+  async function saveOrdering(item: ClubSupplyItemRecord) {
+    setToggling(item.id);
+    setPriceError("");
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`/api/admin/club-supplies/${encodeURIComponent(item.id)}/ordering`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supplier: draftSupplier, unitPrice: draftSupplier === "CONFERENCE" ? draftPrice : null }),
+      });
+      const result = await response.json().catch(() => ({})) as ImportResponse;
+      if (response.status === 400 && result.error === "INVALID_PRICE") {
+        setPriceError(result.message ?? "Enter a price in dollars and cents, such as 1.25.");
+        return;
+      }
+      if (!response.ok || !result.items) throw new Error(result.message ?? "The supplier could not be saved.");
+      setItems(result.items);
+      setEditing(null);
+      setNotice(`Saved. ${item.name} is now ${draftSupplier === "CONFERENCE" ? "supplied by the conference" : "supplied by AdventSource"}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The supplier could not be saved.");
+    } finally {
+      setToggling(null);
+    }
+  }
+
   const visible = useMemo(() => {
     const text = search.term.trim().toLowerCase();
     return items.filter((item) => (!section || item.section === section)
@@ -163,7 +211,8 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
 
   return (
     <section className="page-stack">
-      <StaffPageHeader description="AdventSource items clubs order and keep in stock: insignia, event patches, uniform apparel, honor patches, and master awards. Each size is its own item because each size has its own catalog number." />
+      <StaffPageHeader description="AdventSource items clubs order and keep in stock: insignia, event patches, uniform apparel, honor patches, and master awards. Each size is its own item because each size has its own catalog number. Items the conference supplies itself (the shoulder patches and pin) are ordered from the youth department instead." />
+      <p className="field-help"><Link href="/admin/club-supplies/conference-orders">Conference club orders</Link>: the patches and pins clubs have ordered, to fill and bill to their churches.</p>
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
@@ -287,10 +336,20 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
                       {" · "}{item.catalogNumber ? <>No. <code>{item.catalogNumber}</code></> : "No catalog number"}
                       {item.sizeLabel ? ` · ${item.sizeLabel}` : ""}
                       {item.honorCode ? ` · Honor ${item.honorCode}` : ""}
+                      {" · "}{item.supplier === "CONFERENCE" ? <>Conference-supplied, {item.unitPriceCents === null ? "no price set" : <><Money cents={item.unitPriceCents} /> each</>}</> : "AdventSource"}
                     </small>
                   </span>
                   <span className={styles.itemControls}>
                     <span className={`status-chip ${item.isActive ? "green" : "gold"}`}>{item.isActive ? "Active" : "Inactive"}</span>
+                    <button
+                      aria-label={`Supplier and price: ${item.name}`}
+                      className="secondary-button"
+                      disabled={toggling === item.id}
+                      onClick={() => (editing === item.id ? setEditing(null) : startEditing(item))}
+                      type="button"
+                    >
+                      Supplier and price
+                    </button>
                     <button
                       aria-label={`${item.isActive ? "Mark inactive" : "Mark active"}: ${item.name}`}
                       className="secondary-button"
@@ -301,6 +360,26 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
                       {item.isActive ? "Mark inactive" : <><Check aria-hidden="true" size={14} /> Mark active</>}
                     </button>
                   </span>
+                  {editing === item.id && (
+                    <span className={styles.orderingEditor}>
+                      <label>
+                        Supplied by
+                        <select onChange={(event) => setDraftSupplier(event.target.value as "ADVENTSOURCE" | "CONFERENCE")} value={draftSupplier}>
+                          <option value="ADVENTSOURCE">AdventSource</option>
+                          <option value="CONFERENCE">The conference</option>
+                        </select>
+                      </label>
+                      {draftSupplier === "CONFERENCE" && (
+                        <label>
+                          Price each (dollars)
+                          <input aria-describedby={priceError ? `price-error-${item.id}` : undefined} aria-invalid={priceError ? true : undefined} inputMode="decimal" onChange={(event) => setDraftPrice(event.target.value)} placeholder="1.25" type="text" value={draftPrice} />
+                          {priceError && <small className="field-error-message" id={`price-error-${item.id}`}>{priceError}</small>}
+                        </label>
+                      )}
+                      <button className="primary-button" disabled={toggling === item.id} onClick={() => saveOrdering(item)} type="button">{toggling === item.id ? "Saving…" : "Save supplier"}</button>
+                      <button className="secondary-button" disabled={toggling === item.id} onClick={() => setEditing(null)} type="button">Cancel</button>
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

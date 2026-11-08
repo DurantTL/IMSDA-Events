@@ -212,7 +212,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
         <p className={styles.stateBar}>
           {published
             ? <span className="status-chip green">Published{published.publishedByName ? ` by ${published.publishedByName}` : ""} {when(published.publishedAt)}</span>
-            : <span className="status-chip neutral">Nothing published yet: visitors see the standard homepage</span>}
+            : <span>Nothing published yet: visitors see the standard homepage</span>}
           {dirty
             ? <span className="status-chip gold">Unsaved changes</span>
             : hasDraft && draftDiffers

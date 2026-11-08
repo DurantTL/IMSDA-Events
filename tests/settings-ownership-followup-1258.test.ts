@@ -231,7 +231,7 @@ describe("environment-managed provider status (#1258)", () => {
     for (const role of ["EVENT_ADMIN", "STAFF", null, undefined]) expect(getEnvironmentStatusForViewer({ globalRole: role })).toBeNull();
     expect(getEnvironmentStatusForViewer(null)).toBeNull();
     const page = read("app/(workspace)/admin/settings/page.tsx");
-    expect(page).toContain('user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access")');
+    expect(page).toContain('user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system")');
     expect(page).toContain("getEnvironmentStatusForViewer(user)");
   });
 

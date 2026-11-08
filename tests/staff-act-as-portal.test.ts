@@ -182,11 +182,14 @@ describe("Area Coordinator view-only pages (#442)", () => {
     await expect(areaPage()).rejects.toThrow("NOT_FOUND");
   });
 
-  it("stay closed to a Clubs Administrator, whose act-as is only ever for a club's Director (#1232)", async () => {
+  it("open to an active Clubs Administrator acting as an Area Coordinator, and closed once the grant is revoked (2026-11-06)", async () => {
     mocks.actAsFindFirst.mockResolvedValue(actingRow("AREA_COORDINATOR", null));
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
     mocks.getCurrentSession.mockResolvedValue({ ...admin, user: { ...admin.user, globalRole: null } });
     mocks.sessionFindUnique.mockResolvedValue({ ...liveStaffSession(), user: { ...liveStaffSession().user, globalRole: null } });
     mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
+    await expect(areaPage()).resolves.toBeTruthy();
+    mocks.grantFindFirst.mockResolvedValue(null);
     await expect(areaPage()).rejects.toThrow("NOT_FOUND");
   });
 });

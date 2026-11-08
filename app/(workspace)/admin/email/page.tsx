@@ -30,7 +30,7 @@ export const metadata: Metadata = { title: "Email" };
 export default async function EmailPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   const [switches, settings, eventLists, emailEvents, attention, suppressions, fileUsage] = await Promise.all([
     listNotificationSwitches(),
@@ -75,6 +75,7 @@ export default async function EmailPage() {
           supportContact: settings.supportContact,
           securityAlertEmail: settings.securityAlertEmail,
           newClubApplicationEmail: settings.newClubApplicationEmail,
+          conferenceOrdersEmail: settings.conferenceOrdersEmail,
         }}
         embedded
         events={eventLists}

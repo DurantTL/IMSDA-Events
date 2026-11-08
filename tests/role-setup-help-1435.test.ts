@@ -85,6 +85,8 @@ const CLUB_SITES: Array<[file: string, id: (typeof CLUB_SETUP_IDS)[number]]> = [
   [`${CLUB_PORTAL}health/page.tsx`, "health-none"],
   [`${CLUB_PORTAL}roster/[memberId]/health/page.tsx`, "health-role"],
   [`${CLUB_PORTAL}club-info/page.tsx`, "club-settings-role"],
+  [`${CLUB_PORTAL}roster-health/page.tsx`, "roster-health-health-off"],
+  [`${CLUB_PORTAL}roster-health/page.tsx`, "roster-health-photo-off"],
   [`${CLUB_PORTAL}roster/next-year/page.tsx`, "next-year-role"],
   ["app/(public)/account/(portal)/clubs/page.tsx", "no-clubs"],
   ["app/(public)/account/(portal)/clubs/choose/page.tsx", "no-clubs"],

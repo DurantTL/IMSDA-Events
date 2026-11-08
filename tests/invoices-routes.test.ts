@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => ({
   ensureDocument: vi.fn(),
   churchOfPromoInvoice: vi.fn(),
   prepareChurchDraft: vi.fn(),
+  churchOfClubOrdersInvoice: vi.fn(),
+  prepareClubOrdersDraft: vi.fn(),
 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: mocks.findActiveMembership, listEventsForUser: mocks.listEventsForUser }));
@@ -47,6 +49,7 @@ vi.mock("@/modules/invoices/repository", async () => {
 });
 vi.mock("@/modules/invoices/delivery-repository", () => ({ ensureInvoiceDocument: mocks.ensureDocument }));
 vi.mock("@/modules/promo-codes/church-invoice-repository", () => ({ churchOfPromoInvoice: mocks.churchOfPromoInvoice, prepareChurchCodeInvoiceDraft: mocks.prepareChurchDraft }));
+vi.mock("@/modules/club-orders/conference-invoice-repository", () => ({ churchOfClubOrdersInvoice: mocks.churchOfClubOrdersInvoice, prepareClubOrdersInvoiceDraft: mocks.prepareClubOrdersDraft }));
 vi.mock("@/modules/invoices/finalize-access", () => {
   class InvoiceAccessGrantError extends Error {
     constructor(public readonly code: string, message: string) { super(message); }
@@ -105,6 +108,8 @@ beforeEach(() => {
   mocks.grant.mockResolvedValue({ granted: true, changed: true });
   mocks.ensureDocument.mockResolvedValue({ id: "doc1" });
   mocks.churchOfPromoInvoice.mockResolvedValue(null);
+  mocks.churchOfClubOrdersInvoice.mockResolvedValue(null);
+  mocks.prepareClubOrdersDraft.mockResolvedValue({ outcome: "REFRESHED", invoiceId: "i1", versionId: "v1", revision: 0, amountDueCents: 5000, lineCount: 2 });
   mocks.prepareChurchDraft.mockResolvedValue({ outcome: "REFRESHED", invoiceId: "i1", versionId: "v1", revision: 0, amountDueCents: 5000, lineCount: 2, contactChanged: false });
 });
 
@@ -150,6 +155,26 @@ describe("POST /api/events/[eventId]/invoices", () => {
     expect(mocks.service.regenerateInvoiceDraft).not.toHaveBeenCalled();
     expect(mocks.service.reviseInvoice).not.toHaveBeenCalled();
     expect(mocks.service.finalizeInvoiceVersion).not.toHaveBeenCalled();
+  });
+
+  it("a church's conference club orders invoice (#1688) is refreshed from its filled orders, never rebuilt from a reconciliation, and a contact-only revision is refused", async () => {
+    mocks.churchOfClubOrdersInvoice.mockResolvedValue("church-a");
+    expect((await POST(request({ action: "regenerate", invoiceId: "i1" }), context())).status).toBe(200);
+    expect(mocks.prepareClubOrdersDraft).toHaveBeenLastCalledWith({ eventId: "event-a", churchId: "church-a", actorUserId: "user-finance", requireDraft: true });
+    expect((await POST(request({ action: "revise", invoiceId: "i1", mode: "FROM_RECONCILIATION", reason: "More orders filled" }), context())).status).toBe(200);
+    expect(mocks.prepareClubOrdersDraft).toHaveBeenLastCalledWith({ eventId: "event-a", churchId: "church-a", actorUserId: "user-finance", revisionReason: "More orders filled" });
+    expect((await POST(request({ action: "revise", invoiceId: "i1", mode: "CONTACT_ONLY", reason: "New treasurer" }), context())).status).toBe(409);
+    expect(mocks.prepareChurchDraft).not.toHaveBeenCalled();
+    expect(mocks.service.regenerateInvoiceDraft).not.toHaveBeenCalled();
+    expect(mocks.service.reviseInvoice).not.toHaveBeenCalled();
+    expect(mocks.service.finalizeInvoiceVersion).not.toHaveBeenCalled();
+  });
+
+  it("discarding a conference club orders draft (#1688) goes to the discard service for the event in the URL, as the finance manager", async () => {
+    mocks.churchOfClubOrdersInvoice.mockResolvedValue("church-a");
+    expect((await POST(request({ action: "discard", invoiceId: "i-orders" }), context())).status).toBe(200);
+    expect(mocks.service.discardInvoiceDraft).toHaveBeenCalledWith({ eventId: "event-a", invoiceId: "i-orders", actorUserId: "user-finance" });
+    expect(mocks.prepareClubOrdersDraft).not.toHaveBeenCalled();
   });
 
   it("MANAGE_FINANCE alone does not carry the Finalize invoices permission into finalization", async () => {

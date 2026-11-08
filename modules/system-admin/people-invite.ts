@@ -284,7 +284,7 @@ export async function invitePerson(actorUserId: string, input: PeopleInviteInput
       }
       throw error;
     }
-    if (!isAccountEmailConfigured()) result.created.signUpUrl = clubInviteSignUpUrl(email);
+    if (!isAccountEmailConfigured()) result.created.signUpUrl = clubInviteSignUpUrl(email, access.clubs.length > 0 ? "club" : "area");
   }
 
   if (staffItems) {

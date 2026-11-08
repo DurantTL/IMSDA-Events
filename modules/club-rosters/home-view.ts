@@ -33,6 +33,7 @@ export type ClubHomeMember = {
   attendeeType: keyof typeof clubRosterAttendeeTypeLabels;
   role: string | null;
   classLevel: string | null;
+  schoolGrade?: string | null;
   gender: string | null;
   age: number | null;
   reportedAge: number | null;

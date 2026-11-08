@@ -131,12 +131,12 @@ export function MfaManager({
         // Only before setup starts: once the key is on screen its own help text takes over (#568).
         <p className="quiet-copy">
           {status.required
-            ? "This account administers events, so two-step sign-in is required. You will be asked to set it up the next time you sign in."
+            ? "Your role requires two-step sign-in. You will be asked to set it up the next time you sign in."
             : attendee
               ? otherMethodAvailable
                 ? "A passkey is already set up for this account, so an authenticator is optional. Add one too if you'd like a backup."
                 : "Add an authenticator app, or set up a passkey instead — either one satisfies the requirement before this account may reach medical information or club rosters."
-              : "Turn on two-step sign-in so a leaked password is not enough to sign in as you. Accounts that administer events are required to use it."}
+              : "Turn on two-step sign-in so a leaked password is not enough to sign in as you. Accounts with an administrative or event role are required to use it."}
         </p>
       )}
 

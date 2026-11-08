@@ -35,16 +35,17 @@ export const systemRoleText: Record<SystemRoleKey, RoleText> = {
   },
   CLUBS_ADMIN: {
     name: "Clubs Administrator",
-    summary: "Looks after every club, but not events, churches or system settings.",
+    summary: "Looks after every club and runs every club event, but not other events, churches or system settings.",
     can: [
       "See club reports, points, forms and new club applications for every club.",
       "See club rosters, including birth dates.",
       "Open club health records, giving a reason that is recorded.",
       "Run club imports, invites and transfers, and keep the club catalogs.",
       "Give club roles and make someone an Area Coordinator.",
+      "Run every club event as its event administrator, with no need to be added to it.",
     ],
     cannot: [
-      "Work on events.",
+      "Work on events that are not club events, unless added to them as staff.",
       "Change churches, the conference, settings or accounts.",
     ],
   },
