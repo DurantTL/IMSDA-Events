@@ -3,7 +3,6 @@ import { moneyToolPaths } from "@/modules/payments/money-tools-model";
 import { canAccessOperationalHealth } from "@/modules/operations/access";
 import {
   canShowMoreLauncher,
-  eventFeaturesItem,
   matchesVisibility,
   navigation,
   staffPageTitles,
@@ -34,7 +33,7 @@ export type EventTabsContext = {
   permissions: readonly EventPermission[];
   eventId: string;
   isSystemAdmin: boolean;
-  /** Same inputs as the More directory, so "All event tools" shows exactly when that page has something to list. */
+  /** Same inputs as the More directory, so the Event setup tab shows exactly when that page has something to list. */
   more: Omit<MoreDirectoryContext, "eventQuery">;
   /** Features an event may turn on that would show the reserved Operations tab. None exists yet, so none is ever passed. */
   features?: { volunteers?: boolean; transportation?: boolean; groups?: boolean; sessions?: boolean; safety?: boolean };
@@ -146,13 +145,10 @@ export const eventTabSpecs: readonly TabSpec[] = [
     label: "Event setup",
     // Every other event page (Honors, Lodging, Meals, Team, Club forms ...) is an Event setup page: the tab owns what no other tab does.
     owns: ["/more", "/registration-builder", "/information-forms", "/staff"],
+    // One grouped page and no view strip (#1586): Event settings, Registration forms, Attendee setup, Event features and every other
+    // setup page are cards on it. A single view is the tab's own page, so the tab shows no views.
     views: [
-      { key: "settings", label: staffPageTitles.eventSettings, href: "/more/event-settings", visible: byNav("/more/event-settings") },
-      { key: "registration-form", label: staffPageTitles.registrationForm, href: "/registration-builder", visible: byNav("/registration-builder") },
-      { key: "attendee-setup", label: staffPageTitles.attendeeSetup, href: "/more/attendee-configuration", visible: byNav("/more/attendee-configuration") },
-      { key: "features", label: eventFeaturesItem.label, href: eventFeaturesItem.href, visible: (_, permissions) => matchesVisibility(eventFeaturesItem, permissions) },
-      // The /more directory lists every other setup page (Tags, Honors classes, Lodging, Meals, Team, Club forms ...) as grouped cards.
-      { key: "all-tools", label: "All event tools", href: "/more", visible: (context) => canShowMoreLauncher({ item: nav("/more"), ...context.more }) },
+      { key: "setup", label: "Event setup", href: "/more", visible: (context) => canShowMoreLauncher({ item: nav("/more"), ...context.more }) },
     ],
   },
   // Reserved: no route exists until the first of these features is built (#1559 decisions 7 and 8).
@@ -198,7 +194,7 @@ function isAtOrBelow(pathname: string, path: string) {
 
 /**
  * Which tab, and which of its views, a page belongs to. A page no tab names is an Event setup page and lights no view
- * (the strip shows "All event tools" as the place it came from when that view is listed).
+ * (it lights the Event setup tab, which has no view strip).
  */
 export function currentEventPlace(pathname: string, search: { get(name: string): string | null } = { get: () => null }): { tab: EventTabKey; view: string | null } {
   let best: { tab: EventTabKey; view: string | null; length: number } | null = null;
@@ -216,8 +212,8 @@ export function currentEventPlace(pathname: string, search: { get(name: string):
   const found: { tab: EventTabKey; view: string | null; length: number } = best;
   // The balance view and the plain payments view share one page; the filter says which is current.
   if (found.tab === "money" && pathname === "/finance") return { tab: "money", view: search.get("filter") === "BALANCE" ? "balances" : "payments" };
-  // A tab's own pages with no view of their own (the rest of Event setup, Honors, Lodging ...) light "All event tools".
-  if (found.tab === "setup" && found.view === null) return { tab: "setup", view: "all-tools" };
+  // Every Event setup page (Event settings, Honors, Lodging, Team ...) lights the tab; it has no views to mark.
+  if (found.tab === "setup") return { tab: "setup", view: "setup" };
   return { tab: found.tab, view: found.view };
 }
 

@@ -126,10 +126,9 @@ describe("event tab order (#1565, from the sidebar order of #964)", () => {
     expect(setup?.items.map((item) => item.label)).toEqual(["Event settings", "Event features", "Attendee setup", "Tags"]);
     expect(setup?.items[1]).toMatchObject({ href: eventFeaturesRoute, requiredPermission: "CONFIGURE_EVENT" });
     expect(eventFeaturesRoute).toBe("/more/features");
-    const withFeatures = render({ ...eventAdmin, pathname: eventFeaturesRoute });
-    expect(withFeatures).toContain(`href="${eventFeaturesRoute}?event=event_1"`);
-    expect(views({ ...eventAdmin, pathname: eventFeaturesRoute })).toEqual(["Event settings", "Registration forms", "Attendee setup", "Event features", "All event tools"]);
-    expect(views({ permissions: eventPermissions.filter((permission) => permission !== "CONFIGURE_EVENT"), pathname: "/registration-builder" })).not.toContain("Event features");
+    // Event setup has no view strip (#1586): Event features is a card on the Event setup page, and the page lights the tab.
+    expect(views({ ...eventAdmin, pathname: eventFeaturesRoute })).toEqual([]);
+    expect(render({ ...eventAdmin, pathname: eventFeaturesRoute })).toContain('href="/more?event=event_1"');
   });
 
   it("shows a check-in-only role Event home, Registrations and Check-in, and no empty tab", () => {
@@ -281,7 +280,8 @@ describe("Operational health and the current view (#1565, from #741 slice 4)", (
     expect(current("/more/reports")).toEqual({ tab: ["Reports"], view: ["Operational reports"] });
     expect(current("/more/reports/packets")).toEqual({ tab: ["Reports"], view: ["Printouts"] });
     expect(current("/more/health")).toEqual({ tab: ["Reports"], view: ["Operational health"] });
-    expect(current("/more")).toEqual({ tab: ["Event setup"], view: ["All event tools"] });
+    expect(current("/more")).toEqual({ tab: ["Event setup"], view: [] });
+    expect(current("/more/features")).toEqual({ tab: ["Event setup"], view: [] });
     expect(current("/overview")).toEqual({ tab: ["Event home"], view: [] });
   });
 
@@ -289,7 +289,7 @@ describe("Operational health and the current view (#1565, from #741 slice 4)", (
     expect(current("/people/attendees")).toEqual({ tab: ["Registrations"], view: ["Attendee list"] });
     expect(current("/imports")).toEqual({ tab: ["Registrations"], view: ["Imports"] });
     expect(current("/more/promo-codes")).toEqual({ tab: ["Money"], view: ["Promo codes"] });
-    expect(current("/staff")).toEqual({ tab: ["Event setup"], view: ["All event tools"] });
+    expect(current("/staff")).toEqual({ tab: ["Event setup"], view: [] });
   });
 
   it("lights Event setup for Imports when the viewer cannot see Registrations", () => {
