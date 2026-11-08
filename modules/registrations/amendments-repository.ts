@@ -121,7 +121,7 @@ export type AmendmentProfileMetadata = {
   clubRosterMemberId?: string;
   ageOnEventDate?: number | null;
   temporary?: boolean;
-  temporaryAttendeeType?: "ADULT" | "YOUTH";
+  temporaryAttendeeType?: "ADULT" | "YOUTH" | "UNDERAGE";
   clubGuestId?: string;
   /** Whether the person is a team member or a coach on a team registration (#809), decided by the server. */
   teamRole?: "MEMBER" | "COACH";
@@ -216,7 +216,7 @@ function allowedProfileMetadata(metadata: AmendmentProfileMetadata | undefined) 
     allowed.ageOnEventDate = metadata.ageOnEventDate;
   }
   if (typeof metadata.temporary === "boolean") allowed.temporary = metadata.temporary;
-  if (metadata.temporaryAttendeeType === "ADULT" || metadata.temporaryAttendeeType === "YOUTH") {
+  if (metadata.temporaryAttendeeType === "ADULT" || metadata.temporaryAttendeeType === "YOUTH" || metadata.temporaryAttendeeType === "UNDERAGE") {
     allowed.temporaryAttendeeType = metadata.temporaryAttendeeType;
   }
   if (typeof metadata.clubGuestId === "string") allowed.clubGuestId = metadata.clubGuestId;

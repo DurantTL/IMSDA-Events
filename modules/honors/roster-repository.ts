@@ -14,7 +14,7 @@ import {
 } from "@/modules/honors/roster-domain";
 import { formatPersonName } from "@/lib/person-name";
 
-type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number | null; clubRosterMemberId?: string; temporaryAttendeeType?: "ADULT" | "YOUTH" };
+type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number | null; clubRosterMemberId?: string; temporaryAttendeeType?: "ADULT" | "YOUTH" | "UNDERAGE" };
 
 /** The attendee fields on a form version that ask about food or allergies. */
 function dietaryFieldKeys(definition: unknown) {

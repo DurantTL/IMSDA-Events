@@ -59,7 +59,7 @@ export class ClassSelectionError extends Error {
   }
 }
 
-export type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number | null; clubRosterMemberId?: string; temporaryAttendeeType?: "ADULT" | "YOUTH" };
+export type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number | null; clubRosterMemberId?: string; temporaryAttendeeType?: "ADULT" | "YOUTH" | "UNDERAGE" };
 
 /**
  * Whose seats these are (#650). A club holds seats as its club; a "Group"

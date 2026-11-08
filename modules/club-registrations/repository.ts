@@ -20,7 +20,11 @@ import {
   type ClubRegistrationEditInput,
   formatCalendarDate,
   guestIdFromClientId,
+  guestAttendeeType,
   guestIsAdult,
+  guestIsChild,
+  guestOwnedRole,
+  CHILD_GUEST_TEAM_MESSAGE,
   attendeeAgeKey,
   guestsFromJson,
   rosterAgeSaveOffFromJson,
@@ -951,6 +955,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
             temporary?: boolean;
             clubRosterMemberId?: string;
             clubGuestId?: string;
+            temporaryAttendeeType?: string;
             /** An extra person's optional link to a roster member (#931); nothing else about the registration changes with it. */
             linkedRosterMemberId?: string;
             teamRole?: string;
@@ -967,6 +972,8 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
             alternate: isAlternateAnswer(recordFromJson(formResponses)[ALTERNATE_FIELD_KEY]),
             permission: permissions.get(id) ?? null,
             temporary,
+            // A child who isn't a Pathfinder (#1666), added for the event only.
+            guestChild: temporary && snapshot.temporaryAttendeeType === "UNDERAGE",
             // For seeding a reopened edit (H3b, #366): which roster person
             // or extra person this attendee is. An extra person submitted
             // before guests carried an id is known by their attendee id,
@@ -1211,6 +1218,8 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
             "An extra person on this registration wasn't saved. Go back to Who's going, check the extra people, and try again.",
           );
         }
+        // A child who isn't a Pathfinder (#1666) is never added to a team: teams take team members and coaches only.
+        if (teamSettings && guestIsChild(guest)) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
         // An extra person's typed age is their age on the event's age date (#809).
         const role = teamRoleFor({ responses: attendee.responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: guest.age });
         resolved.set(attendee.clientId, {
@@ -1218,7 +1227,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           rosterMemberId: null,
           ageOnEventDate: guest.age,
           ...(teamSettings ? { teamRole: role } : {}),
-          guest: { email: guest.email, attendeeType: guestIsAdult(guest) ? "ADULT" : "YOUTH", guestId: guest.id },
+          guest: { email: guest.email, attendeeType: guestAttendeeType(guest), guestId: guest.id },
         });
         const person = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
         teamMemberPersons.push({ personId: null, name: formatPersonName(guest), onRoster: false });
@@ -1228,7 +1237,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           alternate: isAlternateAnswer(attendee.responses[ALTERNATE_FIELD_KEY]),
           age: guest.age,
         });
-        return { ...attendee, responses: { ...attendee.responses, ...rosterOwnedResponses(definition as RegistrationFormDefinition, person) } };
+        return { ...attendee, responses: { ...attendee.responses, ...guestOwnedRole(definition as RegistrationFormDefinition, guest), ...rosterOwnedResponses(definition as RegistrationFormDefinition, person) } };
       }
       const memberId = rosterMemberIdFromClientId(attendee.clientId);
       const member = memberId ? byId.get(memberId) : undefined;
@@ -1664,7 +1673,7 @@ export async function amendClubRegistration(
         clubOrganizationId: organizationId,
         ageOnEventDate,
         temporary: true,
-        temporaryAttendeeType: snapshot.temporaryAttendeeType === "YOUTH" || snapshot.temporaryAttendeeType === "ADULT"
+        temporaryAttendeeType: snapshot.temporaryAttendeeType === "YOUTH" || snapshot.temporaryAttendeeType === "ADULT" || snapshot.temporaryAttendeeType === "UNDERAGE"
           ? snapshot.temporaryAttendeeType
           : ageOnEventDate !== null && !guestIsAdult({ age: ageOnEventDate }) ? "YOUTH" : "ADULT",
         clubGuestId: guestId,
@@ -1686,11 +1695,14 @@ export async function amendClubRegistration(
   for (const guest of input.newGuests) {
     const person: RosterPerson = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
     const clientId = clubGuestClientId(guest.id);
+    if (teamSettings && guestIsChild(guest)) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
+    const ownedRole = guestOwnedRole(definition, guest);
     const responses = {
       ...(input.attendeeResponses[clientId] ?? {}),
+      ...ownedRole,
       ...rosterOwnedResponses(definition, person),
     };
-    if (betweenLevelsOnly) assertBetweenLevelsAnswers(null, responses, Object.keys(rosterOwnedResponses(definition, person)));
+    if (betweenLevelsOnly) assertBetweenLevelsAnswers(null, responses, [...Object.keys(ownedRole), ...Object.keys(rosterOwnedResponses(definition, person))]);
     amendmentAttendees.push({ attendeeId: null, clientId, responses });
     const newGuestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: guest.age });
     serverOptions.set(clientId, {
@@ -1699,7 +1711,7 @@ export async function amendClubRegistration(
         clubOrganizationId: organizationId,
         ageOnEventDate: guest.age,
         temporary: true,
-        temporaryAttendeeType: guestIsAdult(guest) ? "ADULT" : "YOUTH",
+        temporaryAttendeeType: guestAttendeeType(guest),
         clubGuestId: guest.id,
         ...(teamSettings ? { teamRole: newGuestRole } : {}),
       },

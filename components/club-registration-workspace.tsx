@@ -34,7 +34,9 @@ import {
   clubGuestClientId,
   formatCalendarDate,
   guestIdFromClientId,
-  guestIsAdult,
+  guestAttendeeType,
+  guestIsChild,
+  GUEST_TYPES,
   MAX_CLUB_GUESTS,
   rosterMemberIdFromClientId,
   rosterOwnedResponses,
@@ -396,14 +398,19 @@ export function ClubRegistrationWorkspace({
     const lastName = String(data.get("lastName") ?? "").trim();
     const age = Number(data.get("age"));
     const email = String(data.get("email") ?? "").trim().toLowerCase();
+    const chosenType = String(data.get("guestType") ?? "");
     if (!firstName || !lastName) return setGuestError("Enter a first and last name.");
     if (!Number.isInteger(age) || age < 0 || age > 120) return setGuestError("Enter their age as a whole number.");
+    const guestType = GUEST_TYPES.find((candidate) => candidate === chosenType);
+    if (!guestType) return setGuestError("Choose Pathfinder, Adult, or Child.");
+    if (guestType === "ADULT" && age < 18) return setGuestError("An adult must be 18 or older. Choose Child or Pathfinder for someone younger.");
+    if (guestType !== "ADULT" && age >= 18) return setGuestError("Someone 18 or older is registered as an Adult.");
     if (draft.guests.length >= MAX_CLUB_GUESTS) return setGuestError(`Add up to ${MAX_CLUB_GUESTS} extra people.`);
     const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => (byte % 36).toString(36)).join("") + Date.now().toString(36);
     setGuestError("");
     setAddingGuest(false);
     setDraft((current) => {
-      const next = { ...current, guests: [...current.guests, { id: id.slice(0, 24), firstName, lastName, age, email: email || null }] };
+      const next = { ...current, guests: [...current.guests, { id: id.slice(0, 24), firstName, lastName, age, email: email || null, guestType }] };
       queueSave(next);
       return next;
     });
@@ -443,7 +450,7 @@ export function ClubRegistrationWorkspace({
         responses: {
           ...(rosterRolePrefill(definition, {
             firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null,
-            attendeeType: guestIsAdult(guest) ? "ADULT" : "YOUTH",
+            attendeeType: guestAttendeeType(guest),
           }) as FormResponses),
           ...(draft.attendeeResponses[clientId] ?? {}),
           ...(rosterOwnedResponses(definition, {
@@ -661,7 +668,7 @@ export function ClubRegistrationWorkspace({
                 <span>
                   <strong translate="no">{guest.lastName}, {guest.firstName}</strong>
                   <small>
-                    This event only · Age <span translate="no">{guest.age}</span>
+                    This event only · {guestIsChild(guest) ? "Child · " : ""}Age <span translate="no">{guest.age}</span>
                     {guest.email ? <> · <span translate="no">{guest.email}</span></> : ""}
                   </small>
                 </span>
@@ -679,6 +686,16 @@ export function ClubRegistrationWorkspace({
               <label>First name<input autoComplete="off" maxLength={80} name="firstName" required /></label>
               <label>Last name<input autoComplete="off" maxLength={80} name="lastName" required /></label>
               <label>{workspace.event.ageAsOf ? `Age on ${ageDateText}` : "Age at the event"}<input {...ageInputAttributes} name="age" required type="number" /></label>
+              <label>
+                Who is this?
+                <select defaultValue="" name="guestType" required>
+                  <option disabled value="">Choose one</option>
+                  <option value="YOUTH">Pathfinder</option>
+                  <option value="ADULT">Adult</option>
+                  {!teamRules && <option value="UNDERAGE">Child (not a Pathfinder)</option>}
+                </select>
+                {!teamRules && <small className="field-help">A child isn&apos;t counted as a Pathfinder and doesn&apos;t take a class seat.</small>}
+              </label>
               <label>
                 Email (optional)
                 <input autoComplete="off" maxLength={254} name="email" type="email" />
