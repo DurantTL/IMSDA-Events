@@ -4,6 +4,7 @@ import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { assertTeachersMeetRule, ClubTeacherError } from "@/modules/club-teachers/repository";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 import { ageOn, clubYearFor } from "@/modules/club-rosters/domain";
 import {
@@ -119,7 +120,8 @@ export class ClubRegistrationError extends Error {
       | "ATTENDEES_INVALID"
       | "TEAM_INVALID"
       | "TEAM_NAME_TAKEN"
-      | "CLASS_CHOICES_NOT_EDITABLE",
+      | "CLASS_CHOICES_NOT_EDITABLE"
+      | "TEACHERS_REQUIRED",
     message: string,
   ) {
     super(message);
@@ -1306,6 +1308,13 @@ export async function submitClubRegistration(
   const event = await requireClubEvent(eventId);
   const form = await publishedClubForm(event.id);
   if (!form) throw new ClubRegistrationError("FORM_UNAVAILABLE", "The event has no published registration form yet.");
+  // Club teachers (#1681): only when the tool is on and its rule says to block. Every other club event skips this.
+  try {
+    await assertTeachersMeetRule(eventId, organizationId, input.attendees?.length ?? 0);
+  } catch (error) {
+    if (error instanceof ClubTeacherError && error.code === "TEACHERS_REQUIRED") throw new ClubRegistrationError("TEACHERS_REQUIRED", error.message);
+    throw error;
+  }
   // The team (#809): named when the event lets a club register several, and never otherwise.
   const teamSettings = await getTeamSettings(eventId);
   const team = resolveTeamName(teamSettings, options.teamName);

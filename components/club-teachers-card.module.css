@@ -1,0 +1,16 @@
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.person { border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; display: grid; gap: 10px; }
+.pick { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); cursor: pointer; }
+.pick input { width: 24px; height: 24px; flex: none; }
+.role { font-weight: 400; color: var(--muted); }
+.details { display: grid; gap: 10px; grid-template-columns: 1fr; }
+.details label { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.details input, .details select { min-height: 44px; }
+.hint { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.status { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.actions button { min-height: 44px; }
+.actions :global(.field-help) { margin: 0; }
+@media (min-width: 640px) {
+  .details { grid-template-columns: 1fr 1fr; }
+}

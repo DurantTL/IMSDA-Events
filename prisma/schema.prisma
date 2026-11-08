@@ -1735,6 +1735,8 @@ model AdminAlertFeedReceipt {
 
 model Event {
   id                   String             @id @default(cuid())
+  clubTeacherRule      ClubTeacherRule?
+  clubTeachers         ClubEventTeacher[]
   healthSnapshots      HealthRecordSnapshot[]
   healthSnapshotHolds  HealthSnapshotHold[]
   slug                 String             @unique
@@ -2065,6 +2067,7 @@ model ModuleRequest {
 /// Deactivate instead of deleting once any registration uses a location.
 model EventLocation {
   id                   String   @id @default(cuid())
+  clubTeachers         ClubEventTeacher[]
   eventId              String
   name                 String
   normalizedName       String
@@ -2692,6 +2695,7 @@ model UserPersonLink {
  * relationship.
  */
 model Organization {
+  clubEventTeachers ClubEventTeacher[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
   scholarshipAwards    ScholarshipAward[]
@@ -5977,6 +5981,7 @@ model HonorOfferingHonor {
 /// stored in plain text (ADR 0005 Addendum A).
 model ClubRosterMember {
   id                   String                 @id @default(cuid())
+  eventTeacherRows     ClubEventTeacher[]
   healthRecord        HealthRecord?
   healthRecordLinks   HealthRecordLink[]
   organizationId       String
@@ -11111,4 +11116,44 @@ model ProblemReport {
   createdAt        DateTime            @default(now())
 
   @@index([status, createdAt])
+}
+
+/// The "Club teachers" rule for one club event (#1681): how many adults a club names as teachers. A row means an Area
+/// Coordinator, the Clubs Administrator or staff have set the rule; clubs see the step only while the "club-teachers"
+/// event module is also on. Turning the module off keeps this row and every teacher below.
+model ClubTeacherRule {
+  eventId            String   @id
+  /// Teachers every club is asked for.
+  baseTeachers       Int      @default(1)
+  /// A club bringing MORE than this many people is asked for `largerClubTeachers`. Null: one number for every club.
+  largerClubOver     Int?
+  largerClubTeachers Int      @default(2)
+  /// When true, a club below its number cannot submit its registration. Off: a warning only.
+  requireTeachers    Boolean  @default(false)
+  updatedByUserId    String?
+  updatedByAccountId String?
+  updatedAt          DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+/// An adult a club named as a teacher for a club event (#1681). The name is read from the roster; nothing else is copied.
+model ClubEventTeacher {
+  id             String   @id @default(cuid())
+  eventId        String
+  organizationId String
+  rosterMemberId String
+  /// The honor the person would teach, as typed. Optional.
+  honorName      String?
+  /// The preferred weekend or site (#413). Optional; a location removed later clears it.
+  locationId     String?
+  createdAt      DateTime @default(now())
+
+  event        Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rosterMember ClubRosterMember @relation(fields: [rosterMemberId], references: [id], onDelete: Cascade)
+  location     EventLocation?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, organizationId, rosterMemberId])
+  @@index([eventId, locationId])
 }
