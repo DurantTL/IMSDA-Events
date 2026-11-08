@@ -18,5 +18,5 @@ export function AccountPortalTabsProvider({ items, children }: { items: AccountN
 export function AccountPortalTabs() {
   const items = useContext(AccountTabItems);
   if (items.length === 0) return null;
-  return <div className="account-portal-tabs"><ClubPortalNav items={items} label="Your account" /></div>;
+  return <div className="account-portal-tabs"><ClubPortalNav items={items} label="Your account" menuLabel="Account menu" /></div>;
 }

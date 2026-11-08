@@ -35,7 +35,7 @@ export default async function AreaClubLayout({
 
   return (
     <>
-      <CoordinatorShellHeader nav={<ClubPortalNav items={areaViewedClubNavItems({ organizationId })} label="Club" />}>
+      <CoordinatorShellHeader nav={<ClubPortalNav items={areaViewedClubNavItems({ organizationId })} label="Club" menuLabel="Club menu" />}>
         {/* The club home's navy band (club-banner in globals.css): the club's name and parent organization, the coordinator's view-only role and the club year. */}
         <section aria-label={`${club.name}, view only`} className="club-banner">
           <div className="club-banner-inner">

@@ -110,7 +110,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     label: "Forms",
     collapsedByDefault: false,
     items: [
-      { href: "/admin/forms", label: "All forms", description: "Every club, general and event form in one list.", icon: ListChecks },
+      { href: "/admin/forms", label: "All forms", description: "Club, general information and event information forms in one list. Registration forms are built inside each event.", icon: ListChecks },
       { href: "/admin/club-forms", label: "Club forms", description: "The forms clubs fill in for events.", icon: ClipboardList },
       { href: "/admin/club-forms/public-page", label: "Public club forms page", description: "Which forms visitors see on the public Club forms page, with preview and publish.", icon: Megaphone },
       { href: "/admin/form-templates", label: "Form templates", description: "The registration forms event staff start from.", icon: FileStack },

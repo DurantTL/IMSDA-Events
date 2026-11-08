@@ -427,6 +427,7 @@ const pages: PageSpec[] = [
   staff("system-feature-requests", "/admin/feature-requests", "system-admin"),
   // The Clubs Administrator dashboard (#1226), opened as a system administrator.
   { name: "clubs-admin-dashboard", path: "/admin/clubs", role: "system-admin", expectText: /Club administration/, flow: "workspace-navigation" },
+  { name: "admin-all-forms", path: "/admin/forms", role: "system-admin", expectText: /Create a form/ },
   // Creating an event asks for start and end times next to the dates (#1406).
   { name: "staff-event-setup-blank", path: "/event-setup", role: "system-admin", expectText: /Start time/ },
   { name: "staff-event-setup-from-template", path: "/event-setup/from-template", role: "system-admin", expectText: /Start time/ },
@@ -3238,9 +3239,10 @@ function layoutSnapshotInPage() {
   const rects: Record<string, [number, number, number, number]> = {};
   const all = Array.from(document.body.querySelectorAll("*"));
   all.forEach((el, index) => {
-    // The phone bottom bar (.mobile-nav) is fixed chrome that slides away while a text field has focus (#1566), so a field
-    // taking focus moves the bar's links on purpose; that is not the page shifting.
-    if (el.closest('[role="listbox"], .sr-only, .back-to-top-button, .mobile-nav, script, style')) return;
+    // The phone bottom bars (.mobile-nav, and the club portal's [data-club-phone-bar], #1641) are fixed chrome: the staff one
+    // slides away while a text field has focus (#1566), and both stay put on screen while the page scrolls, so their links
+    // change document coordinates on purpose; that is not the page shifting.
+    if (el.closest('[role="listbox"], .sr-only, .back-to-top-button, .mobile-nav, [data-club-phone-bar], script, style')) return;
     const style = getComputedStyle(el);
     if (style.display === "none" || style.visibility === "hidden" || style.position === "fixed") return;
     const rect = el.getBoundingClientRect();
@@ -3828,6 +3830,50 @@ async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: n
   }
 }
 
+type PortalMenuEntry = { href: string; ok: boolean; current: boolean };
+
+/**
+ * The club portal's and coordinator's menus (#1641), opened for real: the menu line's button, or on a phone the bottom bar and
+ * its More, must reach exactly the tabs the row has (the strip's links stay in the page, hidden, so they are the reference);
+ * every entry is a 44px target inside the window, one entry is marked `aria-current`, Escape closes the menu and gives focus
+ * back to what opened it, and the page itself never scrolls sideways.
+ */
+async function auditPortalMenus(page: Page) {
+  const root = page.locator("[data-club-portal-nav]").first();
+  if (!(await root.count())) return;
+  const pathOf = (href: string) => new URL(href, "http://x.test").pathname + new URL(href, "http://x.test").hash;
+  const tabHrefs = (await root.locator(":scope > div > nav a").evaluateAll((links: Element[]) => links.map((link: Element) => link.getAttribute("href") ?? ""))).map(pathOf).sort();
+  const bar = root.locator("[data-club-phone-bar]");
+  const barShown = (await bar.count()) > 0 && (await bar.isVisible());
+  const menuButton = root.locator("[data-club-portal-menu-line] button");
+  // With room the strip is the row: there is no menu to open.
+  if (!barShown && !(await menuButton.isVisible())) return;
+  const opener = barShown ? bar.locator("a[aria-haspopup]") : menuButton;
+  const barHrefs = barShown ? (await bar.locator("a:not([aria-haspopup])").evaluateAll((links: Element[]) => links.map((link: Element) => link.getAttribute("href") ?? ""))).map(pathOf) : [];
+  if (barShown && !(await opener.count())) {
+    // Five tabs or fewer: the bar holds every tab and there is no More.
+    if ([...barHrefs].sort().join("|") !== tabHrefs.join("|")) throw new Error("The phone bar without More does not reach exactly the row's tabs");
+  } else {
+    if (!(await opener.isVisible())) throw new Error("The menu button is not visible although the tabs are hidden");
+    await opener.click();
+    const dialog = page.locator("[data-club-portal-menu]");
+    await dialog.waitFor({ state: "visible", timeout: 5000 });
+    const entries: PortalMenuEntry[] = await dialog.locator("li a").evaluateAll((links: Element[]) => links.map((link: Element) => {
+      const box = link.getBoundingClientRect();
+      return { href: link.getAttribute("href") ?? "", ok: box.height >= 43.5 && box.left >= 0 && box.right <= window.innerWidth + 1, current: link.hasAttribute("aria-current") };
+    }));
+    const reached = [...barHrefs, ...entries.map((entry: PortalMenuEntry) => pathOf(entry.href))].sort();
+    if (reached.join("|") !== tabHrefs.join("|")) throw new Error(`The menu${barShown ? " and phone bar" : ""} reach ${reached.length} destinations, the row has ${tabHrefs.length}`);
+    if (entries.some((entry: PortalMenuEntry) => !entry.ok)) throw new Error("A menu entry is under 44px tall or outside the window");
+    const currentCount = entries.filter((entry: PortalMenuEntry) => entry.current).length;
+    if (currentCount > 1) throw new Error(`${currentCount} menu entries are marked aria-current`);
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached", timeout: 5000 });
+    if (!(await opener.evaluate((element: Element) => element === document.activeElement))) throw new Error("Escape did not give focus back to the menu button");
+  }
+  if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) throw new Error("The page scrolls sideways");
+}
+
 /** Attendee links stay reachable from club/coordinator pages, and real transitions retain the account surface (#1302). */
 async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: number) {
   const before = page.url();
@@ -3842,6 +3888,7 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
         return animate(frames, options);
       };
     });
+    await auditPortalMenus(page);
     // The "Your account" drop-down sits in the club and coordinator masthead row (#1555); the details element itself carries the class.
     const menu = page.locator(".account-workspace-menu:visible");
     if (await menu.count()) {
@@ -3860,7 +3907,13 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
       await menu.locator("summary").click();
       await menu.locator('a[href="/account/registrations"]').click();
     } else {
-      await page.locator('.account-portal-tabs a[href="/account/registrations"]').click();
+      const tab = page.locator('.account-portal-tabs a[href="/account/registrations"]');
+      if (await tab.isVisible()) await tab.click();
+      else {
+        // Below 1024px (or when the row is tight) the tabs are the menu line (#1641): open the menu and follow the link there.
+        await page.locator(".account-portal-tabs [data-club-portal-menu-line] button").click();
+        await page.locator('[data-club-portal-menu] a[href="/account/registrations"]').click();
+      }
     }
     await page.waitForURL(`${baseUrl}/account/registrations`, { timeout: 30_000 });
     await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading]'), undefined, { timeout: 30_000 });
@@ -3919,6 +3972,67 @@ function staffTabRowInPage(): string[] {
   return problems;
 }
 
+/**
+ * The club portal's and Area Coordinator's tab row (#1641): it shows the tabs, the menu line or (club pages on a phone) the
+ * bottom bar, never two and never none; below 1024px it is never the strip; the strip never runs past its line or scrolls
+ * sideways; the menu button and the bar stay inside the window with 44px targets. Runs in the page.
+ */
+function portalTabRowInPage(): string[] {
+  const problems: string[] = [];
+  const shown = (element: Element | null) => {
+    if (!element) return false;
+    const style = getComputedStyle(element);
+    return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
+  };
+  for (const root of Array.from(document.querySelectorAll<HTMLElement>("[data-club-portal-nav]"))) {
+    const line = root.querySelector<HTMLElement>(":scope > div");
+    const tabs = line?.querySelector<HTMLElement>(":scope > nav") ?? null;
+    const menu = root.querySelector<HTMLElement>("[data-club-portal-menu-line]");
+    const bar = root.querySelector<HTMLElement>("[data-club-phone-bar]");
+    if (!line || !tabs || !menu) { problems.push("a portal tab row has no tabs or no menu line"); continue; }
+    const tabsShown = shown(tabs);
+    const menuShown = shown(menu);
+    const barShown = shown(bar);
+    const phone = window.innerWidth <= 800;
+    if (bar && phone && !barShown) problems.push("the phone bar is missing on a phone");
+    if (barShown && !phone) problems.push(`the phone bar shows above 800px (${window.innerWidth}px)`);
+    if (barShown && (tabsShown || menuShown)) problems.push("the phone bar and the tab row both show");
+    if (!barShown) {
+      if (tabsShown && menuShown) problems.push("the tabs and the menu line both show");
+      if (!tabsShown && !menuShown) problems.push("neither the tabs, the menu line nor the phone bar show");
+    }
+    if (window.innerWidth < 1024 && tabsShown) problems.push(`the tab row shows below 1024px (${window.innerWidth}px)`);
+    const list = tabs.querySelector<HTMLElement>("ul");
+    if (tabsShown) {
+      if (list && list.getBoundingClientRect().width > line.clientWidth + 1) problems.push(`the tab row is ${Math.round(list.getBoundingClientRect().width)}px in a ${line.clientWidth}px line`);
+      if (tabs.scrollWidth > tabs.clientWidth + 1) problems.push("the tab row scrolls sideways or is cut off");
+    }
+    if (menuShown) {
+      const button = menu.querySelector<HTMLElement>("button");
+      const box = button?.getBoundingClientRect();
+      if (!button || !box || box.right > window.innerWidth + 1 || box.left < -1) problems.push("the menu button is outside the window");
+      else {
+        if (box.height < 43.5) problems.push(`the menu button is ${Math.round(box.height)}px tall`);
+        if (!/ menu/i.test(button.textContent ?? "")) problems.push(`the menu button is named "${(button.textContent ?? "").trim()}", not "Club menu" or "Coordinator menu"`);
+      }
+    }
+    if (barShown && bar) {
+      const links = Array.from(bar.querySelectorAll<HTMLElement>("a"));
+      if (bar.querySelector("button")) problems.push("the phone bar holds a button (it is a navigation bar, not an action bar)");
+      if (links.length < 2 || links.length > 5) problems.push(`the phone bar has ${links.length} items`);
+      for (const link of links) {
+        const box = link.getBoundingClientRect();
+        if (box.left < -1 || box.right > window.innerWidth + 1) problems.push(`the phone bar item "${(link.textContent ?? "").trim()}" is outside the window`);
+        if (box.height < 43.5 || box.width < 43.5) problems.push(`the phone bar item "${(link.textContent ?? "").trim()}" is ${Math.round(box.width)}x${Math.round(box.height)}px`);
+      }
+      // The page ends above the bar: the body reserves at least the bar's height, so no text is left under it.
+      const reserved = Number.parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+      if (reserved < bar.getBoundingClientRect().height - 1) problems.push(`the page reserves ${Math.round(reserved)}px under its content for a ${Math.round(bar.getBoundingClientRect().height)}px phone bar`);
+    }
+  }
+  return problems;
+}
+
 async function auditSqueezeAndBars(page: Page, name: string, width: number) {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(60);
@@ -3926,6 +4040,7 @@ async function auditSqueezeAndBars(page: Page, name: string, width: number) {
   for (const problem of await page.evaluate(squeezedTextInPage)) record("squeezed-text", name, width, problem);
   for (const problem of await page.evaluate(barOverTextInPage)) record("bar-over-text", name, width, problem);
   for (const problem of await page.evaluate(staffTabRowInPage)) record("staff-tab-row", name, width, problem);
+  for (const problem of await page.evaluate(portalTabRowInPage)) record("portal-tab-row", name, width, problem);
 }
 
 async function auditPage(page: Page, spec: PageSpec, width: number, prefix: string) {
