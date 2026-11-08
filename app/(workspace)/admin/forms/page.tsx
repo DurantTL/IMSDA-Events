@@ -12,6 +12,7 @@ import { searchPageHref } from "@/lib/search-page-href";
 import { serverSort, sortOrderText, sortRows, type SortKind, type SortValue } from "@/lib/list-sort";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { loadFormsHub } from "@/modules/forms-hub/load";
+import { logError } from "@/lib/logger";
 import { listEventsForUser } from "@/modules/events/repository";
 import { buildFormCreateEvents } from "@/modules/forms-hub/create-choices";
 import { FormsCreateSection } from "@/components/forms-create/forms-create-section";
@@ -56,7 +57,10 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
   const one = (value: string | string[] | undefined) => (typeof value === "string" ? value : undefined);
   const filters = parseFormsHubFilters({ kind: one(params.kind), status: one(params.status), q: one(params.q) });
   // The same events (archived left out) the workspace switcher lists; a system administrator sees all of them.
-  const eventOptions = buildFormCreateEvents(await listEventsForUser(user.id, true).then((events) => events.map(({ id, name }) => ({ id, name })), () => null));
+  const eventOptions = buildFormCreateEvents(await listEventsForUser(user.id, user.globalRole === "SYSTEM_ADMIN").catch((error: unknown) => {
+    logError("Forms page: events for the create picker could not load", error);
+    return null;
+  }));
   const all = await loadFormsHub();
   const filtered = filterFormsHubRows(all, filters);
   // The hub is loaded whole, so the whole filtered list is sorted before it is paged (#1458); the default is the hub's own order.
@@ -100,7 +104,7 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
         ) : (
           <div className="report-table-wrap">
             {sorting.order.key && <SortOrderNote>{sortOrderText(formSortLabels[sorting.order.key].label, sorting.order.dir, formSortLabels[sorting.order.key].kind)}</SortOrderNote>}
-            <table role="table" className="report-table table-cards table-cards-tablet">
+            <table role="table" className="report-table table-cards table-cards-wide">
               <caption className="sr-only">All forms</caption>
               <thead role="rowgroup">
                 <tr role="row"><ColumnHeader column="form" label="Form" sorting={sorting} /><ColumnHeader column="kind" label="Kind" sorting={sorting} /><ColumnHeader column="event" label="Event" sorting={sorting} /><ColumnHeader column="status" label="Status" sorting={sorting} /><ColumnHeader column="responses" label="Responses" sorting={sorting} /><ColumnHeader column="last" label="Last response" sorting={sorting} /><th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr>

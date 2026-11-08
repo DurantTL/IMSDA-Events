@@ -425,8 +425,8 @@ const pages: PageSpec[] = [
   staff("system-feature-requests", "/admin/feature-requests", "system-admin"),
   // The Clubs Administrator dashboard (#1226), opened as a system administrator.
   { name: "clubs-admin-dashboard", path: "/admin/clubs", role: "system-admin", expectText: /Club administration/, flow: "workspace-navigation" },
-  // Creating an event asks for start and end times next to the dates (#1406).
   { name: "admin-all-forms", path: "/admin/forms", role: "system-admin", expectText: /Create a form/ },
+  // Creating an event asks for start and end times next to the dates (#1406).
   { name: "staff-event-setup-blank", path: "/event-setup", role: "system-admin", expectText: /Start time/ },
   { name: "staff-event-setup-from-template", path: "/event-setup/from-template", role: "system-admin", expectText: /Start time/ },
   staff("calendar-admin", "/admin/calendar", "system-admin"),
