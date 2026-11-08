@@ -1,6 +1,6 @@
 import type { EventPermission } from "@/modules/access/permissions";
 import { withCurrentEvent } from "@/components/staff-navigation";
-import { UNAVAILABLE_STATUS, type CardStatus, type HubBody, type HubCard, type HubGroup } from "@/modules/system-admin/admin-hubs-model";
+import { UNAVAILABLE_STATUS, mergeLoneCards, type CardStatus, type HubBody, type HubCard, type HubGroup } from "@/modules/system-admin/admin-hubs-model";
 
 /**
  * The Review queues page (#1574): the event's registration review pages as grouped cards, each with a live status only where
@@ -136,7 +136,7 @@ export function buildReviewQueuesView(viewer: ReviewQueuesViewer, eventId: strin
     const value = values[key];
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   };
-  const groups = groupDefs.flatMap((group): HubGroup[] => {
+  const shown = groupDefs.flatMap((group): HubGroup[] => {
     const cards = group.cards
       .filter((card) => card.gate(input))
       .map((card): HubCard => {
@@ -146,6 +146,8 @@ export function buildReviewQueuesView(viewer: ReviewQueuesViewer, eventId: strin
       });
     return cards.length > 0 ? [{ title: group.title, cards }] : [];
   });
+  // A group a gate left with one card joins its neighbour, so no row is ever a lone card.
+  const groups = mergeLoneCards(shown.map((group) => ({ title: group.title, cards: [...group.cards] })));
   return { key: "review-queues", description: reviewQueuesDescription, groups };
 }
 

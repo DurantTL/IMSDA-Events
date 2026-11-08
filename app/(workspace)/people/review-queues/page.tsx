@@ -3,8 +3,8 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { AdminHub } from "@/components/admin-hub";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
-import { buildReviewQueuesView, hasVisibleReviewQueue } from "@/modules/registrations/review-queues-model";
-import { loadReviewQueueMetrics } from "@/modules/registrations/review-queues-repository";
+import { buildReviewQueuesView, hasVisibleReviewQueue } from "@/modules/review-queues/review-queues-model";
+import { loadReviewQueueMetrics } from "@/modules/review-queues/review-queues-repository";
 
 export const metadata: Metadata = { title: staffPageTitles.reviewQueues };
 export const dynamic = "force-dynamic";

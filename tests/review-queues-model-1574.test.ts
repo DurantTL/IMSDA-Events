@@ -9,7 +9,7 @@ import {
   reviewQueuePaths,
   type ReviewQueueMetricValues,
   type ReviewQueuesViewer,
-} from "@/modules/registrations/review-queues-model";
+} from "@/modules/review-queues/review-queues-model";
 import { UNAVAILABLE_STATUS } from "@/modules/system-admin/admin-hubs-model";
 
 const more = { permissions: [] as EventPermission[], clubOversight: false, clubEvent: false, isSystemAdmin: false, clubFormsAccess: false };
@@ -121,6 +121,20 @@ describe("Review queues model (#1574)", () => {
     expect(cards({}, club).map((card) => card.title)).toEqual(["Responsible adults", "Find duplicates", "Directory review", "Teams waiting for a club"]);
     expect(hasVisibleReviewQueue({ permissions: ["MANAGE_REGISTRATION"], audience: "CLUB" })).toBe(true);
     expect(neededReviewQueueMetrics(club)).not.toContain("approvalsWaiting");
+  });
+
+  it("never leaves a lone card in a group: a group left with one card joins its neighbour", () => {
+    const layout = (viewer: ReviewQueuesViewer) => buildReviewQueuesView(viewer, "evt_1", {}).groups.map((group) => [group.title, group.cards.map((card) => card.title)]);
+    // A registration manager on a club event loses the two invitation cards.
+    expect(layout({ ...manager, audience: "CLUB" })).toEqual([
+      ["People and families", ["Responsible adults", "Find duplicates", "Directory review", "Teams waiting for a club"]],
+    ]);
+    // Registration management without the sensitive-data permission loses two of the first group's cards.
+    expect(layout(manageOnly)).toEqual([["Teams and staff sign-ups", ["Directory review", "Teams waiting for a club", "Staff invitations", "Staff approvals"]]]);
+    for (const viewer of [manager, { ...manager, audience: "CLUB" as const }, sensitiveOnly, manageOnly]) {
+      const groups = buildReviewQueuesView(viewer, "evt_1", {}).groups;
+      if (groups.length > 1) for (const group of groups) expect(group.cards.length).toBeGreaterThan(1);
+    }
   });
 
   it("asks only for the numbers of the cards the viewer sees", () => {

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
 import { ResponsibleAdultReview } from "@/components/responsible-adult-review";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -19,10 +18,5 @@ export default async function ResponsibleAdultsPage({ searchParams }: { searchPa
     return <AccessRestricted title="People records are restricted" detail="Your event role does not include access to attendee names, so the responsible-adult review is not available." whoToAsk="your event administrator" />;
   }
   const review = await getGuardianReview(event.id);
-  return (
-    <>
-      <ResponsibleAdultReview eventId={event.id} review={review} canEdit={permissions.includes("MANAGE_REGISTRATION")} canExport={permissions.includes("VIEW_REPORTS")} />
-      <p className="quiet-copy"><Link href={`/people/review-queues?event=${encodeURIComponent(event.id)}`}>Back to Review queues</Link></p>
-    </>
-  );
+  return <ResponsibleAdultReview eventId={event.id} review={review} canEdit={permissions.includes("MANAGE_REGISTRATION")} canExport={permissions.includes("VIEW_REPORTS")} />;
 }

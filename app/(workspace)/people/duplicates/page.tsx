@@ -194,7 +194,6 @@ export default async function DuplicateFinderPage({
           ))}
         </section>
       )}
-      <p className="quiet-copy"><Link href={`/people/review-queues?event=${encodeURIComponent(event.id)}`}>Back to Review queues</Link></p>
     </section>
   );
 }

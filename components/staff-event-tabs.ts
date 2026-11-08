@@ -1,5 +1,5 @@
 import { kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
-import { hasVisibleReviewQueue, reviewQueuePaths } from "@/modules/registrations/review-queues-model";
+import { hasVisibleReviewQueue, reviewQueuePaths } from "@/modules/review-queues/review-queues-model";
 import { moneyToolPaths } from "@/modules/payments/money-tools-model";
 import { canAccessOperationalHealth } from "@/modules/operations/access";
 import {

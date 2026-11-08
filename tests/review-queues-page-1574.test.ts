@@ -6,7 +6,7 @@ const dependencies = vi.hoisted(() => ({ resolveEventContext: vi.fn(), loadRevie
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ usePathname: () => "/people/review-queues", useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: dependencies.resolveEventContext }));
-vi.mock("@/modules/registrations/review-queues-repository", () => ({ loadReviewQueueMetrics: dependencies.loadReviewQueueMetrics }));
+vi.mock("@/modules/review-queues/review-queues-repository", () => ({ loadReviewQueueMetrics: dependencies.loadReviewQueueMetrics }));
 
 import ReviewQueuesPage from "@/app/(workspace)/people/review-queues/page";
 
