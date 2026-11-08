@@ -199,7 +199,9 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
     { key: "hub-clubs", destination: adminHubs.clubs.href, visible: sys },
     { key: "hub-people", destination: adminHubs.people.href, visible: sys },
     { key: "hub-forms", destination: adminHubs.forms.href, visible: eitherClubsOrSys },
-    { key: "hub-catalogs", destination: adminHubs.catalogs.href, visible: (v) => eitherClubsOrSys(v) || v.siteContentEditor },
+    // A site content editor who is not a Clubs or System administrator opens the site content page itself (#1735): it is the
+    // one admin page they may open with no event, and the only card the Catalogs hub shows them.
+    { key: "hub-catalogs", destination: adminHubs.catalogs.href, href: (v) => (eitherClubsOrSys(v) ? adminHubs.catalogs.href : "/admin/site-content"), visible: (v) => eitherClubsOrSys(v) || v.siteContentEditor },
   ],
 };
 
