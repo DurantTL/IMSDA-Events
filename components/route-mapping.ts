@@ -173,14 +173,14 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/more/honors/rosters", "/more/honors", "components/honors-setup-workspace.tsx"],
   ["/more/honors/schedule", "/more/honors", "components/honors-setup-workspace.tsx"],
   ["/more/issued-assets/closeout", "/more/issued-assets", "components/issued-assets-workspace.tsx"],
-  ["/more/kitchen-report", "/more/reports", "app/(workspace)/more/reports/page.tsx"],
+  ["/more/kitchen-report", "/more/reports", "components/staff-event-tabs.ts"],
   ["/more/kitchen-report/closeout", "/more/kitchen-report", "app/(workspace)/more/kitchen-report/page.tsx"],
   ["/more/kitchen-report/scanner-import", "/more/kitchen-report", "app/(workspace)/more/kitchen-report/page.tsx"],
-  ["/more/reports/clubs", "/more/reports", "app/(workspace)/more/reports/page.tsx"],
+  ["/more/reports/clubs", "/more/reports/printouts", "modules/reporting/printouts-model.ts"],
   ["/more/reports/clubs/check-in-book", "/more/reports/clubs", "app/(workspace)/more/reports/clubs/page.tsx"],
   ["/more/reports/clubs/team-form", "/more/team-results", "components/team-results-workspace.tsx"],
   ["/more/reports/clubs/team-form/level", "/more/team-results", "components/team-results-workspace.tsx"],
-  ["/more/reports/packets", "/more/reports", "app/(workspace)/more/reports/page.tsx"],
+  ["/more/reports/packets", "/more/reports/printouts", "modules/reporting/printouts-model.ts"],
   ["/more/team-results", "/more/clubs", "app/(workspace)/more/clubs/page.tsx"],
   ["/people/directory-review", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
   ["/people/duplicates", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
@@ -210,6 +210,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
   rows.push({ route: "/home/coming-up", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/home/coming-up", label: "Home: Coming up", group: "Home", note: "New in #1568. The Home area's second tab: the upcoming events the person can open." });
   rows.push({ route: "/finance/tools", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/finance/tools", label: "More money tools", group: "Money", note: "New in #1575. Opened from the Money tab's More money tools view; a card opens each money page the person can reach for this event." });
   rows.push({ route: "/people/review-queues", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/people/review-queues", label: "Review queues", group: "Registrations", note: "New in #1574. Opened from the Registrations tab's Review queues view; a card opens each review page the person can reach for this event." });
+  rows.push({ route: "/more/reports/printouts", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/more/reports/printouts", label: "Printouts", group: "Reports", note: "New in #1583. Opened from the Reports tab's Printouts view; a card opens each packet, book or form the person can print for this event." });
   rows.push({ route: "/help", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Help & learning", group: "Help", note: "New in #1077. Opened from the sidebar's pinned Help & learning link and from search; every staff member, including staff with no event." });
   rows.push({ route: "/help/glossary", kind: "reached", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Glossary", group: "/help", reachedFrom: { parent: "/help", linkedIn: "app/(workspace)/help/page.tsx" } });
   rows.push({ route: "/events-admin", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/events-admin", label: "Events Administrator dashboard", group: "Event administration", note: "The Events Administrator's home, opened from the role switcher. Only people with an active EVENT_ADMIN membership see it, and only for those events." });

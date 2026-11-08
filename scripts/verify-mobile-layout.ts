@@ -374,6 +374,8 @@ const pages: PageSpec[] = [
   staff("program-assignments", "/more/program-assignments"),
   staff("club-forms-staff", "/more/club-forms"),
   staff("reports-packets", "/more/reports/packets"),
+  // Printouts (#1583): the packets, books and forms as grouped cards. The audit's event is a general one, so the club cards are hidden and the packets group shows.
+  { ...staff("reports-printouts", "/more/reports/printouts"), expectText: /Packets, books and rosters/ },
   staff("responsible-adults", "/people/responsible-adults"),
   staff("directory-review", "/people/directory-review"),
   staff("person-matches", "/people/matches", "system-admin"),

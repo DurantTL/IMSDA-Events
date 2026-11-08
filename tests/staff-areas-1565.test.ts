@@ -249,6 +249,11 @@ describe("event tabs (#1565)", () => {
     expect(place("/more/promo-codes")).toEqual({ tab: "money", view: "promo" });
     expect(place(kitchenCountsPath)).toEqual({ tab: "reports", view: "kitchen-counts" });
     expect(place("/more/reports/packets")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports/printouts")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports/clubs")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports/clubs/packet/org_1")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports/clubs/team-form/level")).toEqual({ tab: "reports", view: "printouts" });
+    expect(place("/more/reports")).toEqual({ tab: "reports", view: "operational" });
     // Event setup is one grouped page with no views (#1586): every setup page lights the tab and no view.
     expect(place("/more/lodging")).toEqual({ tab: "setup", view: "setup" });
     expect(place("/more/event-settings")).toEqual({ tab: "setup", view: "setup" });

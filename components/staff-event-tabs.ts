@@ -2,6 +2,7 @@ import { kitchenCountsPath, type EventPermission } from "@/modules/access/permis
 import { hasVisibleReviewQueue, reviewQueuePaths } from "@/modules/review-queues/review-queues-model";
 import { moneyToolPaths } from "@/modules/payments/money-tools-model";
 import { eventSetupHasCards } from "@/components/event-setup-model";
+import { hasVisiblePrintout } from "@/modules/reporting/printouts-model";
 import { canAccessOperationalHealth } from "@/modules/operations/access";
 import {
   matchesVisibility,
@@ -145,11 +146,19 @@ export const eventTabSpecs: readonly TabSpec[] = [
     label: "Reports",
     owns: ["/more/reports", "/more/health", "/more/kitchen-report"],
     views: [
-      { key: "operational", label: staffPageTitles.operationalReports, href: "/more/reports", visible: byNav("/more/reports"), alsoOwns: ["/more/reports/clubs"] },
+      { key: "operational", label: staffPageTitles.operationalReports, href: "/more/reports", visible: byNav("/more/reports") },
       { key: "health", label: staffPageTitles.operationalHealth, href: "/more/health", visible: (context) => canAccessOperationalHealth(context.permissions) },
       { key: "kitchen", label: staffPageTitles.kitchenReport, href: "/more/kitchen-report", visible: holds("VIEW_REPORTS"), alsoOwns: ["/more/kitchen-report/closeout", "/more/kitchen-report/scanner-import"] },
       { key: "kitchen-counts", label: staffPageTitles.kitchenCounts, href: kitchenCountsPath, visible: anyOf("MANAGE_KITCHEN_COUNTS", "VIEW_REPORTS") },
-      { key: "printouts", label: "Printouts", href: "/more/reports/packets", visible: holds("VIEW_REPORTS") },
+      // Group packets and the club event pages (reports, check-in book, team forms and their detail pages) are reached from the
+      // Printouts cards, which light this view as their parent (#1583). It shows when at least one card would.
+      {
+        key: "printouts",
+        label: staffPageTitles.printouts,
+        href: "/more/reports/printouts",
+        visible: (context, permissions) => hasVisiblePrintout({ permissions: [...permissions], audience: context.more.clubEvent ? "CLUB" : "GENERAL", usesTeams: false, honorsOn: false }),
+        alsoOwns: ["/more/reports/packets", "/more/reports/clubs"],
+      },
     ],
   },
   {

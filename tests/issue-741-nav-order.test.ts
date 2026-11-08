@@ -114,7 +114,7 @@ describe("event tab order (#1565, from the sidebar order of #964)", () => {
     // Kitchen counts (#1029) is the one item for staff without the event view, so no admin sees it: it follows the dashboard.
     expect(navigation.filter((item) => item.sidebar).slice(0, 2).map((item) => item.label)).toEqual(["Dashboard", "Kitchen counts"]);
     expect(listed).toEqual(registryOrder.filter((entry) => entry !== "Event features"));
-    expect(navigation.filter((item) => !item.sidebar && item.href !== "/more").map((item) => item.label)).toEqual(["Attendee list", "Imports", "Review queues", "Team", "Promo codes", "More money tools"]);
+    expect(navigation.filter((item) => !item.sidebar && item.href !== "/more").map((item) => item.label)).toEqual(["Attendee list", "Imports", "Review queues", "Team", "Promo codes", "More money tools", "Printouts"]);
     expect(navigation.at(-1)?.href).toBe("/more");
     expect(orderedSidebarItems(new Set(eventPermissions), true).map((item) => item.label)).toEqual(registryOrder.filter((entry) => entry !== "Event features").concat("More"));
     expect([...sidebarSectionOrder]).toEqual(["daily", "setup", "reports"]);
@@ -279,6 +279,8 @@ describe("Operational health and the current view (#1565, from #741 slice 4)", (
   it("marks one tab and one view on a page, never two", () => {
     expect(current("/more/reports")).toEqual({ tab: ["Reports"], view: ["Operational reports"] });
     expect(current("/more/reports/packets")).toEqual({ tab: ["Reports"], view: ["Printouts"] });
+    expect(current("/more/reports/printouts")).toEqual({ tab: ["Reports"], view: ["Printouts"] });
+    expect(current("/more/reports/clubs/check-in-book")).toEqual({ tab: ["Reports"], view: ["Printouts"] });
     expect(current("/more/health")).toEqual({ tab: ["Reports"], view: ["Operational health"] });
     expect(current("/more")).toEqual({ tab: ["Event setup"], view: [] });
     expect(current("/more/features")).toEqual({ tab: ["Event setup"], view: [] });
