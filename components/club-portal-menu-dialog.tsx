@@ -4,6 +4,7 @@ import { useEffect, useRef, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { isPlainClick } from "@/components/more-launcher-model";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import styles from "@/components/club-portal-nav.module.css";
 
@@ -54,7 +55,7 @@ export function ClubPortalMenuDialog({
           <ul>
             {entries.map((entry) => (
               <li key={entry.key}>
-                <Link className={styles.item} href={entry.href} aria-current={entry.current ? "true" : undefined} onClick={follow}>
+                <Link className={styles.item} href={entry.href} aria-current={entry.current ? "true" : undefined} onClick={(event) => { if (isPlainClick(event.nativeEvent)) follow(); }}>
                   <span>{entry.label}</span>
                 </Link>
               </li>

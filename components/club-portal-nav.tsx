@@ -21,6 +21,12 @@ const phoneIcons: Record<ClubPhoneBarKey, typeof Home> = {
   other: LayoutGrid,
 };
 
+/** Rough width of the strip (px): about 9px a letter at the tab font plus 28px padding. The measurement replaces it on mount. */
+const ESTIMATED_ROOM = 900;
+export function estimatedRowWidth(items: readonly { label: string }[]) {
+  return items.reduce((sum, item) => sum + item.label.length * 9 + 28, 0);
+}
+
 type Props = {
   items: AccountNavItem[];
   label?: string;
@@ -68,7 +74,8 @@ function ClubPortalNavView({
   const listRef = useRef<HTMLUListElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const moreRef = useRef<HTMLAnchorElement>(null);
-  const [tight, setTight] = useState(false);
+  // Before the first measurement (and without scripts) a row that would clearly not fit starts as the menu line, so tabs are never cut off.
+  const [tight, setTight] = useState(() => estimatedRowWidth(items) > ESTIMATED_ROOM);
   const [open, setOpen] = useState<"all" | "more" | null>(null);
   const titleId = useId();
   // The year rides on the links only; active state still compares each item's bare href.
@@ -124,7 +131,8 @@ function ClubPortalNavView({
           </ul>
         </nav>
         <div className={styles.menuline} data-club-portal-menu-line>
-          <span className={styles.current}>{current.label}</span>
+          {/* The strip is hidden while this line shows (and the reverse), so only one of them is in the accessibility tree. */}
+          <span className={styles.current} aria-current={isAccountNavItemActive(pathname, current) ? "page" : undefined}>{current.label}</span>
           <button
             ref={menuButtonRef}
             type="button"
@@ -142,9 +150,9 @@ function ClubPortalNavView({
         <nav className={styles.phoneBar} aria-label={`${label} mobile navigation`} data-club-phone-bar>
           {bar.bar.map(({ key, label: text, item }) => {
             const Icon = phoneIcons[key];
-            // The strip above already says "page"; the bar only says "true", so the document has one "page".
+            // The strip and the menu line are hidden while the bar shows, so the bar's current item is the one "page".
             return (
-              <Link key={item.href} className={styles.phoneItem} href={hrefOf.get(item) ?? item.href} aria-current={isAccountNavItemActive(pathname, item) ? "true" : undefined}>
+              <Link key={item.href} className={styles.phoneItem} href={hrefOf.get(item) ?? item.href} aria-current={isAccountNavItemActive(pathname, item) ? "page" : undefined}>
                 <Icon aria-hidden="true" size={22} /><span>{text}</span>
               </Link>
             );

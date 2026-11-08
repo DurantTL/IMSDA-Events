@@ -93,7 +93,7 @@ describe("the club shell navigation bar (#1319)", () => {
     mocks.pathname = pathname;
     return renderToStaticMarkup(createElement(ClubPortalNav, { items: list }));
   };
-  const currentLabels = (html: string) => [...html.matchAll(/aria-current="page"[^>]*>([^<]+)</g)].map((m) => m[1]);
+  const currentLabels = (html: string) => [...html.matchAll(/<a [^>]*aria-current="page"[^>]*>([^<]+)</g)].map((m) => m[1]);
 
   it("renders every item as a link in order, with no More control on the strip", () => {
     const html = render(base);

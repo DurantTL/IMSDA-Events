@@ -3842,6 +3842,8 @@ async function auditPortalMenus(page: Page) {
   const bar = root.locator("[data-club-phone-bar]");
   const barShown = (await bar.count()) > 0 && (await bar.isVisible());
   const menuButton = root.locator("[data-club-portal-menu-line] button");
+  // With room the strip is the row: there is no menu to open.
+  if (!barShown && !(await menuButton.isVisible())) return;
   const opener = barShown ? bar.locator("a[aria-haspopup]") : menuButton;
   const barHrefs = barShown ? (await bar.locator("a:not([aria-haspopup])").evaluateAll((links: Element[]) => links.map((link: Element) => link.getAttribute("href") ?? ""))).map(pathOf) : [];
   if (barShown && !(await opener.count())) {

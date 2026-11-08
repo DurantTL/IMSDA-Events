@@ -83,6 +83,7 @@
   display: inline-flex;
   min-height: 48px;
   min-width: 0;
+  flex: 0 1 auto;
   align-items: center;
   border-bottom: 3px solid var(--imsda-purple);
   color: var(--imsda-navy);
@@ -109,6 +110,13 @@
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+}
+
+/* The shared phone rule makes every .secondary-button full width; here the button keeps its own width beside the label. */
+.menuline .menuButton {
+  width: auto;
+  max-width: 100%;
+  flex: none;
 }
 
 .menuButton:focus-visible {
@@ -290,6 +298,11 @@
 
   .nav[data-phone-bar="on"] .line {
     display: none;
+  }
+
+  /* The page ends above the bar: the body reserves the bar's height, safe-area inset included. */
+  :global(body):has(.phoneBar) {
+    padding-bottom: calc(73px + env(safe-area-inset-bottom, 0px));
   }
 
   .phoneBar {

@@ -106,10 +106,21 @@ describe("ClubPortalNav markup (#1641)", () => {
     expect(html).toContain('data-phone-bar="off"');
   });
 
-  it("marks the current tab 'page' on the strip only, the bar says 'true': one 'page' in the document", () => {
+  it("carries one 'page' in each layout's accessibility tree: the strip, the menu line or the bar (the others are hidden by CSS)", () => {
     const html = render({ items: shell("DIRECTOR"), base, phoneBar: true }, `${base}/roster`);
-    expect([...html.matchAll(/aria-current="page"/g)]).toHaveLength(1);
-    expect([...html.matchAll(/aria-current="true"/g)]).toHaveLength(1);
+    // strip + menu line label + bar item: three in the markup, exactly one of them visible at any width.
+    expect([...html.matchAll(/aria-current="page"/g)]).toHaveLength(3);
+    expect(html).toMatch(/<span class="[^"]*current[^"]*" aria-current="page">Roster<\/span>/);
+    const css = read("components/club-portal-nav.module.css");
+    expect(css).toMatch(/\.nav\[data-phone-bar="on"\] \.line \{\s*display: none;/);
+    expect(css).toMatch(/\.tabs \{\s*position: absolute;[^}]*visibility: hidden;/);
+    const plain = render({ items: shell("DIRECTOR"), base }, `${base}/roster`);
+    expect([...plain.matchAll(/aria-current="page"/g)]).toHaveLength(2);
+  });
+
+  it("starts a row that clearly will not fit as the menu line, before it is measured", () => {
+    expect(render({ items: shell("DIRECTOR"), base })).toContain('data-fit="tight"');
+    expect(render({ items: shell("REPORTER"), base })).toContain('data-fit="ok"');
   });
 
   it("carries the area coordinator's tabs and the view-only club's, with no bar and no editing screens", () => {
