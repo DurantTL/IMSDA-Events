@@ -118,3 +118,35 @@ describe("kitchen report (#787)", () => {
     expect(result.needs).toEqual([{ answer: "Shellfish allergy", count: 1 }]);
   });
 });
+
+describe("kitchen report over the Leadership Weekend and TLT Retreat questions (#1665)", () => {
+  for (const key of ["leadership_weekend", "tlt_retreat"]) {
+    it(`${key}: counts food allergies and diet choices together, with no names`, () => {
+      const form = formTemplates.find((template) => template.key === key)!.definition as unknown as Record<string, unknown>;
+      const record = (id: string, responses: Array<Record<string, unknown>>) => ({ ...registration(id, "CONFIRMED", responses), publicSubmission: { definition: form, responses: {}, attendeeResponses: [] } }) as unknown as RegistrationRecord;
+      const report = buildKitchenReport([
+        record("L1", [
+          { food_allergies: "Peanuts", dietary_needs: ["Vegan", "Dairy-free"] },
+          { food_allergies: "None", dietary_needs: ["Dairy-free"] },
+          { food_allergies: "none", dietary_needs: [] },
+          { food_allergies: "peanuts" },
+        ]),
+      ]);
+      expect(report.needs).toEqual([
+        { answer: "Dairy-free", count: 2 },
+        { answer: "Peanuts", count: 2 },
+        { answer: "Vegan", count: 1 },
+      ]);
+      expect(report.peopleWithNeeds).toBe(3);
+      expect(report.totalPeople).toBe(4);
+      const text = JSON.stringify(report) + kitchenReportCsv(report);
+      expect(text).not.toMatch(/SYNTH-|Family|Surname|holder-/);
+    });
+  }
+
+  it("an older published version with the Vegan / Gluten Free only dietary answer still counts", () => {
+    const old = { ...(formTemplates.find((template) => template.key === "womens_retreat_export")!.definition as object) } as unknown as Record<string, unknown>;
+    const report = buildKitchenReport([{ ...registration("O1", "CONFIRMED", [{ dietary_needs: ["Vegan", "Gluten Free"] }]), publicSubmission: { definition: old, responses: {}, attendeeResponses: [] } } as unknown as RegistrationRecord]);
+    expect(report.needs.map((need) => need.answer).sort()).toEqual(["Gluten Free", "Vegan"]);
+  });
+});

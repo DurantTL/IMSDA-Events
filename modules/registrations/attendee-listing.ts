@@ -58,7 +58,7 @@ export type AttendeeListingRow = {
   accountHolderEmail: string;
 };
 
-type Role = "meal" | "dietary" | "childcare" | "volunteer" | "church" | "churchOther";
+type Role = "meal" | "dietary" | "allergy" | "childcare" | "volunteer" | "church" | "churchOther";
 
 /**
  * Fields are found by the keys the built-in form templates and the WR26 import
@@ -71,6 +71,7 @@ type Role = "meal" | "dietary" | "childcare" | "volunteer" | "church" | "churchO
 export const LISTING_FIELD_KEYS: Record<Role, readonly string[]> = {
   meal: ["meal_preference"],
   dietary: ["dietary_needs", "dietary_restrictions"],
+  allergy: ["food_allergies"],
   childcare: ["childcare_needed"],
   volunteer: ["volunteer"],
   church: ["church_name", "church"],
@@ -190,10 +191,12 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
       let church = registration.isGroup ? "" : answer("church");
       if (!registration.isGroup && (!church || church === DIRECTORY_NOT_LISTED_VALUE || church === "Other")) church = answer("churchOther");
       const mealPreference = answer("meal");
-      const dietaryAnswer = answer("dietary");
+      // Food allergies (#1665) come first, then the diet choices; the kitchen counts each part on its own.
+      const dietaryAnswer = [answer("allergy"), answer("dietary")].filter(Boolean).join("; ");
       const needs = hasDietaryNeeds(dietaryAnswer);
       let dietaryNeeds = "";
-      if (fields.dietary && (index === 0 || fields.dietary.scope === "ATTENDEE")) {
+      const dietaryField = fields.dietary ?? fields.allergy;
+      if (dietaryField && (index === 0 || dietaryField.scope === "ATTENDEE")) {
         dietaryNeeds = options.showDietaryDetails ? dietaryAnswer : needs ? "Yes" : "No";
       }
       rows.push({
