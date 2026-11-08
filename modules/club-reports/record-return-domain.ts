@@ -6,6 +6,7 @@
  * Nothing here changes a review decision, a score or a submission.
  */
 import { safeReturnTo } from "@/lib/return-to";
+import { clubPageReturnHref } from "@/modules/club-reports/club-page-links";
 
 export const REVIEW_LIST_PATH = "/admin/clubs/reports";
 export const RECORDS_VIEW_PATH = "/admin/clubs/summary";
@@ -116,15 +117,19 @@ export function withRecordFrom(href: string, from: string | null): string {
  * including a nested `from`, another club's page, an external host, `//`, a backslash or another path, returns null.
  */
 export function parseRecordFrom(value: string | null | undefined, options: { organizationId?: string } = {}): RecordOrigin | null {
-  const safe = safeReturnTo(value, "");
-  if (!safe) return null;
+  if (typeof value !== "string" || value.length === 0) return null;
+  // Only the path part goes through `safeReturnTo`; the query is rebuilt from allowed parameters below, so a search such as
+  // "100%" or "a//b" does not lose the way back (as #1587's club-page links do).
+  const queryAt = value.indexOf("?");
+  const pathPart = queryAt === -1 ? value : value.slice(0, queryAt);
+  if (safeReturnTo(pathPart, "") !== pathPart) return null;
   let url: URL;
   try {
-    url = new URL(safe, BASE);
+    url = new URL(value, BASE);
   } catch {
     return null;
   }
-  if (url.origin !== BASE) return null;
+  if (url.origin !== BASE || url.pathname !== pathPart.split("#")[0]) return null;
   const origin = recordOriginFor(url.pathname, url.searchParams);
   if (!origin) return null;
   if (origin.kind === "club") {
@@ -152,5 +157,6 @@ export function parseClubPageFrom(value: string | null | undefined): { organizat
   const origin = parseRecordFrom(value);
   if (!origin || origin.kind !== "club") return null;
   const organizationId = clubPageOrganization(new URL(origin.href, BASE).pathname);
-  return organizationId ? { organizationId, href: origin.href } : null;
+  // The club page's own return (its year and the directory it came from) is kept as #1587 builds it.
+  return organizationId ? { organizationId, href: clubPageReturnHref(value, organizationId) ?? origin.href } : null;
 }

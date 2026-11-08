@@ -90,7 +90,10 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
   const eventSorting = serverSort("/admin/clubs/summary", searchParamsRecord, EVENT_CLUB_SORT_COLUMNS, EVENT_CLUB_DEFAULT_SORT, { hash: "#club-events" });
   // A record opened from the Monthly Records view carries that view's address, so its back link returns to it (#1588).
   const recordsFrom = view === "records" ? recordFromParam("/admin/clubs/summary", recordsSearch(searchParamsRecord, clubYear)) : null;
-  const fromClub = view === "records" ? parseClubPageFrom(params.from) : null;
+  const clubFrom = view === "records" ? parseClubPageFrom(params.from) : null;
+  // Only a club that is among this year's clubs gets a link back (#1588).
+  const fromClubName = clubFrom ? clubs.find((club) => club.id === clubFrom.organizationId)?.name : undefined;
+  const fromClub = clubFrom && fromClubName ? clubFrom : null;
   const links = {
     clubHref: (id: string) => clubDirectoryClubHref(id, clubYear),
     reportHref: (id: string, month: string) => withRecordFrom(`/admin/clubs/reports/${encodeURIComponent(id)}/${encodeURIComponent(month)}?year=${encodeURIComponent(clubYear)}`, recordsFrom),
@@ -142,7 +145,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
         {newYearStatus && newYearStatus.clubs.length > 0 && <details className={`panel ${styles.details}`}><summary>Roster carry-forward status</summary><ClubNewYearStatus clubHref={(id) => clubDirectoryClubHref(id, newYearStatus.toClubYear)} status={newYearStatus} /></details>}
       </>}
       {view === "records" && <>
-        {fromClub && <Link className="secondary-button" href={fromClub.href} prefetch={false}>Back to {clubs.find((club) => club.id === fromClub.organizationId)?.name ?? "the club"}</Link>}
+        {fromClub && <Link className="secondary-button" href={fromClub.href} prefetch={false}>Back to {fromClubName}</Link>}
         <Link className="secondary-button" href={`/admin/clubs/reports?year=${encodeURIComponent(clubYear)}`}>Review monthly records</Link>
         <StaffMonthlyRecords clubYear={clubYear} fromClub={fromClub?.href ?? null} links={links} view={buildStaffMonthlyRecords({ clubs, clubYear, now, month: params.month, q: params.q, show: params.show, all: params.all, sort: params.sort, dir: params.dir })} />
         <details className={`panel ${styles.details}`} open={Boolean(params.gridSort || params.overviewSort) || undefined}>

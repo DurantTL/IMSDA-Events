@@ -124,11 +124,10 @@ describe("record return address (#1588)", () => {
     expect(parseRecordFrom(undefined)).toBeNull();
   });
 
-  it("rejects a nested from that hides a bad address and drops a harmless one", () => {
-    expect(parseRecordFrom("/admin/clubs/reports?year=2025-26&from=https%3A%2F%2Fevil.example")).toBeNull();
-    expect(parseRecordFrom("/admin/organizations/org_1/club?year=2025-26&from=%2F%2Fevil.example", { organizationId: "org_1" })).toBeNull();
+  it("drops any nested from, so a bad one never rides along", () => {
+    expect(parseRecordFrom("/admin/clubs/reports?year=2025-26&from=https%3A%2F%2Fevil.example")?.href).toBe("/admin/clubs/reports?year=2025-26");
+    expect(parseRecordFrom("/admin/organizations/org_1/club?year=2025-26&from=%2F%2Fevil.example", { organizationId: "org_1" })?.href).toBe("/admin/organizations/org_1/club?year=2025-26");
     expect(parseRecordFrom("/admin/clubs/reports?year=2025-26&from=%2Fadmin%2Fpeople")?.href).toBe("/admin/clubs/reports?year=2025-26");
-    expect(parseRecordFrom("/admin/organizations/org_1/club?year=2025-26&from=%2Fadmin%2Fpeople", { organizationId: "org_1" })?.href).toBe("/admin/organizations/org_1/club?year=2025-26");
   });
 
   it("names the back link for its parent and returns to the exact address", () => {
@@ -139,6 +138,31 @@ describe("record return address (#1588)", () => {
     expect(recordBackLink("/admin/organizations/org_9/club", input)).toEqual({ href: "/admin/clubs/reports?year=2026-27", label: "Back to Review monthly records" });
     expect(recordBackLink(undefined, input).label).toBe("Back to Review monthly records");
     expect(recordBackLabel("club")).toBe("Back to the club");
+  });
+
+  it("keeps the way back when a records search holds %, // or a backslash", () => {
+    const input = { organizationId: "org_1", clubName: "Eagle Ridge", clubYear: "2026-27" };
+    for (const q of ["100%", "a//b", "a\\b", "50%25"]) {
+      const from = recordFromParam("/admin/clubs/summary", new URLSearchParams({ view: "records", year: "2026-27", q }))!;
+      expect(from).toContain("q=");
+      const back = recordBackLink(from, input);
+      expect([q, back.label]).toEqual([q, "Back to Monthly Records"]);
+      expect(new URL(back.href, "https://x.test").searchParams.get("q")).toBe(q);
+    }
+    // A bad path is still refused even when the query is harmless.
+    expect(parseRecordFrom("//evil.example/admin/clubs/summary?view=records")).toBeNull();
+    expect(parseRecordFrom("/admin/clubs/summary\\x?view=records")).toBeNull();
+  });
+
+  it("keeps the nested directory return on the club page link", () => {
+    const dir = "/admin/clubs/summary?year=2025-26&q=Eagle&page=2";
+    const from = `/admin/organizations/org_1/club?year=2025-26&from=${encodeURIComponent(dir)}`;
+    const club = parseClubPageFrom(from);
+    expect(club?.organizationId).toBe("org_1");
+    expect(club?.href).toContain("/admin/organizations/org_1/club?year=2025-26&from=");
+    expect(decodeURIComponent(club!.href)).toContain("q=Eagle");
+    expect(decodeURIComponent(club!.href)).toContain("page=2");
+    expect(parseClubPageFrom(`/admin/organizations/org_1/club?year=2025-26&from=${encodeURIComponent("https://evil.example")}`)?.href).toBe("/admin/organizations/org_1/club?year=2025-26");
   });
 
   it("reads a club page from for the records view and rejects others", () => {
@@ -164,7 +188,8 @@ describe("Monthly records pages (#1588)", () => {
     const summary = read("app/(workspace)/admin/clubs/summary/page.tsx");
     expect(summary).toContain("withRecordFrom(`/admin/clubs/reports/");
     expect(summary).toContain("parseClubPageFrom(params.from)");
-    expect(summary).toContain("Back to {clubs.find");
+    expect(summary).toContain("Back to {fromClubName}");
+    expect(summary).toContain("fromClubName ? clubFrom : null");
   });
 
   it("export buttons and year links are 44px tap targets from a CSS module", () => {
