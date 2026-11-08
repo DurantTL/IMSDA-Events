@@ -10,7 +10,7 @@ import {
   buildRequestPanel,
   healthStripState,
 } from "@/components/event-modules-page-model";
-import { buildEventSetupView } from "@/components/event-setup-model";
+import { buildEventSetupView, eventSetupEmptyCopy } from "@/components/event-setup-model";
 import { buildMoreDirectoryCards, staffPageTitles } from "@/components/staff-navigation";
 import { resolveStaffViewer } from "@/modules/club-forms/access";
 import { listRecentAuditActivity } from "@/modules/audit/audit-service";
@@ -85,11 +85,13 @@ export default async function MorePage({ searchParams }: { searchParams: Promise
     : null;
 
   const setup = buildEventSetupView({ eventName: event.name, eventQuery, permissions, view });
+  const featuresShown = setup.groups.some((group) => group.cards.some((card) => card.href.startsWith("/more/features")));
 
   return (
     <section className="page-stack event-modules-page">
       <AdminHub view={setup} />
-      {!view.canToggle && <p className="quiet-copy">Only a system administrator turns modules on or off. Event features shows what this event uses.</p>}
+      {setup.groups.length === 0 && <p className="quiet-copy">{eventSetupEmptyCopy}</p>}
+      {!view.canToggle && <p className="quiet-copy">Only a system administrator turns modules on or off.{featuresShown ? " Event features shows what this event uses." : ""}</p>}
 
       {health && (
         <section className="event-modules-health" data-state={health.state} aria-label="Event health">

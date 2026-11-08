@@ -122,7 +122,7 @@ text.push(
   "",
   "## Event setup (#1586)",
   "",
-  "The Event setup tab opens one grouped page, `/more`, with no view strip: Basics, Registration, Program, Lodging and items, Sales, People and clubs. Each card opens its own page and every page keeps its URL and its Event setup lighting. A card shows only when the person may open its page and, for a module page, the module is on for the event. Promo codes is the Money page and says so. The Team page (`/staff`) says it is the event staff team, not participant staff invitations or System account access. Health, change-of-type leftovers, modules that are off, Request a feature and the activity trail stay below the cards.",
+  "The Event setup tab opens one grouped page, `/more`, with no view strip: Basics, Registration, Program, Lodging and items, Sales, People, Clubs. Each card opens its own page and every page keeps its URL and its Event setup lighting. A card shows only when the person may open its page and, for a module page, the module is on for the event. Promo codes is the Money page and says so. The Team page (`/staff`) says it is the event staff team, not participant staff invitations or System account access. Health, change-of-type leftovers, modules that are off, Request a feature and the activity trail stay below the cards.",
   "",
   "## Left out until built",
   "",

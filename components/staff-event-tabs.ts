@@ -1,9 +1,9 @@
 import { kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
 import { hasVisibleReviewQueue, reviewQueuePaths } from "@/modules/review-queues/review-queues-model";
 import { moneyToolPaths } from "@/modules/payments/money-tools-model";
+import { eventSetupHasCards } from "@/components/event-setup-model";
 import { canAccessOperationalHealth } from "@/modules/operations/access";
 import {
-  canShowMoreLauncher,
   matchesVisibility,
   navigation,
   staffPageTitles,
@@ -160,7 +160,7 @@ export const eventTabSpecs: readonly TabSpec[] = [
     // One grouped page and no view strip (#1586): Event settings, Registration forms, Attendee setup, Event features and every other
     // setup page are cards on it. A single view is the tab's own page, so the tab shows no views.
     views: [
-      { key: "setup", label: "Event setup", href: "/more", visible: (context) => canShowMoreLauncher({ item: nav("/more"), ...context.more }) },
+      { key: "setup", label: "Event setup", href: "/more", visible: (context) => eventSetupHasCards(context.more) },
     ],
   },
   // Reserved: no route exists until the first of these features is built (#1559 decisions 7 and 8).

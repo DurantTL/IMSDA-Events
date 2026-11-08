@@ -85,7 +85,7 @@ describe("/more as the Event setup page (#1586)", () => {
     signIn({ globalRole: null, permissions: eventPermissions, enabled: ["merchandise", "emergency-plans"] });
     const markup = await render();
     // Program has only Meals here (the Honors and Seminar modules are off), so it joins Registration; the heading says so.
-    for (const group of ["Basics", "Registration / Program", "Lodging and items", "Sales / People and clubs"]) expect(markup).toContain(`>${group}</h2>`);
+    for (const group of ["Basics", "Registration / Program", "Lodging and items", "Sales / People"]) expect(markup).toContain(`>${group}</h2>`);
     for (const href of ["/more/event-settings", "/more/features", "/registration-builder", "/more/attendee-configuration", "/more/tags", "/information-forms", "/more/meals", "/more/lodging", "/more/lodging/assignments", "/more/lodging/requests", "/more/issued-assets", "/more/merchandise", "/more/promo-codes", "/staff", "/more/event-content", "/more/emergency-plan"]) {
       expect(markup, href).toContain(`href="${href}?event=event_1"`);
     }
@@ -198,6 +198,15 @@ describe("/more as the Event setup page (#1586)", () => {
     const markup = await render();
     expect(cardTitles(markup)).toContain("Club forms");
     expect(markup).not.toContain('href="/finance?event=event_1"');
+  });
+});
+
+describe("Event setup with nothing to show (#1586)", () => {
+  it("says so plainly when no card remains, and does not point at Event features", async () => {
+    signIn({ globalRole: null, permissions: ["VIEW_EVENT", "MANAGE_COMMUNICATIONS"], enabled: [] });
+    const markup = await render();
+    expect(markup).toContain("Nothing to set up here for your role. Ask your event administrator if you need access to setup pages.");
+    expect(markup).not.toContain("Event features shows what this event uses");
   });
 });
 

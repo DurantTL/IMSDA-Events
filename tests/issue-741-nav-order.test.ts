@@ -131,8 +131,8 @@ describe("event tab order (#1565, from the sidebar order of #964)", () => {
     expect(render({ ...eventAdmin, pathname: eventFeaturesRoute })).toContain('href="/more?event=event_1"');
   });
 
-  it("shows a check-in-only role Event home, Registrations and Check-in, and no empty tab", () => {
-    expect(tabs({ permissions: rolePermissions.CHECK_IN_STAFF })).toEqual(["Event home", "Registrations", "Check-in", "Event setup"]);
+  it("shows a check-in-only role Event home, Registrations and Check-in, and no empty tab (Event setup only when it would have a card, #1586)", () => {
+    expect(tabs({ permissions: rolePermissions.CHECK_IN_STAFF })).toEqual(["Event home", "Registrations", "Check-in"]);
     expect(tabs({ permissions: ["MANAGE_CHECK_IN"] })).toEqual(["Check-in"]);
   });
 
@@ -142,7 +142,7 @@ describe("event tab order (#1565, from the sidebar order of #964)", () => {
   });
 
   it("shows a communications role Communications, and Operational health only where its permissions allow", () => {
-    expect(tabs({ permissions: rolePermissions.COMMUNICATIONS_MANAGER })).toEqual(["Event home", "Communications", "Reports", "Event setup"]);
+    expect(tabs({ permissions: rolePermissions.COMMUNICATIONS_MANAGER })).toEqual(["Event home", "Communications", "Reports"]);
     expect(views({ permissions: rolePermissions.COMMUNICATIONS_MANAGER, pathname: "/more/health" })).toEqual([]);
   });
 

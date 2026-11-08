@@ -17,7 +17,7 @@ describe("Team page ownership line (#1586)", () => {
   });
 
   it("says it is not participant staff invitations or System account access", () => {
-    expect(html).toContain("participant staff registrations (see Registrations, Review queues, Staff invitations)");
+    expect(html).toContain("participant staff registrations (in Registrations)");
     expect(html).toContain("System account access (see Admin)");
   });
 

@@ -29,7 +29,7 @@ export function EventModuleToggle({
   async function toggle() {
     if (enabled && !(await confirm({
       title: `Turn off ${title}?`,
-      body: <p>Its pages and links are hidden for this event. The data is kept, and you can turn it back on from Event modules.</p>,
+      body: <p>Its pages and links are hidden for this event. The data is kept, and you can turn it back on from Event features.</p>,
       confirmLabel: `Turn off ${title}`,
       destructive: true,
     }))) return;

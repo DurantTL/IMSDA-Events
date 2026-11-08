@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildEventModulesView } from "@/components/event-modules-page-model";
-import { buildEventSetupView, eventSetupCardKeys } from "@/components/event-setup-model";
+import { buildEventSetupView, eventSetupCardKeys, eventSetupHasCards } from "@/components/event-setup-model";
 import { buildMoreDirectoryCards } from "@/components/staff-navigation";
 import { eventPermissions, rolePermissions, type EventPermission } from "@/modules/access/permissions";
 import { MAX_GROUP_CARDS } from "@/modules/system-admin/admin-hubs-model";
@@ -26,19 +26,19 @@ const titles = (view: ReturnType<typeof build>) => view.groups.map((group) => gr
 const hrefs = (view: ReturnType<typeof build>) => view.groups.flatMap((group) => group.cards.map((card) => card.href));
 
 describe("Event setup groups (#1586)", () => {
-  it("lists Basics, Registration, Program, Lodging and items, Sales, then People and clubs, for full access on a club event", () => {
+  it("lists Basics, Registration, Program, Lodging and items, Sales, People, then Clubs, for full access on a club event", () => {
     const view = build({ isSystemAdmin: true, clubEvent: true });
     expect(titles(view).slice(0, 5)).toEqual(["Basics", "Registration", "Program", "Lodging and items", "Sales"]);
+    expect(titles(view).slice(5)).toEqual(["People", "Clubs"]);
     const byTitle = Object.fromEntries(view.groups.map((group) => [group.title, group.cards.map((card) => card.title)]));
     expect(byTitle["Basics"]).toEqual(["Event settings", "Event features", "Emergency plan", "Public content"]);
     expect(byTitle["Registration"]).toEqual(["Registration forms", "Attendee setup", "Tags", "Information forms"]);
     expect(byTitle["Program"]).toEqual(["Honors Weekend classes", "Seminar assignments", "Meals"]);
     expect(byTitle["Lodging and items"]).toEqual(["Lodging", "Lodging assignments", "Lodging requests", "Issued assets"]);
     expect(byTitle["Sales"]).toEqual(["Merchandise", "Promo codes"]);
-    // Seven people-and-clubs cards are split in two so no group is over six.
-    const people = view.groups.slice(5);
-    expect(people.map((group) => group.title)).toEqual(["People and clubs", "People and clubs (more)"]);
-    expect(people.flatMap((group) => group.cards.map((card) => card.title))).toEqual(["Staff", "Clubs and churches", "This event's clubs", "Club assignments", "Club forms", "Event health information", "Event patches"]);
+    // People and clubs are split by meaning, not by count.
+    expect(byTitle["People"]).toEqual(["Staff", "Event health information"]);
+    expect(byTitle["Clubs"]).toEqual(["Clubs and churches", "This event's clubs", "Club assignments", "Club forms", "Event patches"]);
   });
 
   it("keeps every card to one of the setup keys, so other tabs' pages never appear", () => {
@@ -101,5 +101,15 @@ describe("Event setup groups (#1586)", () => {
 
   it("opens with the plain intro line for the event", () => {
     expect(build({}).description).toBe("Everything you set for Synthetic Camporee, on one page. Each item opens its own page.");
+  });
+
+  it("shows the Event setup tab only when the page would have a card: not for check-in staff or communications managers with the emergency plan off", () => {
+    const hidden = new Set(["emergency-plans", "honors", "event-patches", "club-assignments", "merchandise", "program-assignments"]);
+    const context = (permissions: readonly EventPermission[]) => ({ permissions, clubOversight: false, clubEvent: false, isSystemAdmin: false, clubFormsAccess: false, hiddenCardKeys: hidden });
+    expect(eventSetupHasCards(context(rolePermissions.CHECK_IN_STAFF))).toBe(false);
+    expect(eventSetupHasCards(context(rolePermissions.COMMUNICATIONS_MANAGER))).toBe(false);
+    expect(eventSetupHasCards(context(rolePermissions.EVENT_ADMIN))).toBe(true);
+    // With the emergency plan on, anyone with the event view has that card.
+    expect(eventSetupHasCards({ ...context(rolePermissions.CHECK_IN_STAFF), hiddenCardKeys: new Set() })).toBe(true);
   });
 });

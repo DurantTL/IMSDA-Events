@@ -1,4 +1,4 @@
-import { eventFeaturesItem, matchesVisibility, type MoreDirectoryCard } from "@/components/staff-navigation";
+import { buildMoreDirectoryCards, eventFeaturesItem, matchesVisibility, type MoreDirectoryCard, type MoreDirectoryContext } from "@/components/staff-navigation";
 import type { EventModulesView } from "@/components/event-modules-page-model";
 import type { EventPermission } from "@/modules/access/permissions";
 import { mergeLoneCards, splitGroup, type HubBody, type HubCard, type HubGroup } from "@/modules/system-admin/admin-hubs-model";
@@ -26,14 +26,25 @@ const groupDefs: ReadonlyArray<{ title: string; entries: readonly SetupEntry[] }
   { title: "Program", entries: [{ key: "honors" }, { key: "program-assignments" }, { key: "meals" }] },
   { title: "Lodging and items", entries: [{ key: "lodging" }, { key: "lodging-assignments" }, { key: "lodging-requests" }, { key: "issued-assets" }] },
   { title: "Sales", entries: [{ key: "merchandise" }, { key: "promo-codes" }] },
-  {
-    title: "People and clubs",
-    entries: [{ key: "staff" }, { key: "clubs-and-churches" }, { key: "clubs" }, { key: "club-assignments" }, { key: "club-forms" }, { key: "event-health" }, { key: "event-patches" }],
-  },
+  { title: "People", entries: [{ key: "staff" }, { key: "event-health" }] },
+  { title: "Clubs", entries: [{ key: "clubs-and-churches" }, { key: "clubs" }, { key: "club-assignments" }, { key: "club-forms" }, { key: "event-patches" }] },
 ];
 
 /** The directory keys the Event setup page lists, in order. Every other directory card belongs to another tab. */
 export const eventSetupCardKeys: readonly string[] = groupDefs.flatMap((group) => group.entries.map((entry) => entry.key));
+
+/**
+ * Whether the Event setup page would show this viewer at least one card: a setup card the viewer's permissions allow (the
+ * directory's `hiddenCardKeys` already carries the module-off rule) or Event features. The Event setup tab is shown only then,
+ * so it never opens an empty page. Cards that belong to other tabs do not count.
+ */
+export function eventSetupHasCards(context: Omit<MoreDirectoryContext, "eventQuery">): boolean {
+  if (matchesVisibility(eventFeaturesItem, new Set(context.permissions))) return true;
+  const setupKeys = new Set(eventSetupCardKeys);
+  return buildMoreDirectoryCards({ ...context, eventQuery: "" }).some((card) => card.allowed && setupKeys.has(card.key));
+}
+
+export const eventSetupEmptyCopy = "Nothing to set up here for your role. Ask your event administrator if you need access to setup pages.";
 
 export const eventFeaturesCardCopy = "Turn the features this event uses on or off, and see what each one changes. Turning one off never deletes its data.";
 /** Promo codes are a Money page; the card is the same page, and says where it lives. */
