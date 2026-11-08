@@ -100,7 +100,7 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
         ) : (
           <div className="report-table-wrap">
             {sorting.order.key && <SortOrderNote>{sortOrderText(formSortLabels[sorting.order.key].label, sorting.order.dir, formSortLabels[sorting.order.key].kind)}</SortOrderNote>}
-            <table role="table" className="report-table table-cards">
+            <table role="table" className="report-table table-cards table-cards-tablet">
               <caption className="sr-only">All forms</caption>
               <thead role="rowgroup">
                 <tr role="row"><ColumnHeader column="form" label="Form" sorting={sorting} /><ColumnHeader column="kind" label="Kind" sorting={sorting} /><ColumnHeader column="event" label="Event" sorting={sorting} /><ColumnHeader column="status" label="Status" sorting={sorting} /><ColumnHeader column="responses" label="Responses" sorting={sorting} /><ColumnHeader column="last" label="Last response" sorting={sorting} /><th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr>
