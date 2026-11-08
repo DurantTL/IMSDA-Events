@@ -193,6 +193,8 @@
 }
 .views a:hover { background: var(--imsda-navy-soft); color: var(--imsda-navy); }
 .views a[aria-current="page"] { background: var(--imsda-navy); color: #fff; }
+/* A page below a view (a queue under Review queues, a money page under More money tools) still says where it belongs. */
+.views a[aria-current="true"] { background: var(--imsda-navy-soft); color: var(--imsda-navy); }
 .views a:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
 
 /* ---------- page header (title and Event administration badge) ---------- */

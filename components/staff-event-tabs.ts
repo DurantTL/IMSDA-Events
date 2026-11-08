@@ -1,4 +1,5 @@
 import { kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
+import { hasVisibleReviewQueue, reviewQueuePaths } from "@/modules/review-queues/review-queues-model";
 import { moneyToolPaths } from "@/modules/payments/money-tools-model";
 import { canAccessOperationalHealth } from "@/modules/operations/access";
 import {
@@ -88,9 +89,20 @@ export const eventTabSpecs: readonly TabSpec[] = [
     label: staffPageTitles.registrations,
     owns: ["/people", "/imports"],
     views: [
-      { key: "registrations", label: "All registrations", href: "/people", visible: byNav("/people"), alsoOwns: ["/people/duplicates", "/people/matches", "/people/directory-review", "/people/pending-teams", "/people/responsible-adults", "/people/staff-invitations"] },
+      // Four views (five at most): All registrations, Attendee list, Imports, Review queues (#1574). The six queue pages are
+      // reached from the Review queues cards, which light that view as their parent. /people/matches (every event's possible
+      // duplicate people) stays with All registrations, as before: it is system identity review, not one of this event's queues.
+      { key: "registrations", label: "All registrations", href: "/people", visible: byNav("/people"), alsoOwns: ["/people/matches"] },
       { key: "attendees", label: staffPageTitles.attendeeList, href: "/people/attendees", visible: byNav("/people/attendees") },
       { key: "imports", label: staffPageTitles.imports, href: "/imports", visible: byNav("/imports") },
+      // Visible when at least one card would be: the invitation pages are for events open to everyone only.
+      {
+        key: "review-queues",
+        label: staffPageTitles.reviewQueues,
+        href: "/people/review-queues",
+        visible: (context, permissions) => hasVisibleReviewQueue({ permissions: [...permissions], audience: context.more.clubEvent ? "CLUB" : "GENERAL" }),
+        alsoOwns: reviewQueuePaths,
+      },
     ],
   },
   {

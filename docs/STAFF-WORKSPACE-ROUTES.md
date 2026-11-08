@@ -156,18 +156,19 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/overview` | Event sidebar | Events (inside an event) | Event home | Dashboard | More, This event | Event menu | - | `app/(workspace)/overview/page.tsx` |
 | `/people` | Event sidebar | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/page.tsx` |
 | `/people/attendees` | More directory | Events (inside an event) | Registrations | Attendee list | More, This event | Event menu | - | `app/(workspace)/people/attendees/page.tsx` |
-| `/people/directory-review` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/directory-review/page.tsx` |
-| `/people/duplicates` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/duplicates/page.tsx` |
+| `/people/directory-review` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/directory-review/page.tsx` |
+| `/people/duplicates` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/duplicates/page.tsx` |
 | `/people/matches` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/matches/page.tsx` |
-| `/people/pending-teams` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/pending-teams/page.tsx` |
-| `/people/responsible-adults` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/responsible-adults/page.tsx` |
-| `/people/staff-invitations` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/page.tsx` |
-| `/people/staff-invitations/approvals` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/approvals/page.tsx` |
+| `/people/pending-teams` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/pending-teams/page.tsx` |
+| `/people/responsible-adults` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/responsible-adults/page.tsx` |
+| `/people/review-queues` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/review-queues/page.tsx` |
+| `/people/staff-invitations` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/page.tsx` |
+| `/people/staff-invitations/approvals` | Page link | Events (inside an event) | Registrations | Review queues | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/approvals/page.tsx` |
 | `/registration-builder` | Event sidebar | Events (inside an event) | Event setup | Registration forms | More, This event | Event menu | - | `app/(workspace)/registration-builder/page.tsx` |
 | `/select-event` | Existing page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/select-event/page.tsx` |
 | `/staff` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/staff/page.tsx` |
 
-158 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
+159 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
 
 ## Query states that move a page to another tab or view
 
@@ -198,7 +199,7 @@ Each Admin tab (Events, Clubs, People, Forms, Catalogs and settings) opens its o
 | --- | --- |
 | Check-in passes, badges and keys (`/check-in/passes`, `/check-in/badges`, `/check-in/assets`) | Views of the Check-in tab: Attendee passes, Name badges, Keys and items |
 | `/finance` sub-pages (Owed by churches, Billing responsibility, Attendance reconciliation, Scholarship fund, Invoices, Cancellation rules and requests, Unmatched Square payments, Ledger check) | Money > Payments owns them for the marking, and the Payments page keeps its tool links; the "More money tools" grouped page waits for #1575 and is not listed until it exists |
-| `/people` sub-pages (Find duplicates, Directory review, Teams waiting for a club, Responsible adults, Staff invitations) | Registrations > All registrations owns them, and that page lists them as links; a review-queues page waits for #1574 |
+| `/people` sub-pages (Find duplicates, Directory review, Teams waiting for a club, Responsible adults, Staff invitations) | Registrations > Review queues owns them (#1574): the grouped page lists each one the person can open as a card, with a count where its own page already has one. `/people/matches` stays with All registrations |
 | Imports, Attendee list | Views of the Registrations tab |
 | Honors Weekend classes, instructors, rosters and schedule (`/more/honors/**`) | Event setup > All event tools (the `/more` directory) lists the classes card, and the classes page links the other three |
 | Event features (`/more/features`) | A view of Event setup |
@@ -209,4 +210,4 @@ Each Admin tab (Events, Clubs, People, Forms, Catalogs and settings) opens its o
 ## Left out until built
 
 - Events > All events: there is no in-shell list of all events yet. Staff open an event from the Events row's "Open an event" picker or the dashboards, and switch from the event bar.
-- Money > Refunds and More money tools (#1575), Registrations > Review queues (#1574), Event setup groups (#1571 and the setup issues), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).
+- Money > Refunds and More money tools (#1575), Event setup groups (#1571 and the setup issues), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).
