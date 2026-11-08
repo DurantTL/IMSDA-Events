@@ -28,6 +28,7 @@ import { StaffViewStrip } from "@/components/staff-view-strip";
 import { StaffPhoneBar } from "@/components/staff-phone-bar";
 import { StaffKeyboardWatch } from "@/components/staff-keyboard-watch";
 import { buildStaffNavigation } from "@/components/staff-navigation-model";
+import { showsWorkContextChip } from "@/components/work-context-model";
 import { staffAreaMeta } from "@/components/staff-areas";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
 import { staffWorkspaceOptions } from "@/modules/access/workspace-contexts";
@@ -216,6 +217,15 @@ export function AppShell({
     ? { kind: "system" as const, kindLabel: "System", label: "System administration", detail: "All events" }
     : { kind: "event" as const, kindLabel: selectedEvent ? "Event" : "Staff", label: selectedEvent?.name?.trim() || "Staff workspace", detail: "" };
 
+  // The event bar and the tab row name the place already (#1733); the line under the heading stays only where nothing else does.
+  const eventBarShown = place.inEvent && Boolean(selectedEvent) && !eventlessProfile;
+  const showContextChip = showsWorkContextChip({
+    context: workContext,
+    eventName: selectedEvent?.name,
+    pageTitle,
+    shownPlaceNames: [eventBarShown ? selectedEvent?.name : null, place.inEvent ? selectedEvent?.name : staffAreaMeta[place.area].label],
+  });
+
   // An event named in the URL becomes the remembered selection (#616), so the
   // next page without `?event=` keeps it instead of falling back to the default.
   const lastRememberedId = useRef<string | null>(defaultEventId);
@@ -333,11 +343,12 @@ export function AppShell({
           <header className={styles.pageHeader}>
             <div>
               <h1>{pageTitle}</h1>
-              <p className="work-context" data-context={workContext.kind}>
-                <span className="work-context-kind">{workContext.kindLabel}</span>
-                <span className="work-context-name" title={workContext.label}>{workContext.label}</span>
-                {workContext.kind === "system" && workContext.detail && <span className="work-context-detail">{workContext.detail}</span>}
-              </p>
+              {showContextChip && (
+                <p className="work-context" data-context={workContext.kind}>
+                  <span className="work-context-kind">{workContext.kindLabel}</span>
+                  <span className="work-context-name" title={workContext.label}>{workContext.label}</span>
+                </p>
+              )}
             </div>
           </header>
           <WorkspaceContent pageKey={workspacePageKey(pathname, searchParams)}>

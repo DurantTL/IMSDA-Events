@@ -40,7 +40,7 @@ describe("Club administration uses the hub pattern (#1568)", () => {
 
   it("makes Review applications the one main action and adds no numbers of its own", () => {
     const result = view(system);
-    expect(result.action).toEqual({ href: "/admin/clubs/applications", label: "Review applications" });
+    expect(result.action).toEqual({ href: "/admin/clubs/applications", label: "Review applications", primary: true });
     expect(result.stats).toEqual([]);
     expect(result.title).toBe("Club administration");
   });

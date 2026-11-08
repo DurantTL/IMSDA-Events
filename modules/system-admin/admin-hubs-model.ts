@@ -65,7 +65,8 @@ type CardDef = {
 
 /** `note` is a line under the label for a caveat the number alone would hide (checks that could not be read). */
 type StatDef = { metric: MetricKey; singular: string; plural: string; gate: HubGate; alsoNeeds?: readonly MetricKey[]; note?: (read: Reader) => string | null };
-type ActionDef = { href: string; label: string; gate: HubGate };
+/** `metric` ties an action to a count of work waiting: the action is a filled button only while that count is above 0 (#1733). */
+type ActionDef = { href: string; label: string; gate: HubGate; metric?: MetricKey };
 type GroupDef = { title: string; cards: readonly CardDef[] };
 type HubDef = {
   stats: readonly StatDef[];
@@ -189,7 +190,7 @@ const hubDefs: Record<HubKey, HubDef> = {
   },
   clubs: {
     stats: clubStats,
-    actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs }],
+    actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs, metric: "applicationsWaiting" }],
     groups: [
       { title: "Directory", cards: [clubCards.clubsAndChurches, clubCards.summary, clubCards.leaders] },
       { title: "Records", cards: [clubCards.records] },
@@ -201,7 +202,7 @@ const hubDefs: Record<HubKey, HubDef> = {
   "club-administration": {
     regroupLoneCards: true,
     stats: [],
-    actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs }],
+    actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs, metric: "applicationsWaiting" }],
     groups: [
       { title: "Clubs", cards: [clubCards.summary, clubCards.clubsAndChurches, clubCards.transfers, clubCards.sterling] },
       {
@@ -307,7 +308,7 @@ const hubDefs: Record<HubKey, HubDef> = {
       { metric: "honors", singular: "Honor in the catalog", plural: "Honors in the catalog", gate: hubGates.clubs },
     ],
     actions: [
-      { href: "/admin/readiness", label: "Open System readiness", gate: hubGates.system },
+      { href: "/admin/readiness", label: "Open System readiness", gate: hubGates.system, metric: "readinessAttention" },
       { href: "/admin/honors", label: "Open the Honor catalog", gate: hubGates.clubs },
       { href: "/admin/site-content", label: "Edit homepage & site content", gate: hubGates.siteContent },
     ],
@@ -382,7 +383,8 @@ export type HubView = {
   title: string;
   description: string;
   stats: HubStat[];
-  action: { href: string; label: string } | null;
+  /** `primary` is false for a link with nothing waiting behind it: the page then has no filled button. */
+  action: { href: string; label: string; primary?: boolean } | null;
   groups: HubGroup[];
 };
 
@@ -394,7 +396,7 @@ export type HubBody = {
   key: string;
   description: string;
   stats?: readonly HubStat[];
-  action?: { href: string; label: string } | null;
+  action?: { href: string; label: string; primary?: boolean } | null;
   groups: readonly HubGroup[];
 };
 
@@ -476,12 +478,21 @@ function visibleStats(def: HubDef, viewer: HubViewer) {
 export function neededMetrics(hub: HubKey, viewer: HubViewer): MetricKey[] {
   const def = hubDefs[hub];
   const keys = new Set<MetricKey>();
+  const action = def.actions.find((candidate) => candidate.gate(viewer));
+  if (action?.metric) keys.add(action.metric);
   for (const card of visibleCards(def, viewer)) for (const key of card.metrics ?? []) keys.add(key);
   for (const stat of visibleStats(def, viewer)) {
     keys.add(stat.metric);
     for (const key of stat.alsoNeeds ?? []) keys.add(key);
   }
   return [...keys];
+}
+
+/** A main action is a filled button when it has no count (a create action) or when its count is above 0; otherwise it is a plain link. */
+export function hubActionIsPrimary(action: { metric?: MetricKey }, read: Reader): boolean {
+  if (!action.metric) return true;
+  const value = read(action.metric);
+  return value !== null && value > 0;
 }
 
 export function buildHubView(hub: HubKey, viewer: HubViewer, values: MetricValues): HubView {
@@ -501,11 +512,14 @@ export function buildHubView(hub: HubKey, viewer: HubViewer, values: MetricValue
     };
   });
   const action = def.actions.find((candidate) => candidate.gate(viewer)) ?? null;
+  // A number shown as a key figure is not repeated as a card chip (#1733).
+  const statMetrics = new Set(stats.map((stat) => stat.key));
   let shown = def.groups.flatMap((group): Array<{ title: string; cards: HubCard[] }> => {
     const cards = group.cards.filter((card) => card.gate(viewer)).map((card): HubCard => {
       const needs = card.metrics ?? [];
       let status: CardStatus | null = null;
-      if (card.status) status = needs.some((key) => reading(key) === null) ? UNAVAILABLE_STATUS : card.status(reading);
+      const repeatsStat = needs.length === 1 && statMetrics.has(needs[0]);
+      if (card.status && !repeatsStat) status = needs.some((key) => reading(key) === null) ? UNAVAILABLE_STATUS : card.status(reading);
       return { href: card.href, title: cardTitle(card), description: cardDescription(card), status };
     });
     return cards.length > 0 ? [{ title: group.title, cards }] : [];
@@ -517,7 +531,7 @@ export function buildHubView(hub: HubKey, viewer: HubViewer, values: MetricValue
     title: hub === "club-administration" ? clubsAdminHomeItem.label : adminHubs[hub].title,
     description: hub === "club-administration" ? clubAdministrationDescription : adminHubs[hub].description,
     stats,
-    action: action ? { href: action.href, label: action.label } : null,
+    action: action ? { href: action.href, label: action.label, primary: hubActionIsPrimary(action, reading) } : null,
     groups,
   };
 }

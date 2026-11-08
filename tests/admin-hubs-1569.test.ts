@@ -7,7 +7,7 @@ import { AdminHub } from "@/components/admin-hub";
 import { areaTabs, staffPlaceFor, tabIsOwned, type StaffAreaViewer } from "@/components/staff-areas";
 import { adminHubs, systemSubpageTitle } from "@/components/system-navigation";
 import {
-  buildHubView,
+  hubActionIsPrimary, buildHubView,
   canOpenHub,
   cardRowSizes,
   neededMetrics,
@@ -42,7 +42,7 @@ describe("Admin hub model (#1569)", () => {
       expect(view.action, hub).not.toBeNull();
       expect(view.groups.length, hub).toBeGreaterThan(0);
     }
-    expect(buildHubView("events", system, allMetrics("events", system, 1)).action).toEqual({ href: "/event-setup", label: "Create an event" });
+    expect(buildHubView("events", system, allMetrics("events", system, 1)).action).toEqual({ href: "/event-setup", label: "Create an event", primary: true });
     expect(buildHubView("clubs", system, allMetrics("clubs", system, 1)).action?.href).toBe("/admin/clubs/applications");
     expect(buildHubView("forms", system, allMetrics("forms", system, 1)).action?.href).toBe("/admin/forms");
     expect(buildHubView("catalogs", system, allMetrics("catalogs", system, 1)).action?.href).toBe("/admin/readiness");
@@ -57,7 +57,9 @@ describe("Admin hub model (#1569)", () => {
   it("shows empty states as real zeros with their own words, never as unavailable", () => {
     const view = buildHubView("clubs", system, allMetrics("clubs", system, 0));
     expect(view.stats.map((stat) => stat.display)).toEqual(["0", "0", "0", "0"]);
-    const statuses = Object.fromEntries(view.groups.flatMap((group) => group.cards).map((card) => [card.title, card.status?.text]));
+    // The Clubs hub shows these zeros as key figures, so Club administration (no figures) carries the words (#1733).
+    const home = buildHubView("club-administration", system, Object.fromEntries(neededMetrics("club-administration", system).map((key) => [key, 0])));
+    const statuses = Object.fromEntries(home.groups.flatMap((group) => group.cards).map((card) => [card.title, card.status?.text]));
     expect(statuses["New club applications"]).toBe("None waiting");
     expect(statuses["Club summary"]).toBe("None late");
     expect(statuses["Club member transfers"]).toBe("None open");
@@ -70,7 +72,8 @@ describe("Admin hub model (#1569)", () => {
     const many = buildHubView("clubs", system, { clubs: 42, applicationsWaiting: 4, lateRecords: 3, openTransfers: 1, clubLeaders: 168 });
     expect(many.stats.map((stat) => [stat.display, stat.label])).toEqual([["42", "Active clubs"], ["4", "Applications waiting"], ["3", "Late Monthly Records"], ["1", "Open member transfer"]]);
     const texts = many.groups.flatMap((group) => group.cards).map((card) => card.status?.text);
-    expect(texts).toEqual(["42 active clubs", "3 late", "168 current leaders", "3 late", "4 waiting", "1 open"]);
+    // Only the leaders card keeps its chip: every other number is already a key figure above (#1733).
+    expect(texts).toEqual([undefined, undefined, "168 current leaders", undefined, undefined, undefined]);
     expect(new Set(many.stats.map((stat) => stat.key)).size).toBe(many.stats.length);
   });
 
@@ -81,8 +84,31 @@ describe("Admin hub model (#1569)", () => {
     expect(stat("applicationsWaiting")).toMatchObject({ value: null, display: "Unavailable" });
     expect(stat("clubs")).toMatchObject({ value: 3, display: "3" });
     const cards = view.groups.flatMap((group) => group.cards);
-    expect(cards.find((card) => card.title === "New club applications")?.status).toEqual({ tone: "draft", text: "Unavailable" });
+    // A number already shown as a stat tile is not repeated as a card chip (#1733).
+    expect(cards.find((card) => card.title === "New club applications")?.status).toBeNull();
     expect(cards.find((card) => card.title === "Club leaders")?.status?.text).toBe("3 current leaders");
+  });
+
+  it("shows the main action as a filled button only while something is waiting behind it (#1733)", () => {
+    const action = (values: MetricValues) => buildHubView("clubs", system, { ...allMetrics("clubs", system, 3), ...values }).action;
+    expect(action({ applicationsWaiting: 2 })).toEqual({ href: "/admin/clubs/applications", label: "Review applications", primary: true });
+    expect(action({ applicationsWaiting: 0 })).toMatchObject({ href: "/admin/clubs/applications", primary: false });
+    expect(action({ applicationsWaiting: null })).toMatchObject({ primary: false });
+    expect(buildHubView("catalogs", system, { ...allMetrics("catalogs", system, 1), readinessAttention: 0 }).action).toMatchObject({ href: "/admin/readiness", primary: false });
+    // A create action has no count, so it stays the one main button.
+    expect(buildHubView("events", system, allMetrics("events", system, 0)).action?.primary).toBe(true);
+    expect(neededMetrics("clubs", system)).toContain("applicationsWaiting");
+    expect(hubActionIsPrimary({}, () => null)).toBe(true);
+  });
+
+  it("never says one number twice: a card whose only number is a stat tile has no chip (#1733)", () => {
+    const clubs = buildHubView("clubs", system, allMetrics("clubs", system, 2));
+    const byTitle = Object.fromEntries(clubs.groups.flatMap((group) => group.cards).map((card) => [card.title, card.status?.text ?? null]));
+    expect(clubs.stats.map((stat) => stat.key)).toContain("openTransfers");
+    expect(byTitle["Club member transfers"] ?? null).toBeNull();
+    // Without a tile (Club administration has none) the chip stays.
+    const home = buildHubView("club-administration", system, { applicationsWaiting: 2, openTransfers: 1, lateRecords: 0, clubs: 3 });
+    expect(home.groups.flatMap((group) => group.cards).find((card) => card.href === "/admin/clubs/applications")?.status?.text).toBe("2 waiting");
   });
 
   it("never turns an unread or unreadable value into a healthy zero or All ready", () => {
