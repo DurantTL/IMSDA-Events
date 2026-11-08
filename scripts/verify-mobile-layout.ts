@@ -3955,8 +3955,8 @@ async function waitForShell(page: Page) {
 
 /** The #996 rules: squeezed text, an action bar over text when the page opens (scroll 0), and the loading screen. */
 /**
- * The staff shell's one row of tabs (#1565): it shows either the tabs or the menu line, never both and never neither; below
- * 1024px it is always the menu line; the tabs never run past their line and never scroll sideways; and the menu button
+ * The staff shell's one row of tabs (#1565): it shows either the tabs or the menu line, never both and never neither; it is the menu
+ * line only when the tabs would not fit, at any width (#1734); the tabs never run past their line and never scroll sideways; and the menu button
  * stays inside the window. Runs in the page.
  */
 function staffTabRowInPage(): string[] {
@@ -4041,9 +4041,7 @@ function portalTabRowInPage(): string[] {
       if (tabsShown && menuShown) problems.push("the tabs and the menu line both show");
       if (!tabsShown && !menuShown) problems.push("neither the tabs, the menu line nor the phone bar show");
     }
-    // #1734: a row collapses to the menu line only when it would not fit, at every width: never just because the screen is narrow.
-    const hiddenList = tabs.querySelector<HTMLElement>("ul");
-    if (menuShown && hiddenList && hiddenList.getBoundingClientRect().width > 0 && hiddenList.getBoundingClientRect().width <= line.clientWidth) problems.push(`the tab row became the menu line at ${window.innerWidth}px though its ${Math.round(hiddenList.getBoundingClientRect().width)}px fits in ${line.clientWidth}px`);
+    if (window.innerWidth < 1024 && tabsShown) problems.push(`the tab row shows below 1024px (${window.innerWidth}px)`);
     const list = tabs.querySelector<HTMLElement>("ul");
     if (tabsShown) {
       if (list && list.getBoundingClientRect().width > line.clientWidth + 1) problems.push(`the tab row is ${Math.round(list.getBoundingClientRect().width)}px in a ${line.clientWidth}px line`);

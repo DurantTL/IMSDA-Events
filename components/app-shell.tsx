@@ -6,7 +6,7 @@ import { StaffViewerProvider } from "@/components/staff-viewer-context";
 import type { HelpViewer } from "@/modules/help/visibility";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, LifeBuoy } from "lucide-react";
+import { Archive, ChevronDown, LifeBuoy } from "lucide-react";
 import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
@@ -71,8 +71,6 @@ type ShellEvent = {
 type ShellUser = { id?: string; displayName: string; email: string; globalRole?: "SYSTEM_ADMIN" | null };
 
 const destinationSearchInputId = "destination-search-input";
-/** The event switcher's last choice (#1734): it opens the Archived events list instead of switching to an event. */
-const archivedEventsChoice = "__archived-events__";
 
 /**
  * The staff shell (#1565): a branded header (logo, "Find a page or task", Help, Create, notifications, the account menu
@@ -247,10 +245,6 @@ export function AppShell({
   }, [requestedEventId, knownEventIds]);
 
   function selectEvent(eventId: string) {
-    if (eventId === archivedEventsChoice) {
-      void guardedNavigate(() => router.push("/archived-events"));
-      return;
-    }
     // Guarded (#647): a dirty form prompts first; Cancel changes nothing.
     switchEvent({
       eventId,
@@ -287,12 +281,17 @@ export function AppShell({
       >
         {!selectedEventId && <option value="" disabled>Choose an event</option>}
         {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
-        <option value={archivedEventsChoice}>Archived events…</option>
       </select>
       {/* On a phone the select shows this label, not the event's name again; the select still takes the tap. */}
       <span className={styles.pickerPhoneLabel} aria-hidden="true">Switch event</span>
       <ChevronDown aria-hidden="true" size={16} />
     </span>
+  );
+  // Archived events sits with the switcher (#1734): a link, not a select option, so arrowing through the choices never navigates away.
+  const archivedLink = (
+    <GuardedLink className={styles.archivedLink} href="/archived-events" aria-label="Archived events">
+      <Archive aria-hidden="true" size={18} className={styles.archivedIcon} /><span className={styles.archivedText}>Archived events</span>
+    </GuardedLink>
   );
   const openPicker = pickerEvents.length > 0 && place.area === "events" && !place.inEvent ? (
     <span className={styles.pickerShell}>
@@ -335,6 +334,7 @@ export function AppShell({
               <span className={styles.eventName}>{selectedEvent.name}</span>
               <div className={styles.eventTools}>
                 <span className={styles.picker}>{picker}</span>
+                {archivedLink}
               </div>
             </div>
           )}
