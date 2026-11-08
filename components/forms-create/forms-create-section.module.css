@@ -1,0 +1,13 @@
+/* "Create a form" on the All forms page (#1571): card grid comes from admin-hub.module.css. */
+.section { display: grid; gap: 10px; }
+.heading { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 800; }
+.note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
+.card { display: flex; flex-direction: column; gap: 8px; width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); padding: 14px 16px; color: var(--ink); }
+.title { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.95rem); font-weight: 800; overflow-wrap: anywhere; }
+.text { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.45; overflow-wrap: anywhere; }
+.form { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+.form label { font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.form select { min-height: var(--touch-target, 44px); width: 100%; min-width: 0; }
+.action { width: 100%; margin-top: auto; text-align: center; }
+.form .action { margin-top: 0; }
+.unavailable { margin: 0; color: var(--gold-text); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
