@@ -9,7 +9,9 @@ import { BackLink } from "@/components/back-link";
 import { NeedsAttention, StatusComplete } from "@/components/needs-attention";
 import { classChoiceReadiness, readinessSummaryText } from "@/modules/honors/class-readiness";
 import { ClubHonorsNote } from "@/components/club-honors-note";
+import { EventScoringDirectorCard } from "@/components/event-scoring-director-card";
 import { ClubTeachersCard } from "@/components/club-teachers-card";
+import { loadDirectorEventScoringResultsOrNull } from "@/modules/event-scoring/service";
 import { loadClubTeacherStepOrNull } from "@/modules/club-teachers/repository";
 import { ClubClassPicker } from "@/components/club-class-picker";
 import { ClubPassQr } from "@/components/club-pass-qr";
@@ -144,6 +146,9 @@ export default async function ClubEventRegistrationPage({
 
   // The optional Club teachers step (#1681): shown only while the event's tool is on and has a rule. A failed read hides the step, never the page.
   const teacherStep = showingTeam && !workspace.problem ? await loadClubTeacherStepOrNull(organizationId, eventId) : null;
+
+  // Published Camporee scoring results (#1676): this club's own rows only, and only while the tool is on and results are published.
+  const scoringResults = showingTeam && !workspace.problem ? await loadDirectorEventScoringResultsOrNull(organizationId, eventId) : null;
 
   return (
     <>
@@ -395,6 +400,7 @@ export default async function ClubEventRegistrationPage({
         </section>
       )}
       {teacherStep && <ClubTeachersCard canEdit={access.capabilities.registerForEvents} eventId={eventId} initialStep={teacherStep} organizationId={organizationId} />}
+      {scoringResults && <EventScoringDirectorCard results={scoringResults} />}
       {classes && <ClubClassPicker setupBase={`/account/clubs/${organizationId}`} canOverrideRequirements={access.actor.kind === "STAFF_ACTING"} eventId={eventId} initialWorkspace={classes} organizationId={organizationId} />}
       {classes && classes.offerings.length > 0 && (
         <section className="public-manage-card club-schedule-link">

@@ -14,7 +14,7 @@ export const STAFF_POINTS_CHART_LIMIT = 10;
 
 export type StaffPointsTile = { label: string; value: string | number; detail?: string };
 
-export type StaffPointsClub = Pick<AreaClubSummary, "id" | "name" | "church" | "reportPoints" | "totalPoints" | "registrationOnTime">;
+export type StaffPointsClub = Pick<AreaClubSummary, "id" | "name" | "church" | "reportPoints" | "totalPoints" | "registrationOnTime" | "eventPoints" | "eventAwards">;
 
 /** The middle total; for an even count, the mean of the two middle totals, rounded to a whole point. */
 export function medianTotalPoints(clubs: ReadonlyArray<{ totalPoints: number }>) {

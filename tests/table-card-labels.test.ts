@@ -13,6 +13,8 @@ const club: AreaClubSummary = {
   rosterSize: 12,
   adultCount: 3,
   registrationOnTime: true,
+  eventPoints: 0,
+  eventAwards: [],
   backgroundChecks: { missing: 1, notInCompliance: 0, expiringSoon: 2 },
   months: [
     { month: "2026-09", status: "SUBMITTED", points: 81 },

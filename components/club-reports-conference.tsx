@@ -39,7 +39,7 @@ export function ClubReportsConference({
     const spec: Record<string, SortSpec<ClubYearSummary>> = {
       club: { label: "Club", value: (club) => club.name },
       registration: { label: "Yearly registration", noteLabel: "yearly registration", value: (club) => club.registrationOnTime },
-      ytd: { label: "Year to date", kind: "number", value: (club) => yearToDate(Object.values(club.reports), club.registrationOnTime) },
+      ytd: { label: "Year to date", kind: "number", value: (club) => yearToDate(Object.values(club.reports), club.registrationOnTime, club.eventPoints) },
     };
     for (const month of months) spec[`month-${month}`] = { label: shortMonth(month), kind: "number", noteLabel: `${shortMonth(month)} points`, value: (club) => club.reports[month]?.totalPoints };
     return spec;
@@ -141,7 +141,7 @@ export function ClubReportsConference({
                         </label>
                       )}
                   </td>
-                  <td {...cardCell("Year to date")}><strong>{yearToDate(Object.values(club.reports), club.registrationOnTime).toLocaleString("en-US")}</strong></td>
+                  <td {...cardCell("Year to date")}><strong>{yearToDate(Object.values(club.reports), club.registrationOnTime, club.eventPoints).toLocaleString("en-US")}</strong></td>
                 </tr>
               ))}
             </tbody>

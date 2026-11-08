@@ -191,6 +191,10 @@ const moreOnlyPages: Record<string, (scenario: Scenario) => boolean> = {
   "/more/club-assignments": (scenario) => canManageClubAssignments(scenario.permissions) && scenario.clubEvent,
   // app/(workspace)/more/club-teachers/page.tsx (`resolveClubOversight().allowed`, #1681)
   "/more/club-teachers": (scenario) => scenario.clubOversight && scenario.clubEvent,
+  // app/(workspace)/more/event-scoring/page.tsx (`resolveClubOversight().allowed`, or MANAGE_REGISTRATION to enter scores, #1676)
+  "/more/event-scoring": (scenario) => scenario.clubEvent && (scenario.clubOversight || has(scenario, "MANAGE_REGISTRATION")),
+  // app/(workspace)/more/attendance-points/page.tsx (`resolveClubOversight().allowed`, #1677)
+  "/more/attendance-points": (scenario) => scenario.clubOversight && scenario.clubEvent,
   // app/(workspace)/community/page.tsx
   "/community": (scenario) => has(scenario, "MANAGE_COMMUNICATIONS"),
   // app/(workspace)/more/reports/page.tsx

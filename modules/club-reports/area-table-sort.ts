@@ -5,7 +5,7 @@
  */
 import type { SortState, SortValue } from "@/lib/list-sort";
 import { clubYearMonths } from "@/modules/club-reports/domain";
-import { eventStatusLabels, type AreaClubSummary, type AreaEventClubRow } from "@/modules/club-reports/area-summary-domain";
+import { eventStatusLabels, registrationPointsOf, type AreaClubSummary, type AreaEventClubRow } from "@/modules/club-reports/area-summary-domain";
 
 export const OVERVIEW_SORT_COLUMNS = ["club", "director", "church", "roster", "reports", "points", "lastReport", "sterling"] as const;
 export type OverviewSortColumn = typeof OVERVIEW_SORT_COLUMNS[number];
@@ -56,7 +56,7 @@ export const COORDINATOR_MONTH_SORT_COLUMNS = ["club", "record"] as const;
 export type CoordinatorMonthSortColumn = typeof COORDINATOR_MONTH_SORT_COLUMNS[number];
 
 /** The coordinator's ranking table. `name` and `points` are the older `?sort=` values, kept so old links still work. */
-export const COORDINATOR_RANKING_SORT_COLUMNS = ["rank", "name", "reportPoints", "registration", "points"] as const;
+export const COORDINATOR_RANKING_SORT_COLUMNS = ["rank", "name", "reportPoints", "registration", "eventPoints", "points"] as const;
 export type CoordinatorRankingSortColumn = typeof COORDINATOR_RANKING_SORT_COLUMNS[number];
 export const COORDINATOR_RANKING_DEFAULT_SORT: SortState<CoordinatorRankingSortColumn> = { key: "points", dir: "desc" };
 /** Points columns open highest first, the name column A to Z. */
@@ -65,6 +65,7 @@ export const rankingAccessors = (rankOf: ReadonlyMap<string, number>): Record<Co
   rank: (club) => rankOf.get(club.id),
   name: (club) => club.name,
   reportPoints: (club) => club.reportPoints,
-  registration: (club) => club.totalPoints - club.reportPoints,
+  registration: (club) => registrationPointsOf(club),
+  eventPoints: (club) => club.eventPoints,
   points: (club) => club.totalPoints,
 });

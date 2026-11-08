@@ -18,6 +18,7 @@ import {
 import type { ClubReportInput } from "@/modules/club-reports/schemas";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { clubYearFor, type ClubClassLevel } from "@/modules/club-rosters/domain";
+import { loadClubEventPoints, noEventPoints } from "@/modules/event-points/awards";
 
 /**
  * Club monthly report storage (#377). Totals are always worked out here from
@@ -124,15 +125,17 @@ export async function getClubJoinedOn(organizationId: string): Promise<string | 
   return club ? clubJoinedOn(club) : null;
 }
 
-/** A club's year: every month, its report if any, the year-to-date standing, and the day it joined (new-club applications only). */
+/** A club's year: every month, its report if any, the year-to-date standing, the event points applied (#1677), and the day it joined (new-club applications only). */
 export async function getClubReportYear(organizationId: string, clubYear: string) {
   const prisma = getPrisma();
-  const [reports, standing, joinedOn] = await Promise.all([
+  const [reports, standing, joinedOn, eventPoints] = await Promise.all([
     prisma.clubMonthlyReport.findMany({ where: { organizationId, clubYear }, select: reportSelect, orderBy: { reportMonth: "asc" } }),
     prisma.clubYearStanding.findUnique({ where: { organizationId_clubYear: { organizationId, clubYear } }, select: { registrationOnTime: true } }),
     getClubJoinedOn(organizationId),
+    // Attendance points applied for events (#1677): the club's own total and the event behind each, never a person.
+    loadClubEventPoints(clubYear, [organizationId]),
   ]);
-  return { reports: reports.map(serializeReport), registrationOnTime: standing?.registrationOnTime ?? false, joinedOn };
+  return { reports: reports.map(serializeReport), registrationOnTime: standing?.registrationOnTime ?? false, joinedOn, eventPoints: eventPoints.get(organizationId) ?? noEventPoints };
 }
 
 /**
@@ -297,7 +300,7 @@ export async function reopenClubReport(organizationId: string, reportMonth: stri
  */
 export async function listClubReportsForYear(clubYear: string) {
   const prisma = getPrisma();
-  const [clubs, reports, standings] = await Promise.all([
+  const [clubs, reports, standings, eventPoints] = await Promise.all([
     prisma.organization.findMany({
       where: { type: "CLUB", isActive: true },
       orderBy: { name: "asc" },
@@ -308,6 +311,8 @@ export async function listClubReportsForYear(clubYear: string) {
       select: { organizationId: true, reportMonth: true, totalPoints: true, onTimePoints: true, firstSubmittedAt: true, reviewedAt: true },
     }),
     prisma.clubYearStanding.findMany({ where: { clubYear }, select: { organizationId: true, registrationOnTime: true } }),
+    // Attendance points applied for events (#1677), so Year to date matches the points boards.
+    loadClubEventPoints(clubYear),
   ]);
   const onTimeByClub = new Map(standings.map((standing) => [standing.organizationId, standing.registrationOnTime]));
   return clubs.map((club) => ({
@@ -315,6 +320,8 @@ export async function listClubReportsForYear(clubYear: string) {
     name: club.name,
     church: club.parentOrganization?.name ?? "",
     registrationOnTime: onTimeByClub.get(club.id) ?? false,
+    /** Attendance points from events (#1677), part of Year to date. A count only. */
+    eventPoints: eventPoints.get(club.id)?.total ?? 0,
     /** The day it joined, for a club made through a new-club application; null otherwise. */
     joinedOn: clubJoinedOn(club),
     reports: Object.fromEntries(reports

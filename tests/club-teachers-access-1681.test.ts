@@ -8,7 +8,8 @@ const read = (path: string) => readFileSync(path, "utf8");
  * `scripts/verify-club-teachers.ts` proves the behavior against a real database.
  */
 describe("club teachers access (#1681)", () => {
-  const settings = read("modules/club-teachers/settings.ts");
+  // The switching itself moved to the shared helper (#1676); the teacher rule stays in settings.ts. Both are read as one.
+  const settings = read("modules/club-teachers/settings.ts") + read("modules/event-modules/scoped-toggle.ts");
   const acRoute = read("app/api/attendee/area-clubs/events/[eventId]/club-teachers/route.ts");
   const staffRoute = read("app/api/events/[eventId]/club-teachers/route.ts");
   const moduleService = read("modules/event-modules/service.ts");
