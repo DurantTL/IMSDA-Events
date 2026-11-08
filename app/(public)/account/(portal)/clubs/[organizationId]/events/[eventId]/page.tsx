@@ -299,7 +299,7 @@ export default async function ClubEventRegistrationPage({
                 <span>
                   <strong translate="no">{attendee.lastName}, {attendee.firstName}</strong>
                   {attendee.ageOnEventDate !== null && <small>Age {attendee.ageOnEventDate} at the event</small>}
-                  {attendee.temporary && <small>Not on your roster · this event only{attendee.guestChild ? " · Child" : ""}</small>}
+                  {attendee.temporary && <small>Not on your roster · this event only{attendee.guestChild ? " · Child" : ""}{attendee.guestYouthNotPathfinder ? " · Youth guest (not a Pathfinder)" : ""}</small>}
                   {attendee.teamRole === "COACH" && <small>Coach</small>}
                   {attendee.alternate && <small>Alternate</small>}
                 </span>

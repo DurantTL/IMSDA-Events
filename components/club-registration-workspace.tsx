@@ -15,6 +15,7 @@ import {
   type FormResponses,
   type RosterAttendee,
 } from "@/components/public-registration-form";
+import { ClubGuestTypeFields } from "@/components/club-guest-type-fields";
 import { createDraftSaveQueue, registrationDraftUnsaved } from "@/modules/club-registrations/draft-save-queue";
 import { createDraftSender, DRAFT_CONFLICT_MESSAGE, draftBlockedReason } from "@/modules/club-registrations/draft-sender";
 import { restoreDraftLocation } from "@/modules/club-registrations/draft-location";
@@ -36,6 +37,8 @@ import {
   guestIdFromClientId,
   guestAttendeeType,
   guestIsChild,
+  guestIsYouthNotPathfinder,
+  GUEST_CHILD_AGE_MESSAGE,
   GUEST_TYPES,
   formOffersChildRole,
   MAX_CLUB_GUESTS,
@@ -129,6 +132,8 @@ export function ClubRegistrationWorkspace({
   const needsLocation = locations.length > 0 && !chosenLocation;
   const [addingGuest, setAddingGuest] = useState(false);
   const [guestError, setGuestError] = useState("");
+  const [guestAgeText, setGuestAgeText] = useState("");
+  const [guestTypeProblem, setGuestTypeProblem] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(workspace.draft ? "saved" : "idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The Continue bar stays after the list until the reader has scrolled past the intro, so it never covers it (#996).
@@ -405,17 +410,23 @@ export function ClubRegistrationWorkspace({
     if (!Number.isInteger(age) || age < 0 || age > 120) return setGuestError("Enter their age as a whole number.");
     // An event with team rules (Pathfinder Bible Experience) has no choice: the type comes from the age, as it always has.
     const guestType = teamRules ? undefined : GUEST_TYPES.find((candidate) => candidate === chosenType);
+    // Only a youth aged 10 to 17 can be marked "Not a Pathfinder" (#1728); an event with teams never offers the box.
+    const notPathfinder = !teamRules && guestType === "YOUTH" && data.get("notPathfinder") === "on";
     if (!teamRules) {
-      if (!guestType) return setGuestError("Choose Pathfinder, Adult, or Child.");
-      if (guestType === "ADULT" && age < 18) return setGuestError("An adult must be 18 or older. Choose Child or Pathfinder for someone younger.");
-      if (guestType !== "ADULT" && age >= 18) return setGuestError("Someone 18 or older is registered as an Adult.");
+      const problem = (message: string) => { setGuestTypeProblem(message); setGuestError(""); };
+      if (!guestType) return problem("Choose Pathfinder, Adult, or Child.");
+      if (guestType === "ADULT" && age < 18) return problem("An adult must be 18 or older. Choose Pathfinder for someone younger.");
+      if (guestType !== "ADULT" && age >= 18) return problem("Someone 18 or older is registered as an Adult.");
+      if (guestType === "UNDERAGE" && age >= 10) return problem(GUEST_CHILD_AGE_MESSAGE);
     }
     if (draft.guests.length >= MAX_CLUB_GUESTS) return setGuestError(`Add up to ${MAX_CLUB_GUESTS} extra people.`);
     const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => (byte % 36).toString(36)).join("") + Date.now().toString(36);
     setGuestError("");
+    setGuestTypeProblem("");
+    setGuestAgeText("");
     setAddingGuest(false);
     setDraft((current) => {
-      const next = { ...current, guests: [...current.guests, { id: id.slice(0, 24), firstName, lastName, age, email: email || null, ...(guestType ? { guestType } : {}) }] };
+      const next = { ...current, guests: [...current.guests, { id: id.slice(0, 24), firstName, lastName, age, email: email || null, ...(guestType ? { guestType } : {}), ...(notPathfinder ? { notPathfinder: true } : {}) }] };
       queueSave(next);
       return next;
     });
@@ -661,7 +672,7 @@ export function ClubRegistrationWorkspace({
             <small className="field-help"> For this event only, e.g. a visiting parent. They won&apos;t be added to your roster.</small>
           </span>
           {!addingGuest && (
-            <button className="secondary-button" onClick={() => { setGuestError(""); setAddingGuest(true); }} type="button">
+            <button className="secondary-button" onClick={() => { setGuestError(""); setGuestTypeProblem(""); setGuestAgeText(""); setAddingGuest(true); }} type="button">
               <UserPlus aria-hidden="true" size={14} /> Add a person for this event
             </button>
           )}
@@ -673,7 +684,7 @@ export function ClubRegistrationWorkspace({
                 <span>
                   <strong translate="no">{guest.lastName}, {guest.firstName}</strong>
                   <small>
-                    This event only · {guestIsChild(guest) ? "Child · " : ""}Age <span translate="no">{guest.age}</span>
+                    This event only · {guestIsYouthNotPathfinder(guest) ? "Youth guest (not a Pathfinder) · " : guestIsChild(guest) ? "Child · " : ""}Age <span translate="no">{guest.age}</span>
                     {guest.email ? <> · <span translate="no">{guest.email}</span></> : ""}
                   </small>
                 </span>
@@ -690,19 +701,8 @@ export function ClubRegistrationWorkspace({
             <div className="form-grid two-column">
               <label>First name<input autoComplete="off" maxLength={80} name="firstName" required /></label>
               <label>Last name<input autoComplete="off" maxLength={80} name="lastName" required /></label>
-              <label>{workspace.event.ageAsOf ? `Age on ${ageDateText}` : "Age at the event"}<input {...ageInputAttributes} name="age" required type="number" /></label>
-              {!teamRules && (
-                <label>
-                  Who is this?
-                  <select defaultValue="" name="guestType" required>
-                    <option disabled value="">Choose one</option>
-                    <option value="YOUTH">Pathfinder</option>
-                    <option value="ADULT">Adult</option>
-                    {offersChild && <option value="UNDERAGE">Child (not a Pathfinder)</option>}
-                  </select>
-                  {offersChild && <small className="field-help">A child isn&apos;t counted as a Pathfinder and doesn&apos;t take a class seat.</small>}
-                </label>
-              )}
+              <label>{workspace.event.ageAsOf ? `Age on ${ageDateText}` : "Age at the event"}<input {...ageInputAttributes} name="age" onChange={(event) => setGuestAgeText(event.currentTarget.value)} required type="number" value={guestAgeText} /></label>
+              {!teamRules && <ClubGuestTypeFields age={guestAgeText} error={guestTypeProblem} offersChild={offersChild} />}
               <label>
                 Email (optional)
                 <input autoComplete="off" maxLength={254} name="email" type="email" />
@@ -710,7 +710,7 @@ export function ClubRegistrationWorkspace({
               </label>
             </div>
             <div className="club-registration-toolbar">
-              <button className="secondary-button" onClick={() => { setGuestError(""); setAddingGuest(false); }} type="button">Cancel</button>
+              <button className="secondary-button" onClick={() => { setGuestError(""); setGuestTypeProblem(""); setGuestAgeText(""); setAddingGuest(false); }} type="button">Cancel</button>
               <button className="primary-button" type="submit"><UserPlus aria-hidden="true" size={15} /> Add</button>
             </div>
           </form>

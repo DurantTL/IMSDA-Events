@@ -42,7 +42,7 @@ export type PickingAttendee = {
 export function pickingAttendees(input: {
   roster: ReadonlyArray<{ memberId: string; firstName: string; lastName: string; ageOnEventDate: number | null; attendeeType: PickingAttendee["attendeeType"] }>;
   selectedMemberIds: readonly string[];
-  guests: ReadonlyArray<{ id: string; firstName: string; lastName: string; age: number; guestType?: ClubGuestType | undefined }>;
+  guests: ReadonlyArray<{ id: string; firstName: string; lastName: string; age: number; guestType?: ClubGuestType | undefined; notPathfinder?: boolean | undefined }>;
   /** Ages typed in for roster people with no birth date (#639), by roster member id. */
   rosterAges?: Readonly<Record<string, number>>;
   /** Roster class levels and completed prerequisite honors, by roster member id (#832). */

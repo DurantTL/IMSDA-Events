@@ -129,6 +129,7 @@ export async function getClubEventRecords(
         firstName: attendee.firstName,
         lastName: attendee.lastName,
         responses: attendee.responses,
+        youthGuestNotPathfinder: attendee.youthGuestNotPathfinder,
       })),
       amountOwedCents: churchOwedCents(registration.status as ClubRegistrationStatus, registration.totalAmountCents),
       pricingSnapshot: registration.publicSubmission?.pricingSnapshot ?? {},

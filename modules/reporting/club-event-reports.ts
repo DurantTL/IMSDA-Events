@@ -17,6 +17,14 @@ export type ClubRosterRole = "Pathfinder" | "TLT" | "Staff" | "Child";
 
 export const CLUB_ROSTER_ROLES: readonly ClubRosterRole[] = ["Pathfinder", "TLT", "Staff", "Child"];
 
+/** How a guest aged 10 to 17 who is not a Pathfinder shows on the club packet and check-in book (#1728). */
+export const YOUTH_GUEST_ROLE_LABEL = "Youth guest (not a Pathfinder)";
+
+/** The role as people read it: the roster role, or the youth guest label for a marked guest (#1728). */
+export function attendeeRoleLabel(attendee: Pick<ClubRosterAttendee, "role" | "youthGuest">): string {
+  return attendee.youthGuest ? YOUTH_GUEST_ROLE_LABEL : attendee.role ?? "";
+}
+
 export function roleAbbreviation(role: string | null): string {
   switch (role) {
     case "Pathfinder": return "PF";
@@ -33,6 +41,8 @@ export type ClubRosterAttendee = {
   lastName: string;
   /** The form's "Roster role" answer (Pathfinder/TLT/Staff/Child), or null if unanswered. */
   role: ClubRosterRole | null;
+  /** A guest aged 10 to 17 who is not a Pathfinder (#1728): counted with the children, never as a Pathfinder. */
+  youthGuest?: boolean;
   /** Age on the event date, from the roster's own age answer — never a birth date. */
   ageOnEventDate: number | null;
   gender: string | null;
@@ -170,7 +180,7 @@ export type BuildClubEventRecordInput = {
   status: string;
   submittedAt: string | null;
   registrationResponses: Record<string, unknown>;
-  attendees: Array<{ id: string; firstName: string; lastName: string; responses: Record<string, unknown> }>;
+  attendees: Array<{ id: string; firstName: string; lastName: string; responses: Record<string, unknown>; youthGuestNotPathfinder?: boolean }>;
   amountOwedCents: number;
   pricingSnapshot: Record<string, unknown>;
   lateRateLabel: string | null;
@@ -234,6 +244,7 @@ export function buildClubEventRecord(input: BuildClubEventRecordInput): ClubEven
       firstName: attendee.firstName,
       lastName: attendee.lastName,
       role: roleFromResponse(attendee.responses.attendee_type),
+      ...(attendee.youthGuestNotPathfinder ? { youthGuest: true } : {}),
       ageOnEventDate: numberFromResponse(attendee.responses.attendee_age),
       gender: textValue(attendee.responses.gender) || null,
       classLevel: textValue(attendee.responses.attendee_class) || null,

@@ -328,6 +328,8 @@ function serializeRegistration(registration: RegistrationWithRelations, director
         position: attendee.position,
         source: profile.source === "PUBLIC_REGISTRATION" ? "PUBLIC_REGISTRATION" as const : "STAFF" as const,
         responses: recordFromJson(attendee.formResponses),
+        // A guest 10 or older on a club registration who is not a Pathfinder (#1728): typed Underage, so no class seat.
+        youthGuestNotPathfinder: profile.temporary === true && profile.temporaryAttendeeType === "UNDERAGE" && typeof profile.ageOnEventDate === "number" && profile.ageOnEventDate >= 10,
         checkedIn: Boolean(activeCheckIn),
         checkInId: activeCheckIn?.id ?? null,
         checkedInAt: activeCheckIn?.checkedInAt.toISOString() ?? null,
@@ -423,7 +425,7 @@ export type RegistrationRecord = Omit<SerializedRegistration, "attendees" | "pub
   location?: { id: string; name: string } | null;
   /** Optional like `location`: the place in line at the location while waitlisted there (#599). */
   locationWaitlistPlace?: number | null;
-  attendees: Array<Omit<SerializedRegistration["attendees"][number], "attendeeTypeDefinitionCode"> & { attendeeTypeDefinitionCode?: string | null }>;
+  attendees: Array<Omit<SerializedRegistration["attendees"][number], "attendeeTypeDefinitionCode" | "youthGuestNotPathfinder"> & { attendeeTypeDefinitionCode?: string | null; youthGuestNotPathfinder?: boolean }>;
   publicSubmission: SerializedRegistration["publicSubmission"] extends infer Submission
     ? Submission extends null ? null : Omit<Submission, "attendeeTypeOptions"> & { attendeeTypeOptions?: AttendeeTypeOption[] }
     : never;

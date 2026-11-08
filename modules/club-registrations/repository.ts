@@ -22,7 +22,9 @@ import {
   guestIdFromClientId,
   guestAttendeeType,
   guestIsAdult,
+  guestAgeRuleProblem,
   guestIsChild,
+  guestIsYouthNotPathfinder,
   guestOwnedRole,
   CHILD_GUEST_TEAM_MESSAGE,
   CHILD_GUEST_NO_ROLE_MESSAGE,
@@ -964,6 +966,9 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
           };
           const temporary = snapshot.temporary === true;
           const clubRosterMemberId = snapshot.clubRosterMemberId ?? null;
+          const notAPathfinder = temporary && snapshot.temporaryAttendeeType === "UNDERAGE";
+          const markedYouth = notAPathfinder && typeof snapshot.ageOnEventDate === "number" && guestIsYouthNotPathfinder({ age: snapshot.ageOnEventDate, guestType: "UNDERAGE" });
+          const unmarkedChild = notAPathfinder && !markedYouth;
           return {
             attendeeId: id,
             firstName: snapshot.firstName ?? "",
@@ -975,7 +980,9 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
             permission: permissions.get(id) ?? null,
             temporary,
             // A child who isn't a Pathfinder (#1666), added for the event only.
-            guestChild: temporary && snapshot.temporaryAttendeeType === "UNDERAGE",
+            guestChild: unmarkedChild,
+            // A guest aged 10 to 17 who is not a Pathfinder (#1728), including one saved as Child before the rule.
+            guestYouthNotPathfinder: markedYouth,
             // For seeding a reopened edit (H3b, #366): which roster person
             // or extra person this attendee is. An extra person submitted
             // before guests carried an id is known by their attendee id,
@@ -1221,6 +1228,8 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           );
         }
         // A child who isn't a Pathfinder (#1666) is never added to a team: teams take team members and coaches only.
+        const ageRuleProblem = guestAgeRuleProblem(guest);
+        if (ageRuleProblem) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", ageRuleProblem);
         if (teamSettings && guestIsChild(guest)) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
         if (guestIsChild(guest) && !formOffersChildRole(definition as RegistrationFormDefinition)) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_NO_ROLE_MESSAGE);
         // An extra person's typed age is their age on the event's age date (#809).
@@ -1703,6 +1712,8 @@ export async function amendClubRegistration(
   for (const guest of input.newGuests) {
     const person: RosterPerson = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
     const clientId = clubGuestClientId(guest.id);
+    const ageRuleProblem = guestAgeRuleProblem(guest);
+    if (ageRuleProblem) throw new ClubRegistrationError("ATTENDEES_INVALID", ageRuleProblem);
     if (teamSettings && guestIsChild(guest)) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
     if (guestIsChild(guest) && !formOffersChildRole(definition)) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_NO_ROLE_MESSAGE);
     const ownedRole = guestOwnedRole(definition, guest);

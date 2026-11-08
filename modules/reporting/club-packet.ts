@@ -2,6 +2,7 @@ import type { PerPersonPrice } from "@/modules/club-registrations/per-person-pri
 import {
   clubHeadcounts,
   roleAbbreviation,
+  YOUTH_GUEST_ROLE_LABEL,
   type ClubAssignmentSummary,
   type ClubEventRecord,
   type ClubHeadcounts,
@@ -96,7 +97,7 @@ export function buildClubPacket(club: ClubEventRecord, event: ClubPacketEvent): 
       id: attendee.id,
       lastName: attendee.lastName,
       firstName: attendee.firstName,
-      roleAbbreviation: roleAbbreviation(attendee.role),
+      roleAbbreviation: attendee.youthGuest ? YOUTH_GUEST_ROLE_LABEL : roleAbbreviation(attendee.role),
       ageOnEventDate: attendee.ageOnEventDate,
       gender: attendee.gender,
       medicalPersonnel: attendee.medicalPersonnel,

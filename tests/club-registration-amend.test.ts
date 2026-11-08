@@ -299,7 +299,7 @@ const baseEdit = () => ({
   selectedMemberIds: ["m1"],
   keptGuestIds: [] as string[],
   keptOffRosterAttendeeIds: [] as string[],
-  newGuests: [] as Array<{ id: string; firstName: string; lastName: string; age: number; email: string | null; guestType?: "YOUTH" | "ADULT" | "UNDERAGE" }>,
+  newGuests: [] as Array<{ id: string; firstName: string; lastName: string; age: number; email: string | null; guestType?: "YOUTH" | "ADULT" | "UNDERAGE"; notPathfinder?: boolean }>,
   attendeeResponses: {} as Record<string, Record<string, unknown>>,
   rosterAges: {} as Record<string, number>,
   saveAgeToRosterIds: [] as string[],
@@ -799,6 +799,82 @@ describe("a child added for the event only, on an edit (#1666)", () => {
       ...baseEdit(), keptOffRosterAttendeeIds: ["attendee-m2"], newGuests: [kid],
     }, beforeDeadline)).rejects.toMatchObject({ code: "ATTENDEES_INVALID" });
     expect(prisma.registrationAttendee.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("an event-only guest aged 10 to 17, on an edit (#1728)", () => {
+  const roleDefinition: TestDefinition = {
+    ...baseDefinition,
+    sections: baseDefinition.sections.map((section) => section.id === "roster"
+      ? { ...section, fields: [...section.fields, { id: "a_role", key: "attendee_type", label: "Roster role", helpText: "", type: "RADIO", scope: "ATTENDEE", required: false, options: ["Pathfinder", "TLT", "Staff", "Child"] }] }
+      : section),
+  };
+  const teen = { id: "guestteen001", firstName: "Robin", lastName: "Visitor", age: 13, email: null };
+  const registeredGuest = (age: number) => {
+    const guest = attendee("attendee-teen", "unused", "Robin", "Visitor", age, {}, { attendee_type: "Child" });
+    guest.profileSnapshot = {
+      firstName: "Robin", lastName: "Visitor", email: null, phone: null, source: "CLUB_REGISTRATION",
+      clubOrganizationId: "club-1", ageOnEventDate: age, temporary: true, temporaryAttendeeType: "UNDERAGE", clubGuestId: "guestteen001",
+    };
+    return guest;
+  };
+
+  it("stores a marked new guest as Underage with the Child role", async () => {
+    const { prisma } = fixture({ definition: roleDefinition });
+    await amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(),
+      keptOffRosterAttendeeIds: ["attendee-m2"],
+      newGuests: [{ ...teen, guestType: "YOUTH", notPathfinder: true }],
+      attendeeResponses: { "guest:guestteen001": { attendee_type: "Pathfinder" } },
+    }, beforeDeadline);
+    const created = prisma.registrationAttendee.create.mock.calls[0]![0].data;
+    expect(created.profileSnapshot).toMatchObject({ ageOnEventDate: 13, temporary: true, temporaryAttendeeType: "UNDERAGE", clubGuestId: "guestteen001" });
+    expect(created.formResponses).toMatchObject({ attendee_type: "Child" });
+  });
+
+  it("stores an unmarked new guest as a Pathfinder", async () => {
+    const { prisma } = fixture({ definition: roleDefinition });
+    await amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(),
+      keptOffRosterAttendeeIds: ["attendee-m2"],
+      newGuests: [{ ...teen, guestType: "YOUTH" }],
+      attendeeResponses: { "guest:guestteen001": { attendee_type: "Pathfinder" } },
+    }, beforeDeadline);
+    const created = prisma.registrationAttendee.create.mock.calls[0]![0].data;
+    expect(created.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH" });
+    expect(created.formResponses).toMatchObject({ attendee_type: "Pathfinder" });
+  });
+
+  it("refuses a new Child aged 10 or older", async () => {
+    const { prisma } = fixture({ definition: roleDefinition });
+    await expect(amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(), keptOffRosterAttendeeIds: ["attendee-m2"], newGuests: [{ ...teen, guestType: "UNDERAGE" }],
+    }, beforeDeadline)).rejects.toMatchObject({ code: "ATTENDEES_INVALID" });
+    expect(prisma.registrationAttendee.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses the mark for a guest under 10 or 18 and over", async () => {
+    for (const age of [9, 18]) {
+      const { prisma } = fixture({ definition: roleDefinition });
+      await expect(amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+        ...baseEdit(), keptOffRosterAttendeeIds: ["attendee-m2"], newGuests: [{ ...teen, age, notPathfinder: true }],
+      }, beforeDeadline)).rejects.toBeTruthy();
+      expect(prisma.registrationAttendee.create).not.toHaveBeenCalled();
+    }
+  });
+
+  it("keeps a registered marked guest, and one saved as Child at 10 or older, whatever the client sends", async () => {
+    for (const age of [13, 10]) {
+      const { prisma } = fixture({ definition: roleDefinition, attendees: [attendee("attendee-m1", "m1", "Alex", "Sample", 11), registeredGuest(age)] });
+      await amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+        ...baseEdit(),
+        keptGuestIds: ["guestteen001"],
+        attendeeResponses: { "guest:guestteen001": { attendee_type: "Pathfinder" } },
+      }, beforeDeadline);
+      const kept = updateFor(prisma, "attendee-teen")!;
+      expect(kept.profileSnapshot).toMatchObject({ temporaryAttendeeType: "UNDERAGE", clubGuestId: "guestteen001", ageOnEventDate: age });
+      expect(kept.formResponses).toMatchObject({ attendee_type: "Child" });
+    }
   });
 });
 
