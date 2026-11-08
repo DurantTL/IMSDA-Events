@@ -11,7 +11,7 @@ import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
 import { ClubsYearSelector } from "@/components/clubs-year-selector";
-import { DestinationSearch } from "@/components/destination-search";
+import { StaffHeaderSearch } from "@/components/staff-header-search";
 import { GuardedLink } from "@/components/guarded-link";
 import { WorkspaceContent, workspacePageKey } from "@/components/workspace-content";
 import { moduleDestinationStates } from "@/components/module-destination-states";
@@ -71,6 +71,8 @@ type ShellEvent = {
 type ShellUser = { id?: string; displayName: string; email: string; globalRole?: "SYSTEM_ADMIN" | null };
 
 const destinationSearchInputId = "destination-search-input";
+/** The event switcher's last choice (#1734): it opens the Archived events list instead of switching to an event. */
+const archivedEventsChoice = "__archived-events__";
 
 /**
  * The staff shell (#1565): a branded header (logo, "Find a page or task", Help, Create, notifications, the account menu
@@ -245,6 +247,10 @@ export function AppShell({
   }, [requestedEventId, knownEventIds]);
 
   function selectEvent(eventId: string) {
+    if (eventId === archivedEventsChoice) {
+      void guardedNavigate(() => router.push("/archived-events"));
+      return;
+    }
     // Guarded (#647): a dirty form prompts first; Cancel changes nothing.
     switchEvent({
       eventId,
@@ -281,7 +287,10 @@ export function AppShell({
       >
         {!selectedEventId && <option value="" disabled>Choose an event</option>}
         {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
+        <option value={archivedEventsChoice}>Archived events…</option>
       </select>
+      {/* On a phone the select shows this label, not the event's name again; the select still takes the tap. */}
+      <span className={styles.pickerPhoneLabel} aria-hidden="true">Switch event</span>
       <ChevronDown aria-hidden="true" size={16} />
     </span>
   );
@@ -301,9 +310,7 @@ export function AppShell({
       <StaffKeyboardWatch />
       <header className={styles.topbar} data-shell-region>
         <BrandLink guarded className={styles.brand} wordmark={<span className={styles.brandText}><strong>{PRODUCT_NAME}</strong><small>Events</small></span>} />
-        <div className={styles.search}>
-          <DestinationSearch destinations={searchDestinations} inputId={destinationSearchInputId} />
-        </div>
+        <StaffHeaderSearch destinations={searchDestinations} inputId={destinationSearchInputId} />
         <div className={styles.topActions}>
           <GuardedLink className={styles.topLink} href={withCurrentEvent("/help", selectedEventId)} aria-label={helpPageTitle} aria-current={isHelpRoute ? "page" : undefined}>
             <LifeBuoy aria-hidden="true" size={18} /><span>{helpPageTitle}</span>
@@ -328,7 +335,6 @@ export function AppShell({
               <span className={styles.eventName}>{selectedEvent.name}</span>
               <div className={styles.eventTools}>
                 <span className={styles.picker}>{picker}</span>
-                <GuardedLink className={styles.archivedLink} href="/archived-events">Archived events</GuardedLink>
               </div>
             </div>
           )}

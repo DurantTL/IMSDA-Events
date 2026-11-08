@@ -343,8 +343,9 @@ describe("print and placement", () => {
   it("keeps the staff shell's header hidden in print and its search out of the phone header (#1565)", () => {
     const shellCss = readFileSync(join(process.cwd(), "components/staff-shell.module.css"), "utf8");
     expect(shellCss).toMatch(/@media print \{[^}]*\.topbar[^}]*display: none !important/);
-    // On a phone the search lives in the More sheet, so the header hides it.
+    // On a phone the header box is hidden until the header's search icon button opens it (#1734); the More sheet keeps its own.
     expect(shellCss).toMatch(/@media \(max-width: 800px\) \{[\s\S]*\.search \{ display: none; \}/);
+    expect(shellCss).toMatch(/\.search\[data-open="true"\] \{ display: block;/);
   });
 });
 

@@ -1,0 +1,5 @@
+/* The "Continuing with <event>" notice is one short line on a phone (#1734), so it does not push the page's task down. */
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
+@media (max-width: 800px) {
+  .notice { padding: 8px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+}

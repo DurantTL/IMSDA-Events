@@ -102,7 +102,7 @@ describe("device conditions (#1566)", () => {
 
   it("changes between phone bar, menu line and tab row by width and fit, never by device", () => {
     const css = read("components/staff-shell.module.css");
-    expect(css).toContain("@media (max-width: 1023.98px)");
+    expect(css).not.toContain("@media (max-width: 1023.98px)");
     expect(css).toContain('.tabline[data-fit="tight"] .menuline { display: flex; }');
     for (const file of ["components/staff-tab-row.tsx", "components/staff-shell.module.css", "components/staff-phone-bar.tsx"]) {
       expect(read(file), file).not.toMatch(/iPad|iPhone|userAgent|navigator\.platform/);
