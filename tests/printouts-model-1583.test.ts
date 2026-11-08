@@ -56,13 +56,26 @@ describe("Printouts model (#1583)", () => {
     }
   });
 
-  it("shows only group packets on a general event, with no club page", () => {
-    expect(titles()).toEqual([staffPageTitles.groupedPackets]);
-    expect(titles({ usesTeams: true })).toEqual([staffPageTitles.groupedPackets]);
+  it("shows group packets and the check-in book on a general event, with no club page and no lone card", () => {
+    expect(titles()).toEqual([staffPageTitles.groupedPackets, staffPageTitles.checkInBook]);
+    expect(titles({ usesTeams: true })).toEqual([staffPageTitles.groupedPackets, staffPageTitles.checkInBook]);
+    expect(view().groups).toHaveLength(1);
+    expect(view().groups[0].cards.find((card) => card.title === staffPageTitles.checkInBook)!.description).toContain("each registration on events without clubs");
+  });
+
+  it("keeps a card whose deciding fact could not be read, saying Unavailable", () => {
+    const unknown = view({ audience: "CLUB", usesTeams: null, honorsOn: null }).groups.flatMap((group) => group.cards);
+    const status = (title: string) => unknown.find((card) => card.title === title)?.status?.text;
+    expect(status(staffPageTitles.honorsRosters)).toBe("Unavailable");
+    expect(status("Blank team form")).toBe("Unavailable");
+    expect(status("Team forms by level")).toBe("Unavailable");
+    expect(status(staffPageTitles.groupedPackets)).toBeUndefined();
+    // On a general event the team forms are not shown even when unread.
+    expect(titles({ usesTeams: null })).not.toContain("Blank team form");
   });
 
   it("adds Honors rosters only where the Honors classes module is on, saying it is also in Honors", () => {
-    expect(titles({ honorsOn: true })).toEqual([staffPageTitles.groupedPackets, staffPageTitles.honorsRosters]);
+    expect(titles({ honorsOn: true })).toEqual([staffPageTitles.groupedPackets, staffPageTitles.checkInBook, staffPageTitles.honorsRosters]);
     const card = view({ honorsOn: true }).groups[0].cards.find((entry) => entry.title === staffPageTitles.honorsRosters)!;
     expect(card.description).toContain("Also in Honors");
     expect(titles({ honorsOn: false })).not.toContain(staffPageTitles.honorsRosters);

@@ -3,7 +3,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { AdminHub } from "@/components/admin-hub";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
-import { buildPrintoutsView, hasVisiblePrintout } from "@/modules/reporting/printouts-model";
+import { buildPrintoutsView } from "@/modules/reporting/printouts-model";
 import { loadPrintoutAvailability } from "@/modules/reporting/printouts-repository";
 
 export const metadata: Metadata = { title: staffPageTitles.printouts };
@@ -22,8 +22,5 @@ export default async function PrintoutsPage({ searchParams }: { searchParams: Pr
   }
   const availability = await loadPrintoutAvailability(event.id);
   const viewer = { permissions, audience: event.audience, ...availability };
-  if (!hasVisiblePrintout(viewer)) {
-    return <AccessRestricted title="Printouts are restricted" detail="Your event role does not include any of the printouts." whoToAsk="your event administrator" />;
-  }
   return <AdminHub view={buildPrintoutsView(viewer, event.id)} />;
 }

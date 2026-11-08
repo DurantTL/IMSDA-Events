@@ -39,13 +39,23 @@ describe("Printouts page access (#1583)", () => {
     expect(html).toContain("Also in Honors");
   });
 
-  it("shows only group packets, and no club page, on a general event", async () => {
+  it("shows group packets and the check-in book, and no club page, on a general event", async () => {
     dependencies.resolveEventContext.mockResolvedValue({ event: general, permissions: ["VIEW_REPORTS"] });
     dependencies.loadPrintoutAvailability.mockResolvedValue({ usesTeams: false, honorsOn: false });
     const html = await render();
-    expect(html.match(/data-testid="hub-card"/g)).toHaveLength(1);
+    expect(html.match(/data-testid="hub-card"/g)).toHaveLength(2);
     expect(html).toContain("/more/reports/packets");
-    expect(html).not.toContain("/more/reports/clubs");
+    expect(html).toContain("/more/reports/clubs/check-in-book");
+    expect(html).not.toContain("/more/reports/clubs?");
+    expect(html).not.toContain("team-form");
     expect(html).not.toContain("Unavailable");
+  });
+
+  it("shows Unavailable, never a silent hide, when the event facts could not be read", async () => {
+    dependencies.resolveEventContext.mockResolvedValue({ event: club, permissions: ["VIEW_REPORTS"] });
+    dependencies.loadPrintoutAvailability.mockResolvedValue({ usesTeams: null, honorsOn: null });
+    const html = await render();
+    expect(html.match(/data-testid="hub-card"/g)).toHaveLength(6);
+    expect(html.match(/Unavailable/g)).toHaveLength(3);
   });
 });

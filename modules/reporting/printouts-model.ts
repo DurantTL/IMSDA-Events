@@ -1,6 +1,6 @@
 import type { EventPermission } from "@/modules/access/permissions";
 import { staffPageTitles, withCurrentEvent } from "@/components/staff-navigation";
-import { mergeLoneCards, type HubBody, type HubCard, type HubGroup } from "@/modules/system-admin/admin-hubs-model";
+import { UNAVAILABLE_STATUS, mergeLoneCards, type HubBody, type HubCard, type HubGroup } from "@/modules/system-admin/admin-hubs-model";
 
 /**
  * The Printouts page (#1583): every staff printout and packet for the event as grouped cards, each saying what it prints.
@@ -10,7 +10,7 @@ import { mergeLoneCards, type HubBody, type HubCard, type HubGroup } from "@/mod
  * Rules the model keeps (the same as the Admin hubs, More money tools and Review queues):
  * - A card is shown only when the viewer can open the page it links to (`gate`).
  * - Every card is a link and carries `?event=`. Nothing here prints, downloads or changes a record.
- * - No card has a status: none of these pages computes a number cheaply, and a made-up count would not be honest.
+ * - No card has a status, except "Unavailable" where a fact that decides whether the card applies could not be read.
  * - A group a gate leaves with one card joins its neighbour (`mergeLoneCards`), so no row is a lone card.
  *
  * Detail pages (one club's packet, one team's filled form) are children of a card, not cards. Printouts that belong to
@@ -21,21 +21,22 @@ export type PrintoutsViewer = {
   permissions: readonly EventPermission[];
   /** The event's audience: the club pages are for a club event (Pathfinder, Adventurer ...), not one open to everyone. */
   audience: "GENERAL" | "CLUB";
-  /** The event uses teams (a team-settings row exists): the blank and filled team forms are not found on any other event. */
-  usesTeams: boolean;
-  /** The Honors classes module is on for the event, as it is for the Honors setup card. */
-  honorsOn: boolean;
+  /** The event uses teams (a team-settings row exists): the blank and filled team forms are not found on any other event. `null` is "could not be read". */
+  usesTeams: boolean | null;
+  /** The Honors classes module is on for the event, as it is for the Honors setup card. `null` is "could not be read". */
+  honorsOn: boolean | null;
 };
 
-type Gate = (viewer: { permissions: ReadonlySet<EventPermission>; audience: PrintoutsViewer["audience"]; usesTeams: boolean; honorsOn: boolean }) => boolean;
+type Gate = (viewer: { permissions: ReadonlySet<EventPermission>; audience: PrintoutsViewer["audience"]; usesTeams: boolean | null; honorsOn: boolean | null }) => boolean;
 /** Every page below checks VIEW_REPORTS on the server. */
 const reports: Gate = ({ permissions }) => permissions.has("VIEW_REPORTS");
 /** The club report pages: report access, and only a club event has clubs to print (the pages are empty on any other). */
 const clubReports: Gate = (viewer) => reports(viewer) && viewer.audience === "CLUB";
-const teamForms: Gate = (viewer) => clubReports(viewer) && viewer.usesTeams;
-const honorsRosters: Gate = (viewer) => reports(viewer) && viewer.honorsOn;
+// A fact that could not be read keeps its card, shown as "Unavailable": it never silently means "none".
+const teamForms: Gate = (viewer) => clubReports(viewer) && viewer.usesTeams !== false;
+const honorsRosters: Gate = (viewer) => reports(viewer) && viewer.honorsOn !== false;
 
-type CardDef = { href: string; title: string; description: string; gate: Gate };
+type CardDef = { href: string; title: string; description: string; gate: Gate; unknownWhen?: "usesTeams" | "honorsOn" };
 
 const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
   {
@@ -50,14 +51,15 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
       {
         href: "/more/reports/clubs/check-in-book",
         title: staffPageTitles.checkInBook,
-        description: "The paper check-in book: every club on its own printed page, with its attendees to tick off on arrival.",
-        gate: clubReports,
+        description: "The paper check-in book: each club, or each registration on events without clubs, on its own printed page, with its attendees to tick off on arrival.",
+        gate: reports,
       },
       {
         href: "/more/honors/rosters",
         title: staffPageTitles.honorsRosters,
         description: "Class, site and club rosters for the Honors classes. Also in Honors.",
         gate: honorsRosters,
+        unknownWhen: "honorsOn",
       },
     ],
   },
@@ -75,12 +77,14 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         title: "Blank team form",
         description: "The empty team form, to print for a club that mails or emails the paper.",
         gate: teamForms,
+        unknownWhen: "usesTeams",
       },
       {
         href: "/more/reports/clubs/team-form/level",
         title: "Team forms by level",
         description: "Every team's filled-in form for one level, one page each. Only teams that advanced print at the next level.",
         gate: teamForms,
+        unknownWhen: "usesTeams",
       },
     ],
   },
@@ -104,7 +108,7 @@ export function buildPrintoutsView(viewer: PrintoutsViewer, eventId: string): Hu
   const shown = groupDefs.flatMap((group): HubGroup[] => {
     const cards = group.cards
       .filter((card) => card.gate(input))
-      .map((card): HubCard => ({ href: withCurrentEvent(card.href, eventId), title: card.title, description: card.description, status: null }));
+      .map((card): HubCard => ({ href: withCurrentEvent(card.href, eventId), title: card.title, description: card.description, status: card.unknownWhen && viewer[card.unknownWhen] === null ? UNAVAILABLE_STATUS : null }));
     return cards.length > 0 ? [{ title: group.title, cards }] : [];
   });
   const groups = mergeLoneCards(shown.map((group) => ({ title: group.title, cards: [...group.cards] })));
