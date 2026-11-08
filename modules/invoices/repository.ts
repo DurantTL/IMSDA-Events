@@ -674,8 +674,11 @@ export async function discardInvoiceDraft(input: { eventId: string; invoiceId: s
   const prisma = getPrisma();
   return prisma.$transaction(async (tx) => {
     await lockReconciliationEvent(tx, input.eventId);
-    // A church's promo code draft (#399) can be thrown away like any other; it needs no deferred-invoice event.
-    const churchInvoice = await tx.invoice.findFirst({ where: { id: input.invoiceId, eventId: input.eventId, groupKey: { startsWith: CHURCH_PROMO_GROUP_KEY_PREFIX } }, select: { id: true } });
+    // A church's promo code draft (#399) or conference club orders draft (#1688) can be thrown away like any other; it needs no deferred-invoice event.
+    const churchInvoice = await tx.invoice.findFirst({
+      where: { id: input.invoiceId, eventId: input.eventId, OR: [{ groupKey: { startsWith: CHURCH_PROMO_GROUP_KEY_PREFIX } }, { groupKey: { startsWith: CLUB_ORDERS_GROUP_KEY_PREFIX } }] },
+      select: { id: true },
+    });
     if (!churchInvoice) await requireDeferredEvent(tx, input.eventId);
     const invoice = await requireInvoice(tx, input.eventId, input.invoiceId);
     const draft = invoice.versions[0];

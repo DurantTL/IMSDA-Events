@@ -170,6 +170,13 @@ describe("POST /api/events/[eventId]/invoices", () => {
     expect(mocks.service.finalizeInvoiceVersion).not.toHaveBeenCalled();
   });
 
+  it("discarding a conference club orders draft (#1688) goes to the discard service for the event in the URL, as the finance manager", async () => {
+    mocks.churchOfClubOrdersInvoice.mockResolvedValue("church-a");
+    expect((await POST(request({ action: "discard", invoiceId: "i-orders" }), context())).status).toBe(200);
+    expect(mocks.service.discardInvoiceDraft).toHaveBeenCalledWith({ eventId: "event-a", invoiceId: "i-orders", actorUserId: "user-finance" });
+    expect(mocks.prepareClubOrdersDraft).not.toHaveBeenCalled();
+  });
+
   it("MANAGE_FINANCE alone does not carry the Finalize invoices permission into finalization", async () => {
     expect((await POST(request(finalizeBody), context())).status).toBe(200);
     expect(mocks.service.finalizeInvoiceVersion).toHaveBeenCalledWith({ eventId: "event-a", versionId: "v1", actorUserId: "user-finance", idempotencyKey: KEY, confirm: true, canFinalizeInvoices: false });

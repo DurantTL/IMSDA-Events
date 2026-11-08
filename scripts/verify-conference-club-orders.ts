@@ -201,6 +201,8 @@ async function main() {
     assert(codeOf(await failure(repo.submitConferenceOrder(ids.clubOrphan, { quantities: { [ids.conf1]: 2 } }, director, NOW))) === "NO_SPONSORING_CHURCH", "a club with no sponsoring church cannot submit");
     assert(await prisma.conferenceClubOrder.count({ where: { organizationId: ids.clubOrphan } }) === 0, "and nothing was saved for it");
     assert(codeOf(await failure(repo.submitConferenceOrder(ids.clubMain, { quantities: { [ids.conf1]: 0 }, patchesToExchange: 3 }, director, NOW))) === "INVALID_ORDER", "an order of nothing (patches to exchange alone) is refused");
+    assert(codeOf(await failure(repo.submitConferenceOrder(ids.clubMain, { quantities: { [ids.conf1]: 10_000 } }, director, NOW))) === "INVALID_ORDER", "a quantity over 9,999 is refused, not trimmed");
+    assert(codeOf(await failure(repo.submitConferenceOrder(ids.clubMain, { quantities: { [ids.conf1]: 1 }, patchesToExchange: "20000" }, director, NOW))) === "INVALID_ORDER", "so are patches to exchange over 9,999");
     assert(codeOf(await failure(repo.submitConferenceOrder(ids.clubMain, { quantities: { [ids.adv]: 2 } }, director, NOW))) === "ITEM_NOT_ORDERABLE", "an AdventSource item cannot be ordered from the conference");
     assert(codeOf(await failure(repo.submitConferenceOrder(ids.clubMain, { quantities: { no_such_item: 2 } }, director, NOW))) === "ITEM_NOT_ORDERABLE", "an unknown item is refused");
     assert(codeOf(await failure(repo.submitConferenceOrder("no_such_club", { quantities: { [ids.conf1]: 2 } }, director, NOW))) === "CLUB_NOT_FOUND", "an unknown club is not found");
@@ -279,6 +281,16 @@ async function main() {
     assert(done.changed && done.number && done.amountDueCents === 3600 + 450 + 825, "the treasurer finalizes it with a number and the total");
     const statement = await ledger.getPartyStatement(containerId, ids.churchA);
     assert(statement && statement.invoices.length === 1 && statement.totals.invoicedCents === 4875, "the church's statement finds the invoice on the billing event");
+
+    // A club orders draft can be thrown away like any other (it needs no deferred-invoice event), and a later fill makes a fresh one.
+    await invoices.discardInvoiceDraft({ eventId: containerId, invoiceId: otherFilled.invoiceId!, actorUserId: staff });
+    const discardedB = await prisma.invoiceVersion.findMany({ where: { invoiceId: otherFilled.invoiceId! } });
+    assert(discardedB.length === 1 && discardedB[0]!.status === "DISCARDED", "discarding a club orders draft marks it DISCARDED");
+    assert(await prisma.auditLog.count({ where: { action: "INVOICE_DRAFT_DISCARDED", entityId: discardedB[0]!.id } }) === 1, "and audits it");
+    assert(codeOf(await failure(invoices.discardInvoiceDraft({ eventId: containerId, invoiceId: invoiceA.id, actorUserId: staff }))) === "NOT_A_DRAFT", "a finalized club orders invoice is never discarded");
+    const afterDiscard = await repo.submitConferenceOrder(ids.clubOther, { quantities: { [ids.conf1]: 1 } }, director, NOW);
+    const refilledB = await repo.fillConferenceOrder(afterDiscard.id, { postage: "", addToStock: false }, staff, NOW);
+    assert(refilledB.invoiceOutcome === "CREATED" && refilledB.invoiceId === otherFilled.invoiceId, "a fill after a discard makes a fresh draft on the same invoice");
 
     // A later fill starts a revision draft beside the finalized version.
     const late = await repo.submitConferenceOrder(ids.clubMain, { quantities: { [ids.conf1]: 1 } }, director, NOW);

@@ -52,6 +52,14 @@ export function wholeCount(value: unknown, max = CONFERENCE_ORDER_QUANTITY_MAX) 
   return Number.isFinite(number) ? Math.min(max, Math.max(0, Math.trunc(number))) : 0;
 }
 
+export const QUANTITY_CAP_MESSAGE = `Enter ${CONFERENCE_ORDER_QUANTITY_MAX.toLocaleString("en-US")} or fewer.`;
+
+/** The plain message for a typed count that is over the cap, or null. The server refuses it and the form shows it beside the field. */
+export function quantityOverCap(value: unknown): string | null {
+  const number = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : 0;
+  return Number.isFinite(number) && Math.trunc(number) > CONFERENCE_ORDER_QUANTITY_MAX ? QUANTITY_CAP_MESSAGE : null;
+}
+
 export type OrderableItem = { itemId: string; name: string; unitPriceCents: number };
 
 export type OrderLineDraft = { itemId: string; name: string; quantity: number; unitPriceCents: number; amountCents: number };

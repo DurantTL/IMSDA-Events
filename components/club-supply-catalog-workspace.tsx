@@ -11,6 +11,7 @@ import type { ClubSupplyImportSummary, MergedNumberConflict, RepeatedCatalogNumb
 import { type ClubSupplySection, clubSupplySectionLabels, clubSupplySections } from "@/modules/club-supplies/domain";
 import type { ClubSupplyItemRecord } from "@/modules/club-supplies/repository";
 import { EmptyState } from "@/components/empty-state";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { Money } from "@/components/exact-value";
 
 type PreviewStep = {
@@ -69,6 +70,11 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
   const [editing, setEditing] = useState<string | null>(null);
   const [draftSupplier, setDraftSupplier] = useState<"ADVENTSOURCE" | "CONFERENCE">("ADVENTSOURCE");
   const [draftPrice, setDraftPrice] = useState("");
+  const [priceError, setPriceError] = useState("");
+  // A changed supplier or price that is not saved yet.
+  const editedItem = editing ? items.find((item) => item.id === editing) : undefined;
+  const originalPrice = editedItem?.unitPriceCents == null ? "" : (editedItem.unitPriceCents / 100).toFixed(2);
+  useUnsavedChangesGuard(Boolean(editedItem) && (draftSupplier !== editedItem!.supplier || (draftSupplier === "CONFERENCE" && draftPrice.trim() !== originalPrice)));
 
   async function send(body: Record<string, unknown>) {
     const response = await fetch("/api/admin/club-supplies/import", {
@@ -154,12 +160,14 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
     setEditing(item.id);
     setDraftSupplier(item.supplier);
     setDraftPrice(item.unitPriceCents === null ? "" : (item.unitPriceCents / 100).toFixed(2));
+    setPriceError("");
     setError("");
     setNotice("");
   }
 
   async function saveOrdering(item: ClubSupplyItemRecord) {
     setToggling(item.id);
+    setPriceError("");
     setError("");
     setNotice("");
     try {
@@ -169,6 +177,10 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
         body: JSON.stringify({ supplier: draftSupplier, unitPrice: draftSupplier === "CONFERENCE" ? draftPrice : null }),
       });
       const result = await response.json().catch(() => ({})) as ImportResponse;
+      if (response.status === 400 && result.error === "INVALID_PRICE") {
+        setPriceError(result.message ?? "Enter a price in dollars and cents, such as 1.25.");
+        return;
+      }
       if (!response.ok || !result.items) throw new Error(result.message ?? "The supplier could not be saved.");
       setItems(result.items);
       setEditing(null);
@@ -360,7 +372,8 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
                       {draftSupplier === "CONFERENCE" && (
                         <label>
                           Price each (dollars)
-                          <input inputMode="decimal" onChange={(event) => setDraftPrice(event.target.value)} placeholder="1.25" type="text" value={draftPrice} />
+                          <input aria-describedby={priceError ? `price-error-${item.id}` : undefined} aria-invalid={priceError ? true : undefined} inputMode="decimal" onChange={(event) => setDraftPrice(event.target.value)} placeholder="1.25" type="text" value={draftPrice} />
+                          {priceError && <small className="field-error-message" id={`price-error-${item.id}`}>{priceError}</small>}
                         </label>
                       )}
                       <button className="primary-button" disabled={toggling === item.id} onClick={() => saveOrdering(item)} type="button">{toggling === item.id ? "Saving…" : "Save supplier"}</button>

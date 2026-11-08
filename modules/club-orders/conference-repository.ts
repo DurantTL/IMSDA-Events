@@ -20,6 +20,7 @@ import {
   staffCanFill,
   wholeCount,
   type ConferenceOrderStatus,
+  quantityOverCap,
   type OrderableItem,
 } from "@/modules/club-orders/conference-orders";
 import { deliverConferenceOrderEmails, queueConferenceOrderEmails, resolveConferenceOrdersEmail } from "@/modules/club-orders/conference-email";
@@ -181,10 +182,14 @@ export async function submitConferenceOrder(organizationId: string, input: Submi
   const items = await listConferenceItems(prisma);
   const orderable = new Set(items.map((item) => item.itemId));
   for (const [itemId, quantity] of Object.entries(input.quantities)) {
+    const tooMany = quantityOverCap(quantity);
+    if (tooMany) throw new ClubOrderError("INVALID_ORDER", `A quantity is too large. ${tooMany}`);
     if (wholeCount(quantity) > 0 && !orderable.has(itemId)) throw new ClubOrderError("ITEM_NOT_ORDERABLE", "One of those items can't be ordered from the conference.");
   }
   const lines = buildOrderLines(items, input.quantities);
   if (lines.length === 0) throw new ClubOrderError("INVALID_ORDER", "Enter a quantity for at least one item.");
+  const tooManyPatches = quantityOverCap(input.patchesToExchange);
+  if (tooManyPatches) throw new ClubOrderError("INVALID_ORDER", `Patches to exchange is too large. ${tooManyPatches}`);
   const patchesToExchange = wholeCount(input.patchesToExchange);
   const total = itemsTotalCents(lines);
   const [settings, header] = await Promise.all([getPlatformSettings(), loadOrderExportHeader(organizationId, now)]);

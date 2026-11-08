@@ -11,10 +11,13 @@ import {
   conferenceOrderStatusLabels,
   directorCanCancel,
   itemsTotalCents,
+  quantityOverCap,
   wholeCount,
 } from "@/modules/club-orders/conference-orders";
 import type { ClubConferenceOrderWorkspace, ConferenceOrderRecord } from "@/modules/club-orders/conference-repository";
 import { Money } from "@/components/exact-value";
+
+const statusTone = { SUBMITTED: "gold", FILLED: "green", CANCELLED: "neutral" } as const;
 
 /**
  * A club's "Conference order" section (#1688): the conference-supplied patches and pin, their prices and a quantity each, the
@@ -41,7 +44,9 @@ export function ClubConferenceOrderSection({
 
   const lines = initial.items.map((item) => ({ ...item, quantity: wholeCount(quantities[item.itemId]) }));
   const total = itemsTotalCents(lines.map((line) => ({ quantity: line.quantity, unitPriceCents: line.unitPriceCents })));
-  const canSubmit = !readOnly && !busy && lines.some((line) => line.quantity > 0);
+  const overCap = (value: string | undefined) => quantityOverCap(value ?? "");
+  const hasCapProblem = initial.items.some((item) => overCap(quantities[item.itemId])) || Boolean(overCap(exchange));
+  const canSubmit = !readOnly && !busy && !hasCapProblem && lines.some((line) => line.quantity > 0);
   // Typed quantities that were not sent yet.
   useUnsavedChangesGuard(lines.some((line) => line.quantity > 0) || wholeCount(exchange) > 0);
 
@@ -99,7 +104,7 @@ export function ClubConferenceOrderSection({
   }
 
   return (
-    <section aria-labelledby="conference-order-heading" className={styles.section} id="conference-order">
+    <section aria-labelledby="conference-order-heading" className={`panel ${styles.section}`} id="conference-order">
       {confirmDialog}
       <h2 id="conference-order-heading">Conference order: patches and pins</h2>
       <p className={styles.intro}>
@@ -122,6 +127,8 @@ export function ClubConferenceOrderSection({
                 <label>
                   <span className="sr-only">{item.name} quantity</span>
                   <input
+                    aria-describedby={overCap(quantities[item.itemId]) ? `conference-qty-${item.itemId}` : undefined}
+                    aria-invalid={overCap(quantities[item.itemId]) ? true : undefined}
                     className={styles.quantity}
                     disabled={readOnly || initial.churchName === null}
                     inputMode="numeric"
@@ -132,6 +139,7 @@ export function ClubConferenceOrderSection({
                     type="number"
                     value={quantities[item.itemId] ?? ""}
                   />
+                  {overCap(quantities[item.itemId]) && <small className="field-error-message" id={`conference-qty-${item.itemId}`}>{overCap(quantities[item.itemId])}</small>}
                 </label>
               </li>
             ))}
@@ -140,6 +148,8 @@ export function ClubConferenceOrderSection({
             <label>
               Pathfinder shoulder patches to exchange
               <input
+                aria-describedby={overCap(exchange) ? "conference-exchange-error" : undefined}
+                aria-invalid={overCap(exchange) ? true : undefined}
                 className={styles.quantity}
                 disabled={readOnly || initial.churchName === null}
                 inputMode="numeric"
@@ -150,6 +160,7 @@ export function ClubConferenceOrderSection({
                 type="number"
                 value={exchange}
               />
+              {overCap(exchange) && <small className="field-error-message" id="conference-exchange-error">{overCap(exchange)}</small>}
             </label>
           </div>
           <p className={styles.totals}>
@@ -157,7 +168,7 @@ export function ClubConferenceOrderSection({
             <span>Postage not included.</span>
           </p>
           <div className={styles.actions}>
-            <button className="primary-button" disabled={!canSubmit || initial.churchName === null} type="submit">{busy ? "Working…" : "Submit order"}</button>
+            <button className="primary-button" disabled={!canSubmit || initial.churchName === null} type="submit">{busy ? "Saving…" : "Submit order"}</button>
           </div>
           {readOnly && <p className={styles.muted}>Only a director or deputy can place a conference order.</p>}
         </form>
@@ -172,7 +183,7 @@ export function ClubConferenceOrderSection({
           {orders.map((order) => (
             <li className={styles.order} key={order.id}>
               <div className={styles.orderHead}>
-                <span className={styles.status}>{conferenceOrderStatusLabels[order.status]}</span>
+                <span className={`status-chip ${statusTone[order.status]}`}>{conferenceOrderStatusLabels[order.status]}</span>
                 <span className={styles.muted}>{formatInConferenceTime(order.submittedAt, { dateStyle: "long" })}</span>
               </div>
               <ul className={styles.lines}>

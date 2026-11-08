@@ -17,7 +17,7 @@
 .itemText { display: grid; flex: 1 1 200px; gap: 2px; min-width: 0; }
 .itemText strong { color: var(--imsda-navy); font-size: .76rem; overflow-wrap: anywhere; }
 .itemText small { color: var(--muted); font-size: max(var(--type-floor, 0px), .63rem); }
-.itemControls { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+.itemControls { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
 .quantity { width: 84px; text-align: right; }
 .itemControls :global(.secondary-button) { min-height: 44px; }
 .itemControls :global(.primary-button) { min-height: 44px; }

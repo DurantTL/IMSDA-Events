@@ -14,6 +14,7 @@ import {
   directorCanCancel,
   itemsTotalCents,
   parseMoneyCents,
+  quantityOverCap,
   parsePostageCents,
   staffCanCancel,
   staffCanFill,
@@ -63,6 +64,14 @@ describe("an order's lines and total", () => {
     // The invoice is built from the lines' copied price, never from the catalog.
     const line = clubOrderInvoiceLine({ orderId: "order-1", clubId: "club-1", clubName: "Test Club", lines: [{ itemName: "Pathfinder Shoulder Patch", quantity: 10, unitPriceCents: 125 }], postageCents: 0, filledAt: new Date("2026-11-08T12:00:00Z") });
     expect(line.amountCents).toBe(1250);
+  });
+});
+
+describe("a quantity over the cap is refused, never changed", () => {
+  it("names the cap for a count above it and says nothing at or below it", () => {
+    expect(quantityOverCap(10_000)).toBe("Enter 9,999 or fewer.");
+    expect(quantityOverCap("12000")).toBe("Enter 9,999 or fewer.");
+    expect([quantityOverCap(9999), quantityOverCap("9999"), quantityOverCap(""), quantityOverCap(null), quantityOverCap("abc"), quantityOverCap(0)]).toEqual([null, null, null, null, null, null]);
   });
 });
 

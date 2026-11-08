@@ -23,7 +23,11 @@ import {
 
 type Outbox = Pick<Prisma.TransactionClient, "messageOutbox">;
 
-/** The address the order email goes to: the "conference orders email" platform setting, else the youth department's address. */
+/**
+ * The address the order email goes to: the "conference orders email" platform setting, else the youth department's address.
+ * Deliberately not the platform's email footer help address (`emailHelpEmail`, default support@imsda.org) or the Forms help
+ * contact: those are the general support line, and the owner's default for these orders is youth@imsda.org (#1688).
+ */
 export function resolveConferenceOrdersEmail(setting: string | null | undefined) {
   return setting?.trim() || DEFAULT_CLUB_HELP_EMAIL;
 }

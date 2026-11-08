@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
 import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import styles from "@/components/conference-club-orders-workspace.module.css";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { conferenceOrderStatusLabels, orderGrandTotalCents, staffCanCancel, staffCanFill } from "@/modules/club-orders/conference-orders";
 import type { ChurchBillRecord, StaffConferenceOrderRecord } from "@/modules/club-orders/conference-repository";
 import { Money } from "@/components/exact-value";
+
+const statusTone = { SUBMITTED: "gold", FILLED: "green", CANCELLED: "neutral" } as const;
 
 const apiBase = "/api/admin/conference-club-orders";
 
@@ -26,10 +29,15 @@ export function ConferenceClubOrdersWorkspace({ orders, bills }: { orders: Staff
   const [postage, setPostage] = useState<Record<string, string>>({});
   const [addToStock, setAddToStock] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  // A postage problem is shown on that order's card, beside the field.
+  const [postageError, setPostageError] = useState<Record<string, string>>({});
+  // Postage typed or the stock box ticked, and not filled yet.
+  useUnsavedChangesGuard(Object.values(postage).some((value) => value.trim() !== "") || Object.values(addToStock).some(Boolean));
 
   async function send(orderId: string, action: "fill" | "cancel", body: Record<string, unknown>, success: (result: Record<string, unknown>) => string) {
     setBusyId(orderId);
     setMessage(null);
+    setPostageError((current) => ({ ...current, [orderId]: "" }));
     try {
       const response = await fetch(`${apiBase}/${encodeURIComponent(orderId)}/${action}`, {
         method: "POST",
@@ -38,9 +46,13 @@ export function ConferenceClubOrdersWorkspace({ orders, bills }: { orders: Staff
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setMessage({ tone: "error", text: notSavedMessage(typeof result.message === "string" ? result.message : "The change could not be saved.") });
+        const reason = typeof result.message === "string" ? result.message : "The change could not be saved.";
+        if (result.error === "INVALID_POSTAGE") setPostageError((current) => ({ ...current, [orderId]: reason }));
+        else setMessage({ tone: "error", text: notSavedMessage(reason) });
         return;
       }
+      setPostage((current) => ({ ...current, [orderId]: "" }));
+      setAddToStock((current) => ({ ...current, [orderId]: false }));
       setMessage({ tone: "success", text: savedMessage(success(result)) });
       router.refresh();
     } catch {
@@ -79,7 +91,7 @@ export function ConferenceClubOrdersWorkspace({ orders, bills }: { orders: Staff
       <li className={styles.card} key={order.id}>
         <div className={styles.head}>
           <strong>{order.clubName}</strong>
-          <span className={styles.status}>{conferenceOrderStatusLabels[order.status]}</span>
+          <span className={`status-chip ${statusTone[order.status]}`}>{conferenceOrderStatusLabels[order.status]}</span>
         </div>
         <p className={styles.muted}>
           Billed to {order.churchName} · {order.clubYear} · submitted {formatInConferenceTime(order.submittedAt, { dateStyle: "long" })}
@@ -100,6 +112,8 @@ export function ConferenceClubOrdersWorkspace({ orders, bills }: { orders: Staff
             <label className={styles.field}>
               Postage (dollars)
               <input
+                aria-describedby={postageError[order.id] ? `postage-error-${order.id}` : undefined}
+                aria-invalid={postageError[order.id] ? true : undefined}
                 className={styles.input}
                 inputMode="decimal"
                 onChange={(event) => setPostage((current) => ({ ...current, [order.id]: event.target.value }))}
@@ -107,12 +121,13 @@ export function ConferenceClubOrdersWorkspace({ orders, bills }: { orders: Staff
                 type="text"
                 value={postage[order.id] ?? ""}
               />
+              {postageError[order.id] && <small className="field-error-message" id={`postage-error-${order.id}`}>{postageError[order.id]}</small>}
             </label>
             <label className={styles.check}>
               <input checked={addToStock[order.id] ?? false} onChange={(event) => setAddToStock((current) => ({ ...current, [order.id]: event.target.checked }))} type="checkbox" />
               Add the items to the club&apos;s stock
             </label>
-            <button className="primary-button" disabled={busy} onClick={() => fill(order)} type="button">{busy ? "Working…" : "Mark filled and add to church bill"}</button>
+            <button className="primary-button" disabled={busy} onClick={() => fill(order)} type="button">{busy ? "Saving…" : "Mark filled and add to church bill"}</button>
             {staffCanCancel(order.status) && <button className="secondary-button" disabled={busy} onClick={() => void cancel(order)} type="button">Cancel order</button>}
           </div>
         )}
