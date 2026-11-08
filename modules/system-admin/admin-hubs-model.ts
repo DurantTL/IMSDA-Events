@@ -290,6 +290,18 @@ export type HubView = {
   groups: HubGroup[];
 };
 
+/**
+ * What `AdminHub` draws: the intro line and card groups, with key numbers and a main action only when the page has them.
+ * An Admin hub (`HubView`) is one; so is the event's More money tools page (#1575), which has neither.
+ */
+export type HubBody = {
+  key: string;
+  description: string;
+  stats?: readonly HubStat[];
+  action?: { href: string; label: string } | null;
+  groups: readonly HubGroup[];
+};
+
 /** The largest group drawn as one grid; a bigger one is split in two so no row is ever a lone card. */
 export const MAX_GROUP_CARDS = 6;
 

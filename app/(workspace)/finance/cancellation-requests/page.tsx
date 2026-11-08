@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { staffPageTitles } from "@/components/staff-navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { CancellationRequestsWorkspace } from "@/components/cancellation-requests-workspace";
 import { getCarryOutPanel } from "@/modules/cancellation-execution/repository";
@@ -6,7 +7,7 @@ import { statusFilterSchema } from "@/modules/cancellation-requests/domain";
 import { getCancellationRequestDetail, listCancellationRequests } from "@/modules/cancellation-requests/repository";
 import { resolveEventContext } from "@/modules/events/selection";
 
-export const metadata: Metadata = { title: "Cancellation requests" };
+export const metadata: Metadata = { title: staffPageTitles.cancellationRequests };
 
 /**
  * The staff queue for registrants' cancellation requests (#170). MANAGE_FINANCE on the event, like the rules page. It

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import { staffPageTitles } from "@/components/staff-navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { ScholarshipFundWorkspace } from "@/components/scholarship-fund-workspace";
 import { resolveEventContext } from "@/modules/events/selection";
 import { getFundView, listSponsorDirectory } from "@/modules/scholarship-funds/repository";
 
-export const metadata: Metadata = { title: "Scholarship fund" };
+export const metadata: Metadata = { title: staffPageTitles.scholarshipFund };
 
 export default async function ScholarshipFundPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;

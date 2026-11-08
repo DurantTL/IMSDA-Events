@@ -396,3 +396,9 @@ deposit now"). The logic lives in `modules/payments/deposit-domain.ts`.
   lose, staff see `PAYMENT_CONFLICT` (409) and the card path
   `PAYMENT_OPERATION_CONFLICT`. Proven against PostgreSQL by
   `npm run test:reservation-deposit`.
+
+## More money tools (#1575)
+
+`money-tools-model.ts` (pure: card groups, per-card gates, status words) and `money-tools-repository.ts` (server-only reads,
+one per number, a failed read becomes "Unavailable") feed `/finance/tools`, the event's More money tools page. It is links
+only: nothing there records, refunds, matches or changes anything.

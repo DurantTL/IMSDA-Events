@@ -948,3 +948,8 @@ export async function getAttendanceReconciliationExport(eventId: string, options
     : null;
   return { result: view.result, versionLabel, factsChanged };
 }
+
+/** Whether the event has an approved reconciliation version: the "approved" state the Attendance reconciliation page shows (#1575). */
+export async function hasApprovedReconciliation(eventId: string): Promise<boolean> {
+  return (await getPrisma().attendanceReconciliationVersion.count({ where: { eventId, status: "APPROVED" } })) > 0;
+}
