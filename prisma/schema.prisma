@@ -682,6 +682,8 @@ enum MessageTemplateKey {
   CONFERENCE_CLUB_ORDER_SUBMITTED
   /// The confirmation of a conference club order (#1688): one email to the club's director. Not an event template.
   CONFERENCE_CLUB_ORDER_CONFIRMATION
+  /// The copy of a problem report (#1715) sent to the address the reporter gave, with or without an account: the reference and their own words. Not an event template.
+  PROBLEM_REPORT_COPY
 }
 
 enum MessageTemplateStatus {

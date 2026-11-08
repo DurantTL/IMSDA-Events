@@ -1658,6 +1658,10 @@ async function prepareAccountEmailBody(
   if (input.templateKey === "SYSTEM_TEST_EMAIL") {
     return { bodyText: input.bodyText };
   }
+  // The copy of a problem report (#1715) holds the person's own words: never replace anything in it.
+  if (input.templateKey === "PROBLEM_REPORT_COPY") {
+    return { bodyText: input.bodyText };
+  }
   // Module request email (#741) carries free text and no sentinel: never replace anything in it.
   if (input.templateKey?.startsWith("MODULE_REQUEST_")) {
     return { bodyText: input.bodyText };

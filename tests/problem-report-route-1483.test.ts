@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   count: vi.fn(),
   updateMany: vi.fn(),
   writeAuditLog: vi.fn(),
+  sendCopy: vi.fn(),
 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
@@ -25,6 +26,7 @@ vi.mock("@/modules/security/turnstile", async () => {
   const actual = await vi.importActual<typeof import("@/modules/security/turnstile")>("@/modules/security/turnstile");
   return { ...actual, requireTurnstile: mocks.requireTurnstile, turnstileSiteKeyForPage: () => "site-key-test" };
 });
+vi.mock("@/modules/support/problem-report-copy", () => ({ sendProblemReportCopy: mocks.sendCopy }));
 vi.mock("@/modules/operations/alerting", () => ({ dispatchUnsuppressedAlert: mocks.dispatchUnsuppressedAlert }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/lib/prisma", () => {
@@ -54,6 +56,7 @@ beforeEach(() => {
   mocks.getCurrentAttendee.mockResolvedValue({ account: null });
   mocks.checkRateLimit.mockResolvedValue({ allowed: true, decisions: [] });
   mocks.requireTurnstile.mockResolvedValue(null);
+  mocks.sendCopy.mockResolvedValue("skipped");
   mocks.create.mockResolvedValue({ id: "pr-1", number: 12 });
   mocks.dispatchUnsuppressedAlert.mockResolvedValue({ delivered: true, attempted: true });
 });
@@ -62,7 +65,7 @@ describe("POST /api/support/problem-reports", () => {
   it("stores the report, answers with the reference and keeps only the listed details", async () => {
     const response = await POST(post(valid));
     expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ reference: "P-12" });
+    expect(await response.json()).toEqual({ reference: "P-12", copy: "skipped" });
     const data = mocks.create.mock.calls[0][0].data;
     expect(data).toMatchObject({ message: valid.message, email: "sam@example.test", userId: null });
     const stored = JSON.stringify(data.details);
