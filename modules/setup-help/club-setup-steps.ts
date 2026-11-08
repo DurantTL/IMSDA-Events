@@ -33,6 +33,8 @@ export const CLUB_SETUP_IDS = [
   "sterling-follow-up",
   "no-clubs",
   "two-step-needed",
+  "roster-health-health-off",
+  "roster-health-photo-off",
 ] as const;
 export type ClubSetupId = (typeof CLUB_SETUP_IDS)[number];
 
@@ -149,5 +151,17 @@ export function clubSetupFor(id: ClubSetupId, base: string): RoleSetupEntry {
       };
     case "two-step-needed":
       return { setup: { href: "/account/security", label: "Set up two-step sign-in" }, guideId: "walkthrough-director-two-step" };
+    case "roster-health-health-off":
+      return {
+        setup: howTo(["Roster health can only check health records once the conference has turned the Health Record feature on.", "Until then the health record count reads Not checked, and nobody is flagged for it."], "The health record count shows a number."),
+        whoToAsk: "Only a system administrator can turn on the Health Record feature. Ask the conference office to pass this on.",
+        guideId: "director-roster-and-forms",
+      };
+    case "roster-health-photo-off":
+      return {
+        setup: howTo(["Roster health can only check photo releases once the Pathfinder Photo and Video Release form is turned on for clubs.", "Until then the photo release count reads Not checked, and nobody is flagged for it."], "The photo release count shows a number."),
+        whoToAsk: "Ask your conference Clubs Administrator to turn on the Pathfinder Photo and Video Release form.",
+        guideId: "director-roster-and-forms",
+      };
   }
 }

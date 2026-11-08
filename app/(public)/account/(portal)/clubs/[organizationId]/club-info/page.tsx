@@ -8,6 +8,9 @@ import { getClubProfile, listSponsorOptions } from "@/modules/organizations/club
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { clubTeamPeopleLinkAllowed } from "@/modules/system-admin/people-links";
 import { listClubTeam } from "@/modules/organizations/director-grants-repository";
+import { ClubOptionalFeatures } from "@/components/club-optional-features";
+import { canSwitchClubFeatures } from "@/modules/club-features/domain";
+import { listEnabledClubFeatures } from "@/modules/club-features/repository";
 import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Club settings" };
@@ -33,6 +36,8 @@ export default async function ClubInfoPage({ params }: { params: Promise<{ organ
   }
 
   const profileSection = editProfile ? await loadProfileSection(organizationId) : null;
+  // Optional features (#1709): the director and deputy switch them on; all are off until then.
+  const enabledFeatures = canSwitchClubFeatures(access.capabilities) ? await listEnabledClubFeatures(organizationId) : null;
   const teamSection = manageTeam
     ? await Promise.all([listClubTeam(organizationId), listPendingClubTeamInvites(organizationId)])
     : null;
@@ -48,6 +53,11 @@ export default async function ClubInfoPage({ params }: { params: Promise<{ organ
             endpoint={`/api/attendee/clubs/${encodeURIComponent(organizationId)}/profile`}
             initialProfile={profileSection.profile}
           />
+        </div>
+      )}
+      {enabledFeatures && (
+        <div id="club-optional-features">
+          <ClubOptionalFeatures organizationId={organizationId} initialEnabled={enabledFeatures} />
         </div>
       )}
       {teamSection && (

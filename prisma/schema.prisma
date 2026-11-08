@@ -2707,6 +2707,7 @@ model UserPersonLink {
  */
 model Organization {
   clubEventTeachers ClubEventTeacher[]
+  clubOptionalFeatures ClubOptionalFeature[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
   scholarshipAwards    ScholarshipAward[]
@@ -4629,6 +4630,8 @@ model AuditLog {
   @@index([eventId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([correlationId])
+  /// Roster health flags (#1709) read a person's roster saves by row id.
+  @@index([entityType, entityId])
 }
 
 model ImportRun {
@@ -6149,6 +6152,24 @@ model ClubRosterGuardian {
   rosterMember ClubRosterMember @relation(fields: [rosterMemberId], references: [id], onDelete: Cascade)
 
   @@unique([rosterMemberId, position])
+}
+
+/// An optional club-level feature a club has switched on (#1709). A row exists only while the feature is on: off is the
+/// default for every club, so no row means nothing new is shown. Switching off deletes the row (the audit log keeps the
+/// history); the feature itself stores nothing about people, so nothing else is lost. The keys are a typed list in
+/// `modules/club-features/domain.ts`. Exactly one of the two actor columns is set: the attendee account of a club
+/// director or deputy, or the staff user acting as the club's director (#442).
+model ClubOptionalFeature {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  featureKey         String
+  enabledAt          DateTime @default(now())
+  enabledByAccountId String?
+  enabledByUserId    String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, featureKey])
 }
 
 /// A club-owned, named roster export format (#490): which columns, in what

@@ -1,0 +1,2 @@
+/* Helper copy under a checkbox or a heading, not under a label: the global .field-help pulls up by 9px. */
+.helpText:global(.field-help) { margin: 4px 0 0; }
