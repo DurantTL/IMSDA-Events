@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CopyApplicationLink } from "@/components/copy-application-link";
@@ -112,7 +113,9 @@ export function PendingInvites({ invites, emailConfigured, heading = "Pending in
               </p>
               <div className={styles.pendingActions}>
                 {invite.notSent ? (
-                  <p className={styles.note}>Use Send Area Coordinator invites above.</p>
+                  invite.kind === "club"
+                    ? <p className={styles.note}>Not sent yet. Send it from <Link href="/admin/clubs/invites">Club invites</Link>.</p>
+                    : <p className={styles.note}>Use Send Area Coordinator invites above.</p>
                 ) : copyInstead ? (
                   <p className={styles.note}>Account email isn&apos;t set up, so this invite can&apos;t be emailed. Give them the sign-up link instead.</p>
                 ) : (

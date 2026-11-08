@@ -248,6 +248,7 @@ describe("pending invites on People & access: three sources, one list", () => {
     const where = JSON.stringify(mocks.clubInviteCount.mock.calls[0]![0].where);
     expect(where).not.toContain('"source"');
     expect(where).toContain('"type":"CLUB"');
+    expect(where).toContain('"isActive":true');
     expect(where).toContain('"PENDING","SENT"');
     expect(where).toContain('"contains":"pat"');
   });

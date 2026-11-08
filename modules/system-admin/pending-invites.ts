@@ -27,7 +27,7 @@ export type PendingInvite = {
   from?: string;
   sentAt: string | null;
   expired: boolean;
-  /** An imported Area Coordinator invite (#1608) waiting for a system administrator to press Send. */
+  /** A draft waiting for someone to press Send: an imported Area Coordinator invite (#1608) or a club invite (sent from Club invites). */
   notSent?: boolean;
   /** Family-side invites carry no secret, so staff can pass this link on themselves when email isn't set up. */
   signUpUrl?: string;
@@ -36,7 +36,7 @@ export type PendingInvite = {
 /** Invites per page on People & access. The list is paged in the database from its three sources, so every invite is reachable (#1492). */
 export const PENDING_INVITES_PAGE_SIZE = 25;
 
-const clubSelect = { id: true, source: true, email: true, name: true, role: true, sentAt: true, createdAt: true, expiresAt: true, organization: { select: { name: true } } } as const;
+const clubSelect = { id: true, source: true, status: true, email: true, name: true, role: true, sentAt: true, createdAt: true, expiresAt: true, organization: { select: { name: true } } } as const;
 const areaSelect = { id: true, status: true, email: true, name: true, sentAt: true, createdAt: true, expiresAt: true } as const;
 const staffSelect = {
   id: true, email: true, displayName: true, createdAt: true,
@@ -52,7 +52,7 @@ export function clubInviteFromLabel(source: string): string {
   switch (source) {
     case "APPLICATION": return "From a club application";
     case "CLUB": return "Added by the club";
-    case "PEOPLE": return "Added by staff";
+    case "PEOPLE": return "Added in People & access";
     default: return "From the club import";
   }
 }
@@ -66,7 +66,9 @@ const fromClub = (invite: ClubRow, now: Date): PendingInvite => ({
   from: clubInviteFromLabel(invite.source),
   sentAt: (invite.sentAt ?? invite.createdAt).toISOString(),
   expired: Boolean(invite.expiresAt && invite.expiresAt <= now),
-  signUpUrl: clubInviteSignUpUrl(invite.email, "club"),
+  // A draft cannot be accepted (acceptance needs Sent), so it has no sign-up link and goes out only from Club invites.
+  // sentAt keeps its createdAt fallback so the merged sort and the paged reads order drafts the same way.
+  ...(invite.status === "PENDING" ? { notSent: true } : { signUpUrl: clubInviteSignUpUrl(invite.email, "club") }),
 });
 
 const fromArea = (invite: AreaRow, now: Date): PendingInvite => ({
@@ -123,7 +125,7 @@ function pendingWheres(options: PendingOptions) {
   const open = { status: { in: ["PENDING", "SENT"] as Array<"PENDING" | "SENT"> } };
   return {
     emptyEmails: Boolean(emails && emails.length === 0),
-    club: { ...open, organization: { type: "CLUB" }, ...match() } as Prisma.ClubInviteWhereInput,
+    club: { ...open, organization: { type: "CLUB", isActive: true }, ...match() } as Prisma.ClubInviteWhereInput,
     area: { ...open, ...match() } as Prisma.AreaCoordinatorInviteWhereInput,
     // Staff logins are for the full scope only: a Clubs Administrator never reads them.
     staff: options.scope === "full"

@@ -684,14 +684,26 @@ describe("the pending invites list", () => {
       const { invites } = await listPendingInvites({ scope }, now);
       const clubs = invites.filter((entry) => entry.kind === "club");
       expect(Object.fromEntries(clubs.map((entry) => [entry.id, entry.from]))).toEqual({
-        imp: "From the club import", app: "From a club application", clb: "Added by the club", ppl: "Added by staff", odd: "From the club import",
+        imp: "From the club import", app: "From a club application", clb: "Added by the club", ppl: "Added in People & access", odd: "From the club import",
       });
     }
     // No source narrows the read; accepted and cancelled stay out through the status filter, drafts stay in.
     const where = mocks.clubInviteFindMany.mock.calls.at(-1)![0].where;
     expect(where.source).toBeUndefined();
     expect(where.status).toEqual({ in: ["PENDING", "SENT"] });
-    expect(where.organization).toEqual({ type: "CLUB" });
+    expect(where.organization).toEqual({ type: "CLUB", isActive: true });
+  });
+
+  it("returns a draft club invite as not sent, with no sign-up link, and a sent one with its link", async () => {
+    const row = (id: string, status: string) => ({ id, email: `${id}@example.test`, name: "", role: "DIRECTOR", source: "IMPORT", status, sentAt: null, createdAt: new Date("2026-10-01T00:00:00Z"), expiresAt: null, organization: { name: "Example Pathfinders" } });
+    mocks.clubInviteFindMany.mockResolvedValue([row("draft", "PENDING"), { ...row("live", "SENT"), sentAt: new Date("2026-10-02T00:00:00Z") }]);
+    const { invites } = await listPendingInvites({ scope: "full" }, now);
+    const draft = invites.find((entry) => entry.id === "draft")!;
+    expect(draft.notSent).toBe(true);
+    expect(draft.signUpUrl).toBeUndefined();
+    const live = invites.find((entry) => entry.id === "live")!;
+    expect(live.notSent).toBeUndefined();
+    expect(live.signUpUrl).toContain("invite=club");
   });
 
   it("never reads or shows staff logins to a Clubs Administrator", async () => {
