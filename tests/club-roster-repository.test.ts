@@ -689,4 +689,53 @@ describe("club roster storage", () => {
 
     expect((await removeRosterMember("club-1", id, actor, now)).nameKept).toBe(false);
   });
+  describe("grade, school type and church membership (#1664, #1668)", () => {
+    const withSchool = { ...youth, schoolGrade: "GRADE_7" as const, schoolType: "PUBLIC_SCHOOL" as const, churchMember: "NOT_SURE" as const };
+
+    it("stores all three on a youth and lists the grade for everyone", async () => {
+      await addRosterMember("club-1", "2026-27", withSchool, actor, { now });
+      expect(db.members[0]).toMatchObject({ schoolGrade: "GRADE_7", schoolType: "PUBLIC_SCHOOL", churchMember: "NOT_SURE" });
+      const [member] = await listRoster("club-1", "2026-27", now);
+      expect(member!.schoolGrade).toBe("GRADE_7");
+    });
+
+    it("leaves school type and church membership out of the list unless the caller is allowed them", async () => {
+      await addRosterMember("club-1", "2026-27", withSchool, actor, { now });
+      const [plain] = await listRoster("club-1", "2026-27", now);
+      expect("schoolType" in plain!).toBe(false);
+      expect("churchMember" in plain!).toBe(false);
+      expect(JSON.stringify(plain)).not.toContain("PUBLIC_SCHOOL");
+      const [allowed] = await listRoster("club-1", "2026-27", now, { includeSchoolDetails: true });
+      expect(allowed).toMatchObject({ schoolGrade: "GRADE_7", schoolType: "PUBLIC_SCHOOL", churchMember: "NOT_SURE" });
+    });
+
+    it("keeps none of them for a staff member, on add and when a youth becomes staff", async () => {
+      await addRosterMember("club-1", "2026-27", { ...withSchool, firstName: "Sam", attendeeType: "STAFF", role: "Counselor" }, actor, { now });
+      expect(db.members[0]).not.toMatchObject({ schoolGrade: "GRADE_7" });
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...withSchool, firstName: "Kim" }, actor, { now });
+      await updateRosterMember("club-1", memberId, { attendeeType: "STAFF" }, actor, now);
+      expect(db.members[1]).toMatchObject({ schoolGrade: null, schoolType: null, churchMember: null });
+    });
+
+    it("edits them, and an edit that does not mention them leaves them alone", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", withSchool, actor, { now });
+      await updateRosterMember("club-1", memberId, { role: "TLT" }, actor, now);
+      expect(db.members[0]).toMatchObject({ schoolGrade: "GRADE_7", schoolType: "PUBLIC_SCHOOL" });
+      await updateRosterMember("club-1", memberId, { schoolGrade: "GRADE_8", schoolType: null }, actor, now);
+      expect(db.members[0]).toMatchObject({ schoolGrade: "GRADE_8", schoolType: null, churchMember: "NOT_SURE" });
+    });
+
+    it("erases them with the rest when the member is removed", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", withSchool, actor, { now });
+      await removeRosterMember("club-1", memberId, actor, now);
+      expect(db.members[0]).toMatchObject({ status: "REMOVED", schoolGrade: null, schoolType: null, churchMember: null });
+    });
+
+    it("never writes a grade, school type or church value into the audit log", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", withSchool, actor, { now });
+      await updateRosterMember("club-1", memberId, { schoolType: "HOMESCHOOL" }, actor, now);
+      const text = JSON.stringify(mocks.writeAuditLog.mock.calls);
+      for (const value of ["GRADE_7", "PUBLIC_SCHOOL", "HOMESCHOOL", "NOT_SURE"]) expect(text).not.toContain(value);
+    });
+  });
 });

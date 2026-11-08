@@ -35,7 +35,7 @@ describe("roster export columns (#490)", () => {
   it("defaults to names only, and offers no emergency contact or medical field", () => {
     expect(DEFAULT_ROSTER_EXPORT_COLUMNS.map((column) => column.key)).toEqual(["firstName", "lastName"]);
     expect(ROSTER_EXPORT_COLUMN_KEYS).toEqual([
-      "firstName", "lastName", "birthDate", "age", "gender", "classLevel", "role",
+      "firstName", "lastName", "birthDate", "age", "gender", "classLevel", "schoolGrade", "role",
       "guardian1Name", "guardian1Relationship", "guardian1Email", "guardian1Phone",
       "guardian2Name", "guardian2Relationship", "guardian2Email", "guardian2Phone",
     ]);
@@ -114,8 +114,8 @@ describe("guardian export columns (#510)", () => {
   it("offers guardian columns only to someone who may see guardians", () => {
     const withAccess = rosterExportColumnKeysFor(true);
     const without = rosterExportColumnKeysFor(false);
-    expect(without).toEqual(["firstName", "lastName", "birthDate", "age", "gender", "classLevel", "role"]);
-    expect(withAccess).toHaveLength(15);
+    expect(without).toEqual(["firstName", "lastName", "birthDate", "age", "gender", "classLevel", "schoolGrade", "role"]);
+    expect(withAccess).toHaveLength(16);
     expect(without.some(isGuardianRosterExportColumn)).toBe(false);
   });
 

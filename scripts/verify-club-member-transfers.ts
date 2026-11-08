@@ -89,7 +89,7 @@ async function addMember(club: string, key: string, firstName: string, lastName:
   return prisma.clubRosterMember.create({
     data: {
       id: `${P}_row_${key}_${club}`, organizationId: club, clubYear, personId: `${P}_${key}`, attendeeType: "YOUTH",
-      role: "Pathfinder", classLevel: "FRIEND", gender: "FEMALE", sealedBirthDate: sealed, source: "DIRECTOR",
+      role: "Pathfinder", classLevel: "FRIEND", schoolGrade: "GRADE_6", schoolType: "HOMESCHOOL", churchMember: "YES", gender: "FEMALE", sealedBirthDate: sealed, source: "DIRECTOR",
     },
   });
 }
@@ -228,9 +228,10 @@ async function main() {
   // 5. What moved and what stayed.
   const sendingRow = await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: ada.id } });
   assert(sendingRow.status === "REMOVED" && sendingRow.personId === null && sendingRow.sealedBirthDate === null
-    && sendingRow.gender === null && sendingRow.role === "" && sendingRow.classLevel === null && !sendingRow.willingToDrive, "the sending row is erased like a removal");
+    && sendingRow.gender === null && sendingRow.role === "" && sendingRow.classLevel === null && sendingRow.schoolGrade === null && sendingRow.schoolType === null && sendingRow.churchMember === null && !sendingRow.willingToDrive, "the sending row is erased like a removal");
   const receivingRow = await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: accepted.rosterMemberId } });
   assert(receivingRow.organizationId === clubs.b && receivingRow.personId === ada.personId && receivingRow.sealedBirthDate === sealed && receivingRow.source === "TRANSFER", "the birth date moved to the receiving row");
+  assert(receivingRow.schoolGrade === "GRADE_6" && receivingRow.schoolType === "HOMESCHOOL" && receivingRow.churchMember === "YES", "grade, school type and church membership move with the member (#1664, #1668)");
   assert(await prisma.person.count({ where: { id: ada.personId! } }) === 1, "one Person, no duplicate");
   const history = await listMemberHonorHistory(clubs.b, receivingRow.id);
   assert(history.history.length === 1 && history.history[0]!.recordedAtOrganizationName === "Transfer Test Club A", "honor history follows, still credited to the club that recorded it");

@@ -28,6 +28,9 @@
 .rosterFilterButton { min-height: 44px; }
 .rosterFilterButton[aria-pressed="true"] { border-color: var(--imsda-navy); background: var(--imsda-navy-soft); }
 .rosterSearchPanel :global(.field-help) { margin: 0; }
+.rosterGradeFilter { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.rosterGradeFilter label { font-weight: 600; }
+.rosterGradeFilter select { min-height: 44px; }
 .rosterResultLine { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
 .rosterResultLine p { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
 .rosterResultLine :global(.text-button) { min-height: 44px; }

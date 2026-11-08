@@ -46,7 +46,8 @@ export default async function ClubRosterPage({
   // Transfers (#489) are the same leader-only capability that manages the club's team.
   const canTransfer = access.capabilities.manageTeam && !readOnly;
   const [members, complianceStatuses, clubOptions, guardians] = await Promise.all([
-    listRoster(organizationId, clubYear),
+    // School type and church membership (#1668): this is the club's own roster (director, deputy, registrar).
+    listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: true }),
     clubPortalComplianceStatuses(organizationId, clubYear, access.capabilities),
     canTransfer ? listTransferClubOptions(organizationId) : Promise.resolve([]),
     // Guardian contacts (#510): the club's director and deputy only, and only on the current and next year, where they can be edited (#959).
@@ -117,6 +118,7 @@ export default async function ClubRosterPage({
         organizationId={organizationId}
         readOnly={readOnly}
         sectionsStartClosed={rosterSectionsStartClosed(access.club.role)}
+        schoolDetails
       />
       {canTransfer && <ClubTransfersPanel organizationId={organizationId} />}
     </>

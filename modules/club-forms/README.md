@@ -124,6 +124,14 @@ steps.
 - **Gender:** both seeded forms (version 3) ask a required Male/Female question
   that maps to the roster's gender. Older submissions without it still work; the
   director picks it on the review screen.
+- **Grade, school type and church membership (#1664, #1668):** the Membership
+  Application (version 4) maps its required Grade (5th to 12th) to the roster's
+  grade, and two new optional questions, School type and "Is the Pathfinder a
+  member of the Seventh-day Adventist church?", to the roster's school type and
+  church membership. They are pre-filled on the review screen for the director
+  to check; "Link to existing member" copies nothing. A copy of the form edited in
+  the app keeps its own questions and mapping until an administrator adds them.
+  A staff mapping cannot name these three fields.
 - **Not mapped:** the roster has no address or member-contact field, so the
   applicant's address and own phone or email are not copied. The Membership
   Application's phone pre-fills the first guardian's phone.

@@ -16,7 +16,7 @@ async function roster(access: Parameters<typeof rosterGuardiansForAccess>[0], or
   const clubYear = contactsRosterYear(new URL(request.url).searchParams.get("year"));
   // Guardian contacts (#510) ride along for a director or deputy only.
   const guardians = await rosterGuardiansForAccess(access, organizationId, clubYear);
-  return { clubYear, members: await listRoster(organizationId, clubYear), ...(guardians ? { guardians } : {}) };
+  return { clubYear, members: await listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: true }), ...(guardians ? { guardians } : {}) };
 }
 
 async function patchHandler(request: Request, context: RouteContext) {

@@ -120,12 +120,12 @@ describe("columns per role (#1167)", () => {
   const base = { birthDatesShown: false, showGender: false, hasScreening: false, hasRowActions: true };
 
   it("leads with Name, Age, Type, Current class and Details", () => {
-    expect(rosterColumns({ ...base, hasRowActions: false })).toEqual(["name", "age", "type", "class", "details"]);
+    expect(rosterColumns({ ...base, hasRowActions: false })).toEqual(["name", "age", "type", "class", "grade", "details"]);
   });
 
   it("adds Gender only on request, the birth date only after its reveal, screening only where the role has it", () => {
-    expect(rosterColumns({ ...base, showGender: true })).toEqual(["name", "age", "type", "class", "details", "gender", "actions"]);
-    expect(rosterColumns({ ...base, birthDatesShown: true, hasScreening: true })).toEqual(["name", "age", "birthDate", "type", "class", "details", "screening", "actions"]);
+    expect(rosterColumns({ ...base, showGender: true })).toEqual(["name", "age", "type", "class", "grade", "details", "gender", "actions"]);
+    expect(rosterColumns({ ...base, birthDatesShown: true, hasScreening: true })).toEqual(["name", "age", "birthDate", "type", "class", "grade", "details", "screening", "actions"]);
     expect(rosterColumns(base)).not.toContain("birthDate");
     expect(rosterColumns(base)).not.toContain("screening");
   });
@@ -421,15 +421,16 @@ describe("filters combine and reset together (#1167 review)", () => {
     expect(out).not.toContain("Fixture-c<");
   });
 
-  it("resets the search, Details needed and the compliance filter together, in one history entry that takes all three out of the address (rule B2, #1456)", () => {
-    expect(clearedRosterFilters()).toEqual({ query: "", detailsOnly: false, complianceFilter: null });
+  it("resets the search, Details needed, the grade and compliance filters together, in one history entry that takes all of them out of the address (rule B2, #1456)", () => {
+    expect(clearedRosterFilters()).toEqual({ query: "", detailsOnly: false, complianceFilter: null, grade: "" });
     const source = readFileSync(path.join(process.cwd(), "components/club-roster-workspace.tsx"), "utf8");
     const start = source.indexOf("function clearFilters()");
     const body = source.slice(start, source.indexOf("\n  }\n", start));
     expect(body).toContain("search.setValue(cleared.query)");
     expect(body).toContain('setDetailsRaw("")');
     expect(body).toContain('setComplianceRaw("")');
-    expect(body).toContain('writeAddressParams({ q: null, filter: null, compliance: null }, "push")');
+    expect(body).toContain("setGradeRaw(cleared.grade)");
+    expect(body).toContain('writeAddressParams({ q: null, filter: null, compliance: null, grade: null }, "push")');
     // The one address helper leaves every other param (?year=) alone.
     expect(source).not.toContain("dropFilterParams");
     expect(source).toContain('useAddressParam("filter"');

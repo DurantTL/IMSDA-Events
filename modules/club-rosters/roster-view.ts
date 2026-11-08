@@ -57,22 +57,27 @@ export function rosterDetailsSummary(items: readonly string[]): string {
   return items.length === 0 ? "" : `Needs ${items.map((item) => item.toLowerCase()).join(", ")}`;
 }
 
-export type RosterColumnId = "name" | "age" | "birthDate" | "type" | "class" | "details" | "gender" | "screening" | "actions";
+export type RosterColumnId = "name" | "age" | "birthDate" | "type" | "class" | "grade" | "details" | "gender" | "school" | "churchMember" | "screening" | "actions";
+
+/** The `?grade=` value that lists people with no grade given (#1664). Any other value is a grade key such as `GRADE_7`. */
+export const ROSTER_NO_GRADE_FILTER = "none";
 
 /**
  * The columns a viewer's table has, in order. Name, Age, Type, Current class and Details lead; Gender joins
- * with "Show gender"; the birth date appears only after its separate authorized reveal; screening only where
+ * with "Show gender"; School and church membership (#1668) join with "Show school details", only for a viewer who may see them; the birth date appears only after its separate authorized reveal; screening only where
  * the role gets it today; the actions column only where the row has something to do.
  */
-export function rosterColumns(options: { birthDatesShown: boolean; showGender: boolean; hasScreening: boolean; hasRowActions: boolean }): RosterColumnId[] {
+export function rosterColumns(options: { birthDatesShown: boolean; showGender: boolean; hasScreening: boolean; hasRowActions: boolean; showSchool?: boolean }): RosterColumnId[] {
   return [
     "name",
     "age",
     ...(options.birthDatesShown ? (["birthDate"] as const) : []),
     "type",
     "class",
+    "grade",
     "details",
     ...(options.showGender ? (["gender"] as const) : []),
+    ...(options.showSchool ? (["school", "churchMember"] as const) : []),
     ...(options.hasScreening ? (["screening"] as const) : []),
     ...(options.hasRowActions ? (["actions"] as const) : []),
   ];
@@ -162,21 +167,27 @@ export function rosterLabelDetail(label: string, member: NamedMember): string {
 }
 
 /** The population after the compliance filter, then the search and Details needed. The badge counts the former so it matches the rows. */
+/** The grade filter (#1664): blank is everyone, `none` is nobody with a grade, otherwise the one grade. */
+function matchesGradeFilter(member: { schoolGrade?: string | null }, grade: string | undefined): boolean {
+  if (!grade) return true;
+  return grade === ROSTER_NO_GRADE_FILTER ? !member.schoolGrade : member.schoolGrade === grade;
+}
+
 export function applyRosterFilters<T extends NamedMember & Parameters<typeof rosterRowMissingFields>[0]>(
   population: readonly T[],
-  options: { query: string; detailsOnly: boolean; keepForCompliance: ((member: T) => boolean) | null },
+  options: { query: string; detailsOnly: boolean; keepForCompliance: ((member: T) => boolean) | null; grade?: string },
 ): { afterCompliance: T[]; visible: T[]; needDetailsCount: number } {
   const afterCompliance = options.keepForCompliance ? population.filter(options.keepForCompliance) : [...population];
   return {
     afterCompliance,
     needDetailsCount: afterCompliance.filter((member) => rosterDetailsNeeded(member)).length,
-    visible: afterCompliance.filter((member) => matchesRosterSearch(member, options.query) && (!options.detailsOnly || rosterDetailsNeeded(member))),
+    visible: afterCompliance.filter((member) => matchesRosterSearch(member, options.query) && (!options.detailsOnly || rosterDetailsNeeded(member)) && matchesGradeFilter(member, options.grade)),
   };
 }
 
-/** What "Clear filters" resets: the search, Details needed and the `?compliance=` filter, together. */
+/** What "Clear filters" resets: the search, Details needed, the grade filter and the `?compliance=` filter, together. */
 export function clearedRosterFilters() {
-  return { query: "", detailsOnly: false, complianceFilter: null } as const;
+  return { query: "", detailsOnly: false, complianceFilter: null, grade: "" } as const;
 }
 
 /**

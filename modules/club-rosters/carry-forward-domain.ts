@@ -72,6 +72,21 @@ export function carriedClassLevel(
   return next.classLevel === undefined ? previous.classLevel : next.classLevel;
 }
 
+/**
+ * Grade, school type and church membership (#1664, #1668) belong to youth only, like the class. A carried youth keeps
+ * last year's value unless the director chose another one in the reviewed "Move everyone up one grade" step: nothing
+ * moves up on its own. Anyone carried as another type has none.
+ */
+export function carriedSchoolValue<T>(
+  previous: T | null,
+  next: { attendeeType: string },
+  chosen: T | null | undefined,
+): T | null {
+  if (next.attendeeType !== "YOUTH") return null;
+  return chosen === undefined ? previous : chosen;
+}
+
+
 const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "MASTER_GUIDE"]).nullable();
 
 /** One ticked person: omitted fields keep what last year's row had. Unticked people are simply left out. */
@@ -82,6 +97,8 @@ export const carryForwardInputSchema = z.object({
     attendeeType: z.enum(["YOUTH", "STAFF", "ADULT", "UNDERAGE"]),
     role: z.string().trim().max(60).optional(),
     classLevel: classLevel.optional(),
+    /** The reviewed new grade (#1664); omitted keeps last year's. */
+    schoolGrade: z.enum(["GRADE_K", "GRADE_1", "GRADE_2", "GRADE_3", "GRADE_4", "GRADE_5", "GRADE_6", "GRADE_7", "GRADE_8", "GRADE_9", "GRADE_10", "GRADE_11", "GRADE_12", "NOT_IN_SCHOOL"]).nullable().optional(),
   }).strict()).min(1, "Tick at least one person to carry forward.").max(1000),
 }).strict().refine((data) => new Set(data.people.map((person) => person.memberId)).size === data.people.length, {
   message: "A person is listed twice.",

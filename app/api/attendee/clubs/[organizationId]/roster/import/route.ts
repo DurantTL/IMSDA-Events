@@ -60,6 +60,9 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
             attendeeType,
             role,
             classLevel: row.classLevel ?? null,
+            schoolGrade: row.schoolGrade ?? null,
+            schoolType: null,
+            churchMember: null,
             gender: row.gender ?? null,
           }, actor);
           touchedPersonIds.add(personId);
@@ -70,6 +73,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
             ...(row.birthDate === undefined ? {} : { birthDate: row.birthDate }),
             ...(row.attendeeType === undefined ? {} : { attendeeType: row.attendeeType }),
             ...(row.classLevel === undefined ? {} : { classLevel: row.classLevel }),
+            ...(row.schoolGrade === undefined ? {} : { schoolGrade: row.schoolGrade }),
             ...(row.role === undefined ? {} : { role: row.role }),
             ...(row.gender === undefined ? {} : { gender: row.gender }),
           }, actor);
@@ -103,7 +107,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
         ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId }),
       },
     });
-    return Response.json({ steps: results, added, updated, members: await listRoster(organizationId, clubYear) });
+    return Response.json({ steps: results, added, updated, members: await listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: true }) });
   } catch (error) {
     return rosterApiError(error, "Importing the roster");
   }

@@ -141,7 +141,7 @@ export async function getRosterAddReview(
     const empty = { name: "", relationship: "", email: "", phone: "" };
     return {
       ...base,
-      prefill: { firstName: "", lastName: "", birthDate: "", attendeeType: mapping.rosterType, role: "", classLevel: null, gender: null, guardians: [empty, empty] },
+      prefill: { firstName: "", lastName: "", birthDate: "", attendeeType: mapping.rosterType, role: "", classLevel: null, schoolGrade: null, schoolType: null, churchMember: null, gender: null, guardians: [empty, empty] },
       duplicates: [{ ...filedMember, attendeeType: "", status: "" }],
       canAdd: false,
     };
