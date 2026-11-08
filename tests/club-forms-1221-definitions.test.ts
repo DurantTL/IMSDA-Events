@@ -5,8 +5,8 @@ import { formTemplates, registrationFormDefinitionSchema } from "@/modules/forms
 
 /** #1221: the six new club form templates. Synthetic data only. */
 
-// Caleb's release text, copied from his comment on issue 1221, including its one remaining "Seventhday".
-const RELEASE_TEXT = "I hereby grant permission and authorize the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs the irrevocable right to use, reproduce and publish photographs and videos taken of me and/or the undersigned minor children, and our names, for use for all purposes, in any form, and in any and all media, including, without limitation, printed publications, websites, and outreach purposes, in any manner or in any medium. I understand that such photographs and video recordings of me may be placed on the Internet. I release the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs from any expectation of confidentiality for the undersigned minor children and myself and attest that I am the parent or legal guardian of the children listed below and that I have the authority to consent and allow the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs to use their photographs, videos, and names. I acknowledge that since participation is voluntary, neither the minor children nor I will receive any financial compensation. I agree that participation in any publication and website produced by the Iowa-Missouri Conference of Seventhday Adventists and its affiliated Pathfinder Clubs confers no rights of ownership to me whatsoever and I hereby waive the right to approve the final product. I release the Iowa-Missouri Conference of Seventh-day Adventists, its affiliated Pathfinder Clubs, its contractors, and its employees from liability for any claims by me or any third party in connection with my participation or the participation of the undersigned minor children. I agree that all such portraits, pictures, photographs, video and audio recordings, and any reproductions thereof, and all plates, negatives, recording tape and digital files are and shall remain the property of the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs. This release is binding on me and my heirs, assigns and personal representatives.";
+// Caleb's release text, copied from his comment on issue 1221, with its one "Seventhday" corrected to "Seventh-day" (Caleb, Nov 8).
+const RELEASE_TEXT = "I hereby grant permission and authorize the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs the irrevocable right to use, reproduce and publish photographs and videos taken of me and/or the undersigned minor children, and our names, for use for all purposes, in any form, and in any and all media, including, without limitation, printed publications, websites, and outreach purposes, in any manner or in any medium. I understand that such photographs and video recordings of me may be placed on the Internet. I release the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs from any expectation of confidentiality for the undersigned minor children and myself and attest that I am the parent or legal guardian of the children listed below and that I have the authority to consent and allow the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs to use their photographs, videos, and names. I acknowledge that since participation is voluntary, neither the minor children nor I will receive any financial compensation. I agree that participation in any publication and website produced by the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs confers no rights of ownership to me whatsoever and I hereby waive the right to approve the final product. I release the Iowa-Missouri Conference of Seventh-day Adventists, its affiliated Pathfinder Clubs, its contractors, and its employees from liability for any claims by me or any third party in connection with my participation or the participation of the undersigned minor children. I agree that all such portraits, pictures, photographs, video and audio recordings, and any reproductions thereof, and all plates, negatives, recording tape and digital files are and shall remain the property of the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs. This release is binding on me and my heirs, assigns and personal representatives.";
 
 function seed(key: string) {
   const found = clubFormTemplateSeeds.find((candidate) => candidate.key === key);
@@ -27,11 +27,12 @@ const newKeys = [
 ];
 
 describe("the six new club form templates (#1221)", () => {
-  it("are valid, version 1, in order after the first four, and never share a key with an event form template", () => {
+  it("are valid, version 1 (the photo release 2), in order after the first four, and never share a key with an event form template", () => {
     const eventKeys = new Set(formTemplates.map((template) => template.key));
     newKeys.forEach((key, index) => {
       const template = seed(key);
-      expect(template.version).toBe(1);
+      // The photo release is version 2: its "Seventhday" typo was corrected (Caleb, Nov 8).
+      expect(template.version).toBe(key === "pathfinder_photo_video_release" ? 2 : 1);
       expect(template.sortOrder).toBe(50 + index * 10);
       expect(templateSpecProblems(template), key).toEqual([]);
       expect(eventKeys.has(key), key).toBe(false);
@@ -108,7 +109,7 @@ describe("the six new club form templates (#1221)", () => {
     expect(notes.join(" ")).toBe(RELEASE_TEXT);
     expect(notes[0].startsWith("I hereby grant permission and authorize the Iowa-Missouri Conference of Seventh-day Adventists and its affiliated Pathfinder Clubs the irrevocable right")).toBe(true);
     expect(notes[notes.length - 1].endsWith("This release is binding on me and my heirs, assigns and personal representatives.")).toBe(true);
-    expect(notes.join(" ")).toContain("Seventhday Adventists");
+    expect(notes.join(" ")).not.toContain("Seventhday");
   });
 
   it("asks the release's questions, drops the director's email, and needs the minor, both signatures and the date", () => {
