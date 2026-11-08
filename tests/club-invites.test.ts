@@ -54,7 +54,9 @@ import {
   acceptClubInvite,
   cancelClubTeamInvite,
   clubInviteExpiry,
+  clubInviteEmailContent,
   clubInviteSignUpUrl,
+  signUpInviteKind,
   createClubTeamInvite,
   createPeopleClubInvite,
   listInvitesForAccount,
@@ -62,6 +64,7 @@ import {
   resendClubTeamInvite,
   sendClubInvites,
 } from "@/modules/club-imports/invites";
+import { areaCoordinatorInviteEmailContent } from "@/modules/organizations/area-coordinator-invites";
 
 const now = new Date("2026-09-23T15:00:00Z");
 const account = { id: "account-1", verifiedEmail: "Leader@Example.test" };
@@ -107,7 +110,7 @@ describe("sending club invites (#376)", () => {
     const message = mocks.outboxCreate.mock.calls[0][0].data;
     expect(message).toMatchObject({ templateKey: "CLUB_INVITE", recipientEmail: "leader@example.test", eventId: null });
     // Import invites (#376) point at the working sign-up page, email prefilled, not the bare account page.
-    expect(message.bodyTextSnapshot).toContain("https://events.imsda.test/account/sign-up#email=leader%40example.test");
+    expect(message.bodyTextSnapshot).toContain("https://events.imsda.test/account/sign-up?invite=club#email=leader%40example.test");
     expect(message.bodyTextSnapshot).not.toMatch(/token=/);
     expect(mocks.inviteUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: "SENT", lastMessageId: "message-1" }) }));
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "CLUB_INVITES_SENT", metadata: { count: 1, organizationIds: ["club-1"] } }));
@@ -223,6 +226,48 @@ describe("the sign-up link a club invite's email carries (#434)", () => {
     expect(url).not.toMatch(/[?&]token=/);
   });
 
+  it("marks a club or Area Coordinator invite so the sign-up page speaks to the invited person, and nothing else", () => {
+    expect(clubInviteSignUpUrl("leader@example.test", "club")).toBe("https://events.imsda.test/account/sign-up?invite=club#email=leader%40example.test");
+    expect(clubInviteSignUpUrl("leader@example.test", "area")).toBe("https://events.imsda.test/account/sign-up?invite=area#email=leader%40example.test");
+    expect(signUpInviteKind("club")).toBe("club");
+    expect(signUpInviteKind("area")).toBe("area");
+    for (const other of [undefined, "", "admin", ["club"], "CLUB"]) expect(signUpInviteKind(other)).toBeNull();
+  });
+
+  it("walks a new person through every step they will meet, without promising anything the site doesn't do", () => {
+    const body = clubInviteEmailContent({ name: "Pat Example", email: "pat@example.test", clubName: "Example Pathfinders", role: "DIRECTOR", source: "IMPORT" }).bodyText;
+    for (const step of [
+      "at least 14 characters",
+      "six-digit code",
+      "You're invited to manage a club",
+      "two-step sign-in",
+      "This phone or computer",
+      "Send a new code",
+      "Details needed",
+      "Help on your account page",
+      "Questions?",
+    ]) expect(body).toContain(step);
+    expect(body).not.toMatch(/expires/i);
+    expect(clubInviteEmailContent({ name: "", email: "r@example.test", clubName: "Example Pathfinders", role: "REPORTER", source: "CLUB" }).bodyText).toContain("Monthly Records");
+    expect(clubInviteEmailContent({ name: "", email: "r@example.test", clubName: "Example Pathfinders", role: "REGISTRAR", source: "CLUB" }).bodyText).toContain("Club events");
+    for (const source of ["CLUB", "APPLICATION", "PEOPLE"] as const) {
+      expect(clubInviteEmailContent({ name: "", email: "r@example.test", clubName: "Example Pathfinders", role: "DIRECTOR", source }).bodyText).toContain("This invite expires in 14 days.");
+    }
+  });
+
+  it("gives an Area Coordinator the same real steps, with the Area Coordinator card and marked link", () => {
+    const body = areaCoordinatorInviteEmailContent({ name: "Pat Example", email: "pat@example.test" }).bodyText;
+    for (const step of [
+      "https://events.imsda.test/account/sign-up?invite=area#email=pat%40example.test",
+      "at least 14 characters",
+      "six-digit code",
+      "You're invited to be an Area Coordinator",
+      "This phone or computer",
+      "Club coordination",
+      "This invite expires in 14 days.",
+    ]) expect(body).toContain(step);
+  });
+
   it("normalizes the address the same way an invite matches one", () => {
     // Leading/trailing space and case shouldn't produce a different link for the same address.
     expect(clubInviteSignUpUrl("  Leader@Example.test  ")).toBe(clubInviteSignUpUrl("leader@example.test"));
@@ -246,7 +291,7 @@ describe("club team invites (#425)", () => {
     const message = mocks.outboxCreate.mock.calls[0][0].data;
     expect(message).toMatchObject({ templateKey: "CLUB_INVITE", recipientEmail: "new.helper@example.test" });
     // Club-created invites (#425) get the same working sign-up link as import invites.
-    expect(message.bodyTextSnapshot).toContain("https://events.imsda.test/account/sign-up#email=new.helper%40example.test");
+    expect(message.bodyTextSnapshot).toContain("https://events.imsda.test/account/sign-up?invite=club#email=new.helper%40example.test");
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({
       action: "CLUB_INVITE_CREATED",
       metadata: { organizationId: "club-1", role: "REGISTRAR", actorAttendeeAccountId: "account-1" },

@@ -405,7 +405,7 @@ describe("validation happens before anything is written", () => {
     expect(response.status).toBe(201);
     const body = await response.json();
     expect(body.staffError).toContain("staff login couldn't be created");
-    expect(body.created).toMatchObject({ staffLogin: false, clubInviteIds: ["ci-1"], areaCoordinatorInviteId: "ac-1", signUpUrl: "https://events.imsda.test/account/sign-up#email=pat%40example.test" });
+    expect(body.created).toMatchObject({ staffLogin: false, clubInviteIds: ["ci-1"], areaCoordinatorInviteId: "ac-1", signUpUrl: "https://events.imsda.test/account/sign-up?invite=club#email=pat%40example.test" });
     expect(mocks.deliverAfter).toHaveBeenCalledWith([]);
     expect(mocks.sendStaffInvitationEmail).not.toHaveBeenCalled();
   });
@@ -474,7 +474,7 @@ describe("no email configured", () => {
 
   it("still creates the family invites as SENT, queues nothing, and returns the sign-up link", async () => {
     const body = await (await invite({ areaCoordinator: true, clubs: [{ organizationId: "club_1", role: "DIRECTOR" }] })).json();
-    expect(body.created.signUpUrl).toBe("https://events.imsda.test/account/sign-up#email=pat%40example.test");
+    expect(body.created.signUpUrl).toBe("https://events.imsda.test/account/sign-up?invite=club#email=pat%40example.test");
     expect(body.created.clubInviteIds).toEqual(["ci-1"]);
     expect(mocks.clubInviteCreate.mock.calls[0]![0].data).toMatchObject({ status: "SENT", sentCount: 0 });
     expect(mocks.acCreate.mock.calls[0]![0].data).toMatchObject({ status: "SENT", sentCount: 0 });
@@ -668,7 +668,7 @@ describe("the pending invites list", () => {
       ["area", "Area Coordinator", false],
       ["club", "Director of Example Pathfinders", true],
     ]);
-    expect(invites.find((entry) => entry.kind === "club")!.signUpUrl).toBe("https://events.imsda.test/account/sign-up#email=pat%40example.test");
+    expect(invites.find((entry) => entry.kind === "club")!.signUpUrl).toBe("https://events.imsda.test/account/sign-up?invite=club#email=pat%40example.test");
   });
 
   it("never reads or shows staff logins to a Clubs Administrator", async () => {

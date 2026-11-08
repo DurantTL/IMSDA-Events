@@ -53,7 +53,7 @@ const fromClub = (invite: ClubRow, now: Date): PendingInvite => ({
   what: `${clubDirectorRoleLabels[invite.role]} of ${invite.organization.name}`,
   sentAt: (invite.sentAt ?? invite.createdAt).toISOString(),
   expired: Boolean(invite.expiresAt && invite.expiresAt <= now),
-  signUpUrl: clubInviteSignUpUrl(invite.email),
+  signUpUrl: clubInviteSignUpUrl(invite.email, "club"),
 });
 
 const fromArea = (invite: AreaRow, now: Date): PendingInvite => ({
@@ -65,7 +65,7 @@ const fromArea = (invite: AreaRow, now: Date): PendingInvite => ({
   sentAt: (invite.sentAt ?? invite.createdAt).toISOString(),
   expired: Boolean(invite.expiresAt && invite.expiresAt <= now),
   // A pending invite cannot be accepted yet, so it has no sign-up link to pass on.
-  ...(invite.status === "PENDING" ? { notSent: true } : { signUpUrl: clubInviteSignUpUrl(invite.email) }),
+  ...(invite.status === "PENDING" ? { notSent: true } : { signUpUrl: clubInviteSignUpUrl(invite.email, "area") }),
 });
 
 const fromStaff = (user: StaffRow, now: Date): PendingInvite => {
