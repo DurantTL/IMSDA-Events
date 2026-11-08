@@ -48,6 +48,7 @@ describe("staff UI foundations (#981 batch 1)", () => {
     expect(css).not.toMatch(/\.setup-step \.text-button \{[^}]*min-height: 36px/);
     expect(css).toMatch(/\.arrival-row button \{[^}]*min-height: var\(--touch-target, 44px\);/);
     expect(css).toMatch(/:where\(\.filter-field select\) \{ min-height: var\(--target-touch\); \}/);
+    expect(css).toMatch(/\.operations-search-form \.field select \{ min-height: 44px; \}/);
     // The table headers the issue names read their size through the label floor.
     expect(css).toMatch(/\.finance-head \{[^}]*max\(var\(--type-label-floor/);
     expect(css).toMatch(/\.report-table thead th \{[^}]*max\(var\(--type-label-floor/);

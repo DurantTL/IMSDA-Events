@@ -11932,6 +11932,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .operations-search-form .operations-search-status { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .operations-search-form .operations-search-status legend { width: 100%; padding: 0; margin-bottom: 6px; }
 .operations-search-form .operations-search-status .checkbox-label { min-height: 44px; }
+.operations-search-form .field select { min-height: 44px; } /* #1732: 44px tap target at every width. */
 .operations-search-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .operations-search-actions .primary-button,
 .operations-search-actions .secondary-button { min-height: 44px; }
