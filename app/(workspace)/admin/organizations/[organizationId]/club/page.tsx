@@ -115,7 +115,7 @@ export default async function StaffOpenClubPage({
         Change club admins or the profile from the cards above, and file or correct reports from Monthly Records.
       </p>
 
-      <nav aria-label="Roster club year" className="intro-actions club-year-choice">
+      <nav aria-label="Roster club year" className={`intro-actions club-year-choice ${styles.yearChoice}`}>
         {view.choices.map((year) => (
           <Link
             aria-current={year === view.clubYear ? "page" : undefined}

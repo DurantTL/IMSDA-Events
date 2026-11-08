@@ -54,3 +54,8 @@
   font-weight: 800;
   letter-spacing: 0.02em;
 }
+
+/* The club year buttons meet the 44px tap target at every width (C2), not only where the phone rules stretch them. */
+.yearChoice > a {
+  min-height: 44px;
+}
