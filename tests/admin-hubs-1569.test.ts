@@ -116,8 +116,16 @@ describe("Admin hub model (#1569)", () => {
     expect(cardsOf("forms", clubsAdmin, allMetrics("forms", clubsAdmin, 1)).map((card) => card.href)).toEqual(["/admin/club-forms", "/admin/club-forms/public-page"]);
     expect(neededMetrics("forms", clubsAdmin)).toEqual(["clubFormsOn"]);
     const catalogs = cardsOf("catalogs", clubsAdmin, allMetrics("catalogs", clubsAdmin, 1)).map((card) => card.href);
-    expect(catalogs).toEqual(["/admin/honors", "/admin/club-supplies", "/admin/organizations/background-checks"]);
+    expect(catalogs).toEqual(["/admin/honors", "/admin/club-supplies", "/admin/club-supplies/conference-orders", "/admin/organizations/background-checks"]);
     expect(neededMetrics("catalogs", clubsAdmin)).toEqual(["honors"]);
+    // Problem reports: the page sends everyone but a system administrator away, so only they get the card (#1731).
+    expect(cardsOf("events", system, allMetrics("events", system, 1)).map((card) => card.href)).toContain("/admin/problem-reports");
+    expect(canOpenHub("events", clubsAdmin)).toBe(false);
+    // Conference club orders: the page checks Clubs administration, so a system administrator and a Clubs Administrator see it, nobody else.
+    for (const viewer of [system, clubsAdmin]) {
+      expect(cardsOf("catalogs", viewer, allMetrics("catalogs", viewer, 1)).map((card) => card.href)).toContain("/admin/club-supplies/conference-orders");
+    }
+    expect(cardsOf("catalogs", editor, {}).map((card) => card.href)).not.toContain("/admin/club-supplies/conference-orders");
     expect(buildHubView("forms", clubsAdmin, { clubFormsOn: 2 }).action?.href).toBe("/admin/club-forms");
     // A site content editor: one card, no numbers.
     const editorView = buildHubView("catalogs", editor, {});

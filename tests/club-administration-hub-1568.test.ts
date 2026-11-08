@@ -29,7 +29,7 @@ describe("Club administration uses the hub pattern (#1568)", () => {
       ["Applications", ["New club applications", "Club invites"]],
       ["Club events and forms", ["Club events", "Club forms", "Public club forms page"]],
       ["People", ["Club leaders", "People & access"]],
-      ["Catalogs and imports", ["Honor catalog", "Club supply catalog", "Import clubs", "Import health records"]],
+      ["Catalogs and imports", ["Honor catalog", "Club supply catalog", "Conference club orders", "Import clubs", "Import health records"]],
     ]);
     // Titles the Clubs registry names come from it, not from a second copy.
     const registry = new Map([clubsAdminHomeItem, ...clubsAdminGroups.flatMap((group) => group.items)].map((item) => [item.href, item.label]));
@@ -59,7 +59,7 @@ describe("Club administration uses the hub pattern (#1568)", () => {
     expect(hrefs(clubsAdmin)).toContain("/admin/clubs/health-import");
     expect(hrefs(clubsAdminNoHealth)).not.toContain("/admin/clubs/health-import");
     expect(hrefs({ ...system, healthImport: undefined })).not.toContain("/admin/clubs/health-import");
-    expect(titles(clubsAdminNoHealth).at(-1)).toEqual(["Catalogs and imports", ["Honor catalog", "Club supply catalog", "Import clubs"]]);
+    expect(titles(clubsAdminNoHealth).at(-1)).toEqual(["Catalogs and imports", ["Honor catalog", "Club supply catalog", "Conference club orders", "Import clubs"]]);
   });
 
   it("never leaves a lone card in a group, whatever the gates remove", () => {

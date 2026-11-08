@@ -101,6 +101,7 @@ const count = (n: number, tone: StatusTone, one: string, many = one): CardStatus
 const waiting = (n: number, noun: string, none: string): CardStatus => (n > 0 ? { tone: "review", text: `${n} ${noun}` } : { tone: "ok", text: none });
 
 export const moduleRequestsHref = "/admin/feature-requests";
+export const problemReportsHref = "/admin/problem-reports";
 
 /** Cards both the Clubs hub and Club administration show, defined once. */
 const clubCards = {
@@ -113,6 +114,13 @@ const clubCards = {
   sterling: { href: "/admin/organizations/background-checks", gate: hubGates.clubs },
   honors: { href: "/admin/honors", gate: hubGates.clubs, metrics: ["honors"], status: (read) => count(read("honors")!, "draft", "honor", "honors") },
   supplies: { href: "/admin/club-supplies", gate: hubGates.clubs },
+  // The page checks `hasClubsAdministration` (system administrator or an active Clubs Administrator): the same people as `hubGates.clubs`.
+  conferenceOrders: {
+    href: "/admin/club-supplies/conference-orders",
+    title: "Conference club orders",
+    description: "Patches and pins clubs have ordered, to fill and bill to their churches.",
+    gate: hubGates.clubs,
+  },
   clubForms: { href: "/admin/club-forms", gate: hubGates.clubs, metrics: ["clubFormsOn"], status: (read) => count(read("clubFormsOn")!, "ok", "form on", "forms on") },
   publicClubForms: { href: "/admin/club-forms/public-page", gate: hubGates.clubs },
 } satisfies Record<string, CardDef>;
@@ -160,6 +168,13 @@ const hubDefs: Record<HubKey, HubDef> = {
             gate: hubGates.system,
             metrics: ["moduleRequests"],
             status: (read) => waiting(read("moduleRequests")!, "to review", "None waiting"),
+          },
+          // The page sends everyone but a system administrator to "no access", so the card has the system gate.
+          {
+            href: problemReportsHref,
+            title: "Problem reports",
+            description: "Problems people sent from the Forms help popup, to mark resolved.",
+            gate: hubGates.system,
           },
         ],
       },
@@ -215,6 +230,7 @@ const hubDefs: Record<HubKey, HubDef> = {
         cards: [
           clubCards.honors,
           clubCards.supplies,
+          clubCards.conferenceOrders,
           { href: "/admin/clubs/import", description: "Add or update clubs from a spreadsheet.", gate: hubGates.clubs },
           { href: "/admin/clubs/health-import", description: "Bring club members' health records in from a file.", gate: (v) => hubGates.clubs(v) && v.healthImport === true },
         ],
@@ -340,6 +356,7 @@ const hubDefs: Record<HubKey, HubDef> = {
         cards: [
           clubCards.honors,
           clubCards.supplies,
+          clubCards.conferenceOrders,
           { href: "/admin/master-award-rules", gate: hubGates.system },
           clubCards.sterling,
         ],
