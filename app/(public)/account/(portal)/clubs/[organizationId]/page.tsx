@@ -11,6 +11,7 @@ import {
   ClubHomeTasks,
   ClubHomeUsefulLinks,
 } from "@/components/club-home";
+import { ClubHomeRosterHealth } from "@/components/club-home-roster-health";
 import { SetupChecklistPanel } from "@/components/setup-checklist-panel";
 import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
 import { clubPortalComplianceReminderCounts } from "@/modules/background-checks/repository";
@@ -39,6 +40,7 @@ import { clubEventRegistrationSteps, listClubEvents } from "@/modules/club-regis
 import { listUpcomingDeadlines } from "@/modules/calendar/deadline-list";
 import { getClubReportYear } from "@/modules/club-reports/repository";
 import { buildClubChecklist, CLUB_CHECKLIST_GUIDE_HREF, monthsNotSubmitted } from "@/modules/setup-help/club-checklist";
+import { loadRosterHealthCounts } from "@/modules/club-features/roster-health";
 import { listDirectedClubs } from "@/modules/organizations/director-access";
 import { clubDirectorRoleLabels, clubRoleDescriptions } from "@/modules/organizations/director-grants-domain";
 import { clubAccessClosed } from "@/components/club-access-closed";
@@ -157,7 +159,7 @@ export default async function ClubHomePage({
   const base = `/account/clubs/${organizationId}`;
   const { clubYear, currentClubYear, readOnly, contactsEditable } = rosterYearView(query.year, now);
   // Each source loads on its own: one that fails marks only its own section "unavailable" and never takes the page down.
-  const [members, events, reportYear, clubsLink, compliance, deadlineList, formDrafts] = await Promise.all([
+  const [members, events, reportYear, clubsLink, compliance, deadlineList, formDrafts, rosterHealth] = await Promise.all([
     load(listRoster(organizationId, clubYear)),
     readOnly ? Promise.resolve(null) : load(listClubEvents(organizationId)),
     !readOnly && access.capabilities.submitReports ? load(getClubReportYear(organizationId, clubYear)) : Promise.resolve(null),
@@ -167,6 +169,8 @@ export default async function ClubHomePage({
     // The conference's deadlines (#910): the same list for every club.
     readOnly ? Promise.resolve([]) : load(listUpcomingDeadlines(now)),
     loadFormDrafts(access, clubYear),
+    // Optional (#1709): null unless the club switched roster health flags on and this is its director or deputy.
+    readOnly ? Promise.resolve(null) : load(loadRosterHealthCounts(organizationId, access.capabilities, now)),
   ]);
 
   const summary = clubHomeSummary({ clubYear, members, formDrafts, events });
@@ -187,6 +191,7 @@ export default async function ClubHomePage({
   if (!readOnly) {
     if (formDrafts === "ERROR") unavailable.push("Saved club form drafts");
     steps.push(...formDraftSteps(formDrafts, base));
+    if (rosterHealth === "ERROR") unavailable.push("Roster health");
     if (members === "ERROR") unavailable.push("The roster");
     else steps.push(...rosterSteps(members, base));
     if (reportYear === "ERROR") unavailable.push("Monthly Records");
@@ -256,6 +261,7 @@ export default async function ClubHomePage({
           unavailable={unavailable}
         />
       )}
+      {!readOnly && rosterHealth && rosterHealth !== "ERROR" && <ClubHomeRosterHealth counts={rosterHealth.counts} href={`${base}/roster-health`} />}
       <ClubHomeRoster setupBase={base} clubYear={clubYear} preview={roster} readOnly={readOnly} rosterHref={rosterHref} unavailable={members === "ERROR"} />
       {events && (
         <ClubHomeEvents
