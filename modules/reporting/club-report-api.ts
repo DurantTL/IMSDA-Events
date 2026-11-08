@@ -38,9 +38,14 @@ export async function handleClubReportRequest(input: {
   actor: ClubReportActor;
   body: unknown;
   /** Staff may narrow a report to one location the way the staff reports do; the route resolves it. */
+  /** False for view-only access (Pathfinder event-manager oversight): it may run a report but never change shared layouts. */
+  canManageLayouts?: boolean;
   resolveLocation?: (requested: string | null | undefined) => Promise<string | null>;
 }) {
   const request = clubReportRequestSchema.parse(input.body);
+  if ((request.action === "save-layout" || request.action === "delete-layout") && input.canManageLayouts === false) {
+    throw new AccessDeniedError("View-only access can't change saved layouts.", 403, "PERMISSION_DENIED");
+  }
   if (request.action === "save-layout") {
     const layout = await saveClubReportLayout(input.eventId, input.viewer, input.actor, request);
     return Response.json({ layout, layouts: await listClubReportLayouts(input.eventId, input.viewer) }, { status: 201, headers: noStore });
@@ -81,6 +86,6 @@ export async function resolveCoordinatorReportActor(): Promise<ClubReportActor |
   const account = await currentAreaCoordinator();
   if (account) return { kind: "coordinator", accountId: account.id };
   const acting = await currentStaffActingContext();
-  if (acting?.role === "AREA_COORDINATOR") return { kind: "act-as", userId: acting.userId, actAsId: acting.actAsId };
+  if (acting?.role === "AREA_COORDINATOR") return { kind: "act-as", userId: acting.userId, actAsId: acting.actAsId, ...(acting.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) };
   return null;
 }

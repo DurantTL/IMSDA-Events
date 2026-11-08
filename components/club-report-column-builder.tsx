@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { useConfirm } from "@/components/use-confirm";
+import { fileNameFromDisposition } from "@/components/export-link";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import styles from "@/components/club-report-column-builder.module.css";
 
@@ -9,7 +10,7 @@ export type ClubReportColumnOption = { key: string; header: string };
 export type ClubReportLayoutOption = { id: string; name: string; columns: string[] };
 
 type Table = { headers: string[]; rows: string[][]; totalRows: number; clubNames?: string[] };
-type ApiError = { message?: string };
+type ApiError = { message?: string; error?: string };
 
 /**
  * The club report column chooser (#1671), shared by staff and Area Coordinators: tick and order columns, preview a few
@@ -17,8 +18,12 @@ type ApiError = { message?: string };
  * columns the server offered this viewer are shown, and the server checks them again on every request. Saved layouts
  * hold column keys only.
  */
-export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initialLayouts, locationId = null }: {
+export function ClubReportColumnBuilder({ endpoint, eventName, options, defaultKeys, initialLayouts, locationId = null, canSaveLayouts = true }: {
   endpoint: string;
+  /** Named in the print window title and headings. */
+  eventName: string;
+  /** False for view-only access: layouts can be loaded but not saved or deleted. */
+  canSaveLayouts?: boolean;
   options: ClubReportColumnOption[];
   defaultKeys: string[];
   initialLayouts: ClubReportLayoutOption[];
@@ -31,6 +36,8 @@ export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initia
   const [perClub, setPerClub] = useState(true);
   const [preview, setPreview] = useState<Table | null>(null);
   const [busy, setBusy] = useState(false);
+  const [working, setWorking] = useState<"preview" | "csv" | "print" | "save" | null>(null);
+  const [nameError, setNameError] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   // Only a layout being named is saved work; column picks and the preview just shape a download.
@@ -60,13 +67,14 @@ export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initia
 
   async function failure(response: Response, fallback: string) {
     const result = await response.json().catch(() => ({})) as ApiError;
-    return new Error(result.message ?? fallback);
+    return Object.assign(new Error(result.message ?? fallback), { code: result.error });
   }
 
   async function run(action: "preview" | "csv" | "print") {
     setError("");
     setNotice("");
     setBusy(true);
+    setWorking(action);
     // A pop-up must open straight from the click, before the request, or the browser blocks it.
     const printWindow = action === "print" ? window.open("", "_blank") : null;
     try {
@@ -77,12 +85,12 @@ export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initia
         const url = URL.createObjectURL(await response.blob());
         const link = document.createElement("a");
         link.href = url;
-        link.download = "club-attendee-report.csv";
+        link.download = fileNameFromDisposition(response.headers.get("Content-Disposition")) ?? "club-attendee-report.csv";
         link.click();
         URL.revokeObjectURL(url);
         setNotice("Downloaded the report.");
       } else if (action === "print") {
-        writePrintWindow(printWindow!, await response.json() as Table, perClub);
+        writePrintWindow(printWindow!, await response.json() as Table, perClub, eventName);
       } else {
         setPreview(await response.json() as Table);
       }
@@ -91,6 +99,7 @@ export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initia
       setError(caught instanceof Error ? caught.message : "The report could not be built.");
     } finally {
       setBusy(false);
+      setWorking(null);
     }
   }
 
@@ -100,7 +109,9 @@ export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initia
     if (!name || chosen.length === 0) return;
     setError("");
     setNotice("");
+    setNameError("");
     setBusy(true);
+    setWorking("save");
     try {
       const response = await post({ action: "save-layout", name, columns: chosen });
       if (!response.ok) throw await failure(response, "The layout could not be saved.");
@@ -108,9 +119,13 @@ export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initia
       setLayoutName("");
       setNotice(`Saved "${name}".`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The layout could not be saved.");
+      const message = caught instanceof Error ? caught.message : "The layout could not be saved.";
+      // A taken name belongs next to the name field; anything else goes in the shared alert.
+      if (caught instanceof Error && (caught as { code?: string }).code === "LAYOUT_NAME_TAKEN") setNameError(message);
+      else setError(message);
     } finally {
       setBusy(false);
+      setWorking(null);
     }
   }
 
@@ -158,7 +173,7 @@ export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initia
             {layouts.map((layout) => (
               <li className={styles.layoutItem} key={layout.id}>
                 <button className="secondary-button" disabled={busy} onClick={() => applyLayout(layout)} type="button">{layout.name}</button>
-                <button aria-label={`Delete saved layout "${layout.name}"`} className={`text-button ${styles.small}`} disabled={busy} onClick={() => deleteLayout(layout)} type="button">Delete</button>
+                {canSaveLayouts && <button aria-label={`Delete saved layout "${layout.name}"`} className={`text-button ${styles.small}`} disabled={busy} onClick={() => deleteLayout(layout)} type="button">Delete</button>}
               </li>
             ))}
           </ul>
@@ -204,9 +219,9 @@ export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initia
       {notice && <p className={`status-chip green ${styles.message}`} role="status">{notice}</p>}
 
       <div className={styles.actions}>
-        <button className="secondary-button" disabled={busy || none} onClick={() => run("preview")} type="button">Preview</button>
-        <button className="secondary-button" disabled={busy || none} onClick={() => run("print")} type="button">Print</button>
-        <button className="primary-button" disabled={busy || none} onClick={() => run("csv")} type="button">Download CSV</button>
+        <button className="secondary-button" disabled={busy || none} onClick={() => run("preview")} type="button">{working === "preview" ? "Working…" : "Preview"}</button>
+        <button className="secondary-button" disabled={busy || none} onClick={() => run("print")} type="button">{working === "print" ? "Working…" : "Print"}</button>
+        <button className="primary-button" disabled={busy || none} onClick={() => run("csv")} type="button">{working === "csv" ? "Downloading…" : "Download CSV"}</button>
       </div>
 
       {preview && (
@@ -224,21 +239,26 @@ export function ClubReportColumnBuilder({ endpoint, options, defaultKeys, initia
         </div>
       )}
 
-      <form className={styles.saveRow} onSubmit={saveLayout}>
-        <label>
-          Save these columns as a layout
-          <input maxLength={80} onChange={(event) => setLayoutName(event.target.value)} placeholder="e.g. Spring Camporee check-in" type="text" value={layoutName} />
-        </label>
-        <button className="secondary-button" disabled={busy || none || !layoutName.trim()} type="submit">Save layout</button>
-      </form>
+      {canSaveLayouts && (
+        <form className={styles.saveRow} onSubmit={saveLayout}>
+          <label>
+            Save these columns as a layout
+            <input aria-describedby={nameError ? `${ids}-name-error` : undefined} aria-invalid={nameError ? true : undefined} maxLength={80} onChange={(event) => { setLayoutName(event.target.value); setNameError(""); }} placeholder="e.g. Spring Camporee check-in" type="text" value={layoutName} />
+            {nameError && <span className={`${styles.fieldError} ${styles.message}`} id={`${ids}-name-error`}>{nameError}</span>}
+          </label>
+          <button className="secondary-button" disabled={busy || none || !layoutName.trim()} type="submit">{working === "save" ? "Saving…" : "Save layout"}</button>
+        </form>
+      )}
     </div>
   );
 }
 
 /** Writes the print document with DOM calls only (text, never markup), so a name can't inject anything. */
-function writePrintWindow(target: Window, table: Table, perClub: boolean) {
+function writePrintWindow(target: Window, table: Table, perClub: boolean, eventName: string) {
   const doc = target.document;
-  doc.title = "Club report";
+  const printedOn = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  const title = `${eventName} club report, ${printedOn}`;
+  doc.title = title;
   const style = doc.createElement("style");
   style.textContent = "body{font-family:system-ui,sans-serif;margin:24px;color:#111}table{border-collapse:collapse;width:100%;margin-bottom:24px}th,td{border:1px solid #888;padding:6px 8px;text-align:left;font-size:14px}h1{font-size:18px}.club{break-after:page}.club:last-child{break-after:auto}";
   doc.head.append(style);
@@ -265,13 +285,13 @@ function writePrintWindow(target: Window, table: Table, perClub: boolean) {
   };
   const clubNames = table.clubNames ?? [];
   if (!perClub || clubNames.length === 0) {
-    doc.body.append(heading("Club report"), buildTable(table.rows));
+    doc.body.append(heading(title), buildTable(table.rows));
   } else {
     const order = [...new Set(clubNames)];
     for (const club of order) {
       const section = doc.createElement("section");
       section.className = "club";
-      section.append(heading(club), buildTable(table.rows.filter((_, index) => clubNames[index] === club)));
+      section.append(heading(`${club}: ${title}`), buildTable(table.rows.filter((_, index) => clubNames[index] === club)));
       doc.body.append(section);
     }
   }

@@ -54,6 +54,8 @@ import {
   visibleClubReportColumns,
 } from "@/modules/reporting/club-report-columns";
 import { buildClubEventRecord } from "@/modules/reporting/club-event-reports";
+import { handleClubReportRequest } from "@/modules/reporting/club-report-api";
+import { clubWantsRibbons, isNamedForBaptism } from "@/modules/reporting/club-report-columns";
 
 const context = { params: Promise.resolve({ eventId: "event-1" }) };
 const post = (body: unknown) => new Request("https://events.imsda.test/api/x", { method: "POST", body: JSON.stringify(body) });
@@ -142,6 +144,62 @@ describe("column catalog", () => {
       ["Example, Amy", "Synthetic Trail Blazers", "35", "", "No", "Yes"],
       ["Sample, Zed", "Synthetic Trail Blazers", "12", "Explorer", "Yes", "No"],
     ]);
+  });
+});
+
+describe("club-level answers on person rows", () => {
+  function clubWith(responses: Record<string, unknown>) {
+    return buildClubEventRecord({
+      organizationId: "club-2", organizationName: "Synthetic Explorers", sponsoringChurch: null, registrationId: "reg-2",
+      confirmationCode: "SYN-0002", status: "CONFIRMED", submittedAt: null, registrationResponses: responses,
+      attendees: [
+        { id: "b-1", firstName: "Sam", lastName: "Sample", responses: { attendee_type: "Pathfinder" } },
+        { id: "b-2", firstName: "Pat", lastName: "Example", responses: { attendee_type: "Staff" } },
+        { id: "b-3", firstName: "Lee", lastName: "Other", responses: { attendee_type: "Pathfinder" } },
+      ],
+      amountOwedCents: 0, pricingSnapshot: {}, lateRateLabel: null,
+    });
+  }
+
+  it("marks baptism interest only on the person named, never copying the club's text", () => {
+    const table = buildClubReportTable([clubWith({ baptism_names: "sam  SAMPLE; Example, Pat\nSomeone Else" })], ["name", "baptismInterest"]);
+    expect(table.rows).toEqual([["Example, Pat", "Yes"], ["Other, Lee", ""], ["Sample, Sam", "Yes"]]);
+    expect(JSON.stringify(table.rows)).not.toContain("Someone Else");
+    expect(buildClubReportTable([clubWith({})], ["baptismInterest"]).rows.flat()).toEqual(["", "", ""]);
+  });
+
+  it("matches names on commas, semicolons and new lines", () => {
+    expect(isNamedForBaptism({ firstName: "Lee", lastName: "Other" }, "Lee Other, Sam Sample")).toBe(true);
+    expect(isNamedForBaptism({ firstName: "Lee", lastName: "Other" }, "Other, Lee")).toBe(true);
+    expect(isNamedForBaptism({ firstName: "Lee", lastName: "Other" }, "Leeann Other")).toBe(false);
+  });
+
+  it("shows the club's ribbons answer as Yes or No under a club-labelled header", () => {
+    expect(clubWantsRibbons("12 ribbons")).toBe(true);
+    expect(clubWantsRibbons("None")).toBe(false);
+    expect(clubWantsRibbons("")).toBe(false);
+    const yes = buildClubReportTable([clubWith({ event_ribbons: "12 ribbons" })], ["ribbons"]);
+    expect(yes.headers).toEqual(["Club wants ribbons"]);
+    expect(yes.rows.flat()).toEqual(["Yes", "Yes", "Yes"]);
+    expect(buildClubReportTable([clubWith({ event_ribbons: "no" })], ["ribbons"]).rows.flat()).toEqual(["No", "No", "No"]);
+  });
+});
+
+describe("view-only access and audit role", () => {
+  it("refuses saving or deleting a layout for view-only access but still builds reports", async () => {
+    const base = { eventId: "event-1", viewer: { kind: "staff", canViewDietaryDetails: false } as const, actor: { kind: "staff", userId: "staff-1" } as const, canManageLayouts: false };
+    for (const body of [{ action: "save-layout", name: "X", columns: ["name"] }, { action: "delete-layout", layoutId: "layout-1" }]) {
+      await expect(handleClubReportRequest({ ...base, body })).rejects.toMatchObject({ status: 403 });
+    }
+    expect(mocks.layoutCreate).not.toHaveBeenCalled();
+    expect(mocks.layoutDeleteMany).not.toHaveBeenCalled();
+    expect((await handleClubReportRequest({ ...base, body: { action: "preview", columns: ["name"] } })).status).toBe(200);
+  });
+
+  it("names a Clubs Administrator acting as a coordinator in the audit row", async () => {
+    mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", userId: "staff-1", actAsId: "act-1", viaClubsAdministrator: true });
+    await coordinatorPost(post({ action: "print", columns: ["name"] }), context);
+    expect(mocks.writeAuditLog.mock.calls[0]![0].metadata).toMatchObject({ actAsId: "act-1", actorRole: "CLUBS_ADMINISTRATOR" });
   });
 });
 

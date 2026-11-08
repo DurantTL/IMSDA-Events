@@ -47,6 +47,7 @@ export default async function AreaClubEventReportPage({ params }: { params: Prom
           <ClubReportColumnBuilder
             defaultKeys={[...DEFAULT_CLUB_REPORT_COLUMNS]}
             endpoint={`/api/attendee/area-clubs/events/${encodeURIComponent(eventId)}/report-columns`}
+            eventName={loaded[0].name}
             initialLayouts={loaded[1]}
             options={clubReportColumnKeysFor(viewer).map((key) => ({ key, header: CLUB_REPORT_COLUMNS[key].header }))}
           />

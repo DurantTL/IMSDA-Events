@@ -126,7 +126,9 @@ export default async function ClubEventReportsPage({
         </div>
         <ClubReportColumnBuilder
           defaultKeys={[...DEFAULT_CLUB_REPORT_COLUMNS]}
+          canSaveLayouts={!readOnly}
           endpoint={`/api/events/${encodeURIComponent(event.id)}/club-reports/columns`}
+          eventName={event.name}
           initialLayouts={columnLayouts}
           locationId={locationId}
           options={clubReportColumnKeysFor(reportViewer).map((key) => ({ key, header: CLUB_REPORT_COLUMNS[key].header }))}

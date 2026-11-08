@@ -24,6 +24,8 @@ async function postHandler(request: Request, context: { params: Promise<{ eventI
       viewer: { kind: "staff", canViewDietaryDetails: canViewDietaryDetails({ permissions: access.permissions, clubEvent: true }) },
       actor: { kind: "staff", userId: access.user.id },
       body: await request.json(),
+      // Pathfinder event-manager oversight is view only: it may run a report but not change shared layouts.
+      canManageLayouts: access.permissions.includes("VIEW_REPORTS"),
       resolveLocation: async (requested) => (await resolveLocationFilter(eventId, requested)).locationId,
     });
   } catch (error) {

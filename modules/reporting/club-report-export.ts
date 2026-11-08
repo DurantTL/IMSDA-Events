@@ -28,7 +28,7 @@ import { toCsv } from "@/modules/reporting/csv";
 export type ClubReportActor =
   | { kind: "staff"; userId: string }
   | { kind: "coordinator"; accountId: string }
-  | { kind: "act-as"; userId: string; actAsId: string };
+  | { kind: "act-as"; userId: string; actAsId: string; viaClubsAdministrator?: true };
 
 export type ClubReportMode = "preview" | "csv" | "print";
 
@@ -48,6 +48,7 @@ function auditActor(actor: ClubReportActor) {
       viewer: actor.kind === "staff" ? "STAFF" : "AREA_COORDINATOR",
       ...(actor.kind === "coordinator" ? { actorAttendeeAccountId: actor.accountId } : {}),
       ...(actor.kind === "act-as" ? { actAsId: actor.actAsId } : {}),
+      ...(actor.kind === "act-as" && actor.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" } : {}),
     } satisfies Record<string, Prisma.InputJsonValue>,
   };
 }

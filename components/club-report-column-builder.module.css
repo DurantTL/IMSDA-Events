@@ -65,3 +65,5 @@
 .previewTable td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 
 .message { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.fieldError { color: var(--coral); font-weight: 700; }

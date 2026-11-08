@@ -29,7 +29,7 @@ export const CLUB_REPORT_COLUMNS = {
   role: { header: "Role", audience: "everyone" },
   age: { header: "Age", audience: "everyone" },
   classLevel: { header: "Class", audience: "everyone" },
-  ribbons: { header: "Event ribbons", audience: "everyone" },
+  ribbons: { header: "Club wants ribbons", audience: "everyone" },
   baptismInterest: { header: "Baptism interest", audience: "everyone" },
   medicalVolunteer: { header: "Medical volunteer", audience: "everyone" },
   masterGuide: { header: "Master Guide investiture", audience: "everyone" },
@@ -119,6 +119,34 @@ function yesNo(value: boolean) {
   return value ? "Yes" : "No";
 }
 
+// Answers that mean the club did not ask for ribbons.
+const NO_RIBBONS = /^(no|none|n\/?a|nil|0|-+)\.?$/i;
+
+/** The club's own ribbons answer as Yes or No; the club's text is never copied into a row. */
+export function clubWantsRibbons(answer: string): boolean {
+  const text = answer.trim();
+  return text.length > 0 && !NO_RIBBONS.test(text);
+}
+
+function normalizeName(value: string) {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Whether a person is named in the club's baptism-interest answer: the text is split on commas, semicolons and new
+ * lines, and an entry matches "First Last" or "Last, First" (case and spacing ignored). The text itself is never output.
+ * A "Last, First" entry contains the comma that splits entries, so it is also tried as two neighbouring pieces.
+ */
+export function isNamedForBaptism(person: { firstName: string; lastName: string }, clubAnswer: string): boolean {
+  const first = normalizeName(person.firstName);
+  const last = normalizeName(person.lastName);
+  if (!first || !last) return false;
+  const direct = `${first} ${last}`;
+  const pieces = clubAnswer.split(/[,;\n\r]+/).map(normalizeName).filter(Boolean);
+  if (pieces.some((piece) => piece === direct)) return true;
+  return pieces.some((piece, index) => piece === last && pieces[index + 1] === first);
+}
+
 /**
  * One row per attendee, clubs by name and people by name. `dietaryText` holds the free-text dietary answers by
  * attendee id and is read only for a viewer who may see the `dietaryNeeds` column (the caller builds it only then).
@@ -143,8 +171,8 @@ export function buildClubReportTable(
       case "role": return attendee.role ?? "";
       case "age": return attendee.ageOnEventDate === null ? "" : String(attendee.ageOnEventDate);
       case "classLevel": return attendee.classLevel ?? "";
-      case "ribbons": return club.eventRibbons;
-      case "baptismInterest": return club.baptismNames;
+      case "ribbons": return yesNo(clubWantsRibbons(club.eventRibbons));
+      case "baptismInterest": return isNamedForBaptism(attendee, club.baptismNames) ? "Yes" : "";
       case "medicalVolunteer": return yesNo(attendee.medicalPersonnel);
       case "masterGuide": return yesNo(attendee.masterGuideInvestiture);
       case "firstTimeCamper": return yesNo(attendee.firstTimeCamper);
