@@ -54,8 +54,8 @@ export function clubSummaryHref(input: { clubYear: string; view?: ClubSummaryVie
   return `/admin/clubs/summary?${params}`;
 }
 
-export function clubDirectoryClubHref(id: string, clubYear: string) {
-  return `/admin/organizations/${encodeURIComponent(id)}/club?year=${encodeURIComponent(clubYear)}`;
+export function clubDirectoryClubHref(id: string, clubYear: string, returnTo?: string) {
+  return `/admin/organizations/${encodeURIComponent(id)}/club?year=${encodeURIComponent(clubYear)}${returnTo ? `&from=${encodeURIComponent(returnTo)}` : ""}`;
 }
 
 export function buildClubDirectory(input: {

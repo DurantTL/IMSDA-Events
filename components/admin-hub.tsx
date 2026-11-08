@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import styles from "@/components/admin-hub.module.css";
-import type { HubBody } from "@/modules/system-admin/admin-hubs-model";
+import type { HubBody, HubCard } from "@/modules/system-admin/admin-hubs-model";
 
 /** The shared chip colours (`.status-chip` in globals.css): status words always, colour only as a second cue. */
 const chipClass = { ok: "green", warn: "coral", review: "purple", soon: "gold", draft: "neutral" } as const;
@@ -40,27 +40,36 @@ export function AdminHub({ view }: { view: HubBody }) {
         </section>
       ) : null}
 
-      {view.groups.map((group, index) => {
-        const headingId = `hub-group-${index}`;
-        return (
-          <section key={`${group.title}-${index}`} className={styles.group} aria-labelledby={headingId}>
-            <h2 id={headingId} className={styles.groupHeading}>{group.title}</h2>
-            <ul className={styles.cards} data-count={group.cards.length}>
-              {group.cards.map((card) => (
-                <li key={card.href}>
-                  <Link className={styles.card} href={card.href} data-testid="hub-card">
-                    <span className={styles.cardTop}>
-                      <span className={styles.cardTitle}>{card.title}</span>
-                      {card.status ? <span className={`status-chip ${chipClass[card.status.tone]} ${styles.chip}`} data-tone={card.status.tone}>{card.status.text}</span> : null}
-                    </span>
-                    <span className={styles.cardText}>{card.description}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+      {view.groups.map((group, index) => (
+        <HubCardGroup key={`${group.title}-${index}`} headingId={`hub-group-${index}`} title={group.title} cards={group.cards} />
+      ))}
     </div>
+  );
+}
+
+/**
+ * One titled group of destination cards. Shared by the hubs and by a page that groups its own related links (the selected
+ * club, #1587): the cards fill their row 2, 3 or 4 across, four become 2 x 2 on an iPad and one per row on a phone, and a
+ * status that could not be read says "Unavailable". Every card is a plain link.
+ */
+export function HubCardGroup({ headingId, title, cards, testId = "hub-card" }: { headingId: string; title: string; cards: readonly HubCard[]; testId?: string }) {
+  if (cards.length === 0) return null;
+  return (
+    <section className={styles.group} aria-labelledby={headingId}>
+      <h2 id={headingId} className={styles.groupHeading}>{title}</h2>
+      <ul className={styles.cards} data-count={cards.length}>
+        {cards.map((card) => (
+          <li key={card.href}>
+            <Link className={styles.card} href={card.href} data-testid={testId}>
+              <span className={styles.cardTop}>
+                <span className={styles.cardTitle}>{card.title}</span>
+                {card.status ? <span className={`status-chip ${chipClass[card.status.tone]} ${styles.chip}`} data-tone={card.status.tone}>{card.status.text}</span> : null}
+              </span>
+              <span className={styles.cardText}>{card.description}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
