@@ -1,0 +1,61 @@
+/* The selected club page (#1587): a compact identity block and the separate Act as Director handoff. */
+.identity {
+  min-width: 0;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 8px 0 12px;
+}
+
+.facts > div {
+  min-width: 0;
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+/* Act as Director is not one of the view-only cards: its own bordered area, so it is never mistaken for a link. */
+.actAs {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+}
+
+.actAs p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.5;
+}
+
+.sectionHeading,
+.actAsHeading {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* The club year buttons meet the 44px tap target at every width (C2), not only where the phone rules stretch them. */
+.yearChoice > a {
+  min-height: 44px;
+}

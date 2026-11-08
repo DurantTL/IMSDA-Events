@@ -31,6 +31,7 @@ vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }
 
 import StaffOpenClubPage from "@/app/(workspace)/admin/organizations/[organizationId]/club/page";
 import { ClubImportYearMove } from "@/components/club-import-year-move";
+import { HubCardGroup } from "@/components/admin-hub";
 import { ClubOverview } from "@/components/club-overview";
 import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
 import { AdminPageHeader } from "@/components/admin-page-header";
@@ -73,9 +74,10 @@ describe("the staff club page's club year (#541)", () => {
     const all = elements(tree);
     expect(all.find((element) => element.type === ClubOverview)?.props).toMatchObject({ rosterYear: "2025-26" });
     const clubLinks = all.filter((element) => typeof element.props.href === "string" && String(element.props.href).startsWith("/admin/organizations/club-1/club"));
-    // The staff Honors screen (#591) is its own link, not one of the year choices.
-    expect(clubLinks.some((link) => link.props.href === "/admin/organizations/club-1/club/honors")).toBe(true);
-    const links = clubLinks.filter((link) => link.props.href !== "/admin/organizations/club-1/club/honors");
+    // The staff Honors screen (#591) is a card in the "This club" group (#1587), carrying the year, not a year choice.
+    const group = all.find((element) => element.type === HubCardGroup);
+    expect((group?.props.cards as Array<{ href: string }>).map((card) => card.href)).toContain("/admin/organizations/club-1/club/honors?year=2025-26");
+    const links = clubLinks;
     expect(links.map((link) => [link.props.href, link.props["aria-current"]])).toEqual([
       ["/admin/organizations/club-1/club?year=2023-24", undefined],
       ["/admin/organizations/club-1/club?year=2024-25", undefined],

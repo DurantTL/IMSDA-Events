@@ -6,18 +6,14 @@ import { EventSetupHelp } from "@/components/event-setup-help";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import Link from "next/link";
 import {
-  Award,
   BedDouble,
   Baby,
   CalendarCheck2,
-  ClipboardCheck,
   Download,
   HandHeart,
   ListOrdered,
-  PackageOpen,
   ShieldAlert,
   ShieldCheck,
-  Tent,
   UsersRound,
   Utensils,
 } from "lucide-react";
@@ -244,13 +240,6 @@ export default async function OperationalReportsPage({
             <li><ExportLink href={`/api/events/${encodeURIComponent(event.id)}/exports/meal-ticket-summary`}><Utensils aria-hidden="true" size={16} /> Meal ticket summary</ExportLink></li>
           </>
         )}
-        tools={[
-          { href: `/more/reports/packets${peopleQuery}`, label: "Group packets", icon: PackageOpen },
-          { href: `/more/reports/clubs${peopleQuery}`, label: "Club event reports", icon: Tent },
-          { href: `/more/reports/clubs/check-in-book${peopleQuery}`, label: "Check-in book", icon: ClipboardCheck },
-          { href: `/more/honors/rosters${peopleQuery}`, label: "Honors rosters", icon: Award },
-          { href: `/more/kitchen-report${peopleQuery}`, label: "Kitchen report", icon: Utensils },
-        ]}
       />
 
       <div className="report-safety-note">

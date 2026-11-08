@@ -5,6 +5,7 @@ import { ClubReportForm } from "@/components/club-report-form";
 import { ClubReportReview } from "@/components/club-report-review";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { clubPageReturnHref } from "@/modules/club-reports/club-page-links";
 import { recordBackLink } from "@/modules/club-reports/record-return-domain";
 import { getPrisma } from "@/lib/prisma";
 import { calendarDateIn } from "@/modules/calendar/domain";
@@ -44,7 +45,9 @@ export default async function StaffClubReportPage({
   const prefill = { ...rosterPrefill, averageAttendance: null, honors: [] };
   const clubYear = clubYearFor(new Date(`${month}-15T12:00:00Z`));
   // The back link names its parent and returns to the exact address the record was opened from (#1588).
-  const back = recordBackLink(from, { organizationId, clubName: club.name, clubYear });
+  // A club page `from` keeps its own nested directory return (#1587); the review list and Monthly Records view use #1588's.
+  const clubBack = clubPageReturnHref(from, organizationId);
+  const back = clubBack ? { href: clubBack, label: `Back to ${club.name}` } : recordBackLink(from, { organizationId, clubName: club.name, clubYear });
   return (
     <section className="page-stack">
       <AdminPageHeader path={`/admin/clubs/reports/${organizationId}/${month}`} year={clubYear} back={back} />

@@ -77,7 +77,7 @@ describe("canonical staff workspace navigation (#1565)", () => {
   });
 
   it("gives every page one current tab, and exactly one 'page' mark across rail, tabs and views", () => {
-    for (const path of ["/overview", "/finance", "/more/promo-codes", "/check-in/badges", "/people/attendees", "/more/reports/packets"]) {
+    for (const path of ["/overview", "/finance", "/more/promo-codes", "/check-in/badges", "/people/attendees", "/more/reports/printouts"]) {
       const html = shell(path);
       expect(rail(html).match(/aria-current="true"/g), path).toHaveLength(1);
       const chrome = html.slice(html.indexOf('data-staff-tabs="true"'), html.indexOf("<header", html.indexOf('data-staff-tabs="true"')));
