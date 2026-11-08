@@ -118,6 +118,14 @@ describe("ClubPortalNav markup (#1641)", () => {
     expect([...plain.matchAll(/aria-current="page"/g)]).toHaveLength(2);
   });
 
+  it("marks More as current on a phone when the page is one of the tabs under More", () => {
+    const html = render({ items: shell("DIRECTOR"), base, phoneBar: true }, `${base}/orders`);
+    const bar = html.slice(html.indexOf("data-club-phone-bar"));
+    // More links to the club home, not this page, so it says "true" (the current item of the bar), never "page".
+    expect(bar).toMatch(/<a [^>]*aria-current="true"[^>]*>(?:(?!<\/a>)[\s\S])*<span>More<\/span>/);
+    expect([...bar.matchAll(/aria-current=/g)]).toHaveLength(1);
+  });
+
   it("starts a row that clearly will not fit as the menu line, before it is measured", () => {
     expect(render({ items: shell("DIRECTOR"), base })).toContain('data-fit="tight"');
     expect(render({ items: shell("REPORTER"), base })).toContain('data-fit="ok"');
