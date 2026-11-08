@@ -202,7 +202,7 @@ describe("the staff invitation page", () => {
 });
 
 describe("pending invites on People & access: three sources, one list", () => {
-  const club = (index: number, sent: string | null) => ({ id: `c${index}`, email: `club${index}@example.test`, name: "", role: "DIRECTOR", sentAt: sent ? new Date(sent) : null, createdAt: new Date("2026-10-01T00:00:00Z"), expiresAt: null, organization: { name: "Synthetic Club" } });
+  const club = (index: number, sent: string | null) => ({ id: `c${index}`, email: `club${index}@example.test`, name: "", role: "DIRECTOR", source: "PEOPLE", sentAt: sent ? new Date(sent) : null, createdAt: new Date("2026-10-01T00:00:00Z"), expiresAt: null, organization: { name: "Synthetic Club" } });
   const area = (index: number, sent: string) => ({ id: `a${index}`, email: `area${index}@example.test`, name: "", sentAt: new Date(sent), createdAt: new Date("2026-10-01T00:00:00Z"), expiresAt: null });
   const staff = (index: number, created: string) => ({ id: `s${index}`, email: `staff${index}@example.test`, displayName: "", createdAt: new Date(created), resetTokens: [{ createdAt: new Date(created), expiresAt: new Date("2026-12-01T00:00:00Z"), usedAt: null }] });
 
@@ -239,14 +239,14 @@ describe("pending invites on People & access: three sources, one list", () => {
     expect(mocks.userFindMany).not.toHaveBeenCalled();
   });
 
-  it("keeps the club scope on every club read: PEOPLE invites in CLUB organizations, still open", async () => {
+  it("keeps the club scope on every club read: every source, in CLUB organizations, still open", async () => {
     mocks.clubInviteCount.mockResolvedValue(1);
     mocks.areaCount.mockResolvedValue(0);
     mocks.userFindMany.mockResolvedValue([]);
     mocks.clubInviteFindMany.mockResolvedValue([]);
     await listPendingInvitesPage({ scope: "full", query: "pat" }, 1, now);
     const where = JSON.stringify(mocks.clubInviteCount.mock.calls[0]![0].where);
-    expect(where).toContain('"source":"PEOPLE"');
+    expect(where).not.toContain('"source"');
     expect(where).toContain('"type":"CLUB"');
     expect(where).toContain('"PENDING","SENT"');
     expect(where).toContain('"contains":"pat"');

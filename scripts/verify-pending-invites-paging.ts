@@ -2,7 +2,7 @@
  * Proves the Pending invites list on People & access is paged in the database across its three sources (#1492), against a
  * real PostgreSQL database, with fictitious invites it creates and removes itself:
  *
- * - club role invites, Area Coordinator invites and not-yet-activated staff logins are merged into one list, newest first;
+ * - club role invites (from the import, an application, a club and People & access), Area Coordinator invites and not-yet-activated staff logins are merged into one list, newest first;
  * - the total is the true count of all three, not a cap;
  * - every invite is on exactly one page, and the pages joined are the whole list in the same order as the unpaged read;
  * - a page past the end is clamped to the last page;
@@ -42,7 +42,7 @@ async function main() {
   await prisma.clubInvite.createMany({
     data: Array.from({ length: 60 }, (_, index) => ({
       id: `${P}_ci_${index}`, organizationId: orgId, email: `${P}.club${String(index).padStart(2, "0")}@example.test`, name: `Pinv Club ${index}`, role: "DIRECTOR" as const,
-      source: "PEOPLE", status: index % 3 === 0 ? ("PENDING" as const) : ("SENT" as const),
+      source: (["PEOPLE", "IMPORT", "APPLICATION", "CLUB"] as const)[index % 4], status: index % 3 === 0 ? ("PENDING" as const) : ("SENT" as const),
       createdAt: at(index * 2), sentAt: index % 3 === 0 ? null : at(index * 2 + 7 - (index % 5)),
     })),
   });
@@ -82,6 +82,7 @@ async function main() {
   assert(search.total === 5 && search.invites.every((invite) => invite.kind === "staff"), "the search narrows the staff source");
   const clubs = await listPendingInvitesPage({ scope: "clubs", query: `${P}.` }, 1, now);
   assert(clubs.total === 100 && clubs.invites.every((invite) => invite.kind !== "staff"), "a Clubs Administrator's scope never reads staff logins");
+  assert(new Set(everything.invites.filter((invite) => invite.kind === "club").map((invite) => invite.from)).size === 4, "club invites from import, application, club and staff all appear with a from label");
   assert((await listPendingInvitesPage({ scope: "full", query: `${P}.`, emails: [] }, 1, now)).total === 0, "an empty email list lists nothing");
 
   console.log("pending invites paging: all checks passed");

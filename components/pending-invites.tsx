@@ -106,6 +106,7 @@ export function PendingInvites({ invites, emailConfigured, heading = "Pending in
               <strong translate="no">{who}</strong>
               {invite.name ? <small translate="no">{invite.email}</small> : null}
               <p>{invite.what}</p>
+              {invite.from ? <p className={styles.note}>{invite.from}</p> : null}
               <p className={invite.expired ? styles.fieldError : styles.note}>
                 {invite.expired ? "Expired" : invite.notSent || !invite.sentAt ? "Not sent yet" : `Sent ${formatInConferenceTime(invite.sentAt)}`}
               </p>
