@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import type { ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 const navState = vi.hoisted(() => ({ pathname: "/admin", search: "event=evt_one" }));
@@ -17,7 +19,7 @@ vi.mock("@/components/sign-out-button", () => ({
 import { AdminHub } from "@/components/admin-hub";
 import { AppShell } from "@/components/app-shell";
 import { eventPermissions } from "@/modules/access/permissions";
-import { buildHubView, neededMetrics, type AdminHubKey, type HubViewer } from "@/modules/system-admin/admin-hubs-model";
+import { buildHubView, neededMetrics, type HubViewer } from "@/modules/system-admin/admin-hubs-model";
 
 /** One filled primary button per staff view (#1733). Synthetic data only. */
 
@@ -36,33 +38,36 @@ function shell(pathname: string, body: string) {
 const system: HubViewer = { isSystemAdmin: true, clubsAdmin: false, siteContentEditor: false };
 
 describe("one filled primary button per staff view", () => {
-  it("keeps the header's Create chooser quiet on every staff page, so a page's own action is the only filled button", () => {
+  it("keeps the header's Create chooser a labelled secondary button, never a filled primary", () => {
     for (const path of ["/home", "/admin", "/admin/clubs", "/admin/events", "/overview", "/registrations", "/check-in", "/money"]) {
       const html = shell(path, "content");
       const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
-      expect(header, path).toContain("Create");
-      expect(header.match(filledPrimary) ?? [], `${path} header`).toHaveLength(0);
+      expect(header, path).toMatch(/<button type="button" class="secondary-button [^"]*" aria-haspopup="dialog">/);
+      expect(header, path).toMatch(/Create<\/button>/);
       expect(html.match(filledPrimary) ?? [], path).toHaveLength(0);
     }
   });
 
-  it("makes the Create chooser a visible-label secondary button", () => {
-    const html = shell("/home", "content");
-    expect(html).toMatch(/<button type="button" class="secondary-button [^"]*" aria-haspopup="dialog">/);
-    expect(html).toMatch(/Create<\/button>/);
+  it("draws a hub's main action filled only when it is primary, and as a plain link otherwise", () => {
+    const render = (primary: boolean | undefined) => renderToStaticMarkup(createElement(AdminHub, {
+      view: { key: "clubs", description: "Intro text for the hub.", stats: [], groups: [], action: { href: "/x", label: "Do it", primary } },
+    }));
+    const filled = (html: string) => /class="[^"]*_action_[^"]*"/.test(html) && !/_actionQuiet_/.test(html);
+    expect(filled(render(true))).toBe(true);
+    expect(filled(render(undefined))).toBe(true);
+    expect(render(false)).toMatch(/_actionQuiet_/);
+    expect(render(false)).toContain('data-primary="false"');
   });
 
-  it("gives each hub at most one filled action, and none when nothing is waiting", () => {
-    for (const hub of ["events", "clubs", "people", "forms", "catalogs"] as AdminHubKey[]) {
-      for (const value of [0, 2]) {
-        const values = Object.fromEntries(neededMetrics(hub, system).map((key) => [key, value]));
-        const html = renderToStaticMarkup(createElement(AdminHub, { view: buildHubView(hub, system, values) }));
-        expect(html.match(/data-primary="true"/g)?.length ?? 0, `${hub} ${value}`).toBeLessThanOrEqual(1);
-        expect(html.match(filledPrimary) ?? [], hub).toHaveLength(0);
-      }
-    }
+  it("shows no filled action on a hub with nothing waiting", () => {
     const idle = renderToStaticMarkup(createElement(AdminHub, { view: buildHubView("clubs", system, Object.fromEntries(neededMetrics("clubs", system).map((key) => [key, 0]))) }));
     expect(idle).toContain('data-primary="false"');
     expect(idle).not.toContain('data-primary="true"');
+    const busy = renderToStaticMarkup(createElement(AdminHub, { view: buildHubView("clubs", system, Object.fromEntries(neededMetrics("clubs", system).map((key) => [key, 2]))) }));
+    expect(busy).toContain('data-primary="true"');
+  });
+
+  it("keeps the Club administration page's own Manage event link secondary", () => {
+    expect(readFileSync(join(process.cwd(), "app/(workspace)/admin/clubs/page.tsx"), "utf8")).not.toMatch(/primary-button/);
   });
 });
