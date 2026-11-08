@@ -20,6 +20,9 @@ export const CLUB_ROSTER_ROLES: readonly ClubRosterRole[] = ["Pathfinder", "TLT"
 /** How a guest aged 10 to 17 who is not a Pathfinder shows on the club packet and check-in book (#1728). */
 export const YOUTH_GUEST_ROLE_LABEL = "Youth guest (not a Pathfinder)";
 
+/** The short role code for a marked guest on the packet roster (#1728); the packet key spells it out. */
+export const YOUTH_GUEST_ROLE_CODE = "YG";
+
 /** The role as people read it: the roster role, or the youth guest label for a marked guest (#1728). */
 export function attendeeRoleLabel(attendee: Pick<ClubRosterAttendee, "role" | "youthGuest">): string {
   return attendee.youthGuest ? YOUTH_GUEST_ROLE_LABEL : attendee.role ?? "";
@@ -117,7 +120,9 @@ export type ClubHeadcounts = {
 export function clubHeadcounts(attendees: ClubRosterAttendee[]): ClubHeadcounts {
   const counts = { pathfinder: 0, tlt: 0, staff: 0, child: 0 };
   for (const attendee of attendees) {
-    if (attendee.role === "Pathfinder") counts.pathfinder += 1;
+    // A guest aged 10 to 17 who is not a Pathfinder (#1728) is counted with the children, whatever role the form holds.
+    if (attendee.youthGuest) counts.child += 1;
+    else if (attendee.role === "Pathfinder") counts.pathfinder += 1;
     else if (attendee.role === "TLT") counts.tlt += 1;
     else if (attendee.role === "Staff") counts.staff += 1;
     else if (attendee.role === "Child") counts.child += 1;

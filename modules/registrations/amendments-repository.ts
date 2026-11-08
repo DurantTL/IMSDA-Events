@@ -123,6 +123,8 @@ export type AmendmentProfileMetadata = {
   temporary?: boolean;
   temporaryAttendeeType?: "ADULT" | "YOUTH" | "UNDERAGE";
   clubGuestId?: string;
+  /** A club guest aged 10 to 17 who is not a Pathfinder (#1728); written false when the director unticks it. */
+  notPathfinder?: boolean;
   /** Whether the person is a team member or a coach on a team registration (#809), decided by the server. */
   teamRole?: "MEMBER" | "COACH";
   /** A "Group" person's id (#650): the client id the registration form gave them. */
@@ -219,6 +221,7 @@ function allowedProfileMetadata(metadata: AmendmentProfileMetadata | undefined) 
   if (metadata.temporaryAttendeeType === "ADULT" || metadata.temporaryAttendeeType === "YOUTH" || metadata.temporaryAttendeeType === "UNDERAGE") {
     allowed.temporaryAttendeeType = metadata.temporaryAttendeeType;
   }
+  if (typeof metadata.notPathfinder === "boolean") allowed.notPathfinder = metadata.notPathfinder;
   if (typeof metadata.clubGuestId === "string") allowed.clubGuestId = metadata.clubGuestId;
   if (metadata.teamRole === "MEMBER" || metadata.teamRole === "COACH") allowed.teamRole = metadata.teamRole;
   if (typeof metadata.groupAttendeeId === "string") allowed.groupAttendeeId = metadata.groupAttendeeId;

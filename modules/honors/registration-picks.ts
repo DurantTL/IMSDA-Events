@@ -5,7 +5,7 @@
  * `locations.ts` and `enrollment-repository.ts`; nothing here repeats them.
  */
 import { z } from "zod";
-import { clubAttendeeClientId, clubGuestClientId, guestAttendeeType, type ClubGuestType } from "@/modules/club-registrations/domain";
+import { clubAttendeeClientId, clubGuestClientId, guestAttendeeType, guestIsYouthNotPathfinder, normalizeLegacyChildGuest, type ClubGuestType } from "@/modules/club-registrations/domain";
 import type { ClubClassLevel } from "@/modules/club-rosters/domain";
 import { consumesClassSeat, selectionProblem, type SelectableOffering } from "@/modules/honors/enrollment-domain";
 import { sessionVisibleAtLocation } from "@/modules/honors/locations";
@@ -62,7 +62,8 @@ export function pickingAttendees(input: {
   }));
   // Extra people count as adults from 18 unless the director chose Child (no class seat), as the registration itself decides.
   const guests = input.guests.map((guest) => {
-    const attendeeType = guestAttendeeType(guest);
+    // A youth marked "not a Pathfinder" (#1728) takes no class seat, like a child, though they stay a youth otherwise.
+    const attendeeType = guestIsYouthNotPathfinder(normalizeLegacyChildGuest(guest)) ? "UNDERAGE" : guestAttendeeType(guest);
     return {
       clientId: clubGuestClientId(guest.id),
       firstName: guest.firstName,

@@ -337,48 +337,64 @@ describe("club registration submit", () => {
 
   describe("an event-only guest aged 10 to 17 (#1728)", () => {
     const roleField = field("a_role", "attendee_type", "Roster role", "RADIO", "ATTENDEE", true);
-    const childForm = () => definition([{ ...roleField, options: ["Pathfinder", "TLT", "Staff", "Child"] }]);
-    const guestInput = {
+    const pricedRoleForm = () => definition([{ ...roleField, options: ["Pathfinder", "TLT", "Staff", "Child"], choicePricesCents: { Pathfinder: 2500, TLT: 2500, Staff: 0, Child: 0 } }]);
+    const guestInput = (guestRole = "Pathfinder") => ({
       ...baseInput,
       attendees: [
         { clientId: "member:m1", responses: { attendee_type: "Pathfinder" } },
-        { clientId: "guest:guestkid001", responses: { attendee_type: "Pathfinder" } },
+        { clientId: "guest:guestkid001", responses: { attendee_type: guestRole } },
       ],
-    };
+    });
     const guest = (extra: Record<string, unknown>) => ({ id: "guestkid001", firstName: "Robin", lastName: "Visitor", email: null, ...extra });
 
-    it("registers a marked guest as Underage with the Child role", async () => {
-      const tx = fixture({ form: childForm() });
+    it("keeps a marked guest a youth with the Pathfinder role, and stores the mark beside it", async () => {
+      const tx = fixture({ form: pricedRoleForm() });
       tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [guest({ age: 13, guestType: "YOUTH", notPathfinder: true })] });
       tx.person.create.mockResolvedValue({ id: "person-kid" });
-      await submit(guestInput);
+      await submit(guestInput());
       const data = tx.registrationAttendee.create.mock.calls[1]![0].data;
-      expect(data.profileSnapshot).toMatchObject({ ageOnEventDate: 13, temporary: true, temporaryAttendeeType: "UNDERAGE" });
-      expect(data.formResponses).toMatchObject({ attendee_type: "Child", attendee_age: "13" });
+      expect(data.profileSnapshot).toMatchObject({ ageOnEventDate: 13, temporary: true, temporaryAttendeeType: "YOUTH", notPathfinder: true });
+      expect(data.formResponses).toMatchObject({ attendee_type: "Pathfinder", attendee_age: "13" });
     });
 
-    it("keeps an unmarked guest a Pathfinder", async () => {
-      const tx = fixture({ form: childForm() });
-      tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [guest({ age: 13, guestType: "YOUTH" })] });
+    it("prices a marked 12-year-old as a youth ($25), not a Child ($0), as an unmarked one is", async () => {
+      for (const extra of [{ notPathfinder: true }, {} as { notPathfinder?: boolean }]) {
+        const tx = fixture({ form: pricedRoleForm() });
+        tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [guest({ age: 12, guestType: "YOUTH", ...extra })] });
+        tx.person.create.mockResolvedValue({ id: "person-kid" });
+        await submit(guestInput());
+        expect(tx.registration.create.mock.calls[0][0].data).toMatchObject({ totalAmount: 50 });
+        const created = tx.registrationAttendee.create.mock.calls[1]![0].data;
+        expect(created.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH" });
+        expect((created.profileSnapshot as { notPathfinder?: boolean }).notPathfinder === true).toBe("notPathfinder" in extra);
+      }
+    });
+
+    it("still prices a child under 10 as a Child ($0)", async () => {
+      const tx = fixture({ form: pricedRoleForm() });
+      tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [guest({ age: 8, guestType: "UNDERAGE" })] });
       tx.person.create.mockResolvedValue({ id: "person-kid" });
-      await submit(guestInput);
-      const data = tx.registrationAttendee.create.mock.calls[1]![0].data;
-      expect(data.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH" });
-      expect(data.formResponses).toMatchObject({ attendee_type: "Pathfinder" });
+      await submit(guestInput());
+      expect(tx.registration.create.mock.calls[0][0].data).toMatchObject({ totalAmount: 25 });
+      expect(tx.registrationAttendee.create.mock.calls[1]![0].data.profileSnapshot).toMatchObject({ temporaryAttendeeType: "UNDERAGE" });
     });
 
-    it("refuses Child for someone 10 or older, still loading the draft that holds one", async () => {
-      const tx = fixture({ form: childForm() });
-      tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [guest({ age: 10, guestType: "UNDERAGE" })] });
-      await expect(submit(guestInput)).rejects.toMatchObject({ code: "CLUB_ATTENDEES_INVALID", message: expect.stringContaining("under 10") });
-      expect(tx.registration.create).not.toHaveBeenCalled();
+    it("accepts a draft guest saved as Child at 12 under #1666 as a marked youth, priced as a Pathfinder", async () => {
+      const tx = fixture({ form: pricedRoleForm() });
+      tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [guest({ age: 12, guestType: "UNDERAGE" })] });
+      tx.person.create.mockResolvedValue({ id: "person-kid" });
+      await submit(guestInput("Child"));
+      const data = tx.registrationAttendee.create.mock.calls[1]![0].data;
+      expect(data.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH", notPathfinder: true });
+      expect(data.formResponses).toMatchObject({ attendee_type: "Pathfinder" });
+      expect(tx.registration.create.mock.calls[0][0].data).toMatchObject({ totalAmount: 50 });
     });
 
     it("refuses the mark on a team event, where the form has no such choice", async () => {
-      const tx = fixture({ form: childForm() });
+      const tx = fixture({ form: pricedRoleForm() });
       tx.eventTeamSettings.findUnique.mockResolvedValue(teamRulesRow());
       tx.clubRegistrationDraft.findUnique.mockResolvedValue({ guests: [guest({ age: 13, guestType: "YOUTH", notPathfinder: true })] });
-      await expect(submit(guestInput, clubTeam("Bible Bees"))).rejects.toMatchObject({ code: "CLUB_ATTENDEES_INVALID" });
+      await expect(submit(guestInput(), clubTeam("Bible Bees"))).rejects.toMatchObject({ code: "CLUB_ATTENDEES_INVALID" });
       expect(tx.registration.create).not.toHaveBeenCalled();
     });
   });

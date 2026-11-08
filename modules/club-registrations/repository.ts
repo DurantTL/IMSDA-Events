@@ -26,6 +26,11 @@ import {
   guestIsChild,
   guestIsYouthNotPathfinder,
   guestOwnedRole,
+  GUEST_NOT_PATHFINDER_AGE_MESSAGE,
+  GUEST_NOT_PATHFINDER_MAX_AGE,
+  GUEST_NOT_PATHFINDER_MIN_AGE,
+  childRoleToPathfinder,
+  snapshotIsYouthNotPathfinder,
   CHILD_GUEST_TEAM_MESSAGE,
   CHILD_GUEST_NO_ROLE_MESSAGE,
   formOffersChildRole,
@@ -960,15 +965,15 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
             clubRosterMemberId?: string;
             clubGuestId?: string;
             temporaryAttendeeType?: string;
+            notPathfinder?: boolean;
             /** An extra person's optional link to a roster member (#931); nothing else about the registration changes with it. */
             linkedRosterMemberId?: string;
             teamRole?: string;
           };
           const temporary = snapshot.temporary === true;
           const clubRosterMemberId = snapshot.clubRosterMemberId ?? null;
-          const notAPathfinder = temporary && snapshot.temporaryAttendeeType === "UNDERAGE";
-          const markedYouth = notAPathfinder && typeof snapshot.ageOnEventDate === "number" && guestIsYouthNotPathfinder({ age: snapshot.ageOnEventDate, guestType: "UNDERAGE" });
-          const unmarkedChild = notAPathfinder && !markedYouth;
+          const markedYouth = snapshotIsYouthNotPathfinder(snapshot);
+          const unmarkedChild = temporary && snapshot.temporaryAttendeeType === "UNDERAGE" && !markedYouth;
           return {
             attendeeId: id,
             firstName: snapshot.firstName ?? "",
@@ -1230,7 +1235,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
         // A child who isn't a Pathfinder (#1666) is never added to a team: teams take team members and coaches only.
         const ageRuleProblem = guestAgeRuleProblem(guest);
         if (ageRuleProblem) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", ageRuleProblem);
-        if (teamSettings && guestIsChild(guest)) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
+        if (teamSettings && (guestIsChild(guest) || guestIsYouthNotPathfinder(guest))) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
         if (guestIsChild(guest) && !formOffersChildRole(definition as RegistrationFormDefinition)) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_NO_ROLE_MESSAGE);
         // An extra person's typed age is their age on the event's age date (#809).
         const role = teamRoleFor({ responses: attendee.responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: guest.age });
@@ -1239,7 +1244,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           rosterMemberId: null,
           ageOnEventDate: guest.age,
           ...(teamSettings ? { teamRole: role } : {}),
-          guest: { email: guest.email, attendeeType: guestAttendeeType(guest), guestId: guest.id },
+          guest: { email: guest.email, attendeeType: guestAttendeeType(guest), guestId: guest.id, ...(guestIsYouthNotPathfinder(guest) ? { notPathfinder: true } : {}) },
         });
         const person = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
         teamMemberPersons.push({ personId: null, name: formatPersonName(guest), onRoster: false });
@@ -1249,7 +1254,9 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           alternate: isAlternateAnswer(attendee.responses[ALTERNATE_FIELD_KEY]),
           age: guest.age,
         });
-        return { ...attendee, responses: { ...attendee.responses, ...guestOwnedRole(definition as RegistrationFormDefinition, guest), ...rosterOwnedResponses(definition as RegistrationFormDefinition, person) } };
+        // A youth guest who isn't a Pathfinder is priced and asked like any youth: an old Child answer becomes Pathfinder (#1728).
+        const guestResponses = guestIsYouthNotPathfinder(guest) ? childRoleToPathfinder(definition as RegistrationFormDefinition, attendee.responses) : attendee.responses;
+        return { ...attendee, responses: { ...guestResponses, ...guestOwnedRole(definition as RegistrationFormDefinition, guest), ...rosterOwnedResponses(definition as RegistrationFormDefinition, person) } };
       }
       const memberId = rosterMemberIdFromClientId(attendee.clientId);
       const member = memberId ? byId.get(memberId) : undefined;
@@ -1674,9 +1681,18 @@ export async function amendClubRegistration(
     const clientId = clubGuestClientId(guestId);
     const ageOnEventDate = typeof snapshot.ageOnEventDate === "number" ? snapshot.ageOnEventDate : null;
     // A child who isn't a Pathfinder keeps the Child role, whatever the client sent (#1666).
-    const childRole = snapshot.temporaryAttendeeType === "UNDERAGE" ? guestOwnedRole(definition, { age: ageOnEventDate ?? 0, guestType: "UNDERAGE" }) : {};
+    const registeredYouthMark = snapshotIsYouthNotPathfinder(snapshot);
+    const isChild = snapshot.temporaryAttendeeType === "UNDERAGE" && !registeredYouthMark;
+    const childRole = isChild ? guestOwnedRole(definition, { age: ageOnEventDate ?? 0, guestType: "UNDERAGE" }) : {};
+    // A guest aged 10 to 17 keeps or changes the "not a Pathfinder" mark as the director chose (#1728); anyone else cannot be marked.
+    const requestedMark = input.keptGuestNotPathfinder?.[guestId];
+    const youthAge = ageOnEventDate !== null && ageOnEventDate >= GUEST_NOT_PATHFINDER_MIN_AGE && ageOnEventDate <= GUEST_NOT_PATHFINDER_MAX_AGE;
+    if (requestedMark === true && !youthAge) throw new ClubRegistrationError("ATTENDEES_INVALID", GUEST_NOT_PATHFINDER_AGE_MESSAGE);
+    const youthMark = youthAge && (requestedMark ?? registeredYouthMark);
+    const keptResponses = withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses));
+    // An old Child answer on a guest aged 10 to 17 becomes Pathfinder, marked or not, so they are priced as a youth.
     const responses = {
-      ...withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses)),
+      ...(youthAge && snapshot.temporaryAttendeeType === "UNDERAGE" ? childRoleToPathfinder(definition, keptResponses) : keptResponses),
       ...childRole,
     };
     assertSeminarPicksUnchanged(current, responses);
@@ -1690,9 +1706,12 @@ export async function amendClubRegistration(
         clubOrganizationId: organizationId,
         ageOnEventDate,
         temporary: true,
-        temporaryAttendeeType: snapshot.temporaryAttendeeType === "YOUTH" || snapshot.temporaryAttendeeType === "ADULT" || snapshot.temporaryAttendeeType === "UNDERAGE"
-          ? snapshot.temporaryAttendeeType
-          : ageOnEventDate !== null && !guestIsAdult({ age: ageOnEventDate }) ? "YOUTH" : "ADULT",
+        temporaryAttendeeType: youthAge && snapshot.temporaryAttendeeType === "UNDERAGE"
+          ? "YOUTH"
+          : snapshot.temporaryAttendeeType === "YOUTH" || snapshot.temporaryAttendeeType === "ADULT" || snapshot.temporaryAttendeeType === "UNDERAGE"
+            ? snapshot.temporaryAttendeeType
+            : ageOnEventDate !== null && !guestIsAdult({ age: ageOnEventDate }) ? "YOUTH" : "ADULT",
+        ...(youthAge ? { notPathfinder: youthMark } : {}),
         clubGuestId: guestId,
         ...(teamSettings ? { teamRole: guestRole } : {}),
       },
@@ -1714,11 +1733,11 @@ export async function amendClubRegistration(
     const clientId = clubGuestClientId(guest.id);
     const ageRuleProblem = guestAgeRuleProblem(guest);
     if (ageRuleProblem) throw new ClubRegistrationError("ATTENDEES_INVALID", ageRuleProblem);
-    if (teamSettings && guestIsChild(guest)) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
+    if (teamSettings && (guestIsChild(guest) || guestIsYouthNotPathfinder(guest))) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
     if (guestIsChild(guest) && !formOffersChildRole(definition)) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_NO_ROLE_MESSAGE);
     const ownedRole = guestOwnedRole(definition, guest);
     const responses = {
-      ...(input.attendeeResponses[clientId] ?? {}),
+      ...(guestIsYouthNotPathfinder(guest) ? childRoleToPathfinder(definition, input.attendeeResponses[clientId] ?? {}) : (input.attendeeResponses[clientId] ?? {})),
       ...ownedRole,
       ...rosterOwnedResponses(definition, person),
     };
@@ -1732,6 +1751,7 @@ export async function amendClubRegistration(
         ageOnEventDate: guest.age,
         temporary: true,
         temporaryAttendeeType: guestAttendeeType(guest),
+        ...(guestIsYouthNotPathfinder(guest) ? { notPathfinder: true } : {}),
         clubGuestId: guest.id,
         ...(teamSettings ? { teamRole: newGuestRole } : {}),
       },

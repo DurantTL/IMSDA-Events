@@ -1,5 +1,6 @@
 import "server-only";
 
+import { snapshotIsYouthNotPathfinder } from "@/modules/club-registrations/domain";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { formatPersonName } from "@/lib/person-name";
@@ -117,6 +118,15 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+/**
+ * Whether a registered person is offered as a "Pathfinder" to score: not Staff or Child, and not a club guest aged 10 to 17
+ * who is not a Pathfinder (#1728), whatever role the form says for them.
+ */
+export function isOfferedAsPathfinder(role: unknown, profileSnapshot: unknown) {
+  if (role === "Staff" || role === "Child") return false;
+  return !snapshotIsYouthNotPathfinder(record(profileSnapshot));
+}
+
 /** Clubs and Pathfinders registered for the event: the only people a score can be entered for. */
 async function loadSubjects(eventId: string): Promise<Subjects> {
   const rows = await getPrisma().clubEventRegistration.findMany({
@@ -127,7 +137,7 @@ async function loadSubjects(eventId: string): Promise<Subjects> {
       registration: {
         select: {
           publicFormSubmission: { select: { responses: true } },
-          attendees: { select: { id: true, formResponses: true, person: { select: { firstName: true, lastName: true } } } },
+          attendees: { select: { id: true, formResponses: true, profileSnapshot: true, person: { select: { firstName: true, lastName: true } } } },
         },
       },
     },
@@ -145,7 +155,7 @@ async function loadSubjects(eventId: string): Promise<Subjects> {
       // includes TLTs (teen leaders in training) and anyone whose registration form has no attendee type. Adults on staff
       // and children are left out. A Pathfinder's score is tied to the registration attendee, so removing that attendee
       // from the registration deletes their score (database cascade); the club's own scores are not affected.
-      if (role === "Staff" || role === "Child") continue;
+      if (!isOfferedAsPathfinder(role, attendee.profileSnapshot)) continue;
       people.set(attendee.id, { name: formatPersonName(attendee.person, "display") || "Unnamed person", organizationId: row.organizationId });
     }
   }

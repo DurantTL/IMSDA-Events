@@ -38,6 +38,10 @@ import {
   guestAttendeeType,
   guestIsChild,
   guestIsYouthNotPathfinder,
+  GUEST_NOT_PATHFINDER_MAX_AGE,
+  GUEST_NOT_PATHFINDER_MIN_AGE,
+  normalizeLegacyChildGuest,
+  childRoleToPathfinder,
   GUEST_CHILD_AGE_MESSAGE,
   GUEST_TYPES,
   formOffersChildRole,
@@ -110,7 +114,7 @@ export function ClubRegistrationWorkspace({
   const rosterIds = useMemo(() => new Set(workspace.roster.map((person) => person.memberId)), [workspace.roster]);
   const [draft, setDraft] = useState<DraftState>(() => ({
     selectedMemberIds: (workspace.draft?.selectedMemberIds ?? []).filter((memberId) => rosterIds.has(memberId)),
-    guests: workspace.draft?.guests ?? [],
+    guests: (workspace.draft?.guests ?? []).map(normalizeLegacyChildGuest),
     // The director's own details fill in only what the draft (or the person) left blank (#618).
     responses: fillMissingAnswers(workspace.draft?.responses, contactPrefill) as FormResponses,
     attendeeResponses: (workspace.draft?.attendeeResponses as Record<string, FormResponses> | undefined) ?? {},
@@ -432,6 +436,29 @@ export function ClubRegistrationWorkspace({
     });
   }
 
+  /** Ticks or unticks "Not a Pathfinder" on an extra person aged 10 to 17 already added (#1728). */
+  function setGuestMark(guestId: string, marked: boolean) {
+    setDraft((current) => {
+      const next = {
+        ...current,
+        guests: current.guests.map((guest) => {
+          if (guest.id !== guestId) return guest;
+          const { notPathfinder: _unused, ...rest } = guest;
+          void _unused;
+          return { ...rest, guestType: "YOUTH" as const, ...(marked ? { notPathfinder: true } : {}) };
+        }),
+        // A role answered "Child" before the guest was a youth becomes Pathfinder, so they are priced as a youth.
+        attendeeResponses: (() => {
+          const clientId = clubGuestClientId(guestId);
+          const answers = current.attendeeResponses[clientId];
+          return answers ? { ...current.attendeeResponses, [clientId]: childRoleToPathfinder(workspace.experience.form.definition, answers) as FormResponses } : current.attendeeResponses;
+        })(),
+      };
+      queueSave(next);
+      return next;
+    });
+  }
+
   function removeGuest(guestId: string) {
     setDraft((current) => {
       const key = clubGuestClientId(guestId);
@@ -688,6 +715,12 @@ export function ClubRegistrationWorkspace({
                     {guest.email ? <> · <span translate="no">{guest.email}</span></> : ""}
                   </small>
                 </span>
+                {!teamRules && guest.age >= GUEST_NOT_PATHFINDER_MIN_AGE && guest.age <= GUEST_NOT_PATHFINDER_MAX_AGE && (
+                  <label className="checkbox-label">
+                    <input checked={guest.notPathfinder === true} onChange={(event) => setGuestMark(guest.id, event.currentTarget.checked)} type="checkbox" />
+                    <span>Not a Pathfinder (for example, a sibling who isn&apos;t in the club)</span>
+                  </label>
+                )}
                 <button aria-label={`Remove ${guest.firstName} ${guest.lastName}`} className="text-button" onClick={() => removeGuest(guest.id)} type="button">
                   <Trash2 aria-hidden="true" size={14} /> Remove
                 </button>

@@ -24,6 +24,7 @@ import {
   reservationHeld,
 } from "@/modules/payments/deposit-domain";
 import { formatPersonName } from "@/lib/person-name";
+import { snapshotIsYouthNotPathfinder } from "@/modules/club-registrations/domain";
 
 type RegistrationWithRelations = Awaited<ReturnType<typeof getRegistrationQuery>>[number];
 type RegistrationReadClient = Prisma.TransactionClient | ReturnType<typeof getPrisma>;
@@ -328,8 +329,8 @@ function serializeRegistration(registration: RegistrationWithRelations, director
         position: attendee.position,
         source: profile.source === "PUBLIC_REGISTRATION" ? "PUBLIC_REGISTRATION" as const : "STAFF" as const,
         responses: recordFromJson(attendee.formResponses),
-        // A guest 10 or older on a club registration who is not a Pathfinder (#1728): typed Underage, so no class seat.
-        youthGuestNotPathfinder: profile.temporary === true && profile.temporaryAttendeeType === "UNDERAGE" && typeof profile.ageOnEventDate === "number" && profile.ageOnEventDate >= 10,
+        // A club guest aged 10 to 17 who is not a Pathfinder (#1728): the stored mark, or the old Child type from 10 to 17.
+        youthGuestNotPathfinder: snapshotIsYouthNotPathfinder(profile),
         checkedIn: Boolean(activeCheckIn),
         checkInId: activeCheckIn?.id ?? null,
         checkedInAt: activeCheckIn?.checkedInAt.toISOString() ?? null,

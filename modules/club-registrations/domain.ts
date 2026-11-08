@@ -123,6 +123,11 @@ export const clubRegistrationEditInputSchema = z.object({
   keptGuestIds: z.array(z.string().trim().min(1).max(100)).max(MAX_CLUB_GUESTS),
   keptOffRosterAttendeeIds: z.array(z.string().trim().min(1).max(100)).max(500),
   newGuests: clubGuestsSchema,
+  /**
+   * Whether a kept guest aged 10 to 17 is marked "not a Pathfinder" (#1728), by guest id. A guest left out keeps the mark
+   * they were registered with, so an older client changes nothing.
+   */
+  keptGuestNotPathfinder: z.record(z.string().min(1).max(100), z.boolean()).optional(),
   attendeeResponses: z.record(z.string(), z.record(z.string(), z.unknown())),
   /** Ages typed in for roster people with no birth date on file (#639), by roster member id. */
   rosterAges: rosterAgesSchema.default({}),
@@ -140,7 +145,7 @@ export type ClubRegistrationEditInput = z.input<typeof clubRegistrationEditInput
 /** Guests saved in a draft, dropping anything that no longer reads as one. */
 export function guestsFromJson(value: unknown): ClubGuest[] {
   const parsed = clubGuestsSchema.safeParse(value);
-  return parsed.success ? parsed.data : [];
+  return parsed.success ? parsed.data.map(normalizeLegacyChildGuest) : [];
 }
 
 export function clubGuestClientId(guestId: string) {
@@ -187,8 +192,6 @@ type GuestTypeInput = Pick<ClubGuest, "age"> & { guestType?: ClubGuestType | und
  * saved before the choice existed is unchanged.
  */
 export function guestAttendeeType(guest: GuestTypeInput): ClubGuestType {
-  // A youth marked "not a Pathfinder" (#1728) is typed like a child, so no class seat, no Pathfinder count.
-  if (guest.notPathfinder && guest.guestType !== "ADULT" && !guestIsAdult(guest)) return "UNDERAGE";
   if (guest.guestType) return guest.guestType;
   return guestIsAdult(guest) ? "ADULT" : "YOUTH";
 }
@@ -208,9 +211,42 @@ export function guestAgeRuleProblem(guest: GuestTypeInput): string | null {
   return null;
 }
 
-/** A youth guest, 10 or older, who is not a Pathfinder (#1728): shown as a youth guest, not as a child. */
+/**
+ * A guest aged 10 to 17 marked "not a Pathfinder" (#1728). They stay a youth (type YOUTH, the role the director picked, the
+ * same price and questions as any youth); the mark is stored beside that and read by the totals, labels and class seats.
+ */
 export function guestIsYouthNotPathfinder(guest: GuestTypeInput) {
-  return guestIsChild(guest) && guest.age > GUEST_CHILD_MAX_AGE;
+  return guest.notPathfinder === true && guest.age >= GUEST_NOT_PATHFINDER_MIN_AGE && guest.age <= GUEST_NOT_PATHFINDER_MAX_AGE;
+}
+
+/**
+ * A guest saved as Child at 10 to 17 under #1666 reads as a youth guest who is not a Pathfinder (#1728): the old Child type
+ * becomes YOUTH with the mark, so the director can untick it. Anyone else is returned as is.
+ */
+export function normalizeLegacyChildGuest<T extends GuestTypeInput>(guest: T): T {
+  if (guest.guestType !== "UNDERAGE" || guest.age < GUEST_NOT_PATHFINDER_MIN_AGE || guest.age > GUEST_NOT_PATHFINDER_MAX_AGE) return guest;
+  return { ...guest, guestType: "YOUTH", notPathfinder: true };
+}
+
+/** A saved attendee of a club registration read as a youth guest who is not a Pathfinder: the mark, or the old Child type from 10 to 17. */
+export function snapshotIsYouthNotPathfinder(snapshot: { temporary?: unknown; temporaryAttendeeType?: unknown; ageOnEventDate?: unknown; notPathfinder?: unknown }) {
+  if (snapshot.temporary !== true) return false;
+  if (snapshot.notPathfinder === true) return true;
+  return snapshot.temporaryAttendeeType === "UNDERAGE" && typeof snapshot.ageOnEventDate === "number"
+    && snapshot.ageOnEventDate >= GUEST_NOT_PATHFINDER_MIN_AGE && snapshot.ageOnEventDate <= GUEST_NOT_PATHFINDER_MAX_AGE;
+}
+
+/**
+ * When a guest saved with the Child role becomes a Pathfinder-priced youth guest (#1728), the form's Child answer is swapped
+ * for its Pathfinder option, so pricing and conditional questions are exactly a youth's. Other answers are left alone.
+ */
+export function childRoleToPathfinder(definition: RegistrationFormDefinition, responses: Record<string, unknown>) {
+  const field = attendeeFields(definition).find((candidate) => candidate.key === "attendee_type" && candidate.options.length > 0);
+  if (!field) return responses;
+  const answer = typeof responses[field.key] === "string" ? String(responses[field.key]).trim().toLowerCase() : "";
+  if (answer !== "child" && answer !== "underage") return responses;
+  const pathfinder = field.options.find((option) => option.trim().toLowerCase() === "pathfinder");
+  return pathfinder ? { ...responses, [field.key]: pathfinder } : responses;
 }
 
 export const CHILD_GUEST_NO_ROLE_MESSAGE = "This form has no Child role, so a child who isn't a Pathfinder can't be added. Choose Pathfinder or Adult.";

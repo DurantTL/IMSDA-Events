@@ -28,6 +28,9 @@ import {
   guestAttendeeType,
   guestIsChild,
   guestIsYouthNotPathfinder,
+  childRoleToPathfinder,
+  GUEST_NOT_PATHFINDER_MAX_AGE,
+  GUEST_NOT_PATHFINDER_MIN_AGE,
   GUEST_CHILD_AGE_MESSAGE,
   GUEST_TYPES,
   formOffersChildRole,
@@ -57,6 +60,10 @@ export function revealRosterSection(
   if (!element) return;
   element.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   element.focus({ preventScroll: true });
+}
+
+function youthAgeRange(age: number | null) {
+  return age !== null && age >= GUEST_NOT_PATHFINDER_MIN_AGE && age <= GUEST_NOT_PATHFINDER_MAX_AGE;
 }
 
 /**
@@ -129,12 +136,16 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
   const [startingSelected] = useState<string[]>(selectedMemberIds);
   const [startingKeptOff] = useState<string[]>(keptOffRosterIds);
   const [startingKeptGuests] = useState<string[]>(keptGuestIds);
+  // "Not a Pathfinder" on each kept guest aged 10 to 17 (#1728), starting as registered; the director can untick it.
+  const [startingMarks] = useState<Record<string, boolean>>(() => Object.fromEntries(existingGuests.map((guest) => [guest.guestId!, guest.guestYouthNotPathfinder === true])));
+  const [keptMarks, setKeptMarks] = useState<Record<string, boolean>>(startingMarks);
+  const sameMarks = Object.keys(startingMarks).every((id) => startingMarks[id] === keptMarks[id]);
   const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id));
   const sameAges = Object.keys(rosterAges).length === Object.keys(startingAges).length
     && Object.entries(rosterAges).every(([id, age]) => startingAges[id] === age);
   const dirty = open && !(
     sameSet(selectedMemberIds, startingSelected) && sameSet(keptOffRosterIds, startingKeptOff)
-    && sameSet(keptGuestIds, startingKeptGuests) && newGuests.length === 0 && sameAges && locationId === currentLocationId
+    && sameSet(keptGuestIds, startingKeptGuests) && newGuests.length === 0 && sameAges && sameMarks && locationId === currentLocationId
   );
   const allowNextNavigation = useUnsavedChangesGuard(dirty);
   // Age problems show only after Continue was pressed and blocked, or once a field is touched (#718).
@@ -228,7 +239,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
       ...offRoster.filter((attendee) => keptOffRosterIds.includes(attendee.attendeeId))
         .map((attendee) => withEdits(clubExistingAttendeeClientId(attendee.attendeeId), attendee.responses)),
       ...existingGuests.filter((guest) => keptGuestIds.includes(guest.guestId!))
-        .map((guest) => withEdits(clubGuestClientId(guest.guestId!), guest.responses)),
+        .map((guest) => withEdits(clubGuestClientId(guest.guestId!), guest.guestYouthNotPathfinder ? childRoleToPathfinder(definition, guest.responses) : guest.responses)),
       ...newGuests.map((guest) => {
         const person = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
         return withEdits(
@@ -276,6 +287,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
           selectedMemberIds,
           keptOffRosterAttendeeIds: keptOffRosterIds,
           keptGuestIds,
+          keptGuestNotPathfinder: Object.fromEntries(existingGuests.filter((guest) => keptGuestIds.includes(guest.guestId!) && youthAgeRange(guest.ageOnEventDate)).map((guest) => [guest.guestId!, keptMarks[guest.guestId!] === true])),
           newGuests,
           rosterAges: typedAges,
           // Only ages the director changed from where they started are saved back to the roster.
@@ -309,7 +321,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
         : { key: issue.key, message: issue.message, attendeeIndex: null }];
     });
     return { ok: false as const, message: result.message ?? "That change couldn't be saved. Refresh and try again.", issues };
-  }, [organizationId, workspace.event.id, workspace.registration.updatedAt, workspace.registration.teamKey, selectedMemberIds, keptOffRosterIds, keptGuestIds, newGuests, typedAges, startingAges, saveAgeOff, locationId, currentLocationId]);
+  }, [organizationId, workspace.event.id, workspace.registration.updatedAt, workspace.registration.teamKey, selectedMemberIds, keptOffRosterIds, keptGuestIds, keptMarks, existingGuests, newGuests, typedAges, startingAges, saveAgeOff, locationId, currentLocationId]);
 
   // Answers as registered, by client id, so an old answer left alone never blocks the edit (#855).
   const previousResponses = useMemo(() => Object.fromEntries([
@@ -478,8 +490,14 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
               <li key={guest.guestId}>
                 <span>
                   <strong translate="no">{guest.lastName}, {guest.firstName}</strong>
-                  <small>This event only{guest.guestChild ? " · Child" : ""}{guest.guestYouthNotPathfinder ? " · Youth guest (not a Pathfinder)" : ""}{guest.ageOnEventDate !== null ? <> · Age <span translate="no">{guest.ageOnEventDate}</span></> : ""}</small>
+                  <small>This event only{guest.guestChild ? " · Child" : ""}{keptMarks[guest.guestId!] ? " · Youth guest (not a Pathfinder)" : ""}{guest.ageOnEventDate !== null ? <> · Age <span translate="no">{guest.ageOnEventDate}</span></> : ""}</small>
                 </span>
+                {!workspace.teams.settings && youthAgeRange(guest.ageOnEventDate) && (
+                  <label className="checkbox-label">
+                    <input checked={keptMarks[guest.guestId!] === true} onChange={(event) => setKeptMarks((current) => ({ ...current, [guest.guestId!]: event.currentTarget.checked }))} type="checkbox" />
+                    <span>Not a Pathfinder (for example, a sibling who isn&apos;t in the club)</span>
+                  </label>
+                )}
                 <button aria-label={`Remove ${guest.firstName} ${guest.lastName}`} className="text-button" onClick={() => setKeptGuestIds((current) => current.filter((id) => id !== guest.guestId))} type="button">
                   <Trash2 aria-hidden="true" size={14} /> Remove
                 </button>

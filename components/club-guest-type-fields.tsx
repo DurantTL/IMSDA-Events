@@ -14,7 +14,7 @@ export function ClubGuestTypeFields({ age, offersChild, error }: { age: string; 
   const parsed = age.trim() === "" ? null : Number(age);
   const wholeAge = parsed !== null && Number.isInteger(parsed) ? parsed : null;
   const childOffered = offersChild && wholeAge !== null && wholeAge <= GUEST_CHILD_MAX_AGE;
-  const markOffered = offersChild && wholeAge !== null && wholeAge >= GUEST_NOT_PATHFINDER_MIN_AGE && wholeAge <= GUEST_NOT_PATHFINDER_MAX_AGE;
+  const markOffered = wholeAge !== null && wholeAge >= GUEST_NOT_PATHFINDER_MIN_AGE && wholeAge <= GUEST_NOT_PATHFINDER_MAX_AGE;
   return (
     <>
       <label>
@@ -29,7 +29,7 @@ export function ClubGuestTypeFields({ age, offersChild, error }: { age: string; 
         {error && <small className="field-error" id="club-guest-type-error" role="alert">{error}</small>}
       </label>
       {markOffered && (
-        <label className="checkbox-row">
+        <label className="checkbox-label">
           <input name="notPathfinder" type="checkbox" />
           <span>Not a Pathfinder (for example, a sibling who isn&apos;t in the club)</span>
         </label>

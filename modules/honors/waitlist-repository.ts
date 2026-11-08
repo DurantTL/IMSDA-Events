@@ -368,7 +368,7 @@ async function promoteOne(
     const base = { id: entry.id, organizationId: entry.organizationId };
     if (!sessionVisibleAtLocation(offering.siteId, entry.registration.locationId)) return { ...base, skipReason: "The class isn't offered at their site." };
     if (!classChangesOpen(event, entry.registration.location, now)) return { ...base, skipReason: waitingNote("DEADLINE_PASSED") };
-    const attendeeType = snapshot.clubRosterMemberId ? typeByMember.get(snapshot.clubRosterMemberId) ?? null : snapshot.temporaryAttendeeType ?? null;
+    const attendeeType = snapshot.clubRosterMemberId ? typeByMember.get(snapshot.clubRosterMemberId) ?? null : (snapshot.notPathfinder === true ? "UNDERAGE" : snapshot.temporaryAttendeeType) ?? null;
     if (!consumesClassSeat(attendeeType)) return { ...base, skipReason: "They no longer use a class seat." };
     const heldIds = heldByAttendee.get(entry.registrationAttendeeId) ?? [];
     const heldOfferings = heldIds.map((id) => offeringsById.get(id)).filter((held): held is NonNullable<typeof held> => Boolean(held));
