@@ -122,7 +122,8 @@ async function main() {
   const adultB = await add(ids.clubB, "Bea", "ADULT", "1979-01-20");
   // Ages on the event's first day (2026-12-05): 16, 17 and 18.
   const staff16 = await add(ids.clubB, "Sixteen", "STAFF", "2010-06-01");
-  const staff17 = await add(ids.clubB, "Seventeen", "STAFF", "2009-12-06");
+  const staff16b = await add(ids.clubB, "Sixteenb", "STAFF", "2009-12-06");
+  const staff17 = await add(ids.clubB, "Seventeen", "STAFF", "2008-12-06");
   const staff18 = await add(ids.clubB, "Eighteen", "STAFF", "2008-12-05");
   // No birth date: one with no age at all, one with a reported age of 20, one with a reported age of 17.
   const noBirthDate = async (firstName: string, reportedAge: number | null) => {
@@ -182,7 +183,8 @@ async function main() {
   // Teachers must be 18 or older (#1727), by birth date or reported age, on the event's first day.
   const nameOne = (memberId: string) => setClubTeachers(ids.clubB, ids.event, { accountId: ids.ac }, { teachers: [{ rosterMemberId: memberId, honorName: null, locationId: null }] });
   await refused(() => nameOne(staff16.memberId), "a 16-year-old staff member cannot be named", "TEACHER_UNDER_18");
-  await refused(() => nameOne(staff17.memberId), "a staff member who turns 18 the day after the event cannot be named", "TEACHER_UNDER_18");
+  await refused(() => nameOne(staff17.memberId), "a 17-year-old who turns 18 the day after the event cannot be named", "TEACHER_UNDER_18");
+  await refused(() => nameOne(staff16b.memberId), "a 16-year-old born in December 2009 cannot be named", "TEACHER_UNDER_18");
   await refused(() => nameOne(reported17.id), "a reported age of 17 cannot be named", "TEACHER_UNDER_18");
   await refused(() => nameOne(noAge.id), "someone with no birth date or age cannot be named", "TEACHER_AGE_UNKNOWN");
   assert((await prisma.clubEventTeacher.count({ where: { eventId: ids.event, organizationId: ids.clubB } })) === 1, "the refused calls changed nothing (only the earlier adult is named)");
@@ -231,6 +233,13 @@ async function main() {
   const flaggedClub = flaggedSummary.clubs.find((club) => club.organizationId === ids.clubB);
   assert(flaggedClub?.teachers.some((teacher) => teacher.flag === "Under 18, can't teach") && flaggedClub.status.named === 1, "the staff view flags a saved under-18 teacher and does not count them");
   assert(flaggedSummary.totalTeachers === 3, "the under-18 teacher is not in the teacher total");
+  assert(!flaggedStep!.unavailable.some((person) => person.memberId === staff16.memberId), "a saved teacher is not also listed as unavailable");
+  assert(flaggedSummary.clubs.find((club) => club.organizationId === ids.clubB)?.teachers.every((teacher) => teacher.flag === null || teacher.flag === "Under 18, can't teach"), "staff see the under-18 flag");
+  // With require on, a flagged saved teacher does not count at submit (one adult is named; a small club of 2 needs 1, so use a club needing 2).
+  await prisma.clubEventTeacher.deleteMany({ where: { eventId: ids.event, organizationId: ids.clubB, rosterMemberId: adultB.memberId } });
+  await refused(() => assertTeachersMeetRule(ids.event, ids.clubB, 2), "a saved under-18 teacher does not satisfy require", "TEACHERS_REQUIRED");
+  await prisma.clubEventTeacher.create({ data: { eventId: ids.event, organizationId: ids.clubB, rosterMemberId: adultB.memberId } });
+  await assertTeachersMeetRule(ids.event, ids.clubB, 2);
   // Keeping them in a save is refused; replacing them works.
   await refused(() => setClubTeachers(ids.clubB, ids.event, { accountId: ids.ac }, { teachers: [{ rosterMemberId: adultB.memberId, honorName: null, locationId: null }, { rosterMemberId: staff16.memberId, honorName: null, locationId: null }] }), "saving the under-18 teacher again is refused", "TEACHER_UNDER_18");
   await nameOne(adultB.memberId);

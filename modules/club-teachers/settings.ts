@@ -112,7 +112,12 @@ export async function applyTeacherSettings(actor: TeacherSettingsActor, eventId:
   });
   // A coordinator turning the tool back on while staff's "require" is still stored on is a conflict staff should hear about (#1727).
   if (actor.kind === "area-coordinator" && input.enabled === true && !wasOn) {
-    await notifyRequireBackOn(actor.accountId, eventId);
+    // The switch is already saved: a failure here must never turn it into an error.
+    try {
+      await notifyRequireBackOn(actor.accountId, eventId);
+    } catch (error) {
+      logError("The require-teachers notice could not be sent", error, { eventId });
+    }
   }
   return loadTeacherToolState(eventId, actor.kind);
 }
@@ -138,7 +143,9 @@ async function notifyRequireBackOn(accountId: string, eventId: string): Promise<
     const result = await dispatchUnsuppressedAlert({
       key: `club-teachers.require-back-on.${eventId}`,
       severity: "WATCH",
-      summary: `Require teachers is back on for ${eventName}. ${who} (Area Coordinator) turned the ${title} tool on, and staff had set it to block registrations below the teacher number. Open Club teachers to keep it or turn it off.`,
+      summary: `Require teachers is back on for ${eventName}. An Area Coordinator turned the ${title} tool on, and staff had set it to block registrations below the teacher number. Open Club teachers to keep it or turn it off.`,
+      // The name goes to staff in the webhook only, not into the server log.
+      webhookOnlyDetail: `Turned on by ${who}.`,
     });
     delivered = result.delivered;
   } catch (error) {

@@ -151,8 +151,10 @@ export async function loadClubTeacherStep(organizationId: string, eventId: strin
   const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
   const assessed = members.map((member) => ({ member, eligibility: teacherEligibility(rosterAgeOn(member, ageDate)) }));
   const candidates = assessed.filter((row) => row.eligibility === "ok").map(({ member }) => ({ memberId: member.id, name: personName(member.person), role: member.role })).sort(byName);
+  // A saved teacher is shown (flagged) in the teachers list, so nobody is listed twice.
+  const savedIds = new Set(rows.map((row) => row.rosterMemberId));
   const unavailable = assessed
-    .filter((row) => row.eligibility !== "ok")
+    .filter((row) => row.eligibility !== "ok" && !savedIds.has(row.member.id))
     .map(({ member, eligibility }) => ({ memberId: member.id, name: personName(member.person), role: member.role, reason: teacherEligibilityLabel(eligibility)! }))
     .sort(byName);
   const teachers = rows

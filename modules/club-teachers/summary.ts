@@ -81,7 +81,7 @@ export async function loadTeacherSummary(eventId: string): Promise<TeacherSummar
           // A teacher's own preference wins; otherwise the weekend the club registered for.
           siteId: siteName.has(teacher.locationId ?? "") ? teacher.locationId : siteName.has(club.locationId ?? "") ? club.locationId : null,
           siteName: siteName.get(teacher.locationId ?? "") ?? siteName.get(club.locationId ?? "") ?? noSite,
-          flag: teacherEligibilityLabel(eligibilityOf(teacher)),
+          flag: teacherEligibilityLabel(eligibilityOf(teacher), "staff"),
         }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     };

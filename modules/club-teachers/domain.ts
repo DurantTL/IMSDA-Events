@@ -95,12 +95,14 @@ export function teacherEligibility(age: number | null): TeacherEligibility {
 
 export const teacherUnderAgeLabel = "Under 18, can't teach";
 export const teacherAgeUnknownLabel = "Age needed, add a birth date on your roster";
+export const teacherAgeUnknownStaffLabel = "Age needed: the club must add a birth date";
 export const teacherUnderAgeMessage = "Teachers must be 18 or older. Remove anyone under 18 and name an adult instead.";
 export const teacherAgeUnknownMessage = "A teacher's age is needed. Add the birth date on your roster first.";
 
-export function teacherEligibilityLabel(eligibility: TeacherEligibility): string | null {
+/** The words for who is looking: the club director is told what to do; staff and coordinators are told the club must. */
+export function teacherEligibilityLabel(eligibility: TeacherEligibility, viewer: "club" | "staff" = "club"): string | null {
   if (eligibility === "under-18") return teacherUnderAgeLabel;
-  if (eligibility === "age-unknown") return teacherAgeUnknownLabel;
+  if (eligibility === "age-unknown") return viewer === "staff" ? teacherAgeUnknownStaffLabel : teacherAgeUnknownLabel;
   return null;
 }
 
