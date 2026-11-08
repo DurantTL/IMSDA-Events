@@ -387,6 +387,81 @@ async function publicRegistrationPreviewFails({ browser, mode, tracker, browserN
   }
 }
 
+/** Amount-like keys a tampering browser might add. The page itself sends none of them. */
+const TAMPERED_AMOUNT_KEYS = ["total", "totalAmount", "totalCents", "subtotalCents", "amount", "amountCents", "price", "priceCents", "fee", "processingFeeCents", "discount", "discountAmountCents", "balanceCents"];
+
+/**
+ * Rule P1: with the page's price preview failing, the submit request is rewritten on the way out. The page sends only
+ * `versionId`, `idempotencyKey`, `responses`, `website` (and `attendees`, `responsibleAdults`, `lodging` where used), never
+ * a total. Request 1 carries amount keys at the top of the body: the server refuses it (400). Request 2 (the page's retry)
+ * carries them inside `responses`: refused too (422, not a field on the form). Neither stores anything. Request 3 goes
+ * out as the page built it. The recorded total, the stored total and the card amount must be the server's.
+ */
+async function publicRegistrationTamperedTotal({ browser, mode, tracker, browserName }: Parameters<Journey["run"]>[0]) {
+  await clearRateLimits();
+  const context = await newContext(browser, mode, tracker, browserName);
+  try {
+    await context.addInitScript(PREVIEW_FAILS_INIT_SCRIPT);
+    const page: Page = await context.newPage();
+    watch(page, tracker);
+    const email = `pbx.tamper.${randomBytes(4).toString("hex")}@example.test`;
+    const fake = Object.fromEntries(TAMPERED_AMOUNT_KEYS.map((key) => [key, key.toLowerCase().includes("cents") ? 1 : 0.01]));
+    const sent: { status: number; keys: string[] }[] = [];
+    await page.route(/\/api\/public\/events\/[^/]+\/forms\/[^/]+\/registrations$/, async (route: any) => {
+      const request = route.request();
+      if (request.method() !== "POST") return route.continue();
+      const body = JSON.parse(request.postData() ?? "{}");
+      const attempt = sent.length;
+      const tampered = attempt === 0
+        ? { ...body, ...fake }
+        : attempt === 1 ? { ...body, responses: { ...body.responses, ...fake } } : body;
+      const response = await route.fetch({ postData: JSON.stringify(tampered) });
+      sent.push({ status: response.status(), keys: Object.keys(body) });
+      return route.fulfill({ response });
+    });
+    await fillRegistration(page, email, { expectPreview: false });
+    assert(await page.evaluate(() => (window as unknown as { __previewThrew?: boolean }).__previewThrew === true), "The injected failure never reached the page's price preview.");
+    const stored = () => prisma.registration.count({ where: { eventId: ids.event, contactSnapshot: { path: ["email"], equals: email } } });
+
+    await page.getByRole("button", { name: "Submit registration" }).first().click();
+    for (let i = 0; i < 100 && sent.length < 1; i += 1) await page.waitForTimeout(100);
+    assert(sent.length === 1, "The submit request was never sent.");
+    assert(!sent[0].keys.some((key) => TAMPERED_AMOUNT_KEYS.includes(key)), `The page itself sent an amount key: ${sent[0].keys.join(", ")}`);
+    assert(sent[0].status === 400, `A body with a total at the top was answered ${sent[0].status}, expected the refusal 400.`);
+    assert((await stored()) === 0, "A registration was stored from a body carrying a tampered total.");
+
+    // The page offers the submit again; the retry carries the amount keys inside the answers.
+    await page.getByRole("button", { name: "Submit registration" }).first().click();
+    for (let i = 0; i < 100 && sent.length < 2; i += 1) await page.waitForTimeout(100);
+    const second = sent[1] as { status: number } | undefined;
+    assert(second && second.status === 422, `Amount keys inside the answers were answered ${second?.status}, expected the refusal 422.`);
+    assert((await stored()) === 0, "A registration was stored from answers carrying a tampered total.");
+
+    // The third request is the page's own, sent unchanged: the server's numbers.
+    await page.getByRole("button", { name: "Submit registration" }).first().click();
+    try {
+      await page.getByText("Registration received").first().waitFor({ timeout: 10_000 });
+    } catch (error) {
+      if (process.env.PRIVACY_DEBUG) console.log(JSON.stringify(sent), (await page.locator("body").innerText()).slice(-1200));
+      throw error;
+    }
+    const text = await page.locator("main, body").first().innerText();
+    const recorded = /Total recorded\s*\n?\s*(\$[\d,.]+)/.exec(text)?.[1];
+    assert(recorded === SERVER_RECORDED_TOTAL, `With a tampered total the confirmation showed ${recorded ?? "no total"}, expected the server's ${SERVER_RECORDED_TOTAL}.`);
+    const registration = await prisma.registration.findFirst({
+      where: { eventId: ids.event, contactSnapshot: { path: ["email"], equals: email } },
+      select: { totalAmount: true },
+    });
+    assert(registration, "The registration was not stored.");
+    assert(Math.round(Number(registration.totalAmount) * 100) === expected.totalPayLaterCents, `Stored total was ${registration.totalAmount}, expected 72.00 although the request said otherwise.`);
+    await paymentStep(page, page.getByRole("link", { name: "Continue to secure card payment" }), mode);
+    await noErrorScreen(page);
+    noUncaughtErrors(tracker, [/Minified React error #(418|423|425)/, /hydrat/i]);
+  } finally {
+    await closeContext(context);
+  }
+}
+
 let embedServer: Server | null = null;
 async function startEmbedHost() {
   if (embedServer) return;
@@ -497,6 +572,7 @@ const journeys: Journey[] = [
   { name: "event page, analytics blocked", run: eventPageWithoutAnalytics },
   { name: "public registration, promo code and card", run: publicRegistration },
   { name: "public registration, price preview throws", run: publicRegistrationPreviewFails },
+  { name: "public registration, tampered total with price preview throwing", run: publicRegistrationTamperedTotal },
   { name: "calendar embed on another site", run: calendarEmbed },
   { name: "Security check blocked on sign-in", turnstile: true, run: (ctx) => securityCheckBlocked("/account/sign-in", ctx) },
   { name: "Security check blocked on password reset", turnstile: true, run: (ctx) => securityCheckBlocked("/account/forgot-password", ctx) },
