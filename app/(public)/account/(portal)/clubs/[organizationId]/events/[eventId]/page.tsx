@@ -9,6 +9,9 @@ import { BackLink } from "@/components/back-link";
 import { NeedsAttention, StatusComplete } from "@/components/needs-attention";
 import { classChoiceReadiness, readinessSummaryText } from "@/modules/honors/class-readiness";
 import { ClubHonorsNote } from "@/components/club-honors-note";
+import { ClubTeachersCard } from "@/components/club-teachers-card";
+import { loadClubTeacherStep } from "@/modules/club-teachers/repository";
+import { logError } from "@/lib/logger";
 import { ClubClassPicker } from "@/components/club-class-picker";
 import { ClubPassQr } from "@/components/club-pass-qr";
 import { clubPassIsAvailable } from "@/modules/checkin/club-pass-token";
@@ -139,6 +142,14 @@ export default async function ClubEventRegistrationPage({
     registered: Boolean(workspace.registration),
     capabilities: access.capabilities,
   });
+
+  // The optional Club teachers step (#1681): shown only while the event's tool is on and has a rule. A failed read hides the step, never the page.
+  const teacherStep = showingTeam && !workspace.problem
+    ? await loadClubTeacherStep(organizationId, eventId).catch((error: unknown) => {
+      logError("Club teachers step read failed", error, { eventId });
+      return null;
+    })
+    : null;
 
   return (
     <>
@@ -389,6 +400,7 @@ export default async function ClubEventRegistrationPage({
             )}
         </section>
       )}
+      {teacherStep && <ClubTeachersCard canEdit={access.capabilities.registerForEvents} eventId={eventId} initialStep={teacherStep} organizationId={organizationId} />}
       {classes && <ClubClassPicker setupBase={`/account/clubs/${organizationId}`} canOverrideRequirements={access.actor.kind === "STAFF_ACTING"} eventId={eventId} initialWorkspace={classes} organizationId={organizationId} />}
       {classes && classes.offerings.length > 0 && (
         <section className="public-manage-card club-schedule-link">

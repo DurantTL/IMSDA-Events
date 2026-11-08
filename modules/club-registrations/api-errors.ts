@@ -45,7 +45,7 @@ export function clubRegistrationApiError(error: unknown, action: string) {
         ? 413
         : error.code === "REGISTRATION_CLOSED"
           ? 410
-          : error.code === "ATTENDEES_INVALID" || error.code === "TEAM_INVALID"
+          : error.code === "ATTENDEES_INVALID" || error.code === "TEAM_INVALID" || error.code === "TEACHERS_REQUIRED"
             ? 422
             : 409;
     return Response.json({ error: error.code, message: error.message }, { status, headers: noStore });
