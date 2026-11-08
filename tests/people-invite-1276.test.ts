@@ -651,7 +651,7 @@ describe("resending and cancelling a staff invite", () => {
 describe("the pending invites list", () => {
   beforeEach(() => {
     mocks.clubInviteFindMany.mockResolvedValue([
-      { id: "ci-1", email: "pat@example.test", name: "Pat Example", role: "DIRECTOR", sentAt: new Date("2026-10-20T00:00:00Z"), createdAt: new Date("2026-10-20T00:00:00Z"), expiresAt: new Date("2026-10-25T00:00:00Z"), organization: { name: "Example Pathfinders" } },
+      { id: "ci-1", email: "pat@example.test", name: "Pat Example", role: "DIRECTOR", source: "IMPORT", sentAt: new Date("2026-10-20T00:00:00Z"), createdAt: new Date("2026-10-20T00:00:00Z"), expiresAt: new Date("2026-10-25T00:00:00Z"), organization: { name: "Example Pathfinders" } },
     ]);
     mocks.acFindMany.mockResolvedValue([
       { id: "aci-1", email: "pat@example.test", name: "Pat Example", sentAt: new Date("2026-10-26T00:00:00Z"), createdAt: new Date("2026-10-26T00:00:00Z"), expiresAt: new Date("2026-11-09T00:00:00Z") },
@@ -669,6 +669,41 @@ describe("the pending invites list", () => {
       ["club", "Director of Example Pathfinders", true],
     ]);
     expect(invites.find((entry) => entry.kind === "club")!.signUpUrl).toBe("https://events.imsda.test/account/sign-up?invite=club#email=pat%40example.test");
+  });
+
+  it("lists open club invites from every source with a plain from label, in both viewer scopes", async () => {
+    const row = (id: string, source: string, sentAt: string | null) => ({ id, email: `${id}@example.test`, name: "", role: "REGISTRAR", source, sentAt: sentAt ? new Date(sentAt) : null, createdAt: new Date("2026-10-01T00:00:00Z"), expiresAt: null, organization: { name: "Example Pathfinders" } });
+    mocks.clubInviteFindMany.mockResolvedValue([
+      row("imp", "IMPORT", "2026-10-21T00:00:00Z"),
+      row("app", "APPLICATION", "2026-10-22T00:00:00Z"),
+      row("clb", "CLUB", "2026-10-23T00:00:00Z"),
+      row("ppl", "PEOPLE", null),
+      row("odd", "SOMETHING_ELSE", "2026-10-24T00:00:00Z"),
+    ]);
+    for (const scope of ["full", "clubs"] as const) {
+      const { invites } = await listPendingInvites({ scope }, now);
+      const clubs = invites.filter((entry) => entry.kind === "club");
+      expect(Object.fromEntries(clubs.map((entry) => [entry.id, entry.from]))).toEqual({
+        imp: "From the club import", app: "From a club application", clb: "Added by the club", ppl: "Added in People & access", odd: "From the club import",
+      });
+    }
+    // No source narrows the read; accepted and cancelled stay out through the status filter, drafts stay in.
+    const where = mocks.clubInviteFindMany.mock.calls.at(-1)![0].where;
+    expect(where.source).toBeUndefined();
+    expect(where.status).toEqual({ in: ["PENDING", "SENT"] });
+    expect(where.organization).toEqual({ type: "CLUB", isActive: true });
+  });
+
+  it("returns a draft club invite as not sent, with no sign-up link, and a sent one with its link", async () => {
+    const row = (id: string, status: string) => ({ id, email: `${id}@example.test`, name: "", role: "DIRECTOR", source: "IMPORT", status, sentAt: null, createdAt: new Date("2026-10-01T00:00:00Z"), expiresAt: null, organization: { name: "Example Pathfinders" } });
+    mocks.clubInviteFindMany.mockResolvedValue([row("draft", "PENDING"), { ...row("live", "SENT"), sentAt: new Date("2026-10-02T00:00:00Z") }]);
+    const { invites } = await listPendingInvites({ scope: "full" }, now);
+    const draft = invites.find((entry) => entry.id === "draft")!;
+    expect(draft.notSent).toBe(true);
+    expect(draft.signUpUrl).toBeUndefined();
+    const live = invites.find((entry) => entry.id === "live")!;
+    expect(live.notSent).toBeUndefined();
+    expect(live.signUpUrl).toContain("invite=club");
   });
 
   it("never reads or shows staff logins to a Clubs Administrator", async () => {
