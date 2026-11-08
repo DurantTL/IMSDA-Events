@@ -6,8 +6,11 @@ const mocks = vi.hoisted(() => ({ permissions: [] as string[] }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: async () => ({ event: { id: "evt_1", name: "Synthetic Event" }, permissions: mocks.permissions }) }));
-vi.mock("@/modules/lodging/preferences-service", () => ({ getStaffLodgingRequestsView: async () => ({ rows: [] }) }));
-vi.mock("@/modules/lodging/assignment-view", () => ({ getAssignmentWorkspace: async () => ({ rows: [] }) }));
+const noProperty = vi.hoisted(() => ({ on: false }));
+const lodgingError = vi.hoisted(() => class LodgingError extends Error { code = "NO_PROPERTY"; });
+vi.mock("@/modules/lodging/errors", () => ({ LodgingError: lodgingError }));
+vi.mock("@/modules/lodging/preferences-service", () => ({ getStaffLodgingRequestsView: async () => { if (noProperty.on) throw new lodgingError(); return { rows: [] }; } }));
+vi.mock("@/modules/lodging/assignment-view", () => ({ getAssignmentWorkspace: async () => { if (noProperty.on) throw new lodgingError(); return { rows: [] }; } }));
 vi.mock("@/modules/issued-assets/closeout", () => ({ getCloseoutReport: async () => ({}) }));
 vi.mock("@/modules/issued-assets/view", () => ({ getAssigneeOptions: async () => ({ staff: [] }) }));
 vi.mock("@/components/lodging-requests-workspace", () => ({ LodgingRequestsWorkspace: () => null }));
@@ -33,7 +36,34 @@ const pages = [
   { name: "issued asset closeout", render: () => IssuedAssetsCloseoutPage(search), registrar: "MANAGE_CHECK_IN", href: "/more/issued-assets?event=evt_1" },
 ];
 
-beforeEach(() => { mocks.permissions = []; });
+beforeEach(() => { mocks.permissions = []; noProperty.on = false; });
+
+function linkHrefs(node: ReactNode): string[] {
+  if (!node || typeof node !== "object") return [];
+  if (Array.isArray(node)) return node.flatMap(linkHrefs);
+  const element = node as ReactElement<{ children?: ReactNode; href?: string }>;
+  return [...(typeof element.props?.href === "string" ? [element.props.href] : []), ...linkHrefs(element.props?.children)];
+}
+function text(node: ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(text).join("");
+  return text((node as ReactElement<{ children?: ReactNode }>).props?.children);
+}
+
+describe("no-property panel links the Lodging page only to event administrators (#1735)", () => {
+  for (const page of pages.slice(0, 2)) {
+    it(`${page.name}: registrar sees plain text, event admin sees the link`, async () => {
+      noProperty.on = true;
+      mocks.permissions = ["MANAGE_REGISTRATION"];
+      const registrar = await page.render();
+      expect(linkHrefs(registrar)).toEqual([]);
+      expect(text(registrar)).toContain("Ask your event administrator to choose one first.");
+      mocks.permissions = ["MANAGE_REGISTRATION", "CONFIGURE_EVENT"];
+      expect(linkHrefs(await page.render())).toEqual(["/more/lodging?event=evt_1"]);
+    });
+  }
+});
 
 describe("back links only to pages the viewer may open (#1735)", () => {
   for (const page of pages) {

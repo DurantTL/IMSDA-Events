@@ -25,7 +25,7 @@ export default async function LodgingAssignmentsPage({ searchParams }: { searchP
     return (
       <section className="panel">
         <h2>{staffPageTitles.lodgingAssignments}</h2>
-        <p>This event has no lodging property yet. An event administrator chooses one on the <Link href={`/more/lodging?event=${encodeURIComponent(event.id)}`}>Lodging page</Link> first.</p>
+        <p>This event has no lodging property yet. {permissions.includes("CONFIGURE_EVENT") ? <>An event administrator chooses one on the <Link href={`/more/lodging?event=${encodeURIComponent(event.id)}`}>Lodging page</Link> first.</> : "Ask your event administrator to choose one first."}</p>
       </section>
     );
   }

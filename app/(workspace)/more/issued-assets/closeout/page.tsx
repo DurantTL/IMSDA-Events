@@ -24,6 +24,7 @@ export default async function IssuedAssetsCloseoutPage({ searchParams }: { searc
     eventId={event.id} eventName={event.name} report={report} staff={options.staff}
     canManageMoney={permissions.includes("MANAGE_FINANCE") || permissions.includes("CONFIGURE_EVENT")}
     canConfigure={permissions.includes("CONFIGURE_EVENT")}
+    canOpenDesk={permissions.includes("MANAGE_CHECK_IN")}
     canUpdateFacility={permissions.includes("MANAGE_CHECK_IN") || permissions.includes("CONFIGURE_EVENT")}
     />
   </>;

@@ -151,7 +151,7 @@ const report: CloseoutReport = {
   ],
 };
 const closeout = (flags: { canManageMoney: boolean; canConfigure: boolean }) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, {
-  eventId: "ev1", eventName: "Camp Meeting 2027", report, staff: [{ userId: "usr_1", name: "Synthetic Staff" }], canManageMoney: flags.canManageMoney, canConfigure: flags.canConfigure, canUpdateFacility: true,
+  eventId: "ev1", eventName: "Camp Meeting 2027", report, staff: [{ userId: "usr_1", name: "Synthetic Staff" }], canManageMoney: flags.canManageMoney, canConfigure: flags.canConfigure, canUpdateFacility: true, canOpenDesk: true,
 }));
 
 describe("closeout screen", () => {
@@ -163,6 +163,12 @@ describe("closeout screen", () => {
     expect(html).toContain("/check-in/assets?event=ev1&amp;attendee=att1");
     expect(html).toContain("past due");
     expect(html).toContain("does not charge, waive, refund or release anything by itself");
+  });
+
+  it("shows a holder as plain text when the viewer cannot open the issue desk (#1735)", () => {
+    const html = renderToStaticMarkup(createElement(AssetCloseoutWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", report, staff: [], canManageMoney: true, canConfigure: false, canUpdateFacility: false, canOpenDesk: false }));
+    expect(html).toContain("Pat Example");
+    expect(html).not.toContain("/check-in/assets");
   });
 
   it("reconciles issued against returned, lost and still out, in words", () => {
@@ -197,7 +203,7 @@ describe("closeout corrections", () => {
     exceptions: [{ code: "UNCHARGED_LOSS", label: "Lost or damaged, nothing charged, waived or kept", subject: "K-214 (Dorm room key)", detail: "Lost.", holderLabel: "Pat Example", amountCents: null, deskAttendeeId: "att1", refId: "l1" }],
   };
   const render = (canManageMoney: boolean) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, {
-    eventId: "ev1", eventName: "Camp Meeting 2027", report: withException, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true,
+    eventId: "ev1", eventName: "Camp Meeting 2027", report: withException, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true, canOpenDesk: true,
   }));
 
   it("offers a found key, a loss and a write-off to finance and administrators only", () => {
@@ -220,12 +226,12 @@ describe("closeout reviews", () => {
     ],
   };
   const render = (canManageMoney: boolean) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, {
-    eventId: "ev1", eventName: "Camp Meeting 2027", report: review, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true,
+    eventId: "ev1", eventName: "Camp Meeting 2027", report: review, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true, canOpenDesk: true,
   }));
 
   it("lists a key charge on a cancelled registration with a review form for finance only", () => {
     const cancelled: CloseoutReport = { ...report, exceptions: [{ code: "CHARGED_ON_CANCELLED_REGISTRATION", label: "Charged for a key or item, but the registration is no longer active and the charge is unpaid", subject: "L-11 (Lodge key)", detail: "Decide.", holderLabel: "Pat Example", amountCents: 400, deskAttendeeId: "att1", refId: "i1", triggerId: "c1" }] };
-    const html = (canManageMoney: boolean) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", report: cancelled, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true }));
+    const html = (canManageMoney: boolean) => renderToStaticMarkup(createElement(AssetCloseoutWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", report: cancelled, staff: [], canManageMoney, canConfigure: false, canUpdateFacility: true, canOpenDesk: true }));
     expect(html(true)).toContain("no longer active and the charge is unpaid");
     expect(html(true)).toContain("Reviewed, nothing more to do");
     expect(html(false)).not.toContain("Reviewed, nothing more to do");
@@ -233,7 +239,7 @@ describe("closeout reviews", () => {
 
   it("shows a deposit partly handed back, and what is still held", () => {
     const partly: CloseoutReport = { ...report, deposits: [{ ...report.deposits[0]!, state: "PARTLY_HANDED_BACK", refundCents: 600, keepCents: 400, lateHandedBackCents: 600, stillHeldCents: 400 }] };
-    const html = renderToStaticMarkup(createElement(AssetCloseoutWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", report: partly, staff: [], canManageMoney: true, canConfigure: false, canUpdateFacility: true }));
+    const html = renderToStaticMarkup(createElement(AssetCloseoutWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", report: partly, staff: [], canManageMoney: true, canConfigure: false, canUpdateFacility: true, canOpenDesk: true }));
     expect(html).toContain("Partly handed back");
     expect(html).toContain("$4.00 of that still held");
   });
