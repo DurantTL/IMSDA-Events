@@ -38,9 +38,9 @@ export function EventPointsByClub({ rows, clubYear }: { rows: readonly EventPoin
           <caption className="sr-only">Event points by club and event for {clubYear}</caption>
           <thead role="rowgroup">
             <tr role="row">
-              <SortableHeader active={sort.key === "club"} direction={sort.dir} label="Club" onSort={() => sort.toggle("club", "club" === "points" ? "desc" : "asc")} />
-              <SortableHeader active={sort.key === "event"} direction={sort.dir} label="Event" onSort={() => sort.toggle("event", "event" === "points" ? "desc" : "asc")} />
-              <SortableHeader active={sort.key === "points"} direction={sort.dir} label="Points" onSort={() => sort.toggle("points", "points" === "points" ? "desc" : "asc")} />
+              <SortableHeader active={sort.key === "club"} direction={sort.dir} label="Club" onSort={() => sort.toggle("club", "asc")} />
+              <SortableHeader active={sort.key === "event"} direction={sort.dir} label="Event" onSort={() => sort.toggle("event", "asc")} />
+              <SortableHeader active={sort.key === "points"} direction={sort.dir} label="Points" onSort={() => sort.toggle("points", "desc")} />
             </tr>
           </thead>
           <tbody role="rowgroup">

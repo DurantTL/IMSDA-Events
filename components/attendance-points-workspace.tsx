@@ -254,11 +254,11 @@ export function AttendancePointsWorkspace({ endpoint, initial }: { endpoint: str
                           <caption className="sr-only">Attendance points by club for {state.eventName}</caption>
                           <thead role="rowgroup">
                             <tr role="row">
-                              <SortableHeader active={sort.key === "club"} direction={sort.dir} label="Club" onSort={() => sort.toggle("club", "club" === "club" || "club" === "why" ? "asc" : "desc")} />
-                              <SortableHeader active={sort.key === "present"} direction={sort.dir} label="Present" onSort={() => sort.toggle("present", "present" === "club" || "present" === "why" ? "asc" : "desc")} />
-                              <SortableHeader active={sort.key === "counted"} direction={sort.dir} label="Counted" onSort={() => sort.toggle("counted", "counted" === "club" || "counted" === "why" ? "asc" : "desc")} />
-                              <SortableHeader active={sort.key === "points"} direction={sort.dir} label="Points" onSort={() => sort.toggle("points", "points" === "club" || "points" === "why" ? "asc" : "desc")} />
-                              <SortableHeader active={sort.key === "why"} direction={sort.dir} label="Why" onSort={() => sort.toggle("why", "why" === "club" || "why" === "why" ? "asc" : "desc")} />
+                              <SortableHeader active={sort.key === "club"} direction={sort.dir} label="Club" onSort={() => sort.toggle("club", "asc")} />
+                              <SortableHeader active={sort.key === "present"} direction={sort.dir} label="Present" onSort={() => sort.toggle("present", "desc")} />
+                              <SortableHeader active={sort.key === "counted"} direction={sort.dir} label="Counted" onSort={() => sort.toggle("counted", "desc")} />
+                              <SortableHeader active={sort.key === "points"} direction={sort.dir} label="Points" onSort={() => sort.toggle("points", "desc")} />
+                              <SortableHeader active={sort.key === "why"} direction={sort.dir} label="Why" onSort={() => sort.toggle("why", "asc")} />
                               {caps.canSeeNames && <th role="columnheader" scope="col"><span className="sr-only">Review</span></th>}
                             </tr>
                           </thead>
