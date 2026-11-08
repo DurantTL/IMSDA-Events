@@ -28,14 +28,13 @@ const LIST_LABELS: Record<ListColumn, { label: string; kind: SortKind }> = {
 export function OutingListTable({ outings, base }: { outings: OutingListRow[]; base: string }) {
   const sort = useAddressSort(LIST_COLUMNS, NO_LIST_SORT, undefined, "outings");
   const rows = sort.key ? sortRows(outings, sort.key, sort.dir, listAccessors) : outings;
-  const header = (column: ListColumn, label: string) => <SortableHeader active={sort.key === column} direction={sort.dir} label={label} onSort={() => sort.toggle(column)} />;
   return (
     <div className="report-table-wrap">
       {sort.key && <SortOrderNote>{sortOrderText(LIST_LABELS[sort.key].label, sort.dir, LIST_LABELS[sort.key].kind)}</SortOrderNote>}
       <table className="report-table table-cards" role="table">
         <caption className="sr-only">Outing permission slips</caption>
         <thead role="rowgroup">
-          <tr role="row">{header("activity", "Outing")}{header("date", "Date")}{header("signed", "Signed")}<th role="columnheader" scope="col">Not yet</th><th role="columnheader" scope="col">Link expired</th>{header("status", "Status")}<th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr>
+          <tr role="row"><SortableHeader active={sort.key === "activity"} direction={sort.dir} label="Outing" onSort={() => sort.toggle("activity")} /><SortableHeader active={sort.key === "date"} direction={sort.dir} label="Date" onSort={() => sort.toggle("date")} /><SortableHeader active={sort.key === "signed"} direction={sort.dir} label="Signed" onSort={() => sort.toggle("signed")} /><th role="columnheader" scope="col">Not yet</th><th role="columnheader" scope="col">Link expired</th><SortableHeader active={sort.key === "status"} direction={sort.dir} label="Status" onSort={() => sort.toggle("status")} /><th role="columnheader" scope="col"><span className="sr-only">Open</span></th></tr>
         </thead>
         <tbody role="rowgroup">
           {rows.map((row) => (
@@ -72,14 +71,13 @@ const TRACK_LABELS: Record<TrackColumn, { label: string; kind: SortKind }> = {
 export function OutingTrackingTable({ organizationId, outingId, members, base, open }: { organizationId: string; outingId: string; members: TrackRow[]; base: string; open: boolean }) {
   const sort = useAddressSort(TRACK_COLUMNS, NO_TRACK_SORT, undefined, "signing");
   const rows = sort.key ? sortRows(members, sort.key, sort.dir, trackAccessors) : members;
-  const header = (column: TrackColumn, label: string) => <SortableHeader active={sort.key === column} direction={sort.dir} label={label} onSort={() => sort.toggle(column)} />;
   return (
     <div className="report-table-wrap">
       {sort.key && <SortOrderNote>{sortOrderText(TRACK_LABELS[sort.key].label, sort.dir, TRACK_LABELS[sort.key].kind)}</SortOrderNote>}
       <table className="report-table table-cards" role="table">
         <caption className="sr-only">Who has signed this outing&apos;s permission slip</caption>
         <thead role="rowgroup">
-          <tr role="row">{header("name", "Member")}{header("state", "Slip")}{header("sent", "Sent")}{header("when", "Signed or expires")}<th role="columnheader" scope="col">Email</th><th role="columnheader" scope="col"><span className="sr-only">Actions</span></th></tr>
+          <tr role="row"><SortableHeader active={sort.key === "name"} direction={sort.dir} label="Member" onSort={() => sort.toggle("name")} /><SortableHeader active={sort.key === "state"} direction={sort.dir} label="Slip" onSort={() => sort.toggle("state")} /><SortableHeader active={sort.key === "sent"} direction={sort.dir} label="Sent" onSort={() => sort.toggle("sent")} /><SortableHeader active={sort.key === "when"} direction={sort.dir} label="Signed or expires" onSort={() => sort.toggle("when")} /><th role="columnheader" scope="col">Email</th><th role="columnheader" scope="col"><span className="sr-only">Actions</span></th></tr>
         </thead>
         <tbody role="rowgroup">
           {rows.map((row) => (

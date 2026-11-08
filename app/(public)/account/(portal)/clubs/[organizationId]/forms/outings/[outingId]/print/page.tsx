@@ -39,7 +39,7 @@ export default async function OutingPrintPage({ params }: { params: Promise<{ or
       <article className="club-form-sheet">
         <header className="club-form-sheet-header">
           <p className="public-registration-eyebrow">{`${access.club.name} · Club year ${tracking.clubYear}`}</p>
-          <h2 translate="no">{tracking.details.activity}: permission slips</h2>
+          <h2><span translate="no">{tracking.details.activity}</span>: permission slips</h2>
           <p className="club-form-sheet-meta">
             <span>{tracking.counts.SIGNED} signed</span>
             <span>{tracking.counts.NOT_YET} not yet</span>
