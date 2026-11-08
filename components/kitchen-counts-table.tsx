@@ -45,7 +45,7 @@ export function KitchenCountsTable({
       {report.rows.length === 0 ? (
         <p>No meal services have tickets or kitchen counts yet.</p>
       ) : (
-        <div className="report-table-wrap"><table role="table" className="report-table report-table-auto table-cards">
+        <div className="report-table-wrap"><table role="table" className="report-table report-table-auto table-cards table-cards-tablet">
           <caption className="sr-only">Ordered, served, prepared, wasted, donated and transferred meals, with variance, by service</caption>
           <thead role="rowgroup"><tr role="row">
             <th role="columnheader" scope="col">Service</th><th role="columnheader" scope="col">Ordered</th><th role="columnheader" scope="col">Served</th>
