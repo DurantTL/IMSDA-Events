@@ -12,6 +12,9 @@ import { searchPageHref } from "@/lib/search-page-href";
 import { serverSort, sortOrderText, sortRows, type SortKind, type SortValue } from "@/lib/list-sort";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { loadFormsHub } from "@/modules/forms-hub/load";
+import { listEventsForUser } from "@/modules/events/repository";
+import { buildFormCreateEvents } from "@/modules/forms-hub/create-choices";
+import { FormsCreateSection } from "@/components/forms-create/forms-create-section";
 import { filterFormsHubRows, type FormsHubRow, formsHubKindLabels, parseFormsHubFilters } from "@/modules/forms-hub/rows";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
@@ -52,6 +55,8 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   const one = (value: string | string[] | undefined) => (typeof value === "string" ? value : undefined);
   const filters = parseFormsHubFilters({ kind: one(params.kind), status: one(params.status), q: one(params.q) });
+  // The same events (archived left out) the workspace switcher lists; a system administrator sees all of them.
+  const eventOptions = buildFormCreateEvents(await listEventsForUser(user.id, true).then((events) => events.map(({ id, name }) => ({ id, name })), () => null));
   const all = await loadFormsHub();
   const filtered = filterFormsHubRows(all, filters);
   // The hub is loaded whole, so the whole filtered list is sorted before it is paged (#1458); the default is the hub's own order.
@@ -63,15 +68,16 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
   return (
     <section className="page-stack">
       <AdminSectionHeaderFor path="/admin/forms" section="system" />
-      <StaffPageHeader description="Club forms, general forms and every event's information forms in one place. Registration forms are built inside each event." />
+      <StaffPageHeader description="Club forms, general information forms and every event's information forms in one place. This list does not include registration forms: those are built inside each event." />
+      <FormsCreateSection events={eventOptions} />
       <section className="panel">
         <SearchAsYouTypeForm action="/admin/forms" className="club-form-filter forms-hub-filter">
           <label>Kind
             <select defaultValue={filters.kind ?? ""} name="kind">
               <option value="">All</option>
-              <option value="CLUB">Club</option>
-              <option value="GENERAL">General</option>
-              <option value="EVENT">Event</option>
+              <option value="CLUB">Club form</option>
+              <option value="GENERAL">General information form</option>
+              <option value="EVENT">Event information form</option>
             </select>
           </label>
           <label>Status
