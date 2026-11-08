@@ -321,7 +321,7 @@
   flex-direction: column;
   gap: 3px;
   border-radius: 10px;
-  color: #566a75;
+  color: var(--muted);
   padding: 4px 2px 2px;
   font-size: max(var(--type-floor, 0px), 0.75rem);
   font-weight: 700;
