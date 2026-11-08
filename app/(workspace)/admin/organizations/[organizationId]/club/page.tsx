@@ -108,12 +108,12 @@ export default async function StaffOpenClubPage({
         />
       </section>
 
+      <h2 className={styles.sectionHeading} id="club-year-overview-heading">Club year overview · {view.clubYear}</h2>
+
       <p className="inline-notice" role="status">
         <Eye aria-hidden="true" size={14} /> View only.{" "}
         Change club admins or the profile from the cards above, and file or correct reports from Monthly Records.
       </p>
-
-      <h2 className={styles.sectionHeading} id="club-year-overview-heading">Club year overview · {view.clubYear}</h2>
 
       <nav aria-label="Roster club year" className="intro-actions club-year-choice">
         {view.choices.map((year) => (
