@@ -119,11 +119,10 @@ describe("link-chip bars became one Tools menu without losing a destination", ()
     expect(source).toContain("tools={[");
   });
 
-  it("/more/reports folds its report links into Tools and its two downloads into Actions", () => {
+  it("/more/reports keeps its two downloads in Actions; the report links moved to the Printouts page and the Kitchen view (#1583)", () => {
     const source = read("app/(workspace)/more/reports/page.tsx");
-    for (const path of ["/more/reports/packets", "/more/reports/clubs", "/more/reports/clubs/check-in-book", "/more/honors/rosters", "/more/kitchen-report"]) {
-      expect(source, path).toContain(`\`${path}\${peopleQuery}\``);
-    }
+    expect(source).not.toContain("tools={[");
+    for (const path of ["/more/reports/packets", "/more/reports/clubs/check-in-book", "/more/honors/rosters"]) expect(source, path).not.toContain(path);
     for (const path of ["exports/meal-tickets", "exports/meal-ticket-summary"]) expect(source, path).toContain(path);
     expect(source).not.toContain("report-actions");
   });

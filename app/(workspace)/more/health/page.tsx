@@ -165,7 +165,7 @@ export default async function OperationalHealthPage({
         <div>
           <p className="eyebrow">Exceptions, not another inbox</p>
           <h2 className="duplicate-page-title">{staffPageTitles.operationalHealth}</h2>
-          <p>See what may need attention for {event.name}, then go straight to the workspace that can resolve it. This page never changes event data.</p>
+          <p>See what may need attention for {event.name}, then go straight to the workspace that can resolve it. This page never changes event data. It covers how the event&apos;s systems are running (payments, email, imports and capacity) and holds no one&apos;s health information.</p>
         </div>
         <div className={styles.introActions}>
           <Link className="secondary-button" href={refreshHref}>

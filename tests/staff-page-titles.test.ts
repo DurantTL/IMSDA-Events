@@ -58,6 +58,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/reports/clubs/check-in-book")).toBe("Check-in book");
     expect(staffSubpageTitle("/more/reports/clubs/packet/org_1")).toBe("Club packet");
     expect(staffSubpageTitle("/more/reports/packets")).toBe("Grouped event packets");
+    expect(staffSubpageTitle("/more/reports/printouts")).toBe("Printouts");
     expect(staffSubpageTitle("/more/clubs")).toBe("Clubs");
     expect(staffSubpageTitle("/more/clubs/org_1")).toBe("Club");
     expect(staffSubpageTitle("/more/clubs/reports")).toBe("Review monthly records");
@@ -122,7 +123,7 @@ describe("staff page names (#685)", () => {
       more: "more", eventModules: "more", eventFeatures: "more/features", honors: "more/honors", honorsRosters: "more/honors/rosters", honorsSchedule: "more/honors/schedule", honorsInstructors: "more/honors/instructors", promoCodes: "more/promo-codes",
       attendeeSetup: "more/attendee-configuration", tags: "more/tags", eventSettings: "more/event-settings",
       clubPacket: "more/reports/clubs/packet/[organizationId]", checkInBook: "more/reports/clubs/check-in-book",
-      clubReports: "more/reports/clubs", groupedPackets: "more/reports/packets", operationalReports: "more/reports",
+      clubReports: "more/reports/clubs", groupedPackets: "more/reports/packets", printouts: "more/reports/printouts", operationalReports: "more/reports",
       clubMonthlyReport: "more/clubs/reports/[organizationId]/[month]", clubMonthlyReports: "more/clubs/reports",
       clubs: "more/clubs", club: "more/clubs/[organizationId]", clubForm: "more/club-forms/[submissionId]",
       clubForms: "more/club-forms", eventHealth: "more/event-health", clubAssignments: "more/club-assignments", eventContent: "more/event-content",
