@@ -1165,6 +1165,60 @@ export async function checkClubFormLinkCreateRateLimit(
   ], configuration);
 }
 
+/** A club's own cap on outing permission slips a day (#1672): a roster-sized allowance, still bounded. */
+export const OUTING_SLIPS_PER_CLUB_DAY = 400;
+
+/**
+ * Sending an outing permission slip (#1672) to a roster's families is one action, not one per family. This charges the
+ * action itself: per client and per acting director an hour, and per club a day. The families are charged separately,
+ * by `checkClubFormOutingRecipientRateLimit`.
+ */
+export async function checkClubFormOutingSendRateLimit(request: Request, actorKey: string, organizationId: string) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const actor = hashRateLimitIdentifier("club-form-outing-actor", actorKey, configuration);
+  const club = hashRateLimitIdentifier("club-form-outing-club", organizationId, configuration);
+  return evaluate([
+    { policy: "club-form.outing-send.client", limit: 60, windowSeconds: oneHour, identifierHashes: [client] },
+    { policy: "club-form.outing-send.actor", limit: 40, windowSeconds: oneHour, identifierHashes: [actor] },
+    { policy: "club-form.outing-send.club", limit: 100, windowSeconds: oneDay, identifierHashes: [club] },
+  ], configuration);
+}
+
+export type ClubFormOutingRecipientLimit = { allowed: true } | { allowed: false; reason: "ADDRESS" | "CLUB_DAY" };
+
+/**
+ * One family's address in an outing send (#1672). A family is one address: it is charged once per send, however many
+ * children share it (`familySize` children get their links if it passes). The address is held to 3 sends an hour for the
+ * same outing, so a resend can't be used to mail a parent over and over, and to 12 an hour in all, across outings. Only an
+ * address that passes is charged against the club's daily allowance (one for each child), so a refused address never uses
+ * club budget. The addresses are guardians on this club's own roster, which is what makes the bigger allowance safe.
+ * Says which limit was hit.
+ */
+export async function checkClubFormOutingRecipientRateLimit(
+  organizationId: string,
+  outingId: string,
+  recipientEmail: string,
+  familySize = 1,
+): Promise<ClubFormOutingRecipientLimit> {
+  const configuration = getRateLimitConfiguration();
+  const club = hashRateLimitIdentifier("club-form-outing-club", organizationId, configuration);
+  const outing = hashRateLimitIdentifier("club-form-outing-id", outingId, configuration);
+  const recipient = hashRateLimitIdentifier("club-form-link-recipient", recipientEmail.trim().toLowerCase(), configuration);
+  const address = await evaluate([
+    { policy: "club-form.outing-recipient.address-outing", limit: 3, windowSeconds: oneHour, identifierHashes: [recipient, outing] },
+    { policy: "club-form.outing-recipient.address", limit: 12, windowSeconds: oneHour, identifierHashes: [recipient] },
+  ], configuration);
+  if (!address.allowed) return { allowed: false, reason: "ADDRESS" };
+  for (let child = 0; child < Math.max(1, familySize); child += 1) {
+    const day = await evaluate([
+      { policy: "club-form.outing-recipient.club-day", limit: OUTING_SLIPS_PER_CLUB_DAY, windowSeconds: oneDay, identifierHashes: [club] },
+    ], configuration);
+    if (!day.allowed) return { allowed: false, reason: "CLUB_DAY" };
+  }
+  return { allowed: true };
+}
+
 /**
  * Feature requests (#741): each one emails the conference office, so an event
  * admin may not send many. A few an hour per account is plenty for a real need.

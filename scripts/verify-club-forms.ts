@@ -30,7 +30,12 @@
  *   passenger list are plain (owner decision, 2026-11-07): the sync applies the
  *   new versions, `unsealEmergencyAnswers` (dry run, then execute, then again)
  *   moves existing answers out of the sealed value and keeps everything else
- *   sealed, and Area Coordinators, staff and the CSV read them.
+ *   sealed, and Area Coordinators, staff and the CSV read them;
+ * - outing permission slips (#1672): off until a system administrator turns the slip
+ *   on, refused birth-date and medical questions, a director's send to the chosen
+ *   family's own link (the migration's table and column on a real database), the
+ *   parent's read-only details and server-set answers, the club's questions in the
+ *   view an Area Coordinator opens, who has signed, and closing withdrawing links.
  *
  * Uses fictitious rows it creates and removes itself.
  *
@@ -86,12 +91,13 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest("hex
 async function cleanup() {
   const links = await prisma.clubFormLink.findMany({ where: { organizationId: { in: clubIds } }, select: { id: true, messageId: true } });
   const submissions = await prisma.clubFormSubmission.findMany({ where: { organizationId: { in: clubIds } }, select: { id: true } });
+  const outingRows = await prisma.clubFormOuting.findMany({ where: { organizationId: { in: clubIds } }, select: { id: true } });
   const applications = await prisma.clubFormSubmission.findMany({ where: { idempotencyKey: { startsWith: applicationKeyPrefix } }, select: { id: true } });
   const templates = await prisma.clubFormTemplate.findMany({ where: { OR: [{ key: { in: [...templateKeys, TLT_APPLICATION, CAN_COLLECTING] } }, { key: { startsWith: BUILDER_PREFIX } }] }, select: { id: true } });
   await prisma.auditLog.deleteMany({
     where: {
       OR: [
-        { entityId: { in: [...links, ...submissions, ...applications].map((row) => row.id) } },
+        { entityId: { in: [...links, ...submissions, ...applications, ...outingRows].map((row) => row.id) } },
         { actorUserId: { in: Object.values(users) } },
         { entityId: { in: templates.map((row) => row.id) }, entityType: "ClubFormTemplate", actorUserId: { in: Object.values(users) } },
       ],
@@ -100,6 +106,7 @@ async function cleanup() {
   await prisma.clubFormSubmission.deleteMany({ where: { OR: [{ organizationId: { in: clubIds } }, { idempotencyKey: { startsWith: applicationKeyPrefix } }] } });
   await prisma.clubFormOpenLinkYear.deleteMany({ where: { template: { key: TLT_APPLICATION } } });
   await prisma.clubFormLink.deleteMany({ where: { organizationId: { in: clubIds } } });
+  await prisma.clubFormOuting.deleteMany({ where: { organizationId: { in: clubIds } } });
   await prisma.messageOutbox.deleteMany({ where: { OR: [{ id: { in: links.flatMap((link) => (link.messageId ? [link.messageId] : [])) } }, { recipientEmail: { endsWith: `@${emailDomain}` } }] } });
   await prisma.rateLimitBucket.deleteMany({ where: { policy: { startsWith: "club-form." } } });
   // Templates made in the builder (#712) belong to this script: remove them with their versions.
@@ -1023,6 +1030,92 @@ async function main() {
 
     // Put the shared rows back as the sync leaves them.
     await prisma.clubFormTemplate.update({ where: { key: SLIP }, data: { customizedAt: null, sensitiveFieldKeys: slipSeed.sensitiveFieldKeys } });
+  }
+
+  // 12. Outing permission slips (#1672) --------------------------------------
+  {
+    const outings = await import("../modules/club-forms/outings");
+    const outingInput = {
+      details: { activity: "Verify canoe trip", startDate: "2026-11-21", endDate: "", departureTime: "08:30", returnTime: "16:45", transportation: "Church van", cost: "$15", whatToBring: "Lunch", note: "" },
+      questions: [
+        { label: "Can your child swim?", type: "YES_NO", required: true, options: [] },
+        { label: "T-shirt size", type: "CHOICE", required: false, options: ["Small", "Medium", "Large"] },
+      ],
+    };
+    await templates.setClubFormTemplateEnabled(SLIP, false, users.admin);
+    await expectCode(outings.createOuting(directorA, clubs.a, outingInput), "SLIP_TEMPLATE_OFF", "an outing can't be created while the slip is off");
+    assert((await outings.getOutingSlipAvailability()).enabled === false, "the director's page can tell the slip is off");
+    await templates.setClubFormTemplateEnabled(SLIP, true, users.admin);
+    await expectCode(outings.createOuting(directorA, clubs.a, { ...outingInput, questions: [{ label: "Child's birth date", type: "TEXT", required: false, options: [] }] }), "VALIDATION_FAILED", "a birth-date question is refused");
+    await expectCode(outings.createOuting(directorA, clubs.a, { ...outingInput, questions: [{ label: "Any medical conditions?", type: "YES_NO", required: false, options: [] }] }), "VALIDATION_FAILED", "a medical question is refused");
+    assert(await prisma.clubFormOuting.count({ where: { organizationId: clubs.a } }) === 0, "a refused outing writes nothing");
+
+    const created = await outings.createOuting(directorA, clubs.a, outingInput);
+    const outingRow = await prisma.clubFormOuting.findUniqueOrThrow({ where: { id: created.outingId } });
+    assert(outingRow.organizationId === clubs.a && outingRow.status === "OPEN" && outingRow.clubYear === clubYear, "the outing belongs to the club and year");
+    await expectCode(outings.createOuting(directorB, clubs.a, outingInput), "FORBIDDEN", "another club's director can't create one for this club");
+    await expectCode(outings.getOutingTracking(directorB, clubs.b, created.outingId), "OUTING_NOT_FOUND", "another club's outing id is not found");
+    for (const viewer of [area, sysAdmin, eventAdmin]) {
+      await expectCode(outings.getOutingTracking(viewer, clubs.a, created.outingId), "FORBIDDEN", "only the club's director and deputy manage an outing");
+      await expectCode(outings.sendOuting(viewer, clubs.a, created.outingId, { memberIds: [rileyRow.id] }), "FORBIDDEN", "only the club's director and deputy send an outing");
+    }
+
+    // A member with no parent email is reported, not sent; with one, the family gets its own link.
+    const none = await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id] });
+    assert(none.sent === 0 && none.results[0].outcome === "NO_PARENT_EMAIL", "a member with no parent email on the roster is skipped");
+    await prisma.clubRosterGuardian.create({ data: { rosterMemberId: rileyRow.id, position: 1, name: "Pat Verify", relationship: "Parent", email: `Outing.Parent@${emailDomain}` } });
+    const sent = await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id, otherClubRow.id] });
+    assert(sent.sent === 1 && sent.results.find((row) => row.memberId === otherClubRow.id)?.outcome === "NOT_FOUND", "the other club's member is not found");
+    const outingLink = await prisma.clubFormLink.findFirstOrThrow({ where: { outingId: created.outingId } });
+    assert(outingLink.organizationId === clubs.a && outingLink.rosterMemberId === rileyRow.id && outingLink.recipientEmail === `outing.parent@${emailDomain}`, "the link is the family's own, to the roster's parent email");
+    assert((await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id] })).results[0].outcome === "ALREADY_SENT", "a live link is not sent twice without Resend");
+    assert(!(await links.listClubFormLinks(directorA, clubs.a)).some((row) => row.id === outingLink.id), "an outing's links are not in the ordinary private links list");
+
+    const outingMessage = await prisma.messageOutbox.findUniqueOrThrow({ where: { id: outingLink.messageId! } });
+    assert(outingMessage.recipientEmail === `outing.parent@${emailDomain}` && outingMessage.bodyTextSnapshot.includes("Verify canoe trip"), "one email goes to the one family and names the outing");
+    const outingPrepared = await linkEmail.prepareClubFormLinkBodyForDelivery({ messageId: outingLink.messageId!, bodyText: outingMessage.bodyTextSnapshot, now });
+    const outingToken = /\/club-forms\/([A-Za-z0-9_-]+)/.exec(outingPrepared.bodyText)![1];
+
+    // The parent's page: the details are read-only text, the slip's own sections are untouched, the club's questions are asked.
+    const parentView = await links.resolveClubFormLinkForFill(outingToken);
+    assert(parentView.outing?.detailRows.some((row) => row.value === "Verify canoe trip") === true, "the parent sees the outing's details");
+    const parentKeys = parentView.form.definition.sections.flatMap((section) => section.fields.map((field) => field.key));
+    assert(!["activity", "activity_date", "ride_with"].some((key) => parentKeys.includes(key)), "the parent has no field to type the three details");
+    assert(parentKeys.includes("outing_q_1") && parentKeys.includes("outing_q_2") && parentKeys.includes("emergency_contact_phone") && parentKeys.includes("parent_signature"), "the club's questions and the slip's required fields are asked");
+    const parentAnswers: Record<string, unknown> = { ...slipAnswers };
+    for (const key of ["activity", "activity_date", "ride_with", "physician_name"]) delete parentAnswers[key];
+    await expectCode(links.submitClubFormViaLink(outingToken, { ...parentAnswers, emergency_contact_phone: "" }), "VALIDATION_FAILED", "the slip's required sections are still required");
+    await expectCode(links.submitClubFormViaLink(outingToken, { ...parentAnswers, outing_q_2: "Medium" }), "VALIDATION_FAILED", "the club's required question is still required");
+    await links.submitClubFormViaLink(outingToken, { ...parentAnswers, outing_q_1: "Yes", outing_q_2: "Medium", activity: "Something else", ride_with: "A stranger" });
+    const outingSubmission = await prisma.clubFormSubmission.findFirstOrThrow({ where: { linkId: outingLink.id } });
+    const storedAnswers = outingSubmission.answers as Record<string, unknown>;
+    assert(storedAnswers.activity === "Verify canoe trip" && storedAnswers.activity_date === "2026-11-21" && storedAnswers.ride_with === "Church van", "the three details are the outing's, not the parent's");
+    assert(storedAnswers.outing_q_1 === "Yes" && storedAnswers.outing_q_2 === "Medium", "the club's answers are kept");
+
+    // Who has signed, what an Area Coordinator and the director read, and resend after a signature.
+    const tracking = await outings.getOutingTracking(directorA, clubs.a, created.outingId);
+    assert(tracking.counts.SIGNED === 1 && tracking.members[0].state === "SIGNED" && tracking.members[0].submissionId === outingSubmission.id, "the tracking list shows the family as signed");
+    assert(!JSON.stringify(tracking).includes(emailDomain), "the tracking data holds no email address");
+    assert((await outings.sendOuting(directorA, clubs.a, created.outingId, { memberIds: [rileyRow.id], resend: true })).results[0].outcome === "ALREADY_SIGNED", "a signed family is never sent again");
+    const areaView = await submissions.getSubmissionForViewer(area, outingSubmission.id);
+    assert(areaView.template.definition.sections.some((section) => section.id === "sec_outing_questions") && areaView.answers.outing_q_1 === "Yes", "an Area Coordinator reads the signed slip with the club's questions");
+    assert((await outings.listOutings(directorA, clubs.a)).find((row) => row.id === created.outingId)?.counts.SIGNED === 1, "the Forms tab list counts the signed slip");
+
+    // Copy, then close: a close withdraws every link still open, and signed slips stay.
+    const copy = await outings.getOutingForCopy(directorA, clubs.a, created.outingId);
+    assert(copy.details.startDate === "" && copy.questions.length === 2, "a copy keeps the details and questions and leaves the dates empty");
+    const second = await outings.createOuting(directorA, clubs.a, { ...outingInput, details: { ...outingInput.details, activity: "Verify campout" } });
+    const secondSent = await outings.sendOuting(directorA, clubs.a, second.outingId, { memberIds: [rileyRow.id] });
+    assert(secondSent.sent === 1, "a second outing can be sent to the same member");
+    const secondLink = await prisma.clubFormLink.findFirstOrThrow({ where: { outingId: second.outingId } });
+    const secondMessage = await prisma.messageOutbox.findUniqueOrThrow({ where: { id: secondLink.messageId! } });
+    const secondPrepared = await linkEmail.prepareClubFormLinkBodyForDelivery({ messageId: secondLink.messageId!, bodyText: secondMessage.bodyTextSnapshot, now });
+    const secondToken = /\/club-forms\/([A-Za-z0-9_-]+)/.exec(secondPrepared.bodyText)![1];
+    assert((await outings.closeOuting(directorA, clubs.a, second.outingId)).closedLinks === 1, "closing withdraws the open link");
+    await expectCode(links.resolveClubFormLinkForFill(secondToken), "LINK_UNAVAILABLE", "a closed outing's link can't be opened");
+    await expectCode(links.submitClubFormViaLink(secondToken, { ...parentAnswers, outing_q_1: "Yes" }), "LINK_UNAVAILABLE", "a closed outing's link can't be submitted");
+    await expectCode(outings.sendOuting(directorA, clubs.a, second.outingId, { memberIds: [rileyRow.id] }), "OUTING_CLOSED", "a closed outing sends nothing");
+    assert(await prisma.clubFormSubmission.count({ where: { linkId: outingLink.id } }) === 1, "the signed slip stays after other outings close");
   }
 
   console.log("Club forms verification passed.");

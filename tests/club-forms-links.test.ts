@@ -513,7 +513,7 @@ describe("a club's own links (#610)", () => {
     ]);
     const rows = await listClubFormLinks(director, "club-a", now);
     expect(rows.map((row) => row.delivery)).toEqual(["QUEUED", "DELIVERED", "NOT_DELIVERED", "NOT_DELIVERED", "SENT"]);
-    expect(mocks.linkFindMany.mock.calls[0][0].where).toEqual({ organizationId: "club-a" });
+    expect(mocks.linkFindMany.mock.calls[0][0].where).toEqual({ organizationId: "club-a", outingId: null });
   });
 
   it("retires a link whose email finally failed, and leaves a used or withdrawn one alone", async () => {
