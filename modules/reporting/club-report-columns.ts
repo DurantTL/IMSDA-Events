@@ -141,7 +141,7 @@ export function isNamedForBaptism(person: { firstName: string; lastName: string 
   const first = normalizeName(person.firstName);
   const last = normalizeName(person.lastName);
   if (!first || !last) return false;
-  const direct = `${first} ${last}`;
+  const direct = formatPersonName({ firstName: first, lastName: last });
   const pieces = clubAnswer.split(/[,;\n\r]+/).map(normalizeName).filter(Boolean);
   if (pieces.some((piece) => piece === direct)) return true;
   return pieces.some((piece, index) => piece === last && pieces[index + 1] === first);

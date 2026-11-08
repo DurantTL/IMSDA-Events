@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { useConfirm } from "@/components/use-confirm";
+import { conferenceDateFormat } from "@/modules/calendar/conference-format";
 import { fileNameFromDisposition } from "@/components/export-link";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import styles from "@/components/club-report-column-builder.module.css";
@@ -229,7 +230,7 @@ export function ClubReportColumnBuilder({ endpoint, eventName, options, defaultK
           <p className={styles.groupTitle}>Preview{preview.totalRows > preview.rows.length ? ` (first ${preview.rows.length} of ${preview.totalRows})` : ` (${preview.totalRows})`}</p>
           {preview.rows.length === 0 ? <p className={styles.message}>No people are registered yet.</p> : (
             <div className={styles.previewWrap}>
-              <table className={styles.previewTable}>
+              <table className={`report-table ${styles.previewTable}`}>
                 <caption className="sr-only">Preview of the club report</caption>
                 <thead><tr>{preview.headers.map((header, index) => <th key={index} scope="col">{header}</th>)}</tr></thead>
                 <tbody>{preview.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>)}</tbody>
@@ -256,7 +257,7 @@ export function ClubReportColumnBuilder({ endpoint, eventName, options, defaultK
 /** Writes the print document with DOM calls only (text, never markup), so a name can't inject anything. */
 function writePrintWindow(target: Window, table: Table, perClub: boolean, eventName: string) {
   const doc = target.document;
-  const printedOn = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  const printedOn = conferenceDateFormat({ month: "long", day: "numeric", year: "numeric" }).format(new Date());
   const title = `${eventName} club report, ${printedOn}`;
   doc.title = title;
   const style = doc.createElement("style");
