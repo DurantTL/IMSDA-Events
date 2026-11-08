@@ -22,6 +22,8 @@ import { todayDateValue } from "@/modules/forms/definition";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { CLUB_FORM_LINK_TEMPLATE_KEY, clubFormLinkEmailContent } from "@/modules/club-forms/link-email";
 import { prepareFillerAnswers, sealFillerAnswers } from "@/modules/club-forms/public-fill";
+import { OUTING_PERMISSION_SECTION_ID, definitionForOutingFill, outingDateLabel, outingDetailRows, readStoredOuting } from "@/modules/club-forms/outing-domain";
+import { prepareOutingAnswers } from "@/modules/club-forms/outing-fill";
 import { assertClubFormTemplateCurrent } from "@/modules/club-forms/template-lock";
 import { assertAnswersSize, resolveRosterMemberName } from "@/modules/club-forms/submissions";
 import { getEnabledClubFormTemplate, withLiveDirectory } from "@/modules/club-forms/templates";
@@ -68,6 +70,8 @@ export type CreateClubFormLinkInput = {
   subjectName?: string;
   rosterMemberId?: string | null;
   expiresInDays?: number;
+  /** An outing permission slip's link (#1672): a director's own club only, and only while the outing is open. */
+  outingId?: string;
 };
 
 export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateClubFormLinkInput, now = new Date()) {
@@ -83,6 +87,21 @@ export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateC
   if (!club || club.type !== "CLUB" || !club.isActive) throw new ClubFormError("CLUB_NOT_FOUND", "That club could not be found.");
   const template = await getEnabledClubFormTemplate(input.templateKey, prisma);
   assertClubFormTemplateCurrent(template);
+  if (input.outingId && leader.kind !== "CLUB_LEADER") {
+    throw new ClubFormError("FORBIDDEN", "Only the club's director or deputy can send an outing permission slip.");
+  }
+  const outing = input.outingId
+    ? await prisma.clubFormOuting.findFirst({
+      where: { id: input.outingId, organizationId: input.organizationId },
+      select: { id: true, templateId: true, status: true, details: true, questions: true },
+    })
+    : null;
+  if (input.outingId) {
+    if (!outing || outing.templateId !== template.id) throw new ClubFormError("OUTING_NOT_FOUND", "That outing could not be found.");
+    if (outing.status !== "OPEN") throw new ClubFormError("OUTING_CLOSED", "This outing is closed, so slips can't be sent for it.");
+  }
+  const outingInput = outing ? readStoredOuting(outing) : null;
+  if (outing && !outingInput) throw new ClubFormError("OUTING_NOT_FOUND", "That outing could not be found.");
   const memberName = input.rosterMemberId
     ? await resolveRosterMemberName(prisma, input.organizationId, input.rosterMemberId)
     : "";
@@ -96,6 +115,7 @@ export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateC
     formName: template.name,
     days,
     expiresOn: formatInConferenceTime(expiresAt, { month: "long", day: "numeric", year: "numeric" }),
+    ...(outingInput ? { outing: { activity: outingInput.details.activity, dateLabel: outingDateLabel(outingInput.details) } } : {}),
   });
   const actor = leader.actor;
   const creator = actor.kind === "ATTENDEE"
@@ -114,6 +134,7 @@ export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateC
         expiresAt,
         ...creator,
         createdAs: leader.kind,
+        outingId: outing?.id ?? null,
       },
       select: { id: true },
     });
@@ -145,7 +166,7 @@ export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateC
       entityId: link.id,
       summary: "Sent a private link to fill in a club form.",
       // No address and no token: who sent it, for which club and form, and when it expires.
-      metadata: { ...who.metadata, organizationId: input.organizationId, templateKey: template.key, expiresAt: expiresAt.toISOString() },
+      metadata: { ...who.metadata, organizationId: input.organizationId, templateKey: template.key, expiresAt: expiresAt.toISOString(), ...(outing ? { outingId: outing.id } : {}) },
     }, tx);
     return { linkId: link.id, messageId: message.id, expiresAt };
   });
@@ -156,7 +177,8 @@ export async function listClubFormLinks(viewer: ClubFormsViewer, organizationId:
   leaderOnly(viewer, organizationId);
   const prisma = getPrisma();
   const links = await prisma.clubFormLink.findMany({
-    where: { organizationId },
+    // An outing's links are listed on the outing's own page (#1672).
+    where: { organizationId, outingId: null },
     orderBy: { createdAt: "desc" },
     take: 50,
     select: {
@@ -277,6 +299,8 @@ const linkSelect = {
   rosterMemberId: true,
   subjectName: true,
   clubYear: true,
+  outingId: true,
+  outing: { select: { status: true, details: true, questions: true } },
   organization: { select: { name: true, isActive: true, type: true } },
   template: {
     select: {
@@ -296,6 +320,7 @@ async function findUsableLink(token: string, now: Date) {
     || !link.template.enabled
     || !link.organization.isActive
     || link.organization.type !== "CLUB"
+    || (Boolean(link.outingId) && link.outing?.status !== "OPEN")
   ) {
     throw unavailable();
   }
@@ -310,7 +335,12 @@ export async function resolveClubFormLinkForFill(token: string, now = new Date()
   const link = await findUsableLink(token, now);
   const template = parseClubFormTemplate(link.template);
   assertClubFormTemplateCurrent(template);
-  const definition = await withLiveDirectory(definitionForLink(template));
+  const outing = link.outingId && link.outing ? readStoredOuting(link.outing) : null;
+  if (link.outingId && !outing) throw unavailable();
+  const linkDefinition = await withLiveDirectory(definitionForLink(template));
+  // An outing's slip: the permission section keeps its wording, the outing's details stand in for the three typed
+  // answers (read-only), and the club's questions come next. Every other section is the template's own.
+  const definition = outing ? definitionForOutingFill(linkDefinition, outing.questions, link.organization.name) : linkDefinition;
   const sectionIds = new Set(definition.sections.map((section) => section.id));
   return {
     clubName: link.organization.name,
@@ -322,6 +352,8 @@ export async function resolveClubFormLinkForFill(token: string, now = new Date()
       sectionNotes: Object.fromEntries(Object.entries(template.sectionNotes).filter(([id]) => sectionIds.has(id))),
       sensitiveFieldKeys: template.sensitiveFieldKeys,
     },
+    /** Read-only outing details for a parent (#1672); null on an ordinary link. */
+    outing: outing ? { detailRows: outingDetailRows(outing.details), sectionId: OUTING_PERMISSION_SECTION_ID } : null,
   };
 }
 
@@ -338,7 +370,11 @@ export async function submitClubFormViaLink(token: string, rawAnswers: Record<st
   const link = await findUsableLink(token, now);
   const template = parseClubFormTemplate(link.template);
   assertClubFormTemplateCurrent(template);
-  const answers = await prepareFillerAnswers(template, rawAnswers, now);
+  const outing = link.outingId && link.outing ? readStoredOuting(link.outing) : null;
+  if (link.outingId && !outing) throw unavailable();
+  const answers = outing
+    ? await prepareOutingAnswers(template, outing, link.organization.name, rawAnswers, now)
+    : await prepareFillerAnswers(template, rawAnswers, now);
   const submissionId = randomUUID();
   const tokenHash = hashOpaqueToken(token);
   // Read before the transaction opens (#1016): a read inside one would need a second pool connection.

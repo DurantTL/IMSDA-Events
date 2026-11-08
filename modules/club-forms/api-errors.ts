@@ -33,6 +33,9 @@ const statusByCode: Record<ClubFormError["code"], number> = {
   APPLICATION_OFF: 409,
   APPLICATION_CLOSED: 409,
   DRAFT_CHANGED: 409,
+  OUTING_NOT_FOUND: 404,
+  OUTING_CLOSED: 409,
+  SLIP_TEMPLATE_OFF: 409,
 };
 
 /**

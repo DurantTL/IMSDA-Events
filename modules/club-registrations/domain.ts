@@ -216,7 +216,7 @@ export function attendeeAgeKey(definition: RegistrationFormDefinition) {
   return attendeeFields(definition).find((field) => field.type === "NUMBER" && isAgeFieldKey(field.key))?.key ?? null;
 }
 
-const BIRTH_DATE_PATTERN = /birth|\bdob\b/i;
+export const BIRTH_DATE_PATTERN = /birth|\bdob\b/i;
 
 /** Fields that would copy a birth date into registration answers. Club registration refuses such forms. */
 export function birthDateFields(definition: RegistrationFormDefinition): RegistrationFormField[] {
@@ -236,7 +236,7 @@ const FREE_TEXT_FIELD_TYPES = new Set<RegistrationFormField["type"]>(["TEXT", "L
 const MEDICAL_FREE_TEXT_PATTERN =
   /\b(?:medic\w*|meds?|health|accessib\w*|disabil\w*|special\s*needs?|insur\w*)\b/i;
 
-function looksLikeMedicalFreeText(field: RegistrationFormField) {
+export function looksLikeMedicalFreeText(field: Pick<RegistrationFormField, "key" | "label">) {
   // Snake_case keys become words so `medical_info` matches as well as its label.
   return MEDICAL_FREE_TEXT_PATTERN.test(`${field.key.replaceAll("_", " ")} ${field.label}`);
 }

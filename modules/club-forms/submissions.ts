@@ -39,6 +39,7 @@ import { sendClubFormSubmittedAlert } from "@/modules/club-forms/submission-aler
 import { usableRosterMapping } from "@/modules/club-forms/roster-mapping";
 import { getClubFormTemplateAtVersion } from "@/modules/club-forms/versions";
 import { formatPersonName } from "@/lib/person-name";
+import { readStoredOuting, withOutingQuestions } from "@/modules/club-forms/outing-domain";
 
 /**
  * Club form submissions (#610). Every function takes a resolved viewer and
@@ -443,7 +444,7 @@ export async function getSubmissionForViewer(
       rosterAction: true,
       rosterActionMemberId: true,
       rosterActionMember: { select: { clubYear: true, status: true } },
-      link: { select: { createdAs: true, createdByAccount: { select: { displayName: true } }, createdByUser: { select: { displayName: true } } } },
+      link: { select: { createdAs: true, createdByAccount: { select: { displayName: true } }, createdByUser: { select: { displayName: true } }, outing: { select: { details: true, questions: true } } } },
       unlistedClubName: true,
       organization: { select: { name: true } },
       template: {
@@ -530,6 +531,9 @@ export async function getSubmissionForViewer(
       if (!offered.has(key)) delete answers[key];
     }
   }
+  // An outing permission slip (#1672) also shows the club's own questions, in their own section.
+  const outing = row.link?.outing ? readStoredOuting(row.link.outing) : null;
+  const shownDefinition = editingDraft ? fillDefinition(template) : template.definition;
   return {
     id: row.id,
     template: {
@@ -537,7 +541,7 @@ export async function getSubmissionForViewer(
       name: template.name,
       description: template.description,
       printLayout: template.printLayout,
-      definition: editingDraft ? fillDefinition(template) : template.definition,
+      definition: outing ? withOutingQuestions(shownDefinition, outing.questions, row.organization?.name ?? "") : shownDefinition,
       sectionNotes: template.sectionNotes,
       sensitiveFieldKeys: template.sensitiveFieldKeys,
       staffOnlyFieldKeys: template.staffOnlyFieldKeys,

@@ -33,6 +33,7 @@ const unsortedTables: Record<string, string> = {
   "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/schedule/page.tsx": "set order: schedule",
   "app/(public)/account/(portal)/clubs/[organizationId]/exports/class-tracking/page.tsx": "print sheet",
   "app/(public)/account/(portal)/clubs/[organizationId]/orders/print/page.tsx": "print sheet",
+  "app/(public)/account/(portal)/clubs/[organizationId]/forms/outings/[outingId]/print/page.tsx": "print sheet: who signed an outing slip",
   "app/(workspace)/more/reports/packets/page.tsx": "print sheet",
   "components/honors-print-report.tsx": "print sheet",
   "components/emergency-reference-sheet.tsx": "print sheet",

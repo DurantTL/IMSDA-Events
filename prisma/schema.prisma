@@ -2786,6 +2786,7 @@ model Organization {
   contacts                OrganizationContact[]
   billingResponsibilities RegistrationBillingResponsibility[]
   clubFormLinks       ClubFormLink[]
+  clubFormOutings     ClubFormOuting[]
   clubFormYearStarts  ClubFormYearStart[]
 
   @@index([type, isActive, name])
@@ -7487,6 +7488,7 @@ model ClubFormTemplate {
   enabledBy   User?                     @relation("ClubFormTemplateEnabledBy", fields: [enabledByUserId], references: [id], onDelete: SetNull)
   submissions ClubFormSubmission[]
   links       ClubFormLink[]
+  outings     ClubFormOuting[]
   versions    ClubFormTemplateVersion[]
   openLinkYears ClubFormOpenLinkYear[]
 }
@@ -7608,6 +7610,8 @@ model ClubFormLink {
   createdByUserId    String?
   /// Who sent it (#1221): CLUB_LEADER or AREA_COORDINATOR. Null on links made before.
   createdAs          String?
+  /// The outing permission slip this link belongs to (#1672); null for an ordinary link.
+  outingId           String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -7617,10 +7621,43 @@ model ClubFormLink {
   createdByAccount AttendeeAccount?    @relation("ClubFormLinkCreatedByAccount", fields: [createdByAccountId], references: [id], onDelete: SetNull)
   createdByUser    User?               @relation("ClubFormLinkCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
   submission       ClubFormSubmission?
+  outing           ClubFormOuting?     @relation(fields: [outingId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, status])
+  @@index([outingId])
   @@index([templateId, organizationId])
   @@index([status, expiresAt])
+}
+
+/// How an outing permission slip is doing (#1672): CLOSED stops its private links and new sends.
+enum ClubFormOutingStatus {
+  OPEN
+  CLOSED
+}
+
+/// One outing's permission slip (#1672): the details a club's director sets once (the conference Off-Premises
+/// Permission Slip's sections stay locked) and up to five club questions. Holds no answer and no personal data:
+/// `details` and `questions` are validated by `outing-domain.ts`. Private links point here through `ClubFormLink.outingId`.
+model ClubFormOuting {
+  id             String               @id @default(cuid())
+  organizationId String
+  templateId     String
+  clubYear       String
+  /// Copies of the activity and first date, for lists and ordering.
+  activity       String
+  startDate      String
+  details        Json
+  questions      Json                 @default("[]")
+  status         ClubFormOutingStatus @default(OPEN)
+  closedAt       DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  template     ClubFormTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  links        ClubFormLink[]
+
+  @@index([organizationId, clubYear, status])
 }
 
 /// A club's "Start the new year" on the Forms page (#1323): once a row exists for

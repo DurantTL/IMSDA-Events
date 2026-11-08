@@ -41,6 +41,8 @@ type Props = {
   initialAnswers?: Answers;
   /** Today in the conference zone (Chicago), from the server, so signing dates fill in the same day on both sides (#719). */
   todayDate?: string;
+  /** An outing permission slip's details (#1672), shown read-only inside the permission section. Never answers: the server sets them. */
+  outing?: { detailRows: Array<{ label: string; value: string }>; sectionId: string } | null;
   /** Public open application only (#1399): from `securityCheckConfigForPage()`; null while Turnstile is off. */
   securityCheck?: SecurityCheckConfig;
 } & (
@@ -346,12 +348,26 @@ export function ClubFormFillIn(props: Props) {
 
       {definition.sections.map((section) => {
         const fields = section.fields.filter((field) => isFieldVisible(field, answers));
-        if (fields.length === 0) return null;
+        const outingDetails = props.outing && props.outing.sectionId === section.id ? props.outing.detailRows : null;
+        if (fields.length === 0 && !outingDetails) return null;
         return (
           <fieldset className="public-manage-card form-stack" disabled={saving} key={section.id}>
             <ClubFormSectionTitle>{section.title}</ClubFormSectionTitle>
             {section.description && <p className="field-help">{section.description}</p>}
             {(sectionNotes[section.id] ?? []).map((note, index) => <p className="club-form-note" key={index}>{note}</p>)}
+            {outingDetails && (
+              <>
+                <p className="field-help">These details were set by the club. You don&apos;t need to type them.</p>
+                <dl className="club-form-answers" data-testid="outing-details">
+                  {outingDetails.map((row) => (
+                    <div key={row.label}>
+                      <dt>{row.label}</dt>
+                      <dd translate="no">{row.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </>
+            )}
             {fieldRuns(fields).map((run, runIndex) => {
               const inputs = run.fields.map((field) => (
                 <FieldInput

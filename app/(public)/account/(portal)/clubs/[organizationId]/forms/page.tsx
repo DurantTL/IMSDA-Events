@@ -8,12 +8,14 @@ import { GetFilterForm } from "@/components/get-filter-form";
 import { EmptyState } from "@/components/empty-state";
 import { ClubFormsStatus } from "@/components/club-forms-status";
 import { SendClubFormLink, StartClubFormsYearButton } from "@/components/club-forms-actions";
+import { ClubOutingsSection } from "@/components/club-outings-section";
 import { ClubFormLinksTable, CollapsibleList, FilledFormsList, PastYearsSection } from "@/components/club-forms-lists";
 import { getServerEnv } from "@/lib/env";
 import { groupClubFormsByFillMode, openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
 import { clubLeaderViewerFromAccess } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, isClubFormsRole } from "@/modules/club-forms/domain";
 import { listClubFormLinks } from "@/modules/club-forms/links";
+import { getOutingSlipAvailability, listOutings } from "@/modules/club-forms/outings";
 import { groupClubFormsByYear, showStartNewYear } from "@/modules/club-forms/past-years-domain";
 import { getClubFormsYearState } from "@/modules/club-forms/year-start";
 import { getRequiredFormsStatus } from "@/modules/club-forms/required";
@@ -52,13 +54,15 @@ export default async function ClubFormsPage({
   }
   const viewer = clubLeaderViewerFromAccess(access);
   const clubYear = clubYearFor(new Date());
-  const [templates, rosterMembers, allSubmissions, allLinks, requiredStatus, yearState] = await Promise.all([
+  const [templates, rosterMembers, allSubmissions, allLinks, requiredStatus, yearState, outings, slip] = await Promise.all([
     listEnabledClubFormTemplates(),
     listRosterChoices(organizationId),
     listSubmissionsForViewer(viewer, member ? { rosterMemberId: member } : {}),
     listClubFormLinks(viewer, organizationId),
     getRequiredFormsStatus(clubYear, [organizationId]),
     getClubFormsYearState(viewer, organizationId, clubYear),
+    listOutings(viewer, organizationId),
+    getOutingSlipAvailability(),
   ]);
   const { currentLinks: links, currentSubmissions: submissions, pastYears } = groupClubFormsByYear({
     links: allLinks,
@@ -157,6 +161,8 @@ export default async function ClubFormsPage({
       {templates.length === 0 ? (
         <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="club forms" id="forms-none" />
       ) : null}
+
+      <ClubOutingsSection base={base} outings={outings} slipEnabled={slip.enabled} />
 
       {(families.length > 0 || links.length > 0) && (
         <section aria-labelledby="club-forms-families" className="club-form-group">

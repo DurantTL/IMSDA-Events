@@ -24,7 +24,10 @@ export type ClubFormErrorCode =
   | "DUPLICATE_ON_ROSTER"
   | "APPLICATION_OFF"
   | "APPLICATION_CLOSED"
-  | "DRAFT_CHANGED";
+  | "DRAFT_CHANGED"
+  | "OUTING_NOT_FOUND"
+  | "OUTING_CLOSED"
+  | "SLIP_TEMPLATE_OFF";
 
 /** A club forms rule that stopped a request. Messages never carry an answer. */
 export class ClubFormError extends Error {
