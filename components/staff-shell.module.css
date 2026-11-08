@@ -291,7 +291,8 @@
   .topbar { flex-wrap: wrap; }
   .search { display: none; }
   .search[data-open="true"] { display: block; order: 10; flex: 1 1 100%; max-width: none; margin: 0 0 4px; }
-  .searchToggle { display: inline-flex; margin-left: auto; }
+  /* An icon button in the header row beside help, alerts and the account; the global phone rule makes .secondary-button full width, so the size is pinned here. */
+  .topbar .searchToggle { display: inline-flex; flex: none; width: 44px; margin-left: auto; }
   .topActions { margin-left: 0; }
   .rail { display: none; }
   .page { padding: 0 16px 35px; }
