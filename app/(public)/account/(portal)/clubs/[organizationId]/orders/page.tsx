@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ClubConferenceOrderSection } from "@/components/club-conference-order-section";
 import { ClubOrderWorkspace } from "@/components/club-order-workspace";
+import { loadClubConferenceOrders } from "@/modules/club-orders/conference-repository";
 import { listOrderableUnlinkedHonors, loadOrderWorkspace } from "@/modules/club-orders/repository";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { listClubStock } from "@/modules/club-supplies/repository";
@@ -12,7 +14,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * A club's Orders screen (#487, #497, #654): the order helper list (honors,
- * uniforms, other supplies) and the club's supplies on hand. Opens on the
+ * uniforms, other supplies) and the club's supplies on hand, then the conference order for
+ * patches and pins (#1688), which goes to the youth department and is billed to the church. Opens on the
  * roster's own gate: a director or deputy edits the list, records uniform
  * needs, hands out and records stock; a registrar views.
  */
@@ -36,6 +39,7 @@ export default async function ClubOrdersPage({ params }: { params: Promise<{ org
         printHref={`/account/clubs/${organizationId}/orders/print`}
         readOnly={!access.capabilities.manageTeam}
       />
+      <ClubConferenceOrderSection initial={await loadClubConferenceOrders(organizationId)} organizationId={organizationId} readOnly={!access.capabilities.manageTeam} />
     </>
   );
 }

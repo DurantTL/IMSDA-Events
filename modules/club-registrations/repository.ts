@@ -4,6 +4,7 @@ import { Prisma, RegistrationFormStatus } from "@prisma/client";
 import { closesRegistration, effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { assertTeachersMeetRule, ClubTeacherError } from "@/modules/club-teachers/repository";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 import { ageOn, clubYearFor } from "@/modules/club-rosters/domain";
 import {
@@ -19,7 +20,13 @@ import {
   type ClubRegistrationEditInput,
   formatCalendarDate,
   guestIdFromClientId,
+  guestAttendeeType,
   guestIsAdult,
+  guestIsChild,
+  guestOwnedRole,
+  CHILD_GUEST_TEAM_MESSAGE,
+  CHILD_GUEST_NO_ROLE_MESSAGE,
+  formOffersChildRole,
   attendeeAgeKey,
   guestsFromJson,
   rosterAgeSaveOffFromJson,
@@ -119,7 +126,8 @@ export class ClubRegistrationError extends Error {
       | "ATTENDEES_INVALID"
       | "TEAM_INVALID"
       | "TEAM_NAME_TAKEN"
-      | "CLASS_CHOICES_NOT_EDITABLE",
+      | "CLASS_CHOICES_NOT_EDITABLE"
+      | "TEACHERS_REQUIRED",
     message: string,
   ) {
     super(message);
@@ -949,6 +957,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
             temporary?: boolean;
             clubRosterMemberId?: string;
             clubGuestId?: string;
+            temporaryAttendeeType?: string;
             /** An extra person's optional link to a roster member (#931); nothing else about the registration changes with it. */
             linkedRosterMemberId?: string;
             teamRole?: string;
@@ -965,6 +974,8 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
             alternate: isAlternateAnswer(recordFromJson(formResponses)[ALTERNATE_FIELD_KEY]),
             permission: permissions.get(id) ?? null,
             temporary,
+            // A child who isn't a Pathfinder (#1666), added for the event only.
+            guestChild: temporary && snapshot.temporaryAttendeeType === "UNDERAGE",
             // For seeding a reopened edit (H3b, #366): which roster person
             // or extra person this attendee is. An extra person submitted
             // before guests carried an id is known by their attendee id,
@@ -1209,6 +1220,9 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
             "An extra person on this registration wasn't saved. Go back to Who's going, check the extra people, and try again.",
           );
         }
+        // A child who isn't a Pathfinder (#1666) is never added to a team: teams take team members and coaches only.
+        if (teamSettings && guestIsChild(guest)) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
+        if (guestIsChild(guest) && !formOffersChildRole(definition as RegistrationFormDefinition)) throw new PublicRegistrationError("CLUB_ATTENDEES_INVALID", CHILD_GUEST_NO_ROLE_MESSAGE);
         // An extra person's typed age is their age on the event's age date (#809).
         const role = teamRoleFor({ responses: attendee.responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: guest.age });
         resolved.set(attendee.clientId, {
@@ -1216,7 +1230,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           rosterMemberId: null,
           ageOnEventDate: guest.age,
           ...(teamSettings ? { teamRole: role } : {}),
-          guest: { email: guest.email, attendeeType: guestIsAdult(guest) ? "ADULT" : "YOUTH", guestId: guest.id },
+          guest: { email: guest.email, attendeeType: guestAttendeeType(guest), guestId: guest.id },
         });
         const person = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
         teamMemberPersons.push({ personId: null, name: formatPersonName(guest), onRoster: false });
@@ -1226,7 +1240,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
           alternate: isAlternateAnswer(attendee.responses[ALTERNATE_FIELD_KEY]),
           age: guest.age,
         });
-        return { ...attendee, responses: { ...attendee.responses, ...rosterOwnedResponses(definition as RegistrationFormDefinition, person) } };
+        return { ...attendee, responses: { ...attendee.responses, ...guestOwnedRole(definition as RegistrationFormDefinition, guest), ...rosterOwnedResponses(definition as RegistrationFormDefinition, person) } };
       }
       const memberId = rosterMemberIdFromClientId(attendee.clientId);
       const member = memberId ? byId.get(memberId) : undefined;
@@ -1306,6 +1320,13 @@ export async function submitClubRegistration(
   const event = await requireClubEvent(eventId);
   const form = await publishedClubForm(event.id);
   if (!form) throw new ClubRegistrationError("FORM_UNAVAILABLE", "The event has no published registration form yet.");
+  // Club teachers (#1681): only when the tool is on and its rule says to block. Every other club event skips this.
+  try {
+    await assertTeachersMeetRule(eventId, organizationId, input.attendees?.length ?? 0);
+  } catch (error) {
+    if (error instanceof ClubTeacherError && error.code === "TEACHERS_REQUIRED") throw new ClubRegistrationError("TEACHERS_REQUIRED", error.message);
+    throw error;
+  }
   // The team (#809): named when the event lets a club register several, and never otherwise.
   const teamSettings = await getTeamSettings(eventId);
   const team = resolveTeamName(teamSettings, options.teamName);
@@ -1642,10 +1663,15 @@ export async function amendClubRegistration(
     const current = currentByGuestId.get(guestId)!;
     const snapshot = recordFromJson(current.profileSnapshot);
     const clientId = clubGuestClientId(guestId);
-    const responses = withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses));
-    assertSeminarPicksUnchanged(current, responses);
-    if (betweenLevelsOnly) assertBetweenLevelsAnswers(recordFromJson(current.formResponses), responses);
     const ageOnEventDate = typeof snapshot.ageOnEventDate === "number" ? snapshot.ageOnEventDate : null;
+    // A child who isn't a Pathfinder keeps the Child role, whatever the client sent (#1666).
+    const childRole = snapshot.temporaryAttendeeType === "UNDERAGE" ? guestOwnedRole(definition, { age: ageOnEventDate ?? 0, guestType: "UNDERAGE" }) : {};
+    const responses = {
+      ...withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses)),
+      ...childRole,
+    };
+    assertSeminarPicksUnchanged(current, responses);
+    if (betweenLevelsOnly) assertBetweenLevelsAnswers(recordFromJson(current.formResponses), responses, Object.keys(childRole));
     amendmentAttendees.push({ attendeeId: current.id, clientId, responses });
     const guestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: ageOnEventDate });
     serverOptions.set(clientId, {
@@ -1655,7 +1681,7 @@ export async function amendClubRegistration(
         clubOrganizationId: organizationId,
         ageOnEventDate,
         temporary: true,
-        temporaryAttendeeType: snapshot.temporaryAttendeeType === "YOUTH" || snapshot.temporaryAttendeeType === "ADULT"
+        temporaryAttendeeType: snapshot.temporaryAttendeeType === "YOUTH" || snapshot.temporaryAttendeeType === "ADULT" || snapshot.temporaryAttendeeType === "UNDERAGE"
           ? snapshot.temporaryAttendeeType
           : ageOnEventDate !== null && !guestIsAdult({ age: ageOnEventDate }) ? "YOUTH" : "ADULT",
         clubGuestId: guestId,
@@ -1677,11 +1703,15 @@ export async function amendClubRegistration(
   for (const guest of input.newGuests) {
     const person: RosterPerson = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
     const clientId = clubGuestClientId(guest.id);
+    if (teamSettings && guestIsChild(guest)) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
+    if (guestIsChild(guest) && !formOffersChildRole(definition)) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_NO_ROLE_MESSAGE);
+    const ownedRole = guestOwnedRole(definition, guest);
     const responses = {
       ...(input.attendeeResponses[clientId] ?? {}),
+      ...ownedRole,
       ...rosterOwnedResponses(definition, person),
     };
-    if (betweenLevelsOnly) assertBetweenLevelsAnswers(null, responses, Object.keys(rosterOwnedResponses(definition, person)));
+    if (betweenLevelsOnly) assertBetweenLevelsAnswers(null, responses, [...Object.keys(ownedRole), ...Object.keys(rosterOwnedResponses(definition, person))]);
     amendmentAttendees.push({ attendeeId: null, clientId, responses });
     const newGuestRole = teamRoleFor({ responses, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: guest.age });
     serverOptions.set(clientId, {
@@ -1690,7 +1720,7 @@ export async function amendClubRegistration(
         clubOrganizationId: organizationId,
         ageOnEventDate: guest.age,
         temporary: true,
-        temporaryAttendeeType: guestIsAdult(guest) ? "ADULT" : "YOUTH",
+        temporaryAttendeeType: guestAttendeeType(guest),
         clubGuestId: guest.id,
         ...(teamSettings ? { teamRole: newGuestRole } : {}),
       },

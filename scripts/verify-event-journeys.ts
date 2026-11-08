@@ -998,6 +998,12 @@ async function sortAttendees(page: J.Page, column: string, label: string, direct
       await page.waitForURL((url: URL) => url.searchParams.get("dir") === "desc", { timeout: 15_000 });
     }
   } else {
+    // The phone Sort by choice submits through the client filter form, so it does nothing until React has hydrated that
+    // select: on a slow runner `settle` (which samples the top of the page) can return first and the change is lost.
+    await page.waitForFunction(() => {
+      const select = document.querySelector('select[name="sort"]');
+      return Boolean(select) && Object.keys(select!).some((key) => key.startsWith("__reactProps$"));
+    }, undefined, { timeout: 20_000 });
     await page.getByLabel("Sort by").selectOption({ label });
     await page.getByLabel("Direction").selectOption(direction);
     await page.waitForURL((url: URL) => url.searchParams.get("sort") === column && (url.searchParams.get("dir") ?? "asc") === direction, { timeout: 15_000 });

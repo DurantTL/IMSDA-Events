@@ -17,7 +17,8 @@ export class ClubsAdministratorError extends Error {
  * grants or revokes. One row per staff user, kept after a revoke for the record;
  * a later grant clears the revoke. The change and its audit entry (who, when) are
  * written in one transaction, and the role is read from this table on every
- * request, so a revoke takes effect on the next one. Nothing is written, or
+ * request, so a revoke takes effect on the next one. A grant ends the person's open sessions (see below), so their next
+ * sign-in goes through two-step enrolment; a revoke needs no such step, since the role is read on every request. Nothing is written, or
  * audited, when the role is already in the wanted state.
  */
 export async function setClubsAdministrator(userId: string, on: boolean, actorUserId: string, now = new Date()): Promise<{ changed: boolean }> {
@@ -43,6 +44,12 @@ export async function applyClubsAdministrator(
       create: { userId, grantedByUserId: actorUserId, grantedAt: now },
       update: { revokedAt: null, revokedByUserId: null, grantedByUserId: actorUserId, grantedAt: now },
     });
+    // The role now needs two-step sign-in (decision Nov 6, 2026, modules/access/mfa-rules.ts). A password-only
+    // session that predates the grant must not carry it, so it ends here, the same way a system administrator
+    // grant does; the next sign-in enrols. Your own sessions are kept (a system administrator already has two-step).
+    if (userId !== actorUserId) {
+      await tx.userSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
+    }
   } else {
     await tx.clubsAdministratorGrant.update({
       where: { userId },

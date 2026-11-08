@@ -8,6 +8,7 @@ import { wouldRemoveLastActiveEventAdmin } from "@/modules/access/membership-rul
 import { hashPassword } from "@/modules/access/passwords";
 import { createOpaqueToken } from "@/modules/access/tokens";
 import { rolePermissions } from "@/modules/access/permissions";
+import { clubEventIdsAdministeredAsClubsAdministrator, clubsAdministratorPermissions } from "@/modules/access/club-event-access";
 import { stripHealthAccess } from "@/modules/coordinator-health/membership-grants";
 import { stripInvoiceFinalizationAccess } from "@/modules/invoices/finalize-access";
 
@@ -44,16 +45,22 @@ export async function listActiveEventPermissionsForUser(
       permissions: true,
     },
   });
-  return new Map(memberships.map((membership) => [
+  const byEvent = new Map(memberships.map((membership) => [
     membership.eventId,
     [...new Set([
       ...rolePermissions[membership.role],
       ...membership.permissions,
     ])] as EventPermission[],
   ]));
+  // An active Clubs Administrator holds the EVENT_ADMIN set on every club event (#1643), on top of any real membership's extra grants.
+  for (const eventId of await clubEventIdsAdministeredAsClubsAdministrator(userId, eventIds)) {
+    const real = memberships.find((membership) => membership.eventId === eventId);
+    byEvent.set(eventId, clubsAdministratorPermissions(real?.permissions) as EventPermission[]);
+  }
+  return byEvent;
 }
 
-/** Each event's role for this user, where they have one (#428: club oversight is EVENT_ADMIN only). */
+/** Each event's role for this user, where they have one (#428: club oversight is EVENT_ADMIN only), including a Clubs Administrator's on club events. */
 export async function listActiveEventRolesForUser(
   userId: string,
   eventIds: readonly string[],
@@ -67,7 +74,10 @@ export async function listActiveEventRolesForUser(
     },
     select: { eventId: true, role: true },
   });
-  return new Map(memberships.map((membership) => [membership.eventId, membership.role]));
+  const byEvent = new Map(memberships.map((membership) => [membership.eventId, membership.role]));
+  // An active Clubs Administrator is the event administrator of every club event (#1643).
+  for (const eventId of await clubEventIdsAdministeredAsClubsAdministrator(userId, eventIds)) byEvent.set(eventId, "EVENT_ADMIN");
+  return byEvent;
 }
 
 export async function listStaffMemberships(eventId: string) {

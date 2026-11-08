@@ -18,6 +18,7 @@
  *    Sterling Volunteers state of a roster person (Clear, Not in compliance, No record): they describe a person, not a
  *    record. The coordinator's gap flags ("No director", "No roster yet", "Missing 1 earlier month", "Late 2
  *    records") are L4 "Missing"/"Late" flags too. Event availability ("Open", "Registration closed", ...) and a form's "Done" are not record statuses either.
+ *    Info labels (money, account type, publishing, system health with its color; see `infoLabelKind`) are accepted too.
  *    A chip's detail after " · " ("Draft saved · 2 chosen") is ignored; its first words are the word. Anything else is
  *    reported as a failure naming the word.
  *  - B13 looks for clock times ("3:15 PM"): each must sit next to a Central label (CT, CDT, CST: the site prints the short
@@ -57,6 +58,64 @@ const L4_FLAGS = ["Missing", "Late", "To review", "No director", "No roster yet"
  */
 const AVAILABILITY_WORDS = ["Open", "Closed", "Registration opens soon", "Registration closed", "Not open for clubs yet", "Done"];
 const NOT_A_RECORD_STATUS = [...Object.values(clubDirectorRoleLabels), "Clear", "Not in compliance", "No record", "No record yet", "Your club", "View only"];
+
+/**
+ * B12 info labels (Caleb, Nov 7, 2026): chips that say something other than the state of a record. Allowed next to the
+ * status words, but only in exactly these shapes and this casing, so a stray word still fails.
+ *  - money: "$350 due", "Paid in full", "No charge";
+ *  - account type: "Staff login", "Website account", "Two-step on", "Two-step not set up";
+ *  - publishing: "Published", "Published Nov 6, 2026, 3:36 PM CST" (optionally "Published by <name> <that date>"),
+ *    "Draft", "Active", "Inactive", "No unpublished changes";
+ *  - system health: exactly "OK" (green), "Check soon" (amber, the gold chip), "Needs attention" (red, the coral chip),
+ *    in that order of severity;
+ *  - neutral reading labels (grey, never OK): "Unavailable", "Count only", "Not run yet";
+ *  - progress: "N of M ticked";
+ *  - tallies of the above: "N OK", "N check soon", "N need attention", "N unavailable", "N count only".
+ * A detail after " · " is checked part by part: each part must be one of these labels or a count like "2 chosen".
+ */
+export const HEALTH_LABELS = [
+  { word: "OK", color: "green" },
+  { word: "Check soon", color: "gold" },
+  { word: "Needs attention", color: "coral" },
+] as const;
+const MONEY_LABELS = [/^\$[\d,]+(\.\d{2})? due$/, /^Paid in full$/, /^No charge$/];
+const ACCOUNT_LABELS = ["Staff login", "Website account", "Two-step on", "Two-step not set up"];
+const PUBLISHED_AT = /^Published( by [^·]+?)? [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2} [AP]M C[SD]T$/;
+const PUBLISHING_LABELS = [/^Published$/, PUBLISHED_AT, /^Draft$/, /^Active$/, /^Inactive$/, /^No unpublished changes$/];
+const READING_WORDS = ["Unavailable", "Count only", "Not run yet"];
+const PROGRESS_LABEL = /^\d+ of \d+ ticked$/;
+const COUNT_DETAIL = /^\d+ [a-z]+$/;
+
+type InfoKind = "money" | "account" | "publishing" | "health" | "reading" | "progress";
+
+function infoKindOfPart(part: string): InfoKind | null {
+  if (MONEY_LABELS.some((pattern) => pattern.test(part))) return "money";
+  if (ACCOUNT_LABELS.includes(part)) return "account";
+  if (PUBLISHING_LABELS.some((pattern) => pattern.test(part))) return "publishing";
+  if (HEALTH_LABELS.some((label) => label.word === part) || /^\d+ (OK|check soon|need attention)$/.test(part)) return "health";
+  if (READING_WORDS.includes(part) || /^\d+ (unavailable|count only)$/.test(part)) return "reading";
+  if (PROGRESS_LABEL.test(part)) return "progress";
+  return null;
+}
+
+/** The family of an info label, or null when the chip is not one. Every part after " · " must itself be an info label or a count. */
+export function infoLabelKind(chip: string): InfoKind | null {
+  const [first, ...rest] = chip.split(" · ").map((part) => part.trim());
+  const kind = infoKindOfPart(first!);
+  if (!kind) return null;
+  return rest.every((part) => infoKindOfPart(part) !== null || COUNT_DETAIL.test(part)) ? kind : null;
+}
+
+/** The color a health or reading chip must have (green, gold = amber, coral = red, neutral = grey), or null for any other chip. */
+export function requiredHealthColor(chip: string): string | null {
+  const word = chip.split(" · ")[0]!.trim().replace(/^\d+ /, "");
+  const found = HEALTH_LABELS.find((label) => label.word === word);
+  if (found) return found.color;
+  if (word === "need attention") return "coral";
+  if (word === "check soon") return "gold";
+  if (word === "unavailable" || word === "count only" || READING_WORDS.includes(word)) return "neutral";
+  return null;
+}
 
 export const clean = (text: string) => text.replace(/\[es\]\s*/g, "").replace(/\s+/g, " ").trim();
 
@@ -140,6 +199,8 @@ const bodyText = (page: Page) => async () => (await page.evaluate(() => document
 
 type Scan = {
   chips: string[];
+  /** The color class (green, gold, coral, neutral, or none) of each chip, in the same order as `chips`. */
+  chipColors: string[];
   badTimes: string[];
   times: number;
   tables: number;
@@ -155,7 +216,9 @@ async function scanPage(page: Page): Promise<Scan> {
       return box.width > 0 && box.height > 0 && style.visibility !== "hidden" && style.display !== "none";
     };
     const squash = (text: string) => text.replace(/\[es\]\s*/g, "").replace(/\s+/g, " ").trim();
-    const chips = [...document.querySelectorAll(".status-chip")].filter(visible).map((chip) => squash(chip.textContent ?? ""));
+    const chipElements = [...document.querySelectorAll(".status-chip")].filter(visible);
+    const chips = chipElements.map((chip) => squash(chip.textContent ?? ""));
+    const chipColors = chipElements.map((chip) => ["green", "gold", "coral", "neutral"].find((color) => chip.classList.contains(color)) ?? "none");
 
     const timePattern = /\b(1[0-2]|0?[1-9]):[0-5]\d\s?(am|pm)\b/i;
     const badTimes: string[] = [];
@@ -206,7 +269,7 @@ async function scanPage(page: Page): Promise<Scan> {
       }
       notSet.push({ text: own.slice(0, 100), fixLinks: fixLinks.slice(0, 3), asksWho: whoPattern.test(squash(container.textContent ?? "")) });
     }
-    return { chips, badTimes, times, tables: tables.length, wideTables, notSet };
+    return { chips, chipColors, badTimes, times, tables: tables.length, wideTables, notSet };
   });
 }
 
@@ -222,9 +285,16 @@ export async function checkPage(page: Page, rec: Recorder, name: string, options
     const wordOf = (chip: string) => chip.split(" · ")[0]!.trim().toLowerCase();
     // "Missing 1 earlier month" and "Late 2 records" are the L4 flags with a count.
     const flagged = (word: string) => /^(missing|late) /.test(word);
-    const bad = [...new Set(scan.chips.filter((chip) => !accepted.includes(wordOf(chip)) && !flagged(wordOf(chip)) && !APPROVED_STATUS_WORDS.some((word) => wordOf(chip).startsWith(`${word.toLowerCase()} `))))];
+    // Info labels (money, account type, publishing, system health) are allowed in their own shapes; a health word must
+    // also carry its color.
+    const wrongColor = scan.chips.flatMap((chip, index) => {
+      const required = requiredHealthColor(chip);
+      return required && scan.chipColors[index] !== required ? [`${chip} (should be ${required})`] : [];
+    });
+    const bad = [...new Set(scan.chips.filter((chip) => !accepted.includes(wordOf(chip)) && infoLabelKind(chip) === null && !flagged(wordOf(chip)) && !APPROVED_STATUS_WORDS.some((word) => wordOf(chip).startsWith(`${word.toLowerCase()} `))))];
     const words = [...new Set(scan.chips)].join(", ");
-    if (bad.length === 0) rec.record(name, "B12", "status chip words", "pass", `chips: ${words}`);
+    if (bad.length === 0 && wrongColor.length > 0) rec.record(name, "B12", "status chip words", "fail", `health chip with the wrong color: ${[...new Set(wrongColor)].map((entry) => `"${entry}"`).join(", ")} (all chips: ${words})`);
+    else if (bad.length === 0) rec.record(name, "B12", "status chip words", "pass", `chips: ${words}`);
     else rec.record(name, "B12", "status chip words", "fail", `chip word(s) outside the approved list: ${bad.map((word) => `"${word}"`).join(", ")} (all chips: ${words})`);
   }
 

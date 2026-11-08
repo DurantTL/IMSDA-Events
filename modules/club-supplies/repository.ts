@@ -14,11 +14,13 @@ import {
  * Club supply catalog storage (#531): the conference-wide `ClubSupplyItem`
  * table (honors and master awards included), the `Honor` catalog fields the
  * import also sets, and each club's stock on hand. The catalog changes only
- * through the staff CSV import and the staff active toggle; nothing here is
- * seeded into production.
+ * through the staff CSV import, the staff active toggle and (for who supplies
+ * an item and its price, #1688) the staff ordering editor; nothing here is
+ * seeded into production except the three conference-supplied items, which
+ * `npm run conference-supplies:sync` adds when they are missing.
  */
 
-export type ClubSupplyErrorCode = "ITEM_NOT_FOUND" | "PREVIEW_CHANGED" | "CATALOG_CONFLICT";
+export type ClubSupplyErrorCode = "ITEM_NOT_FOUND" | "PREVIEW_CHANGED" | "CATALOG_CONFLICT" | "INVALID_PRICE";
 
 export class ClubSupplyError extends Error {
   constructor(public readonly code: ClubSupplyErrorCode, message: string) {
@@ -46,6 +48,8 @@ const itemSelect = {
   sizeLabel: true,
   isActive: true,
   honorId: true,
+  supplier: true,
+  unitPriceCents: true,
   honor: { select: { code: true } },
 } satisfies Prisma.ClubSupplyItemSelect;
 
@@ -59,6 +63,10 @@ function serializeItem(item: Prisma.ClubSupplyItemGetPayload<{ select: typeof it
     isActive: item.isActive,
     honorId: item.honorId,
     honorCode: item.honor?.code ?? null,
+    /** Who supplies it (#1688): AdventSource items go on the AdventSource order list, conference items are ordered from the youth department. */
+    supplier: item.supplier,
+    /** The conference's price per unit in cents; set only on a conference-supplied item. */
+    unitPriceCents: item.unitPriceCents,
   };
 }
 
@@ -170,6 +178,35 @@ export async function setClubSupplyItemActive(itemId: string, isActive: boolean,
   return listClubSupplyItems();
 }
 
+export type ClubSupplyOrderingInput = { supplier: "ADVENTSOURCE" | "CONFERENCE"; unitPriceCents: number | null };
+
+/**
+ * Staff set who supplies a catalog item and, for the conference, its unit price (#1688). A conference item needs a price (a
+ * human decision, never defaulted); an AdventSource item has none. A price change never alters an order already submitted:
+ * those lines keep the price they were submitted with. Audited with the before and after values.
+ */
+export async function setClubSupplyItemOrdering(itemId: string, input: ClubSupplyOrderingInput, actorUserId: string) {
+  const unitPriceCents = input.supplier === "CONFERENCE" ? input.unitPriceCents : null;
+  if (input.supplier === "CONFERENCE" && (unitPriceCents === null || !Number.isInteger(unitPriceCents) || unitPriceCents < 0)) {
+    throw new ClubSupplyError("INVALID_PRICE", "Enter a price in dollars and cents for a conference-supplied item.");
+  }
+  await getPrisma().$transaction(async (tx) => {
+    const item = await tx.clubSupplyItem.findUnique({ where: { id: itemId }, select: { id: true, supplier: true, unitPriceCents: true } });
+    if (!item) throw new ClubSupplyError("ITEM_NOT_FOUND", "That catalog item could not be found.");
+    if (item.supplier === input.supplier && item.unitPriceCents === unitPriceCents) return;
+    await tx.clubSupplyItem.update({ where: { id: itemId }, data: { supplier: input.supplier, unitPriceCents } });
+    await writeAuditLog({
+      actorUserId,
+      action: "CLUB_SUPPLY_ITEM_ORDERING_UPDATED",
+      entityType: "ClubSupplyItem",
+      entityId: itemId,
+      summary: input.supplier === "CONFERENCE" ? "Set a club supply item as conference-supplied with a unit price." : "Set a club supply item as supplied by AdventSource.",
+      metadata: { previousSupplier: item.supplier, previousUnitPriceCents: item.unitPriceCents, supplier: input.supplier, unitPriceCents },
+    }, tx);
+  });
+  return listClubSupplyItems();
+}
+
 export type ClubSupplyStockActor = { accountId: string } | { userId: string; actAsId: string };
 
 export type ClubStockRow = {
@@ -179,6 +216,8 @@ export type ClubStockRow = {
   catalogNumber: string | null;
   sizeLabel: string | null;
   isActive: boolean;
+  /** Conference-supplied items (#1688) are not on the AdventSource list, so the order list's picker leaves them out. */
+  supplier?: "ADVENTSOURCE" | "CONFERENCE";
   quantityOnHand: number;
   /** The honor this patch is linked to, so the order list's picker can search by honor name (#1324). */
   honorName?: string | null;
@@ -192,7 +231,7 @@ export async function listClubStock(organizationId: string): Promise<ClubStockRo
   const [items, stock] = await Promise.all([
     getPrisma().clubSupplyItem.findMany({
       where: { OR: [{ isActive: true }, { stock: { some: { organizationId, quantityOnHand: { gt: 0 } } } }] },
-      select: { id: true, section: true, name: true, catalogNumber: true, sizeLabel: true, isActive: true, honor: { select: { name: true } } },
+      select: { id: true, section: true, name: true, catalogNumber: true, sizeLabel: true, isActive: true, supplier: true, honor: { select: { name: true } } },
       orderBy: [{ section: "asc" }, { name: "asc" }],
     }),
     getPrisma().clubSupplyStock.findMany({ where: { organizationId }, select: { itemId: true, quantityOnHand: true } }),
@@ -205,6 +244,7 @@ export async function listClubStock(organizationId: string): Promise<ClubStockRo
     catalogNumber: item.catalogNumber,
     sizeLabel: item.sizeLabel,
     isActive: item.isActive,
+    supplier: item.supplier,
     quantityOnHand: quantities.get(item.id) ?? 0,
     honorName: item.honor?.name ?? null,
   }));

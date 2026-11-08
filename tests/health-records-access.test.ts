@@ -167,6 +167,14 @@ describe("health access: Area Coordinator", () => {
     await expect(requireAreaCoordinatorHealthViewer(now)).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
+  it("refuses a Clubs Administrator's Area Coordinator act-as as not found: only a real coordinator account counts (2026-11-06)", async () => {
+    state.acting.mockResolvedValue({ role: "AREA_COORDINATOR", organizationId: null, viaClubsAdministrator: true });
+    state.attendee.mockResolvedValue({ via: "staff", sessionId: null });
+    state.coordinator.mockResolvedValue(null);
+    await expect(requireAreaCoordinatorHealthViewer(now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(state.sessionFind).not.toHaveBeenCalled();
+  });
+
   it("is not found when the feature is off, before the coordinator is looked up", async () => {
     state.enabled = false;
     await expect(requireAreaCoordinatorHealthViewer(now)).rejects.toMatchObject({ code: "NOT_FOUND" });

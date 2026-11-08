@@ -1,5 +1,5 @@
 {
-  "_comment": "Frozen from modules/forms/definition.ts as it stood before #153 moved the Women's Retreat, Camp Meeting and Spring Camporee forms to prisma/seed-data/form-templates. sha256 is of the template (key, name, description, audience, definition) as JSON with object keys sorted and undefined dropped. Order is the order of the old formTemplates array.",
+  "_comment": "Frozen from modules/forms/definition.ts as it stood before #153 moved the Women's Retreat, Camp Meeting and Spring Camporee forms to prisma/seed-data/form-templates. sha256 is of the template (key, name, description, audience, definition) as JSON with object keys sorted and undefined dropped. Order is the order of the old formTemplates array. Leadership Weekend and TLT Retreat were re-pinned for the food allergy and diet questions (#1665).",
   "templates": [
     {
       "key": "simple_rsvp",
@@ -57,15 +57,15 @@
     },
     {
       "key": "leadership_weekend",
-      "sha256": "9d3bcb4e5d6ce5eef153185c4687600a4f2c2df190045b636653dd0c2db4454c",
+      "sha256": "33a5dc7f5d64b25cea96b2be813aaf61c5c723a317bdad42aec66b100418188c",
       "sections": 4,
-      "fields": 20
+      "fields": 21
     },
     {
       "key": "tlt_retreat",
-      "sha256": "5335a94045615582f4e2610dc753919f88333937d36665518f833472325f5a98",
+      "sha256": "118701a3fbf2df863ceb54d4bbfbd061fb711b6833ec6d3c71055f7598b562e6",
       "sections": 4,
-      "fields": 13
+      "fields": 14
     },
     {
       "key": "outdoor_school",

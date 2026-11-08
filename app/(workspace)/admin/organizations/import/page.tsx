@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Import organizations" };
 export default async function EadventistImportPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   return (
     <>
       <AdminSectionHeaderFor path="/admin/organizations/import" section="system" />

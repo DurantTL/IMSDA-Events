@@ -15,7 +15,7 @@ export default async function CopyFromPastEventPage() {
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=event-setup");
 
   // Newest first: the year you are most likely to copy is the last one.
-  const events = (await listEventsForUser(user.id, true, { archived: "include" })).slice().reverse();
+  const events = (await listEventsForUser(user.id, true, { archived: "include" })).filter((event) => !event.isBillingContainer).reverse();
   const sources = events.map((event) => ({
     id: event.id,
     name: event.archivedAt ? `${event.name} (archived)` : event.name,

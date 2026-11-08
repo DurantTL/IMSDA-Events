@@ -25,13 +25,15 @@ themselves. Every form is off until a system administrator turns it on.
 - `submissions.ts`: fill in for a member, list, and open one submission (the
   audited read).
 - `links.ts`, `link-email.ts`: private links and their email.
+- `outing-domain.ts`, `outing-fill.ts`, `outings.ts`: outing permission slips (#1672, below).
 - `access.ts`: turns a session into a viewer (club leader, Area Coordinator,
   conference staff).
-- `csv.ts`: the staff CSV, non-sensitive columns only.
+- `csv.ts`: the staff CSV. Sensitive columns are absent; plain answers, including the emergency and physician/clinic ones, are in it.
+- `plain-emergency.ts`, `unseal-emergency.ts`: the 2026-11-07 decision (fixed key list) and the human-run script that moves existing answers out of the sealed value.
 
 ## Who sees what
 
-| Viewer | Fill in / send link | Submitted forms | Health, conduct, physician, emergency answers | Birth dates |
+| Viewer | Fill in / send link | Submitted forms | Health and conduct answers (sealed) | Birth dates |
 | --- | --- | --- | --- | --- |
 | Director or deputy (or a system administrator acting as the director) of the club | yes | own club, including drafts | shown | shown |
 | Registrar, reporter | no | no | no | no |
@@ -39,6 +41,17 @@ themselves. Every form is off until a system administrator turns it on.
 | Area Coordinator (or admin acting as one) | send a link for any club (#1221; narrow in `viewerCanSendLinkForClub` once #843 assigns areas), not fill in | every club, submitted only | `Restricted` | `Restricted` |
 | Event Admin of a current event | no | every club, submitted only | shown | `Restricted` |
 | System administrator | no (unless acting as a director) | every club, submitted only | shown | shown |
+
+**Emergency contact and physician/clinic answers are not in that column.** On
+the Off-Premises Permission Slip (`physician_name`, `physician_phone`,
+`clinic_name`, `clinic_phone`, `emergency_contact_phone`) and the Transportation
+Passenger List (`passenger_N_emergency_contact`) they are plain answers, by
+Caleb's decision of 2026-11-07 (ADR 0005 Addendum G): directors carry the paper
+forms, and the system copy is a backup that must stay reachable in an emergency.
+Everyone who can see one of those submissions sees them, Area Coordinators
+included, and they are in the CSV. The code that allows this is
+`plain-emergency.ts`; every other field that would stop being sensitive is still
+refused.
 
 **Conference staff** is only system administrators and users with an ACTIVE
 `EVENT_ADMIN` membership on an event that has not ended (`hasEventEnded`; the
@@ -112,6 +125,14 @@ steps.
 - **Gender:** both seeded forms (version 3) ask a required Male/Female question
   that maps to the roster's gender. Older submissions without it still work; the
   director picks it on the review screen.
+- **Grade, school type and church membership (#1664, #1668):** the Membership
+  Application (version 4) maps its required Grade (5th to 12th) to the roster's
+  grade, and two new optional questions, School type and "Is the Pathfinder a
+  member of the Seventh-day Adventist church?", to the roster's school type and
+  church membership. They are pre-filled on the review screen for the director
+  to check; "Link to existing member" copies nothing. A copy of the form edited in
+  the app keeps its own questions and mapping until an administrator adds them.
+  A staff mapping cannot name these three fields.
 - **Not mapped:** the roster has no address or member-contact field, so the
   applicant's address and own phone or email are not copied. The Membership
   Application's phone pre-fills the first guardian's phone.
@@ -141,7 +162,30 @@ same transaction as the template update, moving the answer into each
 submission's sealed value. It needs `SECRET_ENCRYPTION_KEY`, and it fails (and
 changes nothing) if it cannot re-seal. A version that would make a sensitive
 field **stop** being sensitive is refused outright; that needs a reviewed,
-hand-written change; so is a birth-date field that stops being one. Changing only
+hand-written change; so is a birth-date field that stops being one. The one
+reviewed change so far is Caleb's of 2026-11-07: the emergency contact and
+physician/clinic keys of the Off-Premises Permission Slip and the Transportation
+Passenger List (`plain-emergency.ts`, a fixed list, not a setting). The sync
+applies it to the template (and to a copy edited in the app that kept the key);
+existing answers are then moved out of each sealed value by the human-run
+`npm run club-forms:unseal-emergency` (dry run by default; idempotent; audit rows
+hold counts and the acting user's id only).
+
+**Runbook, after the deploy that carries this change:**
+
+1. `npm run club-forms:sync` (the deploy entrypoint already runs it).
+2. `npm run club-forms:unseal-emergency` (dry run: takes no lock, changes
+   nothing, prints counts and any `NOT_SYNCED` / `FAILED` template).
+3. `npm run club-forms:unseal-emergency -- --execute --actor <your account email>`
+   (the actor is required and is recorded on the audit row).
+4. Run step 3 again to confirm it moves 0.
+
+Until step 3 has run, an old submission's emergency answers are still inside its
+sealed value: viewers who may open sealed answers see them, and everyone else
+sees `Restricted` for them rather than a blank. The builder does not offer to
+make these keys sensitive again, and a draft or a copy edited in the app that
+still lists them has them removed (the sync does it for stored drafts; save and
+publish do it too). Changing only
 the birth-date class needs no re-seal, since both classes are sealed.
 
 The re-seal runs in the **sync step**, `npm run club-forms:sync`, which
@@ -286,3 +330,47 @@ link. The page reads each template's key and `enabled` flag only.
   Off says "Not available yet."; staff can close the link per club year (`ClubFormOpenLinkYear`).
 - A "Not listed" submission has a null `organizationId`: only conference staff can list or open it, and it can't be
   added to a roster. Every permission rule in `domain.ts` takes `string | null` so null never matches a club viewer.
+
+## Outing permission slips (#1672)
+
+A club's director or deputy sets up the conference's Off-Premises Permission Slip
+(`off_premises_permission_slip`) for **one outing**, sends it to the families going and
+sees who has signed. Pages: the Forms tab section "Outing permission slips", `/forms/outings/new`
+(also `?copy=<outing>`: details and questions come across, dates are left empty),
+`/forms/outings/<id>` (details, send, who has signed, resend, close, copy) and
+`/forms/outings/<id>/print`. API: `app/api/attendee/clubs/[organizationId]/forms/outings/**`
+(create, `send` (also resend), `close`), each behind the cross-origin check and
+`requireClubLeaderViewer`.
+
+- **Storage.** `ClubFormOuting` (club, template, club year, `details`, `questions`, OPEN or CLOSED)
+  and `ClubFormLink.outingId`. An outing holds no answer and no personal data. The slip template is
+  not changed: no version bump, no re-seal. If a system administrator has not turned the slip on,
+  the director sees a plain message (`SLIP_TEMPLATE_OFF`) and cannot create an outing.
+- **Locked sections.** The child and family, permission statement, medical and emergency and
+  signature sections are the template's own and are never altered. On an outing link the permission
+  section keeps its title and wording but its three typed fields (`activity`, `activity_date`,
+  `ride_with`) are replaced by the outing's details, shown read-only under the template's own labels for those three fields (read from the definition, never hard-coded); the server sets those three
+  answers from the outing (`prepareOutingAnswers`) and ignores anything the parent sends for them,
+  then validates the whole slip, so every required section stays required. The date answer is the
+  first date; times, cost, what to bring and the note are shown, not stored as answers.
+- **Club questions.** Up to 5, each short text, yes/no or a choice (2 to 8 choices), optionally
+  required, asked in their own section after the permission section (`outing_q_1` ...). They are never
+  sensitive. A question is refused (create fails with `question:N`) when its wording or any choice reads
+  as a birth date or age, or as medical, health, dietary or insurance (the #408 `looksLikeMedicalFreeText`
+  words plus more, for every type, `outingQuestionProblem`). Medical and emergency answers keep
+  today's handling (ADR 0005 Addendum G); the club cannot add a sensitive field.
+- **Sending.** The director picks youth members (YOUTH, UNDERAGE) of this club's current year. Each
+  gets one link by the existing `createClubFormLink` flow (one email, one recipient: the member's first
+  guardian with an email on the roster), so tokens, expiry (1 to 30 days), outbox delivery, withdrawal on
+  failure and the per-recipient rate limit are unchanged. Members with no parent email, who already signed
+  or already have a live link are skipped and reported by name, never by address. Resend withdraws
+  a still-open link and sends a new one; a signed member is never resent. At most 100 members per send. A resend (and any send) locks the member's roster row and withdraws that member's open links in the same transaction that makes the new one, so a double click leaves one live link. Rate limits are an outing's own (`checkClubFormOutingSendRateLimit`: 40 send actions an hour per director, 100 a day per club; `checkClubFormOutingRecipientRateLimit`: a family (one address) is charged once per send however many children share it, 3 sends an hour per address per outing and 12 an hour per address in all, then, only if the address passed, the club's 400 slips a day, one per child), not the one-at-a-time limits of a typed link; the director is told which limit was hit.
+- **Tracking.** Each member shows Signed, Not yet or Link expired (a withdrawn or undelivered link counts
+  as expired), with the email delivery status and a link to the signed slip. The page and print view hold
+  no answers and no email addresses. Closing an outing withdraws every open link; signed slips stay.
+- **Who sees what.** Creating, sending, tracking, copying and closing are the club's director and
+  deputy (or an administrator acting as the director) only: Area Coordinators, conference staff and other clubs are refused
+  (another club's outing id is "not found"). A signed slip is an ordinary submission, so the table above applies unchanged
+  (Area Coordinators: submitted only, sealed answers `Restricted`); the club's questions and answers show in
+  its own section (`withOutingQuestions`). Outing links are not listed under "Private links you sent".
+- **Not included:** the club's questions are not columns in the staff CSV (it follows the template).

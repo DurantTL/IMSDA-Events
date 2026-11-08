@@ -273,6 +273,12 @@
   text-decoration: underline;
 }
 
+.guideLink {
+  min-height: 44px;
+  width: fit-content;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
 .noFix {
   color: var(--muted);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);

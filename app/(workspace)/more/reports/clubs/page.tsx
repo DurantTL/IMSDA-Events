@@ -9,6 +9,10 @@ import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
 import { getClubEventReports } from "@/modules/reporting/club-event-reports-repository";
 import { resolveClubReportsAccess } from "@/modules/reporting/club-reports-access";
+import { ClubReportColumnBuilder } from "@/components/club-report-column-builder";
+import { canViewDietaryDetails } from "@/modules/registrations/attendee-listing";
+import { CLUB_REPORT_COLUMNS, DEFAULT_CLUB_REPORT_COLUMNS, clubReportColumnKeysFor, type ClubReportViewer } from "@/modules/reporting/club-report-columns";
+import { listClubReportLayouts } from "@/modules/reporting/club-report-export";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { cardCell } from "@/components/table-card-labels";
 import { ColumnHeader } from "@/components/column-header";
@@ -30,7 +34,7 @@ export default async function ClubEventReportsPage({
 }) {
   const query = await searchParams;
   const { event: requested, location: requestedLocation } = query;
-  const { event, allowed, readOnly } = await resolveClubReportsAccess(requested);
+  const { event, allowed, readOnly, permissions } = await resolveClubReportsAccess(requested);
   if (!allowed) {
     return (
       <AccessRestricted
@@ -41,6 +45,9 @@ export default async function ClubEventReportsPage({
     );
   }
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
+  // The column chooser offers only what this person may see; the server checks every request again (#1671).
+  const reportViewer: ClubReportViewer = { kind: "staff", canViewDietaryDetails: canViewDietaryDetails({ permissions, clubEvent: true }) };
+  const columnLayouts = await listClubReportLayouts(event.id, reportViewer);
   // Each location on its own, or all of them combined with the location named (#413).
   const { locations, locationId } = await resolveLocationFilter(event.id, requestedLocation);
   const reports = await getClubEventReports(event.id, { locationId });
@@ -110,6 +117,23 @@ export default async function ClubEventReportsPage({
         <ShieldCheck aria-hidden="true" size={19} />
         <p><strong>No birth dates or protected free text.</strong> Only submitted and confirmed club registrations count. Waitlisted and cancelled clubs are excluded.</p>
       </div>
+
+      <section className="panel report-panel" id="club-report-columns">
+        <div className="section-heading report-section-heading">
+          <div className="report-title">
+            <div><p className="eyebrow">Your own list</p><h2>Attendee report</h2><p>One row per person. Pick only the columns you need, then print or download.</p></div>
+          </div>
+        </div>
+        <ClubReportColumnBuilder
+          defaultKeys={[...DEFAULT_CLUB_REPORT_COLUMNS]}
+          canSaveLayouts={!readOnly}
+          endpoint={`/api/events/${encodeURIComponent(event.id)}/club-reports/columns`}
+          eventName={event.name}
+          initialLayouts={columnLayouts}
+          locationId={locationId}
+          options={clubReportColumnKeysFor(reportViewer).map((key) => ({ key, header: CLUB_REPORT_COLUMNS[key].header }))}
+        />
+      </section>
 
       <section className="panel report-panel" id="club-camping">
         <div className="section-heading report-section-heading">

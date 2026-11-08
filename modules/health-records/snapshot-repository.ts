@@ -192,7 +192,8 @@ export async function sealStartedEventSnapshots(now = new Date(), limit = 500, o
   const pageSize = Math.max(1, options.pageSize ?? SWEEP_PAGE_SIZE);
   const prisma = getPrisma();
   const events = await prisma.event.findMany({
-    where: { startsAt: { lte: now, gt: new Date(now.getTime() - HEALTH_SNAPSHOT_START_CATCH_UP_DAYS * DAY_MS) } },
+    // Not the hidden billing events for conference club orders (#1688): they have no registrations.
+    where: { isBillingContainer: false, startsAt: { lte: now, gt: new Date(now.getTime() - HEALTH_SNAPSHOT_START_CATCH_UP_DAYS * DAY_MS) } },
     select: { id: true },
     orderBy: { id: "asc" },
   });

@@ -6,6 +6,7 @@ import { ClubTransfersPanel, RequestTransferButton } from "@/components/club-tra
 import { clubPortalComplianceStatuses } from "@/modules/background-checks/repository";
 import { COMPLIANCE_FILTER_VALUES, type ComplianceFilterValue } from "@/modules/background-checks/domain";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
+import { rosterSchoolDetailsVisible } from "@/modules/club-rosters/school-details-access";
 import { registrationReturnTo } from "@/modules/club-registrations/roster-return";
 import { getCarryForwardOffer } from "@/modules/club-rosters/carry-forward";
 import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
@@ -45,8 +46,11 @@ export default async function ClubRosterPage({
   // Status only, never the note, and only for a director or deputy: this is the club's own page (#427).
   // Transfers (#489) are the same leader-only capability that manages the club's team.
   const canTransfer = access.capabilities.manageTeam && !readOnly;
+  // School type and church membership (#1668): not for a Clubs Administrator acting as director.
+  const schoolDetails = rosterSchoolDetailsVisible(access);
   const [members, complianceStatuses, clubOptions, guardians] = await Promise.all([
-    listRoster(organizationId, clubYear),
+    // School type and church membership (#1668): this is the club's own roster (director, deputy, registrar).
+    listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: schoolDetails }),
     clubPortalComplianceStatuses(organizationId, clubYear, access.capabilities),
     canTransfer ? listTransferClubOptions(organizationId) : Promise.resolve([]),
     // Guardian contacts (#510): the club's director and deputy only, and only on the current and next year, where they can be edited (#959).
@@ -117,6 +121,7 @@ export default async function ClubRosterPage({
         organizationId={organizationId}
         readOnly={readOnly}
         sectionsStartClosed={rosterSectionsStartClosed(access.club.role)}
+        schoolDetails={schoolDetails}
       />
       {canTransfer && <ClubTransfersPanel organizationId={organizationId} />}
     </>

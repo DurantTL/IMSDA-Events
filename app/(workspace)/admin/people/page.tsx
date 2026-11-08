@@ -63,15 +63,15 @@ export default async function PeopleAccessPage({
           <>
             <InvitePerson clubOptions={clubOptions} eventOptions={eventOptions} scope={viewer.scope} />
             {full ? <AreaCoordinatorImport pendingCount={waitingAreaInvites} /> : null}
-            {viewer.scope === "full" ? (
-              <ActAsButton
-                access="View only"
-                endpoint="/api/admin/act-as/area-coordinator"
-                label="Act as Area Coordinator (2 hours)"
-                resultAction="Open the Area Coordinator portal"
-                role="Area Coordinator"
-              />
-            ) : null}
+            {/* Both scopes (system administrator "full", Clubs Administrator "clubs") match the start route's `requireClubsAdministration` (Caleb, 2026-11-06). */}
+            <ActAsButton
+              access="View only"
+              endpoint="/api/admin/act-as/area-coordinator"
+              label="Act as Area Coordinator (2 hours)"
+              origin="people"
+              resultAction="Open the Area Coordinator portal"
+              role="Area Coordinator"
+            />
           </>
         )}
       />

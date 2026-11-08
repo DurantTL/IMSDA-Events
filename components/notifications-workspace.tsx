@@ -16,6 +16,7 @@ type Addresses = {
   supportContact: string | null;
   securityAlertEmail: string | null;
   newClubApplicationEmail: string | null;
+  conferenceOrdersEmail: string | null;
 };
 
 type AddressDraft = { [K in keyof Addresses]: string };
@@ -25,6 +26,7 @@ function draftFrom(addresses: Addresses): AddressDraft {
     supportContact: addresses.supportContact ?? "",
     securityAlertEmail: addresses.securityAlertEmail ?? "",
     newClubApplicationEmail: addresses.newClubApplicationEmail ?? "",
+    conferenceOrdersEmail: addresses.conferenceOrdersEmail ?? "",
   };
 }
 
@@ -37,7 +39,7 @@ async function readMessage(response: Response) {
 
 /**
  * System management > Notifications (#1016): every automatic staff alert with
- * its recipients and an on/off switch, plus the three platform addresses the
+ * its recipients and an on/off switch, plus the four platform addresses the
  * alerts use. The server checks the system administrator role on every request;
  * nothing here is the protection. Turning the sign-in lockout alert off asks
  * first, and the server asks again (it refuses without `confirmed`).
@@ -66,7 +68,7 @@ export function NotificationsWorkspace({
   const [addressError, setAddressError] = useState("");
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftFrom(addresses));
-  // Unsaved work: the three platform addresses differ from the saved ones, until saved. The on/off switches save instantly (#1468).
+  // Unsaved work: the four platform addresses differ from the saved ones, until saved. The on/off switches save instantly (#1468).
   useUnsavedChangesGuard(dirty);
   const isOn = (key: NotificationKey) => switches.find((entry) => entry.key === key)?.enabled ?? true;
 
@@ -237,7 +239,7 @@ export function NotificationsWorkspace({
         <div className="section-heading">
           <div>
             <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Platform addresses</p>
-            <h2>Where three of the alerts go</h2>
+            <h2>Where alerts and conference orders go</h2>
           </div>
         </div>
         {addressError && <p className="form-error" role="alert">{addressError}</p>}
@@ -247,6 +249,14 @@ export function NotificationsWorkspace({
           <small>
             Gets a short notice (club name, church and director name, with a link) when someone applies to start a new club.
             No phone, address or attachment is ever emailed. Leave blank to send no notice; applications still wait in the queue.
+          </small>
+        </label>
+        <label>
+          Conference orders address
+          <input type="email" placeholder="youth@imsda.org" {...field("conferenceOrdersEmail")} />
+          <small>
+            Gets the order email when a club orders patches and pins from the conference (club, church, director, items, quantities and total).
+            Leave blank to use the youth department address, youth@imsda.org.
           </small>
         </label>
         <label>

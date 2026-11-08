@@ -389,7 +389,8 @@ birth dates need their own protection.
    Decided 2026-10-26): club form sensitive answers, health records and sealed
    copies, Sterling Volunteers detail for club people, and guardian contacts.
    The role does **not** extend to system or email settings, accounts, Team
-   management, events the person is not assigned to, event-scoped coordinator
+   management, events the person is not assigned to (except club events, see
+   "Clubs Administrators on club events" below), event-scoped coordinator
    health, sealed-copy holds, or generic organization management (see the
    2026-10-26 follow-up below for what it does cover). The role is read from
    the database on every request, so a removal takes effect on the next one.
@@ -409,14 +410,54 @@ birth dates need their own protection.
    Clubs Administrator is not assigned to. Everything that serves clubs and churches alike is
    open to a Clubs Administrator **for club organizations only**; the server
    reads the organization type (`requireClubOrganizationAdministration`) and
-   refuses a church, school or the conference. Acting as a Director is valid
+   refuses a church, school or the conference. Acting as a club role is valid
    for a Clubs Administrator only while the grant is active, re-checked on
-   every request, and only as a club's Director: acting as an Area Coordinator
-   stays with system administrators. Generic organization management (list,
+   every request, as a club's Director and, since 2026-11-06, as an Area
+   Coordinator (view only, apart from sending a club form link; see
+   Addendum D). Generic organization management (list,
    create, billing, pastor, location, status, deletion, external identities,
    directory import), Master Award rules, seat overrides, settings, accounts,
-   the Team, events, sealed-copy holds, club-form alert emails and template
-   sync stay with system administrators.
+   the Team, events (apart from club events, below), sealed-copy holds,
+   club-form alert emails and template sync stay with system administrators.
+
+   **Clubs Administrators on club events** (decided 2026-11-07 by Caleb Durant,
+   GitHub issue #1643; Caleb: "They should be able to handle everything that is
+   club events"): an active Clubs Administrator holds the Event Administrator
+   role's permissions on **every event whose audience is Club**, with no staff
+   assignment on the event, and with the same powers an Event Administrator has
+   today, nothing held back. That includes what Event Administrators see and do
+   on a club event: the registration list and people pages, the dietary and
+   kitchen reports and the anonymous kitchen report (Addendum D), the finance
+   pages, payments and refunds as far as the Event Administrator role allows
+   them, exports, messages to attendees, settings and Event staff. Camp Meeting,
+   retreats and every other non-club event are unchanged: a Clubs Administrator
+   has access there only through a real staff assignment, and a real assignment
+   on a club event still applies on top. The server reads the event's audience
+   from the database and the grant on every request (never from the request or
+   a cached session), so removing the role removes the access on the next
+   request. What no Event Administrator holds stays as it was: the
+   coordinator health view (`VIEW_HEALTH_INFORMATION`, Addendum C) and finalizing
+   an invoice (`FINALIZE_INVOICES`) are still granted one staff assignment at a
+   time by a system administrator, and creating, copying or deleting events and
+   system settings stay with system administrators. An audit row
+   written for a club event carries `actorRole: CLUBS_ADMINISTRATOR` in its
+   metadata, like the club areas, in every request where the person's access to
+   that event was checked through this role (an active grant, not a system
+   administrator, no real Event Administrator assignment on it). The permission
+   check remembers that for the request and the database client adds the marker to
+   every audit write for that person and event, whichever repository writes the
+   row, with no extra query (so it cannot hold up a transaction). It is kept for
+   route handlers wrapped in `withRequestContext` (including `mealRoute`) and for
+   server components within one render; a write outside those (a server action,
+   of which none exist today, a script or a background job) is not marked, so a
+   missing marker does not prove the access came from a real staff assignment. An `actorRole` a caller already set is kept. The Events
+   Administrator surfaces (the Events Administrator dashboard, its sidebar pill
+   and the Events header) stay keyed to real Event Administrator assignments by
+   design, so they do not appear for this role; Club administration remains a
+   Clubs Administrator's home, and club events are reached from it, the event
+   picker and the event switcher.
+   Two-step sign-in already applies to the role (Caleb, Nov 6, 2026) and
+   nothing new is asked.
 
    **Club Registrar and Reporter roles** (decided 2026-09-23, #375): a
    director or deputy may give a club **Registrar** the roster and event
@@ -431,7 +472,7 @@ birth dates need their own protection.
    that a club the person does not direct answers 404.
 5. **MFA.** An account must have MFA turned on before it can open a club roster
    (the account page already tells attendees this). System administrators
-   already require MFA.
+   and Clubs Administrators (Caleb, Nov 6, 2026) already require MFA.
 6. **Retention is the club's decision, not the conference's.** Club members
    often stay on as staff for many years, so there is **no automatic deletion or
    expiry**. The roster keeps a person, active or inactive, until that club's
@@ -1034,6 +1075,11 @@ forms, which stay `Restricted` to them.
 
 For attendees of **club events** only:
 
+> Who may open it is unchanged by the 2026-11-07 decision that makes Clubs
+> Administrators Event Administrators on club events (#1643, section 3): the
+> view still needs `VIEW_HEALTH_INFORMATION`, which no role carries, so a Clubs
+> Administrator does not get it from that decision.
+
 - the club registration's `dietary_needs` answer, labelled "Dietary
   restrictions / allergies (as entered)". It is free text and is not an allergy
   record;
@@ -1045,8 +1091,14 @@ For attendees of **club events** only:
 - **medications** show "Not collected". The encrypted Health record (#611) will
   add them.
 
+**Superseded by Addendum G (2026-11-07) for the slip's `emergency_contact_phone`
+and the passenger list's `passenger_N_emergency_contact`: those answers are now
+plain, so this view reads them from the plain answers and no longer needs to
+decrypt anything for them. The paragraph below remains true only for sealed
+answers that other forms may still hold.**
+
 Nothing else is shown or returned. A club form's sealed answers have to be
-decrypted as one object, so the physician and clinic fields are decrypted in
+decrypted as one object, so the physician and clinic fields were decrypted in
 memory with the rest. Every key except the ones listed above is dropped from
 that object immediately after decrypting: it is never shown, returned, logged
 or kept, and no other registration answer is shown.
@@ -1090,6 +1142,10 @@ only.
   club forms "has not ended" rule is unchanged.
 - **MFA.** Staff accounts with any active event membership, and system
   administrators, already require two-step sign-in (decision of 2026-09-25).
+  An active Clubs Administrator (no event membership needed) requires it too
+  (Caleb, Nov 6, 2026). Granting the role ends the person's open sessions (not
+  the granting administrator's own), so their next sign-in enrols; revoking it, with no other qualifying role, goes
+  back to the password alone.
   Granting or removing `VIEW_HEALTH_INFORMATION` ends all of that user's
   sessions in the same transaction, so their next sign-in has to pass two-step
   before the new access works. Area Coordinators and club leaders pass the same
@@ -1148,7 +1204,12 @@ issue #787, from the Communication Director's decision of 2026-10-05.
   `VIEW_SENSITIVE_DATA` or `VIEW_HEALTH_INFORMATION`, and Area Coordinators on
   published club-audience events. Attendees and club directors cannot open it.
   The Addendum C rows for the coordinator health view are unchanged and still
-  apply to that view.
+  apply to that view. Clubs Administrators acting as an Area Coordinator
+  (Caleb, Nov 6, 2026) may also open the area kitchen report: the same
+  anonymous grouped counts, with nothing else widened. System administrators
+  acting as an Area Coordinator already could. A Clubs Administrator also holds
+  `VIEW_REPORTS` on every club event as its Event Administrator (Caleb, Nov 7,
+  2026, #1643; see section 3), so the staff row above covers them there too.
 - **Not audited.** Opening or downloading it is not written to the audit log,
   because the report contains no names.
 - **Accepted risk.** Free text can still identify someone at a small event
@@ -1213,3 +1274,40 @@ rule that every account page needs a second step for a club role.
   cannot enrol their own device and skip it.
 - **Passkey first.** Setup lists the passkey ("Easiest") before the
   authenticator app when passkeys are switched on.
+
+## Addendum G: Emergency and physician answers on two club forms are plain
+
+Status: **Accepted.** Decided by Caleb Durant, repository owner, on 2026-11-07
+(recorded on GitHub issue #1652). It narrows the club form sealing rule of
+2026-09-29 (#610) and the Area Coordinator `Restricted` rule for these answers.
+Nothing else in this ADR changes.
+
+- **What changes.** On the Off-Premises Permission Slip
+  (`off_premises_permission_slip`): `physician_name`, `physician_phone`,
+  `clinic_name`, `clinic_phone` and `emergency_contact_phone`. On the
+  Transportation Passenger List (`transportation_passenger_list`):
+  `passenger_1_emergency_contact` to `passenger_20_emergency_contact`. These
+  are ordinary plain answers: not sealed, shown to everyone who can see that
+  form or submission, and included in the staff CSV.
+- **Why.** Directors carry the paper forms; the system copy is a backup. It has
+  to stay reachable in an emergency, including to people who could not open a
+  sealed answer.
+- **Unchanged and still sealed.** The Membership Application birth date; the
+  Staff/Volunteer Service form birth dates, health limitation and conduct
+  answers; any field a staff builder marks sensitive; and every birth-date rule
+  (Addendum A).
+- **How it is built.** The two seed templates list no sensitive keys (versions
+  3 and 2). `assertNotLoosened` still refuses every other field that would stop
+  being sensitive; it allows exactly these keys, for exactly these template
+  keys (`modules/club-forms/plain-emergency.ts`). A copy edited in the app that
+  kept the seed's key loses exactly these keys from its sensitive list on the
+  next sync; a staff copy under another key is untouched.
+- **Existing submissions.** `npm run club-forms:unseal-emergency` (dry run by
+  default; `-- --execute --actor <email>` to apply, the actor recorded on the audit row) moves these answers from the sealed value
+  into the plain answers, keeps every other sealed answer sealed, and drops the
+  sealed value when nothing sensitive is left. It is idempotent, runs per
+  template in one transaction under the template row lock, and audits
+  (`CLUB_FORM_EMERGENCY_ANSWERS_UNSEALED`) template key and counts only. A human
+  runs it in production, after `npm run club-forms:sync`.
+- **Backups.** A database backup taken before the script ran still holds these
+  answers sealed; one taken after holds them plain.

@@ -16,6 +16,8 @@ export type StaffAccountRow = {
   email: string;
   accountStatus: "PENDING_ACTIVATION" | "ACTIVE";
   globalRole: "SYSTEM_ADMIN" | null;
+  /** An active Clubs Administrator grant: a staff role that needs a second factor (Nov 6, 2026). */
+  clubsAdministrator: boolean;
   credential: { disabledAt: Date | null; lockedUntil: Date | null } | null;
   mfa: MfaState;
   mfaLockedUntil: Date | null;
@@ -280,7 +282,7 @@ export function detectConflicts(
       detail: "An authenticator lockout is active on at least one side. Wait for it to clear or reset it deliberately.",
     });
   }
-  const hasStaffRole = staff.globalRole !== null || staff.counts.activeMemberships > 0;
+  const hasStaffRole = staff.globalRole !== null || staff.counts.activeMemberships > 0 || staff.clubsAdministrator;
   if (hasStaffRole && staff.mfa !== "ACTIVE" && staff.counts.passkeys === 0) {
     conflicts.push({
       code: "STAFF_NO_SECOND_FACTOR",

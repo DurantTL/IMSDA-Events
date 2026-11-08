@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   listSponsorOptions: vi.fn(),
   listClubTeam: vi.fn(),
   listPendingClubTeamInvites: vi.fn(),
+  listEnabledClubFeatures: vi.fn(),
   redirect: vi.fn((to: string) => { throw new Error(`REDIRECT ${to}`); }),
 }));
 
@@ -20,12 +21,14 @@ vi.mock("@/modules/organizations/club-profile-repository", () => ({
   listSponsorOptions: mocks.listSponsorOptions,
 }));
 vi.mock("@/modules/organizations/director-grants-repository", () => ({ listClubTeam: mocks.listClubTeam }));
+vi.mock("@/modules/club-features/repository", () => ({ listEnabledClubFeatures: mocks.listEnabledClubFeatures }));
 vi.mock("@/modules/club-imports/invites", () => ({ listPendingClubTeamInvites: mocks.listPendingClubTeamInvites }));
 
 import ClubAwardsRedirect from "@/app/(public)/account/(portal)/clubs/[organizationId]/awards/page";
 import ClubInfoPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/club-info/page";
 import ClubProfileRedirect from "@/app/(public)/account/(portal)/clubs/[organizationId]/profile/page";
 import ClubTeamRedirect from "@/app/(public)/account/(portal)/clubs/[organizationId]/team/page";
+import { ClubOptionalFeatures } from "@/components/club-optional-features";
 import { ClubProfileForm } from "@/components/club-profile-form";
 import { ClubTeamWorkspace } from "@/components/club-team-workspace";
 
@@ -57,6 +60,7 @@ beforeEach(() => {
   mocks.listSponsorOptions.mockResolvedValue([]);
   mocks.listClubTeam.mockResolvedValue([]);
   mocks.listPendingClubTeamInvites.mockResolvedValue([]);
+  mocks.listEnabledClubFeatures.mockResolvedValue([]);
 });
 
 describe("Club info page (#644)", () => {
@@ -94,6 +98,28 @@ describe("Club info page (#644)", () => {
     expect([paragraph?.props.children].flat().join("")).toContain("director or deputy");
     expect(mocks.getClubProfile).not.toHaveBeenCalled();
     expect(mocks.listClubTeam).not.toHaveBeenCalled();
+  });
+
+  it("offers the optional features, off until switched on, to a viewer who can edit the profile (#1709)", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(open(true, true));
+    const tree = await ClubInfoPage(params);
+    const section = elements(tree).find((element) => element.type === ClubOptionalFeatures);
+    expect(section?.props).toMatchObject({ organizationId: "club-1", initialEnabled: [] });
+    expect(typesIn(tree).indexOf(ClubOptionalFeatures)).toBeGreaterThan(typesIn(tree).indexOf(ClubProfileForm));
+    expect(typesIn(tree).indexOf(ClubOptionalFeatures)).toBeLessThan(typesIn(tree).indexOf(ClubTeamWorkspace));
+  });
+
+  it("passes the features the club has switched on (#1709)", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(open(true, false));
+    mocks.listEnabledClubFeatures.mockResolvedValue(["roster-health-flags"]);
+    const section = elements(await ClubInfoPage(params)).find((element) => element.type === ClubOptionalFeatures);
+    expect(section?.props.initialEnabled).toEqual(["roster-health-flags"]);
+  });
+
+  it("never offers the optional features, or reads them, to a viewer who cannot edit the profile (#1709)", async () => {
+    mocks.getRosterAccessStateForPage.mockResolvedValue(open(false, true));
+    expect(typesIn(await ClubInfoPage(params))).not.toContain(ClubOptionalFeatures);
+    expect(mocks.listEnabledClubFeatures).not.toHaveBeenCalled();
   });
 
   it("says who to ask when the club isn't open to the viewer", async () => {

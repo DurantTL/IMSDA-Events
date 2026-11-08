@@ -1,0 +1,12 @@
+.summary { display: grid; gap: 18px; }
+.counts { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.counts strong { font-size: 1.25rem; }
+.heading { margin: 0 0 8px; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.row { border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; display: grid; gap: 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.rowHead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; }
+.below { color: var(--coral); font-weight: 700; }
+.met { color: var(--green); font-weight: 700; }
+.people { margin: 0; padding-left: 18px; }
+.muted { color: var(--muted); margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.link { display: inline-flex; align-items: center; min-height: 44px; }

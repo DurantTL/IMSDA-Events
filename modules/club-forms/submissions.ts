@@ -15,6 +15,8 @@ import {
   validateClubFormAnswers,
   viewerAuditFields,
   restrictedFieldKeys,
+  schoolDetailFieldKeysFor,
+  viewerCanSeeSchoolDetails,
   clubFormClubLabel,
   viewerCanRevealBirthDates,
   viewerCanRevealSensitive,
@@ -27,6 +29,7 @@ import {
   type ClubFormActor,
   type ClubFormsViewer,
 } from "@/modules/club-forms/domain";
+import { emergencyPlainKeys } from "@/modules/club-forms/plain-emergency";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { openSensitiveAnswers, sealSensitiveAnswers } from "@/modules/club-forms/sealed-answers";
 import { assertClubFormTemplateCurrent, lockClubFormTemplateForWrite } from "@/modules/club-forms/template-lock";
@@ -36,13 +39,16 @@ import { sendClubFormSubmittedAlert } from "@/modules/club-forms/submission-aler
 import { usableRosterMapping } from "@/modules/club-forms/roster-mapping";
 import { getClubFormTemplateAtVersion } from "@/modules/club-forms/versions";
 import { formatPersonName } from "@/lib/person-name";
+import { readStoredOuting, withOutingQuestions } from "@/modules/club-forms/outing-domain";
 
 /**
  * Club form submissions (#610). Every function takes a resolved viewer and
  * checks it again, so a caller that forgot a role check still cannot read or
  * write another club's files. Sensitive answers are sealed before they reach
- * Prisma and are opened only in `getSubmissionForViewer`, after the audit row
- * for the view has been written.
+ * Prisma and are opened only in `getSubmissionForViewer`: revealed only after
+ * the audit row for the view has been written, and, for a viewer who cannot
+ * see them, opened only to list which emergency keys are still sealed (no
+ * values leave the function).
  */
 
 function attribution(actor: ClubFormActor) {
@@ -94,8 +100,10 @@ function carriedForwardAnswers(
   existing: { id: string; answers: unknown; sealedSensitiveAnswers: string | null },
   fillable: RegistrationFormDefinition,
   submissionId: string,
+  keep: ReadonlySet<string> = new Set(),
 ): { plain: Record<string, unknown>; sealed: Record<string, unknown> } {
-  const offered = new Set(allFields(fillable).map((field) => field.key));
+  // `keep` (#1668): keys this saver may not see or change are never "offered", so their stored values carry forward.
+  const offered = new Set(allFields(fillable).map((field) => field.key).filter((key) => !keep.has(key)));
   const notOffered = (entries: Record<string, unknown>) => Object.fromEntries(Object.entries(entries).filter(([key]) => !offered.has(key)));
   let opened: Record<string, unknown> = {};
   if (existing.sealedSensitiveAnswers) {
@@ -145,7 +153,11 @@ export async function saveClubFormSubmission(viewer: ClubFormsViewer, input: Sav
     ? await resolveRosterMemberName(prisma, input.organizationId, input.rosterMemberId)
     : "";
 
+  // School type and church membership (#1668): a saver who cannot see them (a Clubs Administrator acting as director)
+  // neither changes nor erases them. Their incoming values are ignored and the stored ones are carried forward below.
+  const unseenKeys: ReadonlySet<string> = viewerCanSeeSchoolDetails(viewer, input.organizationId) ? new Set() : new Set(schoolDetailFieldKeysFor(template.key));
   const answers = sanitizeClubFormAnswers(definition, input.answers);
+  for (const key of unseenKeys) delete answers[key];
   let issues = validateClubFormAnswers(definition, answers, { draft: !input.submit });
   if (issues.length > 0 && input.submissionId) {
     // Editing a draft (#855): an old answer that fails today's checks is flagged on the form but does not block
@@ -192,7 +204,7 @@ export async function saveClubFormSubmission(viewer: ClubFormsViewer, input: Sav
     // A draft started on an earlier version may hold answers to a field since hidden or removed. The form no
     // longer shows them, so this save carries them forward untouched (sealed ones are re-opened here, server-side
     // only, and sealed again) rather than silently erasing them.
-    const carried = existing ? carriedForwardAnswers(existing, definition, id) : { plain: {}, sealed: {} };
+    const carried = existing ? carriedForwardAnswers(existing, definition, id, unseenKeys) : { plain: {}, sealed: {} };
     const split = splitAnswers({ sensitiveFieldKeys: keys.sensitiveFieldKeys }, { ...carried.plain, ...answers });
     const plain = split.plain;
     const sensitive = { ...split.sensitive, ...carried.sealed };
@@ -432,7 +444,7 @@ export async function getSubmissionForViewer(
       rosterAction: true,
       rosterActionMemberId: true,
       rosterActionMember: { select: { clubYear: true, status: true } },
-      link: { select: { createdAs: true, createdByAccount: { select: { displayName: true } }, createdByUser: { select: { displayName: true } } } },
+      link: { select: { createdAs: true, createdByAccount: { select: { displayName: true } }, createdByUser: { select: { displayName: true } }, outing: { select: { details: true, questions: true } } } },
       unlistedClubName: true,
       organization: { select: { name: true } },
       template: {
@@ -452,6 +464,24 @@ export async function getSubmissionForViewer(
   const restricted = new Set(restrictedFieldKeys(viewer, row.organizationId, template));
   const reveal = viewerCanRevealSensitive(viewer, row.organizationId);
   const revealBirthDates = viewerCanRevealBirthDates(viewer, row.organizationId);
+  // Between a deploy and the human-run `npm run club-forms:unseal-emergency`, an older submission still holds the
+  // emergency answers inside its sealed value. A viewer who cannot open it sees Restricted, not a blank (ADR 0005 Addendum G).
+  if (!reveal && row.hasSensitiveAnswers) {
+    const missing = emergencyPlainKeys(template.key).filter((key) => (row.answers as Record<string, unknown>)[key] === undefined);
+    // Only the keys the sealed value really holds are restricted (the values themselves never leave here). When it
+    // cannot be opened, every missing one is, so nothing is ever shown as a harmless blank.
+    let held: ReadonlySet<string> | null = null;
+    if (missing.length > 0 && row.sealedSensitiveAnswers && isSecretEncryptionConfigured()) {
+      try {
+        held = new Set(Object.keys(openSensitiveAnswers(row.id, row.sealedSensitiveAnswers)));
+      } catch {
+        held = null;
+      }
+    }
+    for (const key of missing) {
+      if (!held || held.has(key)) restricted.add(key);
+    }
+  }
 
   // A plain answer under a sensitive key (stored before that key became sensitive) counts too: never an unaudited view.
   const sensitiveKeys = new Set(template.sensitiveFieldKeys);
@@ -501,6 +531,9 @@ export async function getSubmissionForViewer(
       if (!offered.has(key)) delete answers[key];
     }
   }
+  // An outing permission slip (#1672) also shows the club's own questions, in their own section.
+  const outing = row.link?.outing ? readStoredOuting(row.link.outing) : null;
+  const shownDefinition = editingDraft ? fillDefinition(template) : template.definition;
   return {
     id: row.id,
     template: {
@@ -508,7 +541,7 @@ export async function getSubmissionForViewer(
       name: template.name,
       description: template.description,
       printLayout: template.printLayout,
-      definition: editingDraft ? fillDefinition(template) : template.definition,
+      definition: outing ? withOutingQuestions(shownDefinition, outing.questions, row.organization?.name ?? "") : shownDefinition,
       sectionNotes: template.sectionNotes,
       sensitiveFieldKeys: template.sensitiveFieldKeys,
       staffOnlyFieldKeys: template.staffOnlyFieldKeys,

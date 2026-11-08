@@ -82,6 +82,7 @@ export default async function PublicClubFormPage({ params }: { params: Promise<{
         <ClubFormFillIn
           definition={form.definition}
           mode="link"
+          outing={view.outing}
           sectionNotes={form.sectionNotes}
           sensitiveFieldKeys={form.sensitiveFieldKeys}
           todayDate={view.today}

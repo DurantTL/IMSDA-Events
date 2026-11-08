@@ -17,9 +17,15 @@
 .itemText { display: grid; flex: 1 1 200px; gap: 2px; min-width: 0; }
 .itemText strong { color: var(--imsda-navy); font-size: .76rem; overflow-wrap: anywhere; }
 .itemText small { color: var(--muted); font-size: max(var(--type-floor, 0px), .63rem); }
-.itemControls { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+.itemControls { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
 .quantity { width: 84px; text-align: right; }
 .itemControls :global(.secondary-button) { min-height: 44px; }
+.itemControls :global(.primary-button) { min-height: 44px; }
+/* Supplier and price editor on a catalog row (#1688): full width under the row, 44px targets, 16px inputs. */
+.orderingEditor { display: flex; flex-basis: 100%; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.orderingEditor label { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.orderingEditor select, .orderingEditor input { min-height: 44px; border: 1px solid var(--field-border); border-radius: var(--radius-sm); background: var(--card); padding: 8px; font-size: 16px; }
+.orderingEditor :global(.primary-button), .orderingEditor :global(.secondary-button) { min-height: 44px; min-width: 44px; }
 .sectionBlock { display: grid; gap: 8px; }
 .sectionBlock + .sectionBlock { margin-top: 16px; }
 .sectionBlock h3 { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), .86rem); }

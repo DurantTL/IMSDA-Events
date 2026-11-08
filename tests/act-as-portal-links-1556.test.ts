@@ -50,10 +50,11 @@ describe("Area Coordinator act-as in Clubs administration (#1556)", () => {
   const clubs = readFileSync("app/(workspace)/admin/clubs/page.tsx", "utf8");
   const club = readFileSync("app/(workspace)/admin/organizations/[organizationId]/club/page.tsx", "utf8");
 
-  it("is offered to a system administrator only, against the same endpoint as People", () => {
-    expect(clubs).toMatch(/viewer === "SYSTEM_ADMIN" \?\s*\(\s*<div className="intro-actions">\s*<ActAsButton/);
+  it("is offered to everyone who passes the page's Clubs administration check, against the same endpoint as People", () => {
+    expect(clubs).toContain('if (!(await hasClubsAdministration(user))) redirect("/no-access");');
+    expect(clubs).toMatch(/<div className="intro-actions">\s*<ActAsButton/);
+    expect(clubs).not.toMatch(/viewer === "SYSTEM_ADMIN" \?\s*\(\s*<div className="intro-actions">/);
     expect(clubs).toContain('endpoint="/api/admin/act-as/area-coordinator"');
-    expect(clubs).toContain('const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN"');
   });
 
   it("keeps Act as Director under the club and the 2-hour label", () => {
@@ -65,7 +66,9 @@ describe("Area Coordinator act-as in Clubs administration (#1556)", () => {
     const ac = readFileSync("app/api/admin/act-as/area-coordinator/route.ts", "utf8");
     const dir = readFileSync("app/api/admin/organizations/[organizationId]/act-as-director/route.ts", "utf8");
     expect(ac).toContain("AREA_COORDINATOR_PORTAL_HREF");
-    expect(ac).toContain("requireSystemAdministrator");
+    expect(ac).toContain("requireClubsAdministration");
+    expect(ac).toContain("actAsActor(actor)");
+    expect(ac).not.toContain("requireSystemAdministrator");
     expect(dir).toContain("clubDirectorPortalHref(organizationId)");
   });
 });

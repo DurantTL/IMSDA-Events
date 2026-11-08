@@ -34,6 +34,7 @@ export async function ClubOverview({
   rosterYear,
   portalView = false,
   headingLevel = 2,
+  schoolDetails = false,
 }: {
   organizationId: string;
   /**
@@ -44,6 +45,11 @@ export async function ClubOverview({
   rosterYear?: string;
   /** Rendered in the account portal (not the staff admin pages), so empty states can point to the conference office. */
   portalView?: boolean;
+  /**
+   * Show each Pathfinder's school type and church membership (#1668). True only for a system administrator: Area Coordinators,
+   * event managers and Clubs Administrators who are not system administrators never get either value, because the roster is loaded without them.
+   */
+  schoolDetails?: boolean;
   /** Heading level of the summary tiles (see ClubYearTiles): 3 when the page has its own h2 above. */
   headingLevel?: 2 | 3;
   birthDatesEndpoint?: string;
@@ -79,7 +85,7 @@ export async function ClubOverview({
   const otherYear = shownRosterYear !== clubYear;
   const [team, members, events, reportYear, compliance, reminderCounts, honorRows] = await Promise.all([
     listClubTeam(organizationId, now),
-    listRoster(organizationId, shownRosterYear, now),
+    listRoster(organizationId, shownRosterYear, now, { includeSchoolDetails: schoolDetails }),
     listClubEvents(organizationId, now),
     getClubReportYear(organizationId, clubYear),
     backgroundChecks ? clubRosterComplianceStatuses(organizationId, shownRosterYear, backgroundChecks) : null,
@@ -182,6 +188,7 @@ export async function ClubOverview({
           initialMembers={members.map((member) => ({ ...member, personId: undefined }))}
           organizationId={organizationId}
           readOnly
+          schoolDetails={schoolDetails}
         />
       </div>
 

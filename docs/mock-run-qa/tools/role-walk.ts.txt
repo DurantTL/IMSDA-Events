@@ -1,0 +1,114 @@
+/**
+ * Mock run role walk (Nov 6, 2026). Synthetic data only, local app only.
+ * Visits each role's pages at 1280 and 390, screenshots them, runs the shared site-rule page checks,
+ * and records status, overflow, h1s, console/page errors and 5xx responses.
+ * Copy to your session's scratchpad as role-walk.ts and run from the repo root (see docs/WEEKLY-MOCK-RUN.md, step 4):
+ *   NODE_PATH=$PWD/node_modules:/opt/node-tools/node_modules:$NODE_PATH \
+ *   DATABASE_URL=... WALK_KEEP=1 npx tsx --require ./scripts/support/allow-server-only.cjs <scratchpad>/role-walk.ts
+ * WALK_ROLES=clubsadmin,sysadmin runs only those roles. Output goes to ./out next to the script:
+ * shots/*.png, pages.json (status, redirects, h1, overflow, errors) and rules.json (site-rule page checks).
+ */
+import { loadEnvConfig } from "@next/env";
+import { PrismaClient } from "@prisma/client";
+import fs from "node:fs";
+import path from "node:path";
+
+const REPO = "/home/user/IMSDA-Events";
+loadEnvConfig(REPO);
+const OUT = path.join(path.dirname(new URL(import.meta.url).pathname), "out");
+fs.mkdirSync(path.join(OUT, "shots"), { recursive: true });
+
+async function main() {
+  const J = await import(`${REPO}/scripts/support/browser-journeys`);
+  const { seedJourneyWorld, seedCoordinatorWorld, seedAccount, cleanupJourneyWorld } = await import(`${REPO}/scripts/support/journey-data`);
+  const { Recorder, checkPage } = await import(`${REPO}/scripts/support/site-rule-checks`);
+  J.guardLocal();
+  const prisma = new PrismaClient();
+  const playwright = await J.loadPlaywright();
+  const browser = await J.launch(playwright, "chromium");
+  const tokens: string[] = [];
+  const staffTokens: string[] = [];
+
+  const world = await seedJourneyWorld(prisma, "mockrun");
+  const coord = await seedCoordinatorWorld(prisma, world);
+  const attendeeId = `${world.prefix}_attendee`;
+  await seedAccount(prisma, world, { id: attendeeId, email: `journeycheck.${world.stamp}.attendee@example.test`, first: "Quinn", last: `Mockrun${world.stamp}`, password: `Quartz-Meadow-${world.stamp}-attendee-Lantern-47` });
+
+  // Clubs Administrator: a synthetic staff user with an active grant.
+  const clubsAdminEmail = "mockrun.clubsadmin@imsda-events.test";
+  const clubsAdmin = await prisma.user.upsert({ where: { email: clubsAdminEmail }, update: {}, create: { email: clubsAdminEmail, displayName: "Avery Clubsadmin" } });
+  const { hashPassword } = await import(`${REPO}/modules/access/passwords`);
+  await prisma.authCredential.upsert({ where: { userId: clubsAdmin.id }, update: {}, create: { userId: clubsAdmin.id, passwordHash: await hashPassword("Quartz-Meadow-mockrun-clubsadmin-Lantern-47") } });
+  await prisma.clubsAdministratorGrant.upsert({ where: { userId: clubsAdmin.id }, update: { revokedAt: null }, create: { userId: clubsAdmin.id } });
+
+  const wr = await prisma.event.findUnique({ where: { slug: "womens-retreat-2026" }, select: { id: true } });
+  const ev = `?event=${encodeURIComponent(wr!.id)}`;
+  const club = world.main.clubId;
+  const areaClub = coord.clubs.missing.clubId;
+  const month = new Date().toISOString().slice(0, 7);
+
+  const roles: Array<{ role: string; session: () => Promise<{ name: string; value: string; expires: number } | undefined>; pages: string[] }> = [
+    { role: "public", session: async () => undefined, pages: ["/", "/events", "/events/womens-retreat-2026", "/calendar", "/calendar?view=upcoming", "/clubs", "/clubs/forms", "/help", "/sign-in", "/account/sign-in", "/account/sign-up", "/forgot-password", "/recover-registration", "/register/womens-retreat-2026", "/embed/calendar"] },
+    { role: "attendee", session: () => J.mintDirectorSession(tokens, attendeeId), pages: ["/account", "/account/registrations", "/account/profile", "/account/security", "/account/help", "/account/waitlists", "/admin"] },
+    { role: "director", session: () => J.mintDirectorSession(tokens, world.main.accountId), pages: ["/account", `/account/clubs/${club}`, `/account/clubs/${club}/roster`, `/account/clubs/${club}/forms`, `/account/clubs/${club}/events`, `/account/clubs/${club}/honors`, `/account/clubs/${club}/class-tracking`, `/account/clubs/${club}/reports`, `/account/clubs/${club}/reports/${month}`, `/account/clubs/${club}/records`, `/account/clubs/${club}/orders`, `/account/clubs/${club}/health`, `/account/clubs/${club}/team`, `/account/clubs/${club}/club-info`, `/account/help`, `/account/area-clubs`] },
+    { role: "coordinator", session: () => J.mintDirectorSession(tokens, coord.accountId), pages: ["/account", "/account/area-clubs", "/account/area-clubs/overview", "/account/area-clubs/reports", "/account/area-clubs/events", "/account/area-clubs/applications", "/account/area-clubs/points", "/account/area-clubs/team-permissions", `/account/area/${areaClub}`, `/account/area/${areaClub}/forms`, "/account/help"] },
+    { role: "registration", session: () => J.mintStaffSession(staffTokens, "registration@imsda-events.test"), pages: [`/overview${ev}`, `/people${ev}`, `/people/attendees${ev}`, `/people/duplicates${ev}`, `/registration-builder${ev}`, `/more${ev}`, `/more/promo-codes${ev}`, `/more/event-settings${ev}`, `/finance${ev}`] },
+    { role: "finance", session: () => J.mintStaffSession(staffTokens, "finance@imsda-events.test"), pages: [`/finance${ev}`, `/finance/invoices${ev}`, `/finance/cancellation-requests${ev}`, `/finance/cancellation-policy${ev}`, `/finance/square-payments${ev}`, `/finance/church-owed${ev}`, `/communications/scheduled${ev}`] },
+    { role: "checkin", session: () => J.mintStaffSession(staffTokens, "checkin@imsda-events.test"), pages: [`/check-in${ev}`, `/check-in/badges${ev}`, `/check-in-station${ev}`, `/finance${ev}`] },
+    { role: "communications", session: () => J.mintStaffSession(staffTokens, "communications@imsda-events.test"), pages: [`/communications${ev}`, `/communications/scheduled${ev}`, `/people${ev}`] },
+    { role: "clubsadmin", session: () => J.mintStaffSession(staffTokens, clubsAdminEmail), pages: ["/admin", "/admin/clubs", "/admin/clubs/leaders", "/admin/clubs/invites", "/admin/clubs/reports", "/admin/clubs/summary", "/admin/clubs/applications", "/admin/clubs/transfers", "/admin/club-forms", "/admin/club-supplies", "/admin/honors", `/admin/organizations/${club}/club`, "/admin/email"] },
+    { role: "sysadmin", session: () => J.mintStaffSession(staffTokens, "system@imsda-events.test"), pages: ["/admin", "/admin/email", "/admin/system-report", "/admin/settings", "/admin/calendar", "/admin/people", "/admin/accounts", "/admin/team", "/admin/event-templates", "/event-setup", "/event-setup/from-template", "/admin/readiness", "/admin/site-content", "/admin/organizations", "/admin/clubs", "/admin/clubs/leaders", `/admin/organizations/${club}/club`, "/admin/analytics", "/admin/feature-requests"] },
+  ];
+
+  const only = process.env.WALK_ROLES?.split(",");
+  const rows: Record<string, unknown>[] = [];
+  const allRules: unknown[] = [];
+  for (const width of [1280, 390]) {
+    for (const r of roles) {
+      if (only && !only.includes(r.role)) continue;
+      const cookie = await r.session();
+      const context = await J.newContext(browser, { translate: false, cookie, width });
+      const page = await context.newPage();
+      const rec = new Recorder(String(width));
+      for (const p of r.pages) {
+        const consoleErrors: string[] = [];
+        const serverErrors: string[] = [];
+        const pageErrors: string[] = [];
+        const onConsole = (m: { type(): string; text(): string }) => { if (m.type() === "error") consoleErrors.push(m.text().slice(0, 200)); };
+        const onResp = (res: { status(): number; url(): string }) => { if (res.status() >= 500) serverErrors.push(`${res.status()} ${res.url().replace(J.baseUrl, "")}`); };
+        const onErr = (e: Error) => pageErrors.push(String(e.message).slice(0, 200));
+        page.on("console", onConsole); page.on("response", onResp); page.on("pageerror", onErr);
+        let status = 0;
+        try {
+          const res = await page.goto(`${J.baseUrl}${p}`, { waitUntil: "load", timeout: 60_000 });
+          status = res?.status() ?? 0;
+          await page.waitForLoadState("networkidle", { timeout: 8_000 }).catch(() => undefined);
+        } catch (e) { pageErrors.push(`goto: ${(e as Error).message.slice(0, 120)}`); }
+        const info = await page.evaluate(`(() => ({
+          h1: [...document.querySelectorAll('h1')].map(h => h.innerText.trim()).slice(0,3),
+          title: document.title,
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          crash: /Application error|Something went wrong|Unhandled Runtime Error/.test(document.body.innerText),
+        }))()`).catch(() => ({}));
+        const pageName = `${r.role} ${p.replace(/\?event=.*/, "")}`;
+        try { await checkPage(page, rec, pageName, { look: true }); } catch (e) { pageErrors.push(`checkPage: ${(e as Error).message.slice(0, 120)}`); }
+        const slug = `${r.role}${p.replace(/\?.*$/, "").replace(/[^a-z0-9]+/gi, "-").replace(/journeycheck[^-]*-?/g, "").slice(0, 80)}-${width}`.replace(/-+/g, "-");
+        await page.screenshot({ path: path.join(OUT, "shots", `${slug}.png`), fullPage: true }).catch(() => undefined);
+        const row = { role: r.role, width, path: p.replace(/\?event=.*/, "?event=WR26"), status, finalUrl: page.url().replace(J.baseUrl, "").replace(/event=[^&]+/, "event=WR26"), ...info, consoleErrors, serverErrors, pageErrors, shot: `${slug}.png` };
+        rows.push(row);
+        console.log(JSON.stringify(row));
+        page.off("console", onConsole); page.off("response", onResp); page.off("pageerror", onErr);
+      }
+      allRules.push(...rec.results);
+      await context.close();
+    }
+  }
+  fs.writeFileSync(path.join(OUT, `pages${only ? "-" + only.join("_") : ""}.json`), JSON.stringify(rows, null, 1));
+  fs.writeFileSync(path.join(OUT, `rules${only ? "-" + only.join("_") : ""}.json`), JSON.stringify(allRules, null, 1));
+  await browser.close();
+  await J.revokeSessions(tokens); await J.revokeStaffSessions(staffTokens);
+  if (!process.env.WALK_KEEP) await cleanupJourneyWorld(prisma, world).catch(() => undefined);
+  else fs.writeFileSync(path.join(OUT, "world.json"), JSON.stringify({ world, coord, attendeeId }, null, 1));
+  await prisma.$disconnect();
+}
+main().catch((e) => { console.error(e); process.exit(1); });

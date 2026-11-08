@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Pastor contact" };
 export default async function StaffChurchPastorContactPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const { organizationId } = await params;
   const view = await getChurchPastorContactView(organizationId, { id: user.id, globalRole: user.globalRole });
   if (!view) notFound();

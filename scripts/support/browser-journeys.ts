@@ -13,7 +13,7 @@
  */
 import { createRequire } from "node:module";
 import path from "node:path";
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, ClubRosterSchoolGrade } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./local-only-guard";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -263,7 +263,7 @@ export async function seedJourneyData(prisma: PrismaClient) {
       create: {
         organizationId: clubId, clubYear, personId,
         attendeeType: index === 5 ? "STAFF" : "YOUTH", role: index === 5 ? "Counselor" : "Pathfinder",
-        classLevel: index === 5 ? null : "FRIEND", reportedAge: index === 5 ? 34 : 11 + index, gender: index % 2 === 0 ? "FEMALE" : "MALE", source: "DIRECTOR",
+        classLevel: index === 5 ? null : "FRIEND", reportedAge: index === 5 ? 34 : 11 + index, schoolGrade: index === 5 ? null : (`GRADE_${6 + index}` as ClubRosterSchoolGrade), gender: index % 2 === 0 ? "FEMALE" : "MALE", source: "DIRECTOR",
       },
     });
   }

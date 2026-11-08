@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), redirect: vi.fn(), notFound: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), redirect: vi.fn(), notFound: vi.fn(), usePathname: () => "/", useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ APP_BASE_URL: "https://events.imsda.test" }) }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getAccess }));
 vi.mock("@/modules/club-forms/access", () => ({ clubLeaderViewerFromAccess: () => ({ kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-1" } }) }));
@@ -20,6 +20,7 @@ vi.mock("@/modules/club-forms/templates", () => ({ listEnabledClubFormTemplates:
 vi.mock("@/modules/club-forms/submissions", () => ({ listRosterChoices: mocks.listRoster, listSubmissionsForViewer: mocks.listSubmissions }));
 vi.mock("@/modules/club-forms/required", () => ({ getRequiredFormsStatus: mocks.getRequired }));
 vi.mock("@/modules/club-forms/links", () => ({ listClubFormLinks: mocks.listLinks }));
+vi.mock("@/modules/club-forms/outings", () => ({ listOutings: async () => [], getOutingSlipAvailability: async () => ({ enabled: true }) }));
 vi.mock("@/modules/club-forms/year-start", () => ({ getClubFormsYearState: async () => ({ startedClubYear: null, yearStarted: false, hasEarlierYears: false }) }));
 
 import ClubFormsPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/forms/page";

@@ -4,15 +4,18 @@ import Link from "next/link";
 import { FileText } from "lucide-react";
 import styles from "@/components/club-forms-lists.module.css";
 import { CopyApplicationLink } from "@/components/copy-application-link";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { EmptyState } from "@/components/empty-state";
 import { ClubFormsStatus } from "@/components/club-forms-status";
 import { SendClubFormLink, StartClubFormsYearButton } from "@/components/club-forms-actions";
+import { ClubOutingsSection } from "@/components/club-outings-section";
 import { ClubFormLinksTable, CollapsibleList, FilledFormsList, PastYearsSection } from "@/components/club-forms-lists";
 import { getServerEnv } from "@/lib/env";
 import { groupClubFormsByFillMode, openApplicationUrl } from "@/modules/club-forms/open-applications-domain";
 import { clubLeaderViewerFromAccess } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, isClubFormsRole } from "@/modules/club-forms/domain";
 import { listClubFormLinks } from "@/modules/club-forms/links";
+import { getOutingSlipAvailability, listOutings } from "@/modules/club-forms/outings";
 import { groupClubFormsByYear, showStartNewYear } from "@/modules/club-forms/past-years-domain";
 import { getClubFormsYearState } from "@/modules/club-forms/year-start";
 import { getRequiredFormsStatus } from "@/modules/club-forms/required";
@@ -51,13 +54,15 @@ export default async function ClubFormsPage({
   }
   const viewer = clubLeaderViewerFromAccess(access);
   const clubYear = clubYearFor(new Date());
-  const [templates, rosterMembers, allSubmissions, allLinks, requiredStatus, yearState] = await Promise.all([
+  const [templates, rosterMembers, allSubmissions, allLinks, requiredStatus, yearState, outings, slip] = await Promise.all([
     listEnabledClubFormTemplates(),
     listRosterChoices(organizationId),
     listSubmissionsForViewer(viewer, member ? { rosterMemberId: member } : {}),
     listClubFormLinks(viewer, organizationId),
     getRequiredFormsStatus(clubYear, [organizationId]),
     getClubFormsYearState(viewer, organizationId, clubYear),
+    listOutings(viewer, organizationId),
+    getOutingSlipAvailability(),
   ]);
   const { currentLinks: links, currentSubmissions: submissions, pastYears } = groupClubFormsByYear({
     links: allLinks,
@@ -157,6 +162,8 @@ export default async function ClubFormsPage({
         <ClubSetupHelp base={`/account/clubs/${organizationId}`} context="club forms" id="forms-none" />
       ) : null}
 
+      <ClubOutingsSection base={base} outings={outings} slipEnabled={slip.enabled} />
+
       {(families.length > 0 || links.length > 0) && (
         <section aria-labelledby="club-forms-families" className="club-form-group">
           <h2 id="club-forms-families">Forms for families and individuals: send a link</h2>
@@ -236,7 +243,7 @@ export default async function ClubFormsPage({
 
       <section className="public-manage-card">
         <FilledFormsList base={base} empty={<EmptyState className="empty-state panel" headingLevel={4} icon={<FileText aria-hidden="true" size={26} />} title="No forms filled in yet">Forms you fill in or receive by private link will be listed here.</EmptyState>} filter={rosterMembers.length > 0 && (
-          <form action={base} className="club-form-filter" method="get">
+          <GetFilterForm action={base} className="club-form-filter">
             <label>
               Show forms for
               <select defaultValue={member ?? ""} name="member">
@@ -245,7 +252,7 @@ export default async function ClubFormsPage({
               </select>
             </label>
             <button className="secondary-button" type="submit">Show</button>
-          </form>
+          </GetFilterForm>
         )} submissions={submissions} />
       </section>
 

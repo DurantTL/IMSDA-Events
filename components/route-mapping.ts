@@ -121,6 +121,7 @@ const menuRoutes: readonly Menu[] = [
   ["/community", "Event", "More directory", "Sales & content", "Attendee community"],
   ["/more/clubs", "Event", "More directory", "People & clubs", "This event's clubs"],
   ["/more/club-assignments", "Event", "More directory", "People & clubs", "Club assignments"],
+  ["/more/club-teachers", "Event", "More directory", "People & clubs", "Club teachers"],
   ["/more/event-patches", "Event", "More directory", "Event tools", "Event patches"],
   ["/more/emergency-plan", "Event", "More directory", "Event tools", "Emergency plan"],
   ["/more/club-forms", "Event", "More directory", "People & clubs", "Club forms"],
@@ -150,6 +151,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/admin/organizations/directory", "/admin/organizations", "app/(workspace)/admin/organizations/page.tsx"],
   ["/admin/organizations/map-locations", "/admin/organizations/directory", "app/(workspace)/admin/organizations/directory/page.tsx"],
   ["/admin/clubs/reports/year-end", "/admin/clubs/reports", "app/(workspace)/admin/clubs/reports/page.tsx"],
+  ["/admin/club-supplies/conference-orders", "/admin/club-supplies", "components/club-supply-catalog-workspace.tsx"],
   ["/check-in/assets", "/check-in", "components/check-in-workspace.tsx"],
   ["/check-in/badges", "/check-in", "components/check-in-workspace.tsx"],
   ["/check-in/passes", "/check-in", "components/check-in-workspace.tsx"],
@@ -202,6 +204,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
     rows.push({ route, kind: "reached", oldPlace: "Page link", scope: "Event", destinationPath: parent, label: `Reached from ${parent}`, group: parent, reachedFrom: { parent, linkedIn } });
   }
   rows.push({ route: "/admin", kind: "shell", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "System administration home", group: "System", note: "Opened from the sidebar's System administration link and the phone System menu bar." });
+  rows.push({ route: "/admin/problem-reports", kind: "reached", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "Problem reports", group: "/admin", reachedFrom: { parent: "/admin", linkedIn: "app/(workspace)/admin/page.tsx" }, note: "System administrators only. Problems people sent from the Forms help popup, with the technical details they allowed; mark each resolved." });
   rows.push({ route: "/admin/feature-requests", kind: "reached", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "Feature requests", group: "/admin", reachedFrom: { parent: "/admin", linkedIn: "app/(workspace)/admin/page.tsx" }, note: "System administrators only. Approve or decline event feature requests; the System home only counts them." });
   for (const hub of Object.values(adminHubs)) {
     rows.push({ route: hub.href, kind: "shell", oldPlace: "Page link", scope: "System", destinationPath: hub.href, label: `${hub.label} hub`, group: "Admin hubs", note: "New in #1569. Opened from its Admin tab (the Admin area's tab row); a card there opens each destination of the group the person can reach." });

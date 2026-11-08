@@ -100,7 +100,7 @@ export const platformSettingsRequestSchema = platformSettingsInputSchema.extend(
 }).strict();
 
 /**
- * The three addresses automatic alerts are sent to (#1016). They are edited on
+ * The addresses automatic alerts and conference orders are sent to (#1016, #1688). They are edited on
  * System management > Notifications and nowhere else, so the platform settings
  * form above cannot clear them by leaving them out of its request.
  *
@@ -109,11 +109,14 @@ export const platformSettingsRequestSchema = platformSettingsInputSchema.extend(
  *   the account holder. Blank means only the account holder is emailed.
  * - `newClubApplicationEmail`: gets the "a new club applied" notice (#817).
  *   Blank means no notice is sent; applications still wait in the queue.
+ * - `conferenceOrdersEmail`: gets the order email when a club orders patches and pins (#1688).
+ *   Blank sends it to the youth department address, youth@imsda.org.
  */
 export const platformAddressesInputSchema = z.object({
   supportContact: optionalEmail,
   securityAlertEmail: optionalEmail,
   newClubApplicationEmail: optionalEmail,
+  conferenceOrdersEmail: optionalEmail,
 }).strict();
 
 export type PlatformAddressesInput = z.infer<typeof platformAddressesInputSchema>;
@@ -158,6 +161,7 @@ export async function getPlatformSettings(): Promise<PlatformSettingsRecord> {
     passkeyRpId: row.passkeyRpId,
     securityAlertEmail: row.securityAlertEmail,
     newClubApplicationEmail: row.newClubApplicationEmail,
+    conferenceOrdersEmail: row.conferenceOrdersEmail,
     invoiceHeaderDepartment: row.invoiceHeaderDepartment,
     invoiceHeaderOrganization: row.invoiceHeaderOrganization,
     invoiceHeaderAddress: row.invoiceHeaderAddress,
@@ -220,8 +224,8 @@ export class PlatformSettingsError extends Error {
 
 /**
  * Staff who could sign in only with a passkey: an active account that has to
- * pass a second step (a system administrator, or anyone with an ACTIVE event
- * membership — the rule in modules/access/mfa-rules.ts), at least one live
+ * pass a second step (a system administrator, an active Clubs Administrator,
+ * or anyone with an ACTIVE event membership — the rule in modules/access/mfa-rules.ts), at least one live
  * passkey, and no active authenticator to fall back on. Changing or clearing
  * the passkey domain invalidates every existing passkey, which would strand
  * exactly these people. Staff with no second-step requirement still sign in
@@ -236,6 +240,7 @@ async function countPasskeyOnlyStaff(tx: Pick<ReturnType<typeof getPrisma>, "use
       OR: [
         { globalRole: "SYSTEM_ADMIN" },
         { memberships: { some: { status: "ACTIVE" } } },
+        { clubsAdministratorGrant: { is: { revokedAt: null } } },
       ],
     },
   });
@@ -397,12 +402,13 @@ export async function updatePlatformAddresses(
   await prisma.$transaction(async (tx) => {
     const before = await tx.platformSettings.findUnique({
       where: { id: PLATFORM_SETTINGS_ID },
-      select: { supportContact: true, securityAlertEmail: true, newClubApplicationEmail: true },
+      select: { supportContact: true, securityAlertEmail: true, newClubApplicationEmail: true, conferenceOrdersEmail: true },
     });
     const after = {
       supportContact: input.supportContact ?? null,
       securityAlertEmail: input.securityAlertEmail ?? null,
       newClubApplicationEmail: input.newClubApplicationEmail ?? null,
+      conferenceOrdersEmail: input.conferenceOrdersEmail ?? null,
     };
     await tx.platformSettings.upsert({
       where: { id: PLATFORM_SETTINGS_ID },
@@ -423,6 +429,7 @@ export async function updatePlatformAddresses(
               supportContact: before.supportContact,
               securityAlertEmail: before.securityAlertEmail,
               newClubApplicationEmail: before.newClubApplicationEmail,
+              conferenceOrdersEmail: before.conferenceOrdersEmail,
             }
             : null,
           after,
@@ -435,5 +442,6 @@ export async function updatePlatformAddresses(
     supportContact: saved.supportContact,
     securityAlertEmail: saved.securityAlertEmail,
     newClubApplicationEmail: saved.newClubApplicationEmail,
+    conferenceOrdersEmail: saved.conferenceOrdersEmail,
   };
 }

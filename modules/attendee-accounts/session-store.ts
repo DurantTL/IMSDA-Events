@@ -54,7 +54,7 @@ export const ATTENDEE_SESSION_TOUCH_INTERVAL_SECONDS = 5 * 60;
 export async function createAttendeeSession(
   accountId: string,
   userAgent: string | null,
-  options: { secondFactorVerifiedAt?: Date } = {},
+  options: { secondFactorVerifiedAt?: Date; emailCodeVerifiedAt?: Date } = {},
 ) {
   const token = createOpaqueToken();
   const now = new Date();
@@ -67,6 +67,7 @@ export async function createAttendeeSession(
       lastSeenAt: now,
       userAgentHash: hashUserAgent(userAgent),
       ...(options.secondFactorVerifiedAt ? { secondFactorVerifiedAt: options.secondFactorVerifiedAt } : {}),
+      ...(options.emailCodeVerifiedAt ? { emailCodeVerifiedAt: options.emailCodeVerifiedAt } : {}),
     },
   });
   return { token, expiresAt };

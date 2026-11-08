@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { requestCorrelationId, setLogRequestFieldSource } from "@/lib/logger";
+import { runWithRequestScopedSet } from "@/lib/request-scoped-set";
 import { withNoStore } from "@/lib/live-list-response";
 import { classifyPausableArea } from "@/modules/system-admin/area-pause-model";
 
@@ -37,7 +38,7 @@ setLogRequestFieldSource(() => {
 });
 
 export function runWithRequestContext<T>(context: RequestContext, run: () => T): T {
-  return storage.run(context, run);
+  return storage.run(context, () => runWithRequestScopedSet(run));
 }
 
 export function currentRequestContext(): RequestContext | undefined {

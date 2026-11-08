@@ -1,0 +1,11 @@
+/*
+ * Load shift on /account (#1557, B17). The side cards' help text is long and the column is narrow, so it wraps onto a
+ * different number of lines when the web font replaces the fallback, and the cards below it moved down a line. On the
+ * two-column layout each paragraph reserves the lines it takes in the web font (--help-lines, from reservedHelpLines);
+ * on one column the cards are wide and nothing moves.
+ */
+@media (min-width: 901px) {
+  .reserveHelp {
+    min-height: calc(var(--help-lines, 1) * 1lh);
+  }
+}

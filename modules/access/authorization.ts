@@ -16,6 +16,8 @@ export type MembershipRecord = {
   role: EventRole;
   status: "ACTIVE" | "INACTIVE";
   permissions: readonly EventPermission[];
+  /** Set when the EVENT_ADMIN role comes from an active Clubs Administrator grant on a club event (#1643), not a staff assignment. */
+  viaClubsAdministrator?: true;
 };
 
 export type MembershipLookup = (

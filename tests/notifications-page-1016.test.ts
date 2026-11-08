@@ -62,6 +62,7 @@ const addresses = {
   supportContact: "support@imsda-events.test",
   securityAlertEmail: null,
   newClubApplicationEmail: "clubs@imsda-events.test",
+  conferenceOrdersEmail: null,
 };
 
 function patch(body: unknown) {
@@ -137,7 +138,7 @@ describe("notifications routes: system administrators only (#1016)", () => {
     expect((await patch({ key: "NOT_A_KEY", enabled: false })).status).toBe(400);
     expect((await patch({ key: "NEW_CLUB_APPLICATION", enabled: "no" })).status).toBe(400);
     expect((await patch({ addresses: { securityAlertEmail: "not-an-address" } })).status).toBe(400);
-    expect((await patch({ addresses: { organizationName: "Hijack", supportContact: "", securityAlertEmail: "", newClubApplicationEmail: "" } })).status).toBe(400);
+    expect((await patch({ addresses: { organizationName: "Hijack", supportContact: "", securityAlertEmail: "", newClubApplicationEmail: "", conferenceOrdersEmail: "" } })).status).toBe(400);
     // An omitted key must not silently clear a saved address.
     expect((await patch({ addresses: { securityAlertEmail: "security@imsda-events.test" } })).status).toBe(400);
     expect((await patch({ addresses: { supportContact: "", securityAlertEmail: "" } })).status).toBe(400);
@@ -145,11 +146,11 @@ describe("notifications routes: system administrators only (#1016)", () => {
     expect(mocks.updatePlatformAddresses).not.toHaveBeenCalled();
   });
 
-  it("saves the three addresses for a system administrator", async () => {
-    const response = await patch({ addresses: { securityAlertEmail: " Security@IMSDA-Events.test ", supportContact: "", newClubApplicationEmail: "" } });
+  it("saves the four addresses for a system administrator", async () => {
+    const response = await patch({ addresses: { securityAlertEmail: " Security@IMSDA-Events.test ", supportContact: "", newClubApplicationEmail: "", conferenceOrdersEmail: " Orders@IMSDA-Events.test " } });
     expect(response.status).toBe(200);
     expect(mocks.updatePlatformAddresses).toHaveBeenCalledWith(
-      { securityAlertEmail: "security@imsda-events.test", supportContact: null, newClubApplicationEmail: null },
+      { securityAlertEmail: "security@imsda-events.test", supportContact: null, newClubApplicationEmail: null, conferenceOrdersEmail: "orders@imsda-events.test" },
       "admin-1",
     );
   });

@@ -137,7 +137,7 @@ describe("platform settings input", () => {
   });
 
   it("no longer takes the alert addresses: they are edited on Notifications, so this form cannot clear them (#1016)", () => {
-    for (const field of ["supportContact", "securityAlertEmail", "newClubApplicationEmail"]) {
+    for (const field of ["supportContact", "securityAlertEmail", "newClubApplicationEmail", "conferenceOrdersEmail"]) {
       expect(platformSettingsInputSchema.safeParse(validInput({ [field]: "a@imsda-events.test" })).success).toBe(false);
     }
   });
@@ -146,7 +146,7 @@ describe("platform settings input", () => {
 describe("platform alert addresses (#456, #817, #1016)", () => {
   it("are optional and never default to an address: blank means no notice", () => {
     const parsed = platformAddressesInputSchema.parse({});
-    expect(parsed).toEqual({ supportContact: null, securityAlertEmail: null, newClubApplicationEmail: null });
+    expect(parsed).toEqual({ supportContact: null, securityAlertEmail: null, newClubApplicationEmail: null, conferenceOrdersEmail: null });
     expect(platformAddressesInputSchema.parse({ newClubApplicationEmail: "  ", securityAlertEmail: "" })).toMatchObject({
       newClubApplicationEmail: null,
       securityAlertEmail: null,
@@ -158,13 +158,15 @@ describe("platform alert addresses (#456, #817, #1016)", () => {
       newClubApplicationEmail: "  Youth.Assistant@IMSDA-Events.test ",
       securityAlertEmail: "  Security@IMSDA.org ",
       supportContact: " Help@IMSDA.org",
+      conferenceOrdersEmail: " Orders@IMSDA.org ",
     });
     expect(parsed).toEqual({
       newClubApplicationEmail: "youth.assistant@imsda-events.test",
       securityAlertEmail: "security@imsda.org",
       supportContact: "help@imsda.org",
+      conferenceOrdersEmail: "orders@imsda.org",
     });
-    for (const field of ["supportContact", "securityAlertEmail", "newClubApplicationEmail"]) {
+    for (const field of ["supportContact", "securityAlertEmail", "newClubApplicationEmail", "conferenceOrdersEmail"]) {
       expect(platformAddressesInputSchema.safeParse({ [field]: "not-an-address" }).success).toBe(false);
     }
   });
@@ -178,7 +180,7 @@ describe("platform alert addresses (#456, #817, #1016)", () => {
     const upsert = vi.fn();
     const tx = {
       platformSettings: {
-        findUnique: vi.fn().mockResolvedValue({ supportContact: "old@imsda-events.test", securityAlertEmail: null, newClubApplicationEmail: null }),
+        findUnique: vi.fn().mockResolvedValue({ supportContact: "old@imsda-events.test", securityAlertEmail: null, newClubApplicationEmail: null, conferenceOrdersEmail: null }),
         upsert,
       },
       auditLog: { create: auditCreate },
@@ -194,15 +196,15 @@ describe("platform alert addresses (#456, #817, #1016)", () => {
       "admin-1",
     );
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
-      update: { supportContact: null, securityAlertEmail: "security@imsda-events.test", newClubApplicationEmail: null, updatedByUserId: "admin-1" },
+      update: { supportContact: null, securityAlertEmail: "security@imsda-events.test", newClubApplicationEmail: null, conferenceOrdersEmail: null, updatedByUserId: "admin-1" },
     }));
     expect(auditCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         actorUserId: "admin-1",
         action: "PLATFORM_ALERT_ADDRESSES_UPDATED",
         metadata: {
-          before: { supportContact: "old@imsda-events.test", securityAlertEmail: null, newClubApplicationEmail: null },
-          after: { supportContact: null, securityAlertEmail: "security@imsda-events.test", newClubApplicationEmail: null },
+          before: { supportContact: "old@imsda-events.test", securityAlertEmail: null, newClubApplicationEmail: null, conferenceOrdersEmail: null },
+          after: { supportContact: null, securityAlertEmail: "security@imsda-events.test", newClubApplicationEmail: null, conferenceOrdersEmail: null },
         },
       }),
     });
@@ -252,7 +254,7 @@ describe("clearing the passkey domain", () => {
     await expect(attempt).rejects.toThrow("2 staff sign in only with a passkey; they'd be locked out.");
 
     // Counted as: active accounts that must pass a second step (system admins
-    // and anyone with an active event membership), with a live passkey and no
+    // active Clubs Administrators, and anyone with an active event membership), with a live passkey and no
     // active authenticator.
     expect(tx.user.count).toHaveBeenCalledWith({
       where: {
@@ -262,6 +264,7 @@ describe("clearing the passkey domain", () => {
         OR: [
           { globalRole: "SYSTEM_ADMIN" },
           { memberships: { some: { status: "ACTIVE" } } },
+          { clubsAdministratorGrant: { is: { revokedAt: null } } },
         ],
       },
     });

@@ -70,6 +70,8 @@ export async function unifiedPasswordSignIn(
 
   if (staff.kind === "ok") {
     const result = await staff.complete(userAgent);
+    // The account vanished mid sign-in: refused, with no session of either kind.
+    if (!result) return { kind: "refused" };
     if (result.outcome === "mfa") return { kind: "mfa", userId: result.userId, gate: result.gate };
     if (result.outcome === "passkey_required") return { kind: "passkey_required" };
     // Staff access needs the staff-grade method. `complete` only ever returns a session for

@@ -83,7 +83,7 @@ describe("Backup email service row", () => {
   it("says configured with its last use, or that it has not been needed", () => {
     const used = backupServiceFields("k", { status: active, lastUsedAt: new Date("2026-10-30T08:15:00Z"), now });
     expect(used).toMatchObject({ state: "ok", whenLabel: "Last used", checkedAt: "2026-10-30T08:15:00.000Z" });
-    expect(used.resultText).toContain("2026-10-30 08:15 UTC");
+    expect(used.resultText).toContain("Oct 30, 2026, 3:15 AM CDT");
     const unused = backupServiceFields("k", { status: active, lastUsedAt: null, now });
     expect(unused).toMatchObject({ state: "ok", checkedAt: null, noTimeLabel: "Never" });
   });

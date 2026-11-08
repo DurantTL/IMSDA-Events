@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function AreaPausesPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   return (
     <>

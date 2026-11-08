@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Event module requests" };
 export default async function FeatureRequestsPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   let requests: Awaited<ReturnType<typeof listPendingModuleRequests>> | null = null;
   try {

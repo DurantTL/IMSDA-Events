@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => {
     checkLoginClientRateLimit: vi.fn(),
     checkLoginAccountRateLimit: vi.fn(),
     listEventsForUser: vi.fn(),
+    isActiveClubsAdministrator: vi.fn(),
     cookieGet: vi.fn(),
     cookieSet: vi.fn(),
     logError: vi.fn(),
@@ -60,6 +61,7 @@ vi.mock("@/modules/rate-limit/service", () => ({
   checkLoginClientRateLimit: mocks.checkLoginClientRateLimit,
   checkLoginAccountRateLimit: mocks.checkLoginAccountRateLimit,
 }));
+vi.mock("@/modules/access/admin-roles", () => ({ isActiveClubsAdministrator: mocks.isActiveClubsAdministrator }));
 vi.mock("@/modules/events/repository", () => ({
   listEventsForUser: mocks.listEventsForUser,
 }));
@@ -129,6 +131,40 @@ describe("POST /api/auth/login destination", () => {
       "synthetic-session-token",
       expect.objectContaining({ httpOnly: true, sameSite: "lax" }),
     );
+  });
+
+  it("sends a Clubs Administrator with no event assignment to Club administration", async () => {
+    mocks.authenticateWithPassword.mockResolvedValue(signedInSession());
+    mocks.listEventsForUser.mockResolvedValue([]);
+    mocks.isActiveClubsAdministrator.mockResolvedValue(true);
+
+    const response = await login(post("/api/auth/login", credentials));
+
+    expect((await response.json()).redirectTo).toBe("/admin/clubs");
+  });
+
+  it("sends a Clubs Administrator whose only events are archived to Club administration, not the archived list", async () => {
+    mocks.authenticateWithPassword.mockResolvedValue(signedInSession());
+    mocks.listEventsForUser.mockResolvedValue([{ id: "evt_old", archivedAt: new Date("2025-01-01T00:00:00Z") }]);
+    mocks.isActiveClubsAdministrator.mockResolvedValue(true);
+
+    expect((await (await login(post("/api/auth/login", credentials))).json()).redirectTo).toBe("/admin/clubs");
+  });
+
+  it("still sends event staff with only archived events to the archived list", async () => {
+    mocks.authenticateWithPassword.mockResolvedValue(signedInSession());
+    mocks.listEventsForUser.mockResolvedValue([{ id: "evt_old", archivedAt: new Date("2025-01-01T00:00:00Z") }]);
+    mocks.isActiveClubsAdministrator.mockResolvedValue(false);
+
+    expect((await (await login(post("/api/auth/login", credentials))).json()).redirectTo).toBe("/archived-events");
+  });
+
+  it("still sends event staff with no events to no-access", async () => {
+    mocks.authenticateWithPassword.mockResolvedValue(signedInSession());
+    mocks.listEventsForUser.mockResolvedValue([]);
+    mocks.isActiveClubsAdministrator.mockResolvedValue(false);
+
+    expect((await (await login(post("/api/auth/login", credentials))).json()).redirectTo).toBe("/no-access");
   });
 
   it("sends a system administrator to /admin", async () => {

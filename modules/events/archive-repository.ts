@@ -8,7 +8,7 @@ import {
   type EventArchiveAuditMetadata,
 } from "@/modules/events/archive";
 import { effectiveLifecycleState } from "@/modules/events/lifecycle-state";
-import { EventOperationError } from "@/modules/events/repository";
+import { EventOperationError, eventAccessFilter } from "@/modules/events/repository";
 
 export class EventArchiveForbiddenError extends Error {
   constructor(message: string) {
@@ -30,8 +30,10 @@ type ArchiveActor = EventArchiveActor & { userId: string };
  */
 async function setEventArchived(input: { eventId: string; actor: ArchiveActor; archive: boolean }) {
   return getPrisma().$transaction(async (tx) => {
-    const current = await tx.event.findUnique({ where: { id: input.eventId }, select: { id: true } });
+    const current = await tx.event.findUnique({ where: { id: input.eventId }, select: { id: true, isBillingContainer: true } });
     if (!current) throw new EventOperationError("EVENT_NOT_FOUND", "That event no longer exists.");
+    // The hidden Conference club orders billing event (#1688) stays archived, so no picker, calendar or public page ever lists it.
+    if (current.isBillingContainer) throw new EventArchiveForbiddenError("This is the hidden billing event for conference club orders. It stays archived.");
     const decision = decideEventArchiveAccess(input.actor);
     if (!decision.allowed) throw new EventArchiveForbiddenError(decision.reason);
 
@@ -85,7 +87,9 @@ export async function listArchivedEventsForUser(userId: string, isSystemAdmin: b
   return getPrisma().event.findMany({
     where: {
       archivedAt: { not: null },
-      ...(isSystemAdmin ? {} : { memberships: { some: { userId, status: "ACTIVE" } } }),
+      // The hidden billing events for conference club orders (#1688) are not events anyone looks for here.
+      isBillingContainer: false,
+      ...(await eventAccessFilter(userId, isSystemAdmin, "include")),
     },
     orderBy: [{ startsAt: "desc" }, { id: "asc" }],
     select: { id: true, slug: true, name: true, startsAt: true, endsAt: true, timezone: true, archivedAt: true },

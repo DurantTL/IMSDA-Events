@@ -45,8 +45,8 @@ describe("information form pages (#1149)", () => {
     await expect(AdminListPage()).rejects.toMatchObject({ to: "/login" });
     await expect(AdminFormPage(params("f1"))).rejects.toMatchObject({ to: "/login" });
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u1", globalRole: "STAFF" } });
-    await expect(AdminListPage()).rejects.toMatchObject({ to: "/no-access" });
-    await expect(AdminFormPage(params("f1"))).rejects.toMatchObject({ to: "/no-access" });
+    await expect(AdminListPage()).rejects.toMatchObject({ to: "/no-access?from=system" });
+    await expect(AdminFormPage(params("f1"))).rejects.toMatchObject({ to: "/no-access?from=system" });
     expect(mocks.loadInformationFormView).not.toHaveBeenCalled();
   });
 

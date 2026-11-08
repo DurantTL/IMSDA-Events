@@ -9,6 +9,7 @@ import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 import {
   carriedClassLevel,
   carriedRole,
+  carriedSchoolValue,
   carryForwardYears,
   type CarryForwardInput,
 } from "@/modules/club-rosters/carry-forward-domain";
@@ -52,6 +53,8 @@ export type CarryForwardCandidate = {
   attendeeType: "YOUTH" | "STAFF" | "ADULT" | "UNDERAGE";
   role: string;
   classLevel: string | null;
+  /** Last year's grade (#1664), for the reviewed "Move everyone up one grade" step. Not school type or church membership. */
+  schoolGrade: string | null;
   /** A pending transfer request moves this person to another club: shown flagged and unticked. */
   transferring: boolean;
   /** This club declined a transfer request; it is now with conference staff. Shown with a neutral note, still ticked. */
@@ -91,7 +94,7 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
   const members = await prisma.clubRosterMember.findMany({
     where: { organizationId, clubYear: fromClubYear, status: "ACTIVE", personId: { not: null } },
     select: {
-      id: true, personId: true, attendeeType: true, role: true, classLevel: true, sealedBirthDate: true,
+      id: true, personId: true, attendeeType: true, role: true, classLevel: true, schoolGrade: true, sealedBirthDate: true,
       person: { select: { firstName: true, lastName: true } },
     },
   });
@@ -117,6 +120,7 @@ export async function getCarryForwardOffer(organizationId: string, now = new Dat
       attendeeType: member.attendeeType,
       role: member.role,
       classLevel: member.classLevel,
+      schoolGrade: member.schoolGrade,
       transferring: member.personId ? transferring.has(member.personId) : false,
       transferWithStaff: member.personId ? withStaff.has(member.personId) : false,
       age: member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), today) : null,
@@ -159,6 +163,8 @@ export type CarryForwardResult = {
   carried: number;
   leftBehind: number;
   typeChanged: number;
+  /** Youth whose grade the director changed in the review (a count only). */
+  gradesChanged: number;
   /** Ticked people who were already on the new year's roster, so nothing was added for them. */
   alreadyThere: number;
   /** Emergency contacts copied onto the new year's rows (a count only, never a value). */
@@ -192,7 +198,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
     await tx.$queryRaw`SELECT "id" FROM "ClubRosterMember" WHERE "id" = ANY(${ids}::text[]) AND "organizationId" = ${organizationId} FOR UPDATE`;
     const sources = await tx.clubRosterMember.findMany({
       where: { id: { in: ids }, organizationId, clubYear: fromClubYear, status: "ACTIVE", personId: { not: null } },
-      select: { id: true, personId: true, attendeeType: true, role: true, classLevel: true, gender: true, reportedAge: true, sealedBirthDate: true },
+      select: { id: true, personId: true, attendeeType: true, role: true, classLevel: true, schoolGrade: true, schoolType: true, churchMember: true, gender: true, reportedAge: true, sealedBirthDate: true },
     });
     if (sources.length !== ids.length) {
       throw new RosterOperationError("MEMBER_NOT_FOUND", "One of those people isn't on last year's roster.");
@@ -203,10 +209,12 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
     // New row's person -> the source member whose contacts it inherits.
     const sourceByPerson = new Map<string, string>();
     let typeChanged = 0;
+    let gradesChanged = 0;
     for (const source of sources) {
       if (!source.personId || present.has(source.personId)) continue;
       const choice = choices.get(source.id)!;
       if (choice.attendeeType !== source.attendeeType) typeChanged += 1;
+      if (choice.attendeeType === "YOUTH" && choice.schoolGrade !== undefined && choice.schoolGrade !== source.schoolGrade) gradesChanged += 1;
       sourceByPerson.set(source.personId, source.id);
       rows.push({
         organizationId,
@@ -215,6 +223,9 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
         attendeeType: choice.attendeeType,
         role: carriedRole(source, choice),
         classLevel: carriedClassLevel(source, choice),
+        schoolGrade: carriedSchoolValue(source.schoolGrade, choice, choice.schoolGrade),
+        schoolType: carriedSchoolValue(source.schoolType, choice, undefined),
+        churchMember: carriedSchoolValue(source.churchMember, choice, undefined),
         gender: source.gender,
         reportedAge: source.reportedAge,
         // The ciphertext moves as it is: a carried birth date is never opened here, so it never exists in plain text.
@@ -259,6 +270,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
         carried,
         leftBehind,
         typeChanged,
+        gradesChanged,
         alreadyThere,
         guardiansCopied,
         ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId ?? null }),
@@ -270,6 +282,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
       carried,
       leftBehind,
       typeChanged,
+      gradesChanged,
       alreadyThere,
       guardiansCopied,
       personIds: rows.flatMap((row) => (row.personId ? [row.personId] : [])),

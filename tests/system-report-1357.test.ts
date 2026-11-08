@@ -392,7 +392,7 @@ describe("the page markup", () => {
     expect(markup).toContain("System administrators only");
     expect(markup).toMatch(/<a class="secondary-button" href="\/admin\/system-report">[^]*Check again/);
     expect(markup).toContain("2 problems need attention");
-    expect(markup).toContain("Read Friday, October 30, 2026 at 10:42 AM UTC. 4 readings tried, 1 could not be read.");
+    expect(markup).toContain("Read Friday, October 30, 2026 at 5:42 AM CDT. 4 readings tried, 1 could not be read.");
     for (const section of SECTION_DEFINITIONS) expect(markup).toContain(`href="#s-${section.key}"`);
     expect(markup).toContain("11 of 13 ticked");
     expect(markup).toContain("Counts and states only");
@@ -405,7 +405,7 @@ describe("the page markup", () => {
     expect(markup).toContain("Unavailable");
     expect(markup).toContain("The database is unreachable");
     expect(markup).toContain("Fixed on the server");
-    expect(markup).toContain("Tried </b>10:42 AM UTC today");
+    expect(markup).toContain("Tried </b>5:42 AM CDT today");
     expect(markup).toContain("Ticks record that a person checked something");
   });
 

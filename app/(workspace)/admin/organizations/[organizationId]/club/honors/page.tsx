@@ -29,7 +29,7 @@ export default async function StaffClubHonorsPage({
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   const { organizationId } = await params;
-  if (!(await canAdministerClubOrganization(user, organizationId))) redirect("/no-access");
+  if (!(await canAdministerClubOrganization(user, organizationId))) redirect("/no-access?from=club-only");
   const club = await getPrisma().organization.findUnique({
     where: { id: organizationId },
     select: { type: true, name: true, isActive: true },

@@ -26,6 +26,7 @@ export const TURNSTILE_ACTIONS = {
   clubApplication: "club-application",
   registrationRecovery: "registration-recovery",
   informationForm: "information-form",
+  problemReport: "problem-report",
 } as const;
 
 export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[keyof typeof TURNSTILE_ACTIONS];

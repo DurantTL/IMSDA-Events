@@ -62,6 +62,14 @@ const staffPlain: ClubFormsViewer = { kind: "STAFF", userId: "staff-2", systemAd
 const SECRET_PHYSICIAN = "Dr. Synthetic Physician";
 const SECRET_PHONE = "(515) 555-0199";
 
+/**
+ * A generic "sealed answers" fixture. The seeded slip no longer seals these keys (owner decision, 2026-11-07), so
+ * this stored row keeps the old list on purpose, the way a copy edited in the app that still seals them would.
+ * The sealing, audit and restriction rules below are the same for any sensitive key; the plain behaviour of the
+ * seeded slip has its own tests (club-forms-emergency-plain.test.ts).
+ */
+const SEALED_FIXTURE_KEYS = ["physician_name", "physician_phone", "clinic_name", "clinic_phone", "emergency_contact_phone"];
+
 function slipTemplateRow() {
   const seed = clubFormTemplateSeeds.find((template) => template.key === "off_premises_permission_slip");
   if (!seed) throw new Error("missing seed");
@@ -73,7 +81,7 @@ function slipTemplateRow() {
     version: seed.version,
     definition: seed.definition,
     sectionNotes: seed.sectionNotes,
-    sensitiveFieldKeys: seed.sensitiveFieldKeys,
+    sensitiveFieldKeys: SEALED_FIXTURE_KEYS,
     birthDateFieldKeys: seed.birthDateFieldKeys,
     staffOnlyFieldKeys: seed.staffOnlyFieldKeys,
     printLayout: seed.printLayout,
@@ -409,12 +417,16 @@ describe("opening a submission (#610)", () => {
   });
 
   it("restricts what the code marks sensitive even when the stored template lags", async () => {
+    // The staff form's health answers are still sealed by the code; the slip's emergency answers are not (2026-11-07).
+    const staffSeed = clubFormTemplateSeeds.find((template) => template.key === "pathfinder_staff_service_information");
+    if (!staffSeed) throw new Error("missing seed");
     mocks.submissionFindFirst.mockImplementation(async () => row({
-      template: { ...slipTemplateRow(), sensitiveFieldKeys: [], birthDateFieldKeys: [] },
+      answers: { health_limitation: "Plain by mistake" },
+      template: { ...slipTemplateRow(), key: staffSeed.key, definition: staffSeed.definition, sectionNotes: staffSeed.sectionNotes, staffOnlyFieldKeys: staffSeed.staffOnlyFieldKeys, sensitiveFieldKeys: [], birthDateFieldKeys: [] },
     }));
     const view = await getSubmissionForViewer(areaCoordinator, submissionId);
-    expect(new Set(view.restrictedKeys)).toEqual(new Set(slipTemplateRow().sensitiveFieldKeys));
-    expect(view.answers).not.toHaveProperty("physician_name");
+    expect(new Set(view.restrictedKeys)).toEqual(new Set(staffSeed.sensitiveFieldKeys));
+    expect(view.answers).not.toHaveProperty("health_limitation");
   });
 
   it("drops a restricted key from the plain answers too, in case one was stored there", async () => {
@@ -551,5 +563,51 @@ describe("opening a submission (#610)", () => {
     await expect(getSubmissionForViewer(areaCoordinator, submissionId, "VIEW", "club-b")).rejects.toMatchObject({ code: "SUBMISSION_NOT_FOUND" });
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
     await expect(getSubmissionForViewer(director, submissionId, "VIEW", "club-b")).rejects.toMatchObject({ code: "CLUB_NOT_FOUND" });
+  });
+});
+
+describe("saving a Membership Application draft without seeing school details (#1668)", () => {
+  const membership = clubFormTemplateSeeds.find((seed) => seed.key === "pathfinder_membership_application")!;
+  const membershipRow = {
+    id: "template-membership", key: membership.key, name: membership.name, description: membership.description, version: membership.version,
+    definition: membership.definition, sectionNotes: membership.sectionNotes, sensitiveFieldKeys: membership.sensitiveFieldKeys,
+    birthDateFieldKeys: membership.birthDateFieldKeys, staffOnlyFieldKeys: membership.staffOnlyFieldKeys, printLayout: membership.printLayout, enabled: true,
+  };
+  const clubsAdminActingAsLeader: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "STAFF_ACTING", userId: "staff-3", actAsId: "act-2", viaClubsAdministrator: true } };
+  const stored = { school_type: "Homeschool", church_member: "Yes", full_name: "Riley Sample" };
+
+  beforeEach(() => {
+    mocks.templateFindFirst.mockResolvedValue(membershipRow);
+    mocks.templateFindUnique.mockResolvedValue(membershipRow);
+    mocks.organizationFindMany.mockResolvedValue([]);
+    mocks.submissionFindFirst.mockResolvedValue({ id: "draft-1", status: "DRAFT", answers: stored, sealedSensitiveAnswers: null });
+  });
+
+  const save = (viewer: ClubFormsViewer, answers: Record<string, unknown>) => saveClubFormSubmission(viewer, {
+    organizationId: "club-a", templateKey: membership.key, submissionId: "draft-1", answers, submit: false,
+  }, now);
+  const savedAnswers = () => (mocks.submissionUpdateMany.mock.calls[0]![0] as { data: { answers: Record<string, unknown> } }).data.answers;
+
+  it("keeps the stored school type and church membership when a Clubs Administrator acting as director saves, and ignores values they send", async () => {
+    // The edit view hid the two fields, so the form sends them blank (or a crafted request sends other values).
+    await save(clubsAdminActingAsLeader, { full_name: "Riley Q. Sample", school_type: "", church_member: "No" });
+    expect(savedAnswers()).toMatchObject({ full_name: "Riley Q. Sample", school_type: "Homeschool", church_member: "Yes" });
+  });
+
+  it("keeps them when the form sends nothing for those two fields", async () => {
+    await save(clubsAdminActingAsLeader, { full_name: "Riley Sample" });
+    expect(savedAnswers()).toMatchObject({ school_type: "Homeschool", church_member: "Yes" });
+  });
+
+  it("still updates them when the club's own director saves", async () => {
+    await save(director, { full_name: "Riley Sample", school_type: "Public school", church_member: "No" });
+    expect(savedAnswers()).toMatchObject({ school_type: "Public school", church_member: "No" });
+  });
+
+  it("does not write them for a Clubs Administrator acting as director on a new form either", async () => {
+    mocks.submissionFindFirst.mockResolvedValue(null);
+    await saveClubFormSubmission(clubsAdminActingAsLeader, { organizationId: "club-a", templateKey: membership.key, answers: { full_name: "Riley Sample", school_type: "Homeschool" }, submit: false }, now);
+    const created = (mocks.submissionCreate.mock.calls[0]![0] as { data: { answers: Record<string, unknown> } }).data.answers;
+    expect(created).not.toHaveProperty("school_type");
   });
 });

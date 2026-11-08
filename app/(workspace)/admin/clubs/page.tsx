@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowRight, CalendarDays, ClipboardCheck, ClipboardList, ClipboardPen, Tent } from "lucide-react";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { hasClubsAdministration, resolveAdminRoles } from "@/modules/access/admin-roles";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getRequiredFormsStatus } from "@/modules/club-forms/required";
 import { countWaitingNewClubApplications, listNewClubApplications } from "@/modules/club-applications/repository";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
@@ -51,12 +51,11 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN";
 
   const hubViewer: HubViewer = { isSystemAdmin: viewer === "SYSTEM_ADMIN", clubsAdmin: true, siteContentEditor: false, healthImport: healthRecordsEnabled() };
-  const [clubs, events, applications, waitingCount, roles, requiredForms] = await Promise.all([
+  const [clubs, events, applications, waitingCount, requiredForms] = await Promise.all([
     getAreaClubsSummary(clubYear, now, { backgroundChecks: false }),
     listAreaClubEvents(clubYear),
     listNewClubApplications(viewer),
     countWaitingNewClubApplications(viewer),
-    resolveAdminRoles(user),
     getRequiredFormsStatus(clubYear),
   ]);
   // The destination cards' live status, for the club year picked here: the clubs, late records and waiting applications come
@@ -82,7 +81,6 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   const { counts, nextEvent, registeredClubs } = home;
   const viewAllCount = query ? registeredClubs.matchCount : registeredClubs.total;
   const href = clubsAdminHrefs(clubYear);
-  const canOpenEvent = nextEvent !== null && (user.globalRole === "SYSTEM_ADMIN" || roles.eventAdminEventIds.includes(nextEvent.id));
   const eventParam = nextEvent ? encodeURIComponent(nextEvent.id) : "";
 
   return (
@@ -96,18 +94,17 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
         <p className={styles.identity} data-testid="signed-in-identity">Signed in as <strong>{user.displayName}</strong> ({user.email})</p>
       </section>
 
-      {/* Area Coordinator act-as is for system administrators only (#442), here as under People; a Clubs Administrator never sees it (#1556). */}
-      {viewer === "SYSTEM_ADMIN" ? (
-        <div className="intro-actions">
-          <ActAsButton
-            access="View only"
-            endpoint="/api/admin/act-as/area-coordinator"
-            label="Act as Area Coordinator (2 hours)"
-            resultAction="Open the Area Coordinator portal"
-            role="Area Coordinator"
-          />
-        </div>
-      ) : null}
+      {/* Area Coordinator act-as is for system administrators and Clubs Administrators (Caleb, 2026-11-06): everyone who gets past this page's `hasClubsAdministration` check, which is the same check the start route makes (`requireClubsAdministration`). */}
+      <div className="intro-actions">
+        <ActAsButton
+          access="View only"
+          endpoint="/api/admin/act-as/area-coordinator"
+          label="Act as Area Coordinator (2 hours)"
+          origin="clubs"
+          resultAction="Open the Area Coordinator portal"
+          role="Area Coordinator"
+        />
+      </div>
 
       <GetFilterForm className={styles.yearForm} action="/admin/clubs">
         <label>
@@ -250,14 +247,11 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
               <br />
               {nextEvent.registeredClubs} of {nextEvent.totalClubs} clubs registered · {nextEvent.people} people
             </p>
-            {canOpenEvent ? (
-              <div className={styles.eventLinks}>
-                <Link className={`primary-button ${styles.linkButton}`} href={`/overview?event=${eventParam}`}>Manage event</Link>
-                <Link className={`secondary-button ${styles.linkButton}`} href={`/more/kitchen-report?event=${eventParam}`}>Kitchen report</Link>
-              </div>
-            ) : (
-              <p className={styles.rule}>Ask the event&apos;s administrator for the event workspace.</p>
-            )}
+            {/* Everyone who reaches this page administers every club event: a system administrator, or a Clubs Administrator (#1643). */}
+            <div className={styles.eventLinks}>
+              <Link className={`primary-button ${styles.linkButton}`} href={`/overview?event=${eventParam}`}>Manage event</Link>
+              <Link className={`secondary-button ${styles.linkButton}`} href={`/more/kitchen-report?event=${eventParam}`}>Kitchen report</Link>
+            </div>
           </>
         ) : (
           <p className={styles.rule}>No upcoming club events this club year.</p>

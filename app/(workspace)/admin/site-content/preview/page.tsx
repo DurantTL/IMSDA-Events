@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function SiteContentPreviewPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (!(await canManageSiteContent(user))) redirect("/no-access");
+  if (!(await canManageSiteContent(user))) redirect("/no-access?from=site-content");
   const draft = await getDraftHubContent();
   if (!draft) redirect("/admin/site-content");
 

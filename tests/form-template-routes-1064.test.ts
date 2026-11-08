@@ -162,8 +162,8 @@ describe("form template pages", () => {
 
   it("refuse a signed-in user who is not a system administrator, and read nothing", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: eventAdmin });
-    await expect(AdminFormTemplatesPage({ searchParams: Promise.resolve({}) })).rejects.toMatchObject({ to: "/no-access" });
-    await expect(FormTemplateEditorPage({ params: key.params })).rejects.toMatchObject({ to: "/no-access" });
+    await expect(AdminFormTemplatesPage({ searchParams: Promise.resolve({}) })).rejects.toMatchObject({ to: "/no-access?from=system" });
+    await expect(FormTemplateEditorPage({ params: key.params })).rejects.toMatchObject({ to: "/no-access?from=system" });
     expect(mocks.listFormTemplateLibrary).not.toHaveBeenCalled();
     expect(mocks.getFormTemplateForEditor).not.toHaveBeenCalled();
   });

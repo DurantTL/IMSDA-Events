@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Platform settings" };
 export default async function PlatformSettingsPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   return (
     <>

@@ -36,6 +36,8 @@ export type ClubRosterAttendee = {
   /** Age on the event date, from the roster's own age answer — never a birth date. */
   ageOnEventDate: number | null;
   gender: string | null;
+  /** The roster class answer (Friend, Explorer, ...), for the column chooser (#1671); blank when unanswered. */
+  classLevel?: string | null;
   medicalPersonnel: boolean;
   masterGuideInvestiture: boolean;
   firstTimeCamper: boolean;
@@ -234,6 +236,7 @@ export function buildClubEventRecord(input: BuildClubEventRecordInput): ClubEven
       role: roleFromResponse(attendee.responses.attendee_type),
       ageOnEventDate: numberFromResponse(attendee.responses.attendee_age),
       gender: textValue(attendee.responses.gender) || null,
+      classLevel: textValue(attendee.responses.attendee_class) || null,
       medicalPersonnel: boolValue(attendee.responses.medical_personnel),
       masterGuideInvestiture: boolValue(attendee.responses.master_guide_investiture),
       firstTimeCamper: boolValue(attendee.responses.first_time_camper),

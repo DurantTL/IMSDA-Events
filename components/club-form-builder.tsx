@@ -52,6 +52,8 @@ export type ClubFormBuilderProps = {
   /** Problems the stored draft already has: shown inline, and publish refuses until they are fixed. */
   draftWarnings?: BuilderIssue[];
   lockedSensitiveKeys: string[];
+  /** Keys the owner made plain on 2026-11-07: the Sensitive box is off and disabled for them. */
+  plainByDecisionKeys?: string[];
   lockedBirthDateKeys: string[];
   /** Keys that existed in the published version: their key text cannot change. */
   publishedKeys: string[];
@@ -121,6 +123,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
   });
   const allowNavigation = useUnsavedChangesGuard(dirty, "You have unsaved changes to this form. Leave this page and discard them?");
   const lockedSensitive = useMemo(() => new Set(props.lockedSensitiveKeys), [props.lockedSensitiveKeys]);
+  const plainByDecision = useMemo(() => new Set(props.plainByDecisionKeys ?? []), [props.plainByDecisionKeys]);
   const lockedBirth = useMemo(() => new Set(props.lockedBirthDateKeys), [props.lockedBirthDateKeys]);
   const published = useMemo(() => new Set(props.publishedKeys), [props.publishedKeys]);
   const hasSubmissions = props.submissionCount > 0;
@@ -342,6 +345,7 @@ export function ClubFormBuilder(props: ClubFormBuilderProps) {
                   keyLocked={published.has(field.key)}
                   lockedBirth={lockedBirth.has(field.key)}
                   lockedSensitive={lockedSensitive.has(field.key)}
+                  plainByDecision={plainByDecision.has(field.key)}
                   onToggle={() => setExpanded(expanded === field.id ? null : field.id)}
                   sectionId={section.id}
                 />
@@ -386,6 +390,7 @@ function FieldEditor({
   flagOn,
   keyLocked,
   lockedSensitive,
+  plainByDecision,
   lockedBirth,
   hasSubmissions,
 }: {
@@ -401,6 +406,7 @@ function FieldEditor({
   flagOn: (key: string, flag: FieldFlag) => boolean;
   keyLocked: boolean;
   lockedSensitive: boolean;
+  plainByDecision: boolean;
   lockedBirth: boolean;
   hasSubmissions: boolean;
 }) {
@@ -560,8 +566,8 @@ function FieldEditor({
               <input checked={staffOnly} disabled={lockedSensitive} onChange={(event) => flag("staffOnly", event.target.checked)} type="checkbox" /> Staff only (office use; a private-link filler never sees it)
             </label>
             <label className="checkbox-row">
-              <input checked={sensitive} disabled={lockedSensitive} onChange={(event) => flag("sensitive", event.target.checked)} type="checkbox" />
-              Sensitive (answers are sealed and left out of exports){lockedSensitive ? " · locked: it was sensitive in a published version" : ""}
+              <input checked={sensitive && !plainByDecision} disabled={lockedSensitive || plainByDecision} onChange={(event) => flag("sensitive", event.target.checked)} type="checkbox" />
+              Sensitive (answers are sealed and left out of exports){plainByDecision ? " · off: emergency contact and physician answers on this form are plain by the owner's decision of November 7, 2026" : lockedSensitive ? " · locked: it was sensitive in a published version" : ""}
             </label>
             <label className="checkbox-row">
               <input checked={birth} disabled={lockedBirth} onChange={(event) => flag("birthDate", event.target.checked)} type="checkbox" />

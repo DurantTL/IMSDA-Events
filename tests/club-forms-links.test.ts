@@ -390,7 +390,20 @@ describe("submitting through a private link (#610)", () => {
     expect(view.today).toBe("2026-10-05");
   });
 
+  it("stores the slip's physician and emergency answers plain, with no sealed value (owner decision, 2026-11-07)", async () => {
+    await submitClubFormViaLink(TOKEN, slipAnswers, now);
+    const data = mocks.submissionCreate.mock.calls[0][0].data;
+    expect(data).toMatchObject({ hasSensitiveAnswers: false, sealedSensitiveAnswers: null });
+    expect(data.answers).toMatchObject({ physician_name: SECRET_HEALTH });
+    expect(data.answers).toHaveProperty("emergency_contact_phone");
+  });
+
   it("spends the link and stores the submission in that link's club, sealing sensitive answers", async () => {
+    // A stored copy (edited in the app) that still seals the physician answer, to keep the sealing path covered.
+    const sealing = { ...templateRow("off_premises_permission_slip"), sensitiveFieldKeys: ["physician_name"] };
+    mocks.templateFindFirst.mockResolvedValue(sealing);
+    mocks.templateFindUnique.mockResolvedValue(sealing);
+    mocks.linkFindUnique.mockResolvedValue(openLink({ template: sealing }));
     const result = await submitClubFormViaLink(TOKEN, slipAnswers, now);
     expect(result.confirmationMessage).toContain("permission slip");
 
@@ -500,7 +513,7 @@ describe("a club's own links (#610)", () => {
     ]);
     const rows = await listClubFormLinks(director, "club-a", now);
     expect(rows.map((row) => row.delivery)).toEqual(["QUEUED", "DELIVERED", "NOT_DELIVERED", "NOT_DELIVERED", "SENT"]);
-    expect(mocks.linkFindMany.mock.calls[0][0].where).toEqual({ organizationId: "club-a" });
+    expect(mocks.linkFindMany.mock.calls[0][0].where).toEqual({ organizationId: "club-a", outingId: null });
   });
 
   it("retires a link whose email finally failed, and leaves a used or withdrawn one alone", async () => {

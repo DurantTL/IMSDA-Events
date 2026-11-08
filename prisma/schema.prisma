@@ -678,6 +678,10 @@ enum MessageTemplateKey {
   HONOR_WATCH_SUMMARY
   /// The one plain test email a system administrator sends from the System report (#1383), to one typed address. No event, no attendee data, no links. Not an event template.
   SYSTEM_TEST_EMAIL
+  /// A club submitted a conference order for patches and pins (#1688): one internal email to the conference orders address. Club, church, director, items, quantities and total; no member data. Not an event template.
+  CONFERENCE_CLUB_ORDER_SUBMITTED
+  /// The confirmation of a conference club order (#1688): one email to the club's director. Not an event template.
+  CONFERENCE_CLUB_ORDER_CONFIRMATION
 }
 
 enum MessageTemplateStatus {
@@ -741,6 +745,39 @@ enum ClubRosterAttendeeType {
 enum ClubRosterGender {
   FEMALE
   MALE
+}
+
+/// A youth's school grade on the roster (#1664). Not in school is its own choice.
+enum ClubRosterSchoolGrade {
+  GRADE_K
+  GRADE_1
+  GRADE_2
+  GRADE_3
+  GRADE_4
+  GRADE_5
+  GRADE_6
+  GRADE_7
+  GRADE_8
+  GRADE_9
+  GRADE_10
+  GRADE_11
+  GRADE_12
+  NOT_IN_SCHOOL
+}
+
+/// The kind of school a youth attends (#1668). Visible to the club and system administrators only.
+enum ClubRosterSchoolType {
+  ADVENTIST_SCHOOL
+  PUBLIC_SCHOOL
+  HOMESCHOOL
+  OTHER
+}
+
+/// Whether a youth is a Seventh-day Adventist church member (#1668).
+enum ClubRosterChurchMember {
+  YES
+  NO
+  NOT_SURE
 }
 
 /// REMOVED means the club took the person off: birth date and personal
@@ -1646,6 +1683,8 @@ model PlatformSettings {
   emailHelpPhone            String?            @default("(515) 223-1197")
   /// Where "a new club applied" notices go (#817), e.g. the youth department administrative assistant. Blank means no notice is sent; applications still wait in the queue.
   newClubApplicationEmail   String?
+  /// Where a conference club order (patches and pins, #1688) is emailed. Blank uses the youth department address, youth@imsda.org.
+  conferenceOrdersEmail     String?
   /// The one-sign-in switch (#554, ADR 0013). OFF by default; nothing reads it yet.
   /// Later slices put the unified sign-in and role-aware landing behind it.
   unifiedSignInEnabled      Boolean            @default(false)
@@ -1702,6 +1741,8 @@ model AdminAlertFeedReceipt {
 
 model Event {
   id                   String             @id @default(cuid())
+  clubTeacherRule      ClubTeacherRule?
+  clubTeachers         ClubEventTeacher[]
   healthSnapshots      HealthRecordSnapshot[]
   healthSnapshotHolds  HealthSnapshotHold[]
   slug                 String             @unique
@@ -1811,6 +1852,10 @@ model Event {
   lifecycleState       EventLifecycleState?
   /// Bumped by every lifecycle transition; the transition is a conditional update on it, so two at once cannot both win.
   lifecycleVersion     Int                @default(0)
+  /// True on the one hidden "Conference club orders" billing event per club year (#1688): it only holds the church invoices for
+  /// filled conference club orders. It is archived and unpublished when made, so no picker, calendar or public page lists it,
+  /// and it is never offered for registration. Staff reach its invoices through Club orders, never through an event list.
+  isBillingContainer   Boolean            @default(false)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -1818,6 +1863,7 @@ model Event {
   /// The calendar items this event was set up from or linked to (#445). Several items can share one registration
   /// event (#1086): different dates or sites of one event, or a snow date.
   calendarEntryLinks                  CalendarEntry[]    @relation("CalendarEntryLinkedEvent")
+  conferenceClubOrders                ConferenceClubOrder[]
   calendarMatchDismissals             CalendarEventMatchDismissal[] @relation("CalendarMatchDismissalEvent")
   archivedBy                          User?              @relation("EventArchivedBy", fields: [archivedByUserId], references: [id], onDelete: SetNull)
 
@@ -2032,6 +2078,7 @@ model ModuleRequest {
 /// Deactivate instead of deleting once any registration uses a location.
 model EventLocation {
   id                   String   @id @default(cuid())
+  clubTeachers         ClubEventTeacher[]
   eventId              String
   name                 String
   normalizedName       String
@@ -2659,6 +2706,8 @@ model UserPersonLink {
  * relationship.
  */
 model Organization {
+  clubEventTeachers ClubEventTeacher[]
+  clubOptionalFeatures ClubOptionalFeature[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
   scholarshipAwards    ScholarshipAward[]
@@ -2727,6 +2776,8 @@ model Organization {
   clubSupplyStock    ClubSupplyStock[]
   clubOrderNeeds     ClubOrderNeed[]
   clubOrderBatches   ClubSupplyOrderBatch[]
+  conferenceClubOrders ConferenceClubOrder[] @relation("ConferenceClubOrderClub")
+  conferenceClubOrdersBilled ConferenceClubOrder[] @relation("ConferenceClubOrderChurch")
   clubOrderListLines ClubOrderListLine[]
   clubOrderHonorLines ClubOrderHonorLine[]
   memberClassCompletions MemberClassCompletion[]
@@ -2736,6 +2787,7 @@ model Organization {
   contacts                OrganizationContact[]
   billingResponsibilities RegistrationBillingResponsibility[]
   clubFormLinks       ClubFormLink[]
+  clubFormOutings     ClubFormOuting[]
   clubFormYearStarts  ClubFormYearStart[]
 
   @@index([type, isActive, name])
@@ -4578,6 +4630,8 @@ model AuditLog {
   @@index([eventId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([correlationId])
+  /// Roster health flags (#1709) read a person's roster saves by row id.
+  @@index([entityType, entityId])
 }
 
 model ImportRun {
@@ -5561,6 +5615,13 @@ enum ClubSupplySection {
   MASTER_AWARDS
 }
 
+/// Who supplies a catalog item (#1688). AdventSource items go on a club's AdventSource order list; conference items
+/// (the shoulder patches and pin) are ordered from the youth department and billed to the club's church.
+enum ClubSupplier {
+  ADVENTSOURCE
+  CONFERENCE
+}
+
 /// A conference-wide club supply catalog item (#531): one AdventSource order
 /// line, one row per size. Identity is section plus normalized name; catalog
 /// numbers repeat in the real data (Good Conduct Stars, belts, every
@@ -5580,10 +5641,15 @@ model ClubSupplyItem {
   /// The honor this row is the patch for, when an honor-section row's name
   /// matches an existing `Honor`.
   honorId        String?
+  /// Who supplies it (#1688). Only CONFERENCE items can be ordered from the youth department; AdventSource exports never include them.
+  supplier       ClubSupplier      @default(ADVENTSOURCE)
+  /// The conference's price per unit, in cents (#1688). Set by staff; only a CONFERENCE item has one. A change never alters a submitted order (lines keep their own copy).
+  unitPriceCents Int?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
   honor Honor?            @relation(fields: [honorId], references: [id], onDelete: SetNull)
+  conferenceOrderLines ConferenceClubOrderLine[]
   stock ClubSupplyStock[]
   orderNeeds ClubOrderNeed[]
   orderLines ClubSupplyOrderLine[]
@@ -5781,6 +5847,72 @@ model ClubSupplyOrderLine {
   @@index([itemId])
 }
 
+/// Where a conference club order stands (#1688). A director may cancel only while SUBMITTED; staff fill or cancel it.
+enum ConferenceClubOrderStatus {
+  SUBMITTED
+  FILLED
+  CANCELLED
+}
+
+/// One club's order for conference-supplied patches and pins (#1688), sent to the youth department and billed to the club's
+/// sponsoring church on that club year's billing container event (`Event.isBillingContainer`) once filled. The church and the
+/// totals are copied at submit time, so a later change of church, name or price never alters the order.
+model ConferenceClubOrder {
+  id                    String                    @id @default(cuid())
+  organizationId        String
+  /// The sponsoring church the club had when it submitted: who is billed.
+  churchId              String
+  /// The billing container event of the club year the order was submitted in.
+  eventId               String
+  clubYear              String
+  status                ConferenceClubOrderStatus @default(SUBMITTED)
+  /// How many Pathfinder shoulder patches the club wants to exchange (the sheet's "patches to exchange").
+  patchesToExchange     Int                       @default(0)
+  /// The items total at submit time, in cents. Postage is separate.
+  itemsTotalCents       Int
+  /// Entered by staff when the order is filled; billed as its own line. Null until filled.
+  postageCents          Int?
+  submittedAt           DateTime                  @default(now())
+  submittedByAccountId  String?
+  /// Set instead of `submittedByAccountId` for a staff "act as" director (#442).
+  submittedByUserId     String?
+  filledAt              DateTime?
+  filledByUserId        String?
+  addedToStock          Boolean                   @default(false)
+  cancelledAt           DateTime?
+  cancelledReason       String?
+  cancelledByAccountId  String?
+  cancelledByUserId     String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  club   Organization @relation("ConferenceClubOrderClub", fields: [organizationId], references: [id], onDelete: Restrict)
+  church Organization @relation("ConferenceClubOrderChurch", fields: [churchId], references: [id], onDelete: Restrict)
+  event  Event         @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  lines  ConferenceClubOrderLine[]
+
+  @@index([organizationId, status])
+  @@index([churchId, eventId, status])
+  @@index([status, submittedAt])
+}
+
+/// One item on a conference club order (#1688), with the name and unit price as they were when it was submitted.
+model ConferenceClubOrderLine {
+  id             String   @id @default(cuid())
+  orderId        String
+  itemId         String
+  itemName       String
+  quantity       Int
+  unitPriceCents Int
+  createdAt      DateTime @default(now())
+
+  order ConferenceClubOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item  ClubSupplyItem      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, itemId])
+  @@index([itemId])
+}
+
 /// A named class period at one Honors Weekend site (event). Names differ by
 /// site, so they are data, never hard-coded.
 model HonorSession {
@@ -5944,6 +6076,7 @@ model HonorOfferingHonor {
 /// stored in plain text (ADR 0005 Addendum A).
 model ClubRosterMember {
   id                   String                 @id @default(cuid())
+  eventTeacherRows     ClubEventTeacher[]
   healthRecord        HealthRecord?
   healthRecordLinks   HealthRecordLink[]
   organizationId       String
@@ -5952,6 +6085,12 @@ model ClubRosterMember {
   attendeeType         ClubRosterAttendeeType
   role                 String                 @default("")
   classLevel           ClubClassLevel?
+  /// School grade (#1664), youth only. Optional; a missing one is listed under "Details needed".
+  schoolGrade          ClubRosterSchoolGrade?
+  /// School type (#1668). Optional, never flagged as missing. Not shown to Area Coordinators.
+  schoolType           ClubRosterSchoolType?
+  /// Seventh-day Adventist church member (#1668). Optional, never flagged as missing. Not shown to Area Coordinators.
+  churchMember         ClubRosterChurchMember?
   /// Age as a form reported it (#376), for people imported without a birth
   /// date. Shown with "birth date needed" until the director adds one.
   reportedAge          Int?
@@ -6015,6 +6154,24 @@ model ClubRosterGuardian {
   @@unique([rosterMemberId, position])
 }
 
+/// An optional club-level feature a club has switched on (#1709). A row exists only while the feature is on: off is the
+/// default for every club, so no row means nothing new is shown. Switching off deletes the row (the audit log keeps the
+/// history); the feature itself stores nothing about people, so nothing else is lost. The keys are a typed list in
+/// `modules/club-features/domain.ts`. Exactly one of the two actor columns is set: the attendee account of a club
+/// director or deputy, or the staff user acting as the club's director (#442).
+model ClubOptionalFeature {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  featureKey         String
+  enabledAt          DateTime @default(now())
+  enabledByAccountId String?
+  enabledByUserId    String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, featureKey])
+}
+
 /// A club-owned, named roster export format (#490): which columns, in what
 /// order, and under what header names to hand a specific outside camporee.
 /// `columns` holds only that structure (an ordered array of `{key, header}`)
@@ -6035,6 +6192,24 @@ model ClubRosterExportFormat {
   createdByUser User?            @relation("ClubRosterExportFormatCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, name])
+}
+
+/// A saved column layout for a club event's attendee report (#1671). One per template-or-event scope, audience and
+/// name. `scopeKey` is `template:<id>` for an event made from an event template (so the layout follows the template) or
+/// `event:<id>` for any other event. `audience` keeps staff and Area Coordinator layouts apart. `columns` holds column
+/// keys in order and nothing else: never a name, an answer or any other data. The creator ids are plain references.
+model ClubReportColumnLayout {
+  id                 String   @id @default(cuid())
+  scopeKey           String
+  audience           String
+  name               String
+  columns            Json
+  createdByUserId    String?
+  createdByAccountId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([scopeKey, audience, name])
 }
 
 /// A director confirming that a club started its next club year's roster by
@@ -7334,6 +7509,7 @@ model ClubFormTemplate {
   enabledBy   User?                     @relation("ClubFormTemplateEnabledBy", fields: [enabledByUserId], references: [id], onDelete: SetNull)
   submissions ClubFormSubmission[]
   links       ClubFormLink[]
+  outings     ClubFormOuting[]
   versions    ClubFormTemplateVersion[]
   openLinkYears ClubFormOpenLinkYear[]
 }
@@ -7455,6 +7631,8 @@ model ClubFormLink {
   createdByUserId    String?
   /// Who sent it (#1221): CLUB_LEADER or AREA_COORDINATOR. Null on links made before.
   createdAs          String?
+  /// The outing permission slip this link belongs to (#1672); null for an ordinary link.
+  outingId           String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -7464,10 +7642,43 @@ model ClubFormLink {
   createdByAccount AttendeeAccount?    @relation("ClubFormLinkCreatedByAccount", fields: [createdByAccountId], references: [id], onDelete: SetNull)
   createdByUser    User?               @relation("ClubFormLinkCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
   submission       ClubFormSubmission?
+  outing           ClubFormOuting?     @relation(fields: [outingId], references: [id], onDelete: Restrict)
 
   @@index([organizationId, status])
+  @@index([outingId])
   @@index([templateId, organizationId])
   @@index([status, expiresAt])
+}
+
+/// How an outing permission slip is doing (#1672): CLOSED stops its private links and new sends.
+enum ClubFormOutingStatus {
+  OPEN
+  CLOSED
+}
+
+/// One outing's permission slip (#1672): the details a club's director sets once (the conference Off-Premises
+/// Permission Slip's sections stay locked) and up to five club questions. Holds no answer and no personal data:
+/// `details` and `questions` are validated by `outing-domain.ts`. Private links point here through `ClubFormLink.outingId`.
+model ClubFormOuting {
+  id             String               @id @default(cuid())
+  organizationId String
+  templateId     String
+  clubYear       String
+  /// Copies of the activity and first date, for lists and ordering.
+  activity       String
+  startDate      String
+  details        Json
+  questions      Json                 @default("[]")
+  status         ClubFormOutingStatus @default(OPEN)
+  closedAt       DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  template     ClubFormTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  links        ClubFormLink[]
+
+  @@index([organizationId, clubYear, status])
 }
 
 /// A club's "Start the new year" on the Forms page (#1323): once a row exists for
@@ -8207,6 +8418,8 @@ enum InvoiceVersionBasis {
   CONTACT_ONLY_COPY
   /// Built from what a church's sponsored promo codes covered on a GENERAL event (#399): no reconciliation behind it.
   CHURCH_PROMO_CODES
+  /// Built from the conference club orders (patches and pins) the youth department filled for a church's clubs, on that club year's billing container event (#1688): no reconciliation behind it.
+  CLUB_ORDERS
 }
 
 /// What is owed on one finalized invoice version. OPEN until the version is superseded by a revision.
@@ -11048,4 +11261,68 @@ model EventLifecycleTransition {
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
+}
+
+enum ProblemReportStatus {
+  OPEN
+  RESOLVED
+}
+
+/// A problem someone sent from the Forms help popup (#1483). `number` is the reference they are given ("P-<number>").
+/// `message` and `email` are what the person typed and are kept out of logs, audit metadata and the alert webhook.
+/// `details` holds only the page path with query values stripped and device facts (see modules/support/problem-report-domain.ts),
+/// never form contents, cookies or tokens. `userId` is a plain id with no foreign key so deleting an account never touches a report.
+model ProblemReport {
+  id               String              @id @default(cuid())
+  number           Int                 @unique @default(autoincrement())
+  message          String
+  email            String?
+  userId           String?
+  status           ProblemReportStatus @default(OPEN)
+  details          Json?
+  resolvedByUserId String?
+  resolvedAt       DateTime?
+  createdAt        DateTime            @default(now())
+
+  @@index([status, createdAt])
+}
+
+/// The "Club teachers" rule for one club event (#1681): how many adults a club names as teachers. A row means an Area
+/// Coordinator, the Clubs Administrator or staff have set the rule; clubs see the step only while the "club-teachers"
+/// event module is also on. Turning the module off keeps this row and every teacher below.
+model ClubTeacherRule {
+  eventId            String   @id
+  /// Teachers every club is asked for.
+  baseTeachers       Int      @default(1)
+  /// A club bringing MORE than this many people is asked for `largerClubTeachers`. Null: one number for every club.
+  largerClubOver     Int?
+  largerClubTeachers Int      @default(2)
+  /// When true, a club below its number cannot submit its registration. Off: a warning only.
+  requireTeachers    Boolean  @default(false)
+  updatedByUserId    String?
+  updatedByAccountId String?
+  updatedAt          DateTime @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+/// An adult a club named as a teacher for a club event (#1681). The name is read from the roster; nothing else is copied.
+model ClubEventTeacher {
+  id             String   @id @default(cuid())
+  eventId        String
+  organizationId String
+  rosterMemberId String
+  /// The honor the person would teach, as typed. Optional.
+  honorName      String?
+  /// The preferred weekend or site (#413). Optional; a location removed later clears it.
+  locationId     String?
+  createdAt      DateTime @default(now())
+
+  event        Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  rosterMember ClubRosterMember @relation(fields: [rosterMemberId], references: [id], onDelete: Cascade)
+  location     EventLocation?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, organizationId, rosterMemberId])
+  @@index([eventId, locationId])
 }
