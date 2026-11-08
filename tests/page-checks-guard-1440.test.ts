@@ -154,8 +154,9 @@ describe("C4: a fixed bar must not cover text", () => {
     ".back-to-top-button": "bar: one 44px corner button; the audit's back-to-top check proves it sits on no other control",
     ".public-registration-attendee.is-sheet": "overlay: phone attendee sheet",
     ".event-gallery-backdrop": "overlay: gallery backdrop",
-    ".scrim": "overlay: the menu line's dialog backdrop (staff-shell.module.css)",
-    ".dialog": "overlay: the menu line's dialog, a sheet on a phone (staff-shell.module.css)",
+    ".phoneBar": "bar: the club portal's phone bottom navigation, links only (More is a link trigger); the audit watches it (club-portal-nav.module.css)",
+    ".scrim": "overlay: the menu line's dialog backdrop (staff-shell and club-portal-nav modules)",
+    ".dialog": "overlay: the menu line's dialog, a sheet on a phone (staff-shell and club-portal-nav modules)",
     '.fb-shell[data-inspector="open"] .fb-sidebar': "overlay: builder inspector takes the whole phone screen",
     ".fb-phone-sheet": "overlay: builder phone sheet",
   };

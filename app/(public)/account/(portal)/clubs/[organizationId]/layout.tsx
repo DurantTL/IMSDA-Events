@@ -71,7 +71,7 @@ export default async function ClubLayout({
           <ClubBannerYear currentYear={clubYearFor(new Date())} />
         </div>
       </section>
-      {shellNav.length > 0 && <ClubPortalNav base={base} items={shellNav} />}
+      {shellNav.length > 0 && <ClubPortalNav base={base} items={shellNav} menuLabel="Club menu" menuTitle={access.club.name} phoneBar />}
       <div className="club-roster-layout">
         {gated && (
           <ClubGateSlot>
