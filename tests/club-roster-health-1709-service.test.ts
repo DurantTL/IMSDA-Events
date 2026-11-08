@@ -210,6 +210,21 @@ describe("loadRosterHealth", () => {
     expect((await outdatedFor([oldRow], oldHistory, [save("a", day("2026-10-02"), "CLUB_ROSTER_MEMBER_UPDATED", { fields: ["firstName", "lastName"] })])).rows).toEqual([]);
   });
 
+  it("dates a roster row with no person record by its own creation and its own saves", async () => {
+    const orphan = { ...member("c", { createdAt: day("2024-09-10") }), personId: null };
+    const run = async (audits: ReturnType<typeof save>[]) => {
+      featureOn();
+      mocks.prisma.clubRosterMember.findMany.mockReset();
+      mocks.prisma.clubRosterMember.findMany.mockResolvedValueOnce([orphan]);
+      mocks.prisma.auditLog.findMany.mockResolvedValue(audits);
+      mocks.healthRecordFlagsForRoster.mockResolvedValue({ c: true });
+      mocks.prisma.clubFormSubmission.findMany.mockResolvedValue([{ rosterMemberId: "c" }]);
+      return (await loadRosterHealth("club-1", director, now))!;
+    };
+    expect((await run([])).rows[0]).toMatchObject({ flags: ["OUTDATED"], lastUpdated: "2024-09-10T12:00:00.000Z" });
+    expect((await run([save("c", day("2026-10-01"))])).rows).toEqual([]);
+  });
+
   it("clears the flag when the person was added again this year, on a new row", async () => {
     const readded = member("b", { createdAt: day("2026-09-05") });
     const history = [{ id: "a", personId: "person-b", createdAt: day("2024-09-10") }, { id: "b", personId: "person-b", createdAt: day("2026-09-05") }];

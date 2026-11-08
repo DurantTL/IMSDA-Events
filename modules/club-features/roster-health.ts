@@ -80,6 +80,7 @@ async function computeRosterHealth(organizationId: string, now: Date): Promise<R
     select: {
       id: true,
       personId: true,
+      createdAt: true,
       attendeeType: true,
       person: { select: { firstName: true, lastName: true } },
       guardians: { select: { name: true, relationship: true, email: true, phone: true } },
@@ -105,15 +106,21 @@ async function computeRosterHealth(organizationId: string, now: Date): Promise<R
       select: { rosterMemberId: true },
     }),
   ]);
+  // A row with no person record is dated on its own: its creation and its own audit entries (keyed by the row id).
+  const rows = [
+    ...history,
+    ...members.filter((member) => !member.personId).map((member) => ({ id: member.id, personId: null, createdAt: member.createdAt })),
+  ];
+  const datingKey = (row: { id: string; personId: string | null }) => row.personId ?? `row:${row.id}`;
   // The club's own saves (added or edited a person), from the roster's audit entries, never from row timestamps.
-  const rowIds = history.map((row) => row.id);
+  const rowIds = rows.map((row) => row.id);
   const audits = rowIds.length > 0
     ? await prisma.auditLog.findMany({
       where: { entityType: "ClubRosterMember", entityId: { in: rowIds }, action: { in: [...ROSTER_EDIT_AUDIT_ACTIONS] } },
       select: { entityId: true, action: true, metadata: true, createdAt: true },
     })
     : [];
-  const personByRow = new Map(history.map((row) => [row.id, row.personId]));
+  const personByRow = new Map(rows.map((row) => [row.id, datingKey(row)]));
   const editsByPerson = new Map<string, Date[]>();
   for (const entry of audits) {
     const person = entry.entityId ? personByRow.get(entry.entityId) : undefined;
@@ -122,15 +129,15 @@ async function computeRosterHealth(organizationId: string, now: Date): Promise<R
   const photoOn = template?.enabled === true;
   const released = new Set(releases.flatMap((row) => (row.rosterMemberId ? [row.rosterMemberId] : [])));
   const createdByPerson = new Map<string, Date[]>();
-  for (const row of history) {
-    if (row.personId) createdByPerson.set(row.personId, [...(createdByPerson.get(row.personId) ?? []), row.createdAt]);
+  for (const row of rows) {
+    const key = datingKey(row);
+    createdByPerson.set(key, [...(createdByPerson.get(key) ?? []), row.createdAt]);
   }
 
   const people = members
     .map((member) => {
-      const lastUpdated = member.personId
-        ? lastMeaningfulUpdate(createdByPerson.get(member.personId) ?? [], editsByPerson.get(member.personId) ?? [])
-        : null;
+      const key = datingKey(member);
+      const lastUpdated = lastMeaningfulUpdate(createdByPerson.get(key) ?? [], editsByPerson.get(key) ?? []);
       const flags = rosterHealthFlags({
         attendeeType: member.attendeeType,
         lastUpdated,
