@@ -139,7 +139,19 @@ export function mealCategoryOf(meal: string): MealCategory {
   return "other";
 }
 
-export const NO_DIETARY_NEEDS = /^(?:none(?: needed)?|n\/?a|na|no(?: (?:dietary )?(?:restrictions?|needs?))?|neither|nil|nothing|-+|\.)\.?$/i;
+/**
+ * A form with no `meal_preference` question but a `dietary_needs` choice list (Leadership Weekend, TLT Retreat, #1665)
+ * gets its meal type from the diet choices: one of Vegan, Gluten-free or Vegetarian is that meal, no choice is Regular,
+ * and Dairy-free alone or several choices are Other. Forms with a meal question read it unchanged.
+ */
+function mealCategoryOfRow(fields: ResolvedListingFields, mealPreference: string, dietaryChoices: string): MealCategory {
+  if (fields.meal || fields.dietary?.type !== "MULTISELECT" || fields.dietary.scope !== "ATTENDEE") return mealCategoryOf(mealPreference);
+  const choices = dietaryChoices.split(";").map((part) => part.trim()).filter(Boolean);
+  if (choices.length === 0) return "regular";
+  return choices.length === 1 ? mealCategoryOf(choices[0]!) : "other";
+}
+
+export const NO_DIETARY_NEEDS = /^(?:none(?: needed| known)?|n\/?a|na|nope|no(?: (?:dietary )?(?:restrictions?|needs?))?|no (?:known )?(?:food )?allerg(?:y|ies)|nka|nkfa|neither|nil|nothing|-+|\.)\.?$/i;
 
 export function hasDietaryNeeds(text: string): boolean {
   const parts = text.split(";").map((part) => part.replace(/\s+/g, " ").trim()).filter(Boolean);
@@ -194,10 +206,16 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
       // Food allergies (#1665) come first, then the diet choices; the kitchen counts each part on its own.
       const dietaryAnswer = [answer("allergy"), answer("dietary")].filter(Boolean).join("; ");
       const needs = hasDietaryNeeds(dietaryAnswer);
+      // The staff column leaves out "None"-style parts ("None; Vegan" reads "Vegan"); an all-"None" answer reads "None".
+      const shownNeeds = dietaryAnswer
+        .split(";")
+        .map((part) => part.replace(/\s+/g, " ").trim())
+        .filter((part) => part && !NO_DIETARY_NEEDS.test(part))
+        .join("; ");
       let dietaryNeeds = "";
       const dietaryField = fields.dietary ?? fields.allergy;
       if (dietaryField && (index === 0 || dietaryField.scope === "ATTENDEE")) {
-        dietaryNeeds = options.showDietaryDetails ? dietaryAnswer : needs ? "Yes" : "No";
+        dietaryNeeds = options.showDietaryDetails ? shownNeeds || (dietaryAnswer ? "None" : "") : needs ? "Yes" : "No";
       }
       rows.push({
         registrationId: registration.id,
@@ -215,7 +233,7 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
         group: registration.staffInvitation ? STAFF_GROUP_LABEL[registration.staffInvitation.group] : "",
         church,
         mealPreference,
-        mealCategory: mealCategoryOf(mealPreference),
+        mealCategory: mealCategoryOfRow(fields, mealPreference, answer("dietary")),
         dietaryNeeds,
         hasDietaryNeeds: needs,
         childcareNeeded: answer("childcare"),

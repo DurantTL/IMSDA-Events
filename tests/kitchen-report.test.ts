@@ -124,6 +124,9 @@ describe("kitchen report over the Leadership Weekend and TLT Retreat questions (
     it(`${key}: counts food allergies and diet choices together, with no names`, () => {
       const form = formTemplates.find((template) => template.key === key)!.definition as unknown as Record<string, unknown>;
       const record = (id: string, responses: Array<Record<string, unknown>>) => ({ ...registration(id, "CONFIRMED", responses), publicSubmission: { definition: form, responses: {}, attendeeResponses: [] } }) as unknown as RegistrationRecord;
+      const noAllergies = buildKitchenReport([record("N1", [{ food_allergies: "No allergies" }, { food_allergies: "NKA", dietary_needs: ["Vegan"] }, { food_allergies: "None known" }])]);
+      expect(noAllergies.needs).toEqual([{ answer: "Vegan", count: 1 }]);
+      expect(noAllergies.peopleWithNeeds).toBe(1);
       const report = buildKitchenReport([
         record("L1", [
           { food_allergies: "Peanuts", dietary_needs: ["Vegan", "Dairy-free"] },
@@ -139,6 +142,8 @@ describe("kitchen report over the Leadership Weekend and TLT Retreat questions (
       ]);
       expect(report.peopleWithNeeds).toBe(3);
       expect(report.totalPeople).toBe(4);
+      // Meal types come from the diet choices: Vegan + Dairy-free is Other, Dairy-free alone is Other, the two blanks are Regular.
+      expect(Object.fromEntries(report.meals.map((meal) => [meal.value, meal.count]))).toMatchObject({ vegan: 0, other: 2, regular: 2, none: 0 });
       const text = JSON.stringify(report) + kitchenReportCsv(report);
       expect(text).not.toMatch(/SYNTH-|Family|Surname|holder-/);
     });
