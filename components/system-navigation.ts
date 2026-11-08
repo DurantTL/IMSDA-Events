@@ -226,6 +226,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/club-forms\/public-page(\/|$)/, "Public club forms page"],
   [/^\/admin\/club-forms\/[^/]+(\/|$)/, "Club form builder"],
   [/^\/admin\/club-forms(\/|$)/, "Club forms"],
+  [/^\/admin\/club-supplies\/conference-orders(\/|$)/, "Conference club orders"],
   [/^\/admin\/club-supplies(\/|$)/, "Club supply catalog"],
   [/^\/admin\/honors(\/|$)/, "Honor catalog"],
   [/^\/admin\/master-award-rules(\/|$)/, "Master Award rules"],

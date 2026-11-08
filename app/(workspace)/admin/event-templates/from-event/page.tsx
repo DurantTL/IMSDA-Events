@@ -17,7 +17,7 @@ export default async function SaveEventAsTemplatePage() {
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=event-setup");
 
   // Newest first: the event you most likely want to save is the latest reviewed one.
-  const events = (await listEventsForUser(user.id, true, { archived: "include" })).slice().reverse();
+  const events = (await listEventsForUser(user.id, true, { archived: "include" })).filter((event) => !event.isBillingContainer).reverse();
   const sources = events.map((event) => ({
     id: event.id,
     name: event.archivedAt ? `${event.name} (archived)` : event.name,

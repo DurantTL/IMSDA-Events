@@ -327,6 +327,33 @@ serialize with a revision being finalized, and the database refuses a payment ag
 The PDF and every attachment are served only through the staff route above (MANAGE_FINANCE on the event, `private, no-store`); there is no public or token URL for them, and a test scans `app/` to
 prove no other route reads the stored bytes. A version of another event is a 404. Statements and the CSV follow the same event check. Audit holds ids only.
 
+## Conference club orders (#1688)
+
+Caleb, Nov 8, 2026 (Option A): a club orders the conference shoulder patches and pin from its Orders tab; the order goes to the
+youth department, not AdventSource, and once staff mark it Filled it is billed to the club's **sponsoring church** as lines on that
+church's invoice for the club year. The treasurer finalizes the invoice as usual (`FINALIZE_INVOICES`, unchanged); nothing is
+finalized or sent automatically.
+
+- **One billing container per club year.** An `Event` row with `isBillingContainer = true`, slug `conference-club-orders-<club year>`,
+  made the first time a club submits in that year. It is archived, unpublished and off the calendar when made, so no picker,
+  calendar, public page or registration shows it; it cannot be unarchived, and the Archived events list, the copy-from-event and
+  event-template pickers, the central email preview and the health snapshot sweep leave it out. Staff reach its invoices from
+  Admin, Club supplies, Conference club orders ("Open invoice"), and the church statement works through the usual
+  `/finance/invoices/statements?event=<id>` link. The treasurer needs a staff assignment on that event with the Finalize invoices
+  permission, like any other event (system administrators already have it).
+- **One invoice per church**, group key `club-orders:<churchId>`, version basis `CLUB_ORDERS` (no reconciliation behind it, like the
+  church promo code invoice, #399). Each filled order is one line: every item as a charge at the price copied onto the order, and
+  postage as its own charge. Filling an order creates the church's draft or refreshes it; if the invoice is already finalized it
+  starts a revision draft (the finalized version is untouched). The contact is the church's own billing contact.
+- **Prices are copied.** The order lines keep the item name and unit price from submit time, so a catalog price change never
+  alters a submitted order or a draft built from it.
+- **Postage** is typed by staff when they fill the order (blank is none).
+- **Cancelling:** a director may cancel only while the order is Submitted; staff may cancel a Submitted order with a reason. A
+  filled order is already on the church's bill and is not cancelled in the app.
+- **Email:** one order email to the "conference orders address" (Email, Staff alerts; blank sends to youth@imsda.org) and one
+  confirmation to the director, queued in the outbox with the order.
+- Checked by `npm run test:conference-club-orders` (real database) and `tests/conference-club-orders-*.test.ts`.
+
 ## Immutability, checked in the database
 
 Database triggers (not only application code) enforce, and `npm run test:invoices` proves:

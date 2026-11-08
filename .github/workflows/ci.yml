@@ -349,6 +349,9 @@ jobs:
       # syncing, order/stock math, receiving, awarding never below zero, and
       # an idempotent Honors Weekend write-back (#487).
       - run: npm run test:club-orders
+      # Real-database check of conference club orders (#1688): a club orders patches and pins, the youth department fills the
+      # order, it becomes lines on the sponsoring church's invoice on the hidden billing event, and AdventSource never sees it.
+      - run: npm run test:conference-club-orders
       # Real-database check of uniform ordering on the club order layer: bulk
       # needs, order math with stock and extras, receive/issue, "already has
       # one", a combined honors + uniforms batch, and double-tap safety (#497).

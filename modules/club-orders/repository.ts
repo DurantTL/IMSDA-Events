@@ -51,6 +51,8 @@ import { itemAndSize } from "@/modules/uniforms/domain";
 export type ClubOrderActor = ClubSupplyStockActor;
 
 export type ClubOrderErrorCode = "NOTHING_TO_ORDER" | "BATCH_NOT_FOUND" | "ALREADY_RECEIVED" | "ORDER_CHANGED" | "NOT_ENOUGH_STOCK" | "ITEM_NOT_ORDERABLE" | "MEMBER_NOT_ON_ROSTER"
+  // Conference club orders (#1688).
+  | "NO_SPONSORING_CHURCH" | "CLUB_NOT_FOUND" | "ORDER_NOT_FOUND" | "ORDER_NOT_SUBMITTED" | "INVALID_ORDER" | "INVALID_POSTAGE" | "REASON_REQUIRED"
   // Honors added to the list by hand (#1330).
   | "HONOR_NOT_FOUND" | "HONOR_NOT_ORDERABLE" | "HONOR_HAS_CATALOG_ITEM"
   // Earned awards (#532): a confirmation must match what was suggested or earned.
@@ -261,6 +263,13 @@ export async function moveNeededNeedsToClub(organizationId: string, needs: Reado
 
 const itemSelect = { id: true, name: true, catalogNumber: true } satisfies Prisma.ClubSupplyItemSelect;
 
+/**
+ * Conference-supplied items (#1688) are ordered from the youth department and billed to the church, never from AdventSource:
+ * every read behind the AdventSource order list, its exports and "order" action leaves them out.
+ */
+const adventSourceItemOnly = { supplier: "ADVENTSOURCE" } satisfies Prisma.ClubSupplyItemWhereInput;
+const needsOnAdventSourceList = { OR: [{ itemId: null }, { item: adventSourceItemOnly }] } satisfies Prisma.ClubOrderNeedWhereInput;
+
 function toCatalogItem(item: { id: string; name: string; catalogNumber: string | null }): OrderCatalogItem {
   return { itemId: item.id, name: item.name, catalogNumber: item.catalogNumber };
 }
@@ -302,7 +311,7 @@ type NeededRow = Prisma.ClubOrderNeedGetPayload<{ select: typeof neededSelect }>
 async function neededPicture(organizationId: string) {
   // Undated needs go last (#790), which the database's ascending string order can't say.
   const needs: NeededRow[] = sortNeedsOldestFirst(await getPrisma().clubOrderNeed.findMany({
-    where: { organizationId, status: "NEEDED" },
+    where: { organizationId, status: "NEEDED", ...needsOnAdventSourceList },
     orderBy: oldestFirst,
     select: neededSelect,
   }));
@@ -363,7 +372,7 @@ export async function createOrderBatch(organizationId: string, extras: Record<st
   return getPrisma().$transaction(async (tx) => {
     await lockClubOrders(tx, organizationId);
     const needs = sortNeedsOldestFirst(await tx.clubOrderNeed.findMany({
-      where: { organizationId, status: "NEEDED", itemId: { not: null } },
+      where: { organizationId, status: "NEEDED", itemId: { not: null }, item: adventSourceItemOnly },
       orderBy: oldestFirst,
       select: { id: true, itemId: true, sourceDate: true, createdAt: true },
     }));
@@ -726,7 +735,7 @@ async function waitingFrom(picture: NeededPicture, firstOrderAt: Date | null): P
  */
 async function helperLinesFrom(organizationId: string, picture: NeededPicture): Promise<HelperLine[]> {
   const overrides = await getPrisma().clubOrderListLine.findMany({
-    where: { organizationId },
+    where: { organizationId, item: adventSourceItemOnly },
     select: { itemId: true, quantity: true },
   });
   const overrideByItem = new Map(overrides.map((row) => [row.itemId, row.quantity]));
@@ -759,7 +768,7 @@ async function helperLinesFrom(organizationId: string, picture: NeededPicture): 
   const extraIds = [...overrideByItem.keys()].filter((itemId) => !itemsById.has(itemId));
   if (extraIds.length > 0) {
     const extra = await getPrisma().clubSupplyItem.findMany({
-      where: { id: { in: extraIds } },
+      where: { id: { in: extraIds }, ...adventSourceItemOnly },
       select: { id: true, section: true, name: true, catalogNumber: true, sizeLabel: true },
     });
     for (const item of extra) {
@@ -785,9 +794,9 @@ export async function listHelperLines(organizationId: string): Promise<HelperLin
 export async function setOrderListQuantity(organizationId: string, itemId: string, quantity: number | null, actor: ClubOrderActor) {
   return getPrisma().$transaction(async (tx) => {
     await lockClubOrders(tx, organizationId);
-    const item = await tx.clubSupplyItem.findUnique({ where: { id: itemId }, select: { isActive: true } });
-    // A retired item can still be taken off the list (0) or reset, never ordered.
-    if (!item || (!item.isActive && quantity !== null && quantity !== 0)) {
+    const item = await tx.clubSupplyItem.findUnique({ where: { id: itemId }, select: { isActive: true, supplier: true } });
+    // A retired item can still be taken off the list (0) or reset, never ordered. A conference item is never on the AdventSource list (#1688).
+    if (!item || item.supplier === "CONFERENCE" || (!item.isActive && quantity !== null && quantity !== 0)) {
       throw new ClubOrderError("ITEM_NOT_ORDERABLE", "That catalog item could not be found.");
     }
     // The item line takes over (#1330): a by-hand honor line folded into this item must not keep

@@ -85,6 +85,8 @@ export async function loadCentralEmailPreview(prisma: PrismaClient): Promise<Cen
       await tx.$executeRaw`SET TRANSACTION READ ONLY`;
       const [events, platform, pending] = await Promise.all([
         tx.event.findMany({
+          // Not the hidden billing events for conference club orders (#1688): they send no event email.
+          where: { isBillingContainer: false },
           orderBy: [{ startsAt: "desc" }, { id: "asc" }],
           select: { id: true, slug: true, name: true, messageSettings: { select: { deliveryMode: true, senderEmail: true } } },
         }),

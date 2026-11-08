@@ -14,6 +14,7 @@ import { directorGrantIsActive } from "@/modules/organizations/director-grants-d
 import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
 import { contactsMatch, type InvoiceContact, type InvoiceSnapshot } from "@/modules/invoices/domain";
 import { churchIdOfPromoGroupKey } from "@/modules/promo-codes/church-invoice";
+import { churchIdOfClubOrdersGroupKey } from "@/modules/club-orders/conference-orders";
 import { loadChurchBillingContact } from "@/modules/promo-codes/church-invoice-facts";
 import {
   INVOICE_PDF_GENERATOR_VERSION,
@@ -239,7 +240,8 @@ export type SendPreview = {
 
 async function currentBillingContact(client: Client, eventId: string, groupKey: string) {
   // A church's promo code invoice (#399) goes to the church's own active billing contact, not to an event grouping.
-  const churchId = churchIdOfPromoGroupKey(groupKey);
+  // A conference club orders invoice (#1688) goes the same way.
+  const churchId = churchIdOfPromoGroupKey(groupKey) ?? churchIdOfClubOrdersGroupKey(groupKey);
   if (churchId) return loadChurchBillingContact(client, churchId);
   const billing = await getBillingResponsibilityView(eventId, {}, client);
   return contactOfGroup(billing.groups.find((candidate) => candidate.key === groupKey));
