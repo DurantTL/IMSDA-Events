@@ -95,12 +95,13 @@ describe("the club shell navigation bar (#1319)", () => {
   };
   const currentLabels = (html: string) => [...html.matchAll(/aria-current="page"[^>]*>([^<]+)</g)].map((m) => m[1]);
 
-  it("renders every item as a link in order, with no More control", () => {
+  it("renders every item as a link in order, with no More control on the strip", () => {
     const html = render(base);
     const links = [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)</g)].map((m) => m[2]);
     expect(links).toEqual(labels(items));
-    expect(html).not.toMatch(/<button/);
-    expect(html).not.toContain("aria-expanded");
+    // The one button is the menu line's (#1641); the phone bar and its More are only drawn for club pages (`phoneBar`).
+    expect([...html.matchAll(/<button/g)]).toHaveLength(1);
+    expect(html).toContain('aria-label="Menu, now on Home"');
     expect(html).not.toMatch(/More/);
   });
 

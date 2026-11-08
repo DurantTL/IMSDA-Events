@@ -1,23 +1,37 @@
-/* The club shell's tab row (#1319): every destination the role can open, one row; a horizontally scrollable strip when it does not fit. */
+/*
+ * The club portal's tab row and its two smaller forms (#1319, #1641). Nothing here scrolls sideways:
+ *  - desktop with room: the flat strip, a purple 3px underline on the current tab;
+ *  - below 1024px, or when the strip would not fit (the script sets data-fit="tight"): the menu line, the current tab
+ *    with the same purple underline and a "<Area> menu" button that opens the full list;
+ *  - phone (800px and below, like the staff phone bar), club pages only: a bottom bar of plain links, with More.
+ * "Where you are" stays the club portal's purple (rule L9), never the staff gold.
+ */
 .nav {
   border-bottom: 1px solid var(--line);
   background: var(--card);
 }
 
-.strip {
+.line {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
-  position: relative;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
+}
+
+.tabs {
+  min-width: 0;
+  flex: 1 1 100%;
+  overflow: hidden;
 }
 
 .list {
   display: flex;
   align-items: stretch;
   width: max-content;
-  min-width: 100%;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -46,7 +60,7 @@
   color: var(--imsda-navy);
 }
 
-.link[aria-current="page"] {
+.link[aria-current] {
   border-bottom-color: var(--imsda-purple);
   color: var(--imsda-navy);
 }
@@ -56,15 +70,291 @@
   outline-offset: -3px;
 }
 
-@media (max-width: 640px) {
-  .strip {
-    width: calc(100% - 24px);
+/* ---------- the menu line ---------- */
+.menuline {
+  display: none;
+  flex: 1 1 100%;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.current {
+  display: inline-flex;
+  min-height: 48px;
+  min-width: 0;
+  align-items: center;
+  border-bottom: 3px solid var(--imsda-purple);
+  color: var(--imsda-navy);
+  padding: 8px 4px 5px;
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.menuButton {
+  display: inline-flex;
+  min-height: 44px;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--secondary-bg, #f9fbfb);
+  color: var(--imsda-navy);
+  padding: 0 12px;
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.menuButton:focus-visible {
+  outline: 3px solid var(--imsda-purple);
+  outline-offset: 2px;
+}
+
+/* Below 1024px, or when the strip would not fit, the row is the menu line. The tabs stay in the page, hidden but still
+   measurable, so the strip can come back when there is room. */
+@media (max-width: 1023.98px) {
+  .tabs {
+    position: absolute;
+    left: 0;
+    height: 0;
+    visibility: hidden;
+    pointer-events: none;
   }
 
-  .link {
-    padding-inline: 11px;
-    font-size: max(var(--type-staff-floor, 0px), 0.9rem);
+  .menuline {
+    display: flex;
   }
+}
+
+.nav[data-fit="tight"] .tabs {
+  position: absolute;
+  left: 0;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.nav[data-fit="tight"] .menuline {
+  display: flex;
+}
+
+@media (max-width: 640px) {
+  .line {
+    width: calc(100% - 24px);
+  }
+}
+
+/* ---------- the menu: a sheet on a phone, a dialog on wider screens ---------- */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 35, 54, 0.52);
+}
+
+.dialog {
+  position: fixed;
+  z-index: 91;
+  display: flex;
+  max-height: min(78vh, calc(100dvh - 24px));
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: 0 28px 80px rgba(0, 25, 40, 0.3);
+}
+
+.dialog:focus-visible {
+  outline: 3px solid var(--imsda-purple);
+  outline-offset: -3px;
+}
+
+@media (max-width: 800px) {
+  .dialog {
+    inset: auto env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+    border-radius: 18px 18px 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@media (min-width: 801px) {
+  .dialog {
+    top: 50%;
+    left: 50%;
+    width: min(620px, 92vw);
+    border-radius: var(--radius-modal);
+    transform: translate(-50%, -50%);
+  }
+}
+
+.dialogHead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 16px 10px;
+}
+
+.dialogHead h2 {
+  min-width: 0;
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.15rem);
+  overflow-wrap: anywhere;
+}
+
+.close {
+  display: inline-flex;
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  padding: 0 12px;
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dialogBody {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 8px 14px;
+}
+
+.dialogBody ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 10px;
+  color: var(--ink);
+  padding: 8px 12px;
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.item:hover {
+  background: var(--imsda-navy-soft);
+}
+
+/* The club portal's own "where you are": a purple left edge, not the staff gold. */
+.item[aria-current] {
+  background: var(--imsda-navy-soft);
+  box-shadow: inset 4px 0 var(--imsda-purple);
+  color: var(--imsda-navy);
+  font-weight: 800;
+}
+
+.item:focus-visible {
+  outline: 3px solid var(--imsda-purple);
+  outline-offset: -3px;
+}
+
+/* ---------- the phone bar (club pages) ---------- */
+.phoneBar {
+  display: none;
+}
+
+@media (max-width: 800px) {
+  /* The bar replaces the top row on a phone; with only Home to show, the menu line stays (data-phone-bar="off"). */
+  .nav[data-phone-bar="on"] {
+    border-bottom: 0;
+  }
+
+  .nav[data-phone-bar="on"] .line {
+    display: none;
+  }
+
+  .phoneBar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    display: flex;
+    min-height: calc(67px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: var(--card);
+    padding: 4px max(4px, env(safe-area-inset-right, 0px)) max(4px, env(safe-area-inset-bottom, 0px)) max(4px, env(safe-area-inset-left, 0px));
+    box-shadow: 0 -8px 24px rgba(0, 59, 92, 0.07);
+  }
+
+  /* Never behind the bar: the back-to-top button rides above it. */
+  :global(body):has(.phoneBar) :global(.back-to-top-button) {
+    bottom: calc(67px + env(safe-area-inset-bottom, 0px) + 12px);
+  }
+}
+
+.phoneItem {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 52px;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 3px;
+  border-radius: 10px;
+  color: #566a75;
+  padding: 4px 2px 2px;
+  font-size: max(var(--type-floor, 0px), 0.75rem);
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  text-decoration: none;
+}
+
+.phoneItem span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.phoneItem[aria-current] {
+  background: rgba(0, 59, 92, 0.06);
+  color: var(--imsda-navy);
+}
+
+/* "Where you are" is the club portal's purple: a 4px bar on the current item. */
+.phoneItem[aria-current]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 28%;
+  right: 28%;
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+  background: var(--imsda-purple);
+}
+
+.phoneItem:focus-visible {
+  outline: 3px solid var(--imsda-purple);
+  outline-offset: -3px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -74,7 +364,10 @@
 }
 
 @media print {
-  .nav {
+  .nav,
+  .phoneBar,
+  .scrim,
+  .dialog {
     display: none !important;
   }
 }
