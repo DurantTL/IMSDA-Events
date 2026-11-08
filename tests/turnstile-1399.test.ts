@@ -210,3 +210,63 @@ describe("System report row", () => {
     expect(one.resultText).not.toContain("site-value-1");
   });
 });
+
+describe("requireTurnstile onVerified (#1715: the gate for an emailed copy)", () => {
+  const post = (token?: string) => new Request("https://events.imsda.test/x", { method: "POST", headers: token ? { [TURNSTILE_TOKEN_HEADER]: token } : {} });
+  function enforceEnv() {
+    vi.stubEnv("TURNSTILE_SITE_KEY", "synthetic-site-key");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", SECRET);
+    vi.stubEnv("TURNSTILE_ALLOWED_HOSTNAMES", "events.imsda.test");
+  }
+
+  it("fires for a token Siteverify accepts", async () => {
+    enforceEnv();
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ success: true, action: "registration", hostname: "events.imsda.test" })));
+    try {
+      const onVerified = vi.fn();
+      expect(await requireTurnstile(post("token-1"), { action: "registration", onVerified })).toBeNull();
+      expect(onVerified).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not fire for a token Siteverify rejects", async () => {
+    enforceEnv();
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ success: false, "error-codes": ["invalid-input-response"] })));
+    try {
+      const onVerified = vi.fn();
+      const response = await requireTurnstile(post("bad"), { action: "registration", onVerified });
+      expect(response?.ok).toBe(false);
+      expect(onVerified).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not fire when the check is off (skip mode)", async () => {
+    vi.stubEnv("TURNSTILE_SITE_KEY", "");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "");
+    try {
+      const onVerified = vi.fn();
+      expect(await requireTurnstile(post("token-1"), { action: "registration", onVerified })).toBeNull();
+      expect(onVerified).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("does not fire when no token came", async () => {
+    enforceEnv();
+    try {
+      const onVerified = vi.fn();
+      const response = await requireTurnstile(post(), { action: "registration", onVerified });
+      expect(response?.status).toBe(400);
+      expect(onVerified).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
