@@ -91,7 +91,7 @@ export default async function MorePage({ searchParams }: { searchParams: Promise
     <section className="page-stack event-modules-page">
       <AdminHub view={setup} />
       {setup.groups.length === 0 && <p className="quiet-copy">{eventSetupEmptyCopy}</p>}
-      {!view.canToggle && <p className="quiet-copy">Only a system administrator turns modules on or off.{featuresShown ? " Event features shows what this event uses." : ""}</p>}
+      {!view.canToggle && setup.groups.length > 0 && <p className="quiet-copy">Only a system administrator turns modules on or off.{featuresShown ? " Event features shows what this event uses." : ""}</p>}
 
       {health && (
         <section className="event-modules-health" data-state={health.state} aria-label="Event health">
