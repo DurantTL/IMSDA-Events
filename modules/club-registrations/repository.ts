@@ -1686,9 +1686,18 @@ export async function amendClubRegistration(
     const childRole = isChild ? guestOwnedRole(definition, { age: ageOnEventDate ?? 0, guestType: "UNDERAGE" }) : {};
     // A guest aged 10 to 17 keeps or changes the "not a Pathfinder" mark as the director chose (#1728); anyone else cannot be marked.
     const requestedMark = input.keptGuestNotPathfinder?.[guestId];
-    const youthAge = ageOnEventDate !== null && ageOnEventDate >= GUEST_NOT_PATHFINDER_MIN_AGE && ageOnEventDate <= GUEST_NOT_PATHFINDER_MAX_AGE;
+    // An event with team rules (Pathfinder Bible Experience) has no such mark: it is refused, and nothing about it is written.
+    const youthAge = !teamSettings && ageOnEventDate !== null && ageOnEventDate >= GUEST_NOT_PATHFINDER_MIN_AGE && ageOnEventDate <= GUEST_NOT_PATHFINDER_MAX_AGE;
+    if (teamSettings && requestedMark === true) throw new ClubRegistrationError("ATTENDEES_INVALID", CHILD_GUEST_TEAM_MESSAGE);
     if (requestedMark === true && !youthAge) throw new ClubRegistrationError("ATTENDEES_INVALID", GUEST_NOT_PATHFINDER_AGE_MESSAGE);
     const youthMark = youthAge && (requestedMark ?? registeredYouthMark);
+    // The mark decides whether they take a class seat, so a change is made with their classes, not silently here (as for a group).
+    if (youthAge && youthMark !== registeredYouthMark && (await getPrisma().honorEnrollment.count({ where: { registrationAttendeeId: current.id } })) > 0) {
+      throw new ClubRegistrationError(
+        "ATTENDEES_INVALID",
+        `Changing the Not a Pathfinder choice for ${formatPersonName({ firstName: typeof snapshot.firstName === "string" ? snapshot.firstName : "", lastName: typeof snapshot.lastName === "string" ? snapshot.lastName : "" }) || "this person"} changes whether they use a class seat. Remove their classes first, change it, then choose classes again.`,
+      );
+    }
     const keptResponses = withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses));
     // An old Child answer on a guest aged 10 to 17 becomes Pathfinder, marked or not, so they are priced as a youth.
     const responses = {

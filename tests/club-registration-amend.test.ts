@@ -10,6 +10,12 @@ const dependencies = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 // The registration PDF (#1082) is made after the commit and has its own tests. This fake database has no PDF tables.
 vi.mock("@/modules/registration-pdf/after-commit", () => ({ attachRegistrationPdfAfterCommit: vi.fn(), finishRegistrationChange: vi.fn() }));
+// The team rules run in the amendment's own transaction and are covered by a database script; here the guard stands aside.
+// It is the original everywhere except in tests that switch it off.
+vi.mock("@/modules/club-teams/registration-guard", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/modules/club-teams/registration-guard")>();
+  return { ...original, enforceTeamRegistrationRules: vi.fn(original.enforceTeamRegistrationRules) };
+});
 vi.mock("@/lib/env", () => ({ getServerEnv: dependencies.getServerEnv }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 vi.mock("@/modules/registrations/repository", () => ({
@@ -213,7 +219,7 @@ function fixture({
     clubEventRegistration: { findUnique: vi.fn(async (): Promise<{ registrationId: string } | null> => ({ registrationId: "registration-1" })) },
     eventMealSelection: { findMany: vi.fn(async () => []) },
     // The instructor class change log (#1098) reads a removed attendee's picks; there are none.
-    honorEnrollment: { findMany: vi.fn(async () => []) },
+    honorEnrollment: { findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
     registrationAttendee: {
       findMany: vi.fn(async () => registration.attendees.map((a) => ({ id: a.id, personId: a.personId, profileSnapshot: a.profileSnapshot, formResponses: a.formResponses }))),
       count: vi.fn(async () => 0),
@@ -888,6 +894,34 @@ describe("an event-only guest aged 10 to 17, on an edit (#1728)", () => {
     const unticked = await edit(fixture({ definition: roleDefinition, attendees: legacy() }).prisma, { guestteen001: false }, "Child");
     expect(unticked.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH", notPathfinder: false });
     expect(unticked.formResponses).toMatchObject({ attendee_type: "Pathfinder" });
+  });
+
+  it("refuses a changed mark while the guest has classes, and allows an unchanged one", async () => {
+    const registered = () => [attendee("attendee-m1", "m1", "Alex", "Sample", 11), registeredGuest(13, { temporaryAttendeeType: "YOUTH", notPathfinder: true }, "Pathfinder")];
+    const held = fixture({ definition: roleDefinition, attendees: registered() });
+    held.prisma.honorEnrollment.count.mockResolvedValue(1);
+    await expect(edit(held.prisma, { guestteen001: false })).rejects.toMatchObject({ code: "ATTENDEES_INVALID", message: expect.stringContaining("Remove their classes first") });
+    expect(held.prisma.honorEnrollment.count).toHaveBeenCalledWith({ where: { registrationAttendeeId: "attendee-teen" } });
+    const unchanged = fixture({ definition: roleDefinition, attendees: registered() });
+    unchanged.prisma.honorEnrollment.count.mockResolvedValue(1);
+    await expect(edit(unchanged.prisma, { guestteen001: true })).resolves.toBeTruthy();
+  });
+
+  it("on a team event refuses a true mark and never writes the mark, even a false one", async () => {
+    const teamRows = ({
+      eventId: "event-1", allowMultipleTeams: true, minTeamMembers: null, maxTeamMembers: null, maxAlternates: 0,
+      ageAsOf: null, maxMemberAge: null, booksLine: "", levelInfo: [],
+    }) as never;
+    const registered = () => [attendee("attendee-m1", "m1", "Alex", "Sample", 11), registeredGuest(13, { temporaryAttendeeType: "YOUTH" }, "Pathfinder")];
+    const refused = fixture({ definition: roleDefinition, attendees: registered() });
+    refused.prisma.eventTeamSettings.findUnique.mockResolvedValue(teamRows);
+    await expect(edit(refused.prisma, { guestteen001: true })).rejects.toMatchObject({ code: "ATTENDEES_INVALID" });
+    const plain = fixture({ definition: roleDefinition, attendees: registered() });
+    plain.prisma.eventTeamSettings.findUnique.mockResolvedValue(teamRows);
+    const { enforceTeamRegistrationRules } = await import("@/modules/club-teams/registration-guard");
+    vi.mocked(enforceTeamRegistrationRules).mockResolvedValueOnce({ queuedMessageIds: [] });
+    const kept = await edit(plain.prisma, { guestteen001: false });
+    expect(kept.profileSnapshot).not.toHaveProperty("notPathfinder");
   });
 
   it("keeps a child under 10 a Child with the Child role, and refuses marking them", async () => {

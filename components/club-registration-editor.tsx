@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { submitJson } from "@/lib/submit-json";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Pencil, Trash2, UserPlus, X } from "lucide-react";
+import styles from "@/components/club-guest-list.module.css";
 import { ClubGuestTypeFields } from "@/components/club-guest-type-fields";
 import { ClubLocationPicker } from "@/components/club-location-picker";
 import { rosterHrefFromRegistration } from "@/modules/club-registrations/roster-return";
@@ -287,7 +288,8 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
           selectedMemberIds,
           keptOffRosterAttendeeIds: keptOffRosterIds,
           keptGuestIds,
-          keptGuestNotPathfinder: Object.fromEntries(existingGuests.filter((guest) => keptGuestIds.includes(guest.guestId!) && youthAgeRange(guest.ageOnEventDate)).map((guest) => [guest.guestId!, keptMarks[guest.guestId!] === true])),
+          // An event with team rules has no such mark, so nothing is sent for it.
+          ...(workspace.teams.settings ? {} : { keptGuestNotPathfinder: Object.fromEntries(existingGuests.filter((guest) => keptGuestIds.includes(guest.guestId!) && youthAgeRange(guest.ageOnEventDate)).map((guest) => [guest.guestId!, keptMarks[guest.guestId!] === true])) }),
           newGuests,
           rosterAges: typedAges,
           // Only ages the director changed from where they started are saved back to the roster.
@@ -321,7 +323,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
         : { key: issue.key, message: issue.message, attendeeIndex: null }];
     });
     return { ok: false as const, message: result.message ?? "That change couldn't be saved. Refresh and try again.", issues };
-  }, [organizationId, workspace.event.id, workspace.registration.updatedAt, workspace.registration.teamKey, selectedMemberIds, keptOffRosterIds, keptGuestIds, keptMarks, existingGuests, newGuests, typedAges, startingAges, saveAgeOff, locationId, currentLocationId]);
+  }, [organizationId, workspace.event.id, workspace.registration.updatedAt, workspace.registration.teamKey, selectedMemberIds, keptOffRosterIds, keptGuestIds, keptMarks, existingGuests, workspace.teams.settings, newGuests, typedAges, startingAges, saveAgeOff, locationId, currentLocationId]);
 
   // Answers as registered, by client id, so an old answer left alone never blocks the edit (#855).
   const previousResponses = useMemo(() => Object.fromEntries([
@@ -485,16 +487,16 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
           )}
         </div>
         {(existingGuests.length > 0 || newGuests.length > 0) && (
-          <ul className="club-going-list club-guest-list">
+          <ul className={styles.list}>
             {existingGuests.map((guest) => keptGuestIds.includes(guest.guestId!) && (
-              <li key={guest.guestId}>
-                <span>
+              <li className={styles.row} key={guest.guestId}>
+                <span className={styles.who}>
                   <strong translate="no">{guest.lastName}, {guest.firstName}</strong>
                   <small>This event only{guest.guestChild ? " · Child" : ""}{keptMarks[guest.guestId!] ? " · Youth guest (not a Pathfinder)" : ""}{guest.ageOnEventDate !== null ? <> · Age <span translate="no">{guest.ageOnEventDate}</span></> : ""}</small>
                 </span>
                 {!workspace.teams.settings && youthAgeRange(guest.ageOnEventDate) && (
-                  <label className="checkbox-label">
-                    <input checked={keptMarks[guest.guestId!] === true} onChange={(event) => setKeptMarks((current) => ({ ...current, [guest.guestId!]: event.currentTarget.checked }))} type="checkbox" />
+                  <label className={styles.mark}>
+                    <input checked={keptMarks[guest.guestId!] === true} onChange={(event) => { const checked = event.currentTarget.checked; setKeptMarks((current) => ({ ...current, [guest.guestId!]: checked })); }} type="checkbox" />
                     <span>Not a Pathfinder (for example, a sibling who isn&apos;t in the club)</span>
                   </label>
                 )}
@@ -504,8 +506,8 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
               </li>
             ))}
             {newGuests.map((guest) => (
-              <li key={guest.id}>
-                <span>
+              <li className={styles.row} key={guest.id}>
+                <span className={styles.who}>
                   <strong translate="no">{guest.lastName}, {guest.firstName}</strong>
                   <small>This event only · {guestIsYouthNotPathfinder(guest) ? "Youth guest (not a Pathfinder) · " : guestIsChild(guest) ? "Child · " : ""}Age <span translate="no">{guest.age}</span></small>
                 </span>

@@ -15,6 +15,7 @@ import {
   type FormResponses,
   type RosterAttendee,
 } from "@/components/public-registration-form";
+import styles from "@/components/club-guest-list.module.css";
 import { ClubGuestTypeFields } from "@/components/club-guest-type-fields";
 import { createDraftSaveQueue, registrationDraftUnsaved } from "@/modules/club-registrations/draft-save-queue";
 import { createDraftSender, DRAFT_CONFLICT_MESSAGE, draftBlockedReason } from "@/modules/club-registrations/draft-sender";
@@ -65,6 +66,16 @@ type Workspace = ClubEventWorkspace & { experience: PublicRegistrationExperience
 
 /** Class picks by attendee client id (#618). */
 type HonorPicks = Record<string, string[]>;
+
+/** Role answers of draft guests saved as Child at 10 to 17 under #1666 become Pathfinder, as the server stores them (#1728). */
+function legacyAdjustedAnswers(answers: Record<string, FormResponses>, guests: ClubGuest[], definition: Parameters<typeof childRoleToPathfinder>[0]) {
+  const next = { ...answers };
+  for (const guest of guests) {
+    const clientId = clubGuestClientId(guest.id);
+    if (normalizeLegacyChildGuest(guest) !== guest && next[clientId]) next[clientId] = childRoleToPathfinder(definition, next[clientId]) as FormResponses;
+  }
+  return next;
+}
 
 type DraftState = {
   selectedMemberIds: string[];
@@ -117,7 +128,8 @@ export function ClubRegistrationWorkspace({
     guests: (workspace.draft?.guests ?? []).map(normalizeLegacyChildGuest),
     // The director's own details fill in only what the draft (or the person) left blank (#618).
     responses: fillMissingAnswers(workspace.draft?.responses, contactPrefill) as FormResponses,
-    attendeeResponses: (workspace.draft?.attendeeResponses as Record<string, FormResponses> | undefined) ?? {},
+    // A guest saved as Child at 10 to 17 becomes a marked youth; their saved role answer follows, so the preview matches what is stored (#1728).
+    attendeeResponses: legacyAdjustedAnswers((workspace.draft?.attendeeResponses as Record<string, FormResponses> | undefined) ?? {}, workspace.draft?.guests ?? [], workspace.experience.form.definition),
     honorSelections: workspace.draft?.honorSelections ?? {},
     rosterAges: workspace.draft?.rosterAges ?? {},
     rosterAgeSaveOff: workspace.draft?.rosterAgeSaveOff ?? [],
@@ -705,10 +717,10 @@ export function ClubRegistrationWorkspace({
           )}
         </div>
         {draft.guests.length > 0 && (
-          <ul className="club-going-list club-guest-list">
+          <ul className={styles.list}>
             {draft.guests.map((guest) => (
-              <li key={guest.id}>
-                <span>
+              <li className={styles.row} key={guest.id}>
+                <span className={styles.who}>
                   <strong translate="no">{guest.lastName}, {guest.firstName}</strong>
                   <small>
                     This event only · {guestIsYouthNotPathfinder(guest) ? "Youth guest (not a Pathfinder) · " : guestIsChild(guest) ? "Child · " : ""}Age <span translate="no">{guest.age}</span>
@@ -716,7 +728,7 @@ export function ClubRegistrationWorkspace({
                   </small>
                 </span>
                 {!teamRules && guest.age >= GUEST_NOT_PATHFINDER_MIN_AGE && guest.age <= GUEST_NOT_PATHFINDER_MAX_AGE && (
-                  <label className="checkbox-label">
+                  <label className={styles.mark}>
                     <input checked={guest.notPathfinder === true} onChange={(event) => setGuestMark(guest.id, event.currentTarget.checked)} type="checkbox" />
                     <span>Not a Pathfinder (for example, a sibling who isn&apos;t in the club)</span>
                   </label>
