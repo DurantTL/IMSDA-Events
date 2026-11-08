@@ -322,6 +322,8 @@ const pages: PageSpec[] = [
   staff("event-staff", "/staff"),
   staff("finance", "/finance"),
   staff("finance-invoices", "/finance/invoices"),
+  // Statements list (#1576): no seeded invoice, so the invoice and statement detail routes are not audited here.
+  staff("finance-invoice-statements", "/finance/invoices/statements"),
   staff("finance-church-owed", "/finance/church-owed"),
   // The event's scholarship fund (#398): a long sponsor name, a pledge, and an award on a cancelled registration.
   staff("finance-scholarship-fund", "/finance/scholarship-fund"),

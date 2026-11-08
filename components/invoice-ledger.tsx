@@ -173,6 +173,7 @@ export function StatementsList({ eventId, eventName, parties, totals }: { eventI
         </div>
         <div className="page-intro-actions">
           <a className="secondary-button" href={`/finance/invoices?event=${eventId}`}>All invoices</a>
+          <a className="secondary-button" href={`/finance/tools?event=${eventId}`}>Back to More money tools</a>
           <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(eventId)}/exports/invoices`}>Download CSV for the treasurer</ExportLink>
         </div>
       </div>

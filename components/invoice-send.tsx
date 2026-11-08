@@ -1,6 +1,6 @@
 import { SendInvoiceForm } from "@/components/invoice-ledger-controls";
-import { invoiceMoney, invoiceWhen } from "@/components/invoices";
-import { deliveryStatusLabel } from "@/modules/invoices/delivery-domain";
+import { StatusBadge, invoiceMoney, invoiceWhen } from "@/components/invoices";
+import { deliveryStatusLabel, settlementLabel, type SettlementStatus } from "@/modules/invoices/delivery-domain";
 import type { SendPreview } from "@/modules/invoices/delivery-repository";
 
 /**
@@ -8,7 +8,7 @@ import type { SendPreview } from "@/modules/invoices/delivery-repository";
  * the message, and the earlier sends. Nothing is sent by viewing this page. A version that a revision replaced shows
  * a notice and no form.
  */
-export function InvoiceSendView({ preview, viewerName }: { preview: SendPreview; viewerName: string }) {
+export function InvoiceSendView({ preview, viewerName, settlement = null }: { preview: SendPreview; viewerName: string; settlement?: SettlementStatus | "UNAVAILABLE" | null }) {
   const { version, snapshotContact, currentContact } = preview;
   return (
     <section className="page-stack">
@@ -16,7 +16,10 @@ export function InvoiceSendView({ preview, viewerName }: { preview: SendPreview;
         <div>
           <p className="eyebrow">Invoice</p>
           <h2>{preview.isResend ? "Resend" : "Send"} {version.number}</h2>
-          <p>{version.organizationName} · {invoiceMoney(version.amountDueCents)} · finalized {invoiceWhen(version.finalizedAt)}</p>
+          <p>
+            <StatusBadge status={version.status} />{settlement && version.status === "FINALIZED" && <> <span className="count-badge billing-readiness">{settlement === "UNAVAILABLE" ? "Payment status unavailable" : settlementLabel(settlement)}</span></>} · {invoiceMoney(version.amountDueCents)} · finalized {invoiceWhen(version.finalizedAt)}
+          </p>
+          <p><small>Event {preview.eventName} · Billed to {version.organizationName}</small></p>
         </div>
         <div className="page-intro-actions">
           <a className="secondary-button" href={`/finance/invoices/${preview.invoiceId}?event=${preview.eventId}&version=${version.id}`}>Back to the invoice</a>
