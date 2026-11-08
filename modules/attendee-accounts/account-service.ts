@@ -411,10 +411,13 @@ async function spendVerificationRecord(
   });
   if (!claimed) return { outcome: "rejected" };
 
-  // The code just typed back was emailed to this address and is bound to this browser's
-  // pending sign-up: the same proof as the emailed sign-in code, so this session has passed
-  // that step. A new director or Area Coordinator who accepts an invite right after signing up
-  // then goes straight to two-step setup instead of being asked for a second code.
+  // The code just typed back was emailed to this address: the same proof as the emailed sign-in
+  // code, so this session has passed that step. On sign-up it is also bound to this browser's
+  // pending cookie; on the by-address path (an administrator's "Send verification email") it is
+  // the code alone, which is still no more than any session gets by asking for a sign-in code to
+  // the same inbox. It never stands for knowing the password or for a second factor. A new
+  // director or Area Coordinator who accepts an invite right after signing up then goes straight
+  // to two-step setup instead of being asked for a second code.
   return {
     outcome: "verified",
     accountId: record.accountId,

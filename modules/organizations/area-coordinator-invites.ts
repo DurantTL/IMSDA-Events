@@ -45,7 +45,7 @@ export class AreaCoordinatorInviteError extends Error {
 
 const OPEN_STATUSES = ["PENDING", "SENT"] as const;
 
-function inviteEmailContent(rawInput: { name: string; email: string }) {
+export function areaCoordinatorInviteEmailContent(rawInput: { name: string; email: string }) {
   const name = neutralizePlaceholders(rawInput.name.trim());
   const signUpUrl = clubInviteSignUpUrl(rawInput.email, "area");
   const signInUrl = new URL("/account/sign-in", getServerEnv().APP_BASE_URL).toString();
@@ -89,7 +89,7 @@ function inviteEmailContent(rawInput: { name: string; email: string }) {
 function queueMessage(tx: Prisma.TransactionClient, invite: { id: string; email: string; name: string }, correlationId?: string) {
   return queueAccountInviteMessage(tx, {
     recipient: { email: invite.email, name: invite.name },
-    content: inviteEmailContent(invite),
+    content: areaCoordinatorInviteEmailContent(invite),
     trigger: "AREA_COORDINATOR_INVITE_SENT",
     reference: { areaCoordinatorInviteId: invite.id },
     idempotencyPrefix: "area-coordinator-invite",

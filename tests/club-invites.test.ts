@@ -64,6 +64,7 @@ import {
   resendClubTeamInvite,
   sendClubInvites,
 } from "@/modules/club-imports/invites";
+import { areaCoordinatorInviteEmailContent } from "@/modules/organizations/area-coordinator-invites";
 
 const now = new Date("2026-09-23T15:00:00Z");
 const account = { id: "account-1", verifiedEmail: "Leader@Example.test" };
@@ -249,6 +250,22 @@ describe("the sign-up link a club invite's email carries (#434)", () => {
     expect(body).not.toMatch(/expires/i);
     expect(clubInviteEmailContent({ name: "", email: "r@example.test", clubName: "Example Pathfinders", role: "REPORTER", source: "CLUB" }).bodyText).toContain("Monthly Records");
     expect(clubInviteEmailContent({ name: "", email: "r@example.test", clubName: "Example Pathfinders", role: "REGISTRAR", source: "CLUB" }).bodyText).toContain("Club events");
+    for (const source of ["CLUB", "APPLICATION", "PEOPLE"] as const) {
+      expect(clubInviteEmailContent({ name: "", email: "r@example.test", clubName: "Example Pathfinders", role: "DIRECTOR", source }).bodyText).toContain("This invite expires in 14 days.");
+    }
+  });
+
+  it("gives an Area Coordinator the same real steps, with the Area Coordinator card and marked link", () => {
+    const body = areaCoordinatorInviteEmailContent({ name: "Pat Example", email: "pat@example.test" }).bodyText;
+    for (const step of [
+      "https://events.imsda.test/account/sign-up?invite=area#email=pat%40example.test",
+      "at least 14 characters",
+      "six-digit code",
+      "You're invited to be an Area Coordinator",
+      "This phone or computer",
+      "Club coordination",
+      "This invite expires in 14 days.",
+    ]) expect(body).toContain(step);
   });
 
   it("normalizes the address the same way an invite matches one", () => {
