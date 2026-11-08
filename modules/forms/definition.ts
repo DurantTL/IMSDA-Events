@@ -1249,6 +1249,32 @@ const attendeeName = (prefix: string) => [
   templateField(`${prefix}_last`, "last_name", "Last name", "TEXT", true, [], { scope: "ATTENDEE" }),
 ];
 
+/** The diet choices both retreat-style forms offer (#1665). */
+export const dietChoices = ["Vegetarian", "Vegan", "Dairy-free", "Gluten-free"];
+
+/**
+ * The two kitchen questions (#1665): food allergies (required; "None" or the allergies written in) and diet (optional,
+ * pick any). Both are sensitive and not filterable, like the dietary answer they replace. Allergies are `food_allergies`,
+ * the diet stays `dietary_needs`, so older form versions and reports that read `dietary_needs` keep working.
+ */
+function foodAllergyAndDietFields(prefix: string, scope: RegistrationFormField["scope"]): RegistrationFormField[] {
+  return [
+    templateField(`${prefix}_allergies`, "food_allergies", "Food allergies", "TEXT", true, [], {
+      scope,
+      placeholder: "None, or list each food allergy",
+      helpText: "Write None if there are no food allergies. The kitchen sees only how many people have each allergy, not names.",
+      sensitive: true,
+      filterable: false,
+    }),
+    templateField(`${prefix}_diet`, "dietary_needs", "Diet", "MULTISELECT", false, dietChoices, {
+      scope,
+      helpText: "Choose any that apply. Leave blank for no special diet.",
+      sensitive: true,
+      filterable: false,
+    }),
+  ];
+}
+
 const leadershipTracks = ["Basic Staff Training Certification", "Spanish Basic Staff Training", "Master Guide", "New Directors", "Pathfinder Directors", "Pathfinder Counselor Jumpstart", "TLT Class for Directors", "N/A"];
 
 const leadershipWeekendTemplate: FormTemplate = {
@@ -1286,7 +1312,7 @@ const leadershipWeekendTemplate: FormTemplate = {
         }),
         templateField("lw_room_with", "room_with", "I would like to room with", "TEXT", false, [], { scope: "ATTENDEE" }),
         templateField("lw_meals", "meals", "Meals", "MULTISELECT", false, ["Friday Supper", "Sabbath Breakfast", "Sabbath Lunch", "Sabbath Supper", "Sunday Breakfast"], { scope: "ATTENDEE", helpText: "All meals are vegetarian." }),
-        templateField("lw_dietary", "dietary_needs", "Dietary needs", "MULTISELECT", false, ["Vegan", "Gluten Free"], { scope: "ATTENDEE" }),
+        ...foodAllergyAndDietFields("lw", "ATTENDEE"),
       ] },
       { id: "lw_agreement", title: "Agreement", description: "Confirm before submitting.", fields: [
         templateField("lw_billing_ack", "church_billing_acknowledgment", "Church billing", "CHECKBOX", true, [], { placeholder: "I understand my church will be billed for lodging and meals after the event." }),
@@ -1300,7 +1326,7 @@ const areaCoordinatorExcused = { fieldKey: "tlt_year", operator: "EQUALS", value
 const tltRetreatTemplate: FormTemplate = {
   key: "tlt_retreat",
   name: "TLT Retreat",
-  description: "Participant, TLT year, club and director, dietary choice, and the retreat acknowledgments. No fees. One form for both the spring and fall retreats.",
+  description: "Participant, TLT year, club and director, food allergies and diet, and the retreat acknowledgments. No fees. One form for both the spring and fall retreats.",
   audience: "Individual",
   definition: {
     title: "TLT Retreat registration",
@@ -1317,9 +1343,7 @@ const tltRetreatTemplate: FormTemplate = {
         templateField("tr_director", "club_director_name", "Club director name", "TEXT", true, [], { optionalWhen: areaCoordinatorExcused }),
         templateField("tr_director_email", "club_director_email", "Club director email", "EMAIL", true, [], { optionalWhen: areaCoordinatorExcused }),
       ] },
-      { id: "tr_dietary", title: "Dietary needs", description: "", fields: [
-        templateField("tr_diet", "dietary_needs", "Dietary needs", "RADIO", true, ["Vegan", "Gluten Free", "Both", "Neither"], { scope: "ATTENDEE" }),
-      ] },
+      { id: "tr_dietary", title: "Food allergies & diet", description: "", fields: foodAllergyAndDietFields("tr", "ATTENDEE") },
       { id: "tr_acknowledgments", title: "Acknowledgments", description: "Each participant confirms these before submitting.", fields: [
         templateField("tr_recommendations", "recommendation_forms", "I have registered and submitted three recommendation forms.", "RADIO", false, ["Yes", "N/A"], { helpText: "Spring retreat only. Leave blank at the fall retreat." }),
         templateField("tr_application_ack", "application_approved_acknowledgment", "Application approved", "CHECKBOX", true, [], { placeholder: "I understand that to attend the retreat I need to have completed my application and been approved." }),
