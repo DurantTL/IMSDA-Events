@@ -2,6 +2,7 @@ import { z } from "zod";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
+import { rosterSchoolDetailsVisible } from "@/modules/club-rosters/school-details-access";
 import { rosterApiError } from "@/modules/club-rosters/api-errors";
 import { MAX_ROSTER_CSV_BYTES, parseRosterCsv, planRosterImport, rosterCsvAddDefaults, RosterCsvError } from "@/modules/club-rosters/csv-import";
 import { clubYearFor } from "@/modules/club-rosters/domain";
@@ -107,7 +108,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
         ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : { actAsId: actor.actAsId }),
       },
     });
-    return Response.json({ steps: results, added, updated, members: await listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: true }) });
+    return Response.json({ steps: results, added, updated, members: await listRoster(organizationId, clubYear, new Date(), { includeSchoolDetails: rosterSchoolDetailsVisible(access) }) });
   } catch (error) {
     return rosterApiError(error, "Importing the roster");
   }

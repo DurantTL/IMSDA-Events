@@ -45,6 +45,13 @@ export type ClubFormTemplateSeed = {
   /** Birth-date fields: sensitive, and readable only by the club's leaders and system administrators. */
   birthDateFieldKeys: string[];
   staffOnlyFieldKeys: string[];
+  /**
+   * School type and church membership answers (#1668): readable only by the club's own director and deputy and by
+   * system administrators. Not "sensitive" (they must stay mappable to the roster), but restricted like it for every
+   * other viewer (`restrictedFieldKeys`) and left out of the staff CSV unless the viewer is a system administrator.
+   * Read from the code's seed by template key, so a copy edited in the app keeps the restriction.
+   */
+  schoolDetailFieldKeys?: string[];
   printLayout: "STANDARD" | "PASSENGER_LIST";
   /**
    * The pre-filled "Add to roster" mapping (#721), always off here: an
@@ -134,6 +141,7 @@ const membershipApplication: ClubFormTemplateSeed = {
   },
   sensitiveFieldKeys: ["birth_date"],
   birthDateFieldKeys: ["birth_date"],
+  schoolDetailFieldKeys: ["school_type", "church_member"],
   // v2 (#719): the fee amounts are entered by the club, so a private-link filler never sees them. Signing dates fill in automatically in the same version.
   staffOnlyFieldKeys: ["registration_fee", "club_dues", "insurance_fee"],
   sectionNotes: {

@@ -414,19 +414,39 @@ export function viewerCanRevealBirthDates(viewer: ClubFormsViewer, organizationI
   return viewer.kind === "STAFF" && (viewer.systemAdmin || viewer.clubsAdministrator);
 }
 
+/** The code seed's school type and church membership question keys for a template (#1668); none for any other form. */
+export function schoolDetailFieldKeysFor(templateKey: string | undefined): readonly string[] {
+  return clubFormTemplateSeeds.find((seed) => seed.key === templateKey)?.schoolDetailFieldKeys ?? [];
+}
+
 /**
- * The sensitive keys a viewer may not read, shown as "Restricted": every one,
- * answered or not, so a blank tells nothing.
+ * School type and church membership answers (#1668): the club's own director or deputy and system administrators. Not an
+ * Area Coordinator, an Event Admin, or a Clubs Administrator who is not a system administrator, whether reading as
+ * themselves or acting as the club's director.
+ */
+export function viewerCanSeeSchoolDetails(viewer: ClubFormsViewer, organizationId: string | null) {
+  if (viewer.kind === "CLUB_LEADER") {
+    const viaClubsAdministrator = viewer.actor.kind === "STAFF_ACTING" && viewer.actor.viaClubsAdministrator === true;
+    return organizationId !== null && viewer.organizationId === organizationId && !viaClubsAdministrator;
+  }
+  return viewer.kind === "STAFF" && viewer.systemAdmin;
+}
+
+/**
+ * The keys a viewer may not read, shown as "Restricted": every one, answered or not, so a blank tells nothing. The
+ * sensitive and birth-date keys follow their own rules; the school detail keys (#1668) follow `viewerCanSeeSchoolDetails`.
  */
 export function restrictedFieldKeys(
   viewer: ClubFormsViewer,
   organizationId: string | null,
-  template: Pick<ClubFormTemplateRecord, "sensitiveFieldKeys" | "birthDateFieldKeys">,
+  template: Pick<ClubFormTemplateRecord, "sensitiveFieldKeys" | "birthDateFieldKeys"> & { key?: string },
 ) {
   const birth = new Set(template.birthDateFieldKeys);
   const sensitive = viewerCanRevealSensitive(viewer, organizationId);
   const birthDates = viewerCanRevealBirthDates(viewer, organizationId);
-  return template.sensitiveFieldKeys.filter((key) => (birth.has(key) ? !birthDates : !sensitive));
+  const restricted = template.sensitiveFieldKeys.filter((key) => (birth.has(key) ? !birthDates : !sensitive));
+  if (viewerCanSeeSchoolDetails(viewer, organizationId)) return restricted;
+  return [...restricted, ...schoolDetailFieldKeysFor(template.key).filter((key) => !restricted.includes(key))];
 }
 
 /** Only club directors and deputies use club forms; registrars and reporters do not. */

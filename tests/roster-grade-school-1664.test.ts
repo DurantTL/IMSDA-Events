@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { carriedSchoolValue, carryForwardInputSchema } from "@/modules/club-rosters/carry-forward-domain";
+import { carriedSchoolValue, carryForwardInputSchema, seniorsToReview } from "@/modules/club-rosters/carry-forward-domain";
 import { parseRosterCsv, planRosterImport, ROSTER_CSV_HEADERS } from "@/modules/club-rosters/csv-import";
 import {
   clubSchoolGradeLabels,
@@ -232,11 +232,12 @@ describe("the Membership Application (#1664, #1668)", () => {
 describe("who sees school type and church membership (#1668)", () => {
   it("is read only for the club's own roster and a system administrator's Open club page", () => {
     // The club's own roster page and its API routes ask for the values; the roster routes sit behind requireRosterAccess.
-    expect(read("app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx")).toMatch(/includeSchoolDetails: true/);
+    expect(read("app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx")).toMatch(/schoolDetails = rosterSchoolDetailsVisible\(access\)[\s\S]*includeSchoolDetails: schoolDetails/);
     for (const route of ["app/api/attendee/clubs/[organizationId]/roster/route.ts", "app/api/attendee/clubs/[organizationId]/roster/[memberId]/route.ts", "app/api/attendee/clubs/[organizationId]/roster/import/route.ts"]) {
       const source = read(route);
       expect(source, route).toMatch(/requireRosterAccess/);
-      expect(source, route).toMatch(/includeSchoolDetails: true/);
+      expect(source, route).toMatch(/includeSchoolDetails: rosterSchoolDetailsVisible\(access\)/);
+      expect(source, route).not.toMatch(/includeSchoolDetails: true/);
     }
     // The system administrator's page passes it only for a system administrator.
     expect(read("app/(workspace)/admin/organizations/[organizationId]/club/page.tsx")).toMatch(/schoolDetails=\{user\.globalRole === "SYSTEM_ADMIN"\}/);
@@ -263,5 +264,27 @@ describe("who sees school type and church membership (#1668)", () => {
     for (const file of ["modules/club-rosters/export-repository.ts", "modules/club-rosters/export.ts"]) {
       expect(read(file)).not.toMatch(/schoolType|churchMember/);
     }
+  });
+});
+
+describe("the 12th grade notice on the rollover review (#1664)", () => {
+  const rows = [
+    { id: "senior", schoolGrade: "GRADE_12" },
+    { id: "rising", schoolGrade: "GRADE_11" },
+    { id: "moved-off", schoolGrade: "GRADE_12" },
+    { id: "unticked", schoolGrade: "GRADE_12" },
+    { id: "staff", schoolGrade: "GRADE_12" },
+  ];
+  const choices: Record<string, { ticked: boolean; attendeeType: string; schoolGrade: string }> = {
+    senior: { ticked: true, attendeeType: "YOUTH", schoolGrade: "GRADE_12" },
+    rising: { ticked: true, attendeeType: "YOUTH", schoolGrade: "GRADE_12" },
+    "moved-off": { ticked: true, attendeeType: "YOUTH", schoolGrade: "NOT_IN_SCHOOL" },
+    unticked: { ticked: false, attendeeType: "YOUTH", schoolGrade: "GRADE_12" },
+    staff: { ticked: true, attendeeType: "STAFF", schoolGrade: "" },
+  };
+
+  it("names only those who were in 12th last year and are still in 12th, not someone moved up from 11th", () => {
+    const named = seniorsToReview(rows, { previousGrade: (row) => row.schoolGrade, choice: (row) => choices[row.id]! });
+    expect(named.map((row) => row.id)).toEqual(["senior"]);
   });
 });

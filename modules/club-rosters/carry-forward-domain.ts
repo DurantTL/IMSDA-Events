@@ -87,6 +87,20 @@ export function carriedSchoolValue<T>(
 }
 
 
+/**
+ * Who the "may have graduated" notice names on the carry-forward review (#1664): youth who were in 12th grade last year
+ * and are still in 12th grade in the choices. Someone moved up from 11th to 12th is not flagged.
+ */
+export function seniorsToReview<T>(
+  rows: readonly T[],
+  options: { previousGrade: (row: T) => string | null | undefined; choice: (row: T) => { ticked: boolean; attendeeType: string; schoolGrade: string } },
+): T[] {
+  return rows.filter((row) => {
+    const choice = options.choice(row);
+    return choice.ticked && choice.attendeeType === "YOUTH" && options.previousGrade(row) === "GRADE_12" && choice.schoolGrade === "GRADE_12";
+  });
+}
+
 const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "MASTER_GUIDE"]).nullable();
 
 /** One ticked person: omitted fields keep what last year's row had. Unticked people are simply left out. */

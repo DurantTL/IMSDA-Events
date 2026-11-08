@@ -8,6 +8,8 @@ import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { postJson } from "@/lib/post-json";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { useTableSort, type SortSpec } from "@/components/use-table-sort";
+import { seniorsToReview } from "@/modules/club-rosters/carry-forward-domain";
+import styles from "@/components/club-roster-carry-forward.module.css";
 import { clubClassLevelLabels, clubClassLevels, clubRosterAttendeeTypeLabels, clubSchoolGradeLabels, clubSchoolGrades, nextSchoolGrade, schoolGradeOrder, type ClubSchoolGrade } from "@/modules/club-rosters/domain";
 
 /**
@@ -89,7 +91,7 @@ export function ClubRosterCarryForward({
     ])));
   }
 
-  const graduating = ticked.filter((row) => choices[row.memberId]!.attendeeType === "YOUTH" && choices[row.memberId]!.schoolGrade === "GRADE_12");
+  const graduating = seniorsToReview(rows, { previousGrade: (row) => row.schoolGrade, choice: (row) => choices[row.memberId]! });
 
   function setAll(value: boolean) {
     setChoices((current) => Object.fromEntries(Object.entries(current).map(([id, choice]) => [id, { ...choice, ticked: value }])));
@@ -149,7 +151,7 @@ export function ClubRosterCarryForward({
         <button className="secondary-button" onClick={() => setAll(false)} type="button">Untick everyone</button>
         <button className="secondary-button" onClick={moveEveryoneUp} type="button">Move everyone up one grade</button>
       </div>
-      <p className="field-help">
+      <p className={`field-help ${styles.gradeHelp}`}>
         Move everyone up one grade fills in the Grade column for the people ticked. Check each grade and change any that are wrong before you start the year; nothing is moved
         until then. 12th grade stays 12th grade.
       </p>
