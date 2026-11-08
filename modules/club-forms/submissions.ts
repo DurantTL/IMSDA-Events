@@ -15,6 +15,8 @@ import {
   validateClubFormAnswers,
   viewerAuditFields,
   restrictedFieldKeys,
+  schoolDetailFieldKeysFor,
+  viewerCanSeeSchoolDetails,
   clubFormClubLabel,
   viewerCanRevealBirthDates,
   viewerCanRevealSensitive,
@@ -97,8 +99,10 @@ function carriedForwardAnswers(
   existing: { id: string; answers: unknown; sealedSensitiveAnswers: string | null },
   fillable: RegistrationFormDefinition,
   submissionId: string,
+  keep: ReadonlySet<string> = new Set(),
 ): { plain: Record<string, unknown>; sealed: Record<string, unknown> } {
-  const offered = new Set(allFields(fillable).map((field) => field.key));
+  // `keep` (#1668): keys this saver may not see or change are never "offered", so their stored values carry forward.
+  const offered = new Set(allFields(fillable).map((field) => field.key).filter((key) => !keep.has(key)));
   const notOffered = (entries: Record<string, unknown>) => Object.fromEntries(Object.entries(entries).filter(([key]) => !offered.has(key)));
   let opened: Record<string, unknown> = {};
   if (existing.sealedSensitiveAnswers) {
@@ -148,7 +152,11 @@ export async function saveClubFormSubmission(viewer: ClubFormsViewer, input: Sav
     ? await resolveRosterMemberName(prisma, input.organizationId, input.rosterMemberId)
     : "";
 
+  // School type and church membership (#1668): a saver who cannot see them (a Clubs Administrator acting as director)
+  // neither changes nor erases them. Their incoming values are ignored and the stored ones are carried forward below.
+  const unseenKeys: ReadonlySet<string> = viewerCanSeeSchoolDetails(viewer, input.organizationId) ? new Set() : new Set(schoolDetailFieldKeysFor(template.key));
   const answers = sanitizeClubFormAnswers(definition, input.answers);
+  for (const key of unseenKeys) delete answers[key];
   let issues = validateClubFormAnswers(definition, answers, { draft: !input.submit });
   if (issues.length > 0 && input.submissionId) {
     // Editing a draft (#855): an old answer that fails today's checks is flagged on the form but does not block
@@ -195,7 +203,7 @@ export async function saveClubFormSubmission(viewer: ClubFormsViewer, input: Sav
     // A draft started on an earlier version may hold answers to a field since hidden or removed. The form no
     // longer shows them, so this save carries them forward untouched (sealed ones are re-opened here, server-side
     // only, and sealed again) rather than silently erasing them.
-    const carried = existing ? carriedForwardAnswers(existing, definition, id) : { plain: {}, sealed: {} };
+    const carried = existing ? carriedForwardAnswers(existing, definition, id, unseenKeys) : { plain: {}, sealed: {} };
     const split = splitAnswers({ sensitiveFieldKeys: keys.sensitiveFieldKeys }, { ...carried.plain, ...answers });
     const plain = split.plain;
     const sensitive = { ...split.sensitive, ...carried.sealed };

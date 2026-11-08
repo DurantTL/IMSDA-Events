@@ -565,3 +565,49 @@ describe("opening a submission (#610)", () => {
     await expect(getSubmissionForViewer(director, submissionId, "VIEW", "club-b")).rejects.toMatchObject({ code: "CLUB_NOT_FOUND" });
   });
 });
+
+describe("saving a Membership Application draft without seeing school details (#1668)", () => {
+  const membership = clubFormTemplateSeeds.find((seed) => seed.key === "pathfinder_membership_application")!;
+  const membershipRow = {
+    id: "template-membership", key: membership.key, name: membership.name, description: membership.description, version: membership.version,
+    definition: membership.definition, sectionNotes: membership.sectionNotes, sensitiveFieldKeys: membership.sensitiveFieldKeys,
+    birthDateFieldKeys: membership.birthDateFieldKeys, staffOnlyFieldKeys: membership.staffOnlyFieldKeys, printLayout: membership.printLayout, enabled: true,
+  };
+  const clubsAdminActingAsLeader: ClubFormsViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "STAFF_ACTING", userId: "staff-3", actAsId: "act-2", viaClubsAdministrator: true } };
+  const stored = { school_type: "Homeschool", church_member: "Yes", full_name: "Riley Sample" };
+
+  beforeEach(() => {
+    mocks.templateFindFirst.mockResolvedValue(membershipRow);
+    mocks.templateFindUnique.mockResolvedValue(membershipRow);
+    mocks.organizationFindMany.mockResolvedValue([]);
+    mocks.submissionFindFirst.mockResolvedValue({ id: "draft-1", status: "DRAFT", answers: stored, sealedSensitiveAnswers: null });
+  });
+
+  const save = (viewer: ClubFormsViewer, answers: Record<string, unknown>) => saveClubFormSubmission(viewer, {
+    organizationId: "club-a", templateKey: membership.key, submissionId: "draft-1", answers, submit: false,
+  }, now);
+  const savedAnswers = () => (mocks.submissionUpdateMany.mock.calls[0]![0] as { data: { answers: Record<string, unknown> } }).data.answers;
+
+  it("keeps the stored school type and church membership when a Clubs Administrator acting as director saves, and ignores values they send", async () => {
+    // The edit view hid the two fields, so the form sends them blank (or a crafted request sends other values).
+    await save(clubsAdminActingAsLeader, { full_name: "Riley Q. Sample", school_type: "", church_member: "No" });
+    expect(savedAnswers()).toMatchObject({ full_name: "Riley Q. Sample", school_type: "Homeschool", church_member: "Yes" });
+  });
+
+  it("keeps them when the form sends nothing for those two fields", async () => {
+    await save(clubsAdminActingAsLeader, { full_name: "Riley Sample" });
+    expect(savedAnswers()).toMatchObject({ school_type: "Homeschool", church_member: "Yes" });
+  });
+
+  it("still updates them when the club's own director saves", async () => {
+    await save(director, { full_name: "Riley Sample", school_type: "Public school", church_member: "No" });
+    expect(savedAnswers()).toMatchObject({ school_type: "Public school", church_member: "No" });
+  });
+
+  it("does not write them for a Clubs Administrator acting as director on a new form either", async () => {
+    mocks.submissionFindFirst.mockResolvedValue(null);
+    await saveClubFormSubmission(clubsAdminActingAsLeader, { organizationId: "club-a", templateKey: membership.key, answers: { full_name: "Riley Sample", school_type: "Homeschool" }, submit: false }, now);
+    const created = (mocks.submissionCreate.mock.calls[0]![0] as { data: { answers: Record<string, unknown> } }).data.answers;
+    expect(created).not.toHaveProperty("school_type");
+  });
+});

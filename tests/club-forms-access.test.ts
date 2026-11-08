@@ -89,7 +89,7 @@ describe("club forms role matrix (#610)", () => {
   });
 
   it("lists the fields each viewer sees as Restricted, birth dates separately from the other sensitive answers", () => {
-    const template = { sensitiveFieldKeys: ["birth_date", "health_limitation", "child_1_birth_date"], birthDateFieldKeys: ["birth_date", "child_1_birth_date"] };
+    const template = { key: "a_form", sensitiveFieldKeys: ["birth_date", "health_limitation", "child_1_birth_date"], birthDateFieldKeys: ["birth_date", "child_1_birth_date"] };
     expect(restrictedFieldKeys(director, "club-a", template)).toEqual([]);
     expect(restrictedFieldKeys(systemAdminStaff, "club-a", template)).toEqual([]);
     expect(restrictedFieldKeys(eventAdminStaff, "club-a", template)).toEqual(["birth_date", "child_1_birth_date"]);

@@ -439,7 +439,7 @@ export function viewerCanSeeSchoolDetails(viewer: ClubFormsViewer, organizationI
 export function restrictedFieldKeys(
   viewer: ClubFormsViewer,
   organizationId: string | null,
-  template: Pick<ClubFormTemplateRecord, "sensitiveFieldKeys" | "birthDateFieldKeys"> & { key?: string },
+  template: Pick<ClubFormTemplateRecord, "sensitiveFieldKeys" | "birthDateFieldKeys" | "key">,
 ) {
   const birth = new Set(template.birthDateFieldKeys);
   const sensitive = viewerCanRevealSensitive(viewer, organizationId);
