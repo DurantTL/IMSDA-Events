@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ClubDirectorsWorkspace } from "@/components/club-directors-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { canAdministerClubOrganization } from "@/modules/organizations/access";
-import { allowedReturnTo } from "@/lib/return-to";
+import { clubPageReturnHref } from "@/modules/club-reports/club-page-links";
 import { listDirectorGrants } from "@/modules/organizations/director-grants-repository";
 import { OrganizationOperationError } from "@/modules/organizations/repository";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
@@ -36,12 +36,11 @@ export default async function ClubDirectorsPage({
     if (error instanceof OrganizationOperationError) notFound();
     throw error;
   }
-  const clubHref = `/admin/organizations/${organizationId}/club`;
-  const viaParent = allowedReturnTo(from, [clubHref], "") === clubHref;
+  const parentHref = clubPageReturnHref(from, organizationId);
 
   return (
     <>
-      <AdminPageHeader path={`/admin/organizations/${organizationId}/directors`} parentName={initial.club.name} viaParent={viaParent} />
+      <AdminPageHeader path={`/admin/organizations/${organizationId}/directors`} parentName={initial.club.name} viaParent={parentHref !== null} back={parentHref ? { href: parentHref, label: `Back to ${initial.club.name}` } : undefined} />
       <ClubDirectorsWorkspace canOpenPeople={(await resolvePeopleViewer()).scope !== null} club={initial.club} initialGrants={initial.grants} />
     </>
   );
