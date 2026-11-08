@@ -69,6 +69,15 @@ describe("L9: the Area Coordinator header uses the club portal's shared pieces (
     expect(subnav).not.toContain("AccountSectionNav");
     expect(subnav).toContain('alsoMatchPrefix: "/account/area/"');
   });
+
+  it("keeps the club portal's purple, and no tab row scrolls sideways: a menu line when it does not fit (#1641)", () => {
+    const css = read("components/club-portal-nav.module.css");
+    expect(css).toContain("var(--imsda-purple)");
+    expect(css).not.toContain("--imsda-gold");
+    expect(css).not.toMatch(/overflow-x:\s*(auto|scroll)/);
+    expect(read("components/club-portal-nav.tsx")).toContain('data-fit={tight ? "tight" : "ok"}');
+    expect(read("components/area-clubs-subnav.tsx")).toContain('menuLabel="Coordinator menu"');
+  });
 });
 
 describe("L9: the account drop-down lives in the masthead row, not on a bar of its own (#1555)", () => {
@@ -123,7 +132,7 @@ describe("L9: the attendee account uses the club portal's shared pieces (#1555)"
 
   it("uses the club portal's underline tabs, fed by accountPortalNavItems", () => {
     const tabs = read("components/account-portal-tabs.tsx");
-    expect(tabs).toContain('<ClubPortalNav items={items} label="Your account" />');
+    expect(tabs).toContain('<ClubPortalNav items={items} label="Your account" menuLabel="Account menu" />');
     expect(portalLayout).toContain("<AccountPortalTabsProvider items={items}>");
     expect(portalLayout).not.toContain("<ClubPortalNav");
     expect(portalLayout).not.toContain("AccountSectionNav");

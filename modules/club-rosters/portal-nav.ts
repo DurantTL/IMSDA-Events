@@ -2,6 +2,8 @@ import type { AccountNavItem } from "@/components/account-section-nav";
 import { isClubFormsRole } from "@/modules/club-forms/domain";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
+export { CLUB_PHONE_BAR_SLOTS, clubPhoneBarSplit, type ClubPhoneBarItem, type ClubPhoneBarKey } from "@/modules/club-rosters/portal-phone-bar";
+
 /**
  * The club portal's menu (#644), grouped People / Events / Records / Orders /
  * Club. Every destination keeps the capability check it always had; groups
@@ -43,7 +45,7 @@ const SHELL_ORDER = ["Home", "Roster", "Forms", "Club events", "Honors", "Class 
 
 /**
  * The club shell's navigation (#1319): every destination the role already has,
- * in one flat tab row (the More menu of #1165 is gone). This only reorders the
+ * as one list: a flat tab row on a wide screen, a menu line and menu when it does not fit, and a phone bar with a More sheet (#1641). This only reorders the
  * items `clubPortalNavItems` or `clubReporterNavItems` already produced, so a
  * role never gains a destination here (no second permission list), and nothing
  * is silently dropped: labels not listed above land at the end, in their

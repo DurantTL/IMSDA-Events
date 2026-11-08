@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
 
 /** The All forms hub (#1151). Synthetic data only. */
 const mocks = vi.hoisted(() => ({
   getCurrentSession: vi.fn(),
   load: vi.fn(),
+  listEvents: vi.fn(),
   templateFindMany: vi.fn(),
   submissionGroupBy: vi.fn(),
   formFindMany: vi.fn(),
@@ -11,9 +13,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); } }));
+vi.mock("next/navigation", () => ({
+  redirect: (path: string) => { throw new Error(`REDIRECT:${path}`); },
+  usePathname: () => "/x",
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
+vi.mock("@/modules/events/repository", () => ({ listEventsForUser: mocks.listEvents }));
+vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/modules/forms-hub/load", () => ({ loadFormsHub: mocks.load }));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
@@ -36,6 +45,7 @@ function row(overrides: Partial<FormsHubRow>): FormsHubRow {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.load.mockResolvedValue([]);
+  mocks.listEvents.mockResolvedValue([]);
 });
 
 describe("All forms page access", () => {
@@ -46,6 +56,35 @@ describe("All forms page access", () => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: null } });
     await expect(AdminFormsPage(props)).rejects.toThrow("REDIRECT:/no-access");
     expect(mocks.load).not.toHaveBeenCalled();
+    expect(mocks.listEvents).not.toHaveBeenCalled();
+  });
+
+  it("lists the events for the create picker, all of them for a system administrator", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
+    mocks.listEvents.mockResolvedValue([{ id: "e1", name: "Synthetic Camp", startsAt: new Date("2099-01-01"), endsAt: new Date("2099-01-03") }]);
+    const html = renderToStaticMarkup(await AdminFormsPage({ searchParams: Promise.resolve({}) }));
+    expect(mocks.listEvents).toHaveBeenCalledWith("u", true);
+    expect(html).toContain("Create a form");
+    expect(html).toContain('<option value="e1">Synthetic Camp</option>');
+  });
+
+  it("shows Unavailable, not an empty list, when the events read fails", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
+    mocks.listEvents.mockRejectedValue(new Error("db down"));
+    const html = renderToStaticMarkup(await AdminFormsPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("Unavailable");
+    expect(html).not.toContain('name="event"');
+  });
+
+  it("offers Clear filters on a filtered list and a next step when nothing matches (B2, B4)", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
+    mocks.load.mockResolvedValue([]);
+    const filtered = renderToStaticMarkup(await AdminFormsPage({ searchParams: Promise.resolve({ q: "nothing-like-this" }) }));
+    expect(filtered).toContain("No forms match");
+    expect([...filtered.matchAll(/href="\/admin\/forms">Clear filters/g)].length).toBeGreaterThanOrEqual(1);
+    const unfiltered = renderToStaticMarkup(await AdminFormsPage({ searchParams: Promise.resolve({}) }));
+    expect(unfiltered).toContain("No forms yet");
+    expect(unfiltered).not.toContain("Clear filters");
   });
 
   it("loads for a system administrator", async () => {

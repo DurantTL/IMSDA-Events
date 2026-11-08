@@ -32,6 +32,7 @@ const allowlist: Record<string, string> = {
   "components/church-sponsor-flags.tsx": "action button only, no typed fields",
   "components/club-form-alert-recipients.tsx": "one field",
   "components/desk-location-select.tsx": "saves instantly / autosave",
+  "components/forms-create/forms-create-section.tsx": "navigation only: picks an event, nothing is saved",
   "components/health-import-workspace.tsx": "one field",
   "components/health-privacy-acknowledgment.tsx": "action button only, no typed fields",
   "components/health-record-actions.tsx": "action button only, no typed fields",

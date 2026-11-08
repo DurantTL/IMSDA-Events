@@ -19,7 +19,7 @@ export type FormsHubRow = {
   responsesHref: string;
 };
 
-export const formsHubKindLabels: Record<FormsHubKind, string> = { CLUB: "Club form", GENERAL: "General form", EVENT: "Event form" };
+export const formsHubKindLabels: Record<FormsHubKind, string> = { CLUB: "Club form", GENERAL: "General information form", EVENT: "Event information form" };
 
 export type FormsHubFilters = { kind: FormsHubKind | null; status: FormsHubStatus | null; q: string };
 
