@@ -53,4 +53,13 @@ describe("club teachers access (#1681)", () => {
     expect(repository).toContain("if (!rule || !rule.requireTeachers) return;");
     expect(read("modules/club-registrations/repository.ts")).toContain("assertTeachersMeetRule(eventId, organizationId");
   });
+
+  it("tells staff when a coordinator turns the tool on with require stored on, through the #1483 alert path, and audits it (#1727)", () => {
+    expect(settings).toContain('dispatchUnsuppressedAlert');
+    expect(settings).toContain('actor.kind === "area-coordinator" && input.enabled === true && !wasOn');
+    expect(settings).toContain("if (!rule?.requireTeachers) return;");
+    expect(settings).toContain("CLUB_TEACHER_REQUIRE_NOTICE_SENT");
+    // The stored value is never changed by the notice.
+    expect(settings.slice(settings.indexOf("async function notifyRequireBackOn"))).not.toContain("clubTeacherRule.update");
+  });
 });

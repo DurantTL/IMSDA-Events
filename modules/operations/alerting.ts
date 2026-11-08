@@ -32,6 +32,8 @@ export type Alert = {
   severity: AlertSeverity;
   summary: string;
   detail?: string;
+  /** Sent to the webhook only, never written to the log (for a name that staff need but a log line should not carry). */
+  webhookOnlyDetail?: string;
   context?: Record<string, string | number | boolean | null>;
 };
 
@@ -68,6 +70,7 @@ async function postToWebhook(
   const url = getServerEnv().ALERT_WEBHOOK_URL;
   if (!url) return { delivered: false, attempted: false };
 
+  const detail = [alert.detail, alert.webhookOnlyDetail].filter(Boolean).join(" ") || undefined;
   try {
     const response = await (options.fetchImpl ?? fetch)(url, {
       method: "POST",
@@ -75,11 +78,11 @@ async function postToWebhook(
       body: JSON.stringify({
         // `text` is what Slack and Teams incoming webhooks render; the
         // structured fields are for anything else reading the same payload.
-        text: `[${alert.severity}] IMAdventist: ${alert.summary}${alert.detail ? ` — ${alert.detail}` : ""}`,
+        text: `[${alert.severity}] IMAdventist: ${alert.summary}${detail ? ` — ${detail}` : ""}`,
         severity: alert.severity,
         key: alert.key,
         summary: alert.summary,
-        detail: alert.detail ?? null,
+        detail: detail ?? null,
         context: alert.context ?? {},
         correlationId: currentCorrelationId() ?? null,
         sentAt: new Date().toISOString(),

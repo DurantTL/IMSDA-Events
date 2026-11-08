@@ -329,3 +329,22 @@ describe("recording alert webhook deliveries (#1377)", () => {
     expect(undelivered).toEqual({ sent: [], suppressed: [], undelivered: [urgent] });
   });
 });
+
+describe("webhook-only detail (#1727)", () => {
+  it("sends the webhook-only detail to the webhook but never to a log line", async () => {
+    const fetchImpl = okFetch();
+    const alert = { ...urgent, key: "club-teachers.require-back-on", webhookOnlyDetail: "Turned on by Sample Coordinator." };
+    await dispatchUnsuppressedAlert(alert, { fetchImpl });
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(String(init.body)).toContain("Turned on by Sample Coordinator.");
+    const logged = JSON.stringify([dependencies.logWarn.mock.calls, dependencies.logError.mock.calls, dependencies.logInfo.mock.calls]);
+    expect(logged).not.toContain("Sample Coordinator");
+  });
+
+  it("keeps the log line free of it even when the webhook fails", async () => {
+    const fetchImpl = vi.fn(async () => new Response("down", { status: 500 }));
+    await dispatchUnsuppressedAlert({ ...urgent, key: "club-teachers.require-back-on", webhookOnlyDetail: "Turned on by Sample Coordinator." }, { fetchImpl });
+    const logged = JSON.stringify([dependencies.logWarn.mock.calls, dependencies.logError.mock.calls, dependencies.logInfo.mock.calls]);
+    expect(logged).not.toContain("Sample Coordinator");
+  });
+});

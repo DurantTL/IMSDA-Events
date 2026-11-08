@@ -68,9 +68,11 @@ export function ClubTeachersCard({ canEdit, eventId, initialStep, organizationId
     }
   }
 
-  const named = Object.keys(picks).length;
+  // Only people who can teach count, to match "You have named N".
+  const flaggedIds = new Set(step.teachers.filter((teacher) => teacher.flag).map((teacher) => teacher.memberId));
+  const named = Object.keys(picks).filter((id) => !flaggedIds.has(id)).length;
   // Unsaved: the picks differ from what was last saved.
-  const dirty = named !== step.teachers.length || step.teachers.some((teacher) => {
+  const dirty = Object.keys(picks).length !== step.teachers.length || step.teachers.some((teacher) => {
     const pick = picks[teacher.memberId];
     return !pick || pick.honorName !== teacher.honorName || pick.locationId !== (teacher.locationId ?? "");
   });
@@ -82,16 +84,25 @@ export function ClubTeachersCard({ canEdit, eventId, initialStep, organizationId
         <h2 id="club-teachers-heading"><GraduationCap aria-hidden="true" size={20} /> Who from your club is teaching?</h2>
       </div>
       <p className="field-help">
-        This event asks for {teacherRuleSummary(step.rule)}. Pick adults or staff from your roster.
+        This event asks for {teacherRuleSummary(step.rule)}. Pick adults or staff aged 18 or older from your roster.
         {step.rule.requireTeachers ? " Your registration needs this number before you can submit it." : " Clubs that bring teachers are placed on their weekend first."}
       </p>
       <p className={step.warning ? "inline-notice error" : "inline-notice"} role="status">
         {step.warning ?? `You have named ${step.status.named} of ${step.status.required}. That meets what this event asks.`}
       </p>
-      {step.candidates.length === 0 ? (
-        <p className="public-manage-empty">Your roster has no adults or staff yet. Add them on your roster first.</p>
+      {step.candidates.length === 0 && step.teachers.length === 0 ? (
+        <p className="public-manage-empty">Your roster has no adults or staff aged 18 or older yet. Add them on your roster first.</p>
       ) : (
         <ul className={styles.list}>
+          {step.teachers.filter((teacher) => teacher.flag).map((teacher) => (
+            <li className={styles.person} key={teacher.memberId} data-testid="club-teacher-flagged">
+              <label className={styles.pick}>
+                <input checked={Boolean(picks[teacher.memberId])} disabled={!canEdit || saving} onChange={(event) => toggle(teacher.memberId, event.target.checked)} type="checkbox" />
+                <span translate="no">{teacher.name}</span>
+              </label>
+              <p className="inline-notice error" role="status">{teacher.flag}. {picks[teacher.memberId] ? "Clear the box and save to replace them." : "Save to remove them."}</p>
+            </li>
+          ))}
           {step.candidates.map((candidate) => {
             const pick = picks[candidate.memberId];
             return (
@@ -121,6 +132,18 @@ export function ClubTeachersCard({ canEdit, eventId, initialStep, organizationId
             );
           })}
         </ul>
+      )}
+      {step.unavailable.length > 0 && (
+        <div data-testid="club-teachers-unavailable">
+          <p className={styles.unavailableHeading}>These people can&apos;t be named as teachers yet:</p>
+          <ul className={styles.list}>
+            {step.unavailable.map((person) => (
+              <li className={styles.person} key={person.memberId}>
+                <span translate="no">{person.name}</span> · {person.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {canEdit ? (
         <div className={styles.actions}>
