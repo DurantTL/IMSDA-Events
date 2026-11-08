@@ -124,7 +124,7 @@ describe("staff page names (#685)", () => {
       clubPacket: "more/reports/clubs/packet/[organizationId]", checkInBook: "more/reports/clubs/check-in-book",
       clubReports: "more/reports/clubs", groupedPackets: "more/reports/packets", operationalReports: "more/reports",
       clubMonthlyReport: "more/clubs/reports/[organizationId]/[month]", clubMonthlyReports: "more/clubs/reports",
-      clubs: "more/clubs", clubTeachers: "more/club-teachers", eventScoring: "more/event-scoring", club: "more/clubs/[organizationId]", clubForm: "more/club-forms/[submissionId]",
+      clubs: "more/clubs", clubTeachers: "more/club-teachers", eventScoring: "more/event-scoring", attendancePoints: "more/attendance-points", club: "more/clubs/[organizationId]", clubForm: "more/club-forms/[submissionId]",
       clubForms: "more/club-forms", eventHealth: "more/event-health", clubAssignments: "more/club-assignments", eventContent: "more/event-content",
       eventPatches: "more/event-patches", emergencyPlan: "more/emergency-plan", operationalHealth: "more/health", merchandise: "more/merchandise", lodging: "more/lodging", meals: "more/meals", lodgingRequests: "more/lodging/requests", lodgingAssignments: "more/lodging/assignments", issuedAssets: "more/issued-assets", scheduledEmails: "communications/scheduled", ledgerCheck: "more/ledger-health",
       assignmentRoster: "more/program-assignments/[runId]", programAssignments: "more/program-assignments",

@@ -15,6 +15,7 @@ vi.mock("@/lib/prisma", () => ({
     organization: { findMany: mocks.orgFindMany },
     clubMonthlyReport: { findMany: mocks.reportFindMany },
     clubYearStanding: { findMany: mocks.standingFindMany },
+    clubEventPointAward: { findMany: async () => [] },
   }),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));

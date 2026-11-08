@@ -220,7 +220,7 @@ function CoordinatorTable({ totals, title, clubYear }: { totals: readonly Coordi
 
 /* ------------------------------------------------------------------ Points bars */
 
-export type PointsBarsClub = { id: string; name: string; reportPoints: number; totalPoints: number };
+export type PointsBarsClub = { id: string; name: string; reportPoints: number; totalPoints: number; /** Attendance points from events (#1677), part of the total. */ eventPoints?: number };
 
 export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, scaleMax, showAllHref, title = "Total points by club", ranks, compact }: {
   clubs: readonly PointsBarsClub[];
@@ -241,7 +241,9 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
   const ranked = sortLeaderboard(clubs, "points");
   const shown = ranked.slice(0, limit);
   const max = Math.max(1, scaleMax ?? 0, ...ranked.map((club) => club.totalPoints));
-  const description = `${pointsChartDescription(ranked, clubYear)} Each bar is split into report points and yearly registration points.`
+  // Event points (#1677) add a segment, a legend entry and a table column only once a club has some.
+  const showEvents = ranked.some((club) => (club.eventPoints ?? 0) > 0);
+  const description = `${pointsChartDescription(ranked, clubYear)} Each bar is split into report points${showEvents ? ", yearly registration points and event points" : " and yearly registration points"}.`
     + (ranked.length > shown.length ? ` The chart shows the top ${shown.length}; the table lists all ${ranked.length}.` : "");
   // With ranks (a search), list positions would contradict the whole-year rank each row announces.
   const BarList = ranks ? "ul" : "ol";
@@ -256,13 +258,15 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
       {shown.length === 0 ? <p className={styles.empty}>{`No active clubs for ${clubYear}.`}</p> : (
         <BarList className={compact ? `${styles.bars} ${styles.barsCompact}` : styles.bars}>
           {shown.map((club) => {
-            const registration = club.totalPoints - club.reportPoints;
+            const eventPoints = club.eventPoints ?? 0;
+            const registration = club.totalPoints - club.reportPoints - eventPoints;
             return (
               <li className={styles.barRow} key={club.id}>
                 <span className={styles.barName}>{ranks && <span className="sr-only">Rank {ranks.get(club.id)}, </span>}<ExactValue>{club.name}</ExactValue></span>
                 <span aria-hidden="true" className={styles.barTrack}>
                   <span className={styles.barReport} style={{ width: `${(club.reportPoints / max) * 100}%` }} title={`Report points: ${number(club.reportPoints)}`} />
                   <span className={styles.barRegistration} style={{ width: `${(registration / max) * 100}%` }} title={`Yearly registration: ${number(registration)}`} />
+                  {showEvents && <span className={styles.barEvent} style={{ width: `${(eventPoints / max) * 100}%` }} title={`Event points: ${number(eventPoints)}`} />}
                 </span>
                 <strong className={styles.barTotal}>{number(club.totalPoints)}<span className="sr-only"> total points</span></strong>
               </li>
@@ -273,6 +277,7 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
       <ul aria-label="Legend" className={styles.legend}>
         <li><span aria-hidden="true" className={`${styles.swatch} ${styles.seriesDark}`} />Report points</li>
         <li><span aria-hidden="true" className={`${styles.swatch} ${styles.seriesLight}`} />Yearly registration</li>
+        {showEvents && <li><span aria-hidden="true" className={`${styles.swatch} ${styles.seriesEvent}`} />Event points</li>}
       </ul>
       <div className={compact ? styles.footerCompact : styles.footer}>
       {showAllHref && ranked.length > shown.length && (
@@ -284,7 +289,7 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
           <table className={`report-table report-table-auto table-cards ${styles.table}`} role="table">
             <caption className="sr-only">{`${title}, ${clubYear}, highest total first`}</caption>
             <thead role="rowgroup">
-              <tr role="row"><th role="columnheader" scope="col">Rank</th><th role="columnheader" scope="col">Club</th><th role="columnheader" scope="col">Report points</th><th role="columnheader" scope="col">Yearly registration</th><th role="columnheader" scope="col">Total</th></tr>
+              <tr role="row"><th role="columnheader" scope="col">Rank</th><th role="columnheader" scope="col">Club</th><th role="columnheader" scope="col">Report points</th><th role="columnheader" scope="col">Yearly registration</th>{showEvents && <th role="columnheader" scope="col">Event points</th>}<th role="columnheader" scope="col">Total</th></tr>
             </thead>
             <tbody role="rowgroup">
               {ranked.map((club, index) => (
@@ -292,7 +297,8 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
                   <td {...cardCell("Rank")}>{ranks?.get(club.id) ?? index + 1}</td>
                   <th role="rowheader" scope="row" translate="no">{club.name}</th>
                   <td {...cardCell("Report points")}>{number(club.reportPoints)}</td>
-                  <td {...cardCell("Yearly registration")}>{number(club.totalPoints - club.reportPoints)}</td>
+                  <td {...cardCell("Yearly registration")}>{number(club.totalPoints - club.reportPoints - (club.eventPoints ?? 0))}</td>
+                  {showEvents && <td {...cardCell("Event points")}>{number(club.eventPoints ?? 0)}</td>}
                   <td {...cardCell("Total")}><strong>{number(club.totalPoints)}</strong></td>
                 </tr>
               ))}

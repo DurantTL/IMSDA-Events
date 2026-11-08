@@ -18,6 +18,7 @@ export const eventModuleKeys = [
   "emergency-plans",
   "club-teachers",
   "event-scoring",
+  "attendance-points",
 ] as const;
 
 export type EventModuleKey = (typeof eventModuleKeys)[number];
@@ -166,15 +167,27 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
     routes: ["/more/event-scoring", "/account/area-clubs/events"],
     features: ["event-scoring-step"],
   },
+  {
+    key: "attendance-points",
+    cardKey: "attendance-points",
+    title: "Attendance points",
+    description: "Work out club points for attending the event from check-in or registration, review who counted for each club and why, then apply the points to the clubs' points board.",
+    appliesTo: "club-audience",
+    launcherGroup: "people-access",
+    alwaysOn: false,
+    offByDefault: true,
+    routes: ["/more/attendance-points", "/account/area-clubs/events"],
+    features: ["attendance-points-step"],
+  },
 ];
 
 /**
  * Modules an Area Coordinator may switch on or off for a club event they can see (#1681), besides the Clubs
  * Administrator and event administrators. Such a tool is never asked for through the feature-request list. Every other module stays system administrator only (`service.ts`); this list is the
- * one place the narrower, scoped path (`modules/event-modules/scoped-toggle.ts`, used by Club teachers and Camporee scoring) is allowed to act, so adding a module to it
+ * one place the narrower, scoped path (`modules/event-modules/scoped-toggle.ts`, used by Club teachers, Camporee scoring and Attendance points) is allowed to act, so adding a module to it
  * is a deliberate decision, never a side effect of adding it to the catalog.
  */
-export const scopedToggleModuleKeys: readonly EventModuleKey[] = ["club-teachers", "event-scoring"];
+export const scopedToggleModuleKeys: readonly EventModuleKey[] = ["club-teachers", "event-scoring", "attendance-points"];
 
 const definitionsByKey = new Map<string, EventModuleDefinition>(
   eventModuleCatalog.map((definition) => [definition.key, definition]),

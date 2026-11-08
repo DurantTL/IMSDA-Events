@@ -1746,6 +1746,10 @@ model Event {
   scoredActivities ScoredActivity[]
   activityScores       ActivityScore[]
   eventScoringState EventScoringState?
+  attendancePointsSetting AttendancePointsSetting?
+  attendancePointsOverrides AttendancePointsOverride[]
+  attendancePointsMarks AttendancePointsMark[]
+  clubEventPointAwards ClubEventPointAward[]
   healthSnapshots      HealthRecordSnapshot[]
   healthSnapshotHolds  HealthSnapshotHold[]
   slug                 String             @unique
@@ -2711,6 +2715,8 @@ model UserPersonLink {
 model Organization {
   clubEventTeachers ClubEventTeacher[]
   activityScores    ActivityScore[]
+  attendancePointsOverrides AttendancePointsOverride[]
+  clubEventPointAwards ClubEventPointAward[]
   clubOptionalFeatures ClubOptionalFeature[]
   id                   String           @id @default(cuid())
   scholarshipContributions ScholarshipContribution[]
@@ -3639,6 +3645,7 @@ model RegistrationAttendee {
   id              String   @id @default(cuid())
   teamPermission  ClubTeamMemberPermission?
   activityScores  ActivityScore[]
+  attendancePointsMarks AttendancePointsMark[]
   eventId         String
   registrationId  String
   personId        String
@@ -11417,4 +11424,84 @@ model EventScoringState {
   updatedAt         DateTime  @updatedAt
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+/// How a club's attendance points were counted (#1677): from check-in, or from registration when the event has no check-in.
+enum AttendancePointsBasis {
+  CHECK_IN
+  REGISTRATION
+}
+
+/// A staff decision for one club that replaces what the rules worked out (#1677).
+enum AttendancePointsOutcome {
+  AWARD
+  WITHHOLD
+}
+
+/// Attendance points for one club event (#1677): the points a represented club earns, and whether the event needs
+/// Pathfinders present (a camporee). Written only while the "attendance-points" module is on. `appliedAt` is set while the
+/// points are on the clubs' points board; settings are locked then.
+model AttendancePointsSetting {
+  eventId             String    @id
+  points              Int
+  requiresPathfinders Boolean   @default(false)
+  appliedAt           DateTime?
+  appliedByUserId     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+/// Staff override for one club on one event, with the reason (#1677). One per club; it replaces the rules' answer.
+model AttendancePointsOverride {
+  id             String                  @id @default(cuid())
+  eventId        String
+  organizationId String
+  outcome        AttendancePointsOutcome
+  reason         String
+  setByUserId    String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, organizationId])
+}
+
+/// A registered person staff marked as an Area Coordinator's child (#1677). Marked people do not count as club
+/// representatives. Points at the registration attendee; no name or age is stored here.
+model AttendancePointsMark {
+  id          String   @id @default(cuid())
+  eventId     String
+  attendeeId  String
+  setByUserId String?
+  createdAt   DateTime @default(now())
+
+  event    Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  attendee RegistrationAttendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, attendeeId])
+}
+
+/// Points applied to a club for attending an event (#1677). They count in the club's total for `clubYear` with the event's
+/// name as the reason (`eventName` is the name when applied). Undo deletes the rows; the audit log keeps the history.
+model ClubEventPointAward {
+  id              String                @id @default(cuid())
+  eventId         String
+  organizationId  String
+  clubYear        String
+  eventName       String
+  points          Int
+  basis           AttendancePointsBasis
+  overridden      Boolean               @default(false)
+  appliedByUserId String?
+  appliedAt       DateTime              @default(now())
+
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([eventId, organizationId])
+  @@index([organizationId, clubYear])
 }

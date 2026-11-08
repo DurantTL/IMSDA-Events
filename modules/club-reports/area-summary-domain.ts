@@ -2,6 +2,7 @@ import { clubYearMonths, isLockedForClub, monthNotDueForClub, reportMonthLabel, 
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { toCsv } from "@/modules/reporting/csv";
 import { firstParam } from "@/lib/search-params";
+import type { ClubEventPoints } from "@/modules/event-points/domain";
 import { registrationStatusWords } from "@/modules/registrations/status-words";
 
 /**
@@ -39,6 +40,8 @@ export type AreaSummaryInput = {
   joinedOn?: string | null;
   backgroundChecks: { missing: number; notInCompliance: number; expiringSoon: number };
   reports: ReadonlyArray<{ reportMonth: string; status: "DRAFT" | "SUBMITTED"; totalPoints: number; onTimePoints: number; reviewedAt?: Date | null }>;
+  /** Attendance points applied for events in this club year (#1677), with the event as the reason. Optional so older callers keep compiling. */
+  attendancePoints?: ClubEventPoints;
 };
 
 export type AreaClubSummary = {
@@ -58,8 +61,23 @@ export type AreaClubSummary = {
   missing: number;
   lastReportMonth: string | null;
   reportPoints: number;
+  /** Attendance points from events (#1677); part of `totalPoints`. Counts only. */
+  eventPoints: number;
+  eventAwards: ClubEventPoints["awards"];
   totalPoints: number;
 };
+
+/** One row per club and event for the points board's "Event points" list (#1677), by club name then event. */
+export function eventAwardRows(clubs: ReadonlyArray<Pick<AreaClubSummary, "id" | "name" | "eventAwards">>) {
+  return clubs
+    .flatMap((club) => club.eventAwards.map((award) => ({ clubId: club.id, clubName: club.name, eventName: award.eventName, points: award.points })))
+    .sort((a, b) => a.clubName.localeCompare(b.clubName) || a.eventName.localeCompare(b.eventName));
+}
+
+/** The yearly registration points: what is left of the total after report points and event points. */
+export function registrationPointsOf(club: { totalPoints: number; reportPoints: number; eventPoints?: number }) {
+  return club.totalPoints - club.reportPoints - (club.eventPoints ?? 0);
+}
 
 /** One month's status for one club. Only submitted reports earn points. */
 export function monthCell(
@@ -100,7 +118,9 @@ export function summarizeClub(input: AreaSummaryInput, clubYear: string, now: Da
     lastReportMonth: submittedMonths.length > 0 ? submittedMonths[submittedMonths.length - 1]!.month : null,
     reportPoints: submittedReports.reduce((sum, report) => sum + report.totalPoints, 0),
     // The same figure the club's own overview shows: reports plus the on-time yearly registration.
-    totalPoints: yearToDate(submittedReports, input.registrationOnTime),
+    eventPoints: input.attendancePoints?.total ?? 0,
+    eventAwards: input.attendancePoints?.awards ?? [],
+    totalPoints: yearToDate(submittedReports, input.registrationOnTime, input.attendancePoints?.total ?? 0),
   };
 }
 
@@ -216,19 +236,20 @@ function cellText(cell: MonthCell) {
   return cell.status === "MISSING" || cell.status === "DRAFT" || cell.status === "DUE" ? monthStatusLabels[cell.status].toLowerCase() : "";
 }
 
-/** The monthly summary table: points or status for each month, then club-year totals. */
+/** The monthly summary table: points or status for each month, then club-year totals. An Event points column appears only when a club has some (#1677). */
 export function areaSummaryCsv(clubYear: string, clubs: readonly AreaClubSummary[]) {
   const months = clubYearMonths(clubYear);
+  const withEvents = clubs.some((club) => club.eventPoints > 0);
   const rows: Array<Array<string | number>> = [[
     "Club", "Sponsoring church", ...months.map(reportMonthLabel),
-    "Submitted", "Late", "Draft", "Missing", "Report points", "Yearly registration points", "Total points",
+    "Submitted", "Late", "Draft", "Missing", "Report points", "Yearly registration points", ...(withEvents ? ["Event points"] : []), "Total points",
   ]];
   for (const club of clubs) {
     rows.push([
       club.name, club.church,
       ...club.months.map(cellText),
       club.submitted, club.late, club.drafts, club.missing,
-      club.reportPoints, club.totalPoints - club.reportPoints, club.totalPoints,
+      club.reportPoints, registrationPointsOf(club), ...(withEvents ? [club.eventPoints] : []), club.totalPoints,
     ]);
   }
   return toCsv(rows);
@@ -236,9 +257,10 @@ export function areaSummaryCsv(clubYear: string, clubs: readonly AreaClubSummary
 
 /** The points leaderboard: one row per club, highest first. */
 export function areaPointsCsv(clubYear: string, clubs: readonly AreaClubSummary[]) {
-  const rows: Array<Array<string | number>> = [["Rank", "Club", "Sponsoring church", "Club year", "Report points", "Yearly registration points", "Total points"]];
+  const withEvents = clubs.some((club) => club.eventPoints > 0);
+  const rows: Array<Array<string | number>> = [["Rank", "Club", "Sponsoring church", "Club year", "Report points", "Yearly registration points", ...(withEvents ? ["Event points"] : []), "Total points"]];
   sortLeaderboard(clubs, "points").forEach((club, index) => {
-    rows.push([index + 1, club.name, club.church, clubYear, club.reportPoints, club.totalPoints - club.reportPoints, club.totalPoints]);
+    rows.push([index + 1, club.name, club.church, clubYear, club.reportPoints, registrationPointsOf(club), ...(withEvents ? [club.eventPoints] : []), club.totalPoints]);
   });
   return toCsv(rows);
 }

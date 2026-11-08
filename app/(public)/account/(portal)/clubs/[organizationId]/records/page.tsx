@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClubEventPointsList } from "@/components/club-event-points";
 import { ClubSetupHelp } from "@/components/role-setup-help";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, CircleAlert, Clock3 } from "lucide-react";
@@ -105,7 +106,7 @@ export default async function ClubRecordsPage({
       <div className="club-home-stats">
         <div className="club-home-stat">
           <CheckCircle2 size={20} aria-hidden="true" />
-          <strong>{yearToDate(submittedReports, reportYear.registrationOnTime).toLocaleString("en-US")}</strong>
+          <strong>{yearToDate(submittedReports, reportYear.registrationOnTime, reportYear.eventPoints.total).toLocaleString("en-US")}</strong>
           <span>points this club year ({clubYear})</span>
         </div>
         <div className="club-home-stat">
@@ -119,6 +120,7 @@ export default async function ClubRecordsPage({
           <span>yearly registration points</span>
         </div>
       </div>
+      <ClubEventPointsList clubYear={clubYear} eventPoints={reportYear.eventPoints} />
 
       <nav aria-label={`Months of the ${clubYear} club year`} className="public-manage-card">
         <div className="public-manage-card-heading">

@@ -19,6 +19,7 @@ const client = {
   organization: { findMany: mocks.orgFindMany },
   clubMonthlyReport: { findMany: mocks.reportFindMany },
   clubYearStanding: { findMany: mocks.standingFindMany },
+  clubEventPointAward: { findMany: async () => [] },
   clubRosterMember: { groupBy: mocks.rosterGroupBy },
   clubDirectorGrant: { findMany: mocks.grantFindMany },
   event: { findMany: mocks.eventFindMany },
