@@ -1675,6 +1675,8 @@ export async function amendClubRegistration(
     });
   }
 
+  // Kept guests whose "not a Pathfinder" mark changes (#1728): their classes are checked again inside the transaction.
+  const markChangedAttendees: Array<{ id: string; message: string }> = [];
   for (const guestId of input.keptGuestIds) {
     const current = currentByGuestId.get(guestId)!;
     const snapshot = recordFromJson(current.profileSnapshot);
@@ -1692,11 +1694,11 @@ export async function amendClubRegistration(
     if (requestedMark === true && !youthAge) throw new ClubRegistrationError("ATTENDEES_INVALID", GUEST_NOT_PATHFINDER_AGE_MESSAGE);
     const youthMark = youthAge && (requestedMark ?? registeredYouthMark);
     // The mark decides whether they take a class seat, so a change is made with their classes, not silently here (as for a group).
-    if (youthAge && youthMark !== registeredYouthMark && (await getPrisma().honorEnrollment.count({ where: { registrationAttendeeId: current.id } })) > 0) {
-      throw new ClubRegistrationError(
-        "ATTENDEES_INVALID",
-        `Changing the Not a Pathfinder choice for ${formatPersonName({ firstName: typeof snapshot.firstName === "string" ? snapshot.firstName : "", lastName: typeof snapshot.lastName === "string" ? snapshot.lastName : "" }) || "this person"} changes whether they use a class seat. Remove their classes first, change it, then choose classes again.`,
-      );
+    if (youthAge && youthMark !== registeredYouthMark) {
+      const markMessage = `Changing the Not a Pathfinder choice for ${formatPersonName({ firstName: typeof snapshot.firstName === "string" ? snapshot.firstName : "", lastName: typeof snapshot.lastName === "string" ? snapshot.lastName : "" }) || "this person"} changes whether they use a class seat. Remove their classes first, change it, then choose classes again.`;
+      if ((await getPrisma().honorEnrollment.count({ where: { registrationAttendeeId: current.id } })) > 0) throw new ClubRegistrationError("ATTENDEES_INVALID", markMessage);
+      // Checked again inside the amendment's transaction, so a class picked a moment ago cannot slip past.
+      markChangedAttendees.push({ id: current.id, message: markMessage });
     }
     const keptResponses = withRegisteredIdentity(definition, keptAnswers(clientId, current), recordFromJson(current.formResponses));
     // An old Child answer on a guest aged 10 to 17 becomes Pathfinder, marked or not, so they are priced as a youth.
@@ -1792,9 +1794,12 @@ export async function amendClubRegistration(
   const engineOptions: AmendmentServerOptions = {
     attendees: serverOptions,
     // Inside the amendment's own transaction, so a failed save changes nothing (#639).
-    ...(saveAgeBack.length > 0 || betweenLevelsOnly
+    ...(saveAgeBack.length > 0 || betweenLevelsOnly || markChangedAttendees.length > 0
       ? {
         inTransaction: async (tx: Prisma.TransactionClient) => {
+          for (const changed of markChangedAttendees) {
+            if ((await tx.honorEnrollment.count({ where: { registrationAttendeeId: changed.id } })) > 0) throw new ClubRegistrationError("ATTENDEES_INVALID", changed.message);
+          }
           if (saveAgeBack.length > 0) await saveRosterAgesBack(tx, organizationId, clubYearFor(event.startsAt), actor, saveAgeBack);
           if (betweenLevelsOnly) {
             // Checked again where the change is written, so advancement revoked (or the level held) a moment ago cannot let an

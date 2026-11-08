@@ -68,11 +68,17 @@ type Workspace = ClubEventWorkspace & { experience: PublicRegistrationExperience
 type HonorPicks = Record<string, string[]>;
 
 /** Role answers of draft guests saved as Child at 10 to 17 under #1666 become Pathfinder, as the server stores them (#1728). */
-function legacyAdjustedAnswers(answers: Record<string, FormResponses>, guests: ClubGuest[], definition: Parameters<typeof childRoleToPathfinder>[0]) {
+/**
+ * A marked youth guest keeps the Pathfinder role answer (#1728). Draft guests arrive already normalized by the server
+ * (`guestsFromJson`), so an old #1666 Child guest aged 10 to 17 shows here as marked while its saved answer may still say
+ * Child: swap that answer, so the card and the price preview match what the server stores. Only a Child or Underage answer
+ * is ever changed.
+ */
+export function legacyAdjustedAnswers(answers: Record<string, FormResponses>, guests: ClubGuest[], definition: Parameters<typeof childRoleToPathfinder>[0]) {
   const next = { ...answers };
   for (const guest of guests) {
     const clientId = clubGuestClientId(guest.id);
-    if (normalizeLegacyChildGuest(guest) !== guest && next[clientId]) next[clientId] = childRoleToPathfinder(definition, next[clientId]) as FormResponses;
+    if (guestIsYouthNotPathfinder(normalizeLegacyChildGuest(guest)) && next[clientId]) next[clientId] = childRoleToPathfinder(definition, next[clientId]) as FormResponses;
   }
   return next;
 }

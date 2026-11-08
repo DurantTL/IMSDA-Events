@@ -181,3 +181,22 @@ describe("a marked guest on the packet, the check-in book and the totals (#1728)
     expect(checkInBookCsv(book)).toContain(YOUTH_GUEST_ROLE_LABEL);
   });
 });
+
+describe("an old Child draft guest's answer is swapped after the server normalizes the draft (#1728)", () => {
+  it("shows and prices the Pathfinder answer for a 10–17 guest saved as Child, and leaves a Child under 10 alone", async () => {
+    const { legacyAdjustedAnswers } = await import("@/components/club-registration-workspace");
+    const { guestsFromJson, clubGuestClientId } = await import("@/modules/club-registrations/domain");
+    const guests = guestsFromJson([
+      { id: "guestpat14", firstName: "Pat", lastName: "Sample", age: 14, email: null, guestType: "UNDERAGE" },
+      { id: "guestkit06", firstName: "Kit", lastName: "Sample", age: 6, email: null, guestType: "UNDERAGE" },
+    ]);
+    expect(guests).toHaveLength(2);
+    const answers = legacyAdjustedAnswers(
+      { [clubGuestClientId("guestpat14")]: { attendee_type: "Child" }, [clubGuestClientId("guestkit06")]: { attendee_type: "Child" } },
+      guests,
+      roleForm,
+    );
+    expect(answers[clubGuestClientId("guestpat14")]).toEqual({ attendee_type: "Pathfinder" });
+    expect(answers[clubGuestClientId("guestkit06")]).toEqual({ attendee_type: "Child" });
+  });
+});
