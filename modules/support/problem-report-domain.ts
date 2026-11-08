@@ -23,7 +23,7 @@ export function problemReportReference(number: number) {
 /** The shared status words (rule B12): a report that was sent and waits is "Submitted"; one dealt with is "Completed". */
 export const problemReportStatusLabel = { OPEN: "Submitted", RESOLVED: "Completed" } as const;
 
-/** A long segment is kept only when it reads as a lowercase hyphenated slug ("womens-retreat-registration"); any other long run of letters, digits, "_" or "-" looks like a token. */
+/** A long segment is kept only when it reads as a lowercase hyphenated slug (such as an event registration form name); any other long run of letters, digits, "_" or "-" looks like a token. */
 const TOKENISH_SEGMENT = /^[A-Za-z0-9_-]{20,}$/;
 const READABLE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
 const PRIVATE_PREFIX = /^(club-forms|manage|unsubscribe|staff-invite|staff-invitations|health-records|pass|pay)$/;

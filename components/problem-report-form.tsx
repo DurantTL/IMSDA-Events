@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { HoneypotField } from "@/components/honeypot-field";
@@ -66,6 +67,8 @@ export function ProblemReportSection() {
   }, [focusRequest]);
   const focusField = (field: "message" | "email") => setFocusRequest((current) => ({ field, n: (current?.n ?? 0) + 1 }));
   const [reference, setReference] = useState("");
+  // B6: a typed, unsent report is not lost by leaving the page. The email is prefilled, so only the description counts.
+  useUnsavedChangesGuard(message.trim() !== "" && reference === "", "You have typed a problem report that has not been sent. Leave this page and discard it?");
 
   async function loadConfig() {
     if (loadStarted) return;
