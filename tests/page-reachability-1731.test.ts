@@ -112,6 +112,7 @@ describe("the links added for #1731 are gated like the page they open", () => {
 
   it("the club portal and coordinator links from main are still drawn by their parent pages", () => {
     expect(read("app/(public)/account/(portal)/clubs/[organizationId]/page.tsx")).toContain("/roster-health");
+    expect(read("app/(public)/account/(portal)/clubs/[organizationId]/roster/page.tsx")).toContain("/roster-health");
     expect(read("components/club-outings-section.tsx")).toContain("/outings/new");
     expect(read("app/(public)/account/(portal)/clubs/[organizationId]/forms/page.tsx")).toContain("<ClubOutingsSection");
     expect(read("components/coordinator-destinations.tsx")).toContain("/account/area-clubs/events/${encodeURIComponent(event.id)}/report");
