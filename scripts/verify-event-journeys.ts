@@ -1004,6 +1004,9 @@ async function sortAttendees(page: J.Page, column: string, label: string, direct
       const select = document.querySelector('select[name="sort"]');
       return Boolean(select) && Object.keys(select!).some((key) => key.startsWith("__reactProps$"));
     }, undefined, { timeout: 20_000 });
+    // Opening a page with ?event= makes the app shell remember that event (a server action, then router.refresh()). A
+    // sort navigation started while that is still in flight can be dropped on a slow runner, so wait for it to finish.
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
     await page.getByLabel("Sort by").selectOption({ label });
     await page.getByLabel("Direction").selectOption(direction);
     await page.waitForURL((url: URL) => url.searchParams.get("sort") === column && (url.searchParams.get("dir") ?? "asc") === direction, { timeout: 15_000 });
