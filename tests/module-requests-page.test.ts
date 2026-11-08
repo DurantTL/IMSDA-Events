@@ -122,7 +122,6 @@ describe("Request a feature on /more", () => {
     expect(markup).toContain('data-status="APPROVED"');
     expect(markup).toContain("Attendee community: approved");
     expect(markup).not.toContain('data-request-module="attendee-community"');
-    expect(markup).toContain('data-module="attendee-community"');
   });
 
   it("shows no request panel to a system administrator or to staff who are not Event Admins", async () => {

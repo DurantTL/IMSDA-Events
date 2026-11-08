@@ -65,124 +65,108 @@ beforeEach(() => {
   mocks.listModuleRequestsForEvent.mockResolvedValue([]);
 });
 
-describe("/more as the Event modules page", () => {
-  it("is titled Event modules, with the event name in the subline and no Customize heading (#810)", async () => {
+const cardTitles = (markup: string) => [...markup.matchAll(/data-testid="hub-card"[^>]*>.*?<span class="[^"]*cardTitle[^"]*">([^<]+)<\/span>/g)].map((match) => match[1]);
+
+describe("/more as the Event setup page (#1586)", () => {
+  it("is titled Event setup, with the grouped cards and the event name in the intro", async () => {
     signIn({ globalRole: null, permissions: eventPermissions, enabled: [] });
     const markup = await render();
     expect(markup).not.toContain("Customize this event");
-    // The shell's H1 names the page; the body has no duplicate heading or eyebrow, only the shared header (#981).
     expect(markup).not.toContain("duplicate-page-title");
-    expect(markup).not.toMatch(/<h2[^>]*>Event modules<\/h2>/);
-    expect(markup).not.toContain('class="eyebrow">Event modules');
-    expect(markup).toContain('class="staff-page-header"');
-    // /more is the event's tools and modules; Event features (where features are switched) is its one primary link.
-    expect(markup).toContain("The tools and modules for Synthetic Camporee, with requests for more and the recent activity trail.");
+    expect(markup).toContain('data-testid="admin-hub-event-setup"');
+    expect(markup).toContain("Everything you set for Synthetic Camporee, on one page. Each item opens its own page.");
     expect(markup).toContain('href="/more/features?event=event_1"');
-    expect(markup).toContain("Event features</a>");
-    expect(markup).not.toContain("Turn features on or off for Synthetic Camporee");
-    expect(staffSubpageTitle("/more")).toBe("Event modules");
-    expect(staffSubpageTitle("/more/merchandise")).not.toBe("Event modules");
+    expect(markup).toContain("Event features");
+    expect(staffSubpageTitle("/more")).toBe("Event setup");
+    expect(staffSubpageTitle("/more/merchandise")).not.toBe("Event setup");
   });
 
-  it("offers the Event features link only to staff who can configure the event (#981)", async () => {
+  it("lists the setup cards in groups, each linking its own page with the event, and leaves out other tabs' pages", async () => {
+    signIn({ globalRole: null, permissions: eventPermissions, enabled: ["merchandise", "emergency-plans"] });
+    const markup = await render();
+    // Program has only Meals here (the Honors and Seminar modules are off), so it joins Registration; the heading says so.
+    for (const group of ["Basics", "Registration / Program", "Lodging and items", "Sales / People and clubs"]) expect(markup).toContain(`>${group}</h2>`);
+    for (const href of ["/more/event-settings", "/more/features", "/registration-builder", "/more/attendee-configuration", "/more/tags", "/information-forms", "/more/meals", "/more/lodging", "/more/lodging/assignments", "/more/lodging/requests", "/more/issued-assets", "/more/merchandise", "/more/promo-codes", "/staff", "/more/event-content", "/more/emergency-plan"]) {
+      expect(markup, href).toContain(`href="${href}?event=event_1"`);
+    }
+    // Pages that belong to other tabs are not setup cards, and the old phone-only list is gone.
+    for (const href of ["/people/attendees", "/imports", "/more/reports", "/more/health", "/community"]) {
+      expect(markup, href).not.toContain(`data-testid="hub-card" href="${href}?event=event_1"`);
+    }
+    expect(markup).not.toContain('aria-label="All tools"');
+    expect(markup).not.toContain("more-task-groups");
+    expect(markup).toContain("Lives in Money.");
+  });
+
+  it("offers the Event features card only to staff who can configure the event, and says only a system administrator turns modules on or off", async () => {
     signIn({ globalRole: null, permissions: eventPermissions.filter((permission) => permission !== "CONFIGURE_EVENT"), enabled: [] });
     const markup = await render();
     expect(markup).not.toContain("/more/features");
     expect(markup).toContain("Only a system administrator turns modules on or off.");
   });
 
-  it("shows a system administrator the enabled modules with Turn off and a collapsed Not used by this event with Enable", async () => {
+  it("no longer draws a switch on the cards: Event features holds each module's switch", async () => {
     signIn({ globalRole: "SYSTEM_ADMIN", permissions: eventPermissions, enabled: ["merchandise"] });
     const markup = await render();
-    expect(markup).toContain('data-module="merchandise"');
-    expect(markup).toContain('aria-label="Turn off Merchandise"');
+    expect(markup).not.toContain('aria-label="Turn off Merchandise"');
+    expect(markup).not.toContain('data-module="merchandise"');
+    expect(markup).toContain('href="/more/merchandise?event=event_1"');
+    // What is off stays below the cards, with its Enable for a system administrator.
     expect(markup).toContain("Not used by this event");
     expect(markup).toContain('aria-label="Enable Attendee community"');
-    // Honors is a club module: no Enable on a general event.
     expect(markup).not.toContain('aria-label="Enable Honors classes"');
-    // Collapsed by default: a <details> with no open attribute.
     expect(markup).toMatch(/<details class="panel activity-disclosure event-modules-off"(?! open)/);
-    // Public content is on for every event and cannot be turned off.
-    expect(markup).toContain('data-module="public-content"');
-    expect(markup).not.toContain('aria-label="Turn off Public content"');
   });
 
-  it("shows an event admin only the enabled modules: no disabled card, no Enable, no Turn off", async () => {
+  it("shows an event admin no disabled card, no Enable and no Turn off", async () => {
     signIn({ globalRole: null, permissions: eventPermissions, enabled: ["merchandise"] });
     const markup = await render();
-    expect(markup).toContain('data-module="merchandise"');
-    expect(markup).toContain('data-module="public-content"');
+    expect(markup).toContain('href="/more/merchandise?event=event_1"');
     expect(markup).not.toContain("Not used by this event");
-    expect(markup).not.toContain("Enable ");
     expect(markup).not.toContain(">Enable<");
     expect(markup).not.toContain("Turn off");
-    expect(markup).not.toContain('data-module="honors"');
-    expect(markup).not.toContain('data-module="attendee-community"');
+    expect(markup).not.toContain('href="/more/honors');
     expect(markup).toContain("Only a system administrator turns modules on or off");
   });
 
-  it("shows staff only the enabled modules they may open, and still no switch", async () => {
-    signIn({ globalRole: null, permissions: ["MANAGE_FINANCE"], enabled: ["merchandise", "attendee-community"] });
+  it("shows staff only the cards they may open", async () => {
+    signIn({ globalRole: null, permissions: ["VIEW_EVENT", "MANAGE_FINANCE"], enabled: ["merchandise", "attendee-community"] });
     const markup = await render();
-    // Merchandise and community need CONFIGURE_EVENT / MANAGE_COMMUNICATIONS, which this role lacks.
-    expect(markup).not.toContain('data-module="merchandise"');
-    expect(markup).not.toContain('data-module="attendee-community"');
+    expect(markup).not.toContain('href="/more/merchandise');
+    expect(markup).not.toContain('href="/community');
+    expect(markup).not.toContain('href="/more/event-settings');
+    expect(markup).toContain('href="/more/promo-codes?event=event_1"');
     expect(markup).not.toContain("Not used by this event");
     expect(markup).not.toContain(">Enable<");
   });
 
-  it("hides a card when the module is on but the event type does not apply (club modules on a general event)", async () => {
+  it("hides a club module's card when the event is not a club event, and shows it on a club event", async () => {
     signIn({ globalRole: null, permissions: eventPermissions, enabled: ["event-patches", "club-assignments"], clubEvent: false });
-    const markup = await render();
-    expect(markup).not.toContain('data-module="event-patches"');
-    expect(markup).not.toContain('data-module="club-assignments"');
-  });
-
-  it("shows the club modules on a club event", async () => {
+    let markup = await render();
+    expect(markup).not.toContain('href="/more/event-patches');
+    expect(markup).not.toContain('href="/more/club-assignments');
     signIn({ globalRole: null, permissions: eventPermissions, enabled: ["event-patches", "club-assignments"], clubEvent: true });
-    const markup = await render();
-    expect(markup).toContain('data-module="event-patches"');
-    expect(markup).toContain('data-module="club-assignments"');
+    markup = await render();
+    expect(markup).toContain('href="/more/event-patches?event=event_1"');
+    expect(markup).toContain('href="/more/club-assignments?event=event_1"');
   });
 
-  it("shows Merchandise and Seminar assignments from the event's data with no stored row, with no switch", async () => {
+  it("shows Merchandise and Seminar assignments from the event's data with no stored row", async () => {
     signIn({ globalRole: "SYSTEM_ADMIN", permissions: eventPermissions, enabled: [], dataNeeds: ["merchandise", "seminar-assignments"] });
     const markup = await render();
-    expect(markup).toContain('data-module="merchandise"');
-    expect(markup).toContain('data-module="seminar-assignments"');
-    expect(markup).toContain("On because this event has products.");
-    expect(markup).toContain("On because this event has a ranked seminar choice.");
-    expect(markup).not.toContain('aria-label="Turn off Merchandise"');
+    expect(markup).toContain('href="/more/merchandise?event=event_1"');
+    expect(markup).toContain('href="/more/program-assignments?event=event_1"');
     expect(markup).not.toContain('aria-label="Enable Merchandise"');
   });
 
-  it("shows the same data-driven modules to an event admin", async () => {
-    signIn({ globalRole: null, permissions: eventPermissions, enabled: [], dataNeeds: ["merchandise"] });
-    const markup = await render();
-    expect(markup).toContain('data-module="merchandise"');
-    expect(markup).not.toContain("Turn off");
-  });
-
-  it("shows Honors once, with Turn off and no left-over entry, on a general event that has honors data", async () => {
+  it("shows Honors once on a general event that has honors data, with no left-over entry, and lets it be enabled when it is off", async () => {
     signIn({ globalRole: "SYSTEM_ADMIN", permissions: eventPermissions, enabled: ["honors"], honorsData: true, clubEvent: false });
-    const markup = await render();
-    expect(markup.match(/data-module="honors"/g)).toHaveLength(1);
-    expect(markup).toContain('aria-label="Turn off Honors classes"');
+    let markup = await render();
+    expect(markup.match(/href="\/more\/honors\?event=event_1"/g)).toHaveLength(1);
     expect(markup).not.toContain("Left over from a change of event type");
-  });
-
-  it("lets Honors be enabled again after Turn off on a general event with honors data", async () => {
     signIn({ globalRole: "SYSTEM_ADMIN", permissions: eventPermissions, enabled: [], honorsData: true, clubEvent: false });
-    const markup = await render();
+    markup = await render();
     expect(markup).toContain('aria-label="Enable Honors classes"');
-  });
-
-  it("shows a stored module with data keeping it on without Turn off, and the reason", async () => {
-    signIn({ globalRole: "SYSTEM_ADMIN", permissions: eventPermissions, enabled: ["merchandise"], dataNeeds: ["merchandise"] });
-    const markup = await render();
-    expect(markup).toContain('data-module="merchandise"');
-    expect(markup).not.toContain('aria-label="Turn off Merchandise"');
-    expect(markup).toContain("On because this event has products.");
   });
 
   it("offers a system admin no Enable for a club module on a general event, and lists a leftover row with Turn off", async () => {
@@ -209,14 +193,10 @@ describe("/more as the Event modules page", () => {
     expect(markup).not.toContain("Sign-in settings");
   });
 
-  it("keeps the universal tools on the page for a phone, with club forms for conference staff", async () => {
-    signIn({ globalRole: "SYSTEM_ADMIN", permissions: eventPermissions, enabled: [] });
+  it("keeps club forms for conference staff and never links Payments (a phone tab, #890)", async () => {
+    signIn({ globalRole: "SYSTEM_ADMIN", permissions: eventPermissions, enabled: [], clubEvent: true });
     const markup = await render();
-    expect(markup).toContain('aria-label="All tools"');
-    for (const href of ["/more/event-settings", "/imports", "/more/reports", "/more/club-forms", "/staff"]) {
-      expect(markup).toContain(`href="${href}?event=event_1"`);
-    }
-    // Payments is a phone tab (#890), so the More page no longer links it.
+    expect(cardTitles(markup)).toContain("Club forms");
     expect(markup).not.toContain('href="/finance?event=event_1"');
   });
 });
