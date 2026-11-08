@@ -1190,6 +1190,34 @@ export async function checkModuleRequestRateLimit(request: Request, userId: stri
 }
 
 /**
+ * Problem reports from the Forms help popup (#1483): anyone can send one, and each one posts to the IT team's channel, so a
+ * source gets a few an hour and one email address gets fewer. The Security check and the stricter no-token limit
+ * (`checkSecurityCheckFallbackRateLimit`) sit on top of this.
+ */
+export const PROBLEM_REPORT_BUDGETS = { client: 6, email: 4, windowSeconds: oneHour } as const;
+
+export async function checkProblemReportRateLimit(request: Request, email?: string | null) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const rules: RuleInput[] = [{
+    policy: "support.problem-report.client",
+    limit: PROBLEM_REPORT_BUDGETS.client,
+    windowSeconds: PROBLEM_REPORT_BUDGETS.windowSeconds,
+    identifierHashes: [client],
+  }];
+  const address = email?.trim().toLowerCase();
+  if (address) {
+    rules.push({
+      policy: "support.problem-report.email",
+      limit: PROBLEM_REPORT_BUDGETS.email,
+      windowSeconds: PROBLEM_REPORT_BUDGETS.windowSeconds,
+      identifierHashes: [hashRateLimitIdentifier("problem-report-email", address, configuration)],
+    });
+  }
+  return evaluate(rules, configuration);
+}
+
+/**
  * The public "Register a new club" form (#817). Submitting writes a row and
  * emails the conference, so it is held tight: six an hour from one address,
  * charged once per submit (the route calls this once, before parsing the

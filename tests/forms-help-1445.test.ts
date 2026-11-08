@@ -31,10 +31,10 @@ afterEach(async () => {
 
 describe("Forms help content", () => {
   const html = renderToStaticMarkup(createElement(FormsHelpSections, { contact }));
-  it("has three sections, all collapsed", () => {
-    expect(html.match(/<details/g)).toHaveLength(3);
+  it("has four sections, all collapsed", () => {
+    expect(html.match(/<details/g)).toHaveLength(4);
     expect(html).not.toMatch(/<details[^>]* open/);
-    for (const title of ["Having form issues?", "Need translation?", "Need more help?"]) expect(html).toContain(title);
+    for (const title of ["Having form issues?", "Need translation?", "Need more help?", "Report a problem"]) expect(html).toContain(title);
   });
   it("marks Spanish and gives both languages", () => {
     expect(html).toContain('<span lang="es"> / ¿Necesita traducción?</span>');
@@ -69,8 +69,9 @@ describe("Forms help dialog", () => {
     await click(document.querySelector("[data-forms-help-trigger]")!);
     await flush(40);
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
-    const stops = Array.from(dialog.querySelectorAll<HTMLElement>("button, summary"));
-    expect(stops.map((el) => el.tagName)).toEqual(["BUTTON", "SUMMARY", "SUMMARY", "SUMMARY"]);
+    // Controls inside a closed section (the Report a problem form) are not tab stops.
+    const stops = Array.from(dialog.querySelectorAll<HTMLElement>("button, summary")).filter((el) => el.tagName === "SUMMARY" || !el.closest("details:not([open])"));
+    expect(stops.map((el) => el.tagName)).toEqual(["BUTTON", "SUMMARY", "SUMMARY", "SUMMARY", "SUMMARY"]);
     stops[stops.length - 1]!.focus();
     const forward = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
     stops[stops.length - 1]!.dispatchEvent(forward);

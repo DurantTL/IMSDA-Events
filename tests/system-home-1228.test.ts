@@ -254,7 +254,7 @@ describe("the refreshed page", () => {
     const html = await renderHome();
     const navHrefs = new Set(systemNavGroups.flatMap((group) => group.items.map((item) => item.href)));
     const known = new Set([
-      "/admin", "/admin/feature-requests", "/overview", "/registration-builder", "/more/event-settings", "/more/features", "/finance", "/finance/square-payments", "/more/promo-codes", "/staff",
+      "/admin", "/admin/feature-requests", "/admin/problem-reports", "/overview", "/registration-builder", "/more/event-settings", "/more/features", "/finance", "/finance/square-payments", "/more/promo-codes", "/staff",
       "/more/health", "/imports", "/communications", "/people/staff-invitations/approvals", "/admin/readiness",
     ]);
     const hrefs = [...html.matchAll(/href="([^"]+)"/g)].map((match) => match[1].replaceAll("&amp;", "&"));

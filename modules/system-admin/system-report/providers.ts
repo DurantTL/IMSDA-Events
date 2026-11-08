@@ -77,6 +77,8 @@ import { getServerEnv } from "@/lib/env";
 import { getOffsiteBackups } from "@/modules/operations/offsite-backups-reader";
 import { offsiteBackupFields } from "./backup-signals";
 import { securityCheckFields } from "./security-check-signal";
+import { openProblemReportFields } from "./problem-report-signal";
+import { countOpenProblemReports } from "@/modules/support/problem-reports";
 import { buildCommunicationsProviders } from "./communications-providers";
 import { buildEventOpsProviders } from "./event-ops-providers";
 import { buildSelfTestProviders } from "./self-test-providers";
@@ -184,6 +186,9 @@ function readiness(ctx: ReportContext) {
 }
 function environment(ctx: ReportContext) {
   return ctx.once("environment", async () => buildEnvironmentStatus(process.env));
+}
+function openProblemReportCount(ctx: ReportContext) {
+  return ctx.once("open-problem-report-count", () => countOpenProblemReports());
 }
 function unresolvedAlertCount(ctx: ReportContext) {
   return ctx.once("alert-count", () => getPrisma().alertNotification.count({ where: { resolvedAt: null } }));
@@ -609,7 +614,14 @@ export const systemReportProviders: readonly SignalProvider[] = [
 
   defineProvider("alerts", [
     m("open-alerts", "Unresolved alerts", "Alerts the scheduled scan has raised and is still reporting as unresolved.", null, "Fix page not confirmed"),
-  ], async (ctx) => pickHealth(ctx, ["open-alerts"])),
+    m("open-problem-reports", "Open problem reports", "Problems people sent from the Forms help popup that are not marked resolved yet. A count only.", "/admin/problem-reports", "Open problem reports"),
+  ], async (ctx) => {
+    const reports = await openProblemReportCount(ctx);
+    return [
+      ...(await pickHealth(ctx, ["open-alerts"])),
+      reports.ok ? openProblemReportFields({ openCount: reports.value, now: ctx.now }) : { key: "open-problem-reports", ...tried(reports) },
+    ];
+  }),
 
   defineProvider("setup", [
     m("encryption-key", "Encryption key", "The key that protects stored private data is set (the value is never shown).", "/admin/settings", "Platform settings", systemSetupFor("encryption-key")),
