@@ -1276,7 +1276,15 @@ export async function checkProblemReportRateLimit(request: Request, email?: stri
  * report itself: three copies an hour from one source and two a day to one address. Hitting it only skips the copy; the
  * report is still saved.
  */
-export const PROBLEM_REPORT_COPY_BUDGETS = { client: 3, clientWindowSeconds: oneHour, email: 2, emailWindowSeconds: 24 * oneHour } as const;
+export const PROBLEM_REPORT_COPY_BUDGETS = {
+  client: 3,
+  clientWindowSeconds: oneHour,
+  email: 2,
+  emailWindowSeconds: 24 * oneHour,
+  /** Across the whole site, so a spread-out source cannot turn the copy into a mailer: 30 an hour and 200 a day. */
+  siteHour: 30,
+  siteDay: 200,
+} as const;
 
 export async function checkProblemReportCopyRateLimit(request: Request, email: string) {
   const configuration = getRateLimitConfiguration();
@@ -1293,6 +1301,18 @@ export async function checkProblemReportCopyRateLimit(request: Request, email: s
       limit: PROBLEM_REPORT_COPY_BUDGETS.email,
       windowSeconds: PROBLEM_REPORT_COPY_BUDGETS.emailWindowSeconds,
       identifierHashes: [hashRateLimitIdentifier("problem-report-copy-email", email.trim().toLowerCase(), configuration)],
+    },
+    {
+      policy: "support.problem-report-copy.site-hour",
+      limit: PROBLEM_REPORT_COPY_BUDGETS.siteHour,
+      windowSeconds: oneHour,
+      identifierHashes: [hashRateLimitIdentifier("problem-report-copy-site", "global", configuration)],
+    },
+    {
+      policy: "support.problem-report-copy.site-day",
+      limit: PROBLEM_REPORT_COPY_BUDGETS.siteDay,
+      windowSeconds: 24 * oneHour,
+      identifierHashes: [hashRateLimitIdentifier("problem-report-copy-site", "global", configuration)],
     },
   ], configuration);
 }

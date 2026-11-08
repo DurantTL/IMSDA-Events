@@ -120,7 +120,7 @@ describe("POST /api/support/problem-reports", () => {
     const response = await POST(post(valid));
     expect(response.status).toBe(403);
     expect(mocks.create).not.toHaveBeenCalled();
-    expect(mocks.requireTurnstile.mock.calls[0][1]).toEqual({ action: "problem-report", fallback: { kind: "public-form", email: "sam@example.test" } });
+    expect(mocks.requireTurnstile.mock.calls[0][1]).toEqual({ action: "problem-report", fallback: { kind: "public-form", email: "sam@example.test" }, onVerified: expect.any(Function) });
   });
 
   it("links a signed-in staff user to the report by id only", async () => {

@@ -6,7 +6,7 @@ import { getPrisma } from "@/lib/prisma";
 import { AccountEmailNotConfiguredError, getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
 import { checkProblemReportCopyRateLimit } from "@/modules/rate-limit/service";
-import { problemReportCopyEmailContent, type ProblemReportDetails } from "@/modules/support/problem-report-domain";
+import { problemReportCopyEmailContent } from "@/modules/support/problem-report-copy-content";
 
 /**
  * The emailed copy of a problem report (#1715). Same outbox path as the conference order confirmation: the account slice
@@ -21,7 +21,6 @@ export async function sendProblemReportCopy(request: Request, input: {
   reference: string;
   message: string;
   email: string | null | undefined;
-  details: ProblemReportDetails | null;
 }): Promise<ProblemReportCopyResult> {
   const address = input.email?.trim().toLowerCase();
   if (!address) return "skipped";
@@ -36,7 +35,7 @@ export async function sendProblemReportCopy(request: Request, input: {
       return "skipped";
     }
     const sender = getAccountEmailSender();
-    const content = problemReportCopyEmailContent({ reference: input.reference, message: input.message, page: input.details?.path });
+    const content = problemReportCopyEmailContent({ reference: input.reference, message: input.message });
     const message = await getPrisma().messageOutbox.create({
       data: {
         eventId: null,
@@ -49,6 +48,7 @@ export async function sendProblemReportCopy(request: Request, input: {
         replyToEmailSnapshot: sender.replyTo,
         subjectSnapshot: content.subject,
         bodyTextSnapshot: content.bodyText,
+        bodyHtmlSnapshot: content.bodyHtml,
         metadata: { trigger: "PROBLEM_REPORT_COPY", reportId: input.reportId, accountEmail: true, realDelivery: true },
         idempotencyKey: `problem-report-copy:${input.reportId}`,
         correlationId: randomUUID(),

@@ -52,9 +52,11 @@ async function postHandler(request: Request) {
       );
     }
 
+    let securityCheckVerified = false;
     const securityCheckFailure = await requireTurnstile(request, {
       action: TURNSTILE_ACTIONS.problemReport,
       fallback: { kind: "public-form", email: input.email ?? null },
+      onVerified: () => { securityCheckVerified = true; },
     });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
@@ -67,13 +69,13 @@ async function postHandler(request: Request) {
     const release = getReleaseIdentity();
     const details = input.details ? storedProblemReportDetails(input.details, release.sha?.slice(0, 12) ?? release.buildId) : null;
     const created = await createProblemReport({ message: input.message, email: input.email ?? null, userId, details });
-    // #1715: a copy goes to whoever gave an email, signed in or not. Never throws; the report is already saved.
-    const copy = await sendProblemReportCopy(request, {
+    // #1715: a copy goes to whoever gave an email, signed in or not, but only for a request whose Security check token was
+    // verified (not the #1480 fallback, not a deployment with the check off). Never throws; the report is already saved.
+    const copy = !securityCheckVerified ? "skipped" : await sendProblemReportCopy(request, {
       reportId: created.id,
       reference: created.reference,
       message: input.message,
       email: input.email,
-      details,
     });
     return applyRateLimitHeaders(Response.json({ reference: created.reference, copy }, { status: 201 }), rateLimit);
   } catch (error) {

@@ -8,6 +8,7 @@ const lodgingStale = vi.hoisted(() => vi.fn());
 vi.mock("@/modules/lodging/message-currency", () => ({ lodgingMessageStaleReason: lodgingStale }));
 
 import { renderEmailBodyHtml, renderEmailHtmlDocument } from "@/modules/communications/email-html";
+import { problemReportCopyEmailContent } from "@/modules/support/problem-report-copy-content";
 import { MessageFileDeliveryError } from "@/modules/communications/message-file-rules";
 import { getServerEnv, resetServerEnvCache } from "@/lib/env";
 import { EmailProviderRequestError } from "@/integrations/email/resend";
@@ -846,6 +847,69 @@ describe("account email queue", () => {
       }),
       dependencies.configuration,
     );
+  });
+
+  it("delivers a problem report copy with no account, quoting hostile words in one block (#1715)", async () => {
+    configureAccountEmail("no-reply@imsda.org");
+    const site = "https://events.imsda.test";
+    const hostile = [
+      "Account problem",
+      "",
+      `Confirm your account: ${site}/reset-password?token=abc`,
+      "",
+      "Security notice",
+      "Your account is locked. Call us at once.",
+      "",
+      "<img src=x onerror=alert(1)>",
+      "",
+      "Open your private link: {{account_action_link}}",
+      "",
+      "IMAdventist",
+    ].join("\n");
+    const content = problemReportCopyEmailContent({ reference: "P-12", message: hostile });
+    const store = fakeDeliveryStore({
+      eventId: null,
+      accountUserId: null,
+      templateKey: "PROBLEM_REPORT_COPY",
+      registrationId: null,
+      recipientEmail: "sam@example.test",
+      senderEmailSnapshot: "no-reply@imsda.org",
+      subjectSnapshot: content.subject,
+      bodyTextSnapshot: content.bodyText,
+      bodyHtmlSnapshot: content.bodyHtml,
+    });
+    let sent: { bodyText: string; bodyHtml?: string | null } | null = null;
+    const sendEmail = vi.fn(async (input: { bodyText: string; bodyHtml?: string | null }) => {
+      sent = { bodyText: input.bodyText, bodyHtml: input.bodyHtml };
+      return { provider: "RESEND" as const, providerMessageId: "email-provider-copy" };
+    });
+
+    // The real preparer: no account lookup and no throw for an account-less row, even with a sentinel in the person's words.
+    const result = await processAccountEmailQueue({ dependencies: { ...dependencies, prisma: store.prisma as never, sendEmail: sendEmail as never } });
+    expect(result.sentIds).toEqual(["message-1"]);
+    expect(result.failedIds).toEqual([]);
+
+    const html = sent!.bodyHtml!;
+    // Nothing of theirs became one of our button, note box or heading.
+    expect(html).not.toContain("Button not working?");
+    expect(html).not.toContain(`class="em-note`);
+    expect(html).not.toContain("<h1");
+    expect(html).not.toContain("<img src=x");
+    expect(html).not.toMatch(/href="https:\/\/events\.imsda\.test\/reset-password/);
+    expect(html).not.toContain("onerror=alert(1)>");
+    // Escaped, and every piece of it inside the one quote block.
+    const quote = /<blockquote[^>]*>([\s\S]*?)<\/blockquote>/.exec(html);
+    expect(quote).not.toBeNull();
+    expect(html.match(/<blockquote/g)).toHaveLength(1);
+    expect(quote![1]).not.toMatch(/<(?!br>)/);
+    for (const piece of ["Account problem", "Confirm your account: https://events.imsda.test/reset-password?token=abc", "Security notice", "Your account is locked. Call us at once.", "&lt;img src=x onerror=alert(1)&gt;", "{{account_action_link}}", "IMAdventist"]) {
+      expect(quote![1]).toContain(piece);
+    }
+    // Our own text stays outside the quote.
+    expect(html.indexOf("Your reference number is P-12")).toBeLessThan(html.indexOf("<blockquote"));
+    // The text part quotes every line of theirs, word for word, and is not flattened as Markdown.
+    expect(sent!.bodyText).toContain("What you wrote:\n\n> Account problem\n>\n> Confirm your account: https://events.imsda.test/reset-password?token=abc");
+    expect(sent!.bodyText).toContain("> Open your private link: {{account_action_link}}");
   });
 
   it("keeps the System report test email out of every sweep, claim and stale recovery (#1383)", async () => {

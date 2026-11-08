@@ -120,28 +120,3 @@ export function buildProblemReportDetails(facts: BrowserFacts): ProblemReportDet
     squareBlocked: facts.squareLoadFailed,
   };
 }
-
-/**
- * The emailed copy of a report (#1715): the reference, the page the person reported from (the cleaned address they could
- * see in their browser) and their own words. Nothing else: no browser, window size, version, id or other technical detail.
- */
-export function problemReportCopyEmailContent(input: { reference: string; message: string; page?: string | null }) {
-  const page = input.page?.trim();
-  return {
-    subject: `Your problem report ${input.reference}`,
-    bodyText: [
-      "Hello,",
-      "",
-      `Thank you for telling us about a problem. Your reference number is ${input.reference}. Keep it if you write to us about this.`,
-      "",
-      ...(page ? [`You reported it from this page: ${page}`, ""] : []),
-      "Here is what you wrote:",
-      "",
-      input.message.trim(),
-      "",
-      "The IT team has your report. If we need more, we will write to this address.",
-      "",
-      "IMAdventist",
-    ].join("\n"),
-  };
-}
