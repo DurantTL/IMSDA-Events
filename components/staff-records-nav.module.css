@@ -1,0 +1,6 @@
+/* Tap targets of the Monthly records pages' export buttons and year links (#1588): 44px at every width. The global
+   .intro-actions rule makes a desktop button 36px, so the element selector keeps this one ahead of it. */
+a.target {
+  min-height: 44px;
+  min-width: 44px;
+}

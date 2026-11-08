@@ -1,3 +1,4 @@
+import navStyles from "@/components/staff-records-nav.module.css";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -26,8 +27,8 @@ export default async function ClubYearEndReportsAdminPage({ searchParams }: { se
     <>
       <AdminPageHeader path="/admin/clubs/reports/year-end" />
       <div className="intro-actions club-admin-links">
-        <Link className="secondary-button" href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start - 1)}`}>← {reportYearLabel(start - 1)}</Link>
-        {reportYear !== current && <Link className="secondary-button" href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start + 1)}`}>{reportYearLabel(start + 1)} →</Link>}
+        <Link className={`secondary-button ${navStyles.target}`} href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start - 1)}`}>← {reportYearLabel(start - 1)}</Link>
+        {reportYear !== current && <Link className={`secondary-button ${navStyles.target}`} href={`/admin/clubs/reports/year-end?year=${reportYearLabel(start + 1)}`}>{reportYearLabel(start + 1)} →</Link>}
       </div>
       <ClubYearEndConference
         initialRows={clubs.map((club) => ({
