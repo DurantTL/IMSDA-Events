@@ -25,7 +25,7 @@ function parentPage() {
     sensitiveFieldKeys: slip.sensitiveFieldKeys,
     mode: "link",
     token: "t",
-    outing: { detailRows: outingDetailRows(input.details), sectionId: "sec_permission" },
+    outing: { detailRows: outingDetailRows(input.details, slip.definition), sectionId: "sec_permission" },
   }));
 }
 
@@ -37,6 +37,8 @@ describe("the parent's page for an outing slip (#1672)", () => {
     expect(details).toContain("November 21, 2026");
     expect(details).toContain("8:30 AM");
     expect(details).toContain("Church van");
+    expect(details).toContain("On the date of");
+    expect(details).toContain("I give my child permission to ride with");
     expect(html).not.toContain('id="club-form-f_activity"');
     expect(html).not.toContain('id="club-form-f_activity_date"');
     expect(html).not.toContain('id="club-form-f_ride_with"');
@@ -76,7 +78,7 @@ describe("the director's outing pages (#1672)", () => {
     const html = renderToStaticMarkup(createElement(ClubOutingsSection, {
       base: "/account/clubs/club-a/forms",
       slipEnabled: true,
-      outings: [{ id: "outing-1", activity: "Canoe trip", dateLabel: "November 21, 2026", clubYear: "2026-27", status: "OPEN", questionCount: 1, counts: { SIGNED: 3, NOT_YET: 4, EXPIRED: 1 } }],
+      outings: [{ id: "outing-1", activity: "Canoe trip", startDate: "2026-11-21", dateLabel: "November 21, 2026", clubYear: "2026-27", status: "OPEN", questionCount: 1, counts: { SIGNED: 3, NOT_YET: 4, EXPIRED: 1 } }],
     }));
     expect(html).toContain("Canoe trip");
     expect(html).toContain('href="/account/clubs/club-a/forms/outings/outing-1"');

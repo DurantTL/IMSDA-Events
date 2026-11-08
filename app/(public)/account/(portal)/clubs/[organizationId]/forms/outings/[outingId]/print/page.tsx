@@ -7,7 +7,7 @@ import { cardCell } from "@/components/table-card-labels";
 import { clubLeaderViewerFromAccess } from "@/modules/club-forms/access";
 import { isClubFormsRole } from "@/modules/club-forms/domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
-import { outingDetailRows, outingLinkStateLabel } from "@/modules/club-forms/outing-domain";
+import { outingLinkStateLabel } from "@/modules/club-forms/outing-domain";
 import { getOutingTracking } from "@/modules/club-forms/outings";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
@@ -49,7 +49,7 @@ export default async function OutingPrintPage({ params }: { params: Promise<{ or
         <section className="club-form-sheet-section">
           <h3>Outing details</h3>
           <dl className="club-form-answers">
-            {outingDetailRows(tracking.details).map((row) => (
+            {tracking.detailRows.map((row) => (
               <div key={row.label}>
                 <dt>{row.label}</dt>
                 <dd translate="no">{row.value}</dd>
@@ -70,7 +70,7 @@ export default async function OutingPrintPage({ params }: { params: Promise<{ or
                 <tr key={member.memberId} role="row">
                   <th role="rowheader" scope="row" translate="no">{member.name}</th>
                   <td {...cardCell("Slip")}>{outingLinkStateLabel[member.state]}</td>
-                  <td {...cardCell("Date")}>{member.state === "SIGNED" ? `Signed ${when(member.signedAt)}` : member.state === "EXPIRED" ? `Expired ${when(member.expiresAt)}` : `Sent ${when(member.sentAt)}`}</td>
+                  <td {...cardCell("Date")}>{member.state === "SIGNED" ? `Signed ${when(member.signedAt)}` : member.withdrawnAt ? `Withdrawn ${when(member.withdrawnAt)}` : member.state === "EXPIRED" ? `Expired ${when(member.expiresAt)}` : `Sent ${when(member.sentAt)}`}</td>
                 </tr>
               ))}
             </tbody>

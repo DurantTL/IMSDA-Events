@@ -72,12 +72,14 @@ export type CreateClubFormLinkInput = {
   expiresInDays?: number;
   /** An outing permission slip's link (#1672): a director's own club only, and only while the outing is open. */
   outingId?: string;
+  /** With `outingId`: send again. The member's links still open for this outing are withdrawn in the same transaction; without it, a member who already has a live or signed link is refused. */
+  resend?: boolean;
 };
 
 export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateClubFormLinkInput, now = new Date()) {
   const leader = senderOnly(viewer, input.organizationId);
   if (!isAccountEmailConfigured()) {
-    throw new ClubFormError("EMAIL_NOT_CONFIGURED", "Email isn't set up on this server, so a link can't be sent yet.");
+    throw new ClubFormError("EMAIL_NOT_CONFIGURED", "Email isn't set up on this server, so a link can't be sent yet. Ask a system administrator at the conference office.");
   }
   const prisma = getPrisma();
   const club = await prisma.organization.findUnique({
@@ -123,6 +125,22 @@ export async function createClubFormLink(viewer: ClubFormsViewer, input: CreateC
     : { createdByUserId: actor.userId };
 
   return prisma.$transaction(async (tx) => {
+    if (outing && input.rosterMemberId) {
+      // One send per member at a time: the member's row is locked, so a double click or two tabs queue up and the second one
+      // sees the first one's link (refused, or, for a resend, withdrawn here before the new one is made).
+      await tx.$queryRaw`SELECT "id" FROM "ClubRosterMember" WHERE "id" = ${input.rosterMemberId} FOR UPDATE`;
+      const held = await tx.clubFormLink.findMany({
+        where: { outingId: outing.id, rosterMemberId: input.rosterMemberId },
+        select: { id: true, status: true, expiresAt: true },
+      });
+      if (held.some((existing) => existing.status === "USED")) throw new ClubFormError("OUTING_ALREADY_SIGNED", "This family has already signed this slip.");
+      const live = held.filter((existing) => existing.status === "OPEN" && existing.expiresAt > now);
+      if (live.length > 0 && !input.resend) throw new ClubFormError("OUTING_ALREADY_SENT", "This family already has a slip to sign. Use Resend to send it again.");
+      await tx.clubFormLink.updateMany({
+        where: { outingId: outing.id, rosterMemberId: input.rosterMemberId, status: "OPEN" },
+        data: { status: "REVOKED", revokedAt: now },
+      });
+    }
     const link = await tx.clubFormLink.create({
       data: {
         templateId: template.id,
@@ -353,7 +371,7 @@ export async function resolveClubFormLinkForFill(token: string, now = new Date()
       sensitiveFieldKeys: template.sensitiveFieldKeys,
     },
     /** Read-only outing details for a parent (#1672); null on an ordinary link. */
-    outing: outing ? { detailRows: outingDetailRows(outing.details), sectionId: OUTING_PERMISSION_SECTION_ID } : null,
+    outing: outing ? { detailRows: outingDetailRows(outing.details, linkDefinition), sectionId: OUTING_PERMISSION_SECTION_ID } : null,
   };
 }
 

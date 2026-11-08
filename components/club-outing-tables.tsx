@@ -6,35 +6,23 @@ import { ResendOutingButton } from "@/components/club-outing-actions";
 import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText, sortRows, type SortKind, type SortState, type SortValue } from "@/lib/list-sort";
-import { formatInConferenceTime } from "@/modules/calendar/conference-format";
+import { emailDeliveryLabel, formatDate } from "@/components/club-forms-lists";
 import { outingLinkStateLabel } from "@/modules/club-forms/outing-domain";
 import type { OutingListRow, OutingTracking } from "@/modules/club-forms/outings";
 
 /** The director's outing lists (#1672): every outing on the Forms tab, and who has signed on one outing's page. */
-
-function formatDate(value: string | null) {
-  return value ? formatInConferenceTime(value, { month: "short", day: "numeric", year: "numeric" }) : "";
-}
-
-const emailDeliveryLabel = {
-  QUEUED: "Sending",
-  SENT: "Sent",
-  DELIVERED: "Delivered",
-  NOT_DELIVERED: "Not delivered: send it again",
-  UNKNOWN: "",
-} as const;
 
 const LIST_COLUMNS = ["activity", "date", "signed", "status"] as const;
 type ListColumn = typeof LIST_COLUMNS[number];
 const NO_LIST_SORT: SortState<ListColumn> = { key: null, dir: "asc" };
 const listAccessors: Record<ListColumn, (row: OutingListRow) => SortValue> = {
   activity: (row) => row.activity,
-  date: (row) => row.dateLabel,
+  date: (row) => row.startDate,
   signed: (row) => row.counts.SIGNED,
   status: (row) => row.status,
 };
 const LIST_LABELS: Record<ListColumn, { label: string; kind: SortKind }> = {
-  activity: { label: "activity", kind: "text" }, date: { label: "date", kind: "text" }, signed: { label: "signed count", kind: "number" }, status: { label: "outing status", kind: "text" },
+  activity: { label: "activity", kind: "text" }, date: { label: "date", kind: "date" }, signed: { label: "signed count", kind: "number" }, status: { label: "outing status", kind: "text" },
 };
 
 export function OutingListTable({ outings, base }: { outings: OutingListRow[]; base: string }) {
@@ -75,7 +63,7 @@ const trackAccessors: Record<TrackColumn, (row: TrackRow) => SortValue> = {
   name: (row) => row.name,
   state: (row) => outingLinkStateLabel[row.state],
   sent: (row) => row.sentAt,
-  when: (row) => row.signedAt ?? row.expiresAt,
+  when: (row) => row.signedAt ?? row.withdrawnAt ?? row.expiresAt,
 };
 const TRACK_LABELS: Record<TrackColumn, { label: string; kind: SortKind }> = {
   name: { label: "member", kind: "text" }, state: { label: "signing status", kind: "text" }, sent: { label: "date sent", kind: "date" }, when: { label: "signed or expires date", kind: "date" },
@@ -99,7 +87,7 @@ export function OutingTrackingTable({ organizationId, outingId, members, base, o
               <th role="rowheader" scope="row" translate="no">{row.name}</th>
               <td {...cardCell("Slip")}>{outingLinkStateLabel[row.state]}</td>
               <td {...cardCell("Sent")}>{formatDate(row.sentAt)}</td>
-              <td {...cardCell("Signed or expires")}>{row.state === "SIGNED" ? `Signed ${formatDate(row.signedAt)}` : row.state === "EXPIRED" ? `Expired ${formatDate(row.expiresAt)}` : `Expires ${formatDate(row.expiresAt)}`}</td>
+              <td {...cardCell("Signed or expires")}>{row.state === "SIGNED" ? `Signed ${formatDate(row.signedAt)}` : row.withdrawnAt ? `Withdrawn ${formatDate(row.withdrawnAt)}` : row.state === "EXPIRED" ? `Expired ${formatDate(row.expiresAt)}` : `Expires ${formatDate(row.expiresAt)}`}</td>
               <td {...cardCell("Email")}>{emailDeliveryLabel[row.delivery]}</td>
               <td {...cardCell(null)}>
                 {row.submissionId && <Link className="secondary-button" href={`${base}/submissions/${row.submissionId}`}>View slip<span className="sr-only"> for {row.name}</span></Link>}

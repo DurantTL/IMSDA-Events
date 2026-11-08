@@ -83,9 +83,15 @@ describe("parseOutingInput", () => {
     expect(viaChoice?.message).toMatch(/can't ask for medical/);
   });
 
-  it("allows the examples the club needs", () => {
-    for (const label of ["T-shirt size", "Can your child swim?", "Who will pick your child up?", "Lunch choice"]) {
+  it("allows the examples the club needs, and ordinary uses of words that can be medical", () => {
+    for (const label of ["T-shirt size", "Can your child swim?", "Who will pick your child up?", "Pick-up time", "Do you agree to the conditions?", "Is your child bringing sunglasses?", "Which weekend works best?"]) {
       expect(outingQuestionProblem({ label, options: [] }), label).toBeNull();
+    }
+  });
+
+  it("refuses the other ways a club could ask for medical details", () => {
+    for (const label of ["Does your child wear glasses?", "Any food restrictions?", "Does your child eat meat?", "Takes pills?", "Uses a wheelchair", "Child's weight", "Does your child have ADHD?", "Any conditions we should know about?", "Diagnosed with anything?", "Nurse on call?", "Last hospital visit"]) {
+      expect(outingQuestionProblem({ label, options: [] }), label).toMatch(/medical|birth/);
     }
   });
 
@@ -151,17 +157,38 @@ describe("the slip's definition for an outing", () => {
 
 describe("how an outing reads to a parent and the director", () => {
   it("lists the details read-only, leaving out what is empty, with times unshifted", () => {
-    const rows = outingDetailRows(parseOutingInput({ details: { ...details, cost: "", note: "" }, questions: [] }).details);
-    expect(rows.map((row) => row.label)).toEqual(["Activity", "Date", "Leaving", "Back", "Transportation and who your child rides with", "What to bring"]);
-    expect(rows.find((row) => row.label === "Date")?.value).toBe("November 21, 2026");
+    const rows = outingDetailRows(parseOutingInput({ details: { ...details, cost: "", note: "" }, questions: [] }).details, slip.definition);
+    // The slip's own wording for its three typed fields, read from the template.
+    expect(rows.map((row) => row.label)).toEqual([
+      "I hereby give my permission for my child to participate in the pre-planned activity of",
+      "On the date of",
+      "Leaving",
+      "Back",
+      "I give my child permission to ride with",
+      "What to bring",
+    ]);
+    expect(rows.find((row) => row.label === "On the date of")?.value).toBe("November 21, 2026");
     expect(rows.find((row) => row.label === "Leaving")?.value).toBe("8:30 AM");
     expect(rows.find((row) => row.label === "Back")?.value).toBe("4:45 PM");
     expect(outingTimeLabel("")).toBe("");
   });
 
   it("names several dates as a range", () => {
-    const rows = outingDetailRows(parseOutingInput({ details: { ...details, endDate: "2026-11-23" }, questions: [] }).details);
-    expect(rows.find((row) => row.label === "Dates")?.value).toBe("November 21–23, 2026");
+    const rows = outingDetailRows(parseOutingInput({ details: { ...details, endDate: "2026-11-23" }, questions: [] }).details, slip.definition);
+    expect(rows.find((row) => row.label === "On the date of")?.value).toBe("November 21–23, 2026");
+  });
+
+  it("takes the labels from the template, so an edited label follows and a removed field leaves its row out", () => {
+    const edited = {
+      ...slip.definition,
+      sections: slip.definition.sections.map((section) => ({
+        ...section,
+        fields: section.fields.flatMap((field) => (field.key === "ride_with" ? [] : [field.key === "activity" ? { ...field, label: "Edited activity wording" } : field])),
+      })),
+    };
+    const rows = outingDetailRows(parseOutingInput({ details, questions: [] }).details, edited);
+    expect(rows[0]).toEqual({ label: "Edited activity wording", value: "Canoe trip" });
+    expect(rows.some((row) => row.value === details.transportation)).toBe(false);
   });
 
   it("reads each link as signed, not yet or link expired", () => {

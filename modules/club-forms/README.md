@@ -349,7 +349,7 @@ sees who has signed. Pages: the Forms tab section "Outing permission slips", `/f
 - **Locked sections.** The child and family, permission statement, medical and emergency and
   signature sections are the template's own and are never altered. On an outing link the permission
   section keeps its title and wording but its three typed fields (`activity`, `activity_date`,
-  `ride_with`) are replaced by the outing's details, shown read-only; the server sets those three
+  `ride_with`) are replaced by the outing's details, shown read-only under the template's own labels for those three fields (read from the definition, never hard-coded); the server sets those three
   answers from the outing (`prepareOutingAnswers`) and ignores anything the parent sends for them,
   then validates the whole slip, so every required section stays required. The date answer is the
   first date; times, cost, what to bring and the note are shown, not stored as answers.
@@ -364,7 +364,7 @@ sees who has signed. Pages: the Forms tab section "Outing permission slips", `/f
   guardian with an email on the roster), so tokens, expiry (1 to 30 days), outbox delivery, withdrawal on
   failure and the per-recipient rate limit are unchanged. Members with no parent email, who already signed
   or already have a live link are skipped and reported by name, never by address. Resend withdraws
-  a still-open link and sends a new one; a signed member is never resent. At most 100 members per send.
+  a still-open link and sends a new one; a signed member is never resent. At most 100 members per send. A resend (and any send) locks the member's roster row and withdraws that member's open links in the same transaction that makes the new one, so a double click leaves one live link. Rate limits are an outing's own (`checkClubFormOutingSendRateLimit`: 40 send actions an hour per director, 100 a day per club; `checkClubFormOutingRecipientRateLimit`: 3 an hour per address and 400 slips a day per club), not the one-at-a-time limits of a typed link; the director is told which limit was hit.
 - **Tracking.** Each member shows Signed, Not yet or Link expired (a withdrawn or undelivered link counts
   as expired), with the email delivery status and a link to the signed slip. The page and print view hold
   no answers and no email addresses. Closing an outing withdraws every open link; signed slips stay.

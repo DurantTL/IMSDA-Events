@@ -27,7 +27,9 @@ export type ClubFormErrorCode =
   | "DRAFT_CHANGED"
   | "OUTING_NOT_FOUND"
   | "OUTING_CLOSED"
-  | "SLIP_TEMPLATE_OFF";
+  | "SLIP_TEMPLATE_OFF"
+  | "OUTING_ALREADY_SENT"
+  | "OUTING_ALREADY_SIGNED";
 
 /** A club forms rule that stopped a request. Messages never carry an answer. */
 export class ClubFormError extends Error {

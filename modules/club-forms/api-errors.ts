@@ -36,6 +36,8 @@ const statusByCode: Record<ClubFormError["code"], number> = {
   OUTING_NOT_FOUND: 404,
   OUTING_CLOSED: 409,
   SLIP_TEMPLATE_OFF: 409,
+  OUTING_ALREADY_SENT: 409,
+  OUTING_ALREADY_SIGNED: 409,
 };
 
 /**

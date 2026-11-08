@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
   createOuting: vi.fn(),
   closeOuting: vi.fn(),
   sendOuting: vi.fn(),
-  checkClubFormLinkCreateRateLimit: vi.fn(),
+  checkClubFormOutingSendRateLimit: vi.fn(),
+  checkClubFormOutingRecipientRateLimit: vi.fn(),
   processAccountEmailQueue: vi.fn(),
   after: vi.fn(),
 }));
@@ -18,7 +19,10 @@ vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: 
 vi.mock("@/modules/club-forms/access", () => ({ requireClubLeaderViewer: mocks.requireClubLeaderViewer }));
 vi.mock("@/modules/club-forms/outings", () => ({ createOuting: mocks.createOuting, closeOuting: mocks.closeOuting, sendOuting: mocks.sendOuting }));
 vi.mock("@/modules/communications/email-delivery", () => ({ processAccountEmailQueue: mocks.processAccountEmailQueue }));
-vi.mock("@/modules/rate-limit/service", () => ({ checkClubFormLinkCreateRateLimit: mocks.checkClubFormLinkCreateRateLimit }));
+vi.mock("@/modules/rate-limit/service", () => ({
+  checkClubFormOutingSendRateLimit: mocks.checkClubFormOutingSendRateLimit,
+  checkClubFormOutingRecipientRateLimit: mocks.checkClubFormOutingRecipientRateLimit,
+}));
 vi.mock("@/modules/club-rosters/access", () => ({
   RosterAccessError: class RosterAccessError extends Error {
     constructor(public readonly code: string, public readonly status: number, message: string) {
@@ -46,7 +50,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.requireClubLeaderViewer.mockResolvedValue(leader);
-  mocks.checkClubFormLinkCreateRateLimit.mockResolvedValue({ allowed: true, decisions: [] });
+  mocks.checkClubFormOutingSendRateLimit.mockResolvedValue({ allowed: true, decisions: [] });
+  mocks.checkClubFormOutingRecipientRateLimit.mockResolvedValue({ allowed: true });
   mocks.createOuting.mockResolvedValue({ outingId: "outing-1" });
   mocks.closeOuting.mockResolvedValue({ closedLinks: 2 });
   mocks.sendOuting.mockResolvedValue({ sent: 1, messageIds: ["message-1"], results: [{ memberId: "member-1", name: "Riley Sample", outcome: "SENT" }] });
@@ -97,18 +102,27 @@ describe("the outing routes (#1672)", () => {
     expect(await response.json()).toMatchObject({ error: "SLIP_TEMPLATE_OFF", message: expect.stringContaining("system administrator") });
   });
 
-  it("send applies the per-recipient limit, and delivers the queued emails after the response", async () => {
-    mocks.sendOuting.mockImplementation(async (_viewer, _org, _outing, _body, options: { allowRecipient: (email: string) => Promise<boolean> }) => {
+  it("send charges the action once, charges each address, and delivers the queued emails after the response", async () => {
+    mocks.sendOuting.mockImplementation(async (_viewer, _org, _outing, _body, options: { allowRecipient: (email: string) => Promise<unknown> }) => {
       await options.allowRecipient("parent@example.test");
       return { sent: 1, messageIds: ["message-1"], results: [{ memberId: "member-1", name: "Riley Sample", outcome: "SENT" }] };
     });
     const response = await SEND(post({ memberIds: ["member-1"] }), outing());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ sent: 1 });
-    expect(mocks.checkClubFormLinkCreateRateLimit).toHaveBeenCalledWith(expect.any(Request), "acct-1", "club-a", "parent@example.test");
+    expect(mocks.checkClubFormOutingSendRateLimit).toHaveBeenCalledWith(expect.any(Request), "acct-1", "club-a");
+    expect(mocks.checkClubFormOutingRecipientRateLimit).toHaveBeenCalledWith("club-a", "parent@example.test");
     expect(mocks.after).toHaveBeenCalledTimes(1);
     await mocks.after.mock.calls[0][0]();
     expect(mocks.processAccountEmailQueue).toHaveBeenCalledWith({ messageIds: ["message-1"], limit: 1 });
+  });
+
+  it("send answers 429 in plain words when the action limit is hit, and sends nothing", async () => {
+    mocks.checkClubFormOutingSendRateLimit.mockResolvedValue({ allowed: false, decisions: [{ policy: "p", allowed: false, limit: 1, remaining: 0, count: 2, windowSeconds: 3600, resetAfterSeconds: 60 }] });
+    const response = await SEND(post({ memberIds: ["member-1"] }), outing());
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({ message: expect.stringContaining("too many times") });
+    expect(mocks.sendOuting).not.toHaveBeenCalled();
   });
 
   it("send queues no delivery when nothing was sent, and answers 404 for another club's outing", async () => {

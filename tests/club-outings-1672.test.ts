@@ -122,6 +122,7 @@ function outingRow(overrides: Record<string, unknown> = {}) {
     status: "OPEN",
     closedAt: null,
     createdAt: new Date("2026-11-09T12:00:00Z"),
+    template: { definition: slipRow().definition },
     ...overrides,
   };
 }
@@ -309,10 +310,14 @@ describe("sending to the chosen families (#1672)", () => {
       member("member-4", "Avery", ["pat.four@example.test"]),
       member("member-5", "Quinn", ["pat.five@example.test"], "STAFF"),
     ]);
-    mocks.linkFindMany.mockResolvedValue([
+    const held = [
       { id: "old-2", rosterMemberId: "member-2", status: "USED", expiresAt: new Date("2026-11-20T00:00:00Z") },
       { id: "old-3", rosterMemberId: "member-3", status: "OPEN", expiresAt: new Date("2026-11-24T00:00:00Z") },
-    ]);
+    ];
+    // Like the real table: the per-member lookup under the lock only sees that member's links.
+    mocks.linkFindMany.mockImplementation(async ({ where }: { where: { rosterMemberId: string | { in: string[] } } }) => (
+      typeof where.rosterMemberId === "string" ? held.filter((link) => link.rosterMemberId === where.rosterMemberId) : held
+    ));
     const result = await send({ memberIds: ["member-1", "member-2", "member-3", "member-4", "member-5", "member-of-club-b"] });
     expect(Object.fromEntries(result.results.map((entry) => [entry.memberId, entry.outcome]))).toEqual({
       "member-1": "NO_PARENT_EMAIL",
@@ -339,7 +344,21 @@ describe("sending to the chosen families (#1672)", () => {
     ]);
     const result = await send({ memberIds: ["member-1", "member-2"], resend: true });
     expect(result.results.map((entry) => entry.outcome)).toEqual(["SENT", "SENT"]);
-    expect(mocks.linkUpdateMany).toHaveBeenCalledWith({ where: { id: { in: ["live-2"] }, status: "OPEN" }, data: { status: "REVOKED", revokedAt: now } });
+    // The old links are withdrawn inside the same transaction that makes the new one, under the member's row lock.
+    for (const memberId of ["member-1", "member-2"]) {
+      expect(mocks.linkUpdateMany).toHaveBeenCalledWith({ where: { outingId: "outing-1", rosterMemberId: memberId, status: "OPEN" }, data: { status: "REVOKED", revokedAt: now } });
+    }
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(2);
+    const order = mocks.linkUpdateMany.mock.invocationCallOrder[0];
+    expect(order).toBeLessThan(mocks.linkCreate.mock.invocationCallOrder[0]);
+  });
+
+  it("answers a double click as already sent: the second send finds the first one's link under the lock", async () => {
+    mocks.rosterFindMany.mockResolvedValue([member("member-1", "Riley", ["pat.one@example.test"])]);
+    mocks.linkFindMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: "first", status: "OPEN", expiresAt: new Date("2026-11-24T00:00:00Z") }]);
+    const result = await send({ memberIds: ["member-1"] });
+    expect(result.results[0].outcome).toBe("ALREADY_SENT");
+    expect(mocks.linkCreate).not.toHaveBeenCalled();
   });
 
   it("never resends to a member who already signed", async () => {
@@ -352,10 +371,12 @@ describe("sending to the chosen families (#1672)", () => {
 
   it("applies the route's per-recipient rate limit to each address", async () => {
     mocks.rosterFindMany.mockResolvedValue([member("member-1", "Riley", ["pat.one@example.test"])]);
-    const allowRecipient = vi.fn(async () => false);
+    const allowRecipient = vi.fn(async () => ({ allowed: false as const, reason: "ADDRESS" as const }));
     const result = await send({ memberIds: ["member-1"] }, { allowRecipient });
     expect(allowRecipient).toHaveBeenCalledWith("pat.one@example.test");
     expect(result.results[0].outcome).toBe("RATE_LIMITED");
+    const club = await send({ memberIds: ["member-1"] }, { allowRecipient: async () => ({ allowed: false as const, reason: "CLUB_DAY" as const }) });
+    expect(club.results[0].outcome).toBe("CLUB_LIMIT");
     expect(mocks.linkCreate).not.toHaveBeenCalled();
   });
 
@@ -381,10 +402,10 @@ describe("sending to the chosen families (#1672)", () => {
 describe("tracking and closing (#1672)", () => {
   it("lists each member once with signed, not yet or link expired, newest link first, and no email address", async () => {
     mocks.linkFindMany.mockResolvedValue([
-      { id: "l3", messageId: null, rosterMemberId: "m3", status: "OPEN", expiresAt: new Date("2026-11-24T00:00:00Z"), usedAt: null, createdAt: new Date("2026-11-09T00:00:00Z"), rosterMember: { person: { firstName: "Casey", lastName: "Sample" } }, submission: null },
-      { id: "l2b", messageId: null, rosterMemberId: "m2", status: "OPEN", expiresAt: new Date("2026-11-05T00:00:00Z"), usedAt: null, createdAt: new Date("2026-11-02T00:00:00Z"), rosterMember: { person: { firstName: "Jordan", lastName: "Sample" } }, submission: null },
-      { id: "l2a", messageId: null, rosterMemberId: "m2", status: "REVOKED", expiresAt: new Date("2026-11-04T00:00:00Z"), usedAt: null, createdAt: new Date("2026-11-01T00:00:00Z"), rosterMember: { person: { firstName: "Jordan", lastName: "Sample" } }, submission: null },
-      { id: "l1", messageId: null, rosterMemberId: "m1", status: "USED", expiresAt: new Date("2026-11-20T00:00:00Z"), usedAt: new Date("2026-11-08T00:00:00Z"), createdAt: new Date("2026-11-01T00:00:00Z"), rosterMember: { person: { firstName: "Riley", lastName: "Sample" } }, submission: { id: "sub-1" } },
+      { id: "l3", messageId: null, rosterMemberId: "m3", status: "OPEN", expiresAt: new Date("2026-11-24T00:00:00Z"), usedAt: null, revokedAt: null, createdAt: new Date("2026-11-09T00:00:00Z"), rosterMember: { person: { firstName: "Casey", lastName: "Sample" } }, submission: null },
+      { id: "l2b", messageId: null, rosterMemberId: "m2", status: "OPEN", expiresAt: new Date("2026-11-05T00:00:00Z"), usedAt: null, revokedAt: null, createdAt: new Date("2026-11-02T00:00:00Z"), rosterMember: { person: { firstName: "Jordan", lastName: "Sample" } }, submission: null },
+      { id: "l2a", messageId: null, rosterMemberId: "m2", status: "REVOKED", expiresAt: new Date("2026-11-04T00:00:00Z"), usedAt: null, revokedAt: null, createdAt: new Date("2026-11-01T00:00:00Z"), rosterMember: { person: { firstName: "Jordan", lastName: "Sample" } }, submission: null },
+      { id: "l1", messageId: null, rosterMemberId: "m1", status: "USED", expiresAt: new Date("2026-11-20T00:00:00Z"), usedAt: new Date("2026-11-08T00:00:00Z"), revokedAt: null, createdAt: new Date("2026-11-01T00:00:00Z"), rosterMember: { person: { firstName: "Riley", lastName: "Sample" } }, submission: { id: "sub-1" } },
     ]);
     const tracking = await getOutingTracking(director, "club-a", "outing-1", now);
     expect(tracking.members.map((row) => [row.name, row.state, row.submissionId])).toEqual([
@@ -395,6 +416,16 @@ describe("tracking and closing (#1672)", () => {
     expect(tracking.counts).toEqual({ SIGNED: 1, NOT_YET: 1, EXPIRED: 1 });
     expect(mocks.linkFindMany.mock.calls[0][0].where).toEqual({ outingId: "outing-1", organizationId: "club-a" });
     expect(JSON.stringify(tracking)).not.toMatch(/@|recipientEmail/);
+  });
+
+  it("shows a withdrawn link as withdrawn on the day it was withdrawn, not as expiring in the future", async () => {
+    mocks.linkFindMany.mockResolvedValue([
+      { id: "w", messageId: null, rosterMemberId: "m1", status: "REVOKED", expiresAt: new Date("2026-11-24T00:00:00Z"), usedAt: null, revokedAt: new Date("2026-11-09T00:00:00Z"), createdAt: new Date("2026-11-08T00:00:00Z"), rosterMember: { person: { firstName: "Riley", lastName: "Sample" } }, submission: null },
+    ]);
+    const tracking = await getOutingTracking(director, "club-a", "outing-1", now);
+    expect(tracking.members[0]).toMatchObject({ state: "EXPIRED", withdrawnAt: "2026-11-09T00:00:00.000Z" });
+    // The slip's own labels come with the tracking data, for the page and the print view.
+    expect(tracking.detailRows.map((row) => row.label)).toContain("On the date of");
   });
 
   it("closing withdraws every link still open and audits counts", async () => {
@@ -415,7 +446,15 @@ describe("tracking and closing (#1672)", () => {
 describe("the parent's private link (#1672)", () => {
   it("shows the outing's details read-only, the club's questions, and the slip's own sections unchanged", async () => {
     const view = await resolveClubFormLinkForFill(TOKEN, now);
-    expect(view.outing?.detailRows.map((row) => row.label)).toEqual(["Activity", "Date", "Leaving", "Back", "Transportation and who your child rides with", "Cost", "What to bring"]);
+    expect(view.outing?.detailRows.map((row) => row.label)).toEqual([
+      "I hereby give my permission for my child to participate in the pre-planned activity of",
+      "On the date of",
+      "Leaving",
+      "Back",
+      "I give my child permission to ride with",
+      "Cost",
+      "What to bring",
+    ]);
     expect(view.outing?.sectionId).toBe("sec_permission");
     const keys = view.form.definition.sections.flatMap((section) => section.fields.map((field) => field.key));
     // The parent has no field for the three details: they cannot type them.

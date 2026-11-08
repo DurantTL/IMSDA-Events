@@ -14,12 +14,12 @@ import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 /** The director's Forms page tables (#1323), shared by the current lists and each past club year. */
 
-function formatDate(value: string | null) {
+export function formatDate(value: string | null) {
   if (!value) return "";
   return formatInConferenceTime(value, { month: "short", day: "numeric", year: "numeric" });
 }
 
-const emailDeliveryLabel = {
+export const emailDeliveryLabel = {
   QUEUED: "Sending",
   SENT: "Sent",
   DELIVERED: "Delivered",

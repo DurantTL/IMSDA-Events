@@ -9,7 +9,6 @@ import { OutingTrackingTable } from "@/components/club-outing-tables";
 import { clubLeaderViewerFromAccess } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, isClubFormsRole } from "@/modules/club-forms/domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
-import { outingDetailRows } from "@/modules/club-forms/outing-domain";
 import { getOutingTracking, listOutingRosterChoices } from "@/modules/club-forms/outings";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 
@@ -31,7 +30,7 @@ export default async function OutingPage({ params }: { params: Promise<{ organiz
   if (!tracking) notFound();
   const open = tracking.status === "OPEN";
   const choices = open ? await listOutingRosterChoices(viewer, organizationId, outingId) : [];
-  const rows = outingDetailRows(tracking.details);
+  const rows = tracking.detailRows;
 
   return (
     <>

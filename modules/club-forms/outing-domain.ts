@@ -15,6 +15,8 @@ import type { RegistrationFormDefinition, RegistrationFormField } from "@/module
 export const OUTING_TEMPLATE_KEY = "off_premises_permission_slip";
 export const OUTING_MAX_QUESTIONS = 5;
 export const OUTING_MAX_SEND = 100;
+/** Mirrors `OUTING_SLIPS_PER_CLUB_DAY` in the rate limiter, for the words the director reads. */
+export const OUTING_SLIPS_PER_DAY = 400;
 /** The slip section whose three typed fields the outing presets. */
 export const OUTING_PERMISSION_SECTION_ID = "sec_permission";
 export const OUTING_QUESTIONS_SECTION_ID = "sec_outing_questions";
@@ -85,7 +87,7 @@ export function outingQuestionFields(questions: readonly OutingQuestion[]): Regi
 
 /** Words that mean a medical, health or insurance detail, on top of the club registration form's own rule (#408). */
 const OUTING_MEDICAL_PATTERN =
-  /\b(?:allerg\w*|diet\w*|condition\w*|diagnos\w*|asthma\w*|inhaler\w*|epipen\w*|seizure\w*|epilep\w*|diabet\w*|injur\w*|surger\w*|prescri\w*|doctor\w*|physician\w*|immuni[sz]\w*|vaccin\w*|illness\w*|disease\w*|sick\w*|symptom\w*|therap\w*|treatment\w*|blood\s*type|mental)\b/i;
+  /\b(?:allerg\w*|diet\w*|food|eat|eating|pills?|glasses|wheelchair|hospital\w*|nurse\w*|weight|adhd|autis\w*|anxi\w*|depress\w*|disorder\w*|(?:medical|physical|chronic|existing|pre-?existing|any)\s+conditions?|diagnos\w*|asthma\w*|inhaler\w*|epipen\w*|seizure\w*|epilep\w*|diabet\w*|injur\w*|surger\w*|prescri\w*|doctor\w*|physician\w*|immuni[sz]\w*|vaccin\w*|illness\w*|disease\w*|sick\w*|symptom\w*|therap\w*|treatment\w*|blood\s*type|mental)\b/i;
 const OUTING_BIRTH_PATTERN = /\b(?:born|how\s+old|age)\b/i;
 
 /** Why a question can't be asked, or null. The wording and every choice count; the type does not matter. */
@@ -196,19 +198,31 @@ export function outingDateLabel(details: Pick<OutingDetails, "startDate" | "endD
 
 export type OutingDetailRow = { label: string; value: string };
 
-/** The details as read-only label and value rows, for the parent's page, the email and the print view. Empty ones are left out. */
-export function outingDetailRows(details: OutingDetails): OutingDetailRow[] {
-  const rows: OutingDetailRow[] = [
-    { label: "Activity", value: details.activity },
-    { label: details.endDate && details.endDate !== details.startDate ? "Dates" : "Date", value: outingDateLabel(details) },
+/** The slip's own labels for its three typed fields, read from the template's definition (never written here). */
+export function outingPresetLabels(definition: RegistrationFormDefinition): Partial<Record<keyof typeof OUTING_PRESET_KEYS, string>> {
+  const labels = new Map(definition.sections.flatMap((section) => section.fields.map((field) => [field.key, field.label] as const)));
+  const pick = (key: string) => labels.get(key);
+  return { activity: pick(OUTING_PRESET_KEYS.activity), date: pick(OUTING_PRESET_KEYS.date), rideWith: pick(OUTING_PRESET_KEYS.rideWith) };
+}
+
+/**
+ * The details as read-only label and value rows, for the parent's page, the director's pages and the print view. The
+ * three the slip already asks use the template's own labels (a template that no longer has one leaves that row out);
+ * the extra rows (times, cost, what to bring, the note) have their own. Empty ones are left out.
+ */
+export function outingDetailRows(details: OutingDetails, definition: RegistrationFormDefinition): OutingDetailRow[] {
+  const labels = outingPresetLabels(definition);
+  const rows: Array<{ label: string | undefined; value: string }> = [
+    { label: labels.activity, value: details.activity },
+    { label: labels.date, value: outingDateLabel(details) },
     { label: "Leaving", value: outingTimeLabel(details.departureTime) },
     { label: "Back", value: outingTimeLabel(details.returnTime) },
-    { label: "Transportation and who your child rides with", value: details.transportation },
+    { label: labels.rideWith, value: details.transportation },
     { label: "Cost", value: details.cost },
     { label: "What to bring", value: details.whatToBring },
     { label: "Note from the club", value: details.note },
   ];
-  return rows.filter((row) => row.value !== "");
+  return rows.flatMap((row) => (row.label && row.value !== "" ? [{ label: row.label, value: row.value }] : []));
 }
 
 export type OutingLinkState = "SIGNED" | "NOT_YET" | "EXPIRED";
@@ -222,7 +236,7 @@ export function outingLinkState(link: { status: "OPEN" | "USED" | "REVOKED"; exp
 
 export const outingLinkStateLabel: Record<OutingLinkState, string> = { SIGNED: "Signed", NOT_YET: "Not yet", EXPIRED: "Link expired" };
 
-export type OutingSendOutcome = "SENT" | "ALREADY_SIGNED" | "ALREADY_SENT" | "NO_PARENT_EMAIL" | "NOT_ELIGIBLE" | "RATE_LIMITED" | "NOT_FOUND" | "FAILED";
+export type OutingSendOutcome = "SENT" | "ALREADY_SIGNED" | "ALREADY_SENT" | "NO_PARENT_EMAIL" | "NOT_ELIGIBLE" | "RATE_LIMITED" | "CLUB_LIMIT" | "NOT_FOUND" | "FAILED";
 
 export const outingSendOutcomeText: Record<OutingSendOutcome, string> = {
   SENT: "Sent",
@@ -230,7 +244,8 @@ export const outingSendOutcomeText: Record<OutingSendOutcome, string> = {
   ALREADY_SENT: "Already sent: use Resend to send again",
   NO_PARENT_EMAIL: "No parent email on the roster",
   NOT_ELIGIBLE: "Not a youth member",
-  RATE_LIMITED: "Too many links to this address just now",
+  RATE_LIMITED: "This parent's address already got 3 slips in the last hour: try again later",
+  CLUB_LIMIT: `Your club's daily limit of ${OUTING_SLIPS_PER_DAY} slips is used up: try again tomorrow`,
   NOT_FOUND: "Not on the roster",
   FAILED: "Could not be sent",
 };

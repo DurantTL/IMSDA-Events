@@ -6,14 +6,16 @@ import { requireClubLeaderViewer } from "@/modules/club-forms/access";
 import { clubFormApiError, readClubFormJson } from "@/modules/club-forms/api-errors";
 import { sendOuting } from "@/modules/club-forms/outings";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
-import { checkClubFormLinkCreateRateLimit } from "@/modules/rate-limit/service";
+import { applyRateLimitHeaders } from "@/modules/rate-limit/domain";
+import { checkClubFormOutingRecipientRateLimit, checkClubFormOutingSendRateLimit } from "@/modules/rate-limit/service";
 
 type RouteContext = { params: Promise<{ organizationId: string; outingId: string }> };
 
 /**
  * Sends an outing's slip to the chosen members' parents (#1672), or sends it again (`resend`). Each family gets its own
- * single-use private link in its own email, through the same link flow as any club form link; the per-recipient rate
- * limit applies to every address. Emails are delivered after the response; the outbox sweep retries a failure.
+ * single-use private link in its own email, through the same link flow as any club form link. The send is rate limited
+ * once as an action, and each family by its address (3 an hour) and the club (400 slips a day), not by the one-at-a-time
+ * limits of a typed link. Emails are delivered after the response; the outbox sweep retries a failure.
  */
 async function postHandler(request: Request, context: RouteContext) {
   const originError = rejectCrossOriginRequest(request);
@@ -22,8 +24,16 @@ async function postHandler(request: Request, context: RouteContext) {
     const { organizationId, outingId } = await context.params;
     const viewer = await requireClubLeaderViewer(organizationId);
     const actorKey = viewer.actor.kind === "ATTENDEE" ? viewer.actor.accountId : viewer.actor.userId;
+    // One check for the send itself; each family is then charged to its own address and to the club's daily allowance.
+    const sendLimit = await checkClubFormOutingSendRateLimit(request, actorKey, organizationId);
+    if (!sendLimit.allowed) {
+      return applyRateLimitHeaders(
+        Response.json({ error: "RATE_LIMITED", message: "You have sent slips too many times this hour or today. Wait a while, then send the rest." }, { status: 429 }),
+        sendLimit,
+      );
+    }
     const { results, messageIds, sent } = await sendOuting(viewer, organizationId, outingId, await readClubFormJson(request), {
-      allowRecipient: async (email) => (await checkClubFormLinkCreateRateLimit(request, actorKey, organizationId, email)).allowed,
+      allowRecipient: (email) => checkClubFormOutingRecipientRateLimit(organizationId, email),
     });
     if (messageIds.length > 0) {
       after(async () => {

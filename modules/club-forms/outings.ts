@@ -11,6 +11,7 @@ import {
   OUTING_MAX_SEND,
   OUTING_TEMPLATE_KEY,
   outingDateLabel,
+  outingDetailRows,
   outingLinkState,
   parseOutingInput,
   readStoredOuting,
@@ -19,6 +20,8 @@ import {
   type OutingSendOutcome,
 } from "@/modules/club-forms/outing-domain";
 import { createClubFormLink, leaderOnly } from "@/modules/club-forms/links";
+import { registrationFormDefinitionSchema } from "@/modules/forms/definition";
+import type { ClubFormOutingRecipientLimit } from "@/modules/rate-limit/service";
 
 /**
  * Outing permission slips (#1672): a club's director sets the details of one outing on the conference's Off-Premises
@@ -80,6 +83,7 @@ export async function createOuting(viewer: ClubFormsViewer, organizationId: stri
 
 const outingSelect = {
   id: true, organizationId: true, clubYear: true, activity: true, startDate: true, details: true, questions: true, status: true, closedAt: true, createdAt: true,
+  template: { select: { definition: true } },
 } as const;
 
 async function findOuting(organizationId: string, outingId: string) {
@@ -126,6 +130,7 @@ export async function listOutings(viewer: ClubFormsViewer, organizationId: strin
     return [{
       id: row.id,
       activity: row.activity,
+      startDate: row.startDate,
       dateLabel: outingDateLabel(outing.details),
       clubYear: row.clubYear,
       status: row.status,
@@ -146,7 +151,7 @@ export async function getOutingTracking(viewer: ClubFormsViewer, organizationId:
     where: { outingId: row.id, organizationId },
     orderBy: { createdAt: "desc" },
     select: {
-      id: true, messageId: true, rosterMemberId: true, status: true, expiresAt: true, usedAt: true, createdAt: true,
+      id: true, messageId: true, rosterMemberId: true, status: true, expiresAt: true, usedAt: true, revokedAt: true, createdAt: true,
       rosterMember: { select: { person: { select: { firstName: true, lastName: true } } } },
       submission: { select: { id: true } },
     },
@@ -164,6 +169,8 @@ export async function getOutingTracking(viewer: ClubFormsViewer, organizationId:
       state,
       sentAt: link.createdAt.toISOString(),
       expiresAt: link.expiresAt.toISOString(),
+      /** A link the director or a close withdrew, or whose email failed: "Withdrawn", not "Expired". */
+      withdrawnAt: link.status === "REVOKED" ? (link.revokedAt ?? link.createdAt).toISOString() : null,
       signedAt: link.usedAt?.toISOString() ?? null,
       submissionId: link.submission?.id ?? null,
       delivery: link.messageId ? delivery.get(link.messageId) ?? "UNKNOWN" : "UNKNOWN",
@@ -176,6 +183,8 @@ export async function getOutingTracking(viewer: ClubFormsViewer, organizationId:
     status: row.status,
     clubYear: row.clubYear,
     details: outing.details,
+    /** The details as read-only rows, with the slip's own labels for activity, date and ride-with. */
+    detailRows: outingDetailRows(outing.details, registrationFormDefinitionSchema.parse(row.template.definition)),
     questions: outing.questions,
     members,
     counts,
@@ -230,7 +239,7 @@ export async function sendOuting(
   organizationId: string,
   outingId: string,
   rawInput: unknown,
-  options: { allowRecipient?: (email: string) => Promise<boolean> } = {},
+  options: { allowRecipient?: (email: string) => Promise<ClubFormOutingRecipientLimit> } = {},
   now = new Date(),
 ) {
   leaderOnly(viewer, organizationId);
@@ -282,8 +291,9 @@ export async function sendOuting(
       done("NO_PARENT_EMAIL");
       continue;
     }
-    if (options.allowRecipient && !(await options.allowRecipient(email))) {
-      done("RATE_LIMITED");
+    const limit = options.allowRecipient ? await options.allowRecipient(email) : null;
+    if (limit && !limit.allowed) {
+      done(limit.reason === "CLUB_DAY" ? "CLUB_LIMIT" : "RATE_LIMITED");
       continue;
     }
     try {
@@ -293,15 +303,17 @@ export async function sendOuting(
         recipientEmail: email,
         rosterMemberId: memberId,
         outingId: row.id,
+        resend: input.resend,
         ...(input.expiresInDays ? { expiresInDays: input.expiresInDays } : {}),
       }, now);
       messageIds.push(created.messageId);
-      // A resend replaces the link still open: only the newest one works.
-      if (live.length > 0) {
-        await prisma.clubFormLink.updateMany({ where: { id: { in: live.map((link) => link.id) }, status: "OPEN" }, data: { status: "REVOKED", revokedAt: now } });
-      }
       done("SENT");
     } catch (error) {
+      // Another send for this member got in first (a double click): the link already made stands.
+      if (error instanceof ClubFormError && (error.code === "OUTING_ALREADY_SENT" || error.code === "OUTING_ALREADY_SIGNED")) {
+        done(error.code === "OUTING_ALREADY_SIGNED" ? "ALREADY_SIGNED" : "ALREADY_SENT");
+        continue;
+      }
       // A closed outing, a switched-off slip or email not set up stops the whole send; any other problem is that member's alone.
       if (error instanceof ClubFormError && ["OUTING_CLOSED", "OUTING_NOT_FOUND", "TEMPLATE_NOT_FOUND", "EMAIL_NOT_CONFIGURED", "FORM_UNAVAILABLE", "FORBIDDEN"].includes(error.code)) throw error;
       done("FAILED");
