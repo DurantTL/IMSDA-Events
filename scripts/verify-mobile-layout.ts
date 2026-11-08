@@ -329,6 +329,8 @@ const pages: PageSpec[] = [
   staff("finance-square-payments", "/finance/square-payments"),
   // More money tools (#1575): the other finance pages as grouped cards. The Refunds view is the cancellation queue, audited below as cancellation-staff-queue.
   { ...staff("finance-tools", "/finance/tools"), expectText: /Invoices and churches/ },
+  // Review queues (#1574): the registration review pages as grouped cards.
+  { ...staff("people-review-queues", "/people/review-queues"), expectText: /People and families/ },
   staff("lodging", "/more/lodging"),
   staff("lodging-requests", "/more/lodging/requests"),
   staff("lodging-assignments", "/more/lodging/assignments"),

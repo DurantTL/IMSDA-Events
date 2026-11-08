@@ -182,11 +182,11 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/more/reports/clubs/team-form/level", "/more/team-results", "components/team-results-workspace.tsx"],
   ["/more/reports/packets", "/more/reports/printouts", "modules/reporting/printouts-model.ts"],
   ["/more/team-results", "/more/clubs", "app/(workspace)/more/clubs/page.tsx"],
-  ["/people/directory-review", "/people", "components/people-workspace.tsx"],
-  ["/people/duplicates", "/people", "components/people-workspace.tsx"],
-  ["/people/pending-teams", "/people", "components/people-workspace.tsx"],
-  ["/people/responsible-adults", "/people", "components/people-workspace.tsx"],
-  ["/people/staff-invitations", "/people", "components/people-workspace.tsx"],
+  ["/people/directory-review", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
+  ["/people/duplicates", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
+  ["/people/pending-teams", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
+  ["/people/responsible-adults", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
+  ["/people/staff-invitations", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
   ["/people/staff-invitations/approvals", "/people/staff-invitations", "app/(workspace)/people/staff-invitations/page.tsx"],
 ];
 
@@ -209,6 +209,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
   rows.push({ route: "/home", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/home", label: "Home: Needs you", group: "Home", note: "New in #1568. The Home area's first tab and the phone bar's Home slot; every staff member, and it only links to the pages that do the work." });
   rows.push({ route: "/home/coming-up", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/home/coming-up", label: "Home: Coming up", group: "Home", note: "New in #1568. The Home area's second tab: the upcoming events the person can open." });
   rows.push({ route: "/finance/tools", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/finance/tools", label: "More money tools", group: "Money", note: "New in #1575. Opened from the Money tab's More money tools view; a card opens each money page the person can reach for this event." });
+  rows.push({ route: "/people/review-queues", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/people/review-queues", label: "Review queues", group: "Registrations", note: "New in #1574. Opened from the Registrations tab's Review queues view; a card opens each review page the person can reach for this event." });
   rows.push({ route: "/more/reports/printouts", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/more/reports/printouts", label: "Printouts", group: "Reports", note: "New in #1583. Opened from the Reports tab's Printouts view; a card opens each packet, book or form the person can print for this event." });
   rows.push({ route: "/help", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Help & learning", group: "Help", note: "New in #1077. Opened from the sidebar's pinned Help & learning link and from search; every staff member, including staff with no event." });
   rows.push({ route: "/help/glossary", kind: "reached", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Glossary", group: "/help", reachedFrom: { parent: "/help", linkedIn: "app/(workspace)/help/page.tsx" } });

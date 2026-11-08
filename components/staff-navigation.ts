@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ClipboardCheck,
   ArrowRightLeft,
   Award,
   CheckCircle2,
@@ -184,6 +185,8 @@ export const staffPageTitles = {
   attendanceReconciliation: "Attendance reconciliation",
   cancellationPolicy: "Cancellation rules",
   cancellationRequests: "Cancellation requests",
+  // The Registrations tab's grouped page of review queues (#1574).
+  reviewQueues: "Review queues",
 } as const;
 
 /** Help & learning (#1077): not a nav item (the sidebar draws its own link), so it is not in `staffPageTitles`. */
@@ -231,6 +234,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
   ["/more/ledger-health", "prefix", staffPageTitles.ledgerCheck],
   ["/finance/tools", "prefix", staffPageTitles.moreMoneyTools],
+  ["/people/review-queues", "prefix", staffPageTitles.reviewQueues],
   // Each money page names itself (#1575), like the Ledger check, instead of the Payments page it used to sit under.
   // The cancellation request queue is the Money tab's Refunds view, so its heading says Refunds.
   ["/finance/invoices", "prefix", staffPageTitles.invoices],
@@ -409,6 +413,7 @@ export const navigation: readonly NavigationItem[] = [
   // Not sidebar items (#964): More cards and parent-page links reach them, and the parent lights up while one is open.
   { href: "/people/attendees", label: staffPageTitles.attendeeList, icon: ListChecks, requiredPermission: "VIEW_SENSITIVE_DATA", sidebarParent: "/people" },
   { href: "/imports", label: staffPageTitles.imports, icon: FileUp, requiredPermission: "MANAGE_IMPORTS", sidebarParent: "/people" },
+  { href: "/people/review-queues", label: staffPageTitles.reviewQueues, icon: ClipboardCheck, requiredAnyPermissions: ["VIEW_SENSITIVE_DATA", "MANAGE_REGISTRATION"], sidebarParent: "/people" },
   { href: "/staff", label: staffPageTitles.team, icon: UserCog, requiredPermission: "MANAGE_STAFF", sidebarParent: "/more" },
   { href: "/more/promo-codes", label: staffPageTitles.promoCodes, icon: TicketPercent, requiredPermission: "MANAGE_FINANCE", sidebarParent: "/finance" },
   { href: "/finance/tools", label: staffPageTitles.moreMoneyTools, icon: Wrench, requiredPermission: "MANAGE_FINANCE", sidebarParent: "/finance" },

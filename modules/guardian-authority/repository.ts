@@ -165,7 +165,7 @@ export async function findActiveDeclaredAuthority(
  * ACTIVE declarations and the open conflicts. Club and group registrations are left out: their rosters
  * come from the club or the group contact, with their own adults and youth, not from this form.
  */
-async function loadEventFacts(client: Client, eventId: string): Promise<EventFacts> {
+async function loadEventFacts(client: Client, eventId: string, withNames = true): Promise<EventFacts> {
   const event = await client.event.findUnique({
     where: { id: eventId },
     select: { id: true, name: true, startsAt: true, timezone: true, ageOfMajority: true },
@@ -187,7 +187,7 @@ async function loadEventFacts(client: Client, eventId: string): Promise<EventFac
       registrationId: true,
       profileSnapshot: true,
       formResponses: true,
-      person: { select: { firstName: true, lastName: true } },
+      ...(withNames ? { person: { select: { firstName: true, lastName: true } } } : {}),
       registration: { select: { confirmationCode: true, accountHolderPersonId: true, publicFormSubmission: { select: { formVersionId: true } } } },
     },
     orderBy: [{ registrationId: "asc" }, { position: "asc" }, { id: "asc" }],
@@ -208,7 +208,7 @@ async function loadEventFacts(client: Client, eventId: string): Promise<EventFac
       registrationId: attendee.registrationId,
       confirmationCode: attendee.registration.confirmationCode,
       accountHolderPersonId: attendee.registration.accountHolderPersonId,
-      name: personDisplayName(attendee),
+      name: withNames && attendee.person ? personDisplayName({ ...attendee, person: attendee.person }) : "",
       status: status.status,
       age: status.age,
     };
@@ -683,6 +683,14 @@ function buildReview(facts: EventFacts): GuardianReview {
 /** The staff review for one event. */
 export async function getGuardianReview(eventId: string, client: Client = getPrisma()): Promise<GuardianReview> {
   return buildReview(await loadEventFacts(client, eventId));
+}
+
+/**
+ * How many people the staff review lists as needing attention: the same number as `getGuardianReview(eventId).items.length`
+ * (it runs the same review), but it does not read the people's names. For the Review queues card.
+ */
+export async function countGuardianReviewItems(eventId: string, client: Client = getPrisma()): Promise<number> {
+  return buildReview(await loadEventFacts(client, eventId, false)).items.length;
 }
 
 /**

@@ -867,16 +867,10 @@ export function PeopleWorkspace({
             {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
             <li><a href={`/people/attendees?event=${encodeURIComponent(eventId)}`}><ListChecks aria-hidden="true" size={16} /> Attendee list</a></li>
             {canImport && <li><a href={`/imports?event=${encodeURIComponent(eventId)}`}><FileUp aria-hidden="true" size={16} /> Imports</a></li>}
-            <li><a href={`/people/duplicates?event=${encodeURIComponent(eventId)}`}><CopyCheck aria-hidden="true" size={16} /> Find duplicates</a></li>
-            {/* The cross-event identity queue lives beside the event's own duplicate finder, not in the sidebar; the page checks the role again. */}
+            {/* Find duplicates, Directory review, Teams waiting for a club, Staff invitations and Responsible adults are cards on one page now (#1574). */}
+            <li><a href={`/people/review-queues?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Review queues</a></li>
+            {/* The cross-event identity queue lives beside the event's own review queues, not in the sidebar; the page checks the role again. */}
             {canReviewPeopleMatches && <li><a href="/people/matches"><CopyCheck aria-hidden="true" size={16} /> Possible duplicate people (all events)</a></li>}
-            {/* Same permission the review page itself requires (MANAGE_REGISTRATION). */}
-            {canEdit && <li><a href={`/people/directory-review?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Directory review</a></li>}
-            {/* Teams registered through the general registration link that wait for a club (#931); the same permission. */}
-            {canEdit && <li><a href={`/people/pending-teams?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Teams waiting for a club</a></li>}
-            {/* Personal staff, pastor and volunteer links (#804); the same permission. */}
-            {canEdit && <li><a href={`/people/staff-invitations?event=${encodeURIComponent(eventId)}`}><MailPlus aria-hidden="true" size={16} /> Staff invitations</a></li>}
-            <li><a href={`/people/responsible-adults?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Responsible adults</a></li>
             <li><ExportLink href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink></li>
             {canEmail && <li><button disabled={selectedIds.size === 0} onClick={() => setEmailingSelection(true)} title={selectedIds.size === 0 ? "Tick registrations in the list first" : undefined} type="button"><MailPlus aria-hidden="true" size={16} /> Email selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</button></li>}
           </ActionsMenu>
