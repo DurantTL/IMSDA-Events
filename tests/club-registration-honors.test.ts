@@ -165,6 +165,20 @@ describe("the honors step of a club registration (#618)", () => {
     ]);
   });
 
+  it("gives a child added for the event only no class seat, and a young guest saved without a choice keeps one (#1666)", () => {
+    const people = pickingAttendees({
+      roster: [],
+      selectedMemberIds: [],
+      guests: [
+        { id: "guest-1", firstName: "Robin", lastName: "Visitor", age: 4, guestType: "UNDERAGE" },
+        { id: "guest-2", firstName: "Kit", lastName: "Visitor", age: 4 },
+      ],
+    });
+    expect(people.map((person) => [person.clientId, person.attendeeType, person.consumesSeat])).toEqual([
+      ["guest:guest-1", "UNDERAGE", false], ["guest:guest-2", "YOUTH", true],
+    ]);
+  });
+
   it("uses the shared enrollment rules to catch conflicts and minimum ages before saving", async () => {
     database();
     const { offerings: all } = await getRegistrationHonorsCatalog("club-1", "event-1");

@@ -28,9 +28,12 @@ const GUEST_PREFIX = "guest:";
  * Someone going who isn't on the roster (#388), e.g. a visiting parent. For
  * this event only: never added to the roster or kept for another event.
  */
-export type ClubGuest = { id: string; firstName: string; lastName: string; age: number; email: string | null };
+export type ClubGuest = { id: string; firstName: string; lastName: string; age: number; email: string | null; guestType?: ClubGuestType | undefined };
 
 export const MAX_CLUB_GUESTS = 25;
+
+export const GUEST_TYPES = ["YOUTH", "ADULT", "UNDERAGE"] as const;
+export type ClubGuestType = (typeof GUEST_TYPES)[number];
 
 export const clubGuestSchema = z.object({
   id: z.string().regex(/^[a-z0-9]{6,24}$/, "Refresh the page and add the person again."),
@@ -39,7 +42,19 @@ export const clubGuestSchema = z.object({
   age: z.number().int("Enter the age in whole years.").min(0, "Enter an age from 0 to 120.").max(120, "Enter an age from 0 to 120."),
   email: z.string().trim().toLowerCase().email(EMAIL_FIELD_MESSAGE).max(254).nullable()
     .or(z.literal("").transform(() => null)),
-}).strict();
+  /**
+   * What the director chose for someone added for the event only (#1666): Pathfinder (YOUTH), Adult, or Child, not a
+   * Pathfinder (UNDERAGE). Left out on a guest saved before the choice existed, who keeps the type their age gives.
+   */
+  guestType: z.enum(GUEST_TYPES).optional(),
+}).strict().superRefine((guest, context) => {
+  if (guest.guestType === "ADULT" && guest.age < 18) {
+    context.addIssue({ code: "custom", path: ["guestType"], message: "An adult must be 18 or older. Choose Child or Pathfinder for someone younger." });
+  }
+  if ((guest.guestType === "YOUTH" || guest.guestType === "UNDERAGE") && guest.age >= 18) {
+    context.addIssue({ code: "custom", path: ["guestType"], message: "Someone 18 or older is registered as an Adult." });
+  }
+});
 
 /**
  * Ages typed in for roster people whose roster entry has no birth date (#639),
@@ -145,6 +160,40 @@ export function clubExistingAttendeeClientId(attendeeId: string) {
 /** Adults among guests are background-checked like everyone else. */
 export function guestIsAdult(guest: Pick<ClubGuest, "age">) {
   return guest.age >= 18;
+}
+
+type GuestTypeInput = Pick<ClubGuest, "age"> & { guestType?: ClubGuestType | undefined };
+
+/**
+ * The type an extra person is registered as (#1666): the director's choice, else the type their age gives, so a guest
+ * saved before the choice existed is unchanged.
+ */
+export function guestAttendeeType(guest: GuestTypeInput): ClubGuestType {
+  if (guest.guestType) return guest.guestType;
+  return guestIsAdult(guest) ? "ADULT" : "YOUTH";
+}
+
+/** A child who is not a Pathfinder: counted on the club's page, takes no class seat, not in the Pathfinder totals. */
+export function guestIsChild(guest: GuestTypeInput) {
+  return guestAttendeeType(guest) === "UNDERAGE";
+}
+
+export const CHILD_GUEST_NO_ROLE_MESSAGE = "This form has no Child role, so a child who isn't a Pathfinder can't be added. Choose Pathfinder or Adult.";
+
+/** Whether the form's role question has a Child (or Underage) option, so a child can be shown as Child and kept out of the Pathfinder counts. */
+export function formOffersChildRole(definition: RegistrationFormDefinition) {
+  return Object.keys(guestOwnedRole(definition, { age: 0, guestType: "UNDERAGE" })).length > 0;
+}
+
+export const CHILD_GUEST_TEAM_MESSAGE = "Teams register team members and coaches only, so a child who isn't a Pathfinder can't be added to a team.";
+
+/**
+ * The roster-role answer a child is registered with: the form's "Child" option (or "Underage"), so the club packet and
+ * check-in book show "Child" and the child isn't counted as a Pathfinder. Empty for anyone else, or a form with no such option.
+ */
+export function guestOwnedRole(definition: RegistrationFormDefinition, guest: GuestTypeInput) {
+  if (!guestIsChild(guest)) return {};
+  return rosterRolePrefill(definition, { firstName: "", lastName: "", ageOnEventDate: guest.age, gender: null, attendeeType: "UNDERAGE" });
 }
 
 function attendeeFields(definition: RegistrationFormDefinition) {
