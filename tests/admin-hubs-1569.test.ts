@@ -63,7 +63,7 @@ describe("Admin hub model (#1569)", () => {
     expect(statuses["New club applications"]).toBe("None waiting");
     expect(statuses["Club summary"]).toBe("None late");
     expect(statuses["Club member transfers"]).toBe("None open");
-    expect(buildHubView("catalogs", system, allMetrics("catalogs", system, 0)).groups.flatMap((group) => group.cards).find((card) => card.title === "System readiness")?.status).toEqual({ tone: "ok", text: "All ready" });
+    expect(buildHubView("catalogs", system, allMetrics("catalogs", system, 0)).groups.flatMap((group) => group.cards).find((card) => card.title === "System readiness")?.status).toBeNull();
   });
 
   it("keeps the unit with each count, singular and plural, and keeps distinct counts distinct", () => {
@@ -94,7 +94,12 @@ describe("Admin hub model (#1569)", () => {
     expect(action({ applicationsWaiting: 2 })).toEqual({ href: "/admin/clubs/applications", label: "Review applications", primary: true });
     expect(action({ applicationsWaiting: 0 })).toMatchObject({ href: "/admin/clubs/applications", primary: false });
     expect(action({ applicationsWaiting: null })).toMatchObject({ primary: false });
-    expect(buildHubView("catalogs", system, { ...allMetrics("catalogs", system, 1), readinessAttention: 0 }).action).toMatchObject({ href: "/admin/readiness", primary: false });
+    const readiness = (values: MetricValues) => buildHubView("catalogs", system, { ...allMetrics("catalogs", system, 0), ...values }).action;
+    expect(readiness({})).toMatchObject({ href: "/admin/readiness", primary: false });
+    expect(readiness({ readinessAttention: 1 })).toMatchObject({ primary: true });
+    // Something that could not be read needs a look too.
+    expect(readiness({ readinessUnknown: 2 })).toMatchObject({ primary: true });
+    expect(readiness({ readinessAttention: null })).toMatchObject({ primary: true });
     // A create action has no count, so it stays the one main button.
     expect(buildHubView("events", system, allMetrics("events", system, 0)).action?.primary).toBe(true);
     expect(neededMetrics("clubs", system)).toContain("applicationsWaiting");
@@ -106,9 +111,24 @@ describe("Admin hub model (#1569)", () => {
     const byTitle = Object.fromEntries(clubs.groups.flatMap((group) => group.cards).map((card) => [card.title, card.status?.text ?? null]));
     expect(clubs.stats.map((stat) => stat.key)).toContain("openTransfers");
     expect(byTitle["Club member transfers"] ?? null).toBeNull();
-    // Without a tile (Club administration has none) the chip stays.
-    const home = buildHubView("club-administration", system, { applicationsWaiting: 2, openTransfers: 1, lateRecords: 0, clubs: 3 });
-    expect(home.groups.flatMap((group) => group.cards).find((card) => card.href === "/admin/clubs/applications")?.status?.text).toBe("2 waiting");
+    // Without a tile or page figure (Club administration has none of its own here) the chip stays.
+    const values = { applicationsWaiting: 2, openTransfers: 1, lateRecords: 0, clubs: 3 };
+    const chip = (view: ReturnType<typeof buildHubView>, href: string) => view.groups.flatMap((group) => group.cards).find((card) => card.href === href)?.status?.text ?? null;
+    expect(chip(buildHubView("club-administration", system, values), "/admin/clubs/applications")).toBe("2 waiting");
+    // Figures the page draws itself count as shown (#1733).
+    const withFigures = buildHubView("club-administration", system, values, ["clubs", "applicationsWaiting"]);
+    expect(chip(withFigures, "/admin/clubs/applications")).toBeNull();
+    expect(chip(withFigures, "/admin/organizations")).toBeNull();
+    expect(chip(withFigures, "/admin/clubs/transfers")).toBe("1 open");
+  });
+
+  it("does not repeat the readiness tile on the System health card, and keeps what the tile lacks (#1733)", () => {
+    const readiness = (values: MetricValues) => cardsOf("catalogs", system, { ...allMetrics("catalogs", system, 0), ...values }).find((card) => card.title === "System readiness")?.status ?? null;
+    expect(readiness({ readinessAttention: 3 })).toBeNull();
+    expect(readiness({ readinessUnknown: 2 })).toBeNull();
+    expect(readiness({ readinessAttention: null, readinessUnknown: null })).toBeNull();
+    expect(readiness({})).toBeNull();
+    expect(readiness({ readinessToConfirm: 2 })).toEqual({ tone: "soon", text: "2 to confirm" });
   });
 
   it("never turns an unread or unreadable value into a healthy zero or All ready", () => {
@@ -124,7 +144,8 @@ describe("Admin hub model (#1569)", () => {
     }
     // Readiness: one unreadable half is enough to stop "All ready".
     const partial = cardsOf("catalogs", system, { ...allMetrics("catalogs", system, 0), readinessToConfirm: null }).find((card) => card.title === "System readiness");
-    expect(partial?.status?.text).toBe("Unavailable");
+    // The tile already carries the attention and unreadable numbers, so the card says nothing rather than "All ready" (#1733).
+    expect(partial?.status ?? null).toBeNull();
     expect(cardsOf("catalogs", system, { ...allMetrics("catalogs", system, 0), readinessToConfirm: 2 }).find((card) => card.title === "System readiness")?.status).toEqual({ tone: "soon", text: "2 to confirm" });
   });
 
@@ -262,9 +283,8 @@ describe("Admin hub card layout (#1569)", () => {
   it("never says all ready, or zero needing attention, while a readiness check could not be read", () => {
     const base = allMetrics("catalogs", system, 0);
     const card = (values: MetricValues) => cardsOf("catalogs", system, values).find((entry) => entry.title === "System readiness")?.status;
-    expect(card({ ...base, readinessUnknown: 2 })).toEqual({ tone: "soon", text: "2 could not be read" });
-    expect(card({ ...base, readinessUnknown: null })).toEqual({ tone: "draft", text: "Unavailable" });
-    expect(card({ ...base, readinessUnknown: 0 })).toEqual({ tone: "ok", text: "All ready" });
+    // The tile above carries those numbers; the card never turns them into "All ready" (#1733).
+    for (const unknown of [2, null, 0]) expect(card({ ...base, readinessUnknown: unknown }) ?? null, String(unknown)).toBeNull();
     const stat = (values: MetricValues) => buildHubView("catalogs", system, values).stats.find((entry) => entry.key === "readinessAttention")!;
     expect(stat({ ...base, readinessUnknown: 1 })).toMatchObject({ display: "0", note: "1 check could not be read" });
     expect(stat({ ...base, readinessUnknown: null }).note).toBe("Some checks could not be read");

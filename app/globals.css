@@ -12445,10 +12445,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* Work contexts, the phone System menu, guarded links and module states (#1180). New rules only; shared type scale untouched. */
 .work-context { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8125rem); }
 .work-context-kind { flex: none; border-radius: 999px; background: var(--imsda-purple-soft); color: var(--imsda-purple); font-size: max(var(--type-floor, 0px), var(--text-badge)); font-weight: 700; padding: 2px 8px; }
-.work-context[data-context="system"] .work-context-kind { background: var(--imsda-navy-soft); color: var(--imsda-navy); }
-.work-context[data-context="profile"] .work-context-kind { background: var(--imsda-gold-soft); color: var(--ink); }
 @media screen { .work-context-name { min-width: 0; overflow: hidden; color: var(--ink); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; } }
-.work-context-detail { color: var(--muted); }
 .work-context-return { display: inline-flex; min-height: 44px; align-items: center; color: var(--imsda-purple); font-weight: 700; }
 .work-context-return:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .more-launcher-modules { break-inside: avoid; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
