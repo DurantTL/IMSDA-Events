@@ -37,9 +37,9 @@ export async function handleClubReportRequest(input: {
   viewer: ClubReportViewer;
   actor: ClubReportActor;
   body: unknown;
-  /** Staff may narrow a report to one location the way the staff reports do; the route resolves it. */
   /** False for view-only access (Pathfinder event-manager oversight): it may run a report but never change shared layouts. */
   canManageLayouts?: boolean;
+  /** Staff may narrow a report to one location the way the staff reports do; the route resolves it. */
   resolveLocation?: (requested: string | null | undefined) => Promise<string | null>;
 }) {
   const request = clubReportRequestSchema.parse(input.body);
