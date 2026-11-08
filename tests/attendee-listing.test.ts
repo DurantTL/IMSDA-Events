@@ -382,12 +382,24 @@ describe("food allergy and diet answers on Leadership Weekend and TLT Retreat (#
         attendee("d6", "F", "Synthetic", { food_allergies: "None" }),
       ], {}, definition)]);
       expect(rows.map((row) => row.mealCategory)).toEqual(["vegan", "gluten_free", "vegetarian", "other", "other", "regular"]);
+      expect(rows.map((row) => row.mealPreference)).toEqual(["Vegan", "Gluten-free", "Vegetarian", "Other", "Other", "Regular"]);
       expect(rows.map((row) => row.dietaryNeeds)).toEqual(["Vegan", "Gluten-free", "Peanuts; Vegetarian", "Dairy-free", "Vegan; Dairy-free", "None"]);
       expect(rows.map((row) => row.hasDietaryNeeds)).toEqual([true, true, true, true, true, false]);
       const counts = Object.fromEntries(mealTotals(rows).map((entry) => [entry.value, entry.count]));
       expect(counts).toMatchObject({ vegan: 1, gluten_free: 1, vegetarian: 1, other: 2, regular: 1, none: 0 });
     });
   }
+
+  it("a builder-made None choice in the diet list is no special meal", () => {
+    const definition = structuredClone(templateDefinition("tlt_retreat")) as { sections: Array<{ fields: Array<{ key: string; options?: string[] }> }> };
+    const dietary = definition.sections.flatMap((section) => section.fields).find((field) => field.key === "dietary_needs")!;
+    dietary.options = [...(dietary.options ?? []), "None"];
+    const rows = build([registration("N1", "CONFIRMED", [
+      attendee("n1", "H", "Synthetic", { food_allergies: "None", dietary_needs: ["None"] }),
+      attendee("n2", "I", "Synthetic", { food_allergies: "None", dietary_needs: ["None", "Vegan"] }),
+    ], {}, definition as unknown as Record<string, unknown>)]);
+    expect(rows.map((row) => row.mealCategory)).toEqual(["regular", "vegan"]);
+  });
 
   it("a form with a meal_preference question keeps reading it", () => {
     const [row] = build([registration("M1", "CONFIRMED", [attendee("m1", "G", "Synthetic", { meal_preference: "Vegan", dietary_needs: "Peanut allergy" })], {}, templateDefinition("womens_retreat_export"))]);

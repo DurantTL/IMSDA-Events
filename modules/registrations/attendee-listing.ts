@@ -127,6 +127,10 @@ function displayValue(field: RegistrationFormField | undefined, raw: unknown): s
     .join("; ");
 }
 
+function mealCategoryLabel(category: MealCategory): string {
+  return MEAL_CATEGORIES.find((entry) => entry.value === category)?.label ?? "";
+}
+
 export function mealCategoryOf(meal: string): MealCategory {
   const text = meal.trim().toLowerCase();
   if (!text) return "none";
@@ -144,9 +148,14 @@ export function mealCategoryOf(meal: string): MealCategory {
  * gets its meal type from the diet choices: one of Vegan, Gluten-free or Vegetarian is that meal, no choice is Regular,
  * and Dairy-free alone or several choices are Other. Forms with a meal question read it unchanged.
  */
+function mealFromDietChoices(fields: ResolvedListingFields): boolean {
+  return !fields.meal && fields.dietary?.type === "MULTISELECT" && fields.dietary.scope === "ATTENDEE";
+}
+
 function mealCategoryOfRow(fields: ResolvedListingFields, mealPreference: string, dietaryChoices: string): MealCategory {
-  if (fields.meal || fields.dietary?.type !== "MULTISELECT" || fields.dietary.scope !== "ATTENDEE") return mealCategoryOf(mealPreference);
-  const choices = dietaryChoices.split(";").map((part) => part.trim()).filter(Boolean);
+  if (!mealFromDietChoices(fields)) return mealCategoryOf(mealPreference);
+  // A builder-made choice such as "None" or "N/A" is no special meal, not an extra choice.
+  const choices = dietaryChoices.split(";").map((part) => part.trim()).filter((part) => part && !NO_DIETARY_NEEDS.test(part));
   if (choices.length === 0) return "regular";
   return choices.length === 1 ? mealCategoryOf(choices[0]!) : "other";
 }
@@ -203,6 +212,7 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
       let church = registration.isGroup ? "" : answer("church");
       if (!registration.isGroup && (!church || church === DIRECTORY_NOT_LISTED_VALUE || church === "Other")) church = answer("churchOther");
       const mealPreference = answer("meal");
+      const mealCategory = mealCategoryOfRow(fields, mealPreference, answer("dietary"));
       // Food allergies (#1665) come first, then the diet choices; the kitchen counts each part on its own.
       const dietaryAnswer = [answer("allergy"), answer("dietary")].filter(Boolean).join("; ");
       const needs = hasDietaryNeeds(dietaryAnswer);
@@ -232,8 +242,9 @@ export function buildAttendeeListingRows(registrations: readonly RegistrationRec
         attendeeType: attendee.attendeeType,
         group: registration.staffInvitation ? STAFF_GROUP_LABEL[registration.staffInvitation.group] : "",
         church,
-        mealPreference,
-        mealCategory: mealCategoryOfRow(fields, mealPreference, answer("dietary")),
+        // With no meal question, the column shows the meal type the diet choices give, so it matches the tiles and filter.
+        mealPreference: mealFromDietChoices(fields) ? mealCategoryLabel(mealCategory) : mealPreference,
+        mealCategory,
         dietaryNeeds,
         hasDietaryNeeds: needs,
         childcareNeeded: answer("childcare"),
