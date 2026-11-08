@@ -114,7 +114,7 @@ describe("event tab order (#1565, from the sidebar order of #964)", () => {
     // Kitchen counts (#1029) is the one item for staff without the event view, so no admin sees it: it follows the dashboard.
     expect(navigation.filter((item) => item.sidebar).slice(0, 2).map((item) => item.label)).toEqual(["Dashboard", "Kitchen counts"]);
     expect(listed).toEqual(registryOrder.filter((entry) => entry !== "Event features"));
-    expect(navigation.filter((item) => !item.sidebar && item.href !== "/more").map((item) => item.label)).toEqual(["Attendee list", "Imports", "Team", "Promo codes", "More money tools"]);
+    expect(navigation.filter((item) => !item.sidebar && item.href !== "/more").map((item) => item.label)).toEqual(["Attendee list", "Imports", "Review queues", "Team", "Promo codes", "More money tools"]);
     expect(navigation.at(-1)?.href).toBe("/more");
     expect(orderedSidebarItems(new Set(eventPermissions), true).map((item) => item.label)).toEqual(registryOrder.filter((entry) => entry !== "Event features").concat("More"));
     expect([...sidebarSectionOrder]).toEqual(["daily", "setup", "reports"]);

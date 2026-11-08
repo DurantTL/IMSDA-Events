@@ -112,7 +112,7 @@ text.push(
   "| --- | --- |",
   "| Check-in passes, badges and keys (`/check-in/passes`, `/check-in/badges`, `/check-in/assets`) | Views of the Check-in tab: Attendee passes, Name badges, Keys and items |",
   "| `/finance` sub-pages (Owed by churches, Billing responsibility, Attendance reconciliation, Scholarship fund, Invoices, Cancellation rules and requests, Unmatched Square payments, Ledger check) | Money > Payments owns them for the marking, and the Payments page keeps its tool links; the \"More money tools\" grouped page waits for #1575 and is not listed until it exists |",
-  "| `/people` sub-pages (Find duplicates, Directory review, Teams waiting for a club, Responsible adults, Staff invitations) | Registrations > All registrations owns them, and that page lists them as links; a review-queues page waits for #1574 |",
+  "| `/people` sub-pages (Find duplicates, Directory review, Teams waiting for a club, Responsible adults, Staff invitations) | Registrations > Review queues owns them (#1574): the grouped page lists each one the person can open as a card, with a count where its own page already has one. `/people/matches` stays with All registrations |",
   "| Imports, Attendee list | Views of the Registrations tab |",
   "| Honors Weekend classes, instructors, rosters and schedule (`/more/honors/**`) | Event setup (the `/more` page, grouped cards) lists the classes card under Program, and the classes page links the other three |",
   "| Event features (`/more/features`) | A card in the Basics group of Event setup (the tab has no view strip) |",
@@ -127,7 +127,7 @@ text.push(
   "## Left out until built",
   "",
   "- Events > All events: there is no in-shell list of all events yet. Staff open an event from the Events row's \"Open an event\" picker or the dashboards, and switch from the event bar.",
-  "- Money > Refunds and More money tools (#1575), Registrations > Review queues (#1574), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).",
+    "- Money > Refunds and More money tools (#1575), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).",
   "",
 );
 writeFileSync("docs/STAFF-WORKSPACE-ROUTES.md", text.join("\n"));

@@ -190,6 +190,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: () => guarded }));
 import { formTemplates } from "@/modules/forms/definition";
 import { formCollectsAge } from "@/modules/guardian-authority/domain";
 import {
+  countGuardianReviewItems,
   getResponsibleAdultsByAttendee,
   GuardianAuthorityError,
   declareResponsibleAdultsForRegistration,
@@ -315,6 +316,22 @@ describe("authority comes only from a declaration: nothing is inferred", () => {
     };
     roots.forEach(walk);
     expect(offenders.map((path) => path.replaceAll("\\", "/"))).toEqual(["modules/guardian-authority/repository.ts"]);
+  });
+});
+
+describe("the review count (#1574)", () => {
+  it("is the number of listed items, with or without minors needing attention, and reads no names", async () => {
+    expect(await countGuardianReviewItems("event-1")).toBe(0);
+    seed({ registrationId: "reg-1", code: "REG-1", holder: "p-dad", people: [dad, son] });
+    seed({ registrationId: "reg-2", code: "REG-2", holder: "p-manager", people: [{ ...son, personId: "p-son-2" }] });
+    seed({ registrationId: "reg-3", code: "REG-3", holder: "p-mom", people: [{ personId: "p-mom", name: "Mia Sample", responses: { attendee_age: "40" } }, { personId: "p-kid", name: "Kit Sample", responses: { attendee_age: "9" } }] });
+    const review = await getGuardianReview("event-1");
+    expect(review.items.length).toBeGreaterThan(0);
+    expect(await countGuardianReviewItems("event-1")).toBe(review.items.length);
+    // A declared adult takes the minor off the list for both.
+    await inTransaction((tx) => declareResponsibleAdultsForRegistration(tx, { accessTokenId: "token-1", registrationId: "reg-1", choices: { [att("reg-1", "p-son")]: att("reg-1", "p-dad") } }));
+    expect(await countGuardianReviewItems("event-1")).toBe((await getGuardianReview("event-1")).items.length);
+    expect(await countGuardianReviewItems("event-1")).toBe(review.items.length - 1);
   });
 });
 

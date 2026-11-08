@@ -129,7 +129,7 @@ describe("staff page names (#685)", () => {
       eventPatches: "more/event-patches", emergencyPlan: "more/emergency-plan", operationalHealth: "more/health", merchandise: "more/merchandise", lodging: "more/lodging", meals: "more/meals", lodgingRequests: "more/lodging/requests", lodgingAssignments: "more/lodging/assignments", issuedAssets: "more/issued-assets", scheduledEmails: "communications/scheduled", ledgerCheck: "more/ledger-health",
       assignmentRoster: "more/program-assignments/[runId]", programAssignments: "more/program-assignments",
       teamResults: "more/team-results", teamForm: "more/reports/clubs/team-form", formResponses: "information-forms/responses",
-      moreMoneyTools: "finance/tools", invoices: "finance/invoices", churchOwed: "finance/church-owed", billingResponsibility: "finance/billing-responsibility", scholarshipFund: "finance/scholarship-fund",
+      reviewQueues: "people/review-queues", moreMoneyTools: "finance/tools", invoices: "finance/invoices", churchOwed: "finance/church-owed", billingResponsibility: "finance/billing-responsibility", scholarshipFund: "finance/scholarship-fund",
       squarePayments: "finance/square-payments", attendanceReconciliation: "finance/attendance-reconciliation", cancellationPolicy: "finance/cancellation-policy", cancellationRequests: "finance/cancellation-requests",
     };
     expect(Object.keys(pages).sort()).toEqual(Object.keys(staffPageTitles).sort());

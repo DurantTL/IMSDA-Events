@@ -239,7 +239,8 @@ describe("event tabs (#1565)", () => {
     const place = (path: string, query = "") => currentEventPlace(path, new URLSearchParams(query));
     expect(place("/overview")).toEqual({ tab: "home", view: "overview" });
     expect(place("/people/attendees")).toEqual({ tab: "registrations", view: "attendees" });
-    expect(place("/people/duplicates")).toEqual({ tab: "registrations", view: "registrations" });
+    expect(place("/people/duplicates")).toEqual({ tab: "registrations", view: "review-queues" });
+    expect(place("/people/review-queues")).toEqual({ tab: "registrations", view: "review-queues" });
     expect(place("/check-in/badges")).toEqual({ tab: "check-in", view: "badges" });
     expect(place("/finance")).toEqual({ tab: "money", view: "payments" });
     expect(place("/finance", "filter=BALANCE")).toEqual({ tab: "money", view: "balances" });
