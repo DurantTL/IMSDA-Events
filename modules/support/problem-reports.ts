@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
+import { writeAuditLog } from "@/modules/audit/audit-service";
 import { dispatchUnsuppressedAlert } from "@/modules/operations/alerting";
 import {
   problemReportDetailsSchema,
@@ -95,9 +96,21 @@ export async function countOpenProblemReports() {
 
 /** True when a report was open and is now resolved; false when it does not exist or was already resolved. */
 export async function resolveProblemReport(id: string, actorUserId: string, now = new Date()) {
-  const result = await getPrisma().problemReport.updateMany({
-    where: { id, status: "OPEN" },
-    data: { status: "RESOLVED", resolvedAt: now, resolvedByUserId: actorUserId },
+  return getPrisma().$transaction(async (tx) => {
+    const result = await tx.problemReport.updateMany({
+      where: { id, status: "OPEN" },
+      data: { status: "RESOLVED", resolvedAt: now, resolvedByUserId: actorUserId },
+    });
+    if (result.count !== 1) return false;
+    // Ids only: the person's words and email never go into audit metadata. Same transaction, so no change goes unrecorded.
+    await writeAuditLog({
+      actorUserId,
+      action: "PROBLEM_REPORT_COMPLETED",
+      entityType: "ProblemReport",
+      entityId: id,
+      summary: "Marked a problem report completed.",
+      metadata: { reportId: id },
+    }, tx);
+    return true;
   });
-  return result.count === 1;
 }

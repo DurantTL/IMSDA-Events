@@ -73,7 +73,10 @@ async function postHandler(request: Request) {
     return applyRateLimitHeaders(Response.json({ reference: created.reference }, { status: 201 }), rateLimit);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return Response.json({ error: "INVALID_PROBLEM_REPORT", message: error.issues[0]?.message ?? "Check the report and try again." }, { status: 400 });
+      const issue = error.issues[0];
+      // `field` lets the popup show the message next to the right input (rule B7).
+      const field = typeof issue?.path[0] === "string" ? issue.path[0] : undefined;
+      return Response.json({ error: "INVALID_PROBLEM_REPORT", message: issue?.message ?? "Check the report and try again.", field }, { status: 400 });
     }
     logError("Problem report failed", error);
     return Response.json({ error: "PROBLEM_REPORT_FAILED", message: PROBLEM_REPORT_FAILED_TEXT }, { status: 500 });

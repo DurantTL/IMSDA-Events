@@ -94,11 +94,18 @@ declare global {
 }
 
 let scriptPromise: Promise<TurnstileApi> | null = null;
+let scriptLoadFailed = false;
+
+/** True once the Security check script reported an error or gave up, until a later load works. Used by problem reports (#1483). */
+export function securityCheckLoadFailed() {
+  return scriptLoadFailed;
+}
 
 /** Loads Cloudflare's script once per page, whatever number of widgets mount. */
 function loadTurnstile(nonce: string | undefined): Promise<TurnstileApi> {
   if (window.turnstile) return Promise.resolve(window.turnstile);
   if (scriptPromise) return scriptPromise;
+  scriptLoadFailed = false;
   scriptPromise = new Promise<TurnstileApi>((resolve, reject) => {
     const existing = document.getElementById(SCRIPT_ID);
     const script = existing ?? document.createElement("script");
@@ -106,6 +113,7 @@ function loadTurnstile(nonce: string | undefined): Promise<TurnstileApi> {
     const giveUp = window.setTimeout(() => {
       if (window.turnstile) return;
       scriptPromise = null;
+      scriptLoadFailed = true;
       script.remove();
       reject(new Error("Turnstile took too long to load"));
     }, SCRIPT_TIMEOUT_MS);
@@ -114,12 +122,14 @@ function loadTurnstile(nonce: string | undefined): Promise<TurnstileApi> {
       if (window.turnstile) resolve(window.turnstile);
       else {
         scriptPromise = null;
+        scriptLoadFailed = true;
         reject(new Error("Turnstile did not load"));
       }
     };
     const onError = () => {
       window.clearTimeout(giveUp);
       scriptPromise = null;
+      scriptLoadFailed = true;
       script.remove();
       reject(new Error("Turnstile could not be loaded"));
     };

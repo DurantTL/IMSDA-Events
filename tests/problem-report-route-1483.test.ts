@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   dispatchUnsuppressedAlert: vi.fn(),
   count: vi.fn(),
   updateMany: vi.fn(),
+  writeAuditLog: vi.fn(),
 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
@@ -25,7 +26,11 @@ vi.mock("@/modules/security/turnstile", async () => {
   return { ...actual, requireTurnstile: mocks.requireTurnstile, turnstileSiteKeyForPage: () => "site-key-test" };
 });
 vi.mock("@/modules/operations/alerting", () => ({ dispatchUnsuppressedAlert: mocks.dispatchUnsuppressedAlert }));
-vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ problemReport: { create: mocks.create, count: mocks.count, updateMany: mocks.updateMany } }) }));
+vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
+vi.mock("@/lib/prisma", () => {
+  const problemReport = { create: mocks.create, count: mocks.count, updateMany: mocks.updateMany };
+  return { getPrisma: () => ({ problemReport, $transaction: (run: (tx: unknown) => unknown) => run({ problemReport }) }) };
+});
 
 import { GET, POST } from "@/app/api/support/problem-reports/route";
 import { PATCH } from "@/app/api/admin/problem-reports/[reportId]/route";
@@ -92,7 +97,10 @@ describe("POST /api/support/problem-reports", () => {
     expect((await POST(post(valid, "https://evil.example"))).status).toBe(403);
     expect((await POST(post({ ...valid, website: "http://spam.example" }))).status).toBe(400);
     expect((await POST(post({ ...valid, message: " " }))).status).toBe(400);
-    expect((await POST(post({ ...valid, email: "nope" }))).status).toBe(400);
+    const badEmail = await POST(post({ ...valid, email: "nope" }));
+    expect(badEmail.status).toBe(400);
+    // The field name lets the popup show the message next to the email input.
+    expect(await badEmail.json()).toMatchObject({ field: "email", message: "Enter a valid email address." });
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
@@ -148,6 +156,10 @@ describe("PATCH /api/admin/problem-reports/[reportId]", () => {
     expect((await PATCH(patch(), context)).status).toBe(200);
     expect(mocks.updateMany.mock.calls[0][0].where).toEqual({ id: "pr-1", status: "OPEN" });
     expect((await PATCH(patch(), context)).status).toBe(404);
+    // Audited once, with ids only.
+    expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
+    const entry = mocks.writeAuditLog.mock.calls[0][0];
+    expect(entry).toMatchObject({ action: "PROBLEM_REPORT_COMPLETED", entityType: "ProblemReport", entityId: "pr-1", actorUserId: "admin-1", metadata: { reportId: "pr-1" } });
   });
 });
 

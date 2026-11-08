@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EMAIL_FIELD_MESSAGE } from "@/lib/field-validation";
 import { honeypotFieldSchema } from "@/modules/security/honeypot";
 
 /**
@@ -12,7 +13,6 @@ export const PROBLEM_REPORT_MESSAGE_MIN = 5;
 export const PROBLEM_REPORT_EMAIL_MAX = 254;
 
 export const PROBLEM_REPORT_MESSAGE_REQUIRED_TEXT = "Tell us what happened, in a few words.";
-export const PROBLEM_REPORT_EMAIL_INVALID_TEXT = "Enter a valid email address, or leave it empty.";
 export const PROBLEM_REPORT_FAILED_TEXT = "The report could not be sent. Try again, or email the help address above.";
 
 /** "P-1234": the reference the person is given and the IT team searches for. */
@@ -23,12 +23,15 @@ export function problemReportReference(number: number) {
 /** The shared status words (rule B12): a report that was sent and waits is "Submitted"; one dealt with is "Completed". */
 export const problemReportStatusLabel = { OPEN: "Submitted", RESOLVED: "Completed" } as const;
 
+/** A long segment is kept only when it reads as a lowercase hyphenated slug ("womens-retreat-registration"); any other long run of letters, digits, "_" or "-" looks like a token. */
 const TOKENISH_SEGMENT = /^[A-Za-z0-9_-]{20,}$/;
+const READABLE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
 const PRIVATE_PREFIX = /^(club-forms|manage|unsubscribe|staff-invite|staff-invitations)$/;
 
 /**
  * The page path only: no origin, no query values (they can hold a name, an email or a code) and no hash. A path segment that
- * looks like a private link token (long, or right after a private-link folder) is replaced, so a personal link is never sent.
+ * looks like a private link token (long and not a readable slug) is replaced, and everything after a private-link folder
+ * (`/manage/`, `/club-forms/` and so on) is replaced, so a personal link is never sent.
  */
 export function sanitizePagePath(value: string): string {
   let pathname = value.trim();
@@ -39,28 +42,29 @@ export function sanitizePagePath(value: string): string {
   }
   if (!pathname.startsWith("/")) pathname = `/${pathname}`;
   const segments = pathname.split("/");
-  return segments
-    .map((segment, index) => {
-      if (index === 0 || segment === "") return segment;
-      if (PRIVATE_PREFIX.test(segments[index - 1] ?? "") || TOKENISH_SEGMENT.test(segment)) return "[redacted]";
-      return segment;
-    })
-    .join("/")
-    .slice(0, 300);
+  const kept: string[] = [];
+  for (const [index, segment] of segments.entries()) {
+    if (index > 0 && PRIVATE_PREFIX.test(segments[index - 1] ?? "")) {
+      kept.push("[redacted]");
+      break;
+    }
+    kept.push(index > 0 && TOKENISH_SEGMENT.test(segment) && !READABLE_SLUG.test(segment) ? "[redacted]" : segment);
+  }
+  return kept.join("/").slice(0, 300);
 }
 
 const shortText = (max: number) => z.string().trim().max(max).optional();
 
-/** The technical details, field by field. Unknown fields are dropped, so nothing else can ride along. */
+/** The technical details, field by field. Unknown fields are dropped, so nothing else can ride along. A field that is not valid is dropped too (never the whole report). */
 export const problemReportDetailsSchema = z.object({
-  path: z.string().max(2000).transform(sanitizePagePath).optional(),
-  clientTime: z.string().max(40).refine((value) => !Number.isNaN(Date.parse(value))).optional(),
-  userAgent: shortText(300),
-  language: shortText(35),
-  translation: z.enum(["on", "not-detected"]).optional(),
-  viewport: z.string().regex(/^\d{2,5}x\d{2,5}$/).optional(),
-  securityCheckBlocked: z.boolean().optional(),
-  squareBlocked: z.boolean().optional(),
+  path: z.string().max(2000).transform(sanitizePagePath).optional().catch(undefined),
+  clientTime: z.string().max(40).refine((value) => !Number.isNaN(Date.parse(value))).optional().catch(undefined),
+  userAgent: shortText(300).catch(undefined),
+  language: shortText(35).catch(undefined),
+  translation: z.enum(["on", "not-detected"]).optional().catch(undefined),
+  viewport: z.string().regex(/^[1-9]\d{1,4}x[1-9]\d{1,4}$/).optional().catch(undefined),
+  securityCheckBlocked: z.boolean().optional().catch(undefined),
+  squareBlocked: z.boolean().optional().catch(undefined),
 });
 
 export type ProblemReportDetails = z.infer<typeof problemReportDetailsSchema> & { appVersion?: string };
@@ -69,10 +73,10 @@ export const problemReportInputSchema = z.object({
   message: z.string().trim().min(PROBLEM_REPORT_MESSAGE_MIN, PROBLEM_REPORT_MESSAGE_REQUIRED_TEXT).max(PROBLEM_REPORT_MESSAGE_MAX, `Keep it under ${PROBLEM_REPORT_MESSAGE_MAX} characters.`),
   email: z.preprocess(
     (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-    z.string().trim().max(PROBLEM_REPORT_EMAIL_MAX).pipe(z.email(PROBLEM_REPORT_EMAIL_INVALID_TEXT)).optional(),
+    z.string().trim().max(PROBLEM_REPORT_EMAIL_MAX).pipe(z.email(EMAIL_FIELD_MESSAGE)).optional(),
   ),
   /** Null or absent when the person turned "Include technical details" off. */
-  details: problemReportDetailsSchema.nullish(),
+  details: problemReportDetailsSchema.nullish().catch(null),
   website: honeypotFieldSchema,
 });
 
@@ -86,17 +90,17 @@ export type BrowserFacts = {
   htmlClassName: string;
   innerWidth: number;
   innerHeight: number;
-  turnstileScriptPresent: boolean;
-  turnstileReady: boolean;
-  squareScriptPresent: boolean;
-  squareReady: boolean;
+  /** True only after the Security check script reported a load error or gave up; never while it is still loading. */
+  securityCheckLoadFailed: boolean;
+  /** True only while the card form's own "could not load" notice is showing; never while it is still loading. */
+  squareLoadFailed: boolean;
   now: Date;
 };
 
 /**
  * The details the popup sends. Built only from `BrowserFacts`: the page address (cleaned), the time, the browser, the
- * language, whether the browser's translation has rewritten the page, the window size, and whether Cloudflare's or Square's
- * script was asked for but never became ready. It never reads form fields, cookies, storage, headers or tokens.
+ * language, whether the browser's translation has rewritten the page, the window size, and whether the Security check or the card form reported
+ * that it could not load. It never reads form fields, cookies, storage, headers or tokens.
  */
 export function buildProblemReportDetails(facts: BrowserFacts): ProblemReportDetails {
   return {
@@ -106,7 +110,7 @@ export function buildProblemReportDetails(facts: BrowserFacts): ProblemReportDet
     language: facts.language.slice(0, 35),
     translation: /\btranslated-(ltr|rtl)\b/.test(facts.htmlClassName) ? "on" : "not-detected",
     viewport: `${Math.round(facts.innerWidth)}x${Math.round(facts.innerHeight)}`,
-    securityCheckBlocked: facts.turnstileScriptPresent && !facts.turnstileReady,
-    squareBlocked: facts.squareScriptPresent && !facts.squareReady,
+    securityCheckBlocked: facts.securityCheckLoadFailed,
+    squareBlocked: facts.squareLoadFailed,
   };
 }

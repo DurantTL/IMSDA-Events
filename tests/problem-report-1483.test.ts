@@ -12,6 +12,7 @@ import {
   PROBLEM_REPORT_MESSAGE_MAX,
   type BrowserFacts,
 } from "@/modules/support/problem-report-domain";
+import { EMAIL_FIELD_MESSAGE } from "@/lib/field-validation";
 import { openProblemReportFields } from "@/modules/system-admin/system-report/problem-report-signal";
 import { ProblemReportSection } from "@/components/problem-report-form";
 import { FormsHelpSections } from "@/components/forms-help";
@@ -25,10 +26,8 @@ const facts: BrowserFacts = {
   htmlClassName: "translated-ltr",
   innerWidth: 390,
   innerHeight: 844,
-  turnstileScriptPresent: true,
-  turnstileReady: false,
-  squareScriptPresent: false,
-  squareReady: false,
+  securityCheckLoadFailed: true,
+  squareLoadFailed: false,
   now: new Date("2026-11-08T15:00:00Z"),
 };
 
@@ -39,8 +38,18 @@ describe("page path", () => {
   });
   it("replaces a private link token and any long token-like segment", () => {
     expect(sanitizePagePath("/manage/abcDEF123")).toBe("/manage/[redacted]");
-    expect(sanitizePagePath("/club-forms/short/next")).toBe("/club-forms/[redacted]/next");
+    expect(sanitizePagePath("/club-forms/short/next")).toBe("/club-forms/[redacted]");
     expect(sanitizePagePath("/reset-password/aaaaaaaaaaaaaaaaaaaaaaaaaaaa")).toBe("/reset-password/[redacted]");
+  });
+  it("keeps a long readable form slug", () => {
+    expect(sanitizePagePath("/register/womens-retreat-2026/womens-retreat-registration")).toBe("/register/womens-retreat-2026/womens-retreat-registration");
+  });
+  it("redacts a real 43-character base64url token and a mixed-case run", () => {
+    const token = "Zk3_8vQpL0aXr-N2tYw9bHc4dEf7GhJiKmOpQrStUvW".slice(0, 43);
+    expect(token).toHaveLength(43);
+    expect(sanitizePagePath(`/some/page/${token}`)).toBe("/some/page/[redacted]");
+    expect(sanitizePagePath("/some/page/AbCdEfGhIjKlMnOpQrStUv")).toBe("/some/page/[redacted]");
+    expect(sanitizePagePath("/some/page/abcdefghijklmnopqrstuvwx")).toBe("/some/page/[redacted]");
   });
 });
 
@@ -101,6 +110,19 @@ describe("technical details never carry private content", () => {
   });
 });
 
+describe("a bad detail field never costs the person their report", () => {
+  it("drops only the invalid fields and keeps the rest", () => {
+    const parsed = problemReportDetailsSchema.parse({ viewport: "390x0", clientTime: "not a time", language: "en-US", translation: "maybe", securityCheckBlocked: "yes", path: "/a?b=c" });
+    expect(parsed).toEqual({ language: "en-US", path: "/a" });
+  });
+  it("accepts a report whose details are garbage, saving it without them", () => {
+    const parsed = problemReportInputSchema.parse({ message: "The page froze.", details: "garbage", website: "" });
+    expect(parsed.details).toBeNull();
+    const partial = problemReportInputSchema.parse({ message: "The page froze.", details: { viewport: "390x0", language: "en" }, website: "" });
+    expect(partial.details).toEqual({ language: "en" });
+  });
+});
+
 describe("the report itself", () => {
   const ok = { message: "The Submit button did nothing.", website: "" };
   it("needs a message and limits its length", () => {
@@ -112,7 +134,10 @@ describe("the report itself", () => {
   it("takes an email or none, and refuses a bad one", () => {
     expect(problemReportInputSchema.parse({ ...ok, email: "" }).email).toBeUndefined();
     expect(problemReportInputSchema.parse({ ...ok, email: " sam@example.test " }).email).toBe("sam@example.test");
-    expect(problemReportInputSchema.safeParse({ ...ok, email: "not-an-email" }).success).toBe(false);
+    const bad = problemReportInputSchema.safeParse({ ...ok, email: "not-an-email" });
+    expect(bad.success).toBe(false);
+    expect(!bad.success && bad.error.issues[0]?.message).toBe(EMAIL_FIELD_MESSAGE);
+    expect(!bad.success && bad.error.issues[0]?.path[0]).toBe("email");
   });
   it("accepts no details when the box is off, and refuses a filled honeypot", () => {
     expect(problemReportInputSchema.parse({ ...ok, details: null }).details).toBeNull();
@@ -142,6 +167,7 @@ describe("the popup section", () => {
     expect(html).toContain("What happened?");
     expect(html).toMatch(/<textarea[^>]*required/);
     expect(html).toMatch(/<input[^>]*type="email"/);
+    expect(html).toContain('for="problem-report-message"');
     expect(html).toMatch(/<input[^>]*checked=""[^>]*type="checkbox"|<input[^>]*type="checkbox"[^>]*checked=""/);
     expect(html).toContain("Include technical details");
   });

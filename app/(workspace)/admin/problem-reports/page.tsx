@@ -6,7 +6,8 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { logError } from "@/lib/logger";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { problemReportStatusLabel } from "@/modules/support/problem-report-domain";
-import { listProblemReports } from "@/modules/support/problem-reports";
+import { countOpenProblemReports, listProblemReports } from "@/modules/support/problem-reports";
+import { EmptyState } from "@/components/empty-state";
 import { ProblemReportResolveButton } from "@/components/problem-report-resolve-button";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import systemStyles from "../system-admin.module.css";
@@ -28,7 +29,13 @@ export default async function ProblemReportsPage() {
   } catch (error) {
     logError("Problem reports page could not load the list", error);
   }
-  const open = reports?.filter((report) => report.status === "OPEN").length ?? 0;
+  // The full count, not the count of the 200 rows the list shows.
+  let open: number | null = null;
+  try {
+    open = await countOpenProblemReports();
+  } catch (error) {
+    logError("Problem reports page could not count open reports", error);
+  }
 
   return (
     <section className={`page-stack ${systemStyles.workspace}`}>
@@ -40,14 +47,14 @@ export default async function ProblemReportsPage() {
             <h2 id="problem-reports-heading" tabIndex={-1}>Problem reports</h2>
             <p>What people sent from the Forms help popup. The email, when given, is for following up. Mark a report completed once it is dealt with.</p>
           </div>
-          <span>{reports ? (open === 0 ? "Nothing open" : `${open} open`) : "Unavailable"}</span>
+          <span>{open === null ? "Unavailable" : open === 0 ? "Nothing open" : `${open} open`}</span>
         </div>
         {reports === null ? (
           <p className={systemStyles.unavailable} role="status"><CircleAlert aria-hidden="true" size={16} /><span><strong>Unavailable.</strong> The reports could not be read just now. This is not zero. Reload to try again.</span></p>
         ) : reports.length === 0 ? (
-          <p className="quiet-copy">No problem reports have been sent.</p>
+          <EmptyState actionClass="secondary-button" action={{ label: "Open the System report", href: "/admin/system-report" }} canCreate className="empty-state" headingLevel={3} announce={false} title="No problem reports yet">Reports appear here when someone sends one from the Forms help popup. Until then, the System report shows how the site is doing.</EmptyState>
         ) : (
-          <ul className={styles.list}>
+          <ul className={styles.list} id="problem-report-list">
             {reports.map((report) => (
               <li className={styles.item} key={report.id}>
                 <div className={styles.head}>

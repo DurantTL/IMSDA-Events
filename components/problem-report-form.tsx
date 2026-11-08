@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { EmailInput, emailBlockingMessage } from "@/components/email-input";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
 import { HoneypotField } from "@/components/honeypot-field";
-import { SecurityCheck, type SecurityCheckHandle } from "@/components/security-check/security-check";
+import { SecurityCheck, securityCheckLoadFailed, type SecurityCheckHandle } from "@/components/security-check/security-check";
 import formsHelpStyles from "@/components/forms-help.module.css";
 import styles from "@/components/problem-report-form.module.css";
 import {
@@ -26,7 +28,6 @@ const ENDPOINT = "/api/support/problem-reports";
 
 /** The browser facts for the details, read one by one. Nothing else on the page is touched. */
 export function readBrowserFacts(): BrowserFacts {
-  const w = window as Window & { turnstile?: unknown; Square?: unknown };
   return {
     href: window.location.pathname,
     userAgent: navigator.userAgent,
@@ -34,10 +35,8 @@ export function readBrowserFacts(): BrowserFacts {
     htmlClassName: document.documentElement.className,
     innerWidth: window.innerWidth,
     innerHeight: window.innerHeight,
-    turnstileScriptPresent: Boolean(document.getElementById("cf-turnstile-api")),
-    turnstileReady: Boolean(w.turnstile),
-    squareScriptPresent: Boolean(document.querySelector('script[src*="squarecdn.com"]')),
-    squareReady: Boolean(w.Square),
+    securityCheckLoadFailed: securityCheckLoadFailed(),
+    squareLoadFailed: Boolean(document.querySelector('[data-testid="square-load-failed"]')),
     now: new Date(),
   };
 }
@@ -55,6 +54,10 @@ export function ProblemReportSection() {
   const [website, setWebsite] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [messageError, setMessageError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
   const [reference, setReference] = useState("");
 
   async function loadConfig() {
@@ -76,13 +79,21 @@ export function ProblemReportSection() {
     // The popup is a portal: a React submit bubbles to any form the popup's link sits inside (the registration form).
     event.stopPropagation();
     if (busy) return;
+    setAttempted(true);
+    setError("");
+    setMessageError("");
+    setEmailError("");
     if (message.trim().length < PROBLEM_REPORT_MESSAGE_MIN) {
-      setError(PROBLEM_REPORT_MESSAGE_REQUIRED_TEXT);
+      setMessageError(PROBLEM_REPORT_MESSAGE_REQUIRED_TEXT);
+      messageRef.current?.focus();
+      return;
+    }
+    if (email.trim() && emailBlockingMessage("Email", email)) {
+      document.getElementById("problem-report-email")?.focus();
       return;
     }
     if (!check.current?.require("Send report")) return;
     setBusy(true);
-    setError("");
     let details: ProblemReportDetails | null = null;
     if (includeDetails) {
       try {
@@ -97,10 +108,15 @@ export function ProblemReportSection() {
         headers: { "Content-Type": "application/json", ...check.current?.headers() },
         body: JSON.stringify({ message, email, details, website }),
       });
-      const body = await response.json().catch(() => ({})) as { reference?: string; message?: string };
+      const body = await response.json().catch(() => ({})) as { reference?: string; message?: string; field?: string };
       check.current?.settle(body);
       if (!response.ok) {
-        if (!check.current?.isRejection(body)) setError(body.message ?? PROBLEM_REPORT_FAILED_TEXT);
+        if (check.current?.isRejection(body)) return;
+        const text = body.message ?? PROBLEM_REPORT_FAILED_TEXT;
+        // A field problem lands next to its field.
+        if (body.field === "message") { setMessageError(text); messageRef.current?.focus(); }
+        else if (body.field === "email") { setEmailError(text); document.getElementById("problem-report-email")?.focus(); }
+        else setError(text);
         return;
       }
       setReference(body.reference ?? "");
@@ -124,29 +140,34 @@ export function ProblemReportSection() {
           </p>
         ) : (
           <form className={styles.form} noValidate onSubmit={submit}>
-            <label className={styles.label}>
-              What happened?
+            <div className={styles.label}>
+              <label htmlFor="problem-report-message">What happened?</label>
               <textarea
-                aria-describedby="problem-report-count"
+                {...fieldErrorProps("problem-report-message-error", messageError, "problem-report-count")}
+                id="problem-report-message"
                 maxLength={PROBLEM_REPORT_MESSAGE_MAX}
                 name="message"
-                onChange={(event) => setMessage(event.target.value)}
+                onChange={(event) => { setMessage(event.target.value); setMessageError(""); }}
+                ref={messageRef}
                 required
                 value={message}
               />
+              <FieldError id="problem-report-message-error">{messageError}</FieldError>
               <span className={`${styles.hint} ${styles.count}`} id="problem-report-count">{message.length} of {PROBLEM_REPORT_MESSAGE_MAX}</span>
-            </label>
-            <label className={styles.label}>
-              Email (optional, so we can follow up)
-              <input
-                autoComplete="email"
+            </div>
+            <div className={styles.label}>
+              <label htmlFor="problem-report-email">Email (optional, so we can follow up)</label>
+              <EmailInput
+                error={emailError}
+                id="problem-report-email"
+                label="Email"
                 maxLength={PROBLEM_REPORT_EMAIL_MAX}
                 name="email"
-                onChange={(event) => { setEmailTouched(true); setEmail(event.target.value); }}
-                type="email"
+                onValueChange={(value) => { setEmailTouched(true); setEmail(value); setEmailError(""); }}
+                showNow={attempted}
                 value={email}
               />
-            </label>
+            </div>
             <label className={styles.checkRow}>
               <input checked={includeDetails} name="includeDetails" onChange={(event) => setIncludeDetails(event.target.checked)} type="checkbox" />
               <span className={styles.checkText}>
