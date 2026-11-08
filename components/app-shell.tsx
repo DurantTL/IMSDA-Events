@@ -282,8 +282,8 @@ export function AppShell({
         {!selectedEventId && <option value="" disabled>Choose an event</option>}
         {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
       </select>
-      {/* On a phone the select shows this label, not the event's name again; the select still takes the tap. */}
-      <span className={styles.pickerPhoneLabel} aria-hidden="true">Switch event</span>
+      {/* On a phone the select shows this short label (the select's own name stays "Switch event"), not the event's name again; the select still takes the tap. */}
+      <span className={styles.pickerPhoneLabel} aria-hidden="true">Switch</span>
       <ChevronDown aria-hidden="true" size={16} />
     </span>
   );

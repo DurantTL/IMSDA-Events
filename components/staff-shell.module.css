@@ -299,14 +299,15 @@
   .topLink span { display: none; }
   .topLink { min-width: 44px; justify-content: center; padding: 0; }
   /* The event's name and "Switch event" share one row (#1734). The select keeps the tap but shows the label, not the name again. */
-  .eventBar { flex-wrap: nowrap; gap: 8px; padding-top: 8px; }
+  .eventBar { flex-wrap: wrap; gap: 0 8px; padding-top: 8px; }
   .eventBar .crumb { flex: none; }
-  .eventName { flex: 1 1 0; font-size: 1.05rem; line-height: 1.2; }
-  .eventTools { flex: none; margin-left: 0; width: auto; }
+  /* The name keeps room for its words (never broken mid-word); the switcher drops to its own line only when the name cannot fit beside it. */
+  .eventName { flex: 1 1 7rem; min-width: 7rem; font-size: 1.05rem; line-height: 1.2; overflow-wrap: break-word; word-break: normal; }
+  .eventTools { flex: none; margin-left: auto; width: auto; }
   .pickerShell select { max-width: none; color: transparent; padding-right: 34px; }
   .pickerShell select option { color: var(--ink); }
   .pickerShell .pickerPhoneLabel { position: absolute; left: 12px; display: block; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; pointer-events: none; white-space: nowrap; }
-  .pickerShell select { width: 9.5rem; }
+  .pickerShell select { width: 6.25rem; }
   /* On a phone Archived events is a 44px icon link beside the switcher (named by its aria-label), so the row stays one row. */
   .eventTools { gap: 0; }
   .archivedText { display: none; }

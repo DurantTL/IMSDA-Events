@@ -113,9 +113,10 @@ describe("the event bar on a phone", () => {
 
   it("puts the name and Switch event on one row without repeating the name in the switcher on a phone", () => {
     expect(markup).toContain('aria-label="Switch event"');
-    expect(markup).toContain(">Switch event</span>");
+    expect(markup).toContain(">Switch</span>");
     const css = read("components/staff-shell.module.css");
-    expect(css).toMatch(/\.eventBar \{ flex-wrap: nowrap;/);
+    expect(css).toMatch(/\.eventBar \{ flex-wrap: wrap;/);
+    expect(css).toMatch(/\.eventName \{ flex: 1 1 7rem; min-width: 7rem;/);
     expect(css).toMatch(/\.pickerPhoneLabel \{ display: none; \}/);
   });
 });
