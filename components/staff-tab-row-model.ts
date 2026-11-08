@@ -25,3 +25,13 @@ export function viewCurrent(view: Pick<RowView, "current" | "href">, pathname?: 
   if (!view.current) return undefined;
   return pathname !== undefined && pathOfHref(view.href) !== pathname ? "true" : "page";
 }
+
+/**
+ * Whether a row of tabs fits (#1734): the row's natural width against the room it has. A row collapses to its menu line only
+ * when it would not fit, at any screen width, never because the screen is narrow. A row not yet measured (no width) fits.
+ * Sub-pixel rounding gets a 0.5px allowance so a row that exactly fits never flips to the menu.
+ */
+export function tabRowFits(naturalWidth: number, room: number): boolean {
+  if (!(naturalWidth > 0) || !(room > 0)) return true;
+  return naturalWidth <= room + 0.5;
+}

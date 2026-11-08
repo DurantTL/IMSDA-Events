@@ -163,11 +163,12 @@ describe("tab rows and the menu line (#1565)", () => {
     for (const [path, name] of names) expect(shell(path), path).toContain(`${name}, now on`.replace(", now on", ""));
   });
 
-  it("never scrolls a tab row sideways or cuts it off: below 1024px, or when it does not fit, it is the menu line", () => {
+  it("never scrolls a tab row sideways or cuts it off: when it does not fit, at any width, it is the menu line (#1734)", () => {
     const css = read("components/staff-shell.module.css");
     const tabsRule = css.match(/\.tabs \{[^}]*\}/)?.[0] ?? "";
     expect(tabsRule).not.toMatch(/overflow-x:\s*(auto|scroll)/);
-    expect(css).toMatch(/@media \(max-width: 1023\.98px\) \{\s*\.tabs \{ display: none; \}\s*\.menuline \{ display: flex; \}/);
+    // Narrow screens no longer hide the tabs on their own: only the fit check does.
+    expect(css).not.toMatch(/\.tabs \{ display: none; \}/);
     expect(css).toMatch(/\.tabline\[data-fit="tight"\] \.tabs \{[^}]*visibility: hidden/);
     expect(css).toMatch(/\.tabline\[data-fit="tight"\] \.menuline \{ display: flex; \}/);
     expect(css).toMatch(/\.current \{[^}]*border-bottom: 4px solid var\(--imsda-gold\)/);

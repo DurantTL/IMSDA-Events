@@ -147,7 +147,10 @@ describe("the Admin area on /admin pages", () => {
     expect(tabsOf(events)).toContain('href="/archived-events?event=evt_one">Archived events');
     expect(events.match(/>Archived events</g)).toHaveLength(1);
     navigation.pathname = "/overview";
-    expect(render(admin).match(/>Archived events</g)).toHaveLength(1);
+    // On an event page the list is the event switcher's last choice, once (#1734), not a link in the event bar.
+    const eventPage = render(admin);
+    expect(eventPage.match(/>Archived events…</g)).toHaveLength(1);
+    expect(eventPage).not.toContain('href="/archived-events"');
   });
 
   it("leaves the event tabs unchanged off /admin, and never shows system pages to non-admins", () => {
