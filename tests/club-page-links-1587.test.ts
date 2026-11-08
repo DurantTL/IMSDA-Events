@@ -30,6 +30,15 @@ describe("directory return (#1587)", () => {
     ]) expect(directoryReturnHref(bad), String(bad)).toBeNull();
   });
 
+  it("keeps the return when the search holds a percent sign or double slash", () => {
+    for (const q of ["100%", "a//b", "back\\slash"]) {
+      const dir = clubSummaryHref({ clubYear: "2025-26", query: q });
+      expect(directoryReturnHref(dir), q).toBe(dir);
+      const here = clubPageHref("club-1", "2025-26", dir);
+      expect(clubPageReturnHref(here, "club-1"), q).toBe(here);
+    }
+  });
+
   it("is carried by the directory card link and read back by the club page", () => {
     const href = clubDirectoryClubHref("club-1", "2025-26", directory);
     const from = new URL(href, "https://x.test").searchParams.get("from");
@@ -49,7 +58,7 @@ describe("club page return (#1587)", () => {
     expect(clubPageReturnHref("/admin/organizations/club-2/club?year=2025-26", "club-1")).toBeNull();
     expect(clubPageReturnHref("/admin/organizations/club-1/directors", "club-1")).toBeNull();
     expect(clubPageReturnHref("https://evil.example/admin/organizations/club-1/club", "club-1")).toBeNull();
-    expect(clubPageReturnHref("/admin/organizations/club-1/club?year=2025-26&from=https://evil.example", "club-1")).toBeNull();
+    expect(clubPageReturnHref("/admin/organizations/club-1/club?year=2025-26&from=https://evil.example", "club-1")).toBe("/admin/organizations/club-1/club?year=2025-26"); // the external from is dropped, never followed
     expect(clubPageReturnHref(`/admin/organizations/club-1/club?year=2025-26&from=${encodeURIComponent("/admin/clubs/reports")}`, "club-1")).toBe("/admin/organizations/club-1/club?year=2025-26");
     expect(clubPageReturnHref("/admin/organizations/club-1/club?year=bad", "club-1")).toBe("/admin/organizations/club-1/club");
   });
@@ -70,6 +79,10 @@ describe("the This club cards (#1587)", () => {
     expect(cards.every((card) => card.status === null)).toBe(true);
   });
 
+  it("leaves out Monthly Records for an inactive club, whose records the view does not list", () => {
+    expect(clubRelatedCards({ ...base, clubActive: false, viewer: all }).map((c) => c.title)).toEqual(["Club admins", "Club profile", "Honors"]);
+  });
+
   it("shows only what the viewer can reach", () => {
     expect(clubRelatedCards({ ...base, viewer: { canAdministerClub: false, clubsAdministration: true } }).map((c) => c.title)).toEqual(["Monthly Records"]);
     expect(clubRelatedCards({ ...base, viewer: { canAdministerClub: true, clubsAdministration: false } }).map((c) => c.title)).toEqual(["Club admins", "Club profile", "Honors"]);
@@ -88,6 +101,15 @@ describe("selected club page source (#1587)", () => {
     expect(page).toContain("Back to Club directory");
     expect(page.indexOf("<HubCardGroup")).toBeLessThan(page.indexOf("<ActAsButton"));
     expect(page).toContain("canAdministerClubOrganization(user, organizationId)");
+  });
+
+  it("keeps heading order: This club, Act as Director, then the year overview before the overview's own sections", () => {
+    const at = (text: string) => page.indexOf(text);
+    expect(at('title="This club"')).toBeGreaterThan(0);
+    expect(at("<HubCardGroup")).toBeLessThan(at(">Act as Director</h2>"));
+    expect(at(">Act as Director</h2>")).toBeLessThan(at("Club year overview"));
+    expect(at("Club year overview")).toBeLessThan(at("<ClubOverview"));
+    expect(at("Club year overview")).toBeLessThan(at("<ClubGuardiansPanel"));
   });
 
   it("adds no birth date, guardian, screening, health or financial fields of its own", () => {

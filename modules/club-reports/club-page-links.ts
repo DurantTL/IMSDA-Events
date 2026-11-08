@@ -13,11 +13,19 @@ const DIRECTORY_PATH = "/admin/clubs/summary";
 const MAX_PAGE = 1000;
 const PLACEHOLDER_ORIGIN = "https://same-site.invalid";
 
+/**
+ * Parses a same-site relative path. Only the path part is run through `safeReturnTo` (so an external URL, a protocol-relative
+ * URL, a backslash or an API route is refused); the query is never trusted as is, callers rebuild from whitelisted parts, so
+ * a search such as "100%" or "a//b" inside it does not lose the return.
+ */
 function parseSafe(from: string | null | undefined): URL | null {
-  if (typeof from !== "string" || safeReturnTo(from, "") !== from) return null;
+  if (typeof from !== "string" || from.length === 0) return null;
+  const queryAt = from.indexOf("?");
+  const pathPart = queryAt === -1 ? from : from.slice(0, queryAt);
+  if (safeReturnTo(pathPart, "") !== pathPart) return null;
   try {
     const url = new URL(from, PLACEHOLDER_ORIGIN);
-    return url.origin === PLACEHOLDER_ORIGIN ? url : null;
+    return url.origin === PLACEHOLDER_ORIGIN && url.pathname === pathPart ? url : null;
   } catch {
     return null;
   }
@@ -74,7 +82,7 @@ export type ClubLinksViewer = {
  * (no read on this page supplies one), so nothing here can show a number that was not read. A card the viewer could not
  * open is left out; one to four cards, so the row always fills.
  */
-export function clubRelatedCards(input: { organizationId: string; clubName: string; clubYear: string; directoryHref?: string | null; viewer: ClubLinksViewer }): HubCard[] {
+export function clubRelatedCards(input: { organizationId: string; clubName: string; clubActive?: boolean; clubYear: string; directoryHref?: string | null; viewer: ClubLinksViewer }): HubCard[] {
   const { organizationId, clubName, clubYear, viewer } = input;
   const id = encodeURIComponent(organizationId);
   const from = encodeURIComponent(clubPageHref(organizationId, clubYear, input.directoryHref));
@@ -84,7 +92,8 @@ export function clubRelatedCards(input: { organizationId: string; clubName: stri
     cards.push({ href: `/admin/organizations/${id}/profile?from=${from}`, title: "Club profile", description: "The club's name, sponsoring church and contact details.", status: null });
     cards.push({ href: `/admin/organizations/${id}/club/honors?year=${encodeURIComponent(clubYear)}`, title: "Honors", description: "Honors this club's members have earned. View only.", status: null });
   }
-  if (viewer.clubsAdministration) {
+  // The records view lists active clubs only, so an inactive club would not be found there: no card.
+  if (viewer.clubsAdministration && input.clubActive !== false) {
     cards.push({
       href: `${clubSummaryHref({ clubYear, view: "records", query: clubName })}#${clubSummaryAnchors.records}`,
       title: "Monthly Records",

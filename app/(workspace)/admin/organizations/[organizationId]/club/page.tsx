@@ -66,6 +66,7 @@ export default async function StaffOpenClubPage({
   const cards = clubRelatedCards({
     organizationId,
     clubName: club.name,
+    clubActive: club.isActive,
     clubYear: view.clubYear,
     directoryHref,
     viewer: { canAdministerClub: await canAdministerClubOrganization(user, organizationId), clubsAdministration: true },
@@ -111,6 +112,8 @@ export default async function StaffOpenClubPage({
         <Eye aria-hidden="true" size={14} /> View only.{" "}
         Change club admins or the profile from the cards above, and file or correct reports from Monthly Records.
       </p>
+
+      <h2 className={styles.sectionHeading} id="club-year-overview-heading">Club year overview · {view.clubYear}</h2>
 
       <nav aria-label="Roster club year" className="intro-actions club-year-choice">
         {view.choices.map((year) => (
