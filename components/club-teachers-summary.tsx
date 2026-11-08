@@ -61,6 +61,7 @@ export function ClubTeachersSummary({ instructorsHref, summary }: { instructorsH
                         <span translate="no">{teacher.name}</span>
                         {teacher.honorName ? <> · <span translate="no">{teacher.honorName}</span></> : null}
                         {" · "}<span translate="no">{teacher.siteName}</span>
+                        {teacher.flag ? <> · <strong className={styles.below}>{teacher.flag}</strong></> : null}
                       </li>
                     ))}
                   </ul>

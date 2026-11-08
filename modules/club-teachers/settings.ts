@@ -1,10 +1,12 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import { logError } from "@/lib/logger";
 import { type MembershipLookup, type Session } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { ClubTeacherError, getTeacherRule, ruleFromRow, type TeacherActor } from "@/modules/club-teachers/repository";
 import type { TeacherRule, TeacherSettingsInput } from "@/modules/club-teachers/domain";
+import { dispatchUnsuppressedAlert } from "@/modules/operations/alerting";
 import { eventModuleDefinition } from "@/modules/event-modules/catalog";
 import {
   ScopedToggleError,
@@ -84,6 +86,7 @@ export async function applyTeacherSettings(actor: TeacherSettingsActor, eventId:
   }
   const who = scopedActorAudit(actor);
   const title = eventModuleDefinition(moduleKey).title;
+  const wasOn = await scopedModuleIsOn(eventId, moduleKey);
   await prisma.$transaction(async (tx) => {
     if (input.rule) {
       // A coordinator saves the numbers only; "require" keeps whatever staff set.
@@ -107,5 +110,52 @@ export async function applyTeacherSettings(actor: TeacherSettingsActor, eventId:
     }
     await writeScopedModuleSwitch(tx, { actor, eventId, moduleKey, enabled: input.enabled });
   });
+  // A coordinator turning the tool back on while staff's "require" is still stored on is a conflict staff should hear about (#1727).
+  if (actor.kind === "area-coordinator" && input.enabled === true && !wasOn) {
+    await notifyRequireBackOn(actor.accountId, eventId);
+  }
   return loadTeacherToolState(eventId, actor.kind);
+}
+
+/**
+ * Tells staff that "require teachers" is back on for an event because an Area Coordinator turned the tool on (#1727),
+ * through the alert webhook the problem reports use (#1483). The stored value is never changed: staff keep it or turn it
+ * off. Audited whether or not the webhook answered; a webhook that is down never fails the switch.
+ */
+async function notifyRequireBackOn(accountId: string, eventId: string): Promise<void> {
+  const rule = await getTeacherRule(eventId);
+  if (!rule?.requireTeachers) return;
+  const prisma = getPrisma();
+  const [event, account] = await Promise.all([
+    prisma.event.findUnique({ where: { id: eventId }, select: { name: true } }),
+    prisma.attendeeAccount.findUnique({ where: { id: accountId }, select: { displayName: true } }),
+  ]);
+  const title = eventModuleDefinition(moduleKey).title;
+  const eventName = event?.name ?? "a club event";
+  const who = account?.displayName?.trim() || "An Area Coordinator";
+  let delivered = false;
+  try {
+    const result = await dispatchUnsuppressedAlert({
+      key: `club-teachers.require-back-on.${eventId}`,
+      severity: "WATCH",
+      summary: `Require teachers is back on for ${eventName}. ${who} (Area Coordinator) turned the ${title} tool on, and staff had set it to block registrations below the teacher number. Open Club teachers to keep it or turn it off.`,
+    });
+    delivered = result.delivered;
+  } catch (error) {
+    logError("The require-teachers notice could not be sent to staff", error, { eventId });
+  }
+  try {
+    await writeAuditLog({
+      eventId,
+      action: "CLUB_TEACHER_REQUIRE_NOTICE_SENT",
+      entityType: "ClubTeacherRule",
+      entityId: eventId,
+      summary: delivered
+        ? `Told staff that require teachers is back on: an Area Coordinator turned the ${title} tool on.`
+        : `Tried to tell staff that require teachers is back on: an Area Coordinator turned the ${title} tool on. The alert was not delivered.`,
+      metadata: { actorAttendeeAccountId: accountId, viaAreaCoordinator: true, eventId, moduleKey, requireTeachers: true, delivered },
+    });
+  } catch (error) {
+    logError("The require-teachers notice could not be audited", error, { eventId });
+  }
 }
