@@ -16,6 +16,8 @@ import { requirementSummary, type ClubRequiredForms } from "@/modules/club-forms
 import { reportMonthLabel } from "@/modules/club-reports/domain";
 import type { RecordToReview } from "@/modules/club-reports/review-domain";
 import type { WhosMissingRow } from "@/modules/club-reports/whos-missing-what";
+import { useRecordFrom } from "@/components/use-record-from";
+import { withRecordFrom } from "@/modules/club-reports/record-return-domain";
 import { clubRosterAttendeeTypeLabels } from "@/modules/club-rosters/domain";
 import { EMERGENCY_CONTACT_TERM, GUARDIAN_SLOTS, type GuardianRecord } from "@/modules/club-rosters/guardians-domain";
 import styles from "./coordinator-whos-missing.module.css";
@@ -122,6 +124,7 @@ const RECORDS_TO_REVIEW_SORT = {
 } satisfies Record<string, SortSpec<RecordToReview>>;
 
 export function RecordsToReviewTable({ rows, month }: { rows: readonly RecordToReview[]; month: string }) {
+  const from = useRecordFrom();
   const sorted = useTableSort(rows, RECORDS_TO_REVIEW_SORT, "review");
   return (
     <div className="report-table-wrap">
@@ -142,7 +145,7 @@ export function RecordsToReviewTable({ rows, month }: { rows: readonly RecordToR
               <th role="rowheader" scope="row" translate="no">{row.name}{row.church && <small> ({row.church})</small>}</th>
               <td {...cardCell("Points")}>{row.points}{row.late && <small> late</small>}</td>
               <td {...cardCell("Open")}>
-                <Link className="secondary-button" href={`/admin/clubs/reports/${encodeURIComponent(row.id)}/${row.month}`}>Open<span className="sr-only">{` ${row.name} record`}</span></Link>
+                <Link className="secondary-button" href={withRecordFrom(`/admin/clubs/reports/${encodeURIComponent(row.id)}/${row.month}`, from)}>Open<span className="sr-only">{` ${row.name} record`}</span></Link>
               </td>
               <td {...cardCell("Review")}><ClubReportReview clubName={row.name} compact month={row.month} organizationId={row.id} reviewed={false} /></td>
             </tr>

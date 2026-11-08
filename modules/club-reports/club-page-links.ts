@@ -95,7 +95,8 @@ export function clubRelatedCards(input: { organizationId: string; clubName: stri
   // The records view lists active clubs only, so an inactive club would not be found there: no card.
   if (viewer.clubsAdministration && input.clubActive !== false) {
     cards.push({
-      href: `${clubSummaryHref({ clubYear, view: "records", query: clubName })}#${clubSummaryAnchors.records}`,
+      // The records view shows "Back to <club>" for a valid club-page `from` (#1588).
+      href: `${clubSummaryHref({ clubYear, view: "records", query: clubName })}&from=${from}#${clubSummaryAnchors.records}`,
       title: "Monthly Records",
       description: "This club's monthly reports for the club year, found by its name.",
       status: null,

@@ -114,7 +114,7 @@ describe("staff areas (#1565)", () => {
       ["/admin", "", "admin", "system-administration"],
       ["/admin/clubs", "", "clubs", "club-administration"],
       ["/admin/clubs/summary", "", "clubs", "club-summary"],
-      ["/admin/clubs/summary", "view=points", "reports", "points"],
+      ["/admin/clubs/summary", "view=points", "clubs", "monthly-records"],
       ["/admin/clubs/summary", "view=records", "clubs", "monthly-records"],
       ["/admin/clubs/reports/year-end", "", "reports", "year-end"],
       ["/admin/clubs/reports/org_1/2026-10", "", "clubs", "monthly-records"],

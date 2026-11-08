@@ -75,7 +75,10 @@ describe("the This club cards (#1587)", () => {
     expect(cards[0]!.href).toBe(`/admin/organizations/club-1/directors?from=${from}`);
     expect(cards[1]!.href).toBe(`/admin/organizations/club-1/profile?from=${from}`);
     expect(cards[2]!.href).toBe("/admin/organizations/club-1/club/honors?year=2025-26");
-    expect(cards[3]!.href).toBe(`${clubSummaryHref({ clubYear: "2025-26", view: "records", query: "Synthetic Pathfinders" })}#monthly-records`);
+    // The records view honours a club-page `from` (#1588) and shows "Back to <club>".
+    expect(cards[3]!.href.startsWith(`${clubSummaryHref({ clubYear: "2025-26", view: "records", query: "Synthetic Pathfinders" })}&from=`)).toBe(true);
+    expect(cards[3]!.href.endsWith("#monthly-records")).toBe(true);
+    expect(new URL(cards[3]!.href, "https://x.test").searchParams.get("from")!.startsWith("/admin/organizations/club-1/club?year=2025-26")).toBe(true);
     expect(cards.every((card) => card.status === null)).toBe(true);
   });
 

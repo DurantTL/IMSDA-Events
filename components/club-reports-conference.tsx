@@ -8,6 +8,8 @@ import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { Download } from "lucide-react";
 import { clubYearMonths, isLockedForClub, monthNotDueForClub, yearToDate } from "@/modules/club-reports/domain";
 import type { ClubYearSummary } from "@/modules/club-reports/repository";
+import { useRecordFrom } from "@/components/use-record-from";
+import { withRecordFrom } from "@/modules/club-reports/record-return-domain";
 import { cardCell } from "@/components/table-card-labels";
 
 const shortMonth = (month: string) => new Date(`${month}-15T12:00:00Z`).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
@@ -29,6 +31,7 @@ export function ClubReportsConference({
   viewOnlyReportHref?: { base: string; query: string };
 }) {
   const viewOnly = Boolean(viewOnlyReportHref);
+  const from = useRecordFrom();
   const [clubs, setClubs] = useState(initialClubs);
   const [error, setError] = useState("");
   const months = clubYearMonths(clubYear);
@@ -87,7 +90,7 @@ export function ClubReportsConference({
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <p className="field-help">{`${clubs.length} active clubs · ${missingTotal} missing reports so far.`}</p>
       {clubs.length === 0 ? (
-        <div className="panel"><p className="report-empty">No active clubs yet.</p></div>
+        <div className="panel"><p className="report-empty">{`No active clubs for ${clubYear}. Try another club year.`}</p></div>
       ) : (
         <div className="report-table-wrap club-reports-grid">
           {sorted.noteText && <SortOrderNote>{sorted.noteText}</SortOrderNote>}
@@ -111,7 +114,7 @@ export function ClubReportsConference({
                     const future = month > now.slice(0, 7) || monthNotDueForClub(month, club.joinedOn, false);
                     const href = viewOnlyReportHref
                       ? `${viewOnlyReportHref.base}/${encodeURIComponent(club.id)}/${month}${viewOnlyReportHref.query}`
-                      : `/admin/clubs/reports/${encodeURIComponent(club.id)}/${month}`;
+                      : withRecordFrom(`/admin/clubs/reports/${encodeURIComponent(club.id)}/${month}`, from);
                     if (report) {
                       return <td key={month} {...cardCell(shortMonth(month))}><Link href={href}>{report.totalPoints}</Link>{!report.onTime && <small> late</small>}{report.reviewed && <small> reviewed</small>}</td>;
                     }

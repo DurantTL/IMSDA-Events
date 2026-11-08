@@ -31,6 +31,7 @@ import {
 } from "@/modules/club-reports/area-table-sort";
 import { buildStaffMonthlyRecords } from "@/modules/club-reports/staff-monthly-records-domain";
 import { buildStaffPoints } from "@/modules/club-reports/staff-points-domain";
+import { parseClubPageFrom, recordFromParam, withRecordFrom } from "@/modules/club-reports/record-return-domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
 import styles from "@/components/club-directory.module.css";
@@ -39,7 +40,7 @@ import pointsStyles from "@/components/staff-points.module.css";
 export const metadata: Metadata = { title: "Club summary" };
 export const dynamic = "force-dynamic";
 
-type Search = { year?: string; sort?: string; dir?: string; gridSort?: string; gridDir?: string; overviewSort?: string; overviewDir?: string; q?: string | string[]; view?: string; attention?: string; page?: string; month?: string; show?: string; all?: string };
+type Search = { year?: string; sort?: string; dir?: string; gridSort?: string; gridDir?: string; overviewSort?: string; overviewDir?: string; q?: string | string[]; view?: string; attention?: string; page?: string; month?: string; show?: string; all?: string; from?: string };
 const views = [
   { key: "directory", label: "Club directory", icon: LayoutGrid },
   { key: "records", label: "Monthly Records", icon: ClipboardList },
@@ -87,9 +88,15 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
   const gridSorting = serverSort("/admin/clubs/summary", searchParamsRecord, gridSortColumns(clubYear), GRID_DEFAULT_SORT, { prefix: "grid", hash: "#monthly-grid" });
   const overviewSorting = serverSort("/admin/clubs/summary", searchParamsRecord, OVERVIEW_SORT_COLUMNS, OVERVIEW_DEFAULT_SORT, { prefix: "overview", hash: "#club-overview" });
   const eventSorting = serverSort("/admin/clubs/summary", searchParamsRecord, EVENT_CLUB_SORT_COLUMNS, EVENT_CLUB_DEFAULT_SORT, { hash: "#club-events" });
+  // A record opened from the Monthly Records view carries that view's address, so its back link returns to it (#1588).
+  const recordsFrom = view === "records" ? recordFromParam("/admin/clubs/summary", recordsSearch(searchParamsRecord, clubYear)) : null;
+  const clubFrom = view === "records" ? parseClubPageFrom(params.from) : null;
+  // Only a club that is among this year's clubs gets a link back (#1588).
+  const fromClubName = clubFrom ? clubs.find((club) => club.id === clubFrom.organizationId)?.name : undefined;
+  const fromClub = clubFrom && fromClubName ? clubFrom : null;
   const links = {
     clubHref: (id: string) => clubDirectoryClubHref(id, clubYear),
-    reportHref: (id: string, month: string) => `/admin/clubs/reports/${encodeURIComponent(id)}/${encodeURIComponent(month)}?year=${encodeURIComponent(clubYear)}`,
+    reportHref: (id: string, month: string) => withRecordFrom(`/admin/clubs/reports/${encodeURIComponent(id)}/${encodeURIComponent(month)}?year=${encodeURIComponent(clubYear)}`, recordsFrom),
   };
   return (
     <section className="page-stack">
@@ -138,8 +145,9 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
         {newYearStatus && newYearStatus.clubs.length > 0 && <details className={`panel ${styles.details}`}><summary>Roster carry-forward status</summary><ClubNewYearStatus clubHref={(id) => clubDirectoryClubHref(id, newYearStatus.toClubYear)} status={newYearStatus} /></details>}
       </>}
       {view === "records" && <>
+        {fromClub && <Link className="secondary-button" href={fromClub.href} prefetch={false}>Back to {fromClubName}</Link>}
         <Link className="secondary-button" href={`/admin/clubs/reports?year=${encodeURIComponent(clubYear)}`}>Review monthly records</Link>
-        <StaffMonthlyRecords clubYear={clubYear} links={links} view={buildStaffMonthlyRecords({ clubs, clubYear, now, month: params.month, q: params.q, show: params.show, all: params.all, sort: params.sort, dir: params.dir })} />
+        <StaffMonthlyRecords clubYear={clubYear} fromClub={fromClub?.href ?? null} links={links} view={buildStaffMonthlyRecords({ clubs, clubYear, now, month: params.month, q: params.q, show: params.show, all: params.all, sort: params.sort, dir: params.dir })} />
         <details className={`panel ${styles.details}`} open={Boolean(params.gridSort || params.overviewSort) || undefined}>
           <summary>Full-year grid and yearly totals</summary>
           <AreaMonthlyReportsTable clubYear={clubYear} clubs={clubs} links={links} sorting={gridSorting} />
@@ -152,4 +160,14 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
       {view === "events" && <AreaClubEvents clubHref={links.clubHref} events={events} sorting={eventSorting} />}
     </section>
   );
+}
+
+/** The records view's own address as the record's `from` reads it: its year and the filter and sort params it uses. */
+function recordsSearch(record: Record<string, string | string[] | undefined>, clubYear: string) {
+  const search = new URLSearchParams({ view: "records", year: clubYear });
+  for (const [name, value] of Object.entries(record)) {
+    const first = Array.isArray(value) ? value[0] : value;
+    if (name !== "view" && name !== "year" && first !== undefined) search.set(name, first);
+  }
+  return search;
 }
