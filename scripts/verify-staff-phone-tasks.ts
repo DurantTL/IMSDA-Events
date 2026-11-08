@@ -9,7 +9,7 @@
  *  3. enter an edit page, change a field, try to leave, get the unsaved-changes guard, stay, then leave;
  *  4. open a record and come back to the list with its search kept;
  *  5. check an attendee in (and undo it, so the run can be repeated);
- *  6. reach a secondary tool through More (the sheet on a phone, Event setup > All event tools on an iPad);
+ *  6. reach a secondary tool through More (the sheet on a phone, the Event setup tab on an iPad);
  *  7. the sheets fit the screen with Close in view, and a focused field is never under the bottom bar.
  *
  * Then as limited roles, asserting each sees only their subset in every menu (rail, tab row, bottom bar, More sheet) and
@@ -351,9 +351,9 @@ const tasks: Task[] = [
         await page.locator('[data-staff-menu-line] button:has-text("Event menu")').click();
         await page.locator("[data-staff-menu]").waitFor({ state: "visible", timeout: 5000 });
         check((await insideViewport(page, "[data-staff-menu] button:has-text('Close')")) === "ok", "Event menu: Close is in view");
-        await page.locator("[data-staff-menu] a:has-text('All event tools')").first().click();
+        await page.locator("[data-staff-menu] a:has-text('Event setup')").first().click();
         await page.waitForURL(/\/more(\?|$)/, { timeout: 15000 });
-        check(pathOf(page) === "/more", "All event tools opened");
+        check(pathOf(page) === "/more", "Event setup opened");
         const tool = page.locator('main.workspace a[href^="/more/emergency-plan"], main.workspace a[href^="/more/promo-codes"], main.workspace a[href^="/more/kitchen-report"], main.workspace a[href^="/more/meals"]').first();
         await tool.waitFor({ state: "visible", timeout: 15000 });
         await tool.click();

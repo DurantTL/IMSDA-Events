@@ -104,44 +104,44 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/home` | Page link | Home | Needs you | - | bar: Home | Home menu | - | `app/(workspace)/home/page.tsx` |
 | `/home/coming-up` | Page link | Home | Coming up | - | bar: Home | Home menu | - | `app/(workspace)/home/coming-up/page.tsx` |
 | `/imports` | More directory | Events (inside an event) | Registrations | Imports | More, This event | Event menu | - | `app/(workspace)/imports/page.tsx` |
-| `/information-forms` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/information-forms/page.tsx` |
-| `/information-forms/responses` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/information-forms/responses/page.tsx` |
-| `/more` | Event sidebar | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/page.tsx` |
-| `/more/attendee-configuration` | Event sidebar | Events (inside an event) | Event setup | Attendee setup | More, This event | Event menu | - | `app/(workspace)/more/attendee-configuration/page.tsx` |
-| `/more/club-assignments` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/club-assignments/page.tsx` |
-| `/more/club-forms` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/club-forms/page.tsx` |
-| `/more/club-forms/[submissionId]` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/club-forms/[submissionId]/page.tsx` |
-| `/more/clubs` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/clubs/page.tsx` |
-| `/more/clubs/[organizationId]` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/clubs/[organizationId]/page.tsx` |
-| `/more/clubs/reports` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/clubs/reports/page.tsx` |
-| `/more/clubs/reports/[organizationId]/[month]` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/clubs/reports/[organizationId]/[month]/page.tsx` |
-| `/more/emergency-plan` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/emergency-plan/page.tsx` |
-| `/more/emergency-plan/print` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/emergency-plan/print/page.tsx` |
-| `/more/event-content` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/event-content/page.tsx` |
-| `/more/event-health` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/event-health/page.tsx` |
-| `/more/event-patches` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/event-patches/page.tsx` |
-| `/more/event-settings` | Event sidebar | Events (inside an event) | Event setup | Event settings | More, This event | Event menu | - | `app/(workspace)/more/event-settings/page.tsx` |
-| `/more/features` | Event sidebar | Events (inside an event) | Event setup | Event features | More, This event | Event menu | - | `app/(workspace)/more/features/page.tsx` |
+| `/information-forms` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/information-forms/page.tsx` |
+| `/information-forms/responses` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/information-forms/responses/page.tsx` |
+| `/more` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/page.tsx` |
+| `/more/attendee-configuration` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/attendee-configuration/page.tsx` |
+| `/more/club-assignments` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/club-assignments/page.tsx` |
+| `/more/club-forms` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/club-forms/page.tsx` |
+| `/more/club-forms/[submissionId]` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/club-forms/[submissionId]/page.tsx` |
+| `/more/clubs` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/clubs/page.tsx` |
+| `/more/clubs/[organizationId]` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/clubs/[organizationId]/page.tsx` |
+| `/more/clubs/reports` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/clubs/reports/page.tsx` |
+| `/more/clubs/reports/[organizationId]/[month]` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/clubs/reports/[organizationId]/[month]/page.tsx` |
+| `/more/emergency-plan` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/emergency-plan/page.tsx` |
+| `/more/emergency-plan/print` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/emergency-plan/print/page.tsx` |
+| `/more/event-content` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-content/page.tsx` |
+| `/more/event-health` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-health/page.tsx` |
+| `/more/event-patches` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-patches/page.tsx` |
+| `/more/event-settings` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/event-settings/page.tsx` |
+| `/more/features` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/features/page.tsx` |
 | `/more/health` | Event sidebar | Events (inside an event) | Reports | Operational health | More, This event | Event menu | - | `app/(workspace)/more/health/page.tsx` |
-| `/more/health-records/[organizationId]/[memberId]` | Event sidebar | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/health-records/[organizationId]/[memberId]/page.tsx` |
-| `/more/honors` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/honors/page.tsx` |
-| `/more/honors/instructors` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/honors/instructors/page.tsx` |
-| `/more/honors/rosters` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/honors/rosters/page.tsx` |
-| `/more/honors/schedule` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/honors/schedule/page.tsx` |
-| `/more/issued-assets` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/issued-assets/page.tsx` |
-| `/more/issued-assets/closeout` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/issued-assets/closeout/page.tsx` |
+| `/more/health-records/[organizationId]/[memberId]` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/health-records/[organizationId]/[memberId]/page.tsx` |
+| `/more/honors` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/honors/page.tsx` |
+| `/more/honors/instructors` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/honors/instructors/page.tsx` |
+| `/more/honors/rosters` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/honors/rosters/page.tsx` |
+| `/more/honors/schedule` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/honors/schedule/page.tsx` |
+| `/more/issued-assets` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/issued-assets/page.tsx` |
+| `/more/issued-assets/closeout` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/issued-assets/closeout/page.tsx` |
 | `/more/kitchen-report` | Page link | Events (inside an event) | Reports | Kitchen report | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/page.tsx` |
 | `/more/kitchen-report/closeout` | Page link | Events (inside an event) | Reports | Kitchen report | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/closeout/page.tsx` |
 | `/more/kitchen-report/counts` | Event sidebar | Events (inside an event) | Reports | Kitchen counts | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/counts/page.tsx` |
 | `/more/kitchen-report/scanner-import` | Page link | Events (inside an event) | Reports | Kitchen report | More, This event | Event menu | - | `app/(workspace)/more/kitchen-report/scanner-import/page.tsx` |
 | `/more/ledger-health` | Page link | Events (inside an event) | Money | More money tools | More, This event | Event menu | - | `app/(workspace)/more/ledger-health/page.tsx` |
-| `/more/lodging` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/lodging/page.tsx` |
-| `/more/lodging/assignments` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/lodging/assignments/page.tsx` |
-| `/more/lodging/requests` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/lodging/requests/page.tsx` |
-| `/more/meals` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/meals/page.tsx` |
-| `/more/merchandise` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/merchandise/page.tsx` |
-| `/more/program-assignments` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/program-assignments/page.tsx` |
-| `/more/program-assignments/[runId]` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/program-assignments/[runId]/page.tsx` |
+| `/more/lodging` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/lodging/page.tsx` |
+| `/more/lodging/assignments` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/lodging/assignments/page.tsx` |
+| `/more/lodging/requests` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/lodging/requests/page.tsx` |
+| `/more/meals` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/meals/page.tsx` |
+| `/more/merchandise` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/merchandise/page.tsx` |
+| `/more/program-assignments` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/program-assignments/page.tsx` |
+| `/more/program-assignments/[runId]` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/program-assignments/[runId]/page.tsx` |
 | `/more/promo-codes` | More directory | Events (inside an event) | Money | Promo codes | More, This event | Event menu | - | `app/(workspace)/more/promo-codes/page.tsx` |
 | `/more/reports` | Event sidebar | Events (inside an event) | Reports | Operational reports | More, This event | Event menu | - | `app/(workspace)/more/reports/page.tsx` |
 | `/more/reports/clubs` | Page link | Events (inside an event) | Reports | Operational reports | More, This event | Event menu | - | `app/(workspace)/more/reports/clubs/page.tsx` |
@@ -151,8 +151,8 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/more/reports/clubs/team-form/[registrationId]` | Page link | Events (inside an event) | Reports | Operational reports | More, This event | Event menu | - | `app/(workspace)/more/reports/clubs/team-form/[registrationId]/page.tsx` |
 | `/more/reports/clubs/team-form/level` | Page link | Events (inside an event) | Reports | Operational reports | More, This event | Event menu | - | `app/(workspace)/more/reports/clubs/team-form/level/page.tsx` |
 | `/more/reports/packets` | Page link | Events (inside an event) | Reports | Printouts | More, This event | Event menu | - | `app/(workspace)/more/reports/packets/page.tsx` |
-| `/more/tags` | Event sidebar | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/tags/page.tsx` |
-| `/more/team-results` | Page link | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/more/team-results/page.tsx` |
+| `/more/tags` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/tags/page.tsx` |
+| `/more/team-results` | Page link | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/more/team-results/page.tsx` |
 | `/overview` | Event sidebar | Events (inside an event) | Event home | Dashboard | More, This event | Event menu | - | `app/(workspace)/overview/page.tsx` |
 | `/people` | Event sidebar | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/page.tsx` |
 | `/people/attendees` | More directory | Events (inside an event) | Registrations | Attendee list | More, This event | Event menu | - | `app/(workspace)/people/attendees/page.tsx` |
@@ -163,9 +163,9 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/people/responsible-adults` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/responsible-adults/page.tsx` |
 | `/people/staff-invitations` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/page.tsx` |
 | `/people/staff-invitations/approvals` | Page link | Events (inside an event) | Registrations | All registrations | More, This event | Event menu | - | `app/(workspace)/people/staff-invitations/approvals/page.tsx` |
-| `/registration-builder` | Event sidebar | Events (inside an event) | Event setup | Registration forms | More, This event | Event menu | - | `app/(workspace)/registration-builder/page.tsx` |
+| `/registration-builder` | Event sidebar | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/registration-builder/page.tsx` |
 | `/select-event` | Existing page link | Home | none (Help, Profile and pages no tab lists light Home and no tab) | - | More | Home menu | - | `app/select-event/page.tsx` |
-| `/staff` | More directory | Events (inside an event) | Event setup | All event tools | More, This event | Event menu | - | `app/(workspace)/staff/page.tsx` |
+| `/staff` | More directory | Events (inside an event) | Event setup | Event setup | More, This event | Event menu | - | `app/(workspace)/staff/page.tsx` |
 
 158 staff page definitions. Dynamic patterns count once. Alias routes remain aliases. The table does not enumerate query states, permissions or approved data fields; those remain with each owning issue and page guard.
 
@@ -200,13 +200,17 @@ Each Admin tab (Events, Clubs, People, Forms, Catalogs and settings) opens its o
 | `/finance` sub-pages (Owed by churches, Billing responsibility, Attendance reconciliation, Scholarship fund, Invoices, Cancellation rules and requests, Unmatched Square payments, Ledger check) | Money > Payments owns them for the marking, and the Payments page keeps its tool links; the "More money tools" grouped page waits for #1575 and is not listed until it exists |
 | `/people` sub-pages (Find duplicates, Directory review, Teams waiting for a club, Responsible adults, Staff invitations) | Registrations > All registrations owns them, and that page lists them as links; a review-queues page waits for #1574 |
 | Imports, Attendee list | Views of the Registrations tab |
-| Honors Weekend classes, instructors, rosters and schedule (`/more/honors/**`) | Event setup > All event tools (the `/more` directory) lists the classes card, and the classes page links the other three |
-| Event features (`/more/features`) | A view of Event setup |
+| Honors Weekend classes, instructors, rosters and schedule (`/more/honors/**`) | Event setup (the `/more` page, grouped cards) lists the classes card under Program, and the classes page links the other three |
+| Event features (`/more/features`) | A card in the Basics group of Event setup (the tab has no view strip) |
 | Event module requests (`/admin/feature-requests`) | The Event module requests section of the System administration dashboard (`/admin`); it is the page's own title now |
 | Club invites, Import clubs, Import health records, Sterling Volunteers | Views of the Clubs tabs New club applications and Club administration |
 | Archived events (`/archived-events`) | Events tab for system administrators and Event Administrators, and the event bar's link for everyone else |
 
+## Event setup (#1586)
+
+The Event setup tab opens one grouped page, `/more`, with no view strip: Basics, Registration, Program, Lodging and items, Sales, People and clubs. Each card opens its own page and every page keeps its URL and its Event setup lighting. A card shows only when the person may open its page and, for a module page, the module is on for the event. Promo codes is the Money page and says so. The Team page (`/staff`) says it is the event staff team, not participant staff invitations or System account access. Health, change-of-type leftovers, modules that are off, Request a feature and the activity trail stay below the cards.
+
 ## Left out until built
 
 - Events > All events: there is no in-shell list of all events yet. Staff open an event from the Events row's "Open an event" picker or the dashboards, and switch from the event bar.
-- Money > Refunds and More money tools (#1575), Registrations > Review queues (#1574), Event setup groups (#1571 and the setup issues), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).
+- Money > Refunds and More money tools (#1575), Registrations > Review queues (#1574), the reserved event tabs Operations and Safety (no feature or route exists, so none is listed).
