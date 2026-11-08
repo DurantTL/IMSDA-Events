@@ -36,6 +36,14 @@
   text-decoration: none;
 }
 
+/* A main action with nothing waiting behind it is a plain link, not a filled button (#1733). */
+.action.actionQuiet {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--imsda-navy);
+  font-weight: 700;
+}
+
 /* The stats use the shared .metric-grid and .metric-card; this fits them to the count so a row is never left with a lone card:
    1 across the row, 2, 3 or 4 across, four as 2 x 2 on an iPad, one per row on a phone. */
 ul.stats {

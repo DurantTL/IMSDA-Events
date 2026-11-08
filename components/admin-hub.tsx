@@ -18,7 +18,7 @@ export function AdminHub({ view }: { view: HubBody }) {
       <div className={styles.intro}>
         <p className={styles.introText}>{view.description}</p>
         {view.action ? (
-          <Link className={styles.action} href={view.action.href} data-testid="hub-action">
+          <Link className={view.action.primary === false ? `${styles.action} ${styles.actionQuiet}` : styles.action} data-primary={view.action.primary === false ? "false" : "true"} href={view.action.href} data-testid="hub-action">
             {view.action.label}
             <ArrowRight aria-hidden="true" size={16} />
           </Link>
