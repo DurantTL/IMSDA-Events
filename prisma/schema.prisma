@@ -4630,6 +4630,8 @@ model AuditLog {
   @@index([eventId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([correlationId])
+  /// Roster health flags (#1709) read a person's roster saves by row id.
+  @@index([entityType, entityId])
 }
 
 model ImportRun {

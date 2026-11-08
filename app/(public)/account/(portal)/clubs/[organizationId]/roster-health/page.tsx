@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { ClubSetupHelp } from "@/components/role-setup-help";
 import { BackLink } from "@/components/back-link";
 import { clubAccessClosed } from "@/components/club-access-closed";
 import { ClubRosterHealthTable, RosterHealthCountList } from "@/components/club-roster-health";
@@ -23,6 +24,7 @@ export default async function ClubRosterHealthPage({ params }: { params: Promise
   const list = await loadRosterHealth(organizationId, access.capabilities);
   if (!list) notFound();
   const base = `/account/clubs/${organizationId}`;
+  const notChecked = (flag: "NO_HEALTH_RECORD" | "NO_PHOTO_RELEASE") => list.notChecked.find((item) => item.flag === flag)?.reason ?? null;
   return (
     <>
       <BackLink href={`${base}/roster`}>Back to the roster</BackLink>
@@ -33,11 +35,23 @@ export default async function ClubRosterHealthPage({ params }: { params: Promise
         </div>
         <p className="quiet-copy">
           Active people on the roster with something missing or out of date. A record counts as out of date when nobody has
-          edited the person or their emergency contacts for over a year. This only says that something is missing; open the
+          saved the person (including their emergency contacts) on the roster for over a year. This only says that something is missing; open the
           roster to add it. You can turn this off in <a href={`${base}/club-info#club-optional-features`}>Club settings</a>.
         </p>
-        <RosterHealthCountList counts={list.counts} />
-        {list.notChecked.map((item) => <p className="inline-notice" key={item.flag}>{item.reason}</p>)}
+        <RosterHealthCountList counts={list.counts} notChecked={list.notChecked.map((item) => item.flag)} />
+        {/* A check that could not run says so and who can turn it on. A neutral note, not the green success notice. */}
+        {notChecked("NO_HEALTH_RECORD") && (
+          <>
+            <p className="quiet-copy">{notChecked("NO_HEALTH_RECORD")}</p>
+            <ClubSetupHelp base={base} context="the health record check" id="roster-health-health-off" />
+          </>
+        )}
+        {notChecked("NO_PHOTO_RELEASE") && (
+          <>
+            <p className="quiet-copy">{notChecked("NO_PHOTO_RELEASE")}</p>
+            <ClubSetupHelp base={base} context="the photo release check" id="roster-health-photo-off" />
+          </>
+        )}
       </section>
       <ClubRosterHealthTable rows={list.rows} />
     </>

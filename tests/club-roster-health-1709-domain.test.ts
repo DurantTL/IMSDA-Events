@@ -4,6 +4,7 @@ import {
   canSeeRosterHealth,
   canSwitchClubFeatures,
   isClubOptionalFeatureKey,
+  isClubRosterEdit,
   lastMeaningfulUpdate,
   outdatedBefore,
   rosterHealthCounts,
@@ -104,28 +105,31 @@ describe("rosterHealthFlags", () => {
 describe("lastMeaningfulUpdate", () => {
   const at = (iso: string) => new Date(iso);
 
-  it("dates a never-edited person by the earliest row, not by a carried-forward copy", () => {
-    const first = { createdAt: at("2024-09-10T10:00:00Z"), updatedAt: at("2024-09-10T10:00:00Z") };
-    const carried = { createdAt: at("2025-08-20T10:00:00Z"), updatedAt: at("2025-08-20T10:00:00Z") };
-    expect(lastMeaningfulUpdate([carried, first], [])?.toISOString()).toBe("2024-09-10T10:00:00.000Z");
+  it("is the latest save by the club, across every year's row", () => {
+    expect(lastMeaningfulUpdate([at("2024-09-10T10:00:00Z")], [at("2025-02-01T10:00:00Z"), at("2026-03-01T10:00:00Z")])?.toISOString()).toBe("2026-03-01T10:00:00.000Z");
   });
 
-  it("uses the latest real edit on any year's row", () => {
-    const first = { createdAt: at("2024-09-10T10:00:00Z"), updatedAt: at("2025-02-01T10:00:00Z") };
-    const carried = { createdAt: at("2025-08-20T10:00:00Z"), updatedAt: at("2025-08-20T10:00:00Z") };
-    expect(lastMeaningfulUpdate([first, carried], [])?.toISOString()).toBe("2025-02-01T10:00:00.000Z");
-  });
-
-  it("counts an edited emergency contact, but not a contact copied forward", () => {
-    const row = { createdAt: at("2024-09-10T10:00:00Z"), updatedAt: at("2024-09-10T10:00:00Z") };
-    const edited = { createdAt: at("2024-09-10T10:00:00Z"), updatedAt: at("2026-03-01T10:00:00Z") };
-    const copied = { createdAt: at("2025-08-20T10:00:00Z"), updatedAt: at("2025-08-20T10:00:00Z") };
-    expect(lastMeaningfulUpdate([row], [edited])?.toISOString()).toBe("2026-03-01T10:00:00.000Z");
-    expect(lastMeaningfulUpdate([row], [copied])?.toISOString()).toBe("2024-09-10T10:00:00.000Z");
+  it("falls back to the earliest row's creation date when nobody has saved the person since", () => {
+    expect(lastMeaningfulUpdate([at("2025-08-20T10:00:00Z"), at("2024-09-10T10:00:00Z")], [])?.toISOString()).toBe("2024-09-10T10:00:00.000Z");
   });
 
   it("is null with nothing to go on", () => {
     expect(lastMeaningfulUpdate([], [])).toBeNull();
+  });
+});
+
+describe("isClubRosterEdit", () => {
+  it("counts a person added or saved by the club", () => {
+    expect(isClubRosterEdit({ action: "CLUB_ROSTER_MEMBER_ADDED", metadata: { source: "DIRECTOR" } })).toBe(true);
+    expect(isClubRosterEdit({ action: "CLUB_ROSTER_MEMBER_UPDATED", metadata: { fields: ["firstName"] } })).toBe(true);
+    expect(isClubRosterEdit({ action: "CLUB_ROSTER_MEMBER_UPDATED" })).toBe(true);
+  });
+
+  it("does not count a status flip, a carry-forward, an import's year move, a removal or a registration filling in a reported age", () => {
+    for (const action of ["CLUB_ROSTER_MEMBER_DEACTIVATED", "CLUB_ROSTER_MEMBER_REACTIVATED", "CLUB_ROSTER_CARRIED_FORWARD", "CLUB_IMPORT_YEAR_MOVED", "CLUB_ROSTER_MEMBER_REMOVED"]) {
+      expect(isClubRosterEdit({ action }), action).toBe(false);
+    }
+    expect(isClubRosterEdit({ action: "CLUB_ROSTER_MEMBER_UPDATED", metadata: { source: "CLUB_REGISTRATION", fields: ["reportedAge"] } })).toBe(false);
   });
 });
 

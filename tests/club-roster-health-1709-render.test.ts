@@ -40,6 +40,15 @@ describe("the roster health table", () => {
     expect(html).toContain('translate="no">Sam Rivers</th>');
   });
 
+  it("pages with the shared count line, 25 to a page", () => {
+    const many: RosterHealthRow[] = Array.from({ length: 30 }, (_, index) => ({ ...rows[0]!, id: `m${index}`, firstName: `Pat${index}` }));
+    const html30 = renderToStaticMarkup(createElement(ClubRosterHealthTable, { rows: many }));
+    expect(html30).toContain("Showing 1–25 of 30 people");
+    expect(html30.match(/<tr role="row">/g)).toHaveLength(26);
+    expect(html30).toContain('aria-label="Roster health pages"');
+    expect(html).toContain("Showing 1–2 of 2 people");
+  });
+
   it("says nobody is flagged instead of drawing an empty table", () => {
     const empty = renderToStaticMarkup(createElement(ClubRosterHealthTable, { rows: [] }));
     expect(empty).toContain("Nobody on this year&#x27;s roster has anything flagged.");
@@ -56,6 +65,18 @@ describe("the Home counts", () => {
     expect(html).toContain('href="/account/clubs/club-1/roster-health"');
     expect(html).not.toContain("Rivers");
     expect(html).not.toContain("Alex");
+  });
+});
+
+describe("counts for checks that never ran", () => {
+  it("reads Not checked, never zero, on the list page's and Home's counts", () => {
+    const counts = rosterHealthCounts(rows);
+    const home = renderToStaticMarkup(createElement(ClubHomeRosterHealth, { counts, notChecked: ["NO_HEALTH_RECORD", "NO_PHOTO_RELEASE"], href: "/x" }));
+    expect(home.match(/Not checked/g)).toHaveLength(2);
+    expect(home).toMatch(/No health record<\/dt><dd class="club-home-count-value">Not checked/);
+    expect(home).toMatch(/No emergency contact<\/dt><dd class="club-home-count-value">1</);
+    const checked = renderToStaticMarkup(createElement(ClubHomeRosterHealth, { counts, href: "/x" }));
+    expect(checked).not.toContain("Not checked");
   });
 });
 

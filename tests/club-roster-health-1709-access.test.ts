@@ -132,6 +132,13 @@ describe("switching roster health flags on (PUT club features)", () => {
     expect(mocks.setClubFeature).toHaveBeenCalledWith("club-1", "roster-health-flags", true, { userId: "staff-1", actAsId: "act-1" });
   });
 
+  it("passes a Clubs Administrator acting as the director through, so the audit can name the role", async () => {
+    mocks.currentStaffActingContext.mockResolvedValue({ role: "CLUB_DIRECTOR", organizationId: "club-1", userId: "staff-1", staffSessionId: "s", actAsId: "act-1", viaClubsAdministrator: true });
+    mocks.prisma.organization.findUnique.mockResolvedValue({ type: "CLUB", isActive: true, name: "Test Pathfinders", parentOrganization: null });
+    expect((await PUT(put({ features: { "roster-health-flags": true } }), params)).status).toBe(200);
+    expect(mocks.setClubFeature).toHaveBeenCalledWith("club-1", "roster-health-flags", true, { userId: "staff-1", actAsId: "act-1", viaClubsAdministrator: true });
+  });
+
   it("rejects a key that is not on the typed list, and a body that is not an object of booleans", async () => {
     signedInAs("DIRECTOR");
     expect((await PUT(put({ features: { "something-else": true } }), params)).status).toBe(400);

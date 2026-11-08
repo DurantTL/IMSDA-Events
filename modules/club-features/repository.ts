@@ -11,7 +11,7 @@ import { clubOptionalFeatureDefinitions, type ClubOptionalFeatureKey } from "@/m
  */
 
 /** Who switched it: the attendee account of a director or deputy, or a staff user acting as the club's director (#442). */
-export type ClubFeatureActor = { accountId: string } | { userId: string; actAsId?: string };
+export type ClubFeatureActor = { accountId: string } | { userId: string; actAsId?: string; viaClubsAdministrator?: true };
 
 export class ClubFeatureError extends Error {
   constructor(public readonly code: "NOT_FOUND", message: string) {
@@ -49,7 +49,9 @@ export async function setClubFeature(organizationId: string, featureKey: ClubOpt
     const metadata = {
       organizationId,
       featureKey,
-      ...("accountId" in actor ? { actorAttendeeAccountId: actor.accountId } : actor.actAsId ? { actAsId: actor.actAsId } : {}),
+      ...("accountId" in actor
+        ? { actorAttendeeAccountId: actor.accountId }
+        : { ...(actor.actAsId ? { actAsId: actor.actAsId } : {}), ...(actor.viaClubsAdministrator ? { actorRole: "CLUBS_ADMINISTRATOR" } : {}) }),
     };
     const changed = enabled
       ? (await tx.clubOptionalFeature.createMany({ data: [{ organizationId, featureKey, ...who }], skipDuplicates: true })).count > 0

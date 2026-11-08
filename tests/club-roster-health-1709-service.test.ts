@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
     clubRosterMember: { findMany: vi.fn() },
     clubFormTemplate: { findUnique: vi.fn() },
     clubFormSubmission: { findMany: vi.fn() },
+    auditLog: { findMany: vi.fn() },
   };
   return {
     prisma,
@@ -50,6 +51,7 @@ beforeEach(() => {
   mocks.clubRosterComplianceStatuses.mockResolvedValue({ statuses: {}, notInCompliance: 0, expiringSoon: 0, missing: 0 });
   mocks.prisma.clubFormTemplate.findUnique.mockResolvedValue({ enabled: true });
   mocks.prisma.clubFormSubmission.findMany.mockResolvedValue([]);
+  mocks.prisma.auditLog.findMany.mockResolvedValue([]);
 });
 
 describe("the optional feature switch", () => {
@@ -84,6 +86,11 @@ describe("the optional feature switch", () => {
     expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ actorUserId: "staff-1", metadata: { actAsId: "act-1" } });
   });
 
+  it("records a Clubs Administrator acting as the director as one, like the health pages do", async () => {
+    await setClubFeature("club-1", "roster-health-flags", true, { userId: "staff-1", actAsId: "act-1", viaClubsAdministrator: true });
+    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ actorUserId: "staff-1", metadata: { actAsId: "act-1", actorRole: "CLUBS_ADMINISTRATOR" } });
+  });
+
   it("switches off with its own audit entry", async () => {
     await setClubFeature("club-1", "roster-health-flags", false, { accountId: "account-1" });
     expect(mocks.prisma.clubOptionalFeature.deleteMany).toHaveBeenCalledWith({ where: { organizationId: "club-1", featureKey: "roster-health-flags" } });
@@ -108,25 +115,25 @@ describe("the optional feature switch", () => {
   });
 });
 
-type Stamp = { createdAt: Date; updatedAt: Date };
-function member(id: string, overrides: Partial<{ attendeeType: string; createdAt: Date; updatedAt: Date; guardians: Array<{ name: string; relationship: string; email: string; phone: string } & Stamp> }> = {}) {
-  const createdAt = overrides.createdAt ?? day("2026-09-01");
+type Contact = { name: string; relationship: string; email: string; phone: string };
+function member(id: string, overrides: Partial<{ attendeeType: string; createdAt: Date; guardians: Contact[] }> = {}) {
   return {
     id,
     personId: `person-${id}`,
     attendeeType: overrides.attendeeType ?? "YOUTH",
-    createdAt,
-    updatedAt: overrides.updatedAt ?? createdAt,
+    createdAt: overrides.createdAt ?? day("2026-09-01"),
     person: { firstName: `First${id}`, lastName: `Last${id}` },
-    guardians: overrides.guardians ?? [{ name: "Pat Sample", relationship: "Parent", email: "", phone: "(515) 555-0100", createdAt, updatedAt: createdAt }],
+    guardians: overrides.guardians ?? [{ name: "Pat Sample", relationship: "Parent", email: "", phone: "(515) 555-0100" }],
   };
 }
-/** The two roster queries: this year's active rows, then every year's rows for the same people. */
-function rosterIs(rows: ReturnType<typeof member>[], history?: Array<{ personId: string } & Stamp & { guardians: Stamp[] }>) {
+type Row = ReturnType<typeof member>;
+/** The roster queries: this year's active rows, then every year's rows (id, person, created) for the same people. */
+function rosterIs(rows: Row[], history?: Array<{ id: string; personId: string; createdAt: Date }>) {
   mocks.prisma.clubRosterMember.findMany
     .mockResolvedValueOnce(rows)
-    .mockResolvedValueOnce(history ?? rows.map((row) => ({ personId: row.personId, createdAt: row.createdAt, updatedAt: row.updatedAt, guardians: row.guardians })));
+    .mockResolvedValueOnce(history ?? rows.map((row) => ({ id: row.id, personId: row.personId, createdAt: row.createdAt })));
 }
+const save = (entityId: string, createdAt: Date, action = "CLUB_ROSTER_MEMBER_UPDATED", metadata: Record<string, unknown> = { fields: ["firstName"] }) => ({ entityId, action, metadata, createdAt });
 function featureOn() {
   mocks.prisma.clubOptionalFeature.findUnique.mockResolvedValue({ id: "feature-1" });
 }
@@ -169,18 +176,56 @@ describe("loadRosterHealth", () => {
     expect(list?.notChecked).toEqual([]);
   });
 
-  it("flags a person not updated in over a year, using the last real edit across years", async () => {
+  /** An old record with everything else on file, so OUTDATED is the only thing that can show. */
+  async function outdatedFor(rows: Row[], history: Array<{ id: string; personId: string; createdAt: Date }>, audits: ReturnType<typeof save>[]) {
     featureOn();
-    const row = member("a", { createdAt: day("2026-08-20"), updatedAt: day("2026-08-20") });
-    rosterIs([row], [
-      { personId: row.personId, createdAt: day("2024-09-10"), updatedAt: day("2025-02-01"), guardians: [] },
-      { personId: row.personId, createdAt: day("2026-08-20"), updatedAt: day("2026-08-20"), guardians: [] },
-    ]);
-    mocks.healthRecordFlagsForRoster.mockResolvedValue({ a: true });
-    mocks.prisma.clubFormSubmission.findMany.mockResolvedValue([{ rosterMemberId: "a" }]);
-    const list = await loadRosterHealth("club-1", director, now);
-    expect(list?.rows).toHaveLength(1);
-    expect(list?.rows[0]).toMatchObject({ id: "a", flags: ["OUTDATED"], lastUpdated: "2025-02-01T12:00:00.000Z" });
+    rosterIs(rows, history);
+    mocks.prisma.auditLog.findMany.mockResolvedValue(audits);
+    mocks.healthRecordFlagsForRoster.mockResolvedValue(Object.fromEntries(rows.map((row) => [row.id, true])));
+    mocks.prisma.clubFormSubmission.findMany.mockResolvedValue(rows.map((row) => ({ rosterMemberId: row.id })));
+    return (await loadRosterHealth("club-1", director, now))!;
+  }
+  const oldRow = member("a", { createdAt: day("2024-09-10") });
+  const oldHistory = [{ id: "a", personId: "person-a", createdAt: day("2024-09-10") }];
+
+  it("flags a person nobody has saved in over a year, dated by the earliest row", async () => {
+    const list = await outdatedFor([oldRow], oldHistory, []);
+    expect(list.rows[0]).toMatchObject({ flags: ["OUTDATED"], lastUpdated: "2024-09-10T12:00:00.000Z" });
+  });
+
+  it("reads the club's saves from the roster's audit entries for every year's row of the person", async () => {
+    await outdatedFor([oldRow], oldHistory, []);
+    expect(mocks.prisma.auditLog.findMany.mock.calls[0]![0].where).toMatchObject({
+      entityType: "ClubRosterMember",
+      entityId: { in: ["a"] },
+      action: { in: ["CLUB_ROSTER_MEMBER_ADDED", "CLUB_ROSTER_MEMBER_UPDATED"] },
+    });
+  });
+
+  it("clears the flag when a contact is added to an old record (saved through the roster edit, which audits an update)", async () => {
+    expect((await outdatedFor([oldRow], oldHistory, [save("a", day("2026-10-01"))])).rows).toEqual([]);
+  });
+
+  it("clears the flag for a name-only edit, which leaves the row's own timestamp alone", async () => {
+    expect((await outdatedFor([oldRow], oldHistory, [save("a", day("2026-10-02"), "CLUB_ROSTER_MEMBER_UPDATED", { fields: ["firstName", "lastName"] })])).rows).toEqual([]);
+  });
+
+  it("clears the flag when the person was added again this year, on a new row", async () => {
+    const readded = member("b", { createdAt: day("2026-09-05") });
+    const history = [{ id: "a", personId: "person-b", createdAt: day("2024-09-10") }, { id: "b", personId: "person-b", createdAt: day("2026-09-05") }];
+    expect((await outdatedFor([readded], history, [save("b", day("2026-09-05"), "CLUB_ROSTER_MEMBER_ADDED", { source: "DIRECTOR" })])).rows).toEqual([]);
+  });
+
+  it("does not clear the flag for a carry-forward, an import's year move, a status flip or a registration's reported age", async () => {
+    const carried = member("b", { createdAt: day("2026-08-20") });
+    const history = [{ id: "a", personId: "person-b", createdAt: day("2024-09-10") }, { id: "b", personId: "person-b", createdAt: day("2026-08-20") }];
+    // The carry-forward and the import move write no per-person entry; a status flip and a registration's age do, and do not count.
+    const audits = [
+      save("b", day("2026-08-20"), "CLUB_ROSTER_MEMBER_REACTIVATED", { fields: ["status"] }),
+      save("b", day("2026-09-01"), "CLUB_ROSTER_MEMBER_DEACTIVATED", { fields: ["status"] }),
+      save("b", day("2026-10-10"), "CLUB_ROSTER_MEMBER_UPDATED", { source: "CLUB_REGISTRATION", fields: ["reportedAge"] }),
+    ];
+    expect((await outdatedFor([carried], history, audits)).rows.map((row) => row.flags)).toEqual([["OUTDATED"]]);
   });
 
   it("flags a missing emergency contact, and treats an all-blank contact as missing", async () => {

@@ -261,7 +261,7 @@ export default async function ClubHomePage({
           unavailable={unavailable}
         />
       )}
-      {!readOnly && rosterHealth && rosterHealth !== "ERROR" && <ClubHomeRosterHealth counts={rosterHealth.counts} href={`${base}/roster-health`} />}
+      {!readOnly && rosterHealth && rosterHealth !== "ERROR" && <ClubHomeRosterHealth counts={rosterHealth.counts} notChecked={rosterHealth.notChecked.map((item) => item.flag)} href={`${base}/roster-health`} />}
       <ClubHomeRoster setupBase={base} clubYear={clubYear} preview={roster} readOnly={readOnly} rosterHref={rosterHref} unavailable={members === "ERROR"} />
       {events && (
         <ClubHomeEvents

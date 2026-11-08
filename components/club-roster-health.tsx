@@ -1,13 +1,16 @@
 "use client";
 
 import { CircleCheck } from "lucide-react";
+import { useState } from "react";
 import styles from "./club-roster-health.module.css";
+import { ListPager } from "@/components/list-pager";
 import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { formatPersonName } from "@/lib/person-name";
+import { paginate } from "@/lib/pagination";
 import { sortOrderText, sortRows, type SortKind, type SortState, type SortValue } from "@/lib/list-sort";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
-import { ROSTER_HEALTH_FLAGS, rosterHealthFlagCountLabels, rosterHealthFlagLabels, type RosterHealthCounts } from "@/modules/club-features/domain";
+import { ROSTER_HEALTH_FLAGS, rosterHealthFlagCountLabels, rosterHealthFlagLabels, type RosterHealthCounts, type RosterHealthNotChecked } from "@/modules/club-features/domain";
 import type { RosterHealthList, RosterHealthRow } from "@/modules/club-features/roster-health";
 
 /**
@@ -15,6 +18,7 @@ import type { RosterHealthList, RosterHealthRow } from "@/modules/club-features/
  * Never a health record's content, a contact or a check's details. Sorting happens in the browser, kept in the address.
  */
 
+const PAGE_SIZE = 25;
 const COLUMNS = ["person", "type", "updated", "needs"] as const;
 type Column = typeof COLUMNS[number];
 const NO_SORT: SortState<Column> = { key: null, dir: "asc" };
@@ -32,7 +36,7 @@ const LABELS: Record<Column, { label: string; kind: SortKind }> = {
 };
 
 /** The counts Home and this page both show: people checked, people flagged, and each kind. */
-export function RosterHealthCountList({ counts }: { counts: RosterHealthCounts }) {
+export function RosterHealthCountList({ counts, notChecked = [] }: { counts: RosterHealthCounts; notChecked?: RosterHealthNotChecked }) {
   return (
     <dl className="club-home-counts">
       <div className="club-home-count">
@@ -43,7 +47,8 @@ export function RosterHealthCountList({ counts }: { counts: RosterHealthCounts }
       {ROSTER_HEALTH_FLAGS.map((flag) => (
         <div className="club-home-count" key={flag}>
           <dt>{rosterHealthFlagCountLabels[flag]}</dt>
-          <dd className="club-home-count-value">{counts.byFlag[flag]}</dd>
+          {/* A check that never ran is not zero: say so. */}
+          <dd className="club-home-count-value">{notChecked.includes(flag) ? "Not checked" : counts.byFlag[flag]}</dd>
         </div>
       ))}
     </dl>
@@ -51,8 +56,12 @@ export function RosterHealthCountList({ counts }: { counts: RosterHealthCounts }
 }
 
 export function ClubRosterHealthTable({ rows }: { rows: RosterHealthList["rows"] }) {
-  const sort = useAddressSort(COLUMNS, NO_SORT, undefined, "health");
-  const shown = sort.key ? sortRows(rows, sort.key, sort.dir, accessors) : rows;
+  const [page, setPage] = useState(1);
+  // A new sort order starts again at page 1.
+  const sort = useAddressSort(COLUMNS, NO_SORT, () => setPage(1), "health");
+  const sorted = sort.key ? sortRows(rows, sort.key, sort.dir, accessors) : rows;
+  const slice = paginate(sorted, page, PAGE_SIZE);
+  const shown = slice.items;
   if (rows.length === 0) {
     return (
       <p className="inline-notice">
@@ -88,6 +97,7 @@ export function ClubRosterHealthTable({ rows }: { rows: RosterHealthList["rows"]
           ))}
         </tbody>
       </table>
+      <ListPager label="Roster health pages" noun="people" nounOne="person" onPage={setPage} slice={slice} />
     </div>
   );
 }

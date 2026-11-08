@@ -15,7 +15,7 @@ export type ClubOptionalFeatureKey = (typeof CLUB_OPTIONAL_FEATURE_KEYS)[number]
 export const clubOptionalFeatureDefinitions: Record<ClubOptionalFeatureKey, { title: string; description: string }> = {
   "roster-health-flags": {
     title: "Roster health flags",
-    description: "Lists the people on your roster whose record is over a year old or who are missing an emergency contact, a health record, a photo release or a Sterling Volunteers check, with counts on your club Home. It only says that something is missing; it never shows what is in a record.",
+    description: "Lists the people on your roster whose record is over a year old or who are missing an emergency contact, a health record, a photo release or a Sterling Volunteers check, with counts on your club Home. The photo release check covers the Pathfinder Photo and Video Release form linked to the roster. It only says that something is missing; it never shows what is in a record.",
   },
 };
 
@@ -77,24 +77,30 @@ export function sterlingApplies(attendeeType: string) {
   return STERLING_TYPES.includes(attendeeType);
 }
 
-/** A row edited at least this long after it was created counts as edited. A carried-forward or imported row is written once. */
-const EDIT_GAP_MS = 60_000;
+/** The audit actions that mean a club's director, deputy or registrar saved a person's record (add or edit). */
+export const ROSTER_EDIT_AUDIT_ACTIONS = ["CLUB_ROSTER_MEMBER_ADDED", "CLUB_ROSTER_MEMBER_UPDATED"] as const;
 
-type Stamped = { createdAt: Date; updatedAt: Date };
+/** An update written by a club registration filling in a reported age is the system's, not the club's, so it does not count. */
+const SYSTEM_EDIT_SOURCES: readonly string[] = ["CLUB_REGISTRATION"];
+
+export function isClubRosterEdit(entry: { action: string; metadata?: unknown }): boolean {
+  if (!(ROSTER_EDIT_AUDIT_ACTIONS as readonly string[]).includes(entry.action)) return false;
+  const source = entry.metadata && typeof entry.metadata === "object" ? (entry.metadata as { source?: unknown }).source : undefined;
+  return !(typeof source === "string" && SYSTEM_EDIT_SOURCES.includes(source));
+}
 
 /**
- * When the person's record was last meaningfully updated. The roster row's `updatedAt` alone would be wrong: carrying the
- * roster forward each August creates a fresh row, which would make everyone look updated that day. So this is the latest
- * time a roster row of that person in this club, or one of their emergency contacts, was edited after it was written
- * (`updatedAt` more than a minute past `createdAt`), over every year. A person never edited since they were first entered
- * is dated by the earliest row (when they were first added).
+ * When the person's record was last meaningfully updated: the latest time a club leader added or saved the person on any
+ * of this club's roster rows (the roster's own audit entries, `isClubRosterEdit`). Row timestamps are not used for edits:
+ * a name or contact-only save leaves the row's `updatedAt` alone, a new contact is created rather than updated, and the
+ * August carry-forward, an import's year move and a status flip all touch rows without being an update by the club.
+ * With no such entry (a person who came in by import or carry-forward and was never saved since), the earliest row's
+ * creation date is used.
  */
-export function lastMeaningfulUpdate(rows: readonly Stamped[], contacts: readonly Stamped[]): Date | null {
-  const all = [...rows, ...contacts];
-  if (all.length === 0) return null;
-  const edited = all.filter((row) => row.updatedAt.getTime() - row.createdAt.getTime() > EDIT_GAP_MS).map((row) => row.updatedAt.getTime());
-  if (edited.length > 0) return new Date(Math.max(...edited));
-  return new Date(Math.min(...rows.map((row) => row.createdAt.getTime()), ...contacts.map((row) => row.createdAt.getTime())));
+export function lastMeaningfulUpdate(rowCreatedAts: readonly Date[], editedAts: readonly Date[]): Date | null {
+  if (editedAts.length > 0) return new Date(Math.max(...editedAts.map((at) => at.getTime())));
+  if (rowCreatedAts.length === 0) return null;
+  return new Date(Math.min(...rowCreatedAts.map((at) => at.getTime())));
 }
 
 /** The moment a year before `now`: a record last updated before it is "over a year" old. */
@@ -126,6 +132,9 @@ export function rosterHealthFlags(input: RosterHealthInput, now: Date): RosterHe
   if (input.noSterlingCheck === true && sterlingApplies(input.attendeeType)) flags.push("NO_STERLING_CHECK");
   return flags;
 }
+
+/** The checks that could not be made, so their counts read "Not checked", never zero. */
+export type RosterHealthNotChecked = readonly RosterHealthFlag[];
 
 export type RosterHealthCounts = { people: number; flagged: number; byFlag: Record<RosterHealthFlag, number> };
 

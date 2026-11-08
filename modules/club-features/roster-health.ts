@@ -4,7 +4,9 @@ import { getPrisma } from "@/lib/prisma";
 import { clubRosterComplianceStatuses } from "@/modules/background-checks/repository";
 import {
   PHOTO_RELEASE_TEMPLATE_KEY,
+  ROSTER_EDIT_AUDIT_ACTIONS,
   canSeeRosterHealth,
+  isClubRosterEdit,
   lastMeaningfulUpdate,
   rosterHealthCounts,
   rosterHealthFlags,
@@ -79,22 +81,20 @@ async function computeRosterHealth(organizationId: string, now: Date): Promise<R
       id: true,
       personId: true,
       attendeeType: true,
-      createdAt: true,
-      updatedAt: true,
       person: { select: { firstName: true, lastName: true } },
-      guardians: { select: { name: true, relationship: true, email: true, phone: true, createdAt: true, updatedAt: true } },
+      guardians: { select: { name: true, relationship: true, email: true, phone: true } },
     },
   });
   const ids = members.map((member) => member.id);
   const personIds = members.flatMap((member) => (member.personId ? [member.personId] : []));
 
   const healthOn = healthRecordsEnabled();
-  const [otherYears, healthFlags, sterling, template, releases] = await Promise.all([
-    // Every year of this club's rows for these people, so a carried-forward row is dated by the last real edit.
+  const [history, healthFlags, sterling, template, releases] = await Promise.all([
+    // Every year of this club's rows for these people: creation dates for the fallback, and ids to find the club's saves.
     personIds.length > 0
       ? prisma.clubRosterMember.findMany({
         where: { organizationId, personId: { in: personIds }, status: { not: "REMOVED" } },
-        select: { personId: true, createdAt: true, updatedAt: true, guardians: { select: { createdAt: true, updatedAt: true } } },
+        select: { id: true, personId: true, createdAt: true },
       })
       : Promise.resolve([]),
     healthOn ? healthRecordFlagsForRoster(organizationId, ids) : Promise.resolve({} as Record<string, boolean>),
@@ -105,19 +105,32 @@ async function computeRosterHealth(organizationId: string, now: Date): Promise<R
       select: { rosterMemberId: true },
     }),
   ]);
+  // The club's own saves (added or edited a person), from the roster's audit entries, never from row timestamps.
+  const rowIds = history.map((row) => row.id);
+  const audits = rowIds.length > 0
+    ? await prisma.auditLog.findMany({
+      where: { entityType: "ClubRosterMember", entityId: { in: rowIds }, action: { in: [...ROSTER_EDIT_AUDIT_ACTIONS] } },
+      select: { entityId: true, action: true, metadata: true, createdAt: true },
+    })
+    : [];
+  const personByRow = new Map(history.map((row) => [row.id, row.personId]));
+  const editsByPerson = new Map<string, Date[]>();
+  for (const entry of audits) {
+    const person = entry.entityId ? personByRow.get(entry.entityId) : undefined;
+    if (person && isClubRosterEdit(entry)) editsByPerson.set(person, [...(editsByPerson.get(person) ?? []), entry.createdAt]);
+  }
   const photoOn = template?.enabled === true;
   const released = new Set(releases.flatMap((row) => (row.rosterMemberId ? [row.rosterMemberId] : [])));
-  const rowsByPerson = new Map<string, typeof otherYears>();
-  for (const row of otherYears) {
-    if (row.personId) rowsByPerson.set(row.personId, [...(rowsByPerson.get(row.personId) ?? []), row]);
+  const createdByPerson = new Map<string, Date[]>();
+  for (const row of history) {
+    if (row.personId) createdByPerson.set(row.personId, [...(createdByPerson.get(row.personId) ?? []), row.createdAt]);
   }
 
   const people = members
     .map((member) => {
-      const history = member.personId ? rowsByPerson.get(member.personId) ?? [] : [];
-      const rows = history.length > 0 ? history : [member];
-      const contacts = history.length > 0 ? history.flatMap((row) => row.guardians) : member.guardians;
-      const lastUpdated = lastMeaningfulUpdate(rows, contacts);
+      const lastUpdated = member.personId
+        ? lastMeaningfulUpdate(createdByPerson.get(member.personId) ?? [], editsByPerson.get(member.personId) ?? [])
+        : null;
       const flags = rosterHealthFlags({
         attendeeType: member.attendeeType,
         lastUpdated,

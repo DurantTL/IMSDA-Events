@@ -20,7 +20,9 @@ async function putHandler(request: Request, context: { params: Promise<{ organiz
       return Response.json({ error: "ROLE_NOT_ALLOWED", message: "Your club role doesn't include this. Ask your club director." }, { status: 403 });
     }
     const input = clubFeaturesInputSchema.parse(await readRosterJson(request));
-    const actor = actorAttribution(access.actor);
+    const attribution = actorAttribution(access.actor);
+    // A Clubs Administrator acting as the director is recorded as one, as the health pages do.
+    const actor = access.actor.kind === "STAFF_ACTING" && access.actor.viaClubsAdministrator ? { ...attribution, viaClubsAdministrator: true as const } : attribution;
     for (const key of CLUB_OPTIONAL_FEATURE_KEYS) {
       const wanted = input.features[key];
       if (wanted !== undefined) await setClubFeature(organizationId, key, wanted, actor);
