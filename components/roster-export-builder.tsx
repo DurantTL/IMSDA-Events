@@ -15,9 +15,23 @@ import {
 } from "@/modules/club-rosters/export-columns";
 import type { RosterExportFormatRecord } from "@/modules/club-rosters/export-repository";
 import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
+import { fileNameFromDisposition } from "@/components/export-link";
+import { CoordinatorClubPicker } from "@/components/coordinator-club-picker";
+import {
+  COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS,
+  DEFAULT_COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS,
+  coordinatorRosterExportHeader,
+  isCoordinatorRosterExportColumnKey,
+} from "@/modules/club-rosters/coordinator-export-columns";
 
 type PreviewResponse = { headers?: string[]; rows?: string[][]; totalRows?: number; message?: string };
 type FormatsResponse = { formats?: RosterExportFormatRecord[]; format?: RosterExportFormatRecord; message?: string };
+
+/** A chosen column: the director's keys, or the coordinator's own allow-list keys (#1760). */
+type ChosenColumn = { key: string; header: string };
+
+/** The Area Coordinator's use of this builder (#1760): pick clubs, GET preview and CSV, no renaming, no saved formats, nothing sensitive. */
+export type CoordinatorExportSetup = { clubs: { id: string; name: string }[]; initialClubIds: string[]; clubYear: string };
 
 function withDefaultHeader(key: RosterExportColumnKey): RosterExportColumn {
   return { key, header: ROSTER_EXPORT_COLUMNS[key].header };
@@ -30,20 +44,34 @@ function withDefaultHeader(key: RosterExportColumnKey): RosterExportColumn {
  * frozen copy of the roster.
  */
 export function RosterExportBuilder({
-  organizationId,
-  canSeeBirthDates,
+  organizationId = "",
+  canSeeBirthDates = false,
   canSeeGuardians = false,
-  initialFormats,
+  initialFormats = [],
+  coordinator,
 }: {
-  organizationId: string;
+  organizationId?: string;
   /** Directors and deputies only (#375); a registrar can build an export but never the birth-date column. */
-  canSeeBirthDates: boolean;
+  canSeeBirthDates?: boolean;
   /** Directors and deputies only (#510): everyone else is never offered the guardian columns. */
   canSeeGuardians?: boolean;
-  initialFormats: RosterExportFormatRecord[];
+  initialFormats?: RosterExportFormatRecord[];
+  /** Set for an Area Coordinator (#1760): the same column builder over the coordinator's own column list. */
+  coordinator?: CoordinatorExportSetup;
 }) {
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/roster/export`;
-  const [columns, setColumns] = useState<RosterExportColumn[]>(DEFAULT_ROSTER_EXPORT_COLUMNS);
+  const headerOf = (key: string) => (coordinator
+    ? (isCoordinatorRosterExportColumnKey(key) ? coordinatorRosterExportHeader(key) : key)
+    : ROSTER_EXPORT_COLUMNS[key as RosterExportColumnKey].header);
+  const [clubChoice, setClubChoice] = useState<{ all: boolean; ids: string[] }>({
+    all: !coordinator || coordinator.initialClubIds.length === 0,
+    ids: coordinator?.initialClubIds ?? [],
+  });
+  const [columns, setColumns] = useState<ChosenColumn[]>(
+    coordinator
+      ? DEFAULT_COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS.map((key) => ({ key, header: coordinatorRosterExportHeader(key) }))
+      : DEFAULT_ROSTER_EXPORT_COLUMNS,
+  );
   const [confirmSensitive, setConfirmSensitive] = useState(false);
   const [preview, setPreview] = useState<{ headers: string[]; rows: string[][]; totalRows: number } | null>(null);
   const [formats, setFormats] = useState(initialFormats);
@@ -59,24 +87,43 @@ export function RosterExportBuilder({
   const [notice, setNotice] = useState("");
 
   const chosenKeys = useMemo(() => new Set(columns.map((column) => column.key)), [columns]);
-  const offeredKeys = useMemo(() => rosterExportColumnKeysFor(canSeeGuardians), [canSeeGuardians]);
+  const offeredKeys: string[] = useMemo(
+    () => (coordinator ? COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS : rosterExportColumnKeysFor(canSeeGuardians)),
+    [coordinator, canSeeGuardians],
+  );
   const available = offeredKeys.filter((key) => !chosenKeys.has(key));
-  const sensitiveChosen = sensitiveRosterExportColumns(columns);
+  // The coordinator list has nothing sensitive to confirm: those columns are simply never offered.
+  const sensitiveChosen = coordinator ? [] : sensitiveRosterExportColumns(columns as RosterExportColumn[]);
   const needsConfirmation = sensitiveChosen.length > 0;
 
-  function addColumn(key: RosterExportColumnKey) {
+  function addColumn(key: string) {
     if (!offeredKeys.includes(key)) return;
     setPreview(null);
-    setColumns((current) => (current.some((column) => column.key === key) ? current : [...current, withDefaultHeader(key)]));
+    setColumns((current) => (current.some((column) => column.key === key)
+      ? current
+      : [...current, coordinator ? { key, header: headerOf(key) } : withDefaultHeader(key as RosterExportColumnKey)]));
   }
 
-  function removeColumn(key: RosterExportColumnKey) {
+  function removeColumn(key: string) {
     setPreview(null);
     setColumns((current) => {
       const next = current.filter((column) => column.key !== key);
-      if (!sensitiveRosterExportColumns(next).length) setConfirmSensitive(false);
+      if (!coordinator && !sensitiveRosterExportColumns(next as RosterExportColumn[]).length) setConfirmSensitive(false);
       return next;
     });
+  }
+
+  const noClubsChosen = Boolean(coordinator) && !clubChoice.all && clubChoice.ids.length === 0;
+
+  /** The coordinator route's query: ordered column keys, the clubs (or all) and the year. */
+  function coordinatorQuery(forPreview: boolean) {
+    const params = new URLSearchParams({
+      columns: columns.map((column) => column.key).join(","),
+      clubs: clubChoice.all ? "all" : clubChoice.ids.join(","),
+      year: coordinator?.clubYear ?? "",
+    });
+    if (forPreview) params.set("preview", "1");
+    return `/api/attendee/area-clubs/roster-export?${params.toString()}`;
   }
 
   function moveColumn(index: number, delta: -1 | 1) {
@@ -100,17 +147,19 @@ export function RosterExportBuilder({
     setNotice("");
     setBusy(true);
     try {
-      const response = await fetch(base, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, columns, confirmSensitive }),
-      });
+      const response = coordinator
+        ? await fetch(coordinatorQuery(mode === "preview"), { credentials: "same-origin", cache: "no-store" })
+        : await fetch(base, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode, columns, confirmSensitive }),
+        });
       if (mode === "csv" && response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = "roster-export.csv";
+        link.download = fileNameFromDisposition(response.headers.get("Content-Disposition")) ?? "roster-export.csv";
         link.click();
         URL.revokeObjectURL(url);
         setNotice("Downloaded the roster export.");
@@ -184,19 +233,32 @@ export function RosterExportBuilder({
     }
   }
 
-  const blockedByBirthDateAccess = columns.some((column) => column.key === "birthDate") && !canSeeBirthDates;
-  const canRun = columns.length > 0 && !blockedByBirthDateAccess && (!needsConfirmation || confirmSensitive);
+  const blockedByBirthDateAccess = !coordinator && columns.some((column) => column.key === "birthDate") && !canSeeBirthDates;
+  const canRun = columns.length > 0 && !blockedByBirthDateAccess && (!needsConfirmation || confirmSensitive) && !noClubsChosen;
 
   return (
     <div className="public-manage-card">
       {confirmDialog}
       <h2>Export builder</h2>
-      <p className="quiet-copy">
-        Build a CSV for an outside camporee: choose the columns it needs, put them in the order it wants, and rename
-        the headers to match its template. Save the structure as a named format to reuse it next time.
-      </p>
+      {coordinator ? (
+        <p className="quiet-copy">Choose the clubs, then the columns you need and their order. Preview shows the first rows before you download.</p>
+      ) : (
+        <p className="quiet-copy">
+          Build a CSV for an outside camporee: choose the columns it needs, put them in the order it wants, and rename
+          the headers to match its template. Save the structure as a named format to reuse it next time.
+        </p>
+      )}
 
-      {formats.length > 0 && (
+      {coordinator && (
+        <CoordinatorClubPicker
+          allClubs={clubChoice.all}
+          clubs={coordinator.clubs}
+          onChange={(next) => { setPreview(null); setClubChoice(next); }}
+          selectedIds={clubChoice.ids}
+        />
+      )}
+
+      {!coordinator && formats.length > 0 && (
         <section aria-labelledby="roster-export-formats-heading">
           <h3 id="roster-export-formats-heading">Saved formats</h3>
           <ul className="roster-export-format-list">
@@ -226,7 +288,7 @@ export function RosterExportBuilder({
             <select
               id="roster-export-add-column"
               onChange={(event) => {
-                if (isRosterExportColumnValue(event.target.value)) addColumn(event.target.value);
+                if (offeredKeys.includes(event.target.value)) addColumn(event.target.value);
                 event.target.value = "";
               }}
               value=""
@@ -234,7 +296,7 @@ export function RosterExportBuilder({
               <option value="">Choose a column…</option>
               {available.map((key) => (
                 <option key={key} value={key}>
-                  {ROSTER_EXPORT_COLUMNS[key].header}{isSensitiveRosterExportColumn(key) ? " (sensitive)" : ""}
+                  {headerOf(key)}{!coordinator && isSensitiveRosterExportColumn(key as RosterExportColumnKey) ? " (sensitive)" : ""}
                 </option>
               ))}
             </select>
@@ -248,15 +310,19 @@ export function RosterExportBuilder({
             {columns.map((column, index) => (
               <li key={column.key}>
                 <span className="roster-export-column-order">{index + 1}</span>
-                <label>
-                  <span className="sr-only">Header name for {ROSTER_EXPORT_COLUMNS[column.key].header}</span>
-                  <input
-                    onChange={(event) => renameHeader(index, event.target.value)}
-                    type="text"
-                    value={column.header}
-                  />
-                </label>
-                {isSensitiveRosterExportColumn(column.key) && <span className="status-chip gold">Sensitive</span>}
+                {coordinator ? (
+                  <strong>{column.header}</strong>
+                ) : (
+                  <label>
+                    <span className="sr-only">Header name for {headerOf(column.key)}</span>
+                    <input
+                      onChange={(event) => renameHeader(index, event.target.value)}
+                      type="text"
+                      value={column.header}
+                    />
+                  </label>
+                )}
+                {!coordinator && isSensitiveRosterExportColumn(column.key as RosterExportColumnKey) && <span className="status-chip gold">Sensitive</span>}
                 <div className="roster-export-column-actions">
                   <button aria-label={`Move ${column.header} up`} className="text-button" disabled={index === 0} onClick={() => moveColumn(index, -1)} type="button">↑</button>
                   <button aria-label={`Move ${column.header} down`} className="text-button" disabled={index === columns.length - 1} onClick={() => moveColumn(index, 1)} type="button">↓</button>
@@ -299,6 +365,8 @@ export function RosterExportBuilder({
       {error && <p className="status-chip coral" role="alert">{error}</p>}
       {notice && <p className="status-chip green" role="status">{notice}</p>}
 
+      {noClubsChosen && <p className="field-help">Choose at least one club, or All clubs, to preview or download.</p>}
+
       <div className="form-actions">
         <button className="secondary-button" disabled={busy || !canRun} onClick={() => request("preview")} type="button">Preview</button>
         <button className="primary-button" disabled={busy || !canRun} onClick={() => request("csv")} type="button">Download CSV</button>
@@ -324,7 +392,7 @@ export function RosterExportBuilder({
         </section>
       )}
 
-      <form className="roster-export-save-format" onSubmit={saveFormat}>
+      {!coordinator && <form className="roster-export-save-format" onSubmit={saveFormat}>
         <label htmlFor="roster-export-format-name">Save this column selection as a named format</label>
         <div className="roster-export-save-row">
           <input
@@ -338,11 +406,7 @@ export function RosterExportBuilder({
           <button aria-describedby={disabledHintId(saveBlocked, "roster-export-save-hint")} className="secondary-button" disabled={busy || !formatName.trim() || columns.length === 0} type="submit">Save format</button>
         </div>
         <DisabledHint id="roster-export-save-hint" reason={saveBlocked} />
-      </form>
+      </form>}
     </div>
   );
-}
-
-function isRosterExportColumnValue(value: string): value is RosterExportColumnKey {
-  return Object.hasOwn(ROSTER_EXPORT_COLUMNS, value);
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
@@ -34,6 +35,9 @@ export default async function AreaClubPage({ params }: { params: Promise<{ organ
 
   return (
     <>
+    <p>
+      <Link className="secondary-button" href={`/account/area-clubs/roster-export?club=${encodeURIComponent(organizationId)}`}>Export this club&apos;s roster</Link>
+    </p>
     <ClubOverview
       portalView
       backgroundChecks={{ includeNotes }}
