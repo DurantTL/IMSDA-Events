@@ -48,7 +48,7 @@
 ".assignment-field-hint span | 0.58rem",
 ".assignment-leave-out legend | 0.66rem",
 ".assignment-leave-out p | 0.62rem",
-".assignment-roster-intro h2 | 18pt",
+".assignment-roster-heading | 18pt",
 ".assignment-run-main p, .assignment-run-main small | 0.6rem",
 ".assignment-safety-note p, .assignment-feedback p, .assignment-capacity-warning p | 0.7rem",
 ".assignment-select-grid label | 0.62rem",

@@ -10,6 +10,8 @@ import { LocationFilter } from "@/components/location-filter";
 import { HonorPickRemoveButton, HonorSeatPlacementForm } from "@/components/honor-seat-override";
 import { ColumnHeader } from "@/components/column-header";
 import { SortOrderNote } from "@/components/list-sort";
+import { HonorsViewsStrip } from "@/components/honors-views-strip";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { PrintReportButton } from "@/components/print-report-button";
 import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -49,7 +51,12 @@ export default async function HonorRostersPage({
   // Placing a youth in a full class by hand, and removing a pick, are for system administrators only (#962); the server checks too.
   const canOverrideSeats = user.globalRole === "SYSTEM_ADMIN";
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Honors rosters are restricted" detail="This page needs report access." whoToAsk="your event administrator" />;
+    return (
+      <>
+        <HonorsViewsStrip current="rosters" eventId={event.id} permissions={permissions} />
+        <AccessRestricted title="Honors rosters are restricted" detail="This page needs report access." whoToAsk="your event administrator" />
+      </>
+    );
   }
   const includeDietary = permissions.includes("VIEW_SENSITIVE_DATA");
   // "All sites" plus each location, from the filter the other staff views share (#413).
@@ -104,20 +111,11 @@ export default async function HonorRostersPage({
 
   return (
     <section className="page-stack reports-workspace honor-rosters">
-      <div className="page-intro report-page-intro">
-        <div>
-          <p className="eyebrow">Honors Weekend</p>
-          <h2>Rosters for {data.event.name}</h2>
-          <p>
-            Class sheets, the site check-in roster, and each club&apos;s schedule, from submitted club registrations.
-            Ages are on the first day of the event.
-          </p>
-        </div>
-        <div className="intro-actions report-actions">
-          <Link className="secondary-button" href={`/more/honors?${eventQuery}`}>Back to classes</Link>
-          <PrintReportButton label="Print" />
-        </div>
-      </div>
+      <HonorsViewsStrip current="rosters" eventId={event.id} permissions={permissions} />
+      <StaffPageHeader
+        description="Class sheets, the site check-in roster, and each club's schedule, from submitted club registrations. Ages are on the first day of the event."
+        primary={<PrintReportButton label="Print" />}
+      />
 
       <div className="report-safety-note">
         <ShieldCheck aria-hidden="true" size={19} />

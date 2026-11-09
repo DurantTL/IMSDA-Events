@@ -1,6 +1,7 @@
 import { ExportLink } from "@/components/export-link";
 import type { Metadata } from "next";
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { Download, ShieldCheck } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { PrintReportButton } from "@/components/print-report-button";
@@ -55,18 +56,17 @@ export default async function ProgramAssignmentRosterPage({
 
   return (
     <section className="page-stack assignment-roster-page">
-      <div className="page-intro assignment-roster-intro">
-        <div>
-          <p className="eyebrow">Frozen assignment run</p>
-          <h2>{roster.fieldLabel}</h2>
-          <p>{roster.eventName} · {roster.formName} version {roster.formVersionNumber} · applied {formatInConferenceTime(roster.appliedAt, { dateStyle: "medium", timeStyle: "short" })} by {roster.appliedByName}</p>
-        </div>
-        <div className="intro-actions assignment-print-actions">
-          <Link className="secondary-button" href={`/more/program-assignments?event=${encodeURIComponent(event.id)}`}>Back to assignments</Link>
-          <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/program-assignments/${encodeURIComponent(roster.id)}/roster`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
-          <PrintReportButton />
-        </div>
-      </div>
+      <BackLink href={`/more/program-assignments?event=${encodeURIComponent(event.id)}`} variant="staff">Back to seminar assignments</BackLink>
+      <StaffPageHeader
+        description={<>Applied (frozen) run. {roster.eventName} · {roster.formName} version {roster.formVersionNumber} · applied {formatInConferenceTime(roster.appliedAt, { dateStyle: "medium", timeStyle: "short" })} by {roster.appliedByName}</>}
+        extra={
+          <>
+            <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/program-assignments/${encodeURIComponent(roster.id)}/roster`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
+            <PrintReportButton />
+          </>
+        }
+      />
+      <h2 className="assignment-roster-heading">{roster.fieldLabel}</h2>
       <div className="assignment-safety-note">
         <ShieldCheck aria-hidden="true" size={19} />
         <p><strong>Immutable roster.</strong> This printout is the exact applied run. Later registrations or form changes do not alter it.</p>

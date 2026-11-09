@@ -370,6 +370,8 @@ const pages: PageSpec[] = [
   staff("clubs-oversight-reports", "/more/clubs/reports"),
   staff("honors", "/more/honors"),
   staff("honors-rosters", "/more/honors/rosters"),
+  staff("honors-schedule", "/more/honors/schedule"),
+  staff("honors-instructors", "/more/honors/instructors"),
   staff("event-health", "/more/event-health"),
   // Ledger check (shadow, #117): the empty state, or the list of registrations whose ledger differs from the stored total.
   staff("ledger-check", "/more/ledger-health"),

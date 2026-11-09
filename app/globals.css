@@ -384,11 +384,12 @@
   .assignment-run-actions .secondary-button { width: auto; flex: 1; }
 }
 
+.assignment-roster-heading { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.125rem); overflow-wrap: anywhere; }
+
 @media print {
-  .assignment-print-actions,
   .assignment-roster-page .secondary-button { display: none !important; }
   .assignment-roster-page { gap: 12px; padding: 0; }
-  .assignment-roster-intro h2 { font-size: 18pt; }
+  .assignment-roster-heading { font-size: 18pt; }
   .assignment-safety-note { border-color: #aaa; background: white; color: #222; }
   .assignment-roster-group {
     border-color: #aaa;

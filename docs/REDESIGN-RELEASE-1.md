@@ -155,6 +155,20 @@ The event journeys (attendee and event staff pages) and the club journeys (club 
 
 - #1753 (low, not a blocker): the event switcher clips long names mid-word, and the Area Coordinator Overview runs an event name into its date. The second also happens on main.
 
+## Coverage after release 1 (#1596 ledger)
+
+Pages finished after the release-1 merge, one row per page, added by each child's PR. Browser checks ran on a seeded local database with synthetic data, signed in as the seeded system admin, at 1280 and 390 px.
+
+| Page | Issue | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|---|
+| `/more/honors` | #1580 | Event setup → Program card | Honors views strip (Classes, Schedule board, Instructors, Rosters) replaces the Tools menu | Pass: strip and current view, one h1, no sideways scroll | Restricted state: code and tests only (admin holds every permission) |
+| `/more/honors/schedule` | #1580 | Honors views strip | Board / Agenda switch; Agenda is the phone and iPad default (under 1024 px) with a Move dialog that lists every place and why it can't take the class; no layout jump on load | Pass: default view, switching, Move dialog (focus trap, Escape, focus return, after a move too), B17, C1, C2, L7 | Multi-site events, full classes and clashes with enrolled people were not set up in the browser |
+| `/more/honors/instructors` | #1580 | Honors views strip | Strip replaces the back link; header without a repeated title | Pass | - |
+| `/more/honors/rosters` | #1580 | Honors views strip, and Reports → Printouts (same page) | Strip replaces the back button; Print is the one primary action | Pass | - |
+| `/more/program-assignments` | #1580 | Event setup → Program card | Header without a repeated title; preview says it is not saved, applied runs say they are frozen history | Pass | - |
+| `/more/program-assignments/[runId]` | #1580 | Seminar assignments | Staff back link; the field name stays as a printed heading | Not opened | The seed has no assignment run (needs a published ranked-choice form); code and tests only |
+| `/more/team-results` | #1580 | Club event pages | Level views (Area, Conference, Union) as a views strip with counts; header without a repeated title | Pass (empty state, 0 teams) | Conference and Union levels with teams: the seed has no teams |
+
 ## Also in the merge (not redesign pages)
 
 The branch also carries its preview setup. None of it touches the database or the production configuration unless the server sets it:

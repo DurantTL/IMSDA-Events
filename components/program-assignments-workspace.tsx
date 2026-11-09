@@ -2,6 +2,7 @@
 
 import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -244,13 +245,7 @@ export function ProgramAssignmentsWorkspace({
   if (fields.length === 0) {
     return (
       <section className="page-stack program-assignments-workspace">
-        <div className="page-intro">
-          <div>
-            <p className="eyebrow">Program planning</p>
-            <h2>Seminar assignments</h2>
-            <p>Turn attendee rankings into room rosters for {eventName}.</p>
-          </div>
-        </div>
+        <StaffPageHeader description={`Turn attendee rankings into room rosters for ${eventName}.`} />
         <section className="panel assignment-empty">
           <span><UsersRound aria-hidden="true" size={24} /></span>
           <h3>No assignable ranked sessions yet</h3>
@@ -276,13 +271,7 @@ export function ProgramAssignmentsWorkspace({
 
   return (
     <section className="page-stack program-assignments-workspace">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Program planning</p>
-          <h2>Seminar assignments</h2>
-          <p>Preview the best fit from attendee rankings, check the result, and apply a frozen roster only when you are ready.</p>
-        </div>
-      </div>
+      <StaffPageHeader description="Preview the best fit from attendee rankings, check the result, and apply a frozen roster only when you are ready. A preview is not saved; an applied run is frozen history." />
 
       <div className="assignment-safety-note">
         <Eye aria-hidden="true" size={19} />

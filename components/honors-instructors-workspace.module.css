@@ -1,0 +1,5 @@
+/* Invite form (#1580): each label sits above its field, never run into it on one line. */
+.inviteForm > label {
+  display: grid;
+  gap: 6px;
+}

@@ -3,7 +3,7 @@
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { useConfirm } from "@/components/use-confirm";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Award, CalendarRange, ClipboardList, Copy, Pencil, Plus, Power, Save, Trash2, TriangleAlert, UsersRound, X } from "lucide-react";
+import { Award, CalendarRange, Copy, Pencil, Plus, Power, Save, Trash2, TriangleAlert, X } from "lucide-react";
 import { clubClassLevelLabels, clubClassLevels } from "@/modules/club-rosters/domain";
 import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
@@ -416,11 +416,6 @@ export function HonorsSetupWorkspace({
       <StaffPageHeader
         description="Name this site's sessions, then add the classes it teaches. A class can teach one honor or several. Capacity counts youth seats only. Seats and sign-ups appear here once class selection opens."
         extra={<span className="count-badge">{totalSeats} youth seats</span>}
-        tools={[
-          { href: `/more/honors/schedule?event=${encodeURIComponent(eventId)}`, label: "Schedule board", icon: CalendarRange },
-          { href: `/more/honors/rosters?event=${encodeURIComponent(eventId)}`, label: "Rosters", icon: ClipboardList },
-          { href: `/more/honors/instructors?event=${encodeURIComponent(eventId)}`, label: "Instructors", icon: UsersRound },
-        ]}
       />
 
       {notice && <div className="inline-notice success" role="status">{notice}</div>}

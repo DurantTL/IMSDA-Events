@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
+import { HonorsViewsStrip } from "@/components/honors-views-strip";
 import { HonorsInstructorsWorkspace } from "@/components/honors-instructors-workspace";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -15,11 +15,11 @@ export const metadata: Metadata = {
 export default async function HonorInstructorsPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
-  const back = <BackLink href={`/more/honors?event=${event.id}`} variant="staff">Back to classes</BackLink>;
+  const strip = <HonorsViewsStrip current="instructors" eventId={event.id} permissions={permissions} />;
   if (!permissions.includes("CONFIGURE_EVENT")) {
     return (
       <>
-        {back}
+        {strip}
         <AccessRestricted title="Instructors are restricted" detail="Event administrators choose who teaches each Honors Weekend class." whoToAsk="your event administrator" />
       </>
     );
@@ -27,12 +27,11 @@ export default async function HonorInstructorsPage({ searchParams }: { searchPar
   const { instructors, classes } = await listHonorInstructors(event.id);
   return (
     <>
-      {back}
+      {strip}
       <HonorsInstructorsWorkspace
         classes={classes}
         emailConfigured={isAccountEmailConfigured()}
         eventId={event.id}
-        eventName={event.name}
         initialInstructors={instructors}
       />
     </>
