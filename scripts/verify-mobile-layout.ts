@@ -257,6 +257,8 @@ const pages: PageSpec[] = [
   { name: "account-help-attendee", path: "/account/help", role: "attendee" },
   { name: "account-help-director", path: "/account/help", role: "director" },
   { name: "account-help-guide-director", path: "/account/help/director-monthly-record", role: "director" },
+  // The Area Coordinator card on the account Overview: each upcoming event's name and dates on separate lines (#1753).
+  { name: "account-overview-area", path: "/account", role: "area", expectText: /Upcoming club events/ },
   { name: "account-help-area", path: "/account/help", role: "area" },
   { name: "account-help-guide-area", path: "/account/help/coordinator-follow-records", role: "area" },
   // Walkthrough guides (#1482): each step is an instruction and a picture, so the picture must fit the column at every width.

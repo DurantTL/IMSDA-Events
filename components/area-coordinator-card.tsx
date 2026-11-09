@@ -1,4 +1,5 @@
 import { NavigationLink as Link } from "@/components/navigation-link";
+import styles from "@/components/area-coordinator-card.module.css";
 import { ArrowRight, MapPinned } from "lucide-react";
 import { NeedsAttention } from "@/components/needs-attention";
 import { areaCardLinks } from "@/modules/club-reports/area-card-domain";
@@ -14,7 +15,7 @@ function EventList({ events, empty }: { events: AreaCardEvent[]; empty: string }
     <ul className="account-overview-list">
       {events.map((event) => (
         <li key={`${event.eventId}:${event.locationName ?? ""}`}>
-          <span>
+          <span className={styles.eventText}>
             <strong translate="no">{event.eventName}{event.locationName ? ` · ${event.locationName}` : ""}</strong>
             <small>
               {dayFormat(event.startsAt, event.timezone)} to {dayFormat(event.endsAt, event.timezone)} · {event.registration.label}
