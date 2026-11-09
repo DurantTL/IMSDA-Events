@@ -18,11 +18,13 @@ export default async function IssuedAssetsCloseoutPage({ searchParams }: { searc
   }
   const [report, options] = await Promise.all([getCloseoutReport(event.id), getAssigneeOptions(event.id)]);
   return <>
-    <BackLink href={`/more/issued-assets?event=${encodeURIComponent(event.id)}`} variant="staff">Back to issued assets</BackLink>
+    {/* The catalog page is for event administrators (CONFIGURE_EVENT, as it checks), so others get no link to a closed page (#1735). */}
+    {permissions.includes("CONFIGURE_EVENT") ? <BackLink href={`/more/issued-assets?event=${encodeURIComponent(event.id)}`} variant="staff">Back to issued assets</BackLink> : null}
     <AssetCloseoutWorkspace
     eventId={event.id} eventName={event.name} report={report} staff={options.staff}
     canManageMoney={permissions.includes("MANAGE_FINANCE") || permissions.includes("CONFIGURE_EVENT")}
     canConfigure={permissions.includes("CONFIGURE_EVENT")}
+    canOpenDesk={permissions.includes("MANAGE_CHECK_IN")}
     canUpdateFacility={permissions.includes("MANAGE_CHECK_IN") || permissions.includes("CONFIGURE_EVENT")}
     />
   </>;
