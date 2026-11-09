@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { readRecentErrorIds } from "@/lib/recent-error-ids";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
@@ -39,6 +40,7 @@ export function readBrowserFacts(): BrowserFacts {
     securityCheckLoadFailed: securityCheckLoadFailed(),
     squareLoadFailed: Boolean(document.querySelector('[data-testid="square-load-failed"]')),
     now: new Date(),
+    errorIds: readRecentErrorIds(),
   };
 }
 
@@ -184,7 +186,7 @@ export function ProblemReportSection() {
               <input checked={includeDetails} name="includeDetails" onChange={(event) => setIncludeDetails(event.target.checked)} type="checkbox" />
               <span className={styles.checkText}>
                 Include technical details
-                <span className={styles.hint}>The page address (nothing after the ?), the time, your browser, language and window size. Never what you typed into a form.</span>
+                <span className={styles.hint}>The page address (nothing after the ?), the time, your browser, language and window size, and the ids of any recent page errors (no messages). Never what you typed into a form.</span>
               </span>
             </label>
             <HoneypotField onChange={setWebsite} value={website} />

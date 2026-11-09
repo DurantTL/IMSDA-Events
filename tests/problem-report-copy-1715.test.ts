@@ -122,6 +122,14 @@ describe("emailed copy of a problem report (#1715)", () => {
     expect(JSON.stringify(data.metadata)).not.toContain("Synthetic Browser");
   });
 
+  it("never puts recent error ids in the emailed copy, though they are saved for the IT team", async () => {
+    await POST(post({ ...base, email: "sam@example.test", details: { ...base.details, errorIds: ["1234567890", "abc-DEF_9"] } }));
+    expect(mocks.reportCreate.mock.calls[0][0].data.details.errorIds).toEqual(["1234567890", "abc-DEF_9"]);
+    const data = mocks.outboxCreate.mock.calls[0][0].data;
+    const all = `${data.subjectSnapshot}\n${data.bodyTextSnapshot}\n${data.bodyHtmlSnapshot ?? ""}\n${JSON.stringify(data.metadata)}`;
+    for (const id of ["1234567890", "abc-DEF_9", "Error id"]) expect(all).not.toContain(id);
+  });
+
   it("builds the words as one escaped quote block with a quoted text part", () => {
     const content = problemReportCopyEmailContent({ reference: "P-7", message: "It <b>broke</b>.\n\nTwice." });
     expect(content.bodyText).toContain("What you wrote:\n\n> It <b>broke</b>.\n>\n> Twice.");

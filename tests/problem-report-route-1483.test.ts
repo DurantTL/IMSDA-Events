@@ -167,6 +167,11 @@ describe("PATCH /api/admin/problem-reports/[reportId]", () => {
 });
 
 describe("the IT team line", () => {
+  it("adds recent error ids to the line for the IT team, and nothing when there are none (#1715)", () => {
+    expect(problemReportAlertDetail({ path: "/sign-in", errorIds: ["a1", "b2"] })).toContain("Error ids a1, b2");
+    expect(problemReportAlertDetail({ path: "/sign-in" })).not.toContain("Error ids");
+  });
+
   it("holds device and page facts only", () => {
     const line = problemReportAlertDetail({ path: "/sign-in", userAgent: "Synthetic Browser", translation: "on", securityCheckBlocked: true, appVersion: "abc123" });
     expect(line).toContain("Page /sign-in");
