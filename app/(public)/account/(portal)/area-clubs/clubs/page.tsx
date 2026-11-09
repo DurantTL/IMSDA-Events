@@ -1,3 +1,5 @@
+import { Download } from "lucide-react";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CoordinatorClubsList } from "@/components/coordinator-clubs-list";
@@ -34,6 +36,13 @@ export default async function AreaClubsPage({ searchParams }: { searchParams: Pr
   return (
     <section className="public-manage-card page-stack coordinator-clubs-page">
       <CoordinatorSectionHeading eyebrow={`Club year ${yearLabel(clubYear)}`} title="Clubs" />
+      {clubs && (
+        <p>
+          <Link className="secondary-button" href={`/account/area-clubs/roster-export?year=${encodeURIComponent(clubYear)}`}>
+            <Download aria-hidden="true" size={15} /> Export rosters
+          </Link>
+        </p>
+      )}
       {clubs ? <CoordinatorClubsList clubYear={clubYear} clubs={clubs} ownClubIds={ownClubIds} query={query} /> : <CoordinatorUnavailable what="The club list" />}
     </section>
   );
