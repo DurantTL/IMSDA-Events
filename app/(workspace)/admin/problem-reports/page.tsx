@@ -76,6 +76,7 @@ export default async function ProblemReportsPage() {
                       <dt>Translation</dt><dd>{report.details.translation === "on" ? "On" : "Not detected"}</dd>
                       <dt>Security check</dt><dd>{report.details.securityCheckBlocked ? "Did not load" : "No problem seen"}</dd>
                       <dt>Card form</dt><dd>{report.details.squareBlocked ? "Did not load" : "No problem seen"}</dd>
+                      {report.details.errorIds && report.details.errorIds.length > 0 && <><dt>Error ids</dt><dd translate="no">{report.details.errorIds.join(", ")}</dd></>}
                       {typeof report.appVersion === "string" && <><dt>Version</dt><dd translate="no">{report.appVersion}</dd></>}
                     </>
                   ) : (
