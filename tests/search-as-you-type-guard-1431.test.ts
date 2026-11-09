@@ -84,6 +84,7 @@ type Allowed = { file: string; count: number; reason: string };
 /** Pickers and comboboxes: they filter their own option list on every keystroke. */
 const pickers = [
   "components/searchable-select.tsx|2",
+  "components/area-club-switcher.tsx|1",
   "components/destination-search.tsx|1",
   "components/honor-combobox.tsx|1",
   "components/honor-multi-select.tsx|1",
@@ -100,7 +101,12 @@ const wrapped: Allowed[] = [
   { file: "app/(public)/events/events-search-field.tsx", count: 1, reason: "wrapped: rendered inside SearchAsYouTypeForm by app/(public)/events/page.tsx" },
 ];
 
-const allowlist: Allowed[] = [...pickers, ...wrapped];
+/** A search that hands off to another page on purpose. */
+const handoffs: Allowed[] = [
+  { file: "components/coordinator-find-club.tsx", count: 1, reason: "hand-off: Find a club on the Overview submits to the Clubs page (#1759); typing must not leave the Overview" },
+];
+
+const allowlist: Allowed[] = [...pickers, ...wrapped, ...handoffs];
 
 describe("search boxes search as you type (#1431)", () => {
   const files = [...walk(path.join(root, "app")), ...walk(path.join(root, "components"))]

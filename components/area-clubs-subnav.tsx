@@ -11,8 +11,9 @@ import { ClubPortalNav } from "@/components/club-portal-nav";
  */
 export function coordinatorNavItems({ showWaitlists = false }: { showWaitlists?: boolean } = {}): AccountNavItem[] {
   return [
-    // Overview owns the club list (Clubs at a glance, #1551), so it stays lit on the view-only club pages.
-    { href: "/account/area-clubs/overview", label: "Overview", alsoMatchPrefix: "/account/area/" },
+    { href: "/account/area-clubs/overview", label: "Overview" },
+    // The club list owns the view-only club pages, so Clubs stays lit on them (#1759).
+    { href: "/account/area-clubs/clubs", label: "Clubs", alsoMatchPrefix: "/account/area/" },
     { href: "/account/area-clubs/reports", label: "Monthly Records" },
     { href: "/account/area-clubs/points", label: "Points" },
     { href: "/account/area-clubs/events", label: "Club events" },

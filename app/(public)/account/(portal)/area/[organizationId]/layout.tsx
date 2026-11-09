@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { Eye } from "lucide-react";
 import { YearBox } from "@/components/club-banner-year";
 import { ClubPortalNav } from "@/components/club-portal-nav";
+import { AreaClubSwitcher } from "@/components/area-club-switcher";
+import styles from "@/components/area-club-switcher.module.css";
 import { BackLink } from "@/components/back-link";
 import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
 import { getPrisma } from "@/lib/prisma";
@@ -32,6 +34,12 @@ export default async function AreaClubLayout({
     select: { type: true, name: true, isActive: true, parentOrganization: { select: { name: true } } },
   });
   if (!club || club.type !== "CLUB" || !club.isActive) notFound();
+  // The switcher's list: the same scope the coordinator already sees (every active club), name and parent church only (#1759).
+  const switchable = (await getPrisma().organization.findMany({
+    where: { type: "CLUB", isActive: true },
+    select: { id: true, name: true, parentOrganization: { select: { name: true } } },
+    orderBy: { name: "asc" },
+  })).map((entry) => ({ id: entry.id, name: entry.name, church: entry.parentOrganization?.name ?? null }));
 
   return (
     <>
@@ -51,7 +59,10 @@ export default async function AreaClubLayout({
         </section>
       </CoordinatorShellHeader>
       <div className="club-roster-layout area-club-layout">
-        <BackLink href="/account/area-clubs/overview#clubs-at-a-glance">Clubs at a glance</BackLink>
+        <div className={`area-club-top ${styles.row}`}>
+          <BackLink href="/account/area-clubs/clubs">All clubs</BackLink>
+          <AreaClubSwitcher clubs={switchable} currentId={organizationId} />
+        </div>
         <p className="inline-notice" role="status">
           <Eye aria-hidden="true" size={14} /> View only. You see what the club&apos;s director sees, with ages instead of
           birth dates, plus each adult&apos;s Sterling Volunteers status and note. The club&apos;s director maintains the

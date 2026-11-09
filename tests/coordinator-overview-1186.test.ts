@@ -227,7 +227,7 @@ describe("overview markup (#1186)", () => {
     expect(all).toMatch(/<a[^>]*href="\/account\/area\/o1">Orchard Club<span/);
     expect(all).toMatch(/<a[^>]*href="\/account\/clubs\/h1">Harbor Club<span/);
     expect(all).toContain("Search clubs");
-    expect(all).toContain('placeholder="Club, church or city"');
+    expect(all).toContain('placeholder="Club, church, city or director"');
   });
 
   it("filters the table by search while the summary and follow-up stay whole, with N of M shown", () => {
@@ -243,13 +243,13 @@ describe("overview markup (#1186)", () => {
 
   it("offers Clear filters for a search with no results, and says that differently from no clubs", () => {
     const none = render(ready(six), "zzz");
-    expect(none).toContain("No club name, church or city matches");
+    expect(none).toContain("No club, church, city or director matches");
     expect(none).toContain("Clear filters");
     expect(none).toContain('href="/account/area-clubs/overview?year=2026-27"');
     expect(none).not.toContain("Showing");
     const empty = render(ready([]));
     expect(empty).toContain("No active clubs are available to this role yet.");
-    expect(empty).not.toContain("No club name, church or city matches");
+    expect(empty).not.toContain("No club, church, city or director matches");
     expect(empty).not.toContain("Clear filters");
   });
 
@@ -386,11 +386,11 @@ describe("coordinator masthead and navigation (#1186, #442)", () => {
     }
   });
 
-  it("lists the six destinations, with no All clubs tab (#1551), with Overview first, keeping every route", () => {
+  it("lists Clubs second (#1759), with Overview first, keeping every route", () => {
     const items = coordinatorNavItems();
-    expect(items.map((item) => item.label)).toEqual(["Overview", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
+    expect(items.map((item) => item.label)).toEqual(["Overview", "Clubs", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
     expect(items.map((item) => item.href)).toEqual([
-      "/account/area-clubs/overview", "/account/area-clubs/reports", "/account/area-clubs/points",
+      "/account/area-clubs/overview", "/account/area-clubs/clubs", "/account/area-clubs/reports", "/account/area-clubs/points",
       "/account/area-clubs/events", "/account/area-clubs/team-permissions", "/account/area-clubs/applications",
     ]);
   });
@@ -403,12 +403,13 @@ describe("coordinator masthead and navigation (#1186, #442)", () => {
     expect(coordinatorMastheadModel({ ...base, secondStepPending: true }).showWaitlists).toBe(false);
   });
 
-  it("shows the active destination, including a coordinator's club pages under Overview", () => {
+  it("shows the active destination, including a coordinator's club pages under Clubs (#1759)", () => {
     const items = coordinatorNavItems();
     const active = (path: string) => items.filter((item) => isAccountNavItemActive(path, item)).map((item) => item.label);
     expect(active("/account/area-clubs/overview")).toEqual(["Overview"]);
-    expect(active("/account/area/club_1")).toEqual(["Overview"]);
-    expect(active("/account/area/club_1/reports/2026-09")).toEqual(["Overview"]);
+    expect(active("/account/area-clubs/clubs")).toEqual(["Clubs"]);
+    expect(active("/account/area/club_1")).toEqual(["Clubs"]);
+    expect(active("/account/area/club_1/reports/2026-09")).toEqual(["Clubs"]);
     expect(active("/account/area-clubs/reports")).toEqual(["Monthly Records"]);
   });
 });

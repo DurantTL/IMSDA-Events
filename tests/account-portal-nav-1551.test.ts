@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { accountPortalNavItems, workspaceMenuNavItems, type AccountPortalNavInput } from "@/components/account-portal-nav";
 import { isAccountNavItemActive } from "@/components/account-nav-model";
+import type { AccountNavItem } from "@/components/account-section-nav";
 import { coordinatorNavItems } from "@/components/area-clubs-subnav";
 import { coordinatorClubsPath } from "@/modules/club-rosters/portal-directory";
 
@@ -74,9 +75,9 @@ describe("the Your account menu per role (#1551)", () => {
 });
 
 describe("the Club coordination tabs (#1551)", () => {
-  it("has no All clubs tab, and Overview first", () => {
+  it("has Overview first and Clubs second (#1759), and no /account/clubs tab", () => {
     const tabs = coordinatorNavItems({ showWaitlists: true });
-    expect(tabs.map((tab) => tab.label)).toEqual(["Overview", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs", "Waitlists"]);
+    expect(tabs.map((tab) => tab.label)).toEqual(["Overview", "Clubs", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs", "Waitlists"]);
     expect(tabs.some((tab) => tab.href === "/account/clubs")).toBe(false);
   });
 
@@ -84,9 +85,12 @@ describe("the Club coordination tabs (#1551)", () => {
     expect(coordinatorNavItems({ showWaitlists: false }).map((tab) => tab.label)).not.toContain("Waitlists");
   });
 
-  it("keeps Overview lit on the view-only club pages", () => {
-    const overview = coordinatorNavItems()[0]!;
-    expect(isAccountNavItemActive("/account/area/club_1", overview)).toBe(true);
+  it("lights Clubs, not Overview, on the view-only club pages (#1759)", () => {
+    const [overview, clubs] = coordinatorNavItems() as [AccountNavItem, AccountNavItem];
+    expect(isAccountNavItemActive("/account/area/club_1", clubs)).toBe(true);
+    expect(isAccountNavItemActive("/account/area/club_1", overview)).toBe(false);
+    expect(isAccountNavItemActive("/account/area-clubs/clubs", clubs)).toBe(true);
+    expect(isAccountNavItemActive("/account/area-clubs/clubs", overview)).toBe(false);
     expect(isAccountNavItemActive("/account/area-clubs/overview", overview)).toBe(true);
     expect(isAccountNavItemActive("/account/area-clubs/points", overview)).toBe(false);
   });
