@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Eye } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { BackLink } from "@/components/back-link";
@@ -13,6 +14,7 @@ import { getPrisma } from "@/lib/prisma";
 import { getClubAssignmentForClub } from "@/modules/club-registrations/assignments-repository";
 import { resolveStaffGuardianViewer } from "@/modules/club-rosters/guardians-access";
 import { isClubRegisteredForEvent, resolveClubOversight } from "@/modules/club-rosters/event-oversight";
+import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
 import { staffPageTitles } from "@/components/staff-navigation";
 
 export const metadata: Metadata = { title: staffPageTitles.club };
@@ -27,7 +29,7 @@ export default async function EventClubPage({
   searchParams: Promise<{ event?: string }>;
 }) {
   const [{ organizationId }, { event: requested }] = await Promise.all([params, searchParams]);
-  const { event, allowed } = await resolveClubOversight(requested);
+  const { event, allowed, permissions } = await resolveClubOversight(requested);
   if (!allowed) return <AccessRestricted title="Club oversight is restricted" detail="Event administrators of this Pathfinder event can view its clubs." whoToAsk="your event administrator" />;
   // Only clubs registered for this event: the role is for this event only.
   if (!(await isClubRegisteredForEvent(event.id, organizationId))) notFound();
@@ -44,7 +46,7 @@ export default async function EventClubPage({
   const guardianViewer = await resolveStaffGuardianViewer(event.id);
   return (
     <section className="page-stack">
-      <BackLink href={`/more/clubs${query}`} variant="staff">Back to clubs</BackLink>
+      <BackLink href={`/more/clubs${query}`} variant="staff">Back to clubs attending</BackLink>
       <div className="page-intro">
         <div>
           <p className="eyebrow">{event.name} · view only</p>
@@ -67,12 +69,14 @@ export default async function EventClubPage({
       )}
       {assignment && (
         <section className="panel">
-          <h3>Assignments</h3>
+          <h3>Event assignments</h3>
+          <p className="quiet-copy">Set by event staff for {event.name}.</p>
           <ul className="quiet-copy compact-list">
             {assignment.fields.campsiteLocation && <li>Campsite: {assignment.fields.campsiteLocation}</li>}
             {assignment.fields.dutyLabel && <li>Duty: {assignment.fields.dutyLabel}{assignment.fields.dutyDay ? ` — ${assignment.fields.dutyDay}` : ""}{assignment.fields.dutyTime ? ` ${assignment.fields.dutyTime}` : ""}</li>}
             {assignment.fields.activityLabel && <li>Activity: {assignment.fields.activityLabel}</li>}
           </ul>
+          {canManageClubAssignments(permissions) && <p><Link className="text-button" href={`/more/club-assignments${query}`}>Change on Club assignments</Link></p>}
         </section>
       )}
       <ClubOverview

@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, FileText, UsersRound } from "lucide-react";
+import { ArrowRight, UsersRound } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
+import { EventClubsSummary } from "@/components/event-clubs-summary";
+import { EventClubsViewsStrip } from "@/components/event-clubs-views-strip";
+import { StaffPageHeader } from "@/components/staff-page-header";
+import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { listEventBackgroundFlags } from "@/modules/background-checks/repository";
 import { getTeamSettings } from "@/modules/club-teams/settings-repository";
@@ -21,17 +25,22 @@ export const dynamic = "force-dynamic";
 export default async function EventClubsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const query = await searchParams;
   const requested = typeof query.event === "string" ? query.event : undefined;
-  const { event, allowed, clubEvent } = await resolveClubOversight(requested);
+  const { event, allowed, clubEvent, permissions } = await resolveClubOversight(requested);
+  // The strip lists only the pages this viewer passes the same check for (#1582).
+  const strip = <EventClubsViewsStrip access={{ oversight: allowed, assignments: clubEvent && canManageClubAssignments(permissions) }} current="attending" eventId={event.id} />;
   if (!allowed && !clubEvent) {
-    return <NotAvailableForEvent reason="Clubs register for Pathfinder events only, and this event is not one." />;
+    return <>{strip}<NotAvailableForEvent reason="Clubs register for Pathfinder events only, and this event is not one." /></>;
   }
   if (!allowed) {
     return (
-      <AccessRestricted
-        title="Club oversight is restricted"
-        detail="Event administrators of this Pathfinder event can view its clubs."
-        whoToAsk="your event administrator"
-      />
+      <>
+        {strip}
+        <AccessRestricted
+          title="Club oversight is restricted"
+          detail="Event administrators of this Pathfinder event can view its clubs."
+          whoToAsk="your event administrator"
+        />
+      </>
     );
   }
   const [clubs, backgroundFlags, teamSettings] = await Promise.all([listRegisteredClubs(event.id), listEventBackgroundFlags(event.id), getTeamSettings(event.id)]);
@@ -51,22 +60,15 @@ export default async function EventClubsPage({ searchParams }: { searchParams: P
   });
   return (
     <section className="page-stack">
-      <div className="intro-actions club-admin-links">
-        <Link className="secondary-button" href={`/more/clubs/reports?event=${event.id}`}>
-          <FileText aria-hidden="true" size={14} /> All clubs&apos; Monthly Records
-        </Link>
-        {teamSettings && <Link className="secondary-button" href={`/more/team-results?event=${event.id}`}>Team results</Link>}
-      </div>
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Event manager · view only</p>
-          <h2>Clubs at {event.name}</h2>
-          <p>Every club registered for this event. Open one to see its roster (ages, not birth dates), admins, and reports. Nothing can be changed here.</p>
-        </div>
-      </div>
+      {strip}
+      <StaffPageHeader
+        description="Every club registered for this event. Open one to see its roster (ages, not birth dates), admins, and reports. Nothing can be changed here."
+        extra={teamSettings ? <Link className="secondary-button" href={`/more/team-results?event=${event.id}`}>Team results</Link> : undefined}
+      />
+      {clubs.length > 0 && <EventClubsSummary backgroundFlags={backgroundFlags} clubs={clubs} />}
       <section className="panel">
         {clubs.length === 0 ? (
-          <p className="quiet-copy"><UsersRound aria-hidden="true" size={15} /> No clubs have registered yet.</p>
+          <p className="quiet-copy"><UsersRound aria-hidden="true" size={15} /> No clubs have registered yet. Clubs appear here once they register for {event.name}.</p>
         ) : (
           <div className="report-table-wrap">
             {sorting.order.key && <SortOrderNote>{sortLine(sorting.order)}</SortOrderNote>}
