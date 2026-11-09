@@ -46,9 +46,10 @@ export type ClubFormTemplateSeed = {
   birthDateFieldKeys: string[];
   staffOnlyFieldKeys: string[];
   /**
-   * School type and church membership answers (#1668): readable only by the club's own director and deputy and by
-   * system administrators. Not "sensitive" (they must stay mappable to the roster), but restricted like it for every
-   * other viewer (`restrictedFieldKeys`) and left out of the staff CSV unless the viewer is a system administrator.
+   * School type and church membership answers (#1668, #1778): readable by the club's own director and deputy, system
+   * administrators, and, view only, Clubs Administrators and Area Coordinators (`viewerCanSeeSchoolDetails`). Not
+   * "sensitive" (they must stay mappable to the roster), but restricted like it for every other viewer
+   * (`restrictedFieldKeys`) and left out of the staff CSV for staff who are neither.
    * Read from the code's seed by template key, so a copy edited in the app keeps the restriction.
    */
   schoolDetailFieldKeys?: string[];
