@@ -96,7 +96,7 @@ export type ClubSchoolGrade = keyof typeof clubSchoolGradeLabels;
 
 export const clubSchoolGrades = Object.keys(clubSchoolGradeLabels) as ClubSchoolGrade[];
 
-/** School type (#1668): for the club's leaders and system administrators only, never Area Coordinators. */
+/** School type (#1668, #1758): for the club's leaders and system administrators, and view only for Clubs Administrators and Area Coordinators; never event managers. */
 export const clubSchoolTypeLabels = {
   ADVENTIST_SCHOOL: "Adventist school",
   PUBLIC_SCHOOL: "Public school",

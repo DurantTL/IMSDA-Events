@@ -239,13 +239,15 @@ describe("who sees school type and church membership (#1668)", () => {
       expect(source, route).toMatch(/includeSchoolDetails: rosterSchoolDetailsVisible\(access\)/);
       expect(source, route).not.toMatch(/includeSchoolDetails: true/);
     }
-    // The system administrator's page passes it only for a system administrator.
-    expect(read("app/(workspace)/admin/organizations/[organizationId]/club/page.tsx")).toMatch(/schoolDetails=\{user\.globalRole === "SYSTEM_ADMIN"\}/);
+    // The staff Open club page (#1758) passes it to every viewer, and only opens for Clubs Administration.
+    const staffPage = read("app/(workspace)/admin/organizations/[organizationId]/club/page.tsx");
+    expect(staffPage).toMatch(/if \(!\(await hasClubsAdministration\(user\)\)\) redirect\("\/no-access"\)[\s\S]*<ClubOverview[\s\S]*schoolDetails\n/);
+    // The Area Coordinator's club page (#1758) passes it, and only opens for an active Area Coordinator.
+    expect(read("app/(public)/account/(portal)/area/[organizationId]/page.tsx")).toMatch(/if \(!areaCoordinatorActive\) notFound\(\)[\s\S]*<ClubOverview[\s\S]*schoolDetails\n/);
   });
 
-  it("is never asked for by the Area Coordinator, event manager, export or Home views", () => {
+  it("is never asked for by the event manager, export or Home views", () => {
     const withoutValues = [
-      "app/(public)/account/(portal)/area/[organizationId]/page.tsx",
       "app/(workspace)/more/clubs/[organizationId]/page.tsx",
       "modules/club-rosters/export-repository.ts",
       "app/(public)/account/(portal)/clubs/[organizationId]/page.tsx",
@@ -257,6 +259,8 @@ describe("who sees school type and church membership (#1668)", () => {
     const overview = read("components/club-overview.tsx");
     expect(overview).toMatch(/schoolDetails = false/);
     expect(overview).toMatch(/includeSchoolDetails: schoolDetails/);
+    // The roster it shows is always view only, so the new viewers (#1758) can never edit school details.
+    expect(overview).toMatch(/\n\s*readOnly\n\s*schoolDetails=\{schoolDetails\}/);
   });
 
   it("is never a roster export column", () => {
