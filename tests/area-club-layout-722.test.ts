@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   accountNeedsSecondStep: vi.fn(),
   grantFindUnique: vi.fn(),
   orgFindUnique: vi.fn(),
+  orgFindMany: vi.fn(),
   notFound: vi.fn(() => { throw new Error("NOT_FOUND"); }),
 }));
 
@@ -22,12 +23,13 @@ vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: vi.fn(),
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     areaCoordinatorGrant: { findUnique: mocks.grantFindUnique },
-    organization: { findUnique: mocks.orgFindUnique },
+    organization: { findUnique: mocks.orgFindUnique, findMany: mocks.orgFindMany },
   }),
 }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
+vi.mock("@/modules/organizations/own-directed-club-ids", () => ({ currentOwnDirectedClubIds: async () => ["club-2"] }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
 
 import AreaClubLayout from "@/app/(public)/account/(portal)/area/[organizationId]/layout";
@@ -43,6 +45,10 @@ beforeEach(() => {
   mocks.accountNeedsSecondStep.mockResolvedValue("OK");
   mocks.grantFindUnique.mockResolvedValue(null);
   mocks.orgFindUnique.mockResolvedValue({ type: "CLUB", name: "Synthetic Trail Club", isActive: true, parentOrganization: null });
+  mocks.orgFindMany.mockResolvedValue([
+    { id: "club-1", name: "Synthetic Trail Club", parentOrganization: null },
+    { id: "club-2", name: "Synthetic Ridge Club", parentOrganization: { name: "Synthetic Church" } },
+  ]);
 });
 
 describe("area club layout access (#722)", () => {
@@ -69,7 +75,11 @@ describe("area club layout access (#722)", () => {
   it("renders for a real coordinator and for an act-as coordinator", async () => {
     mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-1" }, via: "attendee", sessionId: "sess-1" });
     mocks.grantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null });
-    expect(await AreaClubLayout(props)).toBeTruthy();
+    const tree = JSON.stringify(await AreaClubLayout(props));
+    expect(tree).toContain("Synthetic Ridge Club");
+    expect(tree).toContain("Synthetic Church");
+    expect(tree).toContain('"ownClubIds":["club-2"]');
+    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true } }));
     mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
     mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", organizationId: null });
     expect(await AreaClubLayout(props)).toBeTruthy();

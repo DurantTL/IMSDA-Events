@@ -9,10 +9,10 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/account/area-clubs/clubs",
 }));
 
-import { CoordinatorClubsList, coordinatorClubHref } from "@/components/coordinator-clubs-list";
+import { CoordinatorClubsList } from "@/components/coordinator-clubs-list";
 import { filterClubsByNameChurchCityOrDirector, matchingDirectors, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
 import { overviewTableClubs } from "@/modules/club-reports/coordinator-overview-domain";
-import { switchClubHref } from "@/modules/club-rosters/area-club-switch";
+import { coordinatorClubHref, switchClubHref } from "@/modules/club-rosters/area-club-switch";
 
 /** Find a club (#1759): synthetic clubs only. */
 const row = (id: string, name: string, church: string, city: string, directors: string[]) => ({ id, name, church, city, directors }) as unknown as AreaClubSummary;
@@ -55,7 +55,7 @@ describe("the Clubs page list (#1759)", () => {
 
   it("shows N of M, each club's church, city and director, and links view only", () => {
     const html = render("");
-    expect(html).toContain("3 of 3 clubs");
+    expect(html).toContain("1\u20133 of 3 clubs");
     expect(html).toContain("Harbor Church");
     expect(html).toContain("Port Sample");
     expect(html).toContain("Dana Example, Lee Sample");
@@ -65,7 +65,7 @@ describe("the Clubs page list (#1759)", () => {
 
   it("says which director matched, and links an own club normally", () => {
     const html = render("lee", ["a"]);
-    expect(html).toContain("1 of 3 clubs");
+    expect(html).toContain("1 of 3 clubs match");
     expect(html).toContain("Matches director:");
     expect(html).toContain('href="/account/clubs/a"');
     expect(html).toContain("Your club");
@@ -90,6 +90,10 @@ describe("Switch club keeps the tab (#1759)", () => {
     ["/somewhere/else", "/account/area/new"],
   ])("%s goes to %s", (from, to) => {
     expect(switchClubHref(from, "new")).toBe(to);
+  });
+
+  it("sends a club the coordinator also directs to its normal page", () => {
+    expect(coordinatorClubHref("mine", new Set(["mine"]))).toBe("/account/clubs/mine");
   });
 
   it("handles a missing path and encodes the id", () => {

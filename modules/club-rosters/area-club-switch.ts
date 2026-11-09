@@ -15,3 +15,8 @@ export function switchClubHref(pathname: string | null | undefined, targetClubId
 }
 
 export type SwitchableClub = { id: string; name: string; church: string | null };
+
+/** Where a club opens for this coordinator: their own club normally, every other club view only (#1551). */
+export function coordinatorClubHref(clubId: string, ownClubIds: ReadonlySet<string>) {
+  return ownClubIds.has(clubId) ? `/account/clubs/${encodeURIComponent(clubId)}` : `/account/area/${encodeURIComponent(clubId)}`;
+}

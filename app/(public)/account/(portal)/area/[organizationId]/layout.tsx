@@ -6,6 +6,7 @@ import { AreaClubSwitcher } from "@/components/area-club-switcher";
 import styles from "@/components/area-club-switcher.module.css";
 import { BackLink } from "@/components/back-link";
 import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
+import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-club-ids";
 import { getPrisma } from "@/lib/prisma";
 import { areaViewedClubNavItems } from "@/modules/club-rosters/portal-nav";
 import { clubYearFor } from "@/modules/club-rosters/domain";
@@ -35,6 +36,7 @@ export default async function AreaClubLayout({
   });
   if (!club || club.type !== "CLUB" || !club.isActive) notFound();
   // The switcher's list: the same scope the coordinator already sees (every active club), name and parent church only (#1759).
+  const ownClubIds = await currentOwnDirectedClubIds();
   const switchable = (await getPrisma().organization.findMany({
     where: { type: "CLUB", isActive: true },
     select: { id: true, name: true, parentOrganization: { select: { name: true } } },
@@ -61,7 +63,7 @@ export default async function AreaClubLayout({
       <div className="club-roster-layout area-club-layout">
         <div className={`area-club-top ${styles.row}`}>
           <BackLink href="/account/area-clubs/clubs">All clubs</BackLink>
-          <AreaClubSwitcher clubs={switchable} currentId={organizationId} />
+          <AreaClubSwitcher clubs={switchable} currentId={organizationId} ownClubIds={ownClubIds} />
         </div>
         <p className="inline-notice" role="status">
           <Eye aria-hidden="true" size={14} /> View only. You see what the club&apos;s director sees, with ages instead of

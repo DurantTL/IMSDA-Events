@@ -17,6 +17,7 @@ const allowlist: Record<string, string> = {
   "app/(workspace)/admin/system-report/email-tester-card.tsx": "one field",
   "app/(workspace)/check-in/badges/page.tsx": "search or filter",
   "app/(workspace)/more/reports/clubs/check-in-book/page.tsx": "search or filter",
+  "components/coordinator-find-club.tsx": "search or filter",
   "components/attendee-pass-grid.tsx": "action button only, no typed fields",
   "components/attendee-password-reset-form.tsx": "sign-in",
   "components/attendee-sign-in-form.tsx": "sign-in",

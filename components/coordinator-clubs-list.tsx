@@ -1,16 +1,13 @@
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { ExactValue } from "@/components/exact-value";
+import { ListPager } from "@/components/list-pager";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { filterClubsByNameChurchCityOrDirector, matchingDirectors, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
+import { coordinatorClubHref } from "@/modules/club-rosters/area-club-switch";
 import styles from "./coordinator-clubs-list.module.css";
 
 export const CLUB_SEARCH_PLACEHOLDER = "Club, church, city or director";
-
-/** Where a club opens for this coordinator: their own club normally, every other club view only (#1551). */
-export function coordinatorClubHref(clubId: string, ownClubIds: ReadonlySet<string>) {
-  return ownClubIds.has(clubId) ? `/account/clubs/${encodeURIComponent(clubId)}` : `/account/area/${encodeURIComponent(clubId)}`;
-}
 
 /**
  * The Clubs page body (#1759): the search first, the "N of M clubs" count, then one card per club with its church, city
@@ -31,7 +28,7 @@ export function CoordinatorClubsList({ clubs, clubYear, ownClubIds = [], query }
   return (
     <>
       <AreaClubSearch basePath="/account/area-clubs/clubs" clubYear={clubYear} label="Search clubs" placeholder={CLUB_SEARCH_PLACEHOLDER} query={query} shown={found.length} total={clubs.length} />
-      <p className={styles.count} role="status">{found.length} of {clubs.length} {clubs.length === 1 ? "club" : "clubs"}</p>
+      <ListPager announce={false} label="Clubs shown" noun="clubs" nounOne="club" slice={{ from: found.length === 0 ? 0 : 1, to: found.length, total: found.length, page: 1, pageCount: 1 }} />
       {found.length === 0 ? (
         <p className="report-empty">
           No club, church, city or director matches “{query}”.{" "}

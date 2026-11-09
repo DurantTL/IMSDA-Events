@@ -8,7 +8,7 @@ import { NavigationLink as Link } from "@/components/navigation-link";
 import { isPlainClick } from "@/components/more-launcher-model";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { filterClubsByNameChurchOrCity } from "@/modules/club-reports/area-summary-domain";
-import { switchClubHref, type SwitchableClub } from "@/modules/club-rosters/area-club-switch";
+import { coordinatorClubHref, switchClubHref, type SwitchableClub } from "@/modules/club-rosters/area-club-switch";
 import styles from "./area-club-switcher.module.css";
 
 /**
@@ -16,7 +16,7 @@ import styles from "./area-club-switcher.module.css";
  * the active clubs, each a link to the same tab on that club. The list is the coordinator's club list; the current club
  * is marked, not hidden. Escape and Close return focus to the button; following a link closes it.
  */
-export function AreaClubSwitcher({ clubs, currentId }: { clubs: readonly SwitchableClub[]; currentId: string }) {
+export function AreaClubSwitcher({ clubs, currentId, ownClubIds = [] }: { clubs: readonly SwitchableClub[]; currentId: string; ownClubIds?: readonly string[] }) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   return (
@@ -31,12 +31,12 @@ export function AreaClubSwitcher({ clubs, currentId }: { clubs: readonly Switcha
       >
         <ArrowLeftRight aria-hidden="true" size={16} /> Switch club
       </button>
-      {open && <SwitcherDialog clubs={clubs} currentId={currentId} onClose={() => setOpen(false)} returnTo={buttonRef} />}
+      {open && <SwitcherDialog clubs={clubs} currentId={currentId} own={ownClubIds} onClose={() => setOpen(false)} returnTo={buttonRef} />}
     </>
   );
 }
 
-function SwitcherDialog({ clubs, currentId, onClose, returnTo }: { clubs: readonly SwitchableClub[]; currentId: string; onClose: () => void; returnTo: RefObject<HTMLElement | null> }) {
+function SwitcherDialog({ clubs, currentId, own, onClose, returnTo }: { clubs: readonly SwitchableClub[]; currentId: string; own: readonly string[]; onClose: () => void; returnTo: RefObject<HTMLElement | null> }) {
   const pathname = usePathname();
   const titleId = useId();
   const inputId = useId();
@@ -88,7 +88,7 @@ function SwitcherDialog({ clubs, currentId, onClose, returnTo }: { clubs: readon
                     <Link
                       aria-current={current ? "true" : undefined}
                       className={styles.item}
-                      href={switchClubHref(pathname, club.id)}
+                      href={own.includes(club.id) ? coordinatorClubHref(club.id, new Set(own)) : switchClubHref(pathname, club.id)}
                       onClick={(event) => {
                         if (!isPlainClick(event.nativeEvent)) return;
                         followed.current = true;

@@ -11,7 +11,10 @@ export function CoordinatorFindClub({ clubYear }: { clubYear: string }) {
       <input name="year" type="hidden" value={clubYear} />
       <label htmlFor="coordinator-find-club">Find a club</label>
       <div className={styles.row}>
-        <input autoComplete="off" id="coordinator-find-club" maxLength={80} name="q" placeholder="Club, church, city or director" type="search" />
+        <div className="search-field">
+          <Search aria-hidden="true" size={16} />
+          <input autoComplete="off" id="coordinator-find-club" maxLength={80} name="q" placeholder="Club, church, city or director" type="search" />
+        </div>
         <button className="secondary-button" type="submit"><Search aria-hidden="true" size={16} /> Search</button>
       </div>
     </form>
