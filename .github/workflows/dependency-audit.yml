@@ -1,0 +1,23 @@
+name: Dependency audit
+
+# Weekly check of the packages the app runs with (#1776). It fails when a new
+# high or critical advisory appears. It does not run on pull requests.
+on:
+  schedule:
+    - cron: "43 10 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Reads package-lock.json only; nothing is installed.
+      - run: npm run audit:production
