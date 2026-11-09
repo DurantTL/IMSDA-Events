@@ -30,6 +30,7 @@ export function SortableHeader({
   className,
   hiddenLabel,
   dataCol,
+  fullLabel,
 }: {
   label: string;
   active: boolean;
@@ -44,10 +45,13 @@ export function SortableHeader({
   hiddenLabel?: string;
   /** Sets `data-col` on the header cell, for column width rules that name it. */
   dataCol?: string;
+  /** The whole name when `label` is a short form on screen ("SDA member"); read out after the short form, never shown. */
+  fullLabel?: string;
 }) {
   const content = (
     <>
       {label}
+      {fullLabel && <span className="sr-only"> ({fullLabel})</span>}
       {hiddenLabel && <span className="sr-only">, {hiddenLabel}</span>}
       {active
         ? (direction === "asc" ? <ArrowUp aria-hidden="true" size={13} /> : <ArrowDown aria-hidden="true" size={13} />)
