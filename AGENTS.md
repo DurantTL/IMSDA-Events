@@ -96,6 +96,12 @@ Then `npm run dev`.
   like "(555) 010-0100" or 7-digit numbers fail validation.
 - **Dates in tests:** date-dependent tests pin the clock with
   `vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(...)`.
+- **Style tokens:** new CSS uses tokens for colors, text sizes and corner radii
+  (`var(--…)`, `50%` or `0` for radii). Existing raw values are frozen as counts
+  per file in `tests/fixtures/style-token-baseline-1770.json`, which only
+  shrinks. After removing one, run
+  `STYLE_BASELINE_LOWER=1 npx vitest run tests/style-token-guard-1770.test.ts`
+  and commit the lowered fixture.
 - **Migrations:** names are sequential and future-dated; follow the latest
   folder in `prisma/migrations/`.
 
