@@ -54,7 +54,7 @@ export function StaffCreateMenu({ isSystemAdmin, clubFormsAccess, canManageForms
 
   return (
     <div className={styles.menu}>
-      <button type="button" className={`primary-button ${styles.trigger}`} aria-haspopup="dialog" onClick={() => show("start")}>
+      <button type="button" className={`secondary-button ${styles.trigger}`} aria-haspopup="dialog" onClick={() => show("start")}>
         <Plus size={17} aria-hidden="true" /> Create
       </button>
       {step && createPortal(

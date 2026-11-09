@@ -35,6 +35,7 @@ import {
   systemMenuReturnsFocus,
   systemMenuStillAllowed,
   workContextSwitches,
+  showsWorkContextChip,
 } from "@/components/work-context-model";
 import { alwaysOnModuleKeys, disabledModuleCardKeys, eventModuleCatalog, type EventModuleKey } from "@/modules/event-modules/catalog";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
@@ -91,19 +92,26 @@ describe("distinct work contexts", () => {
     expect(handoff).toMatchObject({ method: "post", href: "/api/auth/switch-to-attendee", label: "My registrations" });
   });
 
-  it("shows the active context in the header for System, an event and the profile page", () => {
-    const system = render("admin", "/admin/people");
-    expect(system).toContain('class="work-context" data-context="system"');
-    expect(system).toContain("System administration");
-    expect(system).toContain("All events");
+  it("drops the place line where the rail, tabs or event bar already name the place (#1733)", () => {
+    // System, Home and the account page: the tab row and heading say where you are.
+    for (const [role, path] of [["admin", "/admin/people"], ["admin", "/home"], ["limited", "/profile"]] as const) {
+      expect(render(role, path), path).not.toContain('class="work-context"');
+    }
+    // An event page: the event bar and tab row carry the event name once, not a second time under the heading.
     const event = render("admin", "/people");
-    expect(event).toContain('data-context="event"');
+    expect(event).not.toContain('class="work-context"');
     expect(event).toContain("Synthetic Event One");
-    expect(render("limited", "/profile")).toContain('data-context="profile"');
-    // Home (#1568) spans every event the person holds, so it names none.
-    const home = render("admin", "/home");
-    expect(home).toContain("Your work");
-    expect(home).not.toContain("Synthetic Event One</span>");
+  });
+
+  it("keeps the place line only for an event that nothing else on the page names", () => {
+    const event = { kind: "event" as const, kindLabel: "Event", label: "Synthetic Event One", detail: "" };
+    const input = { context: event, eventName: "Synthetic Event One", pageTitle: "Settings", shownPlaceNames: ["Staff"] };
+    expect(showsWorkContextChip(input)).toBe(true);
+    expect(showsWorkContextChip({ ...input, shownPlaceNames: ["Synthetic Event One"] })).toBe(false);
+    expect(showsWorkContextChip({ ...input, pageTitle: "Synthetic Event One setup" })).toBe(false);
+    expect(showsWorkContextChip({ ...input, eventName: null })).toBe(false);
+    expect(showsWorkContextChip({ ...input, context: { ...event, kind: "system", label: "System administration" } })).toBe(false);
+    expect(showsWorkContextChip({ ...input, context: { ...event, label: "No event selected" } })).toBe(false);
   });
 });
 

@@ -61,11 +61,23 @@ type CardDef = {
   gate: HubGate;
   metrics?: readonly MetricKey[];
   status?: (read: Reader) => CardStatus | null;
+  /** What the card says when a number it reads is already a key figure on the page (#1733); without it the chip is dropped. */
+  statusBesideFigures?: (read: Reader) => CardStatus | null;
 };
 
 /** `note` is a line under the label for a caveat the number alone would hide (checks that could not be read). */
 type StatDef = { metric: MetricKey; singular: string; plural: string; gate: HubGate; alsoNeeds?: readonly MetricKey[]; note?: (read: Reader) => string | null };
-type ActionDef = { href: string; label: string; gate: HubGate };
+/** `metric` ties an action to a count of work waiting: the action is a filled button only while that count is above 0 (#1733). */
+type ActionDef = {
+  href: string;
+  label: string;
+  gate: HubGate;
+  metric?: MetricKey;
+  /** A second count that also makes the action primary when above 0. */
+  alsoMetric?: MetricKey;
+  /** When true, a `metric` that could not be read counts as "needs a look" and keeps the action primary. */
+  unreadableIsPrimary?: boolean;
+};
 type GroupDef = { title: string; cards: readonly CardDef[] };
 type HubDef = {
   stats: readonly StatDef[];
@@ -189,7 +201,7 @@ const hubDefs: Record<HubKey, HubDef> = {
   },
   clubs: {
     stats: clubStats,
-    actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs }],
+    actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs, metric: "applicationsWaiting" }],
     groups: [
       { title: "Directory", cards: [clubCards.clubsAndChurches, clubCards.summary, clubCards.leaders] },
       { title: "Records", cards: [clubCards.records] },
@@ -201,7 +213,7 @@ const hubDefs: Record<HubKey, HubDef> = {
   "club-administration": {
     regroupLoneCards: true,
     stats: [],
-    actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs }],
+    actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs, metric: "applicationsWaiting" }],
     groups: [
       { title: "Clubs", cards: [clubCards.summary, clubCards.clubsAndChurches, clubCards.transfers, clubCards.sterling] },
       {
@@ -307,7 +319,7 @@ const hubDefs: Record<HubKey, HubDef> = {
       { metric: "honors", singular: "Honor in the catalog", plural: "Honors in the catalog", gate: hubGates.clubs },
     ],
     actions: [
-      { href: "/admin/readiness", label: "Open System readiness", gate: hubGates.system },
+      { href: "/admin/readiness", label: "Open System readiness", gate: hubGates.system, metric: "readinessAttention", alsoMetric: "readinessUnknown", unreadableIsPrimary: true },
       { href: "/admin/honors", label: "Open the Honor catalog", gate: hubGates.clubs },
       { href: "/admin/site-content", label: "Edit homepage & site content", gate: hubGates.siteContent },
     ],
@@ -319,6 +331,16 @@ const hubDefs: Record<HubKey, HubDef> = {
             href: "/admin/readiness",
             gate: hubGates.system,
             metrics: ["readinessAttention", "readinessToConfirm", "readinessUnknown"],
+            // The tile above already says how many need attention and how many could not be read; the card adds only what it does not.
+            statusBesideFigures: (read) => {
+              const toConfirm = read("readinessToConfirm");
+              // The tile has no "to confirm" figure, so an unreadable one is still said here, never hidden.
+              if (toConfirm === null) return UNAVAILABLE_STATUS;
+              const attention = read("readinessAttention");
+              const unknown = read("readinessUnknown");
+              const tileSpeaks = attention === null || attention > 0 || unknown === null || unknown > 0;
+              return toConfirm > 0 && !tileSpeaks ? { tone: "soon", text: `${toConfirm} to confirm` } : null;
+            },
             status: (read) => {
               const attention = read("readinessAttention")!;
               const toConfirm = read("readinessToConfirm")!;
@@ -382,7 +404,8 @@ export type HubView = {
   title: string;
   description: string;
   stats: HubStat[];
-  action: { href: string; label: string } | null;
+  /** `primary` is false for a link with nothing waiting behind it: the page then has no filled button. */
+  action: { href: string; label: string; primary?: boolean } | null;
   groups: HubGroup[];
 };
 
@@ -394,7 +417,7 @@ export type HubBody = {
   key: string;
   description: string;
   stats?: readonly HubStat[];
-  action?: { href: string; label: string } | null;
+  action?: { href: string; label: string; primary?: boolean } | null;
   groups: readonly HubGroup[];
 };
 
@@ -476,6 +499,9 @@ function visibleStats(def: HubDef, viewer: HubViewer) {
 export function neededMetrics(hub: HubKey, viewer: HubViewer): MetricKey[] {
   const def = hubDefs[hub];
   const keys = new Set<MetricKey>();
+  const action = def.actions.find((candidate) => candidate.gate(viewer));
+  if (action?.metric) keys.add(action.metric);
+  if (action?.alsoMetric) keys.add(action.alsoMetric);
   for (const card of visibleCards(def, viewer)) for (const key of card.metrics ?? []) keys.add(key);
   for (const stat of visibleStats(def, viewer)) {
     keys.add(stat.metric);
@@ -484,7 +510,18 @@ export function neededMetrics(hub: HubKey, viewer: HubViewer): MetricKey[] {
   return [...keys];
 }
 
-export function buildHubView(hub: HubKey, viewer: HubViewer, values: MetricValues): HubView {
+/** A main action is a filled button when it has no count (a create action) or when its count is above 0; otherwise it is a plain link. */
+export function hubActionIsPrimary(action: { metric?: MetricKey; alsoMetric?: MetricKey; unreadableIsPrimary?: boolean }, read: Reader): boolean {
+  if (!action.metric) return true;
+  const value = read(action.metric);
+  if (value === null) return action.unreadableIsPrimary === true;
+  if (value > 0) return true;
+  const other = action.alsoMetric ? read(action.alsoMetric) : null;
+  return other !== null && other > 0;
+}
+
+/** `shownMetrics` are numbers the page draws itself (Club administration's own figures); their card chips are dropped too. */
+export function buildHubView(hub: HubKey, viewer: HubViewer, values: MetricValues, shownMetrics: readonly MetricKey[] = []): HubView {
   const def = hubDefs[hub];
   const reading = (key: MetricKey): number | null => {
     const value = values[key];
@@ -501,11 +538,15 @@ export function buildHubView(hub: HubKey, viewer: HubViewer, values: MetricValue
     };
   });
   const action = def.actions.find((candidate) => candidate.gate(viewer)) ?? null;
+  // A number shown as a key figure is not repeated as a card chip (#1733).
+  const statMetrics = new Set<MetricKey>([...stats.map((stat) => stat.key), ...shownMetrics]);
   let shown = def.groups.flatMap((group): Array<{ title: string; cards: HubCard[] }> => {
     const cards = group.cards.filter((card) => card.gate(viewer)).map((card): HubCard => {
       const needs = card.metrics ?? [];
       let status: CardStatus | null = null;
-      if (card.status) status = needs.some((key) => reading(key) === null) ? UNAVAILABLE_STATUS : card.status(reading);
+      const repeatsFigure = needs.some((key) => statMetrics.has(key));
+      if (card.status && repeatsFigure) status = card.statusBesideFigures ? card.statusBesideFigures(reading) : null;
+      else if (card.status) status = needs.some((key) => reading(key) === null) ? UNAVAILABLE_STATUS : card.status(reading);
       return { href: card.href, title: cardTitle(card), description: cardDescription(card), status };
     });
     return cards.length > 0 ? [{ title: group.title, cards }] : [];
@@ -517,7 +558,7 @@ export function buildHubView(hub: HubKey, viewer: HubViewer, values: MetricValue
     title: hub === "club-administration" ? clubsAdminHomeItem.label : adminHubs[hub].title,
     description: hub === "club-administration" ? clubAdministrationDescription : adminHubs[hub].description,
     stats,
-    action: action ? { href: action.href, label: action.label } : null,
+    action: action ? { href: action.href, label: action.label, primary: hubActionIsPrimary(action, reading) } : null,
     groups,
   };
 }

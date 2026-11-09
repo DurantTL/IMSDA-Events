@@ -44,6 +44,18 @@ export function activeWorkContext(input: { pathname: string; isSystemAdmin: bool
   return { kind: "event", kindLabel: "Event", label: input.eventName?.trim() || "No event selected", detail: "Event workspace" };
 }
 
+/**
+ * Whether the small "Event · <name>" line under the page heading adds anything (#1733). The rail, the tab row, the event bar
+ * and the heading already name System, Clubs, Home, the account and the selected event, so the line shows only for a
+ * specific event that none of them names: `shownPlaceNames` is every place name already on screen, `pageTitle` the heading.
+ */
+export function showsWorkContextChip(input: { context: ActiveWorkContext; eventName?: string | null; pageTitle: string; shownPlaceNames: readonly (string | null | undefined)[] }): boolean {
+  const eventName = input.eventName?.trim();
+  if (input.context.kind !== "event" || !eventName || input.context.label !== eventName) return false;
+  if (input.pageTitle.includes(eventName)) return false;
+  return !input.shownPlaceNames.some((name) => name?.trim() === eventName);
+}
+
 export type WorkContextSwitch = {
   kind: WorkContextKind;
   label: string;

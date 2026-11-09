@@ -7,7 +7,7 @@ import { AdminHub } from "@/components/admin-hub";
 import { areaTabs, staffPlaceFor, tabIsOwned, type StaffAreaViewer } from "@/components/staff-areas";
 import { adminHubs, systemSubpageTitle } from "@/components/system-navigation";
 import {
-  buildHubView,
+  hubActionIsPrimary, buildHubView,
   canOpenHub,
   cardRowSizes,
   neededMetrics,
@@ -42,7 +42,7 @@ describe("Admin hub model (#1569)", () => {
       expect(view.action, hub).not.toBeNull();
       expect(view.groups.length, hub).toBeGreaterThan(0);
     }
-    expect(buildHubView("events", system, allMetrics("events", system, 1)).action).toEqual({ href: "/event-setup", label: "Create an event" });
+    expect(buildHubView("events", system, allMetrics("events", system, 1)).action).toEqual({ href: "/event-setup", label: "Create an event", primary: true });
     expect(buildHubView("clubs", system, allMetrics("clubs", system, 1)).action?.href).toBe("/admin/clubs/applications");
     expect(buildHubView("forms", system, allMetrics("forms", system, 1)).action?.href).toBe("/admin/forms");
     expect(buildHubView("catalogs", system, allMetrics("catalogs", system, 1)).action?.href).toBe("/admin/readiness");
@@ -57,11 +57,13 @@ describe("Admin hub model (#1569)", () => {
   it("shows empty states as real zeros with their own words, never as unavailable", () => {
     const view = buildHubView("clubs", system, allMetrics("clubs", system, 0));
     expect(view.stats.map((stat) => stat.display)).toEqual(["0", "0", "0", "0"]);
-    const statuses = Object.fromEntries(view.groups.flatMap((group) => group.cards).map((card) => [card.title, card.status?.text]));
+    // The Clubs hub shows these zeros as key figures, so Club administration (no figures) carries the words (#1733).
+    const home = buildHubView("club-administration", system, Object.fromEntries(neededMetrics("club-administration", system).map((key) => [key, 0])));
+    const statuses = Object.fromEntries(home.groups.flatMap((group) => group.cards).map((card) => [card.title, card.status?.text]));
     expect(statuses["New club applications"]).toBe("None waiting");
     expect(statuses["Club summary"]).toBe("None late");
     expect(statuses["Club member transfers"]).toBe("None open");
-    expect(buildHubView("catalogs", system, allMetrics("catalogs", system, 0)).groups.flatMap((group) => group.cards).find((card) => card.title === "System readiness")?.status).toEqual({ tone: "ok", text: "All ready" });
+    expect(buildHubView("catalogs", system, allMetrics("catalogs", system, 0)).groups.flatMap((group) => group.cards).find((card) => card.title === "System readiness")?.status).toBeNull();
   });
 
   it("keeps the unit with each count, singular and plural, and keeps distinct counts distinct", () => {
@@ -70,7 +72,8 @@ describe("Admin hub model (#1569)", () => {
     const many = buildHubView("clubs", system, { clubs: 42, applicationsWaiting: 4, lateRecords: 3, openTransfers: 1, clubLeaders: 168 });
     expect(many.stats.map((stat) => [stat.display, stat.label])).toEqual([["42", "Active clubs"], ["4", "Applications waiting"], ["3", "Late Monthly Records"], ["1", "Open member transfer"]]);
     const texts = many.groups.flatMap((group) => group.cards).map((card) => card.status?.text);
-    expect(texts).toEqual(["42 active clubs", "3 late", "168 current leaders", "3 late", "4 waiting", "1 open"]);
+    // Only the leaders card keeps its chip: every other number is already a key figure above (#1733).
+    expect(texts).toEqual([undefined, undefined, "168 current leaders", undefined, undefined, undefined]);
     expect(new Set(many.stats.map((stat) => stat.key)).size).toBe(many.stats.length);
   });
 
@@ -81,8 +84,51 @@ describe("Admin hub model (#1569)", () => {
     expect(stat("applicationsWaiting")).toMatchObject({ value: null, display: "Unavailable" });
     expect(stat("clubs")).toMatchObject({ value: 3, display: "3" });
     const cards = view.groups.flatMap((group) => group.cards);
-    expect(cards.find((card) => card.title === "New club applications")?.status).toEqual({ tone: "draft", text: "Unavailable" });
+    // A number already shown as a stat tile is not repeated as a card chip (#1733).
+    expect(cards.find((card) => card.title === "New club applications")?.status).toBeNull();
     expect(cards.find((card) => card.title === "Club leaders")?.status?.text).toBe("3 current leaders");
+  });
+
+  it("shows the main action as a filled button only while something is waiting behind it (#1733)", () => {
+    const action = (values: MetricValues) => buildHubView("clubs", system, { ...allMetrics("clubs", system, 3), ...values }).action;
+    expect(action({ applicationsWaiting: 2 })).toEqual({ href: "/admin/clubs/applications", label: "Review applications", primary: true });
+    expect(action({ applicationsWaiting: 0 })).toMatchObject({ href: "/admin/clubs/applications", primary: false });
+    expect(action({ applicationsWaiting: null })).toMatchObject({ primary: false });
+    const readiness = (values: MetricValues) => buildHubView("catalogs", system, { ...allMetrics("catalogs", system, 0), ...values }).action;
+    expect(readiness({})).toMatchObject({ href: "/admin/readiness", primary: false });
+    expect(readiness({ readinessAttention: 1 })).toMatchObject({ primary: true });
+    // Something that could not be read needs a look too.
+    expect(readiness({ readinessUnknown: 2 })).toMatchObject({ primary: true });
+    expect(readiness({ readinessAttention: null })).toMatchObject({ primary: true });
+    // A create action has no count, so it stays the one main button.
+    expect(buildHubView("events", system, allMetrics("events", system, 0)).action?.primary).toBe(true);
+    expect(neededMetrics("clubs", system)).toContain("applicationsWaiting");
+    expect(hubActionIsPrimary({}, () => null)).toBe(true);
+  });
+
+  it("never says one number twice: a card whose only number is a stat tile has no chip (#1733)", () => {
+    const clubs = buildHubView("clubs", system, allMetrics("clubs", system, 2));
+    const byTitle = Object.fromEntries(clubs.groups.flatMap((group) => group.cards).map((card) => [card.title, card.status?.text ?? null]));
+    expect(clubs.stats.map((stat) => stat.key)).toContain("openTransfers");
+    expect(byTitle["Club member transfers"] ?? null).toBeNull();
+    // Without a tile or page figure (Club administration has none of its own here) the chip stays.
+    const values = { applicationsWaiting: 2, openTransfers: 1, lateRecords: 0, clubs: 3 };
+    const chip = (view: ReturnType<typeof buildHubView>, href: string) => view.groups.flatMap((group) => group.cards).find((card) => card.href === href)?.status?.text ?? null;
+    expect(chip(buildHubView("club-administration", system, values), "/admin/clubs/applications")).toBe("2 waiting");
+    // Figures the page draws itself count as shown (#1733).
+    const withFigures = buildHubView("club-administration", system, values, ["clubs", "applicationsWaiting"]);
+    expect(chip(withFigures, "/admin/clubs/applications")).toBeNull();
+    expect(chip(withFigures, "/admin/organizations")).toBeNull();
+    expect(chip(withFigures, "/admin/clubs/transfers")).toBe("1 open");
+  });
+
+  it("does not repeat the readiness tile on the System health card, and keeps what the tile lacks (#1733)", () => {
+    const readiness = (values: MetricValues) => cardsOf("catalogs", system, { ...allMetrics("catalogs", system, 0), ...values }).find((card) => card.title === "System readiness")?.status ?? null;
+    expect(readiness({ readinessAttention: 3 })).toBeNull();
+    expect(readiness({ readinessUnknown: 2 })).toBeNull();
+    expect(readiness({ readinessAttention: null, readinessUnknown: null })).toBeNull();
+    expect(readiness({})).toBeNull();
+    expect(readiness({ readinessToConfirm: 2 })).toEqual({ tone: "soon", text: "2 to confirm" });
   });
 
   it("never turns an unread or unreadable value into a healthy zero or All ready", () => {
@@ -98,7 +144,8 @@ describe("Admin hub model (#1569)", () => {
     }
     // Readiness: one unreadable half is enough to stop "All ready".
     const partial = cardsOf("catalogs", system, { ...allMetrics("catalogs", system, 0), readinessToConfirm: null }).find((card) => card.title === "System readiness");
-    expect(partial?.status?.text).toBe("Unavailable");
+    // The tile has no "to confirm" figure, so the card says it could not be read, and never "All ready" (#1733).
+    expect(partial?.status).toEqual({ tone: "draft", text: "Unavailable" });
     expect(cardsOf("catalogs", system, { ...allMetrics("catalogs", system, 0), readinessToConfirm: 2 }).find((card) => card.title === "System readiness")?.status).toEqual({ tone: "soon", text: "2 to confirm" });
   });
 
@@ -236,9 +283,8 @@ describe("Admin hub card layout (#1569)", () => {
   it("never says all ready, or zero needing attention, while a readiness check could not be read", () => {
     const base = allMetrics("catalogs", system, 0);
     const card = (values: MetricValues) => cardsOf("catalogs", system, values).find((entry) => entry.title === "System readiness")?.status;
-    expect(card({ ...base, readinessUnknown: 2 })).toEqual({ tone: "soon", text: "2 could not be read" });
-    expect(card({ ...base, readinessUnknown: null })).toEqual({ tone: "draft", text: "Unavailable" });
-    expect(card({ ...base, readinessUnknown: 0 })).toEqual({ tone: "ok", text: "All ready" });
+    // The tile above carries those numbers; the card never turns them into "All ready" (#1733).
+    for (const unknown of [2, null, 0]) expect(card({ ...base, readinessUnknown: unknown }) ?? null, String(unknown)).toBeNull();
     const stat = (values: MetricValues) => buildHubView("catalogs", system, values).stats.find((entry) => entry.key === "readinessAttention")!;
     expect(stat({ ...base, readinessUnknown: 1 })).toMatchObject({ display: "0", note: "1 check could not be read" });
     expect(stat({ ...base, readinessUnknown: null }).note).toBe("Some checks could not be read");
