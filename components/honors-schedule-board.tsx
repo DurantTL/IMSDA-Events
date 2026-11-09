@@ -86,7 +86,11 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
 
   /** Puts keyboard focus back on a class's Move button once the board has re-rendered. */
   function focusMove(id: string) {
-    window.setTimeout(() => (document.getElementById(`sb-move-${id}`) ?? document.getElementById(`sb-agenda-move-${id}`))?.focus(), 0);
+    // Both views can be in the page (one hidden by CSS until a view is chosen): focus the one that is showing.
+    window.setTimeout(() => {
+      const candidates = [document.getElementById(`sb-move-${id}`), document.getElementById(`sb-agenda-move-${id}`)];
+      candidates.find((element) => element && element.getClientRects().length > 0)?.focus();
+    }, 0);
   }
 
   async function call(url: string, method: string, body: unknown) {

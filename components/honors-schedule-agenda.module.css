@@ -4,14 +4,14 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   overflow: hidden;
-  background: #fff;
+  background: var(--card);
 }
 
 .switch button {
   min-height: 44px;
   min-width: 44px;
   border: 0;
-  background: #fff;
+  background: var(--card);
   padding: 0 16px;
   color: var(--ink);
   font: inherit;
@@ -21,7 +21,7 @@
 }
 
 .switch button + button { border-left: 1px solid var(--line); }
-.switch button[aria-pressed="true"] { background: var(--navy, #002336); color: #fff; }
+.switch button[aria-pressed="true"] { background: var(--imsda-navy); color: #fff; }
 
 .agenda { display: grid; gap: 18px; }
 
@@ -41,7 +41,7 @@
   min-width: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--card);
   padding: 10px 12px;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
   overflow-wrap: anywhere;
