@@ -101,12 +101,7 @@ const wrapped: Allowed[] = [
   { file: "app/(public)/events/events-search-field.tsx", count: 1, reason: "wrapped: rendered inside SearchAsYouTypeForm by app/(public)/events/page.tsx" },
 ];
 
-/** A search that hands off to another page on purpose. */
-const handoffs: Allowed[] = [
-  { file: "components/coordinator-find-club.tsx", count: 1, reason: "hand-off: Find a club on the Overview submits to the Clubs page (#1759); typing must not leave the Overview" },
-];
-
-const allowlist: Allowed[] = [...pickers, ...wrapped, ...handoffs];
+const allowlist: Allowed[] = [...pickers, ...wrapped];
 
 describe("search boxes search as you type (#1431)", () => {
   const files = [...walk(path.join(root, "app")), ...walk(path.join(root, "components"))]

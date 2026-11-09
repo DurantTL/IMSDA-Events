@@ -1,22 +1,19 @@
+import Link from "next/link";
 import { Search } from "lucide-react";
 import styles from "./coordinator-find-club.module.css";
 
 /**
- * A short "Find a club" search near the top of the coordinator Overview (#1759). A plain GET form to the Clubs page, so it
- * works without script: the Clubs page does the matching (club, church, city or director).
+ * "Find a club" near the top of the coordinator Overview (#1759): a link to the Clubs page, whose own search narrows as
+ * you type (club, church, city or director). A link rather than a second search box, so every search box searches as
+ * you type (S4) and typing never leaves the Overview.
  */
 export function CoordinatorFindClub({ clubYear }: { clubYear: string }) {
   return (
-    <form action="/account/area-clubs/clubs" className={styles.form} method="get" role="search">
-      <input name="year" type="hidden" value={clubYear} />
-      <label htmlFor="coordinator-find-club">Find a club</label>
-      <div className={styles.row}>
-        <div className="search-field">
-          <Search aria-hidden="true" size={16} />
-          <input autoComplete="off" id="coordinator-find-club" maxLength={80} name="q" placeholder="Club, church, city or director" type="search" />
-        </div>
-        <button className="secondary-button" type="submit"><Search aria-hidden="true" size={16} /> Search</button>
-      </div>
-    </form>
+    <p className={styles.row}>
+      <Link className="secondary-button" href={`/account/area-clubs/clubs?year=${encodeURIComponent(clubYear)}`}>
+        <Search aria-hidden="true" size={16} /> Find a club
+      </Link>
+      <span className={styles.hint}>Search every club by club, church, city or director.</span>
+    </p>
   );
 }

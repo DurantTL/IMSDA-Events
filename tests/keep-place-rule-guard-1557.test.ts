@@ -28,7 +28,6 @@ const RAW_GET_FORMS: Record<string, { forms: number; why: string }> = {
   "app/(workspace)/check-in/badges/page.tsx": { forms: 1, why: "badge print controls; the print buttons need a real GET" },
   "app/(workspace)/more/reports/clubs/check-in-book/page.tsx": { forms: 1, why: "report options; the print buttons need a real GET" },
   "components/area-club-search-form.tsx": { forms: 1, why: "search as you type (useListNavigation)" },
-  "components/coordinator-find-club.tsx": { forms: 1, why: "Find a club on the Overview goes to the Clubs page (#1759); it is a hand-off, not a filter of this page" },
   "components/choice-answer-filter.tsx": { forms: 1, why: "filter that goes to /people on purpose" },
   "components/desk-location-select.tsx": { forms: 1, why: "check-in desk choice, a one-field form that changes the desk, not a list" },
   "components/organization-search-controls.tsx": { forms: 1, why: "search as you type (useListNavigation)" },
