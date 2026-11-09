@@ -27,8 +27,10 @@ you to review the current branch against `origin/main`.
    (for example a short Node script using `require('playwright')`) at 1280 px
    and 390 px (app on port 3000, seeded synthetic data). Starting the app with
    `npm run dev` if it is not running is allowed; it only writes build output,
-   never source files. and try each rule in `docs/SITE-RULES.md` that
-   applies by using the page. Keep screenshots in a temporary folder; never
+   never source files. Try each rule in `docs/SITE-RULES.md` that
+   applies by using the page; for a change that is only layout, styling or
+   copy, use the ten checks in `docs/SCREEN-AUDIT.md` (SA1 to SA10) as the
+   review skill describes. Keep screenshots in a temporary folder; never
    commit them. If no page changed, say so.
 4. Report only actionable findings, most severe first, each with `path:line`,
    what is wrong, a concrete failure scenario, and a suggested fix. List
