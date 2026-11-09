@@ -1,7 +1,7 @@
 {
   "color": {
     "app/(workspace)/admin/clubs/admin-clubs.module.css": 7,
-    "app/(workspace)/admin/system-admin.module.css": 23,
+    "app/(workspace)/admin/system-admin.module.css": 24,
     "app/(workspace)/admin/system-report/page.module.css": 2,
     "app/(workspace)/admin/system-report/testers.module.css": 1,
     "app/(workspace)/events-admin/events-admin.module.css": 7,

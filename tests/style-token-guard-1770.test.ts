@@ -7,6 +7,8 @@ import { cssRules, moduleCssFiles, read, root, stripCssComments } from "./helper
  * Site rule G3 (docs/SITE-RULES.md, #1770): everything is styled from the shared tokens. New CSS in app/globals.css or a
  * *.module.css file may not use a raw color, a raw font-size or a raw border-radius. The raw values that existed on
  * November 9, 2026 are frozen as counts per file in tests/fixtures/style-token-baseline-1770.json; the counts only shrink.
+ * The check is a count per file, so removing one raw value and adding another in the same file goes unseen. Known limits:
+ * rules nested inside rules are not read as their own rules, and a raw size inside the max(var(--type-staff-floor, 0px), ...) form is allowed.
  *
  * Lowering the baseline after you replace a raw value:
  *   STYLE_BASELINE_LOWER=1 npx vitest run tests/style-token-guard-1770.test.ts
@@ -43,7 +45,7 @@ const hexColor = /#[0-9a-fA-F]{8}\b|#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3,4}\b/g;
 const colorFunction = /\b(?:rgb|rgba|hsl|hsla|hwb|lab|lch|oklab|oklch|color)\(/i;
 /** Named colors count only where a color is the whole value of a color property. Keywords such as transparent, currentColor, inherit and none are not raw colors. */
 const namedColors = /^(?:white|black|red|green|blue|gray|grey|silver|yellow|orange|purple|navy|teal|maroon|lime|aqua|fuchsia|olive|pink|brown|gold)$/i;
-const colorProperty = /^(?:color|background(?:-color)?|border(?:-(?:top|right|bottom|left))?(?:-color)?|outline(?:-color)?|fill|stroke|caret-color|accent-color|text-decoration-color|column-rule(?:-color)?)$/;
+const colorProperty = /^(?:color|background|fill|stroke|outline|border(?:-[a-z]+)*|text-decoration|column-rule|box-shadow|text-shadow)$|color$/;
 
 const radiusProperty = /^border(?:-(?:top|bottom)-(?:left|right)|-(?:start|end)-(?:start|end))?-radius$/;
 const allowedRadiusPart = /^(?:0|0px|50%|var\(--radius-[\w-]+(?:\s*,[^)]*)?\))$/;
@@ -79,7 +81,7 @@ export function scanStyles(file: string, source: string): Violation[] {
       const index = entry.indexOf(":");
       if (index < 0) continue;
       const property = entry.slice(0, index).trim().toLowerCase();
-      if (!/^[a-z][\w-]*$/.test(property)) continue; // custom properties (--x) and nested selectors
+      if (!/^-?[a-z][\w-]*$/.test(property)) continue; // custom properties (--x) and nested selectors
       const value = entry.slice(index + 1).trim().replace(/\s*!important$/i, "");
       const leading = entry.slice(0, entry.length - entry.trimStart().length);
       const line = rule.line + body.slice(0, start + leading.length).split("\n").length - 1;
@@ -93,11 +95,15 @@ export function scanStyles(file: string, source: string): Violation[] {
         const px = /(?<![\w.-])(\d+)px/.exec(bare)?.[1];
         add("radius", (px && radiusTokens.get(`${px}px`) ? `var(${radiusTokens.get(`${px}px`)})` : "a var(--radius-*) token") + ", 50% or 0");
       }
-      const isColorValue = colorProperty.test(property) || /gradient\(|shadow$/.test(`${property} ${bare}`);
-      if (isColorValue || /^(?:box-shadow|text-shadow|filter|background-image)$/.test(property)) {
-        const hexes = [...bare.matchAll(hexColor)].map((match) => normalHex(match[0]));
-        const named = colorProperty.test(property) && bare.split(/\s+/).some((part) => namedColors.test(part));
-        if (hexes.length > 0 || colorFunction.test(bare) || named) {
+      if (property === "font" && /(?<![\w.-])\d*\.?\d+(?:px|rem|em|pt|%)/.test(bare)) {
+        add("fontSize", "var(--text-helper-min), another size token, or font-size with max(var(--type-staff-floor, 0px), <size>)");
+      }
+      {
+        // Every value is scanned for hex and color functions (quoted text excluded); named colors only on color-bearing properties.
+        const scannable = bare.replace(/"[^"]*"|'[^']*'/g, "");
+        const hexes = [...scannable.matchAll(hexColor)].map((match) => normalHex(match[0]));
+        const named = colorProperty.test(property) && scannable.split(/[\s,]+/).some((part) => namedColors.test(part));
+        if (hexes.length > 0 || colorFunction.test(scannable) || named) {
           const token = hexes.map((hex) => colorTokens.get(hex)).find(Boolean);
           add("color", token ? `var(${token})` : "a color token from :root in app/globals.css (a new shade needs a mockup, rule G2)");
         }
@@ -212,8 +218,11 @@ describe("G3: no new raw color, font-size or border-radius (#1770)", () => {
       ".u { background: url(\"data:image/svg+xml;utf8,<svg fill='%23fff'/>\"); }",
       ".bad { border-top-left-radius: 4px; border-radius: 12px 12px 0 0; font-size: inherit; font-size: 1em;",
       "  background: linear-gradient(90deg, rgba(0,0,0,.1), #fff); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); border: 1px solid #ccc; color: white; }",
+      ".more { border-inline-start: 1px solid #abc; border-block-color: #fff; scrollbar-color: #123 #456; stop-color: #fff; -webkit-text-fill-color: #111; border-image: linear-gradient(#fff, #000) 1; }",
+      ".font { font: 12px/1 Arial; } .fontok { font: inherit; font: 600 var(--text-sm) var(--font-body); }",
     ].join("\n");
     const found = scanStyles("s.css", sample).map((item) => `${item.kind}:${item.property}`);
-    expect(found).toEqual(["radius:border-top-left-radius", "radius:border-radius", "fontSize:font-size", "fontSize:font-size", "color:background", "color:box-shadow", "color:border", "color:color"]);
+    expect(found).toEqual(["radius:border-top-left-radius", "radius:border-radius", "fontSize:font-size", "fontSize:font-size", "color:background", "color:box-shadow", "color:border", "color:color",
+      "color:border-inline-start", "color:border-block-color", "color:scrollbar-color", "color:stop-color", "color:-webkit-text-fill-color", "color:border-image", "fontSize:font"]);
   });
 });
