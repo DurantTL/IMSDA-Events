@@ -6,7 +6,7 @@ import { StaffViewerProvider } from "@/components/staff-viewer-context";
 import type { HelpViewer } from "@/modules/help/visibility";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Archive, ChevronDown, LifeBuoy } from "lucide-react";
+import { ChevronDown, LifeBuoy } from "lucide-react";
 import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
@@ -16,7 +16,7 @@ import { GuardedLink } from "@/components/guarded-link";
 import { WorkspaceContent, workspacePageKey } from "@/components/workspace-content";
 import { moduleDestinationStates } from "@/components/module-destination-states";
 import { buildSearchDestinations } from "@/components/destination-search-model";
-import { eventToRemember, resolveShellEvent, switchEvent } from "@/components/shell-event-selection";
+import { eventToRemember, refreshAfterRemember, resolveShellEvent, switchEvent } from "@/components/shell-event-selection";
 import { createEventHrefFor, isSystemWorkspacePath } from "@/components/system-navigation";
 import { isEventModuleKey } from "@/modules/event-modules/catalog";
 import { AdminAttentionBell } from "@/components/admin-attention-bell";
@@ -44,6 +44,8 @@ import {
   type NavigationItem,
 } from "@/components/staff-navigation";
 import styles from "@/components/staff-shell.module.css";
+
+const archivedChoice = "__archived-events__";
 
 type ShellEvent = {
   id: string;
@@ -226,6 +228,14 @@ export function AppShell({
     shownPlaceNames: [eventBarShown ? selectedEvent?.name : null, place.inEvent ? selectedEvent?.name : staffAreaMeta[place.area].label],
   });
 
+  // Saves the event as the remembered one, then refreshes only a page that relies on it (#1745): a page whose address
+  // names its event is already right, and refreshing it can cancel a sort or filter the user just chose.
+  function rememberEvent(eventId: string) {
+    return rememberLastUsedEvent(eventId).then(() => {
+      if (refreshAfterRemember(window.location.search)) router.refresh();
+    });
+  }
+
   // An event named in the URL becomes the remembered selection (#616), so the
   // next page without `?event=` keeps it instead of falling back to the default.
   const lastRememberedId = useRef<string | null>(defaultEventId);
@@ -238,13 +248,17 @@ export function AppShell({
     });
     if (toRemember) {
       lastRememberedId.current = toRemember;
-      // Refresh once the cookie is set so the server default catches up.
-      void rememberLastUsedEvent(toRemember).then(() => router.refresh());
+      void rememberEvent(toRemember);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedEventId, knownEventIds]);
 
   function selectEvent(eventId: string) {
+    // "Archived events" is the switcher's last choice (#1747): same page as before, guarded like any other move.
+    if (eventId === archivedChoice) {
+      void guardedNavigate(() => router.push("/archived-events"));
+      return;
+    }
     // Guarded (#647): a dirty form prompts first; Cancel changes nothing.
     switchEvent({
       eventId,
@@ -255,7 +269,8 @@ export function AppShell({
         // Remembered for the next sign-in (#108 queue 1); never blocks the switch.
         lastRememberedId.current = id;
         setSeenEventId(id);
-        void rememberLastUsedEvent(id).then(() => router.refresh());
+        // The switch goes to an address that names the event, so no refresh is needed (#1745).
+        void rememberLastUsedEvent(id);
       },
       push: (href) => router.push(href),
     });
@@ -266,7 +281,7 @@ export function AppShell({
     void guardedNavigate(() => {
       lastRememberedId.current = eventId;
       setSeenEventId(eventId);
-      void rememberLastUsedEvent(eventId).then(() => router.refresh());
+      void rememberLastUsedEvent(eventId);
       router.push(`/overview?event=${encodeURIComponent(eventId)}`);
     });
   }
@@ -281,17 +296,12 @@ export function AppShell({
       >
         {!selectedEventId && <option value="" disabled>Choose an event</option>}
         {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
+        <option value={archivedChoice}>Archived events…</option>
       </select>
       {/* On a phone the select shows this short label (the select's own name stays "Switch event"), not the event's name again; the select still takes the tap. */}
       <span className={styles.pickerPhoneLabel} aria-hidden="true">Switch</span>
       <ChevronDown aria-hidden="true" size={16} />
     </span>
-  );
-  // Archived events sits with the switcher (#1734): a link, not a select option, so arrowing through the choices never navigates away.
-  const archivedLink = (
-    <GuardedLink className={styles.archivedLink} href="/archived-events" aria-label="Archived events">
-      <Archive aria-hidden="true" size={18} className={styles.archivedIcon} /><span className={styles.archivedText}>Archived events</span>
-    </GuardedLink>
   );
   const openPicker = pickerEvents.length > 0 && place.area === "events" && !place.inEvent ? (
     <span className={styles.pickerShell}>
@@ -334,7 +344,6 @@ export function AppShell({
               <span className={styles.eventName}>{selectedEvent.name}</span>
               <div className={styles.eventTools}>
                 <span className={styles.picker}>{picker}</span>
-                {archivedLink}
               </div>
             </div>
           )}

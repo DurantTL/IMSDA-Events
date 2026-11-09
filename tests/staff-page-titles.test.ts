@@ -15,7 +15,7 @@ const pageFile = (path: string) => join(root, "app/(workspace)", path, "page.tsx
 describe("staff page names (#685)", () => {
   it("uses one name per section in the navigation", () => {
     const labelByHref = Object.fromEntries(navigation.map((item) => [item.href, item.label]));
-    expect(labelByHref["/overview"]).toBe("Dashboard");
+    expect(labelByHref["/overview"]).toBe("Event home");
     expect(labelByHref["/people"]).toBe("Registrations");
     expect(labelByHref["/finance"]).toBe("Payments");
     expect(labelByHref["/more/promo-codes"]).toBe("Promo codes");
@@ -32,7 +32,7 @@ describe("staff page names (#685)", () => {
     expect(byHref["/more/promo-codes"]).toBe(titles.promoCodes);
     // The sidebar's own items, as the target names them.
     expect(navigation.filter((item) => item.sidebar).map((item) => item.label)).toEqual([
-      "Dashboard", "Kitchen counts", "Check-in", "Registrations", "Payments", "Emails",
+      "Event home", "Kitchen counts", "Check-in", "Registrations", "Payments", "Emails",
       "Event settings", "Registration forms", "Attendee setup", "Tags",
       "Operational reports", "Operational health",
     ]);
@@ -44,7 +44,7 @@ describe("staff page names (#685)", () => {
     for (const href of mobileNavigationOrder) {
       expect(navigation.find((item) => item.href === href)?.label).toBeTruthy();
     }
-    expect(navigation.find((item) => item.href === "/overview")?.label).toBe("Dashboard");
+    expect(navigation.find((item) => item.href === "/overview")?.label).toBe("Event home");
     expect(navigation.find((item) => item.href === "/people")?.label).toBe("Registrations");
     expect(navigation.every((item) => !("mobileLabel" in item))).toBe(true);
   });

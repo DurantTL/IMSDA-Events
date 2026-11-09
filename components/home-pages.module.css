@@ -171,3 +171,15 @@
     justify-content: flex-start;
   }
 }
+
+/* The empty Needs you states (#1747): an icon beside the sentence and its next step. */
+.emptyMessage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emptyIcon {
+  flex: none;
+  color: var(--imsda-navy);
+}

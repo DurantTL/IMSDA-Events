@@ -49,7 +49,7 @@ describe("Help & learning in the shell", () => {
     expect(markup.match(/href="\/help\?event=event_1"/g)).toHaveLength(1);
   });
 
-  it("lights only Help & learning on /help and below, and no tab, never the Dashboard", () => {
+  it("lights only Help & learning on /help and below, and no tab, never Event home", () => {
     for (const path of ["/help", "/help/invite-staff"]) {
       const markup = render(path, ["VIEW_EVENT", "MANAGE_CHECK_IN"]);
       expect(helpLit(markup)).toBe(true);

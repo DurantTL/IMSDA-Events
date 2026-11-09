@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CalendarDays, CircleCheck } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import styles from "@/components/home-pages.module.css";
 import { homeDestinations } from "@/components/staff-areas";
@@ -48,15 +48,23 @@ function Item({ item }: { item: NeedsItem }) {
  * the page that does the work; nothing on Home approves, sends or changes a record. "Nothing needs you right now" shows only
  * when every read worked and found nothing; a read that failed says "Unavailable".
  */
-export function NeedsYouPage({ view }: { view: NeedsView }) {
+export function NeedsYouPage({ view, comingUp = null }: { view: NeedsView; comingUp?: { events: ComingUpEvent[] | null; nextStep: { href: string; label: string } | null } | null }) {
+  // The next step from an empty Needs you (#1747): never a link the Coming up list below already holds, so it is Help.
+  const nextStep = { href: "/help", label: "Open Help" };
   return (
     <div className={styles.home} data-testid="home-needs-you">
       {view.noAdminRole ? (
-        <p className={styles.message} data-testid="home-no-admin-role">
-          The work for your events is listed on each event&apos;s page. <Link href={homeDestinations.comingUp.href}>See your events in Coming up</Link>.
+        <p className={`${styles.message} ${styles.emptyMessage}`} data-testid="home-no-admin-role">
+          <CalendarDays aria-hidden="true" size={20} className={styles.emptyIcon} />
+          <span>The work for your events is listed on each event&apos;s page. <Link href={homeDestinations.comingUp.href}>See your events in Coming up</Link>.</span>
         </p>
       ) : null}
-      {view.allClear ? <p className={styles.message} data-testid="home-all-clear">Nothing needs you right now.</p> : null}
+      {view.allClear ? (
+        <p className={`${styles.message} ${styles.emptyMessage}`} data-testid="home-all-clear">
+          <CircleCheck aria-hidden="true" size={20} className={styles.emptyIcon} />
+          <span><strong>Nothing needs you right now.</strong> <Link href={nextStep.href} data-testid="home-all-clear-next">{nextStep.label}</Link></span>
+        </p>
+      ) : null}
       {view.sections.map((section) => (
         <section key={section.role} className={styles.section} aria-labelledby={`home-section-${section.role}`} data-role={section.role}>
           <div className={styles.sectionHead}>
@@ -70,6 +78,12 @@ export function NeedsYouPage({ view }: { view: NeedsView }) {
           ) : null}
         </section>
       ))}
+      {comingUp && (view.allClear || view.noAdminRole) ? (
+        <section className={styles.section} aria-labelledby="home-needs-coming-up" data-testid="home-needs-coming-up">
+          <h2 id="home-needs-coming-up" className={styles.sectionTitle}>Coming up</h2>
+          <ComingUpPage events={comingUp.events} nextStep={comingUp.nextStep} />
+        </section>
+      ) : null}
     </div>
   );
 }

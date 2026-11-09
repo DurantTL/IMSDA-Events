@@ -7,6 +7,7 @@ import { heldAdminRoles } from "@/modules/access/admin-roles-domain";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { buildNeedsView } from "@/modules/system-admin/home-needs-model";
+import { loadComingUp } from "@/modules/system-admin/home-coming-up-repository";
 import { loadNeedsInput } from "@/modules/system-admin/home-needs-repository";
 
 export const metadata: Metadata = { title: "Home" };
@@ -22,10 +23,12 @@ export default async function HomeNeedsYouPage() {
   const roles = await resolveAdminRoles(user);
   const held = heldAdminRoles(roles);
   const view = buildNeedsView(await loadNeedsInput(roles, held));
+  // Coming up sits below the empty states (#1747): only read when nothing needs this person.
+  const comingUp = view.allClear || view.noAdminRole ? await loadComingUp(user, async () => held) : null;
   return (
     <section className="page-stack">
       <StaffPageHeader description="What needs you, and what is coming up." />
-      <NeedsYouPage view={view} />
+      <NeedsYouPage view={view} comingUp={comingUp} />
     </section>
   );
 }

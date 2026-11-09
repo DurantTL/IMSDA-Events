@@ -24,6 +24,9 @@ vi.mock("@/modules/billing-responsibility/repository", () => ({ getBillingRespon
 const hasApprovedReconciliation = vi.fn();
 vi.mock("@/modules/attendance-reconciliation/repository", () => ({ hasApprovedReconciliation: (...args: unknown[]) => { calls.push("attendance"); return hasApprovedReconciliation(...args); } }));
 
+const listUnmatchedSquarePayments = vi.fn();
+vi.mock("@/modules/payments/square-match-repository", () => ({ listUnmatchedSquarePayments: (...args: unknown[]) => { calls.push("square"); return listUnmatchedSquarePayments(...args); } }));
+
 const { loadMoneyToolMetrics } = await import("@/modules/payments/money-tools-repository");
 
 const finance = { permissions: ["MANAGE_FINANCE" as const] };
@@ -46,12 +49,14 @@ beforeEach(() => {
   getBillingResponsibilityView.mockResolvedValue({ isDeferred: true, unrecordedCount: 4, outdatedCount: 1, summary: { unresolvedCount: 2, needsContactCount: 3 } });
   hasApprovedReconciliation.mockReset();
   hasApprovedReconciliation.mockResolvedValue(true);
+  listUnmatchedSquarePayments.mockReset();
+  listUnmatchedSquarePayments.mockResolvedValue({ findings: [{}, {}], examined: 9, unreachableSquare: false, environment: "sandbox" });
 });
 
 describe("More money tools loaders (#1575)", () => {
   it("reads each number for the one event, with the counts the pages use", async () => {
     const values = await loadMoneyToolMetrics(finance, "evt_1", now);
-    expect(values).toEqual({ churchFlags: 1, ledgerDifferences: 3, policyVersions: 2, policyInEffect: 1, draftInvoices: 2, scholarshipBalanceCents: 250000, billingUnrecorded: 4, billingOutdated: 1, billingUnresolved: 2, billingNeedsContact: 3, billedToOrganizations: 1, attendanceApproved: 1 });
+    expect(values).toEqual({ churchFlags: 1, ledgerDifferences: 3, policyVersions: 2, policyInEffect: 1, draftInvoices: 2, scholarshipBalanceCents: 250000, billingUnrecorded: 4, billingOutdated: 1, billingUnresolved: 2, billingNeedsContact: 3, billedToOrganizations: 1, attendanceApproved: 1, unmatchedSquare: 2 });
     expect(countOpenChurchSponsorFlags).toHaveBeenCalledWith("evt_1");
     expect(reconcileRegistrationLedger).toHaveBeenCalledWith(prisma, { eventId: "evt_1" });
     expect(countOpenInvoiceDrafts).toHaveBeenCalledWith("evt_1");
@@ -72,6 +77,40 @@ describe("More money tools loaders (#1575)", () => {
     expect(values.churchFlags).toBe(1);
     expect(values.draftInvoices).toBe(2);
     expect(logError).toHaveBeenCalledTimes(3);
+  });
+
+  it("gives up on the Square list after a few seconds, so the card never holds the page up (#1747)", async () => {
+    vi.useFakeTimers();
+    try {
+      listUnmatchedSquarePayments.mockReturnValue(new Promise(() => {}));
+      const pending = loadMoneyToolMetrics(finance, "evt_1", now);
+      await vi.advanceTimersByTimeAsync(3100);
+      const values = await pending;
+      expect(values.unmatchedSquare).toBeNull();
+      expect(values.churchFlags).toBe(1);
+      // The same list the Square page reads, so the chip and that page agree.
+      expect(listUnmatchedSquarePayments).toHaveBeenCalledWith();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not log an error when Square is simply not set up, but logs a real failure (#1747)", async () => {
+    listUnmatchedSquarePayments.mockRejectedValue(Object.assign(new Error("Square is not configured for this site."), { code: "SQUARE_NOT_CONFIGURED" }));
+    expect((await loadMoneyToolMetrics(finance, "evt_1", now)).unmatchedSquare).toBeNull();
+    expect(logError).not.toHaveBeenCalled();
+    listUnmatchedSquarePayments.mockRejectedValue(new Error("boom"));
+    await loadMoneyToolMetrics(finance, "evt_1", now);
+    expect(logError).toHaveBeenCalledTimes(1);
+  });
+
+  it("makes the unmatched Square count unavailable when Square is not configured or cannot be reached (#1747)", async () => {
+    listUnmatchedSquarePayments.mockRejectedValue(new Error("Square is not configured for this site."));
+    expect((await loadMoneyToolMetrics(finance, "evt_1", now)).unmatchedSquare).toBeNull();
+    listUnmatchedSquarePayments.mockResolvedValue({ findings: [], examined: 0, unreachableSquare: true, environment: "sandbox" });
+    expect((await loadMoneyToolMetrics(finance, "evt_1", now)).unmatchedSquare).toBeNull();
+    listUnmatchedSquarePayments.mockResolvedValue({ findings: [], examined: 3, unreachableSquare: false, environment: "sandbox" });
+    expect((await loadMoneyToolMetrics(finance, "evt_1", now)).unmatchedSquare).toBe(0);
   });
 
   it("makes the billing and approval numbers unavailable when their reads fail", async () => {

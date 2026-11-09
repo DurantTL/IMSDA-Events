@@ -1,0 +1,13 @@
+/* The Registrations count and sort note share one line (#1747); they wrap only when the line cannot hold both. */
+.countLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 14px;
+}
+.countLine > :global(.list-pager) { padding: 6px 0; }
+.countLine > :global(.sort-order-note) { margin: 0; }
+
+/* The Help button sits in the actions row with no row or margin of its own. */
+.helpSlot.helpSlot > * { margin: 0; }
+.countLine > :global(.count-badge) { margin: 0; }

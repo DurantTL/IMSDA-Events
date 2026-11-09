@@ -167,12 +167,11 @@ ul.stats[data-count] > li:last-child { grid-column: auto; }
   text-decoration: none;
 }
 
+/* The status chip sits on its own line under the title, so it is in the same place on every card (#1747). */
 .cardTop {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 6px 10px;
+  display: grid;
+  justify-items: start;
+  gap: 6px;
 }
 
 .cardTitle {

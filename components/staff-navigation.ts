@@ -56,7 +56,7 @@ export { clubsAdminRecordsHref };
  * phone (#475).
  *
  * The sidebar (#964) is short and grouped. System management and the event
- * picker sit above it, then the daily items (Dashboard, Check-in, Registrations,
+ * picker sit above it, then the daily items (Event home, Check-in, Registrations,
  * Payments, Emails) always visible, then the collapsible "Set up" and "Reports"
  * groups, then More last (the one item with no section). A group with no
  * visible item is left out. System management is not a nav item: the shell draws
@@ -121,7 +121,7 @@ export function withCurrentEvent(href: string, eventId: string | null | undefine
  * which the header used to call "More".
  */
 export const staffPageTitles = {
-  overview: "Dashboard",
+  overview: "Event home",
   checkIn: "Check-in",
   registrationForm: "Registration forms",
   attendeeSetup: "Attendee setup",
@@ -178,7 +178,7 @@ export const staffPageTitles = {
   lodgingAssignments: "Lodging assignments",
   issuedAssets: "Issued assets",
   scheduledEmails: "Scheduled emails",
-  ledgerCheck: "Ledger check (shadow)",
+  ledgerCheck: "Ledger check",
   // The money pages the More money tools view lists (#1575): the titles the pages already carry, named once here.
   moreMoneyTools: "More money tools",
   invoices: "Invoices",

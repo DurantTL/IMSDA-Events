@@ -220,6 +220,32 @@ describe("Needs you model (#1568)", () => {
     expect(html).not.toContain("Nothing needs you right now.");
   });
 
+  it("shows Coming up under an empty Needs you, with an icon and a next step (#1747)", () => {
+    const events = [{ id: "evt_1", name: "Synthetic Camporee", dates: "Mar 5 to 7, 2027", place: "Synthetic Camp", status: { text: "Published", tone: "ok" as const }, href: "/overview?event=evt_1" }];
+    const clear = buildNeedsView({ held: ["EVENTS_ADMIN"], events: buildEventsAdminHome([], now) });
+    expect(clear.allClear).toBe(true);
+    const html = renderToStaticMarkup(createElement(NeedsYouPage, { view: clear, comingUp: { events, nextStep: null } }));
+    expect(html).toMatch(/data-testid="home-all-clear"[^>]*><svg[^>]*aria-hidden="true"/);
+    // The one event link is the Coming up row; the empty state's own next step is Help, not a repeat of it.
+    expect(html.match(/href="\/overview\?event=evt_1"/g)).toHaveLength(1);
+    expect(html).toMatch(/data-testid="home-all-clear-next"[^>]*>Open Help</);
+    expect(html).not.toContain("Open Synthetic Camporee");
+    expect(html.indexOf("Nothing needs you right now.")).toBeLessThan(html.indexOf("home-needs-coming-up"));
+    expect(html).toContain("Synthetic Camporee");
+    const none = renderToStaticMarkup(createElement(NeedsYouPage, { view: clear, comingUp: { events: [], nextStep: comingUpNextStep(["EVENTS_ADMIN"], false) } }));
+    expect(none).toContain("No upcoming events.");
+    expect(none).toContain('data-testid="home-all-clear-next"');
+    const noRole = renderToStaticMarkup(createElement(NeedsYouPage, { view: buildNeedsView({ held: [] }), comingUp: { events, nextStep: null } }));
+    expect(noRole).toMatch(/data-testid="home-no-admin-role"[^>]*><svg[^>]*aria-hidden="true"/);
+    expect(noRole).toContain("home-needs-coming-up");
+  });
+
+  it("does not show Coming up under a Needs you that has work in it (#1747)", () => {
+    const busy = buildNeedsView({ held: ["CLUBS_ADMIN"], clubs: { applications: 2, lateRecords: 0 } });
+    const html = renderToStaticMarkup(createElement(NeedsYouPage, { view: busy, comingUp: { events: [], nextStep: null } }));
+    expect(html).not.toContain("home-needs-coming-up");
+  });
+
   it("renders Unavailable in words and every item as a link only", () => {
     const view = buildNeedsView({ held: ["CLUBS_ADMIN"], clubs: { applications: null, lateRecords: 2 } });
     const html = renderToStaticMarkup(createElement(NeedsYouPage, { view }));
@@ -257,7 +283,7 @@ describe("Coming up model (#1568)", () => {
       now,
     );
     expect(list.map((event) => event.id)).toEqual(["now", "soon", "late"]);
-    expect(list[1]).toMatchObject({ place: "Location not set", status: { text: "Not published" }, href: "/overview?event=soon" });
+    expect(list[1]).toMatchObject({ place: "Location not set", status: { text: "Draft" }, href: "/overview?event=soon" });
     expect(plain(list[1].dates)).toBe("Dec 1 – 3, 2026");
     expect(list[0].status.text).toBe("Published");
   });

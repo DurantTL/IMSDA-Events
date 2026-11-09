@@ -8,6 +8,7 @@ import { countOpenInvoiceDrafts } from "@/modules/invoices/repository";
 import { listPolicyVersions } from "@/modules/cancellation-policy/repository";
 import { reconcileRegistrationLedger } from "@/modules/ledger/reconciliation";
 import { countOpenChurchSponsorFlags } from "@/modules/promo-codes/church-sponsor-lodging";
+import { listUnmatchedSquarePayments } from "@/modules/payments/square-match-repository";
 import { getFundView } from "@/modules/scholarship-funds/repository";
 import { neededMoneyMetrics, type MoneyMetricKey, type MoneyMetricValues, type MoneyToolsViewer } from "@/modules/payments/money-tools-model";
 
@@ -33,6 +34,22 @@ const policy = (context: Context) => shared(context, "policy", () => listPolicyV
 
 const billing = (context: Context) => shared(context, "billing", () => getBillingResponsibilityView(context.eventId));
 
+export const squareTimeoutMs = 3000;
+
+/** Rejects when `read` has not finished in time. The late result is dropped. */
+function withTimeout<T>(read: () => Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("The Square read took too long")), ms);
+    read().then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
+/** Square not being set up is expected on a site without it: the card says Unavailable, and nothing is logged. */
+const isExpectedUnavailable = (error: unknown) => (error as { code?: unknown } | null)?.code === "SQUARE_NOT_CONFIGURED";
+
 const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
   // The Payments page's notice and the Owed by churches page read the same open flags.
   churchFlags: ({ eventId }) => countOpenChurchSponsorFlags(eventId),
@@ -51,6 +68,14 @@ const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
   // The pages' own test for "This event is not billed to organizations" (billing mode is not deferred organization invoicing).
   billedToOrganizations: async (context) => ((await billing(context)).isDeferred ? 1 : 0),
   attendanceApproved: async ({ eventId }) => ((await hasApprovedReconciliation(eventId)) ? 1 : 0),
+  // The Unmatched Square payments page's own list, read the same way (#1747), so the chip and that page always agree.
+  // It gets a few seconds at most, so this card can never hold up the page: not configured, unreachable or too slow throws,
+  // and the card says "Unavailable", never "OK".
+  unmatchedSquare: () => withTimeout(async () => {
+    const { findings, unreachableSquare } = await listUnmatchedSquarePayments();
+    if (unreachableSquare) throw new Error("Square could not be reached");
+    return findings.length;
+  }, squareTimeoutMs),
   // Exact server cents, as the Scholarship fund page shows its balance.
   scholarshipBalanceCents: async ({ eventId }) => (await getFundView(eventId)).summary.balanceCents,
 };
@@ -64,7 +89,7 @@ export async function loadMoneyToolMetrics(viewer: MoneyToolsViewer, eventId: st
         const value = await readers[key](context);
         return [key, Number.isFinite(value) ? value : null];
       } catch (error) {
-        logError(`More money tools number could not load: ${key}`, error);
+        if (!isExpectedUnavailable(error)) logError(`More money tools number could not load: ${key}`, error);
         return [key, null];
       }
     }),

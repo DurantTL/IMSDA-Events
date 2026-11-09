@@ -46,7 +46,7 @@ beforeEach(() => {
 
 describe("Ledger check page (shadow)", () => {
   it("has the staff page title", () => {
-    expect(String(metadata.title)).toBe("Ledger check (shadow)");
+    expect(String(metadata.title)).toBe("Ledger check");
   });
 
   it("shows the restricted notice and reads no ledger data without finance access", async () => {
@@ -70,7 +70,7 @@ describe("Ledger check page (shadow)", () => {
     mocks.resolveEventContext.mockResolvedValue({ event, permissions: ["MANAGE_FINANCE"] });
     mocks.reconcile.mockResolvedValue({ checked: 12, failing: [] });
     const copy = text(await LedgerCheckPage(props()));
-    expect(copy).toContain("Ledger check (shadow)");
+    expect(copy).toContain("Ledger check");
     expect(copy).toContain("changes nothing");
     expect(copy).toContain("The ledger matches every registration.");
     expect(copy).toContain("12 registrations were checked and none differ.");

@@ -30,7 +30,7 @@ It never runs on its own: not from the seed, a migration, postinstall, the Docke
 3. `npm run ledger:backfill -- --apply`: writes the missing entries. Add `--event <id>` to do one event at a time. It is
    safe to stop and start again; it commits one registration at a time.
 4. `npm run ledger:backfill`: run the dry run again. It must report **0 entries to write**.
-5. Open **Ledger check (shadow)** (`/more/ledger-health?event=<id>`, needs finance access) for each event. It lists every
+5. Open **Ledger check** (`/more/ledger-health?event=<id>`, needs finance access) for each event. It lists every
    registration whose ledger differs from its current total. Those are the same residuals from step 2 plus anything
    changed since. An empty list means the ledger matches every registration in that event.
 
