@@ -23,7 +23,7 @@ export default async function AreaRecordsExportPage({ searchParams }: { searchPa
   return (
     <>
       <CoordinatorDestinationHeading clubYear={clubYear} title="Export Monthly Records" />
-      <p className="quiet-copy">Every download is logged. Only club-level points and statuses are included, never people.</p>
+      <p className="quiet-copy">Every download is logged. The file holds club-level points and statuses and, only if you choose it, the club&apos;s director names. It never holds members, signers, attendance or Sterling data.</p>
       <RecordsExportBuilder clubYear={clubYear} clubs={clubs} months={months} />
     </>
   );

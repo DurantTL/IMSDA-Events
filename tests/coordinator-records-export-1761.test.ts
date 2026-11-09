@@ -176,6 +176,8 @@ describe("body validation (#1761)", () => {
     ["no clubs", { columns: ["club"] }],
     ["an unknown field", { columns: ["club"], clubs: "all", includeSigners: true }],
     ["year totals in the club-month layout", { columns: ["club", "totalPoints"], clubs: "all", layout: "clubMonth" }],
+    ["a garbage year", { columns: ["club"], clubs: "all", year: "garbage" }],
+    ["a year whose second part is wrong", { columns: ["club"], clubs: "all", year: "2026-28" }],
     ["an unknown layout", { columns: ["club"], clubs: "all", layout: "wide" }],
   ])("rejects %s with 400, with no read and no audit", async (_name, body) => {
     asCoordinator();
@@ -207,6 +209,42 @@ describe("body validation (#1761)", () => {
     for (const word of ["signature", "signer", "honors list", "attendance", "head", "sterling", "background", "meeting place", "email", "phone"]) {
       expect(text).not.toContain(word);
     }
+  });
+});
+
+describe("year, director names, partial ranges and error code (#1761 fix round)", () => {
+  it("accepts a real club year and refuses malformed ones", () => {
+    expect(parseRecordsExportBody({ columns: ["club"], clubs: "all", year: "2026-27" }).months[0]).toBe("2026-09");
+    expect(parseRecordsExportBody({ columns: ["club"], clubs: "all", year: "2099-00" }).months[0]).toBe("2099-09");
+    for (const year of ["2026-2027", "26-27", "2026-26", "abcd-ef", ""]) {
+      expect(() => parseRecordsExportBody({ columns: ["club"], clubs: "all", year }), year).toThrow();
+    }
+  });
+
+  it("keeps director names out of the default selection", () => {
+    expect(DEFAULT_RECORDS_EXPORT_COLUMN_KEYS).not.toContain("directors");
+  });
+
+  it("prefixes year-total headers with 'Year' beside a partial month range, and not for the whole year", () => {
+    const club = exportClub();
+    const columns: RecordsExportColumnKey[] = ["club", "submitted", "registrationPoints", "totalPoints", "rank"];
+    const partial = buildRecordsExportTable({ clubYear: YEAR, columns, layout: "club", months: ["2026-09", "2026-10"], clubs: [club] });
+    expect(partial.headers).toEqual(["Club", "Year submitted", "Year registration points", "Year total points", "Year rank"]);
+    const whole = buildRecordsExportTable({ clubYear: YEAR, columns, layout: "club", months, clubs: [club] });
+    expect(whole.headers).toEqual(["Club", "Submitted", "Yearly registration points", "Total points", "Rank"]);
+  });
+
+  it("keeps Monthly Records lit on the export page, and only there", async () => {
+    const { coordinatorNavItems } = await import("@/components/area-clubs-subnav");
+    const records = coordinatorNavItems().find((item) => item.label === "Monthly Records")!;
+    expect(records.alsoMatchPrefix).toBe("/account/area-clubs/reports/");
+    expect(coordinatorNavItems().filter((item) => item.alsoMatchPrefix).map((item) => item.label)).toEqual(["Clubs", "Monthly Records"]);
+  });
+
+  it("answers a bad body with a records-specific error code", async () => {
+    asCoordinator();
+    const body = await (await post({ columns: ["nope"], clubs: "all" })).json();
+    expect(body.error).toBe("INVALID_RECORDS_EXPORT_REQUEST");
   });
 });
 
@@ -257,7 +295,7 @@ describe("layouts and item scores (#1761)", () => {
       "September 2026 Status", "September 2026 Points", "September 2026 On-time points", "September 2026 Monthly staff meeting",
       "October 2026 Status", "October 2026 Points", "October 2026 On-time points", "October 2026 Monthly staff meeting",
       "November 2026 Status", "November 2026 Points", "November 2026 On-time points", "November 2026 Monthly staff meeting",
-      "Submitted", "Rank",
+      "Year submitted", "Year rank",
     ]);
     expect(table.rows[0]).toEqual([
       "Synthetic Eagles", "Testville", "Dana Director; Dev Deputy",

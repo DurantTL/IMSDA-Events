@@ -1,3 +1,4 @@
+import { ZodError } from "zod";
 import { withRequestContext } from "@/lib/request-context";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
@@ -39,6 +40,10 @@ async function postHandler(request: Request) {
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (error) {
+    // Records-specific code for a bad body; every other failure keeps the shared roster/export mapping.
+    if (error instanceof ZodError) {
+      return Response.json({ error: "INVALID_RECORDS_EXPORT_REQUEST", message: error.issues[0]?.message, issues: error.issues }, { status: 400 });
+    }
     return rosterApiError(error, "Building an Area Coordinator Monthly Records export");
   }
 }

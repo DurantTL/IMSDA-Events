@@ -12,8 +12,8 @@ import { toCsv } from "@/modules/reporting/csv";
 
 /**
  * The Area Coordinator's Monthly Records export (#1761): choose clubs, a month range, a layout and columns. A closed
- * allow-list of club-level figures: no person, no signer name, no honors list, no attendance or head count, no Sterling
- * count, no meeting place. Pure (no server-only), so the page, the route and the tests agree on what a key means.
+ * allow-list of club-level figures. The only names are the club's director names, and only when that column is chosen;
+ * never members, signers, honors lists, attendance or head counts, Sterling data or meeting place. Pure (no server-only), so the page, the route and the tests agree on what a key means.
  * With the default selection the output is byte for byte `areaSummaryCsv`.
  */
 
@@ -81,6 +81,12 @@ export const RECORDS_EXPORT_PREVIEW_ROW_LIMIT = 5;
 export const RECORDS_EXPORT_MAX_CLUBS = 500;
 export const RECORDS_EXPORT_TOTALS_REFUSED = "Year totals are only in the one-row-per-club layout.";
 
+const CLUB_YEAR_PATTERN = /^\d{4}-\d{2}$/;
+/** "2026-27": the second part is the next calendar year's last two digits. */
+function isClubYear(value: string) {
+  return CLUB_YEAR_PATTERN.test(value) && Number(value.slice(5)) === (Number(value.slice(0, 4)) + 1) % 100;
+}
+
 export function isRecordsExportColumnKey(value: string): value is RecordsExportColumnKey {
   return (RECORDS_EXPORT_COLUMN_KEYS as string[]).includes(value);
 }
@@ -126,7 +132,7 @@ export const recordsExportBodySchema = z.object({
     z.literal("all"),
     z.array(z.string().min(1).max(64)).min(1, "Choose all clubs or at least one club.").max(RECORDS_EXPORT_MAX_CLUBS, "Too many clubs chosen."),
   ]),
-  year: z.string().max(16).optional(),
+  year: z.string().regex(CLUB_YEAR_PATTERN, "Choose a club year like 2026-27.").refine(isClubYear, "Choose a club year like 2026-27.").optional(),
   from: z.string().max(7).optional(),
   to: z.string().max(7).optional(),
   preview: z.boolean().default(false),
@@ -218,6 +224,13 @@ function monthCellValue(club: RecordsExportClub, month: string, key: RecordsExpo
   return score === undefined ? "" : score;
 }
 
+/** "Year submitted", "Year total points": the whole-year figures beside a partial month range. */
+export function yearTotalHeader(key: RecordsExportTotalColumn) {
+  if (key === "registrationPoints") return "Year registration points";
+  const header = RECORDS_EXPORT_TOTAL_COLUMNS[key];
+  return `Year ${header.charAt(0).toLowerCase()}${header.slice(1)}`;
+}
+
 /** Builds the whole table; the preview takes its first rows, the download all of them. */
 export function buildRecordsExportTable(input: RecordsExportInput) {
   const columns = orderRecordsExportColumns(input.columns);
@@ -226,6 +239,8 @@ export function buildRecordsExportTable(input: RecordsExportInput) {
   const totalKeys = input.layout === "club" ? columns.filter(isTotalColumn) : [];
   const withEvents = input.clubs.some((club) => club.summary.eventPoints > 0);
   const shownTotals = totalKeys.filter((key) => key !== "eventPoints" || withEvents);
+  // Year totals always cover the whole club year, so beside a partial month range their headers say so.
+  const partialRange = input.months.length < 12;
   const ranks = input.ranks ?? new Map(sortLeaderboard(input.clubs.map((club) => club.summary), "points").map((club, index) => [club.id, index + 1]));
 
   const total = (club: AreaClubSummary, key: RecordsExportTotalColumn): number => {
@@ -247,7 +262,7 @@ export function buildRecordsExportTable(input: RecordsExportInput) {
       ...clubKeys.map(recordsExportHeader),
       // `Result` is the month's own label, as in today's file; the other columns follow it as "<Month> <column>".
       ...input.months.flatMap((month) => monthKeys.map((key) => (key === "result" ? reportMonthLabel(month) : `${reportMonthLabel(month)} ${recordsExportHeader(key)}`))),
-      ...shownTotals.map(recordsExportHeader),
+      ...shownTotals.map((key) => (partialRange ? yearTotalHeader(key) : recordsExportHeader(key))),
     ];
     const rows = input.clubs.map((club) => [
       ...clubKeys.map((key) => clubCell(club.summary, key)),

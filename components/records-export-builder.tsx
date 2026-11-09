@@ -153,6 +153,7 @@ export function RecordsExportBuilder({
           </label>
         </div>
         <DisabledHint id="records-export-range-hint" reason={rangeProblem} />
+        <p className={styles.help}>Year totals always cover the whole club year.</p>
       </fieldset>
 
       <fieldset className={styles.section}>

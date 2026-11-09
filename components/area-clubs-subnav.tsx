@@ -14,7 +14,7 @@ export function coordinatorNavItems({ showWaitlists = false }: { showWaitlists?:
     { href: "/account/area-clubs/overview", label: "Overview" },
     // The club list owns the view-only club pages, so Clubs stays lit on them (#1759).
     { href: "/account/area-clubs/clubs", label: "Clubs", alsoMatchPrefix: "/account/area/" },
-    { href: "/account/area-clubs/reports", label: "Monthly Records" },
+    { href: "/account/area-clubs/reports", label: "Monthly Records", alsoMatchPrefix: "/account/area-clubs/reports/" },
     { href: "/account/area-clubs/points", label: "Points" },
     { href: "/account/area-clubs/events", label: "Club events" },
     { href: "/account/area-clubs/team-permissions", label: "Team approvals" },
