@@ -3,6 +3,7 @@ import { serverSort } from "@/lib/list-sort";
 import { COORDINATOR_GLANCE_SORT_COLUMNS } from "@/modules/club-reports/area-table-sort";
 import { notFound } from "next/navigation";
 import { CoordinatorOverviewBody, CoordinatorOverviewHeading, type CoordinatorOverviewData } from "@/components/coordinator-overview";
+import { CoordinatorFindClub } from "@/components/coordinator-find-club";
 import { ClubNewYearStatus } from "@/components/club-new-year-status";
 import { UpcomingDeadlines } from "@/components/upcoming-deadlines";
 import { logError } from "@/lib/logger";
@@ -52,6 +53,7 @@ export default async function AreaOverviewPage({ searchParams }: { searchParams:
       <UpcomingDeadlines deadlines={deadlines} />
       <section className="public-manage-card page-stack area-overview-page coordinator-overview">
         <CoordinatorOverviewHeading clubYear={clubYear} />
+        {clubs && <CoordinatorFindClub clubYear={clubYear} />}
         <CoordinatorOverviewBody data={data} now={now} ownClubIds={ownClubIds} query={query} sorting={serverSort("/account/area-clubs/overview", params, COORDINATOR_GLANCE_SORT_COLUMNS, { key: null, dir: "asc" })} />
         {clubs && <ClubNewYearStatus clubHref={(id) => `/account/area/${id}`} status={newYearStatus} />}
       </section>

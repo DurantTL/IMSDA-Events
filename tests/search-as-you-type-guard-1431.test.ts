@@ -84,6 +84,7 @@ type Allowed = { file: string; count: number; reason: string };
 /** Pickers and comboboxes: they filter their own option list on every keystroke. */
 const pickers = [
   "components/searchable-select.tsx|2",
+  "components/area-club-switcher.tsx|1",
   "components/destination-search.tsx|1",
   "components/honor-combobox.tsx|1",
   "components/honor-multi-select.tsx|1",

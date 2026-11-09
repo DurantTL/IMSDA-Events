@@ -1,0 +1,10 @@
+/* The coordinator Clubs page (#1759): one card per club, no wide table, so it reads at 390px. */
+.list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+.card { display: grid; gap: 6px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); align-content: start; justify-items: start; }
+.name { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); font-weight: 700; overflow-wrap: anywhere; }
+.facts { display: grid; gap: 2px; width: 100%; margin: 0; }
+.facts div { display: flex; flex-wrap: wrap; gap: 0 6px; }
+.facts dt { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.facts dt::after { content: ":"; }
+.facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.match { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }

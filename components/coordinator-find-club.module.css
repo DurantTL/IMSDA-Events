@@ -1,0 +1,4 @@
+/* "Find a club" on the coordinator Overview (#1759). */
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0; }
+.row > a { display: inline-flex; width: auto; min-height: 44px; align-items: center; justify-content: center; gap: 6px; }
+.hint { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

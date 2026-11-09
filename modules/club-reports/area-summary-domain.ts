@@ -222,6 +222,26 @@ export function filterClubsByNameChurchOrCity<T extends { name: string; sponsori
     [club.name, club.sponsoringChurch ?? "", club.city ?? ""].some((field) => startsAWord(field, needle)));
 }
 
+/**
+ * The coordinator's club search (#1759): club, church, city or director name, a word starting with the text, ignoring case.
+ * A sibling of `filterClubsByNameChurchOrCity`, so Monthly Records, Points and Club events keep their own matching.
+ */
+export function filterClubsByNameChurchCityOrDirector<T extends { name: string; sponsoringChurch?: string | null; city?: string | null; directors?: readonly string[] }>(
+  clubs: readonly T[],
+  query: string | undefined,
+) {
+  const needle = normalizeName(query ?? "");
+  if (needle === "") return [...clubs];
+  return clubs.filter((club) =>
+    [club.name, club.sponsoringChurch ?? "", club.city ?? "", ...(club.directors ?? [])].some((field) => startsAWord(field, needle)));
+}
+
+/** The directors whose name matches the search, so a result can say which director matched. Empty for a blank search. */
+export function matchingDirectors(directors: readonly string[], query: string | undefined) {
+  const needle = normalizeName(query ?? "");
+  return needle === "" ? [] : directors.filter((director) => startsAWord(director, needle));
+}
+
 /** Plain-language description of a chart, for screen readers. */
 export function pointsChartDescription(clubs: ReadonlyArray<{ name: string; totalPoints: number }>, clubYear: string) {
   if (clubs.length === 0) return `No active clubs for ${clubYear}.`;
