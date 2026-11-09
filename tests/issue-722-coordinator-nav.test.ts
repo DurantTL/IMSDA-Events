@@ -71,7 +71,7 @@ describe("layout classes (#722)", () => {
   });
 
   it("wraps the Club coordination sub-menu in the page-body column on both pages that show it", () => {
-    expect(areaClubsNavItems.map((item) => item.label)).toEqual(["Overview", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
+    expect(areaClubsNavItems.map((item) => item.label)).toEqual(["Overview", "Clubs", "Monthly Records", "Points", "Club events", "Team approvals", "New clubs"]);
     for (const file of ["app/(public)/account/(portal)/area-clubs/layout.tsx", "app/(public)/account/(portal)/area/[organizationId]/layout.tsx"]) {
       expect(readFileSync(file, "utf8")).toContain("<CoordinatorShellHeader");
     }
@@ -88,7 +88,8 @@ describe("layout classes (#722)", () => {
     expect(layout).toContain("<ClubPortalNav");
     expect(layout).not.toContain("AccountSectionNav");
     expect(layout).toContain("View only");
-    expect(css).toMatch(/\.area-club-layout > :is\(a, p\.inline-notice\)/);
-    expect(layout).toContain('href="/account/area-clubs/overview#clubs-at-a-glance"');
+    expect(css).toMatch(/\.area-club-layout > :is\(a, p\.inline-notice/);
+    expect(layout).toContain('<BackLink href="/account/area-clubs/clubs">All clubs</BackLink>');
+    expect(layout).toContain("<AreaClubSwitcher");
   });
 });

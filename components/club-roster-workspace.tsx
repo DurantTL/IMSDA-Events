@@ -16,6 +16,7 @@ import { SortOrderNote, SortableHeader, useAddressSort } from "@/components/list
 import { sortByName, sortOrderText, sortRows, type SortDirection, type SortKind, type SortState, type SortValue } from "@/lib/list-sort";
 import { BirthDateField } from "@/components/birth-date-field";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
+import { RosterTableScroll } from "@/components/roster-table-scroll";
 import { RosterTypeDefinitions } from "@/components/roster-type-definitions";
 import { validateRosterForm, rosterFormFieldOrder, type RosterFormErrors, type RosterFormField } from "@/modules/club-rosters/form-validation";
 import { ClubMemberHonorsDialog } from "@/components/club-member-honors-dialog";
@@ -993,7 +994,7 @@ function ClubRosterWorkspaceInner({
                 {section.people.length === 0 ? (
                   <p className={styles.empty}>{section.empty}</p>
                 ) : (
-                  <div className="report-table-wrap">
+                  <RosterTableScroll label={`${section.title}, scrolls sideways`}>
                     <table aria-labelledby={`roster-section-${section.key.toLowerCase()}-title`} className="report-table table-cards table-cards-xwide roster-card-table" role="table">
                       <thead role="rowgroup">
                         <tr role="row">
@@ -1006,7 +1007,7 @@ function ClubRosterWorkspaceInner({
                               case "class": return <SortableHeader active={activeSort.key === "class"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Current class" onSort={() => rosterSort.toggle("class")} />;
                               case "grade": return <SortableHeader active={activeSort.key === "grade"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Grade" onSort={() => rosterSort.toggle("grade")} />;
                               case "school": return <SortableHeader active={activeSort.key === "school"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="School" onSort={() => rosterSort.toggle("school")} />;
-                              case "churchMember": return <SortableHeader active={activeSort.key === "churchMember"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label={CHURCH_MEMBER_LABEL} onSort={() => rosterSort.toggle("churchMember")} />;
+                              case "churchMember": return <SortableHeader active={activeSort.key === "churchMember"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="SDA member" fullLabel={CHURCH_MEMBER_LABEL} onSort={() => rosterSort.toggle("churchMember")} />;
                               case "details": return <SortableHeader active={activeSort.key === "details"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Details" onSort={() => rosterSort.toggle("details")} />;
                               case "gender": return <SortableHeader active={activeSort.key === "gender"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Gender" onSort={() => rosterSort.toggle("gender")} />;
                               case "screening": return <SortableHeader active={activeSort.key === "screening"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Sterling Volunteers" onSort={() => rosterSort.toggle("screening")} />;
@@ -1170,7 +1171,7 @@ function ClubRosterWorkspaceInner({
                         })}
                       </tbody>
                     </table>
-                  </div>
+                  </RosterTableScroll>
                 )}
               </details>
             ))}

@@ -46,8 +46,9 @@ export async function ClubOverview({
   /** Rendered in the account portal (not the staff admin pages), so empty states can point to the conference office. */
   portalView?: boolean;
   /**
-   * Show each Pathfinder's school type and church membership (#1668). True only for a system administrator: Area Coordinators,
-   * event managers and Clubs Administrators who are not system administrators never get either value, because the roster is loaded without them.
+   * Show each Pathfinder's school type and church membership, view only (#1668, #1758): on the staff club page (system
+   * administrators and Clubs Administrators) and an Area Coordinator's club page. Event managers never get either value,
+   * because the roster is loaded without them.
    */
   schoolDetails?: boolean;
   /** Heading level of the summary tiles (see ClubYearTiles): 3 when the page has its own h2 above. */

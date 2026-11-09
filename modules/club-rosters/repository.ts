@@ -72,7 +72,7 @@ function ageFrom(member: StoredMember, onDate: string) {
   return member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), onDate) : null;
 }
 
-/** `includeSchoolDetails` (#1668): school type and church membership go only to the club's leaders and system administrators, never Area Coordinators or event managers. Left out, the keys are absent, not null. */
+/** `includeSchoolDetails` (#1668, #1758): school type and church membership go only to the club's leaders, system administrators, Clubs Administrators and Area Coordinators (the last two view only), never event managers. Left out, the keys are absent, not null. */
 function serializeMember(member: StoredMember, today: string, includeSchoolDetails = false) {
   return {
     id: member.id,

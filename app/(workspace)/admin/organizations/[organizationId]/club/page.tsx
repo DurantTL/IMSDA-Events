@@ -142,8 +142,9 @@ export default async function StaffOpenClubPage({
         reportHref={(month) => `/admin/clubs/reports/${organizationId}/${month}${fromHere}`}
         reportsEditable
         rosterYear={view.clubYear}
-        // School type and church membership (#1668): system administrators only, not a Clubs Administrator without that role.
-        schoolDetails={user.globalRole === "SYSTEM_ADMIN"}
+        // School type and church membership, view only (#1668, #1758): every viewer here holds Clubs Administration (checked
+        // above), so system administrators and Clubs Administrators both see them. Event managers' club page does not.
+        schoolDetails
       />
 
       {guardianViewer && !view.readOnly && <ClubGuardiansPanel headingLevel={3} organizationId={organizationId} viewer={guardianViewer} />}

@@ -34,12 +34,13 @@ vi.mock("@/modules/club-reports/area-summary-repository", () => ({
 }));
 
 import AreaLayout from "@/app/(public)/account/(portal)/area-clubs/layout";
+import ClubsPage from "@/app/(public)/account/(portal)/area-clubs/clubs/page";
 import EventsPage from "@/app/(public)/account/(portal)/area-clubs/events/page";
 import OverviewPage from "@/app/(public)/account/(portal)/area-clubs/overview/page";
 import PointsPage from "@/app/(public)/account/(portal)/area-clubs/points/page";
 import ReportsPage from "@/app/(public)/account/(portal)/area-clubs/reports/page";
 
-const pages = { overview: OverviewPage, reports: ReportsPage, points: PointsPage, events: EventsPage };
+const pages = { overview: OverviewPage, clubs: ClubsPage, reports: ReportsPage, points: PointsPage, events: EventsPage };
 const props = { searchParams: Promise.resolve({}) };
 
 beforeEach(() => {

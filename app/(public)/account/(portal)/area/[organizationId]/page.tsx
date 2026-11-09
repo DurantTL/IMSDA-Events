@@ -17,7 +17,8 @@ export const dynamic = "force-dynamic";
  * dates. The hero, menu and "View only" notice come from the layout (#722).
  * Sterling Volunteers status, counts and the full note are shown for the
  * club's adults (#443). Guardian contacts (#510) are shown for every club:
- * coordinators need them during events.
+ * coordinators need them during events. School type and church membership
+ * are shown too, view only (#1758).
  */
 export default async function AreaClubPage({ params }: { params: Promise<{ organizationId: string }> }) {
   const areaCoordinatorActive = await currentAreaCoordinatorViewerActive();
@@ -45,6 +46,9 @@ export default async function AreaClubPage({ params }: { params: Promise<{ organ
       organizationId={organizationId}
       reportHref={(month) => `/account/area/${organizationId}/reports/${month}`}
       reportsEditable={false}
+      // School type and church membership, view only (#1758): an active Area Coordinator (checked above) sees them for
+      // every active club, since coordinators work conference-wide until areas exist (#843).
+      schoolDetails
     />
     {guardianViewer && <ClubGuardiansPanel emptyHelp={<CoordinatorSetupHelp context="emergency contacts" id="club-no-emergency-contacts" />} organizationId={organizationId} viewer={guardianViewer} />}
     </>

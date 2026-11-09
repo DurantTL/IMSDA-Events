@@ -168,7 +168,7 @@ const writtenPortalGuides: readonly PortalGuide[] = [
     changes: ["Nothing. Everything a coordinator opens here is view only."],
     steps: [
       "Open Club coordination in the Your account menu. Overview lists every active club available to your role under Clubs at a glance.",
-      "Use Search clubs (Club, church or city) to narrow the list.",
+      "Use Search clubs (Club, church, city or director) to narrow the list. The Clubs tab has the same search, and on a club page Switch club moves to another club.",
       "Choose a club name, or Open club beside it. A club you do not run opens view only, with ages instead of birth dates, and the list says View only beside it. A club you also run says Your club and opens as usual with Open my club.",
       "On a view-only club, the notice says View only. You see what the club's director sees, with ages instead of birth dates, plus each adult's Sterling Volunteers status and note.",
       "The director maintains the roster and the club's settings, so ask the director for any change. Club Orders are not shown to you.",

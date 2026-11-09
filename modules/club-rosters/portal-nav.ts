@@ -101,8 +101,8 @@ export function areaClubPortalNavItems({ organizationId }: { organizationId: str
 
 /**
  * The one tab row of a club an Area Coordinator is viewing (#1555), like the club home's: the club's own view-only tabs.
- * There is no "All clubs" tab (#1551); the page's "Clubs at a glance" back link returns to the list, and from there to the
- * other coordinator tabs. Each page below still checks access on the server.
+ * There is no "All clubs" tab in this row; the page's "All clubs" back link and Switch club control (#1759) go to the
+ * Clubs list and the other clubs. Each page below still checks access on the server.
  */
 export function areaViewedClubNavItems({ organizationId }: { organizationId: string }): AccountNavItem[] {
   return areaClubPortalNavItems({ organizationId });

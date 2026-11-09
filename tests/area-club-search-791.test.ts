@@ -143,7 +143,7 @@ describe.each([
 
   it("says so when no club matches", async () => {
     const out = await html(Page, { q: "nothing here" });
-    expect(out).toContain(name === "overview" ? "No club name, church or city matches" : "No club name matches");
+    expect(out).toContain(name === "overview" ? "No club, church, city or director matches" : "No club name matches");
   });
 });
 

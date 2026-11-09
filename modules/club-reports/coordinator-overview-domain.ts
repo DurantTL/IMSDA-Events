@@ -1,5 +1,5 @@
 import { calendarDateIn } from "@/modules/calendar/domain";
-import { filterClubsByNameChurchOrCity, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
+import { filterClubsByNameChurchCityOrDirector, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
 import { clubYearMonths, formatDueDate, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
 
 /**
@@ -133,10 +133,10 @@ export function coordinatorMonthlyTotals(clubs: readonly AreaClubSummary[], club
 
 /**
  * The clubs the table shows for a search; the summary and follow-up above always speak about every club. Clubs at a
- * glance is the one club list (#1551), so the search matches club name, church and city, like the old Clubs page.
+ * glance is the one club list (#1551), so the search matches club name, church, city and director name (#1759).
  */
 export function overviewTableClubs(clubs: readonly AreaClubSummary[], query: string) {
-  return filterClubsByNameChurchOrCity(clubs.map((club) => ({ club, name: club.name, sponsoringChurch: club.church, city: club.city ?? null })), query)
+  return filterClubsByNameChurchCityOrDirector(clubs.map((club) => ({ club, name: club.name, sponsoringChurch: club.church, city: club.city ?? null, directors: club.directors })), query)
     .map((entry) => entry.club);
 }
 

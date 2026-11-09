@@ -77,7 +77,7 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
       search: async (ctx) => {
         await overview(ctx);
         await settle(ctx);
-        return ctx.page.getByPlaceholder("Club, church or city");
+        return ctx.page.getByPlaceholder("Club, church, city or director");
       },
       "open-club": async (ctx) => ctx.page.getByRole("link", { name: /Open club/ }).first(),
       "whos-missing": async (ctx) => {

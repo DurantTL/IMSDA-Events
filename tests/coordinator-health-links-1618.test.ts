@@ -84,12 +84,12 @@ describe("the Health information link next to Kitchen report (#1618)", () => {
 });
 
 describe("the health page keeps Club coordination lit (#1618)", () => {
-  it("lights Club coordination in the menu and only Overview in the tabs", () => {
+  it("lights Club coordination in the menu and only Clubs in the tabs", () => {
     const menu = accountPortalNavItems({ hasAccount: true, directedClubCount: 0, areaCoordinator: true, actingRole: null });
     const item = menu.find((entry) => entry.label === "Club coordination")!;
     expect(isAccountNavItemActive("/account/area/health", item)).toBe(true);
     expect(item.alsoMatchPrefix).toContain("/account/area/health");
     const lit = coordinatorNavItems().filter((tab) => isAccountNavItemActive("/account/area/health", tab));
-    expect(lit.map((tab) => tab.label)).toEqual(["Overview"]);
+    expect(lit.map((tab) => tab.label)).toEqual(["Clubs"]);
   });
 });
