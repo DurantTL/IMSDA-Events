@@ -278,7 +278,7 @@ own or on a wrapper within two levels, or with a boundary under 3:1;
 - **Text floor.** On the staff workspace (`.app-shell`) meta text, help text, chip and table
   sub-lines and captions are at least 14px (`--type-floor` and `--type-staff-floor` are
   `0.875rem` there). Uppercase letter-spaced labels (eyebrows, sidebar group labels, table
-  headers) keep a 12px floor through `--type-label-floor`. Club, account and public pages keep the
+  headers) are 14px too: `--type-label-floor` is `0.875rem` on the staff workspace (#1732). Club, account and public pages keep the
   12px meta floor. Write new small sizes as `max(var(--type-floor, 0px), X)`, or
   `max(var(--type-staff-floor, 0px), X)` for a plain size.
 - **Field rows and filter bars.** A label sits above its control (6px gap, 15px between rows).

@@ -85,13 +85,12 @@
 /* #981: on the staff workspace (.app-shell) meta text is held to the body floor too. Help text,
    chip and table sub-lines, captions and every other size written as max(var(--type-floor), X)
    render at 14px, not 12px. Uppercase letter-spaced labels (eyebrows, sidebar group labels, table
-   headers) read larger than lowercase text of the same size, so they keep a 12px floor through
-   --type-label-floor. Club, account and public pages keep --type-floor at 12px. Not applied in
-   print. scripts/verify-mobile-layout.ts holds every staff page to this. */
+   headers) are 14px too (#1732; --type-label-floor equals the body floor on the staff workspace).
+   Club, account and public pages keep --type-floor at 12px. Not applied in print. scripts/verify-mobile-layout.ts holds every staff page to this. */
 @media screen {
   .app-shell {
     --type-floor: 0.875rem;
-    --type-label-floor: 0.75rem;
+    --type-label-floor: 0.875rem;
     /* Staff-only floor for the sizes that were written as a plain rem (nav items, popovers). */
     --type-staff-floor: 0.875rem;
   }
@@ -1331,7 +1330,7 @@ textarea:focus-visible {
 .checkin-tools .search-field { padding: 0 4px 0 12px; }
 .arrival-row { grid-template-columns: auto 1fr auto auto; }
 .arrival-time { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.67rem); }
-.arrival-row button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #b8d7ca; border-radius: 9px; background: var(--green-soft); color: var(--green); cursor: pointer; padding: 7px 9px; font-size: max(var(--type-body-floor, 0px), 0.65rem); font-weight: 700; }
+.arrival-row button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #b8d7ca; border-radius: 9px; background: var(--green-soft); color: var(--green); cursor: pointer; min-height: var(--touch-target, 44px); padding: 7px 9px; font-size: max(var(--type-body-floor, 0px), 0.65rem); font-weight: 700; }
 .arrival-row button.undo-button { border-color: #dfc9e8; background: var(--imsda-purple-soft); color: var(--imsda-purple); }
 .arrival-row button:disabled { cursor: not-allowed; opacity: 0.55; }
 .inline-notice { border: 1px solid #b8d7ca; border-radius: 12px; background: var(--green-soft); color: var(--green); padding: 10px 13px; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 600; }
@@ -1804,6 +1803,9 @@ body:has(.auth-page) { padding-bottom: 0; }
 .auth-brand > span small { display: block; }
 .auth-brand > span strong { letter-spacing: 0.08em; }
 .auth-brand > span small { color: var(--muted); font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.62rem); font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+/* #1732: the staff event pickers sit outside .app-shell, so their uppercase labels take the staff 14px here (club and public sign-in keep the 12px floor). */
+.select-event-card .eyebrow,
+.select-event-card .auth-brand > span small { font-size: 0.875rem; }
 .auth-heading { margin-bottom: 22px; }
 .auth-heading h1 { margin: 3px 0 7px; color: var(--ink); font-size: 1.75rem; line-height: 1.15; }
 .auth-heading > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.75rem); line-height: 1.6; }
@@ -9972,6 +9974,8 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   :root { --target-desktop: 36px; --target-touch: 44px; }
   :where(.filter-field select, .report-download, .report-record-link, .roster-csv-actions > a, .roster-csv-actions > button,
     .club-event-action, .check-in-queue-actions button, .check-in-review-list article > button) { min-height: var(--target-desktop); }
+  /* #1732: the filter select is 44px at every width (the rest of the list keeps the compact desktop size). */
+  :where(.filter-field select) { min-height: var(--target-touch); }
 }
 @media screen and ((max-width: 768px) or (pointer: coarse)) {
   :root :is(.filter-field select, .report-download, .report-record-link, .roster-csv-actions > a, .roster-csv-actions > button,
@@ -10623,13 +10627,13 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 .setup-step.is-done .setup-step-copy strong { color: var(--muted); font-weight: 600; }
 .setup-step.is-next { background: var(--imsda-gold-soft); }
 .setup-step.is-next .setup-step-copy strong { font-weight: 800; }
-.setup-step .text-button { display: inline-flex; min-height: 36px; align-items: center; gap: 5px; font-weight: 700; white-space: nowrap; }
+.setup-step .text-button { display: inline-flex; min-height: var(--touch-target, 44px); align-items: center; gap: 5px; font-weight: 700; white-space: nowrap; }
 .setup-checklist-guide, .role-guide-link { margin: 8px 0 0; }
 .setup-checklist-guide .text-button, .role-guide-link .text-button { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .setup-step-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 14px; }
 @media (max-width: 480px) {
   .setup-step { grid-template-columns: auto minmax(0, 1fr); }
-  .setup-step .text-button { grid-column: 2; justify-self: start; min-height: 44px; }
+  .setup-step .text-button { grid-column: 2; justify-self: start; }
   .setup-step-actions { grid-column: 2; justify-content: flex-start; }
 }
 
@@ -11931,6 +11935,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .operations-search-form .operations-search-status { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .operations-search-form .operations-search-status legend { width: 100%; padding: 0; margin-bottom: 6px; }
 .operations-search-form .operations-search-status .checkbox-label { min-height: 44px; }
+.operations-search-form .field select { min-height: 44px; } /* #1732: 44px tap target at every width. */
 .operations-search-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .operations-search-actions .primary-button,
 .operations-search-actions .secondary-button { min-height: 44px; }
