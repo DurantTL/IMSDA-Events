@@ -209,6 +209,8 @@ const subpageRules: readonly SubpageRule[] = [
   // Help & learning (#1077) is not a nav item; the sidebar draws its own link.
   ["/help/glossary", "prefix", "Glossary"],
   ["/help", "prefix", helpPageTitle],
+  // Attendee community (#1596): a Communications tab, so the header names it rather than falling back to Event home.
+  ["/community", "prefix", "Attendee community"],
   ["/more/honors/rosters", "prefix", staffPageTitles.honorsRosters],
   ["/more/honors/schedule", "prefix", staffPageTitles.honorsSchedule],
   ["/more/honors/instructors", "prefix", staffPageTitles.honorsInstructors],
