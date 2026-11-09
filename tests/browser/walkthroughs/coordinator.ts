@@ -29,9 +29,12 @@ const missingRow = (ctx: WalkthroughContext, club: string) => ctx.page.getByRole
  */
 async function tab(ctx: WalkthroughContext, name: string) {
   const link = ctx.page.getByRole("link", { name, exact: true }).filter({ visible: true }).first();
-  if (await link.count()) return link;
   const menu = ctx.page.getByRole("button", { name: /^(Account|Coordinator) menu/ }).first();
-  if (await menu.isVisible()) await menu.click();
+  // Wait until the tab row has settled into either the visible tab or the menu it folded into.
+  await link.or(menu).first().waitFor({ timeout: 15_000 });
+  if (await link.count()) return link;
+  // A menu left open by the previous step already shows the link, so it is opened only when needed.
+  await menu.click();
   return link;
 }
 
