@@ -23,8 +23,17 @@ const overview = (ctx: WalkthroughContext) => open(ctx, "/account/area-clubs/ove
 /** The club's row in Who's missing what (the first table on Overview that names the club). */
 const missingRow = (ctx: WalkthroughContext, club: string) => ctx.page.getByRole("row", { name: new RegExp(club) }).first();
 
-/** A tab of the Club coordination menu. */
-const tab = (ctx: WalkthroughContext, name: string) => ctx.page.getByRole("link", { name, exact: true }).first();
+/**
+ * A tab of the account or Club coordination menu. On a phone the tabs fold into an "Account menu" or "Coordinator menu"
+ * button when they don't fit (#1641), so that menu is opened first and the link inside it is the one to mark or choose.
+ */
+async function tab(ctx: WalkthroughContext, name: string) {
+  const link = ctx.page.getByRole("link", { name, exact: true }).filter({ visible: true }).first();
+  if (await link.count()) return link;
+  const menu = ctx.page.getByRole("button", { name: /^(Account|Coordinator) menu/ }).first();
+  if (await menu.isVisible()) await menu.click();
+  return link;
+}
 
 export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> = {
   "walkthrough-coordinator-sign-in": {
@@ -83,7 +92,7 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
         return tab(ctx, "Monthly Records");
       },
       "pick-month": async (ctx) => {
-        await tab(ctx, "Monthly Records").click();
+        await (await tab(ctx, "Monthly Records")).click();
         await ctx.page.waitForURL(/\/account\/area-clubs\/reports/, slow);
         await settle(ctx);
         return ctx.page.getByRole("link", { name: /^October 2026/ });
@@ -108,7 +117,7 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
         return tab(ctx, "Points");
       },
       chart: async (ctx) => {
-        await tab(ctx, "Points").click();
+        await (await tab(ctx, "Points")).click();
         await ctx.page.waitForURL(/\/account\/area-clubs\/points/, slow);
         await settle(ctx);
         return ctx.page.getByText("Points leader", { exact: true }).locator("xpath=..");
