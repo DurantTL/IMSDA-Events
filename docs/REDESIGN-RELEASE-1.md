@@ -187,3 +187,15 @@ There are no migrations on the branch (verified: no file under `prisma/` differs
 1. On GitHub, open the merged PR and press **Revert**. Or locally: `git revert -m 1 <merge commit>` on main, then open that as a PR.
 2. Merge the revert PR and deploy as usual. No database step is needed, and data entered while release 1 was live stays valid, because the redesign changes only pages and navigation.
 3. To ship the redesign again later, revert the revert (GitHub's "Revert" on the revert PR) rather than re-merging the branch.
+
+## Coverage after release 1: event club pages (#1582, #1596 ledger)
+
+Browser checks ran on a seeded local database with synthetic data, at 1280 and 390 px. The viewers were a system admin, an event admin, read-only staff, a registration manager, and an event admin on a non-club event.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/more/clubs` | Event setup → Clubs card; Event club pages strip | Views strip (Clubs attending, Club assignments, Monthly Records); header without a repeated title; summary line with clubs, teams, people going, and adults needing Sterling Volunteers (once per person) | Pass; restricted and not-a-club-event states pass | Zero registered clubs and a club with several teams: the seed has one club with one team |
+| `/more/clubs/[organizationId]` | Clubs attending | "Back to clubs attending"; "Event assignments" set by event staff, with a "Change on Club assignments" link only for people who can change them | Pass; unregistered club gives 404 | A club registered as a named team does not show its assignment; this was already so before the change (follow-up) |
+| `/more/clubs/reports` | Event club pages strip | Strip replaces the back link | Pass | - |
+| `/more/clubs/reports/[organizationId]/[month]` | Monthly Records | Event and club named in the header context; return-to unchanged | Pass | - |
+| `/more/club-assignments` | Event club pages strip | Header says what is editable and that email goes out only after preview and send | Pass; registration manager without oversight sees no strip (one view) | Nothing was saved or sent |
