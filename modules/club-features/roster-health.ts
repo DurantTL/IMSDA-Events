@@ -51,14 +51,25 @@ export type RosterHealthList = {
 export const HEALTH_RECORD_NOT_CHECKED = "Health records are not checked because the Health Record feature is turned off.";
 export const PHOTO_RELEASE_NOT_CHECKED = "Photo releases are not checked because the Photo and Video Release form is turned off.";
 
+/**
+ * Whether this viewer and club may open the roster health list: the one check `loadRosterHealth` and the roster page's link
+ * to it share, so the link is shown exactly when the page would open (#1731).
+ */
+export async function rosterHealthAvailable(
+  organizationId: string,
+  capabilities: Pick<ClubCapabilities, "editProfile" | "guardians" | "seeBirthDates">,
+): Promise<boolean> {
+  if (!canSeeRosterHealth(capabilities)) return false;
+  return isClubFeatureEnabled(organizationId, "roster-health-flags");
+}
+
 /** The list for the club's active roster this club year, or null when this viewer or club may not have one. */
 export async function loadRosterHealth(
   organizationId: string,
   capabilities: Pick<ClubCapabilities, "editProfile" | "guardians" | "seeBirthDates">,
   now = new Date(),
 ): Promise<RosterHealthList | null> {
-  if (!canSeeRosterHealth(capabilities)) return null;
-  if (!(await isClubFeatureEnabled(organizationId, "roster-health-flags"))) return null;
+  if (!(await rosterHealthAvailable(organizationId, capabilities))) return null;
   return computeRosterHealth(organizationId, now);
 }
 

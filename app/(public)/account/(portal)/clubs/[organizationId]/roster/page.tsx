@@ -16,6 +16,7 @@ import { ROSTER_DETAILS_NEEDED_FILTER, rosterSectionsStartClosed } from "@/modul
 import { listRoster } from "@/modules/club-rosters/repository";
 import { listTransferClubOptions } from "@/modules/club-transfers/repository";
 import { personIdsMovedToOtherClubs } from "@/modules/earned-awards/order-source";
+import { rosterHealthAvailable } from "@/modules/club-features/roster-health";
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { HealthRecordError } from "@/modules/health-records/errors";
@@ -83,12 +84,19 @@ export default async function ClubRosterPage({
   const nextYearOffer = access.capabilities.manageTeam && !readOnly && carryForwardOversightOpen(new Date())
     ? await getCarryForwardOffer(organizationId)
     : null;
+  // The optional roster health list (#1709): the link is shown exactly when that page would open, with its own check.
+  const showRosterHealth = await rosterHealthAvailable(organizationId, access.capabilities);
   return (
     <>
       {registrationHref && <BackLink href={registrationHref}>Back to registration</BackLink>}
       <p className="quiet-copy">
         <a href={`/account/clubs/${organizationId}/roster/export`}>Build a roster export</a> for an outside camporee.
       </p>
+      {showRosterHealth && (
+        <p>
+          <a className="secondary-button club-event-action" href={`/account/clubs/${organizationId}/roster-health`}>Open roster health</a>
+        </p>
+      )}
       {/* From August a director is offered next year's roster (#414); nothing rolls over until they confirm it. */}
       <NextYearRosterOffer offer={nextYearOffer} organizationId={organizationId} />
       {readOnly && (
