@@ -50,7 +50,14 @@
 .item strong, .item p, .item span { overflow-wrap: anywhere; }
 .item p { margin: 0; }
 
+.autoAgenda { display: block; }
+.autoBoard { display: block; }
+@media (max-width: 1023.98px) { .autoBoard { display: none; } }
+@media (min-width: 1024px) { .autoAgenda { display: none; } }
+
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+
+.meta > span { display: inline-flex; align-items: center; gap: 4px; }
 
 .item :global(.schedule-chip) { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 

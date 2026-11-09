@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import Link from "next/link";
 import { MoveRight, TriangleAlert, Users, X } from "lucide-react";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import {
@@ -24,7 +25,8 @@ function columnsOf(section: BoardSection) {
  * instructors and the same chips as the board. "Move…" opens a dialog that lists every place with "Move here" or the reason
  * the place can't take the class. Nothing here decides a move: the board's own `onMove` and the server do.
  */
-export function HonorsScheduleAgenda({ section, clashes, busy, onOpenMove }: {
+export function HonorsScheduleAgenda({ eventId, section, clashes, busy, onOpenMove }: {
+  eventId: string;
   section: BoardSection;
   clashes: Map<string, string[]>;
   busy: boolean;
@@ -38,7 +40,7 @@ export function HonorsScheduleAgenda({ section, clashes, busy, onOpenMove }: {
           <div className={styles.group} key={column.key}>
             <h3>{column.name}</h3>
             {entries.length === 0 ? (
-              <p className={styles.empty}>No classes.</p>
+              <p className={styles.empty}>No classes here. Add classes on the <Link href={`/more/honors?event=${encodeURIComponent(eventId)}`}>Classes page</Link>.</p>
             ) : (
               <ul className={styles.list}>
                 {entries.map(({ card, room }) => {
@@ -95,6 +97,9 @@ export function HonorsMoveDialog({ card, sections, targetProblem, busy, onMove, 
   const titleId = useId();
   const dialogRef = useAccessibleDialog<HTMLElement>(card !== null, onClose);
   if (!card) return null;
+  // When every room says the same thing about "All sessions" (a single-session class can't go there), say it once.
+  const allProblems = new Set(sections.flatMap((section) => section.rows.map((row) => targetProblem(card, { siteId: section.siteId, roomId: row.room?.id ?? null, column: ALL_SESSIONS_COLUMN }))));
+  const sharedAllProblem = allProblems.size === 1 ? [...allProblems][0] : null;
   const hasSites = sections.length > 1 || sections.some((section) => section.siteId !== null);
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }} role="presentation">
@@ -107,6 +112,7 @@ export function HonorsMoveDialog({ card, sections, targetProblem, busy, onMove, 
         </div>
         <div className={styles.dialogBody}>
           <p className="field-help">Choose a place. A place that can&apos;t take the class says why.</p>
+          {sharedAllProblem && <p className="field-help"><strong>All sessions:</strong> {sharedAllProblem}</p>}
           {sections.map((section) => (
             <div key={section.siteId ?? "none"}>
               {hasSites && <p className={styles.dialogSite}><strong translate="no">{section.name}</strong></p>}
@@ -114,7 +120,7 @@ export function HonorsMoveDialog({ card, sections, targetProblem, busy, onMove, 
                 <div key={row.room?.id ?? "none"}>
                   <p className={styles.dialogSite}><strong translate={row.room ? "no" : undefined}>{row.room ? row.room.name : "No room yet"}</strong></p>
                   <ul className={styles.places}>
-                    {columnsOf(section).map((column) => {
+                    {columnsOf(section).filter((column) => !(sharedAllProblem && column.key === ALL_SESSIONS_COLUMN)).map((column) => {
                       const target: MoveTarget = { siteId: section.siteId, roomId: row.room?.id ?? null, column: column.key };
                       const problem = targetProblem(card, target);
                       return (

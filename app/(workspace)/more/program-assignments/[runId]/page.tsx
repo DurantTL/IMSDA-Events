@@ -58,7 +58,7 @@ export default async function ProgramAssignmentRosterPage({
     <section className="page-stack assignment-roster-page">
       <BackLink href={`/more/program-assignments?event=${encodeURIComponent(event.id)}`} variant="staff">Back to seminar assignments</BackLink>
       <StaffPageHeader
-        description={<><strong>{roster.fieldLabel}</strong>: applied (frozen) run. {roster.eventName} · {roster.formName} version {roster.formVersionNumber} · applied {formatInConferenceTime(roster.appliedAt, { dateStyle: "medium", timeStyle: "short" })} by {roster.appliedByName}</>}
+        description={<>Applied (frozen) run. {roster.eventName} · {roster.formName} version {roster.formVersionNumber} · applied {formatInConferenceTime(roster.appliedAt, { dateStyle: "medium", timeStyle: "short" })} by {roster.appliedByName}</>}
         extra={
           <>
             <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/program-assignments/${encodeURIComponent(roster.id)}/roster`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
@@ -66,6 +66,7 @@ export default async function ProgramAssignmentRosterPage({
           </>
         }
       />
+      <h2 className="assignment-roster-heading">{roster.fieldLabel}</h2>
       <div className="assignment-safety-note">
         <ShieldCheck aria-hidden="true" size={19} />
         <p><strong>Immutable roster.</strong> This printout is the exact applied run. Later registrations or form changes do not alter it.</p>

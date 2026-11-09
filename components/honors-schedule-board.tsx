@@ -43,8 +43,11 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
-  // Agenda on a phone or tablet, the board on a wide screen; either can be chosen (#1580).
-  const [mode, setMode] = useState<"board" | "agenda">("board");
+  // Agenda under 1024px, the board above; either can be chosen (#1580). Until one is chosen, both are rendered and a CSS media
+  // query shows the right one, so there is no jump on first paint. `screenMode` only keeps the switch's pressed state truthful.
+  const [choice, setChoice] = useState<"board" | "agenda" | null>(null);
+  const [screenMode, setScreenMode] = useState<"board" | "agenda">("board");
+  const mode = choice ?? screenMode;
   const [moveCardId, setMoveCardId] = useState<string | null>(null);
   const requestRef = useRef(0);
   // The add-room form of each site and the open edit-room form are unsaved when a field is off what it opened with (a blank
@@ -62,9 +65,8 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
   const hasSites = board.sites.length > 0;
 
   useEffect(() => {
-    // Decided once, after mount (the server can't know the screen); the switch overrides it either way.
     const frame = window.requestAnimationFrame(() => {
-      if (window.matchMedia("(max-width: 1023.98px)").matches) setMode("agenda");
+      if (window.matchMedia("(max-width: 1023.98px)").matches) setScreenMode("agenda");
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
@@ -196,8 +198,8 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
           <>
             <span className="count-badge">{board.cards.length} classes</span>
             <div aria-label="Schedule view" className={agendaStyles.switch} role="group">
-              <button aria-pressed={mode === "board"} onClick={() => setMode("board")} type="button">Board</button>
-              <button aria-pressed={mode === "agenda"} onClick={() => { setMode("agenda"); setSelectedId(null); }} type="button">Agenda</button>
+              <button aria-pressed={mode === "board"} onClick={() => setChoice("board")} type="button">Board</button>
+              <button aria-pressed={mode === "agenda"} onClick={() => { setChoice("agenda"); setSelectedId(null); }} type="button">Agenda</button>
             </div>
           </>
         }
@@ -245,9 +247,13 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
               <span className="count-badge">{sectionRooms.length} rooms</span>
             </div>
             {section.sessions.length === 0 && <p className="field-help">This site has no sessions yet. Add them on the class setup page.</p>}
-            {mode === "agenda" ? (
-              <HonorsScheduleAgenda busy={busy} clashes={clashes} onOpenMove={(card) => { setError(""); setMoveCardId(card.id); }} section={section} />
-            ) : (
+            {choice !== "board" && (
+              <div className={choice === null ? agendaStyles.autoAgenda : undefined}>
+                <HonorsScheduleAgenda eventId={eventId} busy={busy} clashes={clashes} onOpenMove={(card) => { setError(""); setMoveCardId(card.id); }} section={section} />
+              </div>
+            )}
+            {choice !== "agenda" && (
+            <div className={choice === null ? agendaStyles.autoBoard : undefined}>
             <div
               aria-label={`Schedule for ${section.name}. Scrolls sideways.`}
               className="schedule-scroll"
@@ -280,6 +286,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
                   />
                 ))}
               </div>
+            </div>
             </div>
             )}
 

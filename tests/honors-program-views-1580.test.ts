@@ -31,7 +31,7 @@ const sections = buildBoardSections(board);
 
 describe("schedule agenda (#1580)", () => {
   const markup = renderToStaticMarkup(createElement(HonorsScheduleAgenda, {
-    section: sections[0], clashes: instructorClashes(board.cards, board.sessions), busy: false, onOpenMove: () => undefined,
+    eventId: "e1", section: sections[0], clashes: instructorClashes(board.cards, board.sessions), busy: false, onOpenMove: () => undefined,
   }));
 
   it("lists each session and All sessions with room, seats, instructors and the board's chips", () => {
@@ -39,6 +39,11 @@ describe("schedule agenda (#1580)", () => {
       expect(markup, text).toContain(text);
     }
     expect(markup).toContain("Clash");
+  });
+
+  it("says what to do next in an empty session, with a link to the Classes page", () => {
+    expect(markup).toContain("No classes here. Add classes on the");
+    expect(markup).toContain('href="/more/honors?event=e1"');
   });
 
   it("gives every class a Move button named for the class", () => {
@@ -64,10 +69,29 @@ describe("Move dialog (#1580)", () => {
     expect(markup).toContain('aria-modal="true"');
     expect(markup).toContain("Move Sample Knots");
     expect(markup).toContain("It is already here.");
-    expect(markup).toContain("A single-session class can&#x27;t move into All sessions.");
+    // Said once, not per room.
+    expect(markup.split("A single-session class can&#x27;t move into All sessions.").length - 1).toBe(1);
     expect(markup).toContain("Tiny Room seats 5, and this class has 10 seats.");
     expect(markup).toContain("Room A already has a class then.");
     expect(markup).toContain('aria-label="Move Sample Knots to no room, Session Two"');
+  });
+});
+
+describe("schedule board views without a jump (#1580)", () => {
+  it("renders both views until one is chosen and lets CSS pick, then honours the choice", () => {
+    const board = read("components/honors-schedule-board.tsx");
+    expect(board).toContain("agendaStyles.autoAgenda");
+    expect(board).toContain("agendaStyles.autoBoard");
+    expect(board).toContain('choice !== "board"');
+    const css = read("components/honors-schedule-agenda.module.css");
+    expect(css).toMatch(/max-width: 1023\.98px\) \{ \.autoBoard \{ display: none; \}/);
+    expect(css).toMatch(/min-width: 1024px\) \{ \.autoAgenda \{ display: none; \}/);
+  });
+
+  it("keeps a heading on the frozen roster that the print rule matches", () => {
+    expect(read("app/(workspace)/more/program-assignments/[runId]/page.tsx")).toContain('className="assignment-roster-heading"');
+    expect(read("app/globals.css")).toContain(".assignment-roster-heading { font-size: 18pt; }");
+    expect(read("app/globals.css")).not.toContain("assignment-roster-intro");
   });
 });
 
