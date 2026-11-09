@@ -45,4 +45,10 @@ describe("noAccessCopy (#1411 E6)", () => {
     expect(noAccessCopy({ from: null, hasEvents: false, email, clubsAdmin: false }).heading).toBe("No events are assigned");
     expect(noAccessCopy({ from: null, hasEvents: true, email }).showClubs).toBeUndefined();
   });
+
+  it("offers Home to staff with no event, so the card is not a dead end (#1596)", () => {
+    expect(noAccessCopy({ from: null, hasEvents: false, email }).showHome).toBe(true);
+    expect(noAccessCopy({ from: null, hasEvents: true, email }).showHome).toBeUndefined();
+    expect(noAccessCopy({ from: "event-setup", hasEvents: true, email }).showHome).toBeUndefined();
+  });
 });

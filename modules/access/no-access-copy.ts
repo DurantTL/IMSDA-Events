@@ -1,4 +1,4 @@
-export type NoAccessCopy = { heading: string; body: string; whoToAsk: string; showEvents: boolean; /** Offer a link back to Club administration (a Clubs Administrator is working, just not here). */ showClubs?: boolean };
+export type NoAccessCopy = { heading: string; body: string; whoToAsk: string; showEvents: boolean; /** Offer a link back to Club administration (a Clubs Administrator is working, just not here). */ showClubs?: boolean; /** Offer Home (#1596): staff with no event still have Home and any admin role they hold, so the card is not a dead end. */ showHome?: boolean };
 
 /**
  * What /no-access says (#1411): event-creation pages send `?from=event-setup`; anyone else with an assignment gets a
@@ -36,6 +36,7 @@ export function noAccessCopy(input: { from?: string | null; hasEvents: boolean; 
       body: `${input.email} is signed in, but it does not have an active event assignment.`,
       whoToAsk: "an IMSDA event administrator",
       showEvents: false,
+      showHome: true,
     };
   }
   if (input.from === "event-setup") {
