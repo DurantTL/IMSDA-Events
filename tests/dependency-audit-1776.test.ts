@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { applyExceptions, seriousAdvisories } from "../scripts/audit-production-dependencies.mjs";
+import { applyExceptions, isAuditReport, seriousAdvisories } from "../scripts/audit-production-dependencies.mjs";
 
 /** #1776: the weekly dependency check fails on a new high or critical advisory and only accepts listed ones. */
 
@@ -25,6 +25,14 @@ describe("weekly dependency audit (#1776)", () => {
     expect(result.failing.map((advisory: { id: string }) => advisory.id)).toEqual(["GHSA-cccc-cccc-cccc"]);
     expect(result.excepted.map((advisory: { id: string }) => advisory.id)).toEqual(["GHSA-aaaa-aaaa-aaaa"]);
     expect(result.unused).toEqual([{ id: "GHSA-zzzz-zzzz-zzzz" }]);
+  });
+
+  it("only accepts a report it understands, so a changed or failed audit never passes as clean", () => {
+    expect(isAuditReport({ auditReportVersion: 2, ...report })).toBe(true);
+    expect(isAuditReport({ auditReportVersion: 2, vulnerabilities: {} })).toBe(true);
+    for (const bad of [null, {}, { vulnerabilities: {} }, { auditReportVersion: 3, vulnerabilities: {} }, { auditReportVersion: 2 }, { auditReportVersion: 2, vulnerabilities: {}, error: { code: "ENOTFOUND" } }]) {
+      expect(isAuditReport(bad)).toBe(false);
+    }
   });
 
   it("gives every exception an advisory id, a reason and a date", () => {

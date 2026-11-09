@@ -7,6 +7,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 const SEVERITIES = new Set(["high", "critical"]);
 
@@ -21,6 +22,11 @@ export function seriousAdvisories(report) {
     }
   }
   return [...found.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/** Whether this is an npm audit report this script understands. Anything else must fail, never pass as clean. */
+export function isAuditReport(report) {
+  return Boolean(report) && report.auditReportVersion === 2 && typeof report.vulnerabilities === "object" && report.vulnerabilities !== null && !report.error;
 }
 
 /** Splits advisories into those to fail on and those accepted, and lists exceptions that match nothing. */
@@ -49,6 +55,10 @@ function main() {
     console.error(`npm audit failed: ${report.error.summary ?? report.error.code ?? "unknown error"}`);
     process.exit(2);
   }
+  if (!isAuditReport(report)) {
+    console.error("npm audit returned a report in a form this check does not understand. Update scripts/audit-production-dependencies.mjs.");
+    process.exit(2);
+  }
   const { failing, excepted, unused } = applyExceptions(seriousAdvisories(report), exceptions);
   for (const advisory of excepted) console.log(`accepted  ${advisory.id}  ${advisory.package} (${advisory.severity})`);
   for (const exception of unused) console.log(`unused exception  ${exception.id}: remove it from .github/dependency-audit-exceptions.json`);
@@ -61,4 +71,4 @@ function main() {
   process.exit(1);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
