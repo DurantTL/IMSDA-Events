@@ -1,7 +1,7 @@
 /* The club roster table fits its card (#1757). The wrap scrolls sideways when the table is wider than the card, so nothing spills out.
    The doubled global class and the :has() match the specificity of the shared "cards never scroll" rule, which this wrap overrides. */
 .rosterTableWrap:global(.report-table-wrap):has(> :global(table.table-cards)) { overflow-x: auto; overflow-y: hidden; padding: 4px 3px; margin: -4px -3px; }
-.rosterTableWrap:focus-visible { outline: 3px solid var(--imsda-purple, #5b2a86); outline-offset: 2px; }
+.rosterTableWrap:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
 
 /* Table layout only (the wrap is wider than 1100px); a narrower wrap shows cards, which keep their own rules. */
 @container table-box (min-width: 1101px) {
