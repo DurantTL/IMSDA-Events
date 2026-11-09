@@ -220,6 +220,30 @@ describe("Needs you model (#1568)", () => {
     expect(html).not.toContain("Nothing needs you right now.");
   });
 
+  it("shows Coming up under an empty Needs you, with an icon and a next step (#1747)", () => {
+    const events = [{ id: "evt_1", name: "Synthetic Camporee", dates: "Mar 5 to 7, 2027", place: "Synthetic Camp", status: { text: "Published", tone: "ok" as const }, href: "/overview?event=evt_1" }];
+    const clear = buildNeedsView({ held: ["EVENTS_ADMIN"], events: buildEventsAdminHome([], now) });
+    expect(clear.allClear).toBe(true);
+    const html = renderToStaticMarkup(createElement(NeedsYouPage, { view: clear, comingUp: { events, nextStep: null } }));
+    expect(html).toMatch(/data-testid="home-all-clear"[^>]*><svg[^>]*aria-hidden="true"/);
+    expect(html).toContain('href="/overview?event=evt_1"');
+    expect(html).toContain("Open Synthetic Camporee");
+    expect(html.indexOf("Nothing needs you right now.")).toBeLessThan(html.indexOf("home-needs-coming-up"));
+    expect(html).toContain("Synthetic Camporee");
+    const none = renderToStaticMarkup(createElement(NeedsYouPage, { view: clear, comingUp: { events: [], nextStep: comingUpNextStep(["EVENTS_ADMIN"], false) } }));
+    expect(none).toContain("No upcoming events.");
+    expect(none).toContain('data-testid="home-all-clear-next"');
+    const noRole = renderToStaticMarkup(createElement(NeedsYouPage, { view: buildNeedsView({ held: [] }), comingUp: { events, nextStep: null } }));
+    expect(noRole).toMatch(/data-testid="home-no-admin-role"[^>]*><svg[^>]*aria-hidden="true"/);
+    expect(noRole).toContain("home-needs-coming-up");
+  });
+
+  it("does not show Coming up under a Needs you that has work in it (#1747)", () => {
+    const busy = buildNeedsView({ held: ["CLUBS_ADMIN"], clubs: { applications: 2, lateRecords: 0 } });
+    const html = renderToStaticMarkup(createElement(NeedsYouPage, { view: busy, comingUp: { events: [], nextStep: null } }));
+    expect(html).not.toContain("home-needs-coming-up");
+  });
+
   it("renders Unavailable in words and every item as a link only", () => {
     const view = buildNeedsView({ held: ["CLUBS_ADMIN"], clubs: { applications: null, lateRecords: 2 } });
     const html = renderToStaticMarkup(createElement(NeedsYouPage, { view }));

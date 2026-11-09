@@ -13,6 +13,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 // The section header (#1274) is async and has its own tests; these pages are tested without it.
 vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
+vi.mock("@/components/contextual-help-slot", () => ({ StaffContextualHelp: () => null }));
 vi.mock("@/modules/events/selection", () => ({ resolveEventContext: dependencies.resolveEventContext }));
 vi.mock("@/modules/registrations/repository", () => ({ listRegistrations: dependencies.listRegistrations }));
 vi.mock("@/modules/event-locations/filter", () => ({ resolveLocationFilter: dependencies.resolveLocationFilter }));
@@ -23,7 +24,8 @@ vi.mock("@/modules/guardian-authority/repository", () => ({ getResponsibleAdults
 vi.mock("@/components/people-workspace", () => ({
   PeopleWorkspace: (props: Record<string, unknown>) => {
     dependencies.workspaceProps(props);
-    return null;
+    // The filters render inside the workspace, right after its search box (#1747).
+    return (props.filtersAfterSearch ?? null) as never;
   },
 }));
 

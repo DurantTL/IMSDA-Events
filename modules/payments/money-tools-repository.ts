@@ -8,6 +8,7 @@ import { countOpenInvoiceDrafts } from "@/modules/invoices/repository";
 import { listPolicyVersions } from "@/modules/cancellation-policy/repository";
 import { reconcileRegistrationLedger } from "@/modules/ledger/reconciliation";
 import { countOpenChurchSponsorFlags } from "@/modules/promo-codes/church-sponsor-lodging";
+import { listUnmatchedSquarePayments } from "@/modules/payments/square-match-repository";
 import { getFundView } from "@/modules/scholarship-funds/repository";
 import { neededMoneyMetrics, type MoneyMetricKey, type MoneyMetricValues, type MoneyToolsViewer } from "@/modules/payments/money-tools-model";
 
@@ -51,6 +52,12 @@ const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
   // The pages' own test for "This event is not billed to organizations" (billing mode is not deferred organization invoicing).
   billedToOrganizations: async (context) => ((await billing(context)).isDeferred ? 1 : 0),
   attendanceApproved: async ({ eventId }) => ((await hasApprovedReconciliation(eventId)) ? 1 : 0),
+  // The Unmatched Square payments page's own list (default window). Not configured or unreachable throws, so the card says "Unavailable", never "None waiting".
+  unmatchedSquare: async () => {
+    const { findings, unreachableSquare } = await listUnmatchedSquarePayments();
+    if (unreachableSquare) throw new Error("Square could not be reached");
+    return findings.length;
+  },
   // Exact server cents, as the Scholarship fund page shows its balance.
   scholarshipBalanceCents: async ({ eventId }) => (await getFundView(eventId)).summary.balanceCents,
 };

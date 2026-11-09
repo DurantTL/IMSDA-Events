@@ -98,7 +98,7 @@ describe("More money tools model (#1575)", () => {
     expect(neededMoneyMetrics(nobody)).toEqual([]);
     expect(buildMoneyToolsView(nobody, "evt_1", {}).groups).toEqual([]);
     expect(neededMoneyMetrics(finance).sort()).toEqual(
-      (["churchFlags", "ledgerDifferences", "policyVersions", "policyInEffect", "draftInvoices", "scholarshipBalanceCents", "billingUnrecorded", "billingOutdated", "billingUnresolved", "billingNeedsContact", "billedToOrganizations", "attendanceApproved"] as MoneyMetricKey[]).sort(),
+      (["churchFlags", "ledgerDifferences", "policyVersions", "policyInEffect", "draftInvoices", "scholarshipBalanceCents", "billingUnrecorded", "billingOutdated", "billingUnresolved", "billingNeedsContact", "billedToOrganizations", "attendanceApproved", "unmatchedSquare"] as MoneyMetricKey[]).sort(),
     );
   });
 
@@ -110,7 +110,7 @@ describe("More money tools model (#1575)", () => {
   it("shows a failed read as Unavailable, never as zero or healthy", () => {
     const failed = allMetrics(finance, null);
     const withStatus = cards(failed).filter((card) => card.status);
-    expect(withStatus.length).toBe(7);
+    expect(withStatus.length).toBe(8);
     for (const card of withStatus) expect(card.status).toEqual(UNAVAILABLE_STATUS);
     // One failed read does not hide the others.
     expect(statusOf(staffPageTitles.churchOwed, { ...allMetrics(finance, 0), churchFlags: null })).toEqual(UNAVAILABLE_STATUS);
@@ -123,7 +123,7 @@ describe("More money tools model (#1575)", () => {
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyInEffect: 1 })).toEqual(UNAVAILABLE_STATUS);
   });
 
-  it("says its status in words, and a card with no honest number has no chip", () => {
+  it("says its status in words", () => {
     const zero = { ...allMetrics(finance, 0), billedToOrganizations: 1 };
     expect(statusOf(staffPageTitles.churchOwed, zero)).toEqual({ tone: "ok", text: "Nothing waiting" });
     expect(statusOf(staffPageTitles.churchOwed, { churchFlags: 1 })).toEqual({ tone: "warn", text: "1 needs the finance office" });
@@ -137,7 +137,10 @@ describe("More money tools model (#1575)", () => {
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 0, policyInEffect: 0 })).toEqual({ tone: "draft", text: "No rules set" });
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 2, policyInEffect: 0 })).toEqual({ tone: "soon", text: "None in effect yet" });
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 2, policyInEffect: 1 })).toEqual({ tone: "ok", text: "In effect" });
-    expect(statusOf(staffPageTitles.squarePayments, allMetrics(finance, 1))).toBeNull();
+    expect(statusOf(staffPageTitles.squarePayments, allMetrics(finance, 1))).toEqual({ tone: "review", text: "1 waiting to match" });
+    expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: 4 })).toEqual({ tone: "review", text: "4 waiting to match" });
+    expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: 0 })).toEqual({ tone: "ok", text: "None waiting" });
+    expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: null })).toEqual(UNAVAILABLE_STATUS);
     const billing = (extra: MoneyMetricValues) => statusOf(staffPageTitles.billingResponsibility, { ...zero, ...extra });
     expect(billing({})).toEqual({ tone: "ok", text: "All recorded" });
     expect(billing({ billingUnrecorded: 3 })).toEqual({ tone: "review", text: "3 to record" });
@@ -165,5 +168,22 @@ describe("More money tools model (#1575)", () => {
     }
     // The other cards are not affected.
     expect(statusOf(staffPageTitles.churchOwed, notBilled)?.text).toBe("Nothing waiting");
+  });
+
+  it("gathers the tools the event does not use into one last group, and keeps every card's chip", () => {
+    const notBilled = { ...allMetrics(finance, 0), billedToOrganizations: 0 };
+    const view = buildMoneyToolsView(finance, "evt_1", notBilled);
+    expect(view.groups.map((group) => group.title)).toEqual(["Invoices and churches", "Funds and matching", "Rules and checks", "Not used for this event"]);
+    const last = view.groups[view.groups.length - 1];
+    expect(last.cards.map((card) => card.title)).toEqual([staffPageTitles.invoices, staffPageTitles.billingResponsibility, staffPageTitles.attendanceReconciliation]);
+    for (const card of last.cards) expect(card.status?.text).toBe("Not used for this event");
+    for (const group of view.groups.slice(0, -1)) for (const card of group.cards) expect(card.status?.text).not.toBe("Not used for this event");
+    // Every card carries a chip, so it is in the same place on all of them.
+    for (const card of view.groups.flatMap((group) => group.cards)) expect(card.status).not.toBeNull();
+    // An unreadable card is not moved on a guess.
+    const unknown = buildMoneyToolsView(finance, "evt_1", { ...notBilled, billedToOrganizations: null });
+    expect(unknown.groups.map((group) => group.title)).not.toContain("Not used for this event");
+    // A used event has no such group, and the three groups keep their order.
+    expect(buildMoneyToolsView(finance, "evt_1", allMetrics(finance, 1)).groups).toHaveLength(3);
   });
 });

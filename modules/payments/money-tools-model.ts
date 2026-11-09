@@ -16,7 +16,7 @@ import { UNAVAILABLE_STATUS, type CardStatus, type HubBody, type HubCard, type H
  *   from data nobody read.
  * - Every card is a link and carries `?event=`. Nothing here writes, refunds, matches or changes a record.
  */
-export type MoneyMetricKey = "churchFlags" | "ledgerDifferences" | "policyVersions" | "policyInEffect" | "draftInvoices" | "scholarshipBalanceCents" | "billingUnrecorded" | "billingOutdated" | "billingUnresolved" | "billingNeedsContact" | "billedToOrganizations" | "attendanceApproved";
+export type MoneyMetricKey = "churchFlags" | "ledgerDifferences" | "policyVersions" | "policyInEffect" | "draftInvoices" | "scholarshipBalanceCents" | "billingUnrecorded" | "billingOutdated" | "billingUnresolved" | "billingNeedsContact" | "billedToOrganizations" | "attendanceApproved" | "unmatchedSquare";
 
 /** `null` is "could not be read"; a missing key is "not asked for". */
 export type MoneyMetricValues = Partial<Record<MoneyMetricKey, number | null>>;
@@ -44,6 +44,9 @@ const notUsed: CardStatus = { tone: "draft", text: "Not used for this event" };
 const usedFor = (read: Reader) => read("billedToOrganizations")! > 0;
 
 const count = (n: number, tone: CardStatus["tone"], text: string): CardStatus => ({ tone, text: `${n} ${text}` });
+
+/** The group the tools this event does not use are gathered into, always last (#1747). */
+export const notUsedGroupTitle = "Not used for this event";
 
 const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
   {
@@ -103,11 +106,13 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         status: (read) => ({ tone: "draft", text: `Balance ${formatCents(read("scholarshipBalanceCents")!)}` }),
       },
       {
-        // No status on purpose: the unmatched list is a live Square read over a date window, not scoped to one event.
+        // A live Square read over the page's default window, not scoped to one event (#1747): the count waiting to be matched.
         href: "/finance/square-payments",
         title: staffPageTitles.squarePayments,
         description: "Square payments that no registration has claimed yet, ready to match by hand.",
         gate: finance,
+        metrics: ["unmatchedSquare"],
+        status: (read) => (read("unmatchedSquare")! > 0 ? count(read("unmatchedSquare")!, "review", "waiting to match") : { tone: "ok", text: "None waiting" }),
       },
       {
         href: "/finance/attendance-reconciliation",
@@ -169,15 +174,19 @@ export function buildMoneyToolsView(viewer: MoneyToolsViewer, eventId: string, v
     const value = values[key];
     return typeof value === "number" && Number.isFinite(value) ? value : null;
   };
+  const unused: HubCard[] = [];
   const groups = groupDefs.flatMap((group): HubGroup[] => {
-    const cards = group.cards
-      .filter((card) => card.gate(permissions))
-      .map((card): HubCard => {
-        let status: CardStatus | null = null;
-        if (card.status) status = (card.metrics ?? []).some((key) => reading(key) === null) ? UNAVAILABLE_STATUS : card.status(reading);
-        return { href: withCurrentEvent(card.href, eventId), title: card.title, description: card.description, status };
-      });
+    const cards: HubCard[] = [];
+    for (const card of group.cards) {
+      if (!card.gate(permissions)) continue;
+      let status: CardStatus | null = null;
+      if (card.status) status = (card.metrics ?? []).some((key) => reading(key) === null) ? UNAVAILABLE_STATUS : card.status(reading);
+      const built: HubCard = { href: withCurrentEvent(card.href, eventId), title: card.title, description: card.description, status };
+      // Only the tools the event does not use move; an unreadable card stays where it was, never moved on a guess.
+      (status === notUsed ? unused : cards).push(built);
+    }
     return cards.length > 0 ? [{ title: group.title, cards }] : [];
   });
+  if (unused.length > 0) groups.push({ title: notUsedGroupTitle, cards: unused });
   return { key: "money-tools", description: moneyToolsDescription, groups };
 }

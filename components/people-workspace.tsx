@@ -12,7 +12,7 @@ import { sortOrderText } from "@/lib/list-sort";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { suppressionExplanation, suppressionLabel } from "@/modules/communications/suppression-labels";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { closeRegistrationUrlAction, followRegistrationParam, withoutRegistrationParam, type ParamOpened } from "@/lib/registration-param";
@@ -53,6 +53,7 @@ import { findRegistrationToOpen, registrationMatchesSearch } from "@/modules/reg
 import { attendeeBalanceCents } from "@/modules/registrations/finance-view";
 import { registrationAwaitingApproval, registrationMoneyStatus, registrationStatusWord, waitlistStatusText } from "@/modules/registrations/status-words";
 import { PhoneInput, phoneBlocks } from "@/components/phone-input";
+import listStyles from "@/components/people-list.module.css";
 import { samePhoneNumber } from "@/components/form-has-edits";
 import { useEditedForms } from "@/components/use-edited-forms";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -294,6 +295,7 @@ export function PeopleWorkspace({
   announcementOptOuts = {},
   emailSuppressions = { registrations: {}, attendees: {} },
   responsibleAdults = {},
+  filtersAfterSearch,
   locationId = null,
   matchingPersonFilter = false,
   pageScoped = false,
@@ -324,6 +326,8 @@ export function PeopleWorkspace({
   emailSuppressions?: { registrations: Record<string, "BOUNCE" | "COMPLAINT">; attendees: Record<string, "BOUNCE" | "COMPLAINT"> };
   /** Minors by attendee id with who is responsible for them (#131): a name, "None of us", or not recorded. */
   responsibleAdults?: Record<string, { adultName: string | null; noneOfUs: boolean; ageUnknown: boolean }>;
+  /** Advanced search and the other filters, shown right after the simple search box (#1747). */
+  filtersAfterSearch?: ReactNode;
   /** The location filter (#413) the CSV export follows; null exports every location. */
   locationId?: string | null;
   /** The list was narrowed by a choice answer (#739): each row holds at least one matching person. */
@@ -858,8 +862,10 @@ export function PeopleWorkspace({
         <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid in full</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Pending approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
       </div>
       {showToolbarClear && <div><button className="text-button" onClick={clearFilters} type="button">Clear filters</button></div>}
+      {/* Advanced search, the location and the answer filters: filters that come after the simple search (#1747). */}
+      {filtersAfterSearch}
       <div className="page-intro people-intro">
-        <div><p className="eyebrow">Registration hub</p><h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2><p>Review each party’s attendees, submitted choices, payments, emails, and operational status in one record. Times are shown in {eventTimezone}.</p></div>
+        <h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2>
         <div className="intro-actions">
           <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}{canEdit && pendingTeamCount > 0 && !locationId && !pageScoped ? ` · ${pendingTeamsLabel(pendingTeamCount)}` : ""}</span>
           {canEdit && <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a>}
@@ -876,6 +882,7 @@ export function PeopleWorkspace({
           </ActionsMenu>
         </div>
       </div>
+      <div className={listStyles.countLine}>
       <ListPager
         label="Registrations shown"
         noun={`${matchingPersonFilter ? "registrations with a matching person" : "registrations"}${pageScoped ? " on this page of the search results" : ""}`}
@@ -885,6 +892,7 @@ export function PeopleWorkspace({
       />
       <SearchResultStatus message={query.trim() === "" ? "" : `${visible.length} of ${registrations.length} ${registrations.length === 1 ? "registration" : "registrations"} shown.`} />
       {orderText && <SortOrderNote>{orderText}</SortOrderNote>}
+      </div>
       {/* Always shown, so "Select all" is findable before anything is ticked. */}
       {canEmail && (selectedIds.size > 0 || visible.length > 0) && (
         <div className="panel selection-bar">
@@ -1093,6 +1101,7 @@ export function PeopleWorkspace({
                 ) : (
                   <>
                 <div className="detail-grid"><span><small>Confirmation</small><strong translate="no">{selected.confirmationCode}</strong></span>{selected.location && <span><small>Location</small><strong>{selected.location.name}</strong></span>}<span><small>Status</small><strong className="status-word-value">{statusLabel(selected)}</strong></span>{selected.staffInvitation && <span><small>Group</small><strong>{staffGroupLabel[selected.staffInvitation.group]}</strong></span>}<span><small>Submitted</small><strong>{submittedDateTime(selected.submittedAt, eventTimezone)}</strong></span><span><small>Last updated</small><strong>{dateTime(selected.updatedAt, eventTimezone)}</strong></span><span><small>Total</small><strong><Money cents={selected.totalAmountCents} /></strong></span><span><small>Balance</small><strong><Money cents={selected.balanceCents} /></strong></span></div>
+                <p className="quiet-copy">Times are shown in {eventTimezone}.</p>
                 <div className="contact-card"><strong>Contact</strong><p>{selected.accountHolder.email || "No email"}</p><p>{selected.accountHolder.phone || "No phone"}</p>{announcementOptOuts[selected.id] && <p>{announcementOptOuts[selected.id] === "ALL" ? "Opted out of all IMAdventist announcements." : "Opted out of this event's announcements."} Confirmations, receipts and reminders still go.</p>}{emailSuppressions.registrations[selected.id] && <p className="inline-notice error" data-email-suppressed="contact" role="alert"><strong>{suppressionLabel(emailSuppressions.registrations[selected.id]!)}.</strong> {suppressionExplanation(emailSuppressions.registrations[selected.id]!)} Confirmations and receipts for this registration will not arrive; contact them another way.</p>}</div>
                 {selected.publicSubmission && <div className="public-submission-detail">
                   <div><span className="status-chip green">Public form</span><strong>{selected.publicSubmission.formName}</strong><small>Version {selected.publicSubmission.versionNumber} · original submission retained{selected.publicSubmission.amendedAt ? ` · last amended ${dateTime(selected.publicSubmission.amendedAt, eventTimezone)}` : ""}</small></div>

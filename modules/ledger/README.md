@@ -81,7 +81,7 @@ One small transaction per registration.
 For each registration it compares `deriveRegistrationTotalCents(entries)` with `moneyToCents(totalAmount)` and returns
 the failing ones (expected, ledger, difference, entry count, and whether it has no entries). It backs
 `scripts/verify-ledger-shadow.ts` (`npm run test:ledger-shadow`, CI) and the read-only page
-`/more/ledger-health` ("Ledger check (shadow)"), which needs the same permission as Payments (`MANAGE_FINANCE`).
+`/more/ledger-health` ("Ledger check"), which needs the same permission as Payments (`MANAGE_FINANCE`).
 
 ## Not covered yet (will show as discrepancies until slices 2 to 5)
 

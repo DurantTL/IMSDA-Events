@@ -85,7 +85,7 @@ describe("destination registry per role", () => {
     const destinations = buildSearchDestinations(limitedStaff);
     expect(labels(destinations)).toEqual(["Event:Check-in", "Profile:Your account"]);
     // The Dashboard needs the event view, which this role lacks.
-    expect(labels(buildSearchDestinations({ ...base, permissions: ["VIEW_EVENT"] }))).toEqual(["Event:Dashboard", "Profile:Your account"]);
+    expect(labels(buildSearchDestinations({ ...base, permissions: ["VIEW_EVENT"] }))).toEqual(["Event:Event home", "Profile:Your account"]);
     expect(destinations.some((destination) => destination.scope === "System")).toBe(false);
   });
 

@@ -98,7 +98,7 @@ const eventAdmin: Viewer = { permissions: rolePermissions.EVENT_ADMIN };
 const fullTabs = ["Event home", "Registrations", "Check-in", "Communications", "Money", "Reports", "Event setup"];
 /** The registry's sidebar items, still the source of the search order and the More directory (#964). */
 const registryOrder = [
-  "Dashboard", "Check-in", "Registrations", "Payments", "Emails",
+  "Event home", "Check-in", "Registrations", "Payments", "Emails",
   "Event settings", "Event features", "Registration forms", "Attendee setup", "Tags",
   "Operational reports", "Operational health",
 ];
@@ -112,7 +112,7 @@ describe("event tab order (#1565, from the sidebar order of #964)", () => {
   it("keeps navigation's items in the table's order, with the moved items out and More last", () => {
     const listed = navigation.filter((item) => item.sidebar).map((item) => item.label).filter((label) => label !== "Kitchen counts");
     // Kitchen counts (#1029) is the one item for staff without the event view, so no admin sees it: it follows the dashboard.
-    expect(navigation.filter((item) => item.sidebar).slice(0, 2).map((item) => item.label)).toEqual(["Dashboard", "Kitchen counts"]);
+    expect(navigation.filter((item) => item.sidebar).slice(0, 2).map((item) => item.label)).toEqual(["Event home", "Kitchen counts"]);
     expect(listed).toEqual(registryOrder.filter((entry) => entry !== "Event features"));
     expect(navigation.filter((item) => !item.sidebar && item.href !== "/more").map((item) => item.label)).toEqual(["Attendee list", "Imports", "Review queues", "Team", "Promo codes", "More money tools", "Printouts"]);
     expect(navigation.at(-1)?.href).toBe("/more");

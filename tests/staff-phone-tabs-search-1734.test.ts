@@ -101,14 +101,13 @@ describe("the event bar on a phone", () => {
     defaultEventId: "evt_one",
   }, createElement("p", null, "content")));
 
-  it("keeps Archived events beside the switcher as a link, never a select option that arrowing could trigger", () => {
-    const select = markup.slice(markup.indexOf('id="event-picker"'), markup.indexOf("</select>", markup.indexOf('id="event-picker"')));
-    expect(select).not.toContain("Archived events");
-    expect(markup.match(/href="\/archived-events"/g)).toHaveLength(1);
-    expect(markup).toMatch(/<a(?=[^>]*href="\/archived-events")(?=[^>]*aria-label="Archived events")/);
-    const css = read("components/staff-shell.module.css");
-    expect(css).toMatch(/\.archivedLink \{[^}]*min-width: 44px; min-height: 44px/);
-    expect(css).toMatch(/\.archivedText \{ display: none; \}/);
+  it("makes Archived events the switcher's last choice, with no separate link (#1747)", () => {
+    const start = markup.indexOf('id="event-picker"');
+    const select = markup.slice(start, markup.indexOf("</select>", start));
+    expect(select.trimEnd().endsWith("Archived events…</option>")).toBe(true);
+    expect(markup).not.toContain('href="/archived-events"');
+    expect(read("components/app-shell.tsx")).toContain('router.push("/archived-events")');
+    expect(read("components/staff-shell.module.css")).not.toContain("archivedLink");
   });
 
   it("puts the name and Switch event on one row without repeating the name in the switcher on a phone", () => {

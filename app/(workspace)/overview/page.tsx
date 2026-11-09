@@ -137,7 +137,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       <section className="event-hero">
         <div className="hero-copy">
           <span className="event-state">{eventState}</span>
-          <p className="hero-eyebrow">Current event</p><h2>{event.name}</h2>
+          <h2>{event.name}</h2>
           <p className="hero-meta"><CalendarDays aria-hidden="true" size={17} /> {formatEventDates(event.startsAt, event.endsAt, event.timezone)}<span aria-hidden="true">•</span> {event.location ?? "Location pending"}</p>
         </div>
         <div className="hero-capacity" aria-label="Event capacity"><span>Capacity</span><strong>{metrics.people} / {event.capacity ?? "Open"}</strong><div className="capacity-track"><span style={{ width: `${capacityUsed}%` }} /></div></div>

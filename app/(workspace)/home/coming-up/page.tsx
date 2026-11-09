@@ -4,11 +4,9 @@ import { ComingUpPage } from "@/components/home-pages";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
-import { logError } from "@/lib/logger";
-import { listEventsForUser } from "@/modules/events/repository";
 import { resolveAdminRoles } from "@/modules/access/admin-roles";
 import { heldAdminRoles } from "@/modules/access/admin-roles-domain";
-import { buildComingUp, comingUpNextStep, type ComingUpEvent } from "@/modules/system-admin/home-needs-model";
+import { loadComingUp } from "@/modules/system-admin/home-coming-up-repository";
 
 export const metadata: Metadata = { title: "Home" };
 export const dynamic = "force-dynamic";
@@ -21,14 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function HomeComingUpPage() {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  let events: ComingUpEvent[] | null;
-  try {
-    events = buildComingUp(await listEventsForUser(user.id, user.globalRole === "SYSTEM_ADMIN"), new Date());
-  } catch (error) {
-    logError("Home coming-up events could not load", error);
-    events = null;
-  }
-  const nextStep = events?.length === 0 ? comingUpNextStep(heldAdminRoles(await resolveAdminRoles(user)), user.globalRole === "SYSTEM_ADMIN") : null;
+  const { events, nextStep } = await loadComingUp(user, async () => heldAdminRoles(await resolveAdminRoles(user)));
   return (
     <section className="page-stack">
       <StaffPageHeader description="What needs you, and what is coming up." />
