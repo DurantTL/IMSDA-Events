@@ -10863,6 +10863,8 @@ model StaffInvitation {
   lastName        String                   @default("")
   group           StaffInvitationGroup
   linkVersion     Int                      @default(1)
+  /// When the link's 14-day window last started: at creation, on reissue, and on every send. The link stops opening 14 days after.
+  linkIssuedAt    DateTime                 @default(now())
   /// Which import created it (one id per confirmed CSV), so the office can find a file's rows together.
   importBatchId   String?
   createdByUserId String?

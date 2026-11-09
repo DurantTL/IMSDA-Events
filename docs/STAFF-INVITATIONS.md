@@ -21,6 +21,12 @@ registrations that come back wait for the office to approve them in one batch. T
   HMAC of the invitation id and its `linkVersion` under `MANAGE_LINK_DERIVATION_SECRET` (with its `_PREVIOUS` rotation partner), so
   the office can copy the same link again, and a **reissue** (which bumps `linkVersion`) makes every earlier copy stop working.
   **Revoke** turns a link off; a revoked link can be reissued. A person who has registered can be neither revoked nor reissued.
+- **14 days (#1787).** A link opens for 14 days from `linkIssuedAt`: set when the invitation is created, reissued, or sent (every
+  send restarts it). After that the page says the link has expired and to ask the event office for a new invitation, and a
+  submission through it is refused (`INVITATION_EXPIRED`). A person who already registered still sees "already registered". Copy
+  is refused for an expired link. Sending an expired link again moves it to a new link version, so the old link stays expired and
+  the email carries the new one; sending a link that has not expired keeps the same link. Links that existed when the column was
+  added got the deploy time, so each had 14 days from the deploy. The list shows "Link expired" for these.
 - The page and its API are `no-store`, `noindex` and send no referrer. A link that does not work for any reason (wrong, replaced,
   revoked, event unpublished or over) shows the same words.
 
@@ -37,7 +43,7 @@ registrations that come back wait for the office to approve them in one batch. T
   sign-up link). The link is a bearer link, and the exposure is limited: it allows one registration, which waits for the office,
   and the office can reissue it (every earlier copy stops working) or revoke it.
 - The invite list shows Not sent, Sent, Delivery failed (from the message's own status), Registered (waiting), Approved, Declined
-  and Revoked.
+  Link expired and Revoked.
 
 **Registering through a link** (public, no account)
 

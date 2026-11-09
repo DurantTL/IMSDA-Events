@@ -29,6 +29,8 @@ import {
   invitationEmail,
   invitationReinvitable,
   invitationRegistrationSchema,
+  INVITATION_EXPIRED_MESSAGE,
+  invitationLinkExpired,
   invitationStatus,
   invitationUrl,
   invitationUsable,
@@ -71,6 +73,7 @@ export type StaffInvitationErrorCode =
   | "PREVIEW_CHANGED"
   | "INVITATION_NOT_FOUND"
   | "INVITATION_UNAVAILABLE"
+  | "INVITATION_EXPIRED"
   | "INVITATION_USED"
   | "NOT_REISSUABLE"
   | "NOT_REINVITABLE"
@@ -96,6 +99,7 @@ export function staffInvitationErrorStatus(code: StaffInvitationErrorCode) {
     case "INVITATION_NOT_FOUND":
       return 404;
     case "INVITATION_UNAVAILABLE":
+    case "INVITATION_EXPIRED":
       return 410;
     case "INVITATION_USED":
     case "PREVIEW_CHANGED":
@@ -260,6 +264,7 @@ const listSelect = {
   group: true,
   linkVersion: true,
   sentAt: true,
+  linkIssuedAt: true,
   sendCount: true,
   revokedAt: true,
   registeredAt: true,
@@ -284,6 +289,8 @@ export type InvitationListRow = {
   confirmationCode: string | null;
   /** The link can still be copied, sent or revoked. */
   usable: boolean;
+  /** The link's 14 days ran out before the person registered (#1787): it can be sent again or reissued, not copied. */
+  expired: boolean;
   /** A revoked link that nobody used can be reissued, and so can one that has not been used. */
   reissuable: boolean;
   /** The registration was declined (or cancelled while it waited): the office can re-invite the person with a new link (#1027). */
@@ -295,8 +302,8 @@ export type InvitationListRow = {
 const LIST_LIMIT = 2000;
 const DEFAULT_INVITATION_QUERY: InvitationListQuery = { filters: { status: "ALL", group: "ALL", search: "" }, sort: INVITATION_DEFAULT_SORT, page: 1 };
 
-function serializeInvitationRow(row: Prisma.StaffInvitationGetPayload<{ select: typeof listSelect }>): InvitationListRow {
-  const status = invitationStatus({ revokedAt: row.revokedAt, registeredAt: row.registeredAt, approval: row.approval, sentAt: row.sentAt, message: row.lastMessage });
+function serializeInvitationRow(row: Prisma.StaffInvitationGetPayload<{ select: typeof listSelect }>, now: Date): InvitationListRow {
+  const status = invitationStatus({ revokedAt: row.revokedAt, registeredAt: row.registeredAt, approval: row.approval, sentAt: row.sentAt, linkIssuedAt: row.linkIssuedAt, message: row.lastMessage }, now);
   return {
     id: row.id,
     email: row.email,
@@ -309,6 +316,7 @@ function serializeInvitationRow(row: Prisma.StaffInvitationGetPayload<{ select: 
     registeredAt: row.registeredAt?.toISOString() ?? null,
     confirmationCode: row.registration?.confirmationCode ?? null,
     usable: invitationUsable(row),
+    expired: status === "EXPIRED",
     reissuable: !row.registeredAt,
     reinvitable: invitationReinvitable(row),
     deliveryNote: status === "DELIVERY_FAILED" ? (row.lastMessage?.lastError?.slice(0, 200) ?? "The email did not reach this address.") : null,
@@ -319,14 +327,14 @@ function serializeInvitationRow(row: Prisma.StaffInvitationGetPayload<{ select: 
  * One page of the event's invitations, searched, filtered and ordered in the database (#1492). `counts` are the whole event's
  * invitations by status (the filter's own options); `total` is how many match the filters, across every page.
  */
-export async function listInvitations(eventId: string, query: InvitationListQuery = DEFAULT_INVITATION_QUERY) {
+export async function listInvitations(eventId: string, query: InvitationListQuery = DEFAULT_INVITATION_QUERY, now = new Date()) {
   await requireEvent(getPrisma(), eventId);
   const prisma = getPrisma();
-  const where = buildInvitationWhere(eventId, query.filters) as Prisma.StaffInvitationWhereInput;
+  const where = buildInvitationWhere(eventId, query.filters, { now }) as Prisma.StaffInvitationWhereInput;
   const eventWhere = { eventId, supersededAt: null };
   const [total, ...statusCounts] = await Promise.all([
     prisma.staffInvitation.count({ where }),
-    ...INVITATION_STATUSES.map((status) => prisma.staffInvitation.count({ where: { ...eventWhere, ...invitationStatusWhere(status) } as Prisma.StaffInvitationWhereInput })),
+    ...INVITATION_STATUSES.map((status) => prisma.staffInvitation.count({ where: { ...eventWhere, ...invitationStatusWhere(status, now) } as Prisma.StaffInvitationWhereInput })),
   ]);
   const counts = Object.fromEntries(INVITATION_STATUSES.map((status, index) => [status, statusCounts[index] ?? 0])) as Record<InvitationStatus, number>;
   const page = clampPage(query.page, total, INVITATION_PAGE_SIZE);
@@ -335,7 +343,7 @@ export async function listInvitations(eventId: string, query: InvitationListQuer
   if (query.sort.key === "status") {
     // A status is worked out from several columns, so the status order is a window over one query per status (#1492).
     const statuses = invitationStatusSortOrder(query.sort.dir).filter((status) => query.filters.status === "ALL" || status === query.filters.status);
-    const runs = statuses.map((status) => buildInvitationWhere(eventId, { ...query.filters, status }) as Prisma.StaffInvitationWhereInput);
+    const runs = statuses.map((status) => buildInvitationWhere(eventId, { ...query.filters, status }, { now }) as Prisma.StaffInvitationWhereInput);
     const runCounts = await Promise.all(runs.map((runWhere) => prisma.staffInvitation.count({ where: runWhere })));
     const orderBy = invitationOrderBy(query.sort).map((order) => ({ ...order })) as Prisma.StaffInvitationOrderByWithRelationInput[];
     const parts = await Promise.all(segmentWindows(runCounts, skip, INVITATION_PAGE_SIZE).map((window) => prisma.staffInvitation.findMany({
@@ -352,7 +360,7 @@ export async function listInvitations(eventId: string, query: InvitationListQuer
     });
   }
   return {
-    rows: rows.map(serializeInvitationRow),
+    rows: rows.map((row) => serializeInvitationRow(row, now)),
     counts,
     total,
     page,
@@ -383,12 +391,15 @@ async function invitationsById(tx: Tx | ReturnType<typeof getPrisma>, eventId: s
 }
 
 /** The personal link, to copy and hand over. Audited, because it is a credential. */
-export async function copyInvitationLink(eventId: string, actorUserId: string, invitationId: string) {
+export async function copyInvitationLink(eventId: string, actorUserId: string, invitationId: string, now = new Date()) {
   await requireEvent(getPrisma(), eventId);
   const invitation = await getPrisma().staffInvitation.findFirst({ where: { id: invitationId, eventId } });
   if (!invitation) throw new StaffInvitationError("INVITATION_NOT_FOUND", "That invitation could not be found.");
   if (!invitationUsable(invitation)) {
     throw new StaffInvitationError("INVITATION_UNAVAILABLE", invitation.revokedAt ? "That link was revoked. Reissue it to get a new one." : "That person has already registered.");
+  }
+  if (invitationLinkExpired(invitation, now)) {
+    throw new StaffInvitationError("INVITATION_UNAVAILABLE", "That link has expired. Send it again or reissue it to get a new one.");
   }
   await getPrisma().auditLog.create({
     data: {
@@ -433,12 +444,12 @@ export async function revokeInvitations(eventId: string, actorUserId: string, id
  * A fresh link for someone whose link was revoked, lost or sent to the wrong place. Every earlier copy stops working, the
  * invitation goes back to "not sent", and nothing is emailed. Not for someone who already registered.
  */
-export async function reissueInvitation(eventId: string, actorUserId: string, invitationId: string) {
+export async function reissueInvitation(eventId: string, actorUserId: string, invitationId: string, now = new Date()) {
   await requireEvent(getPrisma(), eventId);
   const updated = await getPrisma().$transaction(async (tx) => {
     const guarded = await tx.staffInvitation.updateMany({
       where: { id: invitationId, eventId, registeredAt: null, supersededAt: null },
-      data: { linkVersion: { increment: 1 }, revokedAt: null, sentAt: null, lastMessageId: null },
+      data: { linkVersion: { increment: 1 }, linkIssuedAt: now, revokedAt: null, sentAt: null, lastMessageId: null },
     });
     if (guarded.count === 0) {
       const exists = await tx.staffInvitation.findFirst({ where: { id: invitationId, eventId }, select: { id: true } });
@@ -590,16 +601,20 @@ export async function sendInvitations(eventId: string, actorUserId: string, inpu
     const suppressed = holdNote !== null;
     const correlationId = randomUUID();
     for (const invitation of toSend) {
+      // A link past its 14 days stays dead: sending again moves to a new link version and the email carries that one. A link
+      // still inside its window keeps its link and the window restarts. Either way the person receives a link that opens.
+      const renewed = invitationLinkExpired(invitation, now);
+      const linkVersion = invitation.linkVersion + (renewed ? 1 : 0);
       const content = invitationEmail({
         eventName: event.name,
         firstName: invitation.firstName,
         group: invitation.group,
-        url: invitationUrl(baseUrl(), invitationToken(invitation)),
+        url: invitationUrl(baseUrl(), invitationToken({ id: invitation.id, linkVersion })),
         supportContact: event.supportContact,
       });
       const guarded = await tx.staffInvitation.updateMany({
-        where: { id: invitation.id, sendCount: invitation.sendCount, registeredAt: null, revokedAt: null },
-        data: { sendCount: { increment: 1 }, sentAt: now },
+        where: { id: invitation.id, sendCount: invitation.sendCount, linkVersion: invitation.linkVersion, registeredAt: null, revokedAt: null },
+        data: { sendCount: { increment: 1 }, sentAt: now, linkIssuedAt: now, ...(renewed ? { linkVersion: { increment: 1 } } : {}) },
       });
       if (guarded.count === 0) throw new StaffInvitationError("SEND_COUNT_CHANGED", "A link changed while sending. Nothing was sent. Preview again.");
       const message = await tx.messageOutbox.create({
@@ -779,6 +794,8 @@ export function eventAcceptsInvitationRegistration(event: Pick<InviteEvent, "isP
 export type InvitationExperience =
   | { state: "UNAVAILABLE" }
   | { state: "REGISTERED"; event: { name: string } }
+  /** A genuine link whose 14 days ran out before the person registered (#1787). */
+  | { state: "EXPIRED"; event: { name: string; supportContact: string | null } }
   | {
       state: "OPEN";
       event: { name: string; slug: string; startsOn: string; endsOn: string; timezone: string; supportContact: string | null };
@@ -792,6 +809,7 @@ export async function getInvitationExperience(token: string, now = new Date()): 
   const invitation = await loadByToken(getPrisma(), token);
   if (!invitation || invitation.revokedAt || !eventAcceptsInvitationRegistration(invitation.event, now)) return { state: "UNAVAILABLE" };
   if (invitation.registeredAt) return { state: "REGISTERED", event: { name: invitation.event.name } };
+  if (invitationLinkExpired(invitation, now)) return { state: "EXPIRED", event: { name: invitation.event.name, supportContact: invitation.event.supportContact } };
   return {
     state: "OPEN",
     event: {
@@ -827,6 +845,7 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
   if (!forLink || forLink.revokedAt || forLink.registeredAt) {
     throw new StaffInvitationError(forLink?.registeredAt ? "INVITATION_USED" : "INVITATION_UNAVAILABLE", forLink?.registeredAt ? "This link has already been used to register." : INVITATION_UNAVAILABLE_MESSAGE);
   }
+  if (invitationLinkExpired(forLink, now)) throw new StaffInvitationError("INVITATION_EXPIRED", INVITATION_EXPIRED_MESSAGE);
   const eventForm = await loadEventFormDefinition(getPrisma(), forLink.eventId);
   if (input.answers.length > party.length) throw new StaffInvitationError("INVALID_PARTY", "There are more answer sets than people in the registration.");
   let childNumber = 0;
@@ -842,6 +861,7 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
     if (invitation.registeredAt) {
       throw new StaffInvitationError("INVITATION_USED", "This link has already been used to register.");
     }
+    if (invitationLinkExpired(invitation, now)) throw new StaffInvitationError("INVITATION_EXPIRED", INVITATION_EXPIRED_MESSAGE);
     const event = invitation.event;
     const eventStartDate = calendarDateInEventTimeZone(event.startsAt, event.timezone);
     const holder = await tx.person.upsert({
