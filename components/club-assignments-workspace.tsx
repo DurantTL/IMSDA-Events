@@ -1,5 +1,6 @@
 "use client";
 
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { ExactValue } from "@/components/exact-value";
 import { useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -259,13 +260,11 @@ export function ClubAssignmentsWorkspace({
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Club assignments</p>
-          <h2>{eventName}</h2>
-          <p>Set each club&rsquo;s campsite, duty, and activity. Directors see only what&rsquo;s set once you save it.</p>
-        </div>
-      </div>
+      <StaffPageHeader
+        description={canSend
+          ? `Campsite, duty and activity for each club at ${eventName}. You can change these. Directors see an assignment only once you save it, and get an email only after you preview and send it below (emails then wait in the Delivery log until they go out).`
+          : `Campsite, duty and activity for each club at ${eventName}. You can change these. Directors see an assignment only once you save it.`}
+      />
       {error && <p className="form-error"><CircleAlert aria-hidden="true" size={15} /> {error}</p>}
       <section className="panel">
         {assignments.length === 0 ? (

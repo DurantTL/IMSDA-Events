@@ -170,7 +170,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/finance/scholarship-fund", "/finance", "components/finance-workspace.tsx"],
   ["/finance/square-payments", "/finance", "components/finance-workspace.tsx"],
   ["/information-forms/responses", "/information-forms", "modules/information-forms/hub.ts"],
-  ["/more/clubs/reports", "/more/clubs", "app/(workspace)/more/clubs/page.tsx"],
+  ["/more/clubs/reports", "/more/clubs", "modules/club-rosters/event-clubs-views-model.ts"],
   ["/more/emergency-plan/print", "/more/emergency-plan", "components/emergency-plan-workspace.tsx"],
   ["/more/ledger-health", "/finance", "components/finance-workspace.tsx"],
   ["/more/honors/instructors", "/more/honors", "modules/honors/honors-views-model.ts"],

@@ -7,7 +7,7 @@ import {
 } from "@/modules/club-registrations/assignments-access";
 import { listClubAssignments } from "@/modules/club-registrations/assignments-repository";
 import { resolveClubOversight } from "@/modules/club-rosters/event-oversight";
-import { resolveEventContext } from "@/modules/events/selection";
+import { EventClubsViewsStrip } from "@/components/event-clubs-views-strip";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { NotAvailableForEvent } from "@/components/not-available-for-event";
 
@@ -21,10 +21,13 @@ export default async function ClubAssignmentsPage({
   searchParams: Promise<{ event?: string }>;
 }) {
   const requested = (await searchParams).event;
-  const { event, permissions } = await resolveEventContext(requested);
+  // The same event context as before, plus the oversight check the strip needs (#1582); nothing else is read.
+  const { event, permissions, allowed, clubEvent } = await resolveClubOversight(requested);
+  const strip = <EventClubsViewsStrip access={{ oversight: allowed, assignments: clubEvent && canManageClubAssignments(permissions) }} current="assignments" eventId={event.id} />;
   if (!canManageClubAssignments(permissions)) {
     return (
       <>
+        {strip}
         <AccessRestricted
           title="Club assignments are restricted"
           detail="Assigning campsites, duties, or activities needs registration-management access."
@@ -34,10 +37,10 @@ export default async function ClubAssignmentsPage({
     );
   }
   // Only club (church-billed) events have club registrations to assign.
-  const { clubEvent } = await resolveClubOversight(event.id);
   if (!clubEvent) {
     return (
       <>
+        {strip}
         <NotAvailableForEvent reason="This event doesn't take club registrations. Choose a club event to assign campsites, duties, and activities." />
       </>
     );
@@ -45,6 +48,7 @@ export default async function ClubAssignmentsPage({
   const assignments = await listClubAssignments(event.id);
   return (
     <>
+      {strip}
       <ClubAssignmentsWorkspace
         eventId={event.id}
         eventName={event.name}

@@ -41,7 +41,7 @@ export default async function EventClubReportPage({
   return (
     <section className="page-stack">
       <BackLink href={backHref} variant="staff">{backLabel}</BackLink>
-      <div className="page-intro"><div><p className="eyebrow">Monthly Record · view only</p><h2 translate="no">{club.name}</h2></div></div>
+      <div className="page-intro"><div><p className="eyebrow">{event.name} · Monthly Record · view only</p><h2 translate="no">{club.name}</h2></div></div>
       <ClubReportForm
         dueLabel={formatDueDate(reportDueDate(month))}
         endpoint="/api/admin/club-reports/view-only"
