@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EMAIL_FIELD_MESSAGE } from "@/lib/field-validation";
+import { ERROR_ID_PATTERN, RECENT_ERROR_ID_MAX } from "@/lib/recent-error-ids";
 import { honeypotFieldSchema } from "@/modules/security/honeypot";
 
 /**
@@ -71,6 +72,8 @@ export const problemReportDetailsSchema = z.object({
   viewport: z.string().regex(/^[1-9]\d{1,4}x[1-9]\d{1,4}$/).optional().catch(undefined),
   securityCheckBlocked: z.boolean().optional().catch(undefined),
   squareBlocked: z.boolean().optional().catch(undefined),
+  /** Recent error ids (digests) from the browser's own list, never messages. Invalid or too many: dropped. */
+  errorIds: z.array(z.string().regex(ERROR_ID_PATTERN)).max(RECENT_ERROR_ID_MAX).optional().catch(undefined),
 });
 
 export type ProblemReportDetails = z.infer<typeof problemReportDetailsSchema> & { appVersion?: string };
@@ -101,14 +104,17 @@ export type BrowserFacts = {
   /** True only while the card form's own "could not load" notice is showing; never while it is still loading. */
   squareLoadFailed: boolean;
   now: Date;
+  /** The recent error ids (digests only), newest first. */
+  errorIds?: string[];
 };
 
 /**
  * The details the popup sends. Built only from `BrowserFacts`: the page address (cleaned), the time, the browser, the
  * language, whether the browser's translation has rewritten the page, the window size, and whether the Security check or the card form reported
- * that it could not load. It never reads form fields, cookies, storage, headers or tokens.
+ * that it could not load, and up to 5 recent error ids (digests only). It never reads form fields, cookies, storage, headers or tokens.
  */
 export function buildProblemReportDetails(facts: BrowserFacts): ProblemReportDetails {
+  const ids = (facts.errorIds ?? []).filter((id) => ERROR_ID_PATTERN.test(id)).slice(0, RECENT_ERROR_ID_MAX);
   return {
     path: sanitizePagePath(facts.href),
     clientTime: facts.now.toISOString(),
@@ -118,5 +124,6 @@ export function buildProblemReportDetails(facts: BrowserFacts): ProblemReportDet
     viewport: `${Math.round(facts.innerWidth)}x${Math.round(facts.innerHeight)}`,
     securityCheckBlocked: facts.securityCheckLoadFailed,
     squareBlocked: facts.squareLoadFailed,
+    ...(ids.length > 0 ? { errorIds: ids } : {}),
   };
 }

@@ -37,6 +37,7 @@ export function problemReportAlertDetail(details: ProblemReportDetails | null): 
     details.translation === "on" ? "Page translated" : null,
     details.securityCheckBlocked ? "Security check did not load" : null,
     details.squareBlocked ? "Card form did not load" : null,
+    details.errorIds?.length ? `Error ids ${details.errorIds.join(", ")}` : null,
     details.appVersion ? `Version ${details.appVersion}` : null,
   ].filter(Boolean);
   return parts.join(". ");

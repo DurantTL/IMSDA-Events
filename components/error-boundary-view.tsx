@@ -2,6 +2,7 @@
 
 import { ExactValue } from "@/components/exact-value";
 import { useEffect } from "react";
+import { recordErrorId } from "@/lib/recent-error-ids";
 import { CircleAlert, RotateCw } from "lucide-react";
 import { BrandLink } from "@/components/brand-link";
 import { DEFAULT_CLUB_HELP_EMAIL } from "@/modules/event-info-cards/help-email";
@@ -21,11 +22,13 @@ type ErrorBoundaryViewProps = {
 
 /**
  * Branded error state for a route segment. It never shows the error's message or
- * digest: the error is only logged to the console for whoever has the browser open.
+ * digest on the page. The error is logged to the console for whoever has the browser open, and only its digest (the
+ * server's error id, never the message) is kept in a short browser-side list for the problem report's technical details (#1715).
  */
 export function ErrorBoundaryView({ error, retry, variant }: ErrorBoundaryViewProps) {
   useEffect(() => {
     console.error(error);
+    recordErrorId(error.digest);
   }, [error]);
 
   const Heading = variant === "workspace" ? "h2" : "h1";
