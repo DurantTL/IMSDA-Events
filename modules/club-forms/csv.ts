@@ -26,7 +26,7 @@ export async function buildClubFormsCsv(
   // A key that was sensitive in any version stays out of the file.
   const versions = await listClubFormTemplateVersions(template, prisma);
   const sensitive = new Set(versions.flatMap((version) => version.sensitiveFieldKeys));
-  // School type and church membership (#1668) are in the file only for a system administrator.
+  // School type and church membership (#1668, #1778) are in the file for system administrators and Clubs Administrators.
   if (!viewerCanSeeSchoolDetails(viewer, null)) for (const key of schoolDetailFieldKeysFor(template.key)) sensitive.add(key);
   const columns = exportColumnsAcrossVersions(versions, sensitive);
 

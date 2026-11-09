@@ -420,16 +420,18 @@ export function schoolDetailFieldKeysFor(templateKey: string | undefined): reado
 }
 
 /**
- * School type and church membership answers (#1668): the club's own director or deputy and system administrators. Not an
- * Area Coordinator, an Event Admin, or a Clubs Administrator who is not a system administrator, whether reading as
- * themselves or acting as the club's director.
+ * School type and church membership answers (#1668, #1778): the club's own director or deputy, system administrators,
+ * and, view only, Clubs Administrators and Area Coordinators (every club until #843 decides area assignment), matching
+ * the roster (#1758). Not an Event Admin, another club's leader, or a Clubs Administrator acting as the club's director
+ * (that mode can edit, and this decision is view only).
  */
 export function viewerCanSeeSchoolDetails(viewer: ClubFormsViewer, organizationId: string | null) {
   if (viewer.kind === "CLUB_LEADER") {
     const viaClubsAdministrator = viewer.actor.kind === "STAFF_ACTING" && viewer.actor.viaClubsAdministrator === true;
     return organizationId !== null && viewer.organizationId === organizationId && !viaClubsAdministrator;
   }
-  return viewer.kind === "STAFF" && viewer.systemAdmin;
+  if (viewer.kind === "AREA_COORDINATOR") return true;
+  return viewer.systemAdmin || viewer.clubsAdministrator;
 }
 
 /**

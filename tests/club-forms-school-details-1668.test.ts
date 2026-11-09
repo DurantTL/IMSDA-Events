@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * School type and church membership answers on the Membership Application (#1668): the club's own director and deputy and
- * system administrators read them; Area Coordinators, Event Admins and a Clubs Administrator who is not a system
- * administrator see "Restricted" on the form and nothing in the CSV. Real seed, synthetic people only.
+ * School type and church membership answers on the Membership Application (#1668, #1778): the club's own director and
+ * deputy and system administrators read them, and so do Area Coordinators and Clubs Administrators, view only (matching
+ * the roster, #1758). Event Admins, another club's director and a Clubs Administrator acting as director see "Restricted"
+ * on the form and nothing in the CSV. Real seed, synthetic people only.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -28,7 +29,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 import { rosterSchoolDetailsVisible } from "@/modules/club-rosters/school-details-access";
 import { buildClubFormsCsv } from "@/modules/club-forms/csv";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
-import { parseClubFormTemplate, restrictedFieldKeys, type ClubFormsViewer } from "@/modules/club-forms/domain";
+import { parseClubFormTemplate, restrictedFieldKeys, viewerCanWriteForClub, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { rosterPrefillFromAnswers } from "@/modules/club-forms/roster-mapping";
 import { getSubmissionForViewer } from "@/modules/club-forms/submissions";
 
@@ -77,9 +78,9 @@ describe("which viewers may read school type and church membership on a form", (
     ["a system administrator acting as the director", sysAdminActingAsLeader, "club-a", []],
     ["a system administrator", sysAdmin, "club-a", []],
     ["another club's director", otherClubLeader, "club-a", SCHOOL],
-    ["an Area Coordinator", areaCoordinator, "club-a", SCHOOL],
+    ["an Area Coordinator (view only, #1778)", areaCoordinator, "club-a", []],
     ["an Event Admin", eventAdmin, "club-a", SCHOOL],
-    ["a Clubs Administrator", clubsAdmin, "club-a", SCHOOL],
+    ["a Clubs Administrator (view only, #1778)", clubsAdmin, "club-a", []],
     ["a Clubs Administrator acting as the director", clubsAdminActingAsLeader, "club-a", SCHOOL],
   ] as const)("%s: restricted keys %j", (_label, viewer, organizationId, expected) => {
     const restricted = restrictedFieldKeys(viewer, organizationId, template).filter((key) => SCHOOL.includes(key));
@@ -88,22 +89,25 @@ describe("which viewers may read school type and church membership on a form", (
 });
 
 describe("the form view (Area Coordinator and staff pages)", () => {
-  it("shows an Area Coordinator Restricted and none of the values", async () => {
-    const seen = await getSubmissionForViewer(areaCoordinator, "sub-1");
-    expect(seen.restrictedKeys).toEqual(expect.arrayContaining(SCHOOL));
-    expect(seen.answers).not.toHaveProperty("school_type");
-    expect(seen.answers).not.toHaveProperty("church_member");
-    expect(seen.answers).toMatchObject({ full_name: "Riley Sample", grade: "7th" });
-    expect(JSON.stringify(seen.answers)).not.toMatch(/Public school|Not sure/);
+  it("gives the new viewers (#1778) no way to write: only the club's own leaders save a form", () => {
+    expect(viewerCanWriteForClub(areaCoordinator, "club-a")).toBe(false);
+    expect(viewerCanWriteForClub(clubsAdmin, "club-a")).toBe(false);
+    expect(viewerCanWriteForClub(leader, "club-a")).toBe(true);
   });
 
-  it.each([["an Event Admin", eventAdmin], ["a Clubs Administrator", clubsAdmin], ["a Clubs Administrator acting as director", clubsAdminActingAsLeader]])("hides the values from %s", async (_label, viewer) => {
+  it.each([["an Event Admin", eventAdmin], ["a Clubs Administrator acting as director", clubsAdminActingAsLeader]])("hides the values from %s", async (_label, viewer) => {
     const seen = await getSubmissionForViewer(viewer, "sub-1");
     expect(seen.answers).not.toHaveProperty("school_type");
     expect(seen.answers).not.toHaveProperty("church_member");
   });
 
-  it.each([["the club's director", leader], ["a system administrator", sysAdmin], ["a system administrator acting as director", sysAdminActingAsLeader]])("shows the values to %s", async (_label, viewer) => {
+  it.each([
+    ["the club's director", leader],
+    ["a system administrator", sysAdmin],
+    ["a system administrator acting as director", sysAdminActingAsLeader],
+    ["an Area Coordinator (view only, #1778)", areaCoordinator],
+    ["a Clubs Administrator (view only, #1778)", clubsAdmin],
+  ])("shows the values to %s", async (_label, viewer) => {
     const seen = await getSubmissionForViewer(viewer, "sub-1");
     expect(seen.restrictedKeys.filter((key) => SCHOOL.includes(key))).toEqual([]);
     expect(seen.answers).toMatchObject({ school_type: "Public school", church_member: "Not sure" });
@@ -122,7 +126,7 @@ describe("the submissions CSV", () => {
     enteredVia: "LINK", answers, unlistedClubName: null, organization: { name: "Example Pathfinders" },
   }];
 
-  it.each([["an Event Admin", eventAdmin], ["a Clubs Administrator", clubsAdmin]])("leaves school type and church membership out for %s", async (_label, viewer) => {
+  it.each([["an Event Admin", eventAdmin]])("leaves school type and church membership out for %s", async (_label, viewer) => {
     mocks.submissionFindMany.mockResolvedValue(rows);
     const { csv } = await buildClubFormsCsv(viewer, { templateKey: membership.key });
     const header = csv.split("\r\n")[0];
@@ -132,9 +136,9 @@ describe("the submissions CSV", () => {
     expect(csv).toContain("Riley Sample");
   });
 
-  it("includes them for a system administrator", async () => {
+  it.each([["a system administrator", sysAdmin], ["a Clubs Administrator (#1778)", clubsAdmin]])("includes them for %s", async (_label, viewer) => {
     mocks.submissionFindMany.mockResolvedValue(rows);
-    const { csv } = await buildClubFormsCsv(sysAdmin, { templateKey: membership.key });
+    const { csv } = await buildClubFormsCsv(viewer, { templateKey: membership.key });
     expect(csv.split("\r\n")[0]).toContain("School type");
     expect(csv).toContain("Public school");
     expect(csv).toContain("Not sure");
