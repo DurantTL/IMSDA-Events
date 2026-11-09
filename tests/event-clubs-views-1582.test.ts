@@ -55,10 +55,23 @@ describe("eventClubsSummary (#1582)", () => {
   it("counts clubs, teams and people in their own units, and Sterling once per person, not per team", () => {
     const items = eventClubsSummary({
       clubs: [club("a", "Team One", 5), club("a", "Team Two", 4), club("b", null, 7)],
-      backgroundFlags: { people: [{}, {}] },
+      backgroundFlags: { people: [{ personId: "p1", organizationId: "a" }, { personId: "p2", organizationId: "b" }] },
     });
     expect(items.map((item) => [item.key, item.value])).toEqual([["clubs", 2], ["teams", 2], ["going", 16], ["sterling", 2]]);
     expect(items.find((item) => item.key === "sterling")?.label).toBe("adults need Sterling Volunteers");
+  });
+
+  it("counts an adult on two teams' registrations once, skips rows without a club, and matches the table's total", () => {
+    const people = [
+      { personId: "p1", organizationId: "a" }, { personId: "p1", organizationId: "a" },
+      { personId: "p2", organizationId: "a" }, { personId: "p3", organizationId: null },
+    ];
+    const items = eventClubsSummary({ clubs: [club("a", "Team One", 2), club("a", "Team Two", 2)], backgroundFlags: { people } });
+    expect(items.find((item) => item.key === "sterling")?.value).toBe(2);
+    // The table's per-club count (rows with an organizationId) summed over clubs, with each person once.
+    const perClub = new Map<string, Set<string>>();
+    for (const person of people) if (person.organizationId) perClub.set(person.organizationId, (perClub.get(person.organizationId) ?? new Set()).add(person.personId));
+    expect([...perClub.values()].reduce((sum, set) => sum + set.size, 0)).toBe(2);
   });
 
   it("leaves out teams when no club has them, and Sterling when the event does not check adults", () => {

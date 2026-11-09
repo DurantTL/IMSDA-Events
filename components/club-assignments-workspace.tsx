@@ -262,7 +262,7 @@ export function ClubAssignmentsWorkspace({
     <section className="page-stack">
       <StaffPageHeader
         description={canSend
-          ? `Campsite, duty and activity for each club at ${eventName}. You can change these. Directors see an assignment only once you save it, and get an email only when you preview and send it below.`
+          ? `Campsite, duty and activity for each club at ${eventName}. You can change these. Directors see an assignment only once you save it, and get an email only after you preview and send it below (emails then wait in the Delivery log until they go out).`
           : `Campsite, duty and activity for each club at ${eventName}. You can change these. Directors see an assignment only once you save it.`}
       />
       {error && <p className="form-error"><CircleAlert aria-hidden="true" size={15} /> {error}</p>}

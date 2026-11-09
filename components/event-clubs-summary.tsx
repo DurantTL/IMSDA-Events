@@ -7,7 +7,7 @@ export function EventClubsSummary(input: EventClubsSummaryInput) {
   return (
     <ul className={styles.row} aria-label="Summary" data-testid="event-clubs-summary">
       {items.map((item) => (
-        <li key={item.key} className={styles.item} data-summary={item.key}>
+        <li key={item.key} data-summary={item.key}>
           <strong>{item.value}</strong> {item.label}
         </li>
       ))}

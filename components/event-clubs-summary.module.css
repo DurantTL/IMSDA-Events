@@ -1,17 +1,10 @@
 .row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
+  gap: 4px 20px;
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.item {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  padding: 8px 12px;
   color: var(--muted);
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
