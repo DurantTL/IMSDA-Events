@@ -4,7 +4,10 @@ import { ExportLink } from "@/components/export-link";
 import { ExactValue } from "@/components/exact-value";
 import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Download, Mail, Printer, RefreshCw, Trophy } from "lucide-react";
+import { CheckCircle2, Download, Mail, Printer, RefreshCw } from "lucide-react";
+import { StaffPageHeader } from "@/components/staff-page-header";
+import { StaffViewStrip } from "@/components/staff-view-strip";
+import type { RowView } from "@/components/staff-tab-row-model";
 import { TEAM_LEVELS, teamLabel, teamLevelLabels, type TeamLevel, type TeamLevelInfo } from "@/modules/club-teams/domain";
 import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -18,6 +21,16 @@ import {
   type TeamResultView,
   type TeamResultsRow,
 } from "@/modules/club-teams/results-domain";
+
+/** The Area, Conference and Union links as a view strip (#1580): the counts stay in the labels, the hrefs are unchanged. */
+export function teamLevelViews(eventId: string, rows: TeamResultsRow[], level: TeamLevel): RowView[] {
+  return TEAM_LEVELS.map((each) => ({
+    key: each,
+    label: `${teamLevelLabels[each]} (${teamsAtLevel(rows, each).length})`,
+    href: `/more/team-results?event=${encodeURIComponent(eventId)}&level=${each}`,
+    ...(each === level ? { current: true } : {}),
+  }));
+}
 
 type Draft = { placementRank: string; advanceOverride: "" | "yes" | "no"; notes: string };
 
@@ -296,23 +309,8 @@ export function TeamResultsWorkspace({
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Club registration</p>
-          <h2><Trophy aria-hidden="true" size={18} /> Team results</h2>
-          <p>
-            One event, three levels. Teams register once, for their Area. 1st and 2nd place at a level advance to the next, ties included, unless you decide otherwise.
-            A team that does not advance never appears at the next level.
-          </p>
-        </div>
-      </div>
-      <nav className="team-level-tabs tab-chips" aria-label="Level">
-        {TEAM_LEVELS.map((each) => (
-          <Link aria-current={each === level ? "page" : undefined} href={`/more/team-results?${eventQuery}&level=${each}`} key={each}>
-            {teamLevelLabels[each]} ({teamsAtLevel(rows, each).length})
-          </Link>
-        ))}
-      </nav>
+      <StaffPageHeader description="One event, three levels. Teams register once, for their Area. 1st and 2nd place at a level advance to the next, ties included, unless you decide otherwise. A team that does not advance never appears at the next level." />
+      <StaffViewStrip label="Level" views={teamLevelViews(eventId, rows, level)} />
       <section className="panel" aria-labelledby="team-level-heading">
         <h3 id="team-level-heading">{teamLevelLabels[level]} level · {teams.length} {teams.length === 1 ? "team" : "teams"}</h3>
         {level !== "AREA" && (

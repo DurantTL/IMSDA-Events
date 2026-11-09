@@ -1,0 +1,81 @@
+.switch {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.switch button {
+  min-height: 44px;
+  min-width: 44px;
+  border: 0;
+  background: #fff;
+  padding: 0 16px;
+  color: var(--ink);
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.switch button + button { border-left: 1px solid var(--line); }
+.switch button[aria-pressed="true"] { background: var(--navy, #002336); color: #fff; }
+
+.agenda { display: grid; gap: 18px; }
+
+.group { display: grid; gap: 8px; min-width: 0; }
+
+.group h3 {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.item {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.item strong, .item p, .item span { overflow-wrap: anywhere; }
+.item p { margin: 0; }
+
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+
+.item :global(.schedule-chip) { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.empty { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.item button { justify-self: start; min-height: 44px; }
+
+.dialogBody { display: grid; gap: 14px; }
+
+.dialogSite { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+
+.places { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+
+.place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.place span { min-width: 0; overflow-wrap: anywhere; }
+.place button { min-height: 44px; }
+.reason { color: var(--muted); }

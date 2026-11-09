@@ -6,6 +6,9 @@ import Link from "next/link";
 import { savedMessage } from "@/components/form-message";
 import { GripVertical, MoveRight, Pencil, Plus, Save, Trash2, TriangleAlert, Users, X } from "lucide-react";
 import { staffPageTitles } from "@/components/staff-navigation";
+import { StaffPageHeader } from "@/components/staff-page-header";
+import { HonorsMoveDialog, HonorsScheduleAgenda } from "@/components/honors-schedule-agenda";
+import agendaStyles from "@/components/honors-schedule-agenda.module.css";
 import { useEditedForms } from "@/components/use-edited-forms";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
@@ -40,6 +43,9 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  // Agenda on a phone or tablet, the board on a wide screen; either can be chosen (#1580).
+  const [mode, setMode] = useState<"board" | "agenda">("board");
+  const [moveCardId, setMoveCardId] = useState<string | null>(null);
   const requestRef = useRef(0);
   // The add-room form of each site and the open edit-room form are unsaved when a field is off what it opened with (a blank
   // name and 20 seats, or the room's own). Adding or saving a room clears it; closing the edit form takes it off the page (#1468).
@@ -56,6 +62,14 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
   const hasSites = board.sites.length > 0;
 
   useEffect(() => {
+    // Decided once, after mount (the server can't know the screen); the switch overrides it either way.
+    const frame = window.requestAnimationFrame(() => {
+      if (window.matchMedia("(max-width: 1023.98px)").matches) setMode("agenda");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
     if (!selected) return undefined;
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
@@ -70,7 +84,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
 
   /** Puts keyboard focus back on a class's Move button once the board has re-rendered. */
   function focusMove(id: string) {
-    window.setTimeout(() => document.getElementById(`sb-move-${id}`)?.focus(), 0);
+    window.setTimeout(() => (document.getElementById(`sb-move-${id}`) ?? document.getElementById(`sb-agenda-move-${id}`))?.focus(), 0);
   }
 
   async function call(url: string, method: string, body: unknown) {
@@ -106,6 +120,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
     }
     const sessionChange = card.span === "SINGLE_SESSION" && target.column !== card.sessionId ? { sessionId: target.column } : {};
     setSelectedId(null);
+    setMoveCardId(null);
     const ok = await call(`${base}/offerings/${encodeURIComponent(card.id)}/move`, "POST", { roomId: target.roomId, ...sessionChange });
     if (ok) {
       const where = [
@@ -175,20 +190,18 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
   return (
     <section className="page-stack schedule-board">
       {confirmDialog}
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Honors Weekend</p>
-          <h2 className="duplicate-page-title">{staffPageTitles.honorsSchedule}</h2>
-          <p>
-            Rooms down the side, sessions across the top. Drag a class to another room or session, or choose Move on a class and then Move
-            here. A move never changes who is enrolled: it is refused if the room is too small or busy, or if enrolled people would land in a session
-            where they already hold another class.
-          </p>
-        </div>
-        <div className="intro-actions">
-          <span className="count-badge">{board.cards.length} classes</span>
-        </div>
-      </div>
+      <StaffPageHeader
+        description="Rooms down the side, sessions across the top. Drag a class to another room or session, or choose Move on a class and then Move here. A move never changes who is enrolled: it is refused if the room is too small or busy, or if enrolled people would land in a session where they already hold another class."
+        extra={
+          <>
+            <span className="count-badge">{board.cards.length} classes</span>
+            <div aria-label="Schedule view" className={agendaStyles.switch} role="group">
+              <button aria-pressed={mode === "board"} onClick={() => setMode("board")} type="button">Board</button>
+              <button aria-pressed={mode === "agenda"} onClick={() => { setMode("agenda"); setSelectedId(null); }} type="button">Agenda</button>
+            </div>
+          </>
+        }
+      />
 
       <ul className="schedule-legend" aria-label="What the colors and labels mean">
         <li><span className="schedule-chip is-nearly">Nearly full</span> 80% of the seats or more</li>
@@ -209,6 +222,15 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
+      <HonorsMoveDialog
+        busy={busy}
+        card={moveCardId ? cardById.get(moveCardId) ?? null : null}
+        onClose={() => setMoveCardId(null)}
+        onMove={(card, target) => void move(card, target)}
+        sections={sections}
+        targetProblem={targetProblem}
+      />
+
       {sections.map((section) => {
         const siteKey = section.siteId ?? "none";
         const columns = [...section.sessions.map((session) => ({ key: session.id, name: session.name })), { key: ALL_SESSIONS_COLUMN, name: "All sessions" }];
@@ -223,6 +245,9 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
               <span className="count-badge">{sectionRooms.length} rooms</span>
             </div>
             {section.sessions.length === 0 && <p className="field-help">This site has no sessions yet. Add them on the class setup page.</p>}
+            {mode === "agenda" ? (
+              <HonorsScheduleAgenda busy={busy} clashes={clashes} onOpenMove={(card) => { setError(""); setMoveCardId(card.id); }} section={section} />
+            ) : (
             <div
               aria-label={`Schedule for ${section.name}. Scrolls sideways.`}
               className="schedule-scroll"
@@ -256,6 +281,7 @@ export function HonorsScheduleBoard({ eventId, initialBoard }: { eventId: string
                 ))}
               </div>
             </div>
+            )}
 
             <details className="schedule-rooms">
               <summary>Rooms at {section.name}</summary>

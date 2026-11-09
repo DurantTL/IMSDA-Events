@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
+import { HonorsViewsStrip } from "@/components/honors-views-strip";
 import { HonorsSetupWorkspace } from "@/components/honors-setup-workspace";
 import { HonorWaitlistSettings } from "@/components/honor-waitlist-settings";
 import { HonorWatchPanel } from "@/components/honor-watch-panel";
@@ -17,6 +18,7 @@ export default async function HonorsSetupPage({ searchParams }: { searchParams: 
   if (!permissions.includes("CONFIGURE_EVENT")) {
     return (
       <>
+        <HonorsViewsStrip current="classes" eventId={event.id} permissions={permissions} />
         <AccessRestricted title="Honors setup is restricted" detail="Event administrators set up the sessions and honor classes each Honors Weekend site offers." whoToAsk="your event administrator" />
       </>
     );
@@ -25,6 +27,7 @@ export default async function HonorsSetupPage({ searchParams }: { searchParams: 
   const watchedHonorIds = new Set(watches.watches.flatMap((watch) => watch.honorIds));
   return (
     <>
+      <HonorsViewsStrip current="classes" eventId={event.id} permissions={permissions} />
       <HonorsSetupWorkspace
         catalog={honors.filter((honor) => honor.isActive).map(({ id, code, name }) => ({ id, code, name }))}
         eventId={event.id}

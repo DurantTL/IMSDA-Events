@@ -2,6 +2,7 @@
 
 import { ExactValue } from "@/components/exact-value";
 import { useConfirm } from "@/components/use-confirm";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
 import { Ban, Save, Send, UserPlus } from "lucide-react";
 import { savedMessage } from "@/components/form-message";
@@ -33,13 +34,11 @@ const statusTone = { INVITED: "gold", ACCEPTED: "green", REMOVED: "coral" } as c
  */
 export function HonorsInstructorsWorkspace({
   eventId,
-  eventName,
   classes,
   initialInstructors,
   emailConfigured,
 }: {
   eventId: string;
-  eventName: string;
   classes: ClassOption[];
   initialInstructors: Instructor[];
   emailConfigured: boolean;
@@ -106,18 +105,14 @@ export function HonorsInstructorsWorkspace({
   return (
     <section className="page-stack">
       {confirmDialog}
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Honors Weekend</p>
-          <h2>Instructors for {eventName}</h2>
-          <p>
-            Choose who teaches each class and invite them by email. After accepting from their own account, an instructor sees
-            only their own classes: each person&apos;s name and club, nothing else. They can mark attendance and completion
-            until {INSTRUCTOR_EDIT_GRACE_DAYS} days after the event ends, and an instructor whose Sterling Volunteers check isn&apos;t current still sees the roster, with a warning; a &quot;!&quot; beside their name tells you to follow up.
-            Completed honors go into members&apos; honor records; staff can void one from the honor record if it was a mistake.
-          </p>
-        </div>
-      </div>
+      <StaffPageHeader
+        description={<>
+          Choose who teaches each class and invite them by email. After accepting from their own account, an instructor sees
+          only their own classes: each person&apos;s name and club, nothing else. They can mark attendance and completion
+          until {INSTRUCTOR_EDIT_GRACE_DAYS} days after the event ends, and an instructor whose Sterling Volunteers check isn&apos;t current still sees the roster, with a warning; a &quot;!&quot; beside their name tells you to follow up.
+          Completed honors go into members&apos; honor records; staff can void one from the honor record if it was a mistake.
+        </>}
+      />
 
       {!emailConfigured && <div className="inline-notice error" role="status">Account email isn&apos;t set up on this server, so invites can&apos;t be emailed yet.</div>}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}

@@ -127,8 +127,8 @@ describe("link-chip bars became one Tools menu without losing a destination", ()
     expect(source).not.toContain("report-actions");
   });
 
-  it("/more/honors keeps the Schedule board, Rosters and Instructors, and /check-in keeps its three print and issue links", () => {
-    const honors = read("components/honors-setup-workspace.tsx");
+  it("/more/honors reaches the Schedule board, Rosters and Instructors through the Honors Weekend pages strip (#1580), and /check-in keeps its three print and issue links", () => {
+    const honors = read("modules/honors/honors-views-model.ts");
     for (const path of ["/more/honors/schedule", "/more/honors/rosters", "/more/honors/instructors"]) expect(honors, path).toContain(path);
     const checkIn = read("components/check-in-workspace.tsx");
     for (const path of ["/check-in/passes", "/check-in/badges", "/check-in/assets"]) expect(checkIn, path).toContain(`\`${path}?event=`);
