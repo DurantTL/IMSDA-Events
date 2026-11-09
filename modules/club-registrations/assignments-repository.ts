@@ -209,11 +209,6 @@ function assignmentPublicFields(row: {
 }
 
 /**
- * The read-only view for a club director on their own event page, and for
- * the club packet (#411) print helper. Returns null when staff haven't set
- * anything yet, so an empty section is never shown.
- */
-/**
  * Every assignment for one club at one event, one per live team registration (submitted or confirmed, the same rule as
  * `isClubRegisteredForEvent`), for the staff club page (#1782). A club registered as a named team (#809) has its
  * assignment on that team's registration, so a lookup by the empty team key alone never finds it. Unassigned rows are
@@ -237,6 +232,11 @@ export async function listClubAssignmentsForClub(eventId: string, organizationId
   });
 }
 
+/**
+ * The read-only view for a club director on their own event page, and for
+ * the club packet (#411) print helper. Returns null when staff haven't set
+ * anything yet, so an empty section is never shown.
+ */
 export async function getClubAssignmentForClub(eventId: string, organizationId: string, teamKey = "") {
   const row = await getPrisma().clubEventAssignment.findFirst({
     where: { eventId, organizationId, clubEventRegistration: { teamKey } },
