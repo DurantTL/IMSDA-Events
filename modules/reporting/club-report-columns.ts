@@ -8,7 +8,7 @@
  * contacts and birth dates are never offered to anyone here.
  */
 import { formatPersonName } from "@/lib/person-name";
-import type { ClubEventRecord } from "@/modules/reporting/club-event-reports";
+import { attendeeRoleLabel, type ClubEventRecord } from "@/modules/reporting/club-event-reports";
 
 /**
  * Who may be offered a column:
@@ -168,7 +168,7 @@ export function buildClubReportTable(
       case "location": return club.locationName ?? "";
       case "confirmation": return club.confirmationCode;
       case "name": return entry.name;
-      case "role": return attendee.role ?? "";
+      case "role": return attendeeRoleLabel(attendee);
       case "age": return attendee.ageOnEventDate === null ? "" : String(attendee.ageOnEventDate);
       case "classLevel": return attendee.classLevel ?? "";
       case "ribbons": return yesNo(clubWantsRibbons(club.eventRibbons));

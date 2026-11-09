@@ -27,6 +27,7 @@ const client = {
     findMany: mocksExtra.reportFindMany,
   },
   clubYearStanding: { findMany: mocksExtra.standingFindMany },
+  clubEventPointAward: { findMany: async () => [] },
   $transaction: (work: (tx: unknown) => unknown) => work(client),
 };
 

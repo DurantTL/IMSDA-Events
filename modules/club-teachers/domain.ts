@@ -79,6 +79,33 @@ export function canTeach(attendeeType: string): boolean {
   return (teacherAttendeeTypes as readonly string[]).includes(attendeeType);
 }
 
+/** Teachers are adults: 16- and 17-year-old staff are Pathfinders and TLTs, not adults (#1727). */
+export const youngestTeacherAge = 18;
+
+export type TeacherEligibility = "ok" | "under-18" | "age-unknown";
+
+/**
+ * Whether an adult or staff roster person may teach, from their whole-years age on the event's first day (the roster
+ * birth date, else the age a form reported). An unknown age is not eligible: the club is asked to add the birth date.
+ */
+export function teacherEligibility(age: number | null): TeacherEligibility {
+  if (age === null) return "age-unknown";
+  return age >= youngestTeacherAge ? "ok" : "under-18";
+}
+
+export const teacherUnderAgeLabel = "Under 18, can't teach";
+export const teacherAgeUnknownLabel = "Age needed, add a birth date on your roster";
+export const teacherAgeUnknownStaffLabel = "Age needed: the club must add a birth date";
+export const teacherUnderAgeMessage = "Teachers must be 18 or older. Remove anyone under 18 and name an adult instead.";
+export const teacherAgeUnknownMessage = "A teacher's age is needed. Add the birth date on your roster first.";
+
+/** The words for who is looking: the club director is told what to do; staff and coordinators are told the club must. */
+export function teacherEligibilityLabel(eligibility: TeacherEligibility, viewer: "club" | "staff" = "club"): string | null {
+  if (eligibility === "under-18") return teacherUnderAgeLabel;
+  if (eligibility === "age-unknown") return viewer === "staff" ? teacherAgeUnknownStaffLabel : teacherAgeUnknownLabel;
+  return null;
+}
+
 export const teacherEntriesSchema = z.object({
   teachers: z.array(z.object({
     rosterMemberId: z.string().trim().min(1).max(64),

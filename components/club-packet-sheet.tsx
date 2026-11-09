@@ -83,7 +83,7 @@ export function ClubPacketSheet({ packet, qrSrc }: { packet: ClubPacket; qrSrc: 
             <h3>Attendee roster · check-in list</h3>
             <p className="club-packet-key">
               <CheckSquare aria-hidden="true" size={12} /> Check in
-              &nbsp;·&nbsp;★ First-time camper &nbsp;·&nbsp;[M] Medical personnel &nbsp;·&nbsp;[MG] Master Guide investiture &nbsp;·&nbsp;⚠ Dietary restriction
+              &nbsp;·&nbsp;★ First-time camper &nbsp;·&nbsp;[M] Medical personnel &nbsp;·&nbsp;[MG] Master Guide investiture &nbsp;·&nbsp;⚠ Dietary restriction &nbsp;·&nbsp;YG Youth guest (not a Pathfinder)
             </p>
           </div>
           <ul className="club-packet-roster-columns">

@@ -7,6 +7,7 @@
 .details label { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
 .details input, .details select { min-height: 44px; }
 .hint { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.unavailableHeading { margin: 12px 0 4px; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .status { margin: 0; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .actions button { min-height: 44px; }

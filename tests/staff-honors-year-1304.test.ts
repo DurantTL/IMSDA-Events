@@ -44,7 +44,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-26T18:00:00Z"));
   mocks.listClubHonorsPage.mockResolvedValue([]);
   mocks.listClubTeam.mockResolvedValue([]); mocks.listRoster.mockResolvedValue([]); mocks.listClubEvents.mockResolvedValue([]);
-  mocks.getClubReportYear.mockResolvedValue({ reports: [], registrationOnTime: false });
+  mocks.getClubReportYear.mockResolvedValue({ reports: [], registrationOnTime: false, eventPoints: { total: 0, awards: [] } });
 });
 
 describe("staff Honors page year", () => {

@@ -48,7 +48,7 @@ import {
 function club(id: string, name: string, totalPoints: number): AreaClubSummary {
   return {
     id, name, church: "Test Church", directors: [], rosterSize: 10, adultCount: 3, registrationOnTime: true, submitted: 0, late: 0, drafts: 0, missing: 0,
-    lastReportMonth: null, reportPoints: totalPoints, totalPoints, months: [], backgroundChecks: { notInCompliance: 0, expiringSoon: 0, missing: 0 },
+    lastReportMonth: null, reportPoints: totalPoints, eventPoints: 0, eventAwards: [], totalPoints, months: [], backgroundChecks: { notInCompliance: 0, expiringSoon: 0, missing: 0 },
   } as unknown as AreaClubSummary;
 }
 

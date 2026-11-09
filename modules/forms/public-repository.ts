@@ -192,7 +192,7 @@ export type ClubSubmissionContext = {
       // the created attendee's profileSnapshot as `clubGuestId` so a later
       // reopen-and-amend (H3b, #366) can match this attendee back to the
       // same extra person instead of creating a duplicate.
-      guest?: { email: string | null; attendeeType: "ADULT" | "YOUTH" | "UNDERAGE"; guestId: string };
+      guest?: { email: string | null; attendeeType: "ADULT" | "YOUTH" | "UNDERAGE"; guestId: string; notPathfinder?: boolean };
     }>;
   }>;
 };
@@ -1380,7 +1380,7 @@ async function createPublicRegistrationTransaction(
             ...(clubAttendee.teamRole ? { teamRole: clubAttendee.teamRole } : {}),
             // For this event only: never on the club roster (#388).
             ...(clubAttendee.guest
-              ? { temporary: true, temporaryAttendeeType: clubAttendee.guest.attendeeType, clubGuestId: clubAttendee.guest.guestId }
+              ? { temporary: true, temporaryAttendeeType: clubAttendee.guest.attendeeType, clubGuestId: clubAttendee.guest.guestId, ...(clubAttendee.guest.notPathfinder ? { notPathfinder: true } : {}) }
               : {}),
           } : {}),
         },

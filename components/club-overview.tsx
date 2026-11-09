@@ -146,7 +146,7 @@ export async function ClubOverview({
         />
       )}
       <p className="club-year-tiles-points quiet-copy">
-        <FileText size={15} aria-hidden="true" /> {yearToDate(submittedReports, reportYear.registrationOnTime)} points this club year.
+        <FileText size={15} aria-hidden="true" /> {yearToDate(submittedReports, reportYear.registrationOnTime, reportYear.eventPoints.total)} points this club year{reportYear.eventPoints.total > 0 ? `, including ${reportYear.eventPoints.total.toLocaleString("en-US")} from events (${reportYear.eventPoints.awards.map((award) => award.eventName).join(", ")})` : ""}.
       </p>
 
       <section className="public-manage-card" aria-labelledby="open-club-team">
