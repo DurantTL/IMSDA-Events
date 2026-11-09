@@ -394,7 +394,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   return (
     <div className="fb-shell" data-phone={phone ? "true" : undefined} data-side={sidebarSide} data-sidebar={layout.sidebarVisible ? "shown" : "hidden"} data-inspector={inspectorOpen ? "open" : "closed"} style={topbarSize ? { ["--fb-topbar-height" as string]: `${topbarSize.height}px` } : undefined}>
       <header className="fb-topbar" ref={topbarRef}>
-        <Link className="fb-icon-button" href={information ? informationListHref(information) : `/event-setup?event=${encodeURIComponent(eventId)}`} aria-label={information ? "Back to information forms" : "Back to event setup"}><ChevronLeft size={18} aria-hidden="true" /></Link>
+        <Link className="fb-icon-button" href={information ? informationListHref(information) : `/overview?event=${encodeURIComponent(eventId)}`} aria-label={information ? "Back to information forms" : "Back to event overview"}><ChevronLeft size={18} aria-hidden="true" /></Link>
         {forms.length > 1
           ? <label className="fb-form-switch"><span className="sr-only">Form</span><select value={selectedFormId} onChange={(event) => { const form = forms.find((candidate) => candidate.id === event.target.value); if (form) void chooseForm(form); }}>{forms.map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label>
           : <span className="fb-form-name">{selectedForm.name}</span>}

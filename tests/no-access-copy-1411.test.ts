@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { noAccessCopy } from "@/modules/access/no-access-copy";
 
@@ -44,5 +46,13 @@ describe("noAccessCopy (#1411 E6)", () => {
   it("leaves event staff copy unchanged", () => {
     expect(noAccessCopy({ from: null, hasEvents: false, email, clubsAdmin: false }).heading).toBe("No events are assigned");
     expect(noAccessCopy({ from: null, hasEvents: true, email }).showClubs).toBeUndefined();
+  });
+
+  it("offers Home to staff with no event, so the card is not a dead end (#1596)", () => {
+    expect(noAccessCopy({ from: null, hasEvents: false, email }).showHome).toBe(true);
+    expect(noAccessCopy({ from: null, hasEvents: true, email }).showHome).toBeUndefined();
+    expect(noAccessCopy({ from: "event-setup", hasEvents: true, email }).showHome).toBeUndefined();
+    const page = readFileSync(join(process.cwd(), "app/no-access/page.tsx"), "utf8");
+    expect(page).toContain('{copy.showHome && <Link className="primary-button full-button" href="/home">Go to Home</Link>}');
   });
 });
