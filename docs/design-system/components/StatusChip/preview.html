@@ -1,12 +1,31 @@
-<!-- @dsCard group="Feedback" height=170 -->
+<!-- @dsCard group="Feedback" height=330 -->
+<style>
+  .chip-on-navy { background: var(--imsda-navy); border-radius: 14px; padding: 14px 16px; }
+  .status-chip.neutral.on-dark { border-color: rgba(255,255,255,0.55); color: #fff; }
+  .chip-pair { display: inline-flex; gap: 6px; align-items: center; }
+</style>
 <div class="ds-stage">
   <div class="ds-row">
-    <span class="status-chip green">Registered</span>
-    <span class="status-chip gold">Draft</span>
+    <span class="status-chip green">Confirmed</span>
+    <span class="status-chip gold">Pending payment</span>
     <span class="status-chip gold">Waitlisted</span>
-    <span class="status-chip purple">Invited</span>
     <span class="status-chip coral">Expired</span>
-    <span class="status-chip neutral">Not registered</span>
+    <span class="status-chip purple">Invited</span>
+    <span class="status-chip neutral">Cancelled</span>
     <span class="count-badge">24 members</span>
   </div>
+  <div class="ds-row">
+    <span class="chip-pair"><span class="status-chip green">Confirmed</span><span class="status-chip gold">Balance due</span></span>
+    <span class="chip-pair"><span class="status-chip green">Confirmed</span><span class="status-chip green">Paid in full</span></span>
+    <span class="chip-pair"><span class="status-chip green">Submitted</span><span class="status-chip purple">Billed to church</span></span>
+  </div>
+  <p class="ds-caption">One color per status word. Status first, money as a second chip.</p>
+  <div class="ds-row chip-on-navy">
+    <span class="status-chip green">Confirmed</span>
+    <span class="status-chip gold">Pending payment</span>
+    <span class="status-chip gold">Waitlisted</span>
+    <span class="status-chip coral">Overdue</span>
+    <span class="status-chip neutral on-dark">Cancelled</span>
+  </div>
+  <p class="ds-caption">On navy: filled tones stay the same; the neutral chip turns white.</p>
 </div>

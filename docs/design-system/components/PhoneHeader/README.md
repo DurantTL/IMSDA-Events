@@ -1,0 +1,12 @@
+What sits above the content on a phone in the club portal, the Area Coordinator portal and the staff workspace, and how tall it may be. On a phone the task comes first.
+
+- **The budget:** on a 390px-wide phone the page title starts no lower than 160px from the top in the portals and 200px inside a staff event, and the first control a person came for (search box, list, next step) is on the first screen.
+- **Portal masthead, one row (56px):** the symbol, the area name ("Club portal", "Club coordination"), and one **Account** button that opens a sheet with the signed-in name and role, Switch club, Your account, Forms help and Sign out. The four separate outlined buttons are a desktop layout only.
+- **Club banner, one line (48px):** the club name (one line, ellipsis) and the club year as plain text ("2026–27"). The church, the role and the outlined year box show from 768px up. Area Coordinators see the club they opened the same way; on their own overview there is no banner.
+- **Bottom bar, both portals:** five slots, 52px targets, the current slot with a 3px `--imsda-purple` bar (staff use gold). Club portal: Home, Roster, Events, Records, More. Area Coordinator: Overview, Clubs, Events, Records, More. **More** opens a sheet with the remaining tools in tab order. No tab strip scrolls sideways and no second "menu ▾" line appears above the content.
+- **The page never puts content under the bar:** the page's bottom padding is the bar's height plus 16px, and a message such as "Saved" appears above the bar, not over a field.
+- **Staff event pages:** one row with "‹ Events", the event name and **Switch**; then the menu line (`StaffTabRow`); then the page header. The event name appears once.
+- **Long home pages:** what to do now comes first. On the club Home, "Next steps" is above "Getting started" once setup is more than half done, and "Getting started" collapses to one line when it is finished.
+- **Rows on a phone:** a person or record row shows its name, its status chip and one action; the other actions go in the row's Actions menu. A note that applies to a whole registration (a balance, a payment instruction) shows once for the registration, not on each person.
+
+> Approved by Caleb, Nov 9, 2026. Not built yet: today the club portal header takes 280 to 400px on a phone, the Area Coordinator portal uses a "Coordinator menu ▾" line where the club portal has a bottom bar (#1641), and the staff check-in list repeats a payment note on every person.
