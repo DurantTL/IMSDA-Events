@@ -59,7 +59,7 @@ export class ClassSelectionError extends Error {
   }
 }
 
-export type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number | null; clubRosterMemberId?: string; temporaryAttendeeType?: "ADULT" | "YOUTH" | "UNDERAGE" };
+export type Snapshot = { firstName?: string; lastName?: string; ageOnEventDate?: number | null; clubRosterMemberId?: string; temporaryAttendeeType?: "ADULT" | "YOUTH" | "UNDERAGE"; notPathfinder?: boolean };
 
 /**
  * Whose seats these are (#650). A club holds seats as its club; a "Group"
@@ -165,7 +165,7 @@ export async function loadRegistration(client: Prisma.TransactionClient, owner: 
     : new Map<string, { classLevel: ClubClassLevel | null; completedHonorIds: string[] }>();
   const attendees = clubRegistration.registration.attendees.map((attendee) => {
     const snapshot = attendee.profileSnapshot as Snapshot;
-    const attendeeType = snapshot.clubRosterMemberId ? typeByMember.get(snapshot.clubRosterMemberId) ?? null : snapshot.temporaryAttendeeType ?? null;
+    const attendeeType = snapshot.clubRosterMemberId ? typeByMember.get(snapshot.clubRosterMemberId) ?? null : (snapshot.notPathfinder === true ? "UNDERAGE" : snapshot.temporaryAttendeeType) ?? null;
     return {
       id: attendee.id,
       firstName: snapshot.firstName ?? "",

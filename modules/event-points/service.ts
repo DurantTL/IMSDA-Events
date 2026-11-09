@@ -1,5 +1,6 @@
 import "server-only";
 
+import { snapshotIsYouthNotPathfinder } from "@/modules/club-registrations/domain";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { formatPersonName } from "@/lib/person-name";
@@ -120,6 +121,15 @@ function resolveRole(answer: unknown, member: RosterFacts | undefined): PointsRo
   return null;
 }
 
+/**
+ * The role the points rules see. A club guest aged 10 to 17 who is not a Pathfinder (#1728) never counts as a Pathfinder or
+ * TLT present, whatever role the form says, so they read as Child; Staff is left as it is.
+ */
+export function pointsRoleFor(answer: unknown, member: RosterFacts | undefined, profileSnapshot: unknown): PointsRole | null {
+  const role = resolveRole(answer, member);
+  return role !== "Staff" && snapshotIsYouthNotPathfinder(record(profileSnapshot)) ? "Child" : role;
+}
+
 type ClubPeople = { organizationId: string; name: string; people: PointsPerson[] };
 
 /** Every club registered for the event (teams of one club together) with each registered person, ready for the rules. */
@@ -171,7 +181,7 @@ async function loadClubPeople(eventId: string): Promise<ClubPeople[]> {
       club.people.push({
         id: attendee.id,
         name: formatPersonName(attendee.person, "display") || "Unnamed person",
-        role: resolveRole(responses.attendee_type, member),
+        role: pointsRoleFor(responses.attendee_type, member, attendee.profileSnapshot),
         isDirector: Boolean(member && isDirectorRole(member.role)),
         age: ageFrom(responses.attendee_age),
         checkedIn: attendee.checkIns.length > 0,

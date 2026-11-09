@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { submitJson } from "@/lib/submit-json";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Pencil, Trash2, UserPlus, X } from "lucide-react";
+import styles from "@/components/club-guest-list.module.css";
+import { ClubGuestTypeFields } from "@/components/club-guest-type-fields";
 import { ClubLocationPicker } from "@/components/club-location-picker";
 import { rosterHrefFromRegistration } from "@/modules/club-registrations/roster-return";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -26,6 +28,11 @@ import {
   formatCalendarDate,
   guestAttendeeType,
   guestIsChild,
+  guestIsYouthNotPathfinder,
+  childRoleToPathfinder,
+  GUEST_NOT_PATHFINDER_MAX_AGE,
+  GUEST_NOT_PATHFINDER_MIN_AGE,
+  GUEST_CHILD_AGE_MESSAGE,
   GUEST_TYPES,
   formOffersChildRole,
   MAX_CLUB_GUESTS,
@@ -56,6 +63,10 @@ export function revealRosterSection(
   element.focus({ preventScroll: true });
 }
 
+function youthAgeRange(age: number | null) {
+  return age !== null && age >= GUEST_NOT_PATHFINDER_MIN_AGE && age <= GUEST_NOT_PATHFINDER_MAX_AGE;
+}
+
 /**
  * Reopens a submitted club registration (H3b, #366) before the event's
  * registration deadline. Step one re-ticks who's going: roster people, the
@@ -72,6 +83,8 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
   const [step, setStep] = useState<"who" | "form">("who");
   const [addingGuest, setAddingGuest] = useState(false);
   const [guestEmailProblem, setGuestEmailProblem] = useState("");
+  const [guestAgeText, setGuestAgeText] = useState("");
+  const [guestTypeProblem, setGuestTypeProblem] = useState("");
   const [error, setError] = useState("");
   const [highlightRoster, setHighlightRoster] = useState(false);
   // The confirmation shows only right after a reopen, not on every return to Step 1.
@@ -124,12 +137,16 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
   const [startingSelected] = useState<string[]>(selectedMemberIds);
   const [startingKeptOff] = useState<string[]>(keptOffRosterIds);
   const [startingKeptGuests] = useState<string[]>(keptGuestIds);
+  // "Not a Pathfinder" on each kept guest aged 10 to 17 (#1728), starting as registered; the director can untick it.
+  const [startingMarks] = useState<Record<string, boolean>>(() => Object.fromEntries(existingGuests.map((guest) => [guest.guestId!, guest.guestYouthNotPathfinder === true])));
+  const [keptMarks, setKeptMarks] = useState<Record<string, boolean>>(startingMarks);
+  const sameMarks = Object.keys(startingMarks).every((id) => startingMarks[id] === keptMarks[id]);
   const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((id) => b.includes(id));
   const sameAges = Object.keys(rosterAges).length === Object.keys(startingAges).length
     && Object.entries(rosterAges).every(([id, age]) => startingAges[id] === age);
   const dirty = open && !(
     sameSet(selectedMemberIds, startingSelected) && sameSet(keptOffRosterIds, startingKeptOff)
-    && sameSet(keptGuestIds, startingKeptGuests) && newGuests.length === 0 && sameAges && locationId === currentLocationId
+    && sameSet(keptGuestIds, startingKeptGuests) && newGuests.length === 0 && sameAges && sameMarks && locationId === currentLocationId
   );
   const allowNextNavigation = useUnsavedChangesGuard(dirty);
   // Age problems show only after Continue was pressed and blocked, or once a field is touched (#718).
@@ -168,10 +185,14 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
     const teamRules = workspace.teams.settings;
     // An event with team rules (Pathfinder Bible Experience) has no choice: the type comes from the age, as it always has.
     const guestType = teamRules ? undefined : GUEST_TYPES.find((candidate) => candidate === chosenType);
+    // Only a youth aged 10 to 17 can be marked "Not a Pathfinder" (#1728); an event with teams never offers the box.
+    const notPathfinder = !teamRules && guestType === "YOUTH" && data.get("notPathfinder") === "on";
     if (!teamRules) {
-      if (!guestType) return setError("Choose Pathfinder, Adult, or Child.");
-      if (guestType === "ADULT" && age < 18) return setError("An adult must be 18 or older. Choose Child or Pathfinder for someone younger.");
-      if (guestType !== "ADULT" && age >= 18) return setError("Someone 18 or older is registered as an Adult.");
+      const problem = (message: string) => { setGuestTypeProblem(message); setError(""); };
+      if (!guestType) return problem("Choose Pathfinder, Adult, or Child.");
+      if (guestType === "ADULT" && age < 18) return problem("An adult must be 18 or older. Choose Pathfinder for someone younger.");
+      if (guestType !== "ADULT" && age >= 18) return problem("Someone 18 or older is registered as an Adult.");
+      if (guestType === "UNDERAGE" && age >= 10) return problem(GUEST_CHILD_AGE_MESSAGE);
     }
     const emailCheck = inlineFieldProblem("Email", "email", email, undefined, true);
     if (emailCheck.blocking) {
@@ -182,8 +203,10 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
     const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => (byte % 36).toString(36)).join("") + Date.now().toString(36);
     setError("");
     setGuestEmailProblem("");
+    setGuestTypeProblem("");
+    setGuestAgeText("");
     setAddingGuest(false);
-    setNewGuests((current) => [...current, { id: id.slice(0, 24), firstName, lastName, age, email: email || null, ...(guestType ? { guestType } : {}) }]);
+    setNewGuests((current) => [...current, { id: id.slice(0, 24), firstName, lastName, age, email: email || null, ...(guestType ? { guestType } : {}), ...(notPathfinder ? { notPathfinder: true } : {}) }]);
   }
 
   const goingCount = selectedMemberIds.length + keptOffRosterIds.length + keptGuestIds.length + newGuests.length;
@@ -217,7 +240,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
       ...offRoster.filter((attendee) => keptOffRosterIds.includes(attendee.attendeeId))
         .map((attendee) => withEdits(clubExistingAttendeeClientId(attendee.attendeeId), attendee.responses)),
       ...existingGuests.filter((guest) => keptGuestIds.includes(guest.guestId!))
-        .map((guest) => withEdits(clubGuestClientId(guest.guestId!), guest.responses)),
+        .map((guest) => withEdits(clubGuestClientId(guest.guestId!), guest.guestYouthNotPathfinder ? childRoleToPathfinder(definition, guest.responses) : guest.responses)),
       ...newGuests.map((guest) => {
         const person = { firstName: guest.firstName, lastName: guest.lastName, ageOnEventDate: guest.age, gender: null };
         return withEdits(
@@ -265,6 +288,8 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
           selectedMemberIds,
           keptOffRosterAttendeeIds: keptOffRosterIds,
           keptGuestIds,
+          // An event with team rules has no such mark, so nothing is sent for it.
+          ...(workspace.teams.settings ? {} : { keptGuestNotPathfinder: Object.fromEntries(existingGuests.filter((guest) => keptGuestIds.includes(guest.guestId!) && youthAgeRange(guest.ageOnEventDate)).map((guest) => [guest.guestId!, keptMarks[guest.guestId!] === true])) }),
           newGuests,
           rosterAges: typedAges,
           // Only ages the director changed from where they started are saved back to the roster.
@@ -298,7 +323,7 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
         : { key: issue.key, message: issue.message, attendeeIndex: null }];
     });
     return { ok: false as const, message: result.message ?? "That change couldn't be saved. Refresh and try again.", issues };
-  }, [organizationId, workspace.event.id, workspace.registration.updatedAt, workspace.registration.teamKey, selectedMemberIds, keptOffRosterIds, keptGuestIds, newGuests, typedAges, startingAges, saveAgeOff, locationId, currentLocationId]);
+  }, [organizationId, workspace.event.id, workspace.registration.updatedAt, workspace.registration.teamKey, selectedMemberIds, keptOffRosterIds, keptGuestIds, keptMarks, existingGuests, workspace.teams.settings, newGuests, typedAges, startingAges, saveAgeOff, locationId, currentLocationId]);
 
   // Answers as registered, by client id, so an old answer left alone never blocks the edit (#855).
   const previousResponses = useMemo(() => Object.fromEntries([
@@ -456,29 +481,35 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
             <small className="field-help"> For this event only.</small>
           </span>
           {!addingGuest && (
-            <button className="secondary-button" onClick={() => { setError(""); setAddingGuest(true); }} type="button">
+            <button className="secondary-button" onClick={() => { setError(""); setGuestTypeProblem(""); setGuestAgeText(""); setAddingGuest(true); }} type="button">
               <UserPlus aria-hidden="true" size={14} /> Add a person for this event
             </button>
           )}
         </div>
         {(existingGuests.length > 0 || newGuests.length > 0) && (
-          <ul className="club-going-list club-guest-list">
+          <ul className={styles.list}>
             {existingGuests.map((guest) => keptGuestIds.includes(guest.guestId!) && (
-              <li key={guest.guestId}>
-                <span>
+              <li className={styles.row} key={guest.guestId}>
+                <span className={styles.who}>
                   <strong translate="no">{guest.lastName}, {guest.firstName}</strong>
-                  <small>This event only{guest.guestChild ? " · Child" : ""}{guest.ageOnEventDate !== null ? <> · Age <span translate="no">{guest.ageOnEventDate}</span></> : ""}</small>
+                  <small>This event only{guest.guestChild ? " · Child" : ""}{keptMarks[guest.guestId!] ? " · Youth guest (not a Pathfinder)" : ""}{guest.ageOnEventDate !== null ? <> · Age <span translate="no">{guest.ageOnEventDate}</span></> : ""}</small>
                 </span>
+                {!workspace.teams.settings && youthAgeRange(guest.ageOnEventDate) && (
+                  <label className={styles.mark}>
+                    <input checked={keptMarks[guest.guestId!] === true} onChange={(event) => { const checked = event.currentTarget.checked; setKeptMarks((current) => ({ ...current, [guest.guestId!]: checked })); }} type="checkbox" />
+                    <span>Not a Pathfinder (for example, a sibling who isn&apos;t in the club)</span>
+                  </label>
+                )}
                 <button aria-label={`Remove ${guest.firstName} ${guest.lastName}`} className="text-button" onClick={() => setKeptGuestIds((current) => current.filter((id) => id !== guest.guestId))} type="button">
                   <Trash2 aria-hidden="true" size={14} /> Remove
                 </button>
               </li>
             ))}
             {newGuests.map((guest) => (
-              <li key={guest.id}>
-                <span>
+              <li className={styles.row} key={guest.id}>
+                <span className={styles.who}>
                   <strong translate="no">{guest.lastName}, {guest.firstName}</strong>
-                  <small>This event only · {guestIsChild(guest) ? "Child · " : ""}Age <span translate="no">{guest.age}</span></small>
+                  <small>This event only · {guestIsYouthNotPathfinder(guest) ? "Youth guest (not a Pathfinder) · " : guestIsChild(guest) ? "Child · " : ""}Age <span translate="no">{guest.age}</span></small>
                 </span>
                 <button aria-label={`Remove ${guest.firstName} ${guest.lastName}`} className="text-button" onClick={() => setNewGuests((current) => current.filter((candidate) => candidate.id !== guest.id))} type="button">
                   <Trash2 aria-hidden="true" size={14} /> Remove
@@ -492,19 +523,8 @@ export function ClubRegistrationEditor({ organizationId, workspace }: { organiza
             <div className="form-grid two-column">
               <label>First name<input autoComplete="off" maxLength={80} name="firstName" required /></label>
               <label>Last name<input autoComplete="off" maxLength={80} name="lastName" required /></label>
-              <label>{workspace.event.ageAsOf ? `Age on ${formatCalendarDate(workspace.event.ageDate)}` : "Age at the event"}<input {...ageInputAttributes} name="age" required type="number" /></label>
-              {!workspace.teams.settings && (
-                <label>
-                  Who is this?
-                  <select defaultValue="" name="guestType" required>
-                    <option disabled value="">Choose one</option>
-                    <option value="YOUTH">Pathfinder</option>
-                    <option value="ADULT">Adult</option>
-                    {offersChild && <option value="UNDERAGE">Child (not a Pathfinder)</option>}
-                  </select>
-                  {offersChild && <small className="field-help">A child isn&apos;t counted as a Pathfinder and doesn&apos;t take a class seat.</small>}
-                </label>
-              )}
+              <label>{workspace.event.ageAsOf ? `Age on ${formatCalendarDate(workspace.event.ageDate)}` : "Age at the event"}<input {...ageInputAttributes} name="age" onChange={(event) => setGuestAgeText(event.currentTarget.value)} required type="number" value={guestAgeText} /></label>
+              {!workspace.teams.settings && <ClubGuestTypeFields age={guestAgeText} error={guestTypeProblem} offersChild={offersChild} />}
               <label>Email (optional)<input aria-invalid={guestEmailProblem ? true : undefined} autoComplete="off" inputMode="email" maxLength={254} name="email" onBlur={(event) => setGuestEmailProblem(inlineFieldProblem("Email", "email", event.currentTarget.value.trim(), undefined, true).message)} type="email" />{guestEmailProblem && <small className="field-error" role="alert">{guestEmailProblem}</small>}</label>
             </div>
             <div className="club-registration-toolbar">

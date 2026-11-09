@@ -1,0 +1,57 @@
+/* The extra people added for an event only (#1728). Its own rows, so the roster's "selected" look never applies to a marked guest. */
+.list {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 10px 12px;
+  font-size: var(--text-helper-min);
+}
+
+.who {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.who strong,
+.who small {
+  display: block;
+}
+
+.who small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: var(--text-helper-min);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+/* Under the name, full width, on a narrow screen; the Remove button stays beside the name. */
+.mark {
+  order: 3;
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: var(--text-helper-min);
+}
+
+.mark input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  accent-color: var(--imsda-purple);
+}

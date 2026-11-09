@@ -15,6 +15,8 @@ import {
   type FormResponses,
   type RosterAttendee,
 } from "@/components/public-registration-form";
+import styles from "@/components/club-guest-list.module.css";
+import { ClubGuestTypeFields } from "@/components/club-guest-type-fields";
 import { createDraftSaveQueue, registrationDraftUnsaved } from "@/modules/club-registrations/draft-save-queue";
 import { createDraftSender, DRAFT_CONFLICT_MESSAGE, draftBlockedReason } from "@/modules/club-registrations/draft-sender";
 import { restoreDraftLocation } from "@/modules/club-registrations/draft-location";
@@ -36,6 +38,12 @@ import {
   guestIdFromClientId,
   guestAttendeeType,
   guestIsChild,
+  guestIsYouthNotPathfinder,
+  GUEST_NOT_PATHFINDER_MAX_AGE,
+  GUEST_NOT_PATHFINDER_MIN_AGE,
+  normalizeLegacyChildGuest,
+  childRoleToPathfinder,
+  GUEST_CHILD_AGE_MESSAGE,
   GUEST_TYPES,
   formOffersChildRole,
   MAX_CLUB_GUESTS,
@@ -58,6 +66,22 @@ type Workspace = ClubEventWorkspace & { experience: PublicRegistrationExperience
 
 /** Class picks by attendee client id (#618). */
 type HonorPicks = Record<string, string[]>;
+
+/** Role answers of draft guests saved as Child at 10 to 17 under #1666 become Pathfinder, as the server stores them (#1728). */
+/**
+ * A marked youth guest keeps the Pathfinder role answer (#1728). Draft guests arrive already normalized by the server
+ * (`guestsFromJson`), so an old #1666 Child guest aged 10 to 17 shows here as marked while its saved answer may still say
+ * Child: swap that answer, so the card and the price preview match what the server stores. Only a Child or Underage answer
+ * is ever changed.
+ */
+export function legacyAdjustedAnswers(answers: Record<string, FormResponses>, guests: ClubGuest[], definition: Parameters<typeof childRoleToPathfinder>[0]) {
+  const next = { ...answers };
+  for (const guest of guests) {
+    const clientId = clubGuestClientId(guest.id);
+    if (guestIsYouthNotPathfinder(normalizeLegacyChildGuest(guest)) && next[clientId]) next[clientId] = childRoleToPathfinder(definition, next[clientId]) as FormResponses;
+  }
+  return next;
+}
 
 type DraftState = {
   selectedMemberIds: string[];
@@ -107,10 +131,11 @@ export function ClubRegistrationWorkspace({
   const rosterIds = useMemo(() => new Set(workspace.roster.map((person) => person.memberId)), [workspace.roster]);
   const [draft, setDraft] = useState<DraftState>(() => ({
     selectedMemberIds: (workspace.draft?.selectedMemberIds ?? []).filter((memberId) => rosterIds.has(memberId)),
-    guests: workspace.draft?.guests ?? [],
+    guests: (workspace.draft?.guests ?? []).map(normalizeLegacyChildGuest),
     // The director's own details fill in only what the draft (or the person) left blank (#618).
     responses: fillMissingAnswers(workspace.draft?.responses, contactPrefill) as FormResponses,
-    attendeeResponses: (workspace.draft?.attendeeResponses as Record<string, FormResponses> | undefined) ?? {},
+    // A guest saved as Child at 10 to 17 becomes a marked youth; their saved role answer follows, so the preview matches what is stored (#1728).
+    attendeeResponses: legacyAdjustedAnswers((workspace.draft?.attendeeResponses as Record<string, FormResponses> | undefined) ?? {}, workspace.draft?.guests ?? [], workspace.experience.form.definition),
     honorSelections: workspace.draft?.honorSelections ?? {},
     rosterAges: workspace.draft?.rosterAges ?? {},
     rosterAgeSaveOff: workspace.draft?.rosterAgeSaveOff ?? [],
@@ -129,6 +154,8 @@ export function ClubRegistrationWorkspace({
   const needsLocation = locations.length > 0 && !chosenLocation;
   const [addingGuest, setAddingGuest] = useState(false);
   const [guestError, setGuestError] = useState("");
+  const [guestAgeText, setGuestAgeText] = useState("");
+  const [guestTypeProblem, setGuestTypeProblem] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(workspace.draft ? "saved" : "idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The Continue bar stays after the list until the reader has scrolled past the intro, so it never covers it (#996).
@@ -405,17 +432,46 @@ export function ClubRegistrationWorkspace({
     if (!Number.isInteger(age) || age < 0 || age > 120) return setGuestError("Enter their age as a whole number.");
     // An event with team rules (Pathfinder Bible Experience) has no choice: the type comes from the age, as it always has.
     const guestType = teamRules ? undefined : GUEST_TYPES.find((candidate) => candidate === chosenType);
+    // Only a youth aged 10 to 17 can be marked "Not a Pathfinder" (#1728); an event with teams never offers the box.
+    const notPathfinder = !teamRules && guestType === "YOUTH" && data.get("notPathfinder") === "on";
     if (!teamRules) {
-      if (!guestType) return setGuestError("Choose Pathfinder, Adult, or Child.");
-      if (guestType === "ADULT" && age < 18) return setGuestError("An adult must be 18 or older. Choose Child or Pathfinder for someone younger.");
-      if (guestType !== "ADULT" && age >= 18) return setGuestError("Someone 18 or older is registered as an Adult.");
+      const problem = (message: string) => { setGuestTypeProblem(message); setGuestError(""); };
+      if (!guestType) return problem("Choose Pathfinder, Adult, or Child.");
+      if (guestType === "ADULT" && age < 18) return problem("An adult must be 18 or older. Choose Pathfinder for someone younger.");
+      if (guestType !== "ADULT" && age >= 18) return problem("Someone 18 or older is registered as an Adult.");
+      if (guestType === "UNDERAGE" && age >= 10) return problem(GUEST_CHILD_AGE_MESSAGE);
     }
     if (draft.guests.length >= MAX_CLUB_GUESTS) return setGuestError(`Add up to ${MAX_CLUB_GUESTS} extra people.`);
     const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => (byte % 36).toString(36)).join("") + Date.now().toString(36);
     setGuestError("");
+    setGuestTypeProblem("");
+    setGuestAgeText("");
     setAddingGuest(false);
     setDraft((current) => {
-      const next = { ...current, guests: [...current.guests, { id: id.slice(0, 24), firstName, lastName, age, email: email || null, ...(guestType ? { guestType } : {}) }] };
+      const next = { ...current, guests: [...current.guests, { id: id.slice(0, 24), firstName, lastName, age, email: email || null, ...(guestType ? { guestType } : {}), ...(notPathfinder ? { notPathfinder: true } : {}) }] };
+      queueSave(next);
+      return next;
+    });
+  }
+
+  /** Ticks or unticks "Not a Pathfinder" on an extra person aged 10 to 17 already added (#1728). */
+  function setGuestMark(guestId: string, marked: boolean) {
+    setDraft((current) => {
+      const next = {
+        ...current,
+        guests: current.guests.map((guest) => {
+          if (guest.id !== guestId) return guest;
+          const { notPathfinder: _unused, ...rest } = guest;
+          void _unused;
+          return { ...rest, guestType: "YOUTH" as const, ...(marked ? { notPathfinder: true } : {}) };
+        }),
+        // A role answered "Child" before the guest was a youth becomes Pathfinder, so they are priced as a youth.
+        attendeeResponses: (() => {
+          const clientId = clubGuestClientId(guestId);
+          const answers = current.attendeeResponses[clientId];
+          return answers ? { ...current.attendeeResponses, [clientId]: childRoleToPathfinder(workspace.experience.form.definition, answers) as FormResponses } : current.attendeeResponses;
+        })(),
+      };
       queueSave(next);
       return next;
     });
@@ -661,22 +717,28 @@ export function ClubRegistrationWorkspace({
             <small className="field-help"> For this event only, e.g. a visiting parent. They won&apos;t be added to your roster.</small>
           </span>
           {!addingGuest && (
-            <button className="secondary-button" onClick={() => { setGuestError(""); setAddingGuest(true); }} type="button">
+            <button className="secondary-button" onClick={() => { setGuestError(""); setGuestTypeProblem(""); setGuestAgeText(""); setAddingGuest(true); }} type="button">
               <UserPlus aria-hidden="true" size={14} /> Add a person for this event
             </button>
           )}
         </div>
         {draft.guests.length > 0 && (
-          <ul className="club-going-list club-guest-list">
+          <ul className={styles.list}>
             {draft.guests.map((guest) => (
-              <li key={guest.id}>
-                <span>
+              <li className={styles.row} key={guest.id}>
+                <span className={styles.who}>
                   <strong translate="no">{guest.lastName}, {guest.firstName}</strong>
                   <small>
-                    This event only · {guestIsChild(guest) ? "Child · " : ""}Age <span translate="no">{guest.age}</span>
+                    This event only · {guestIsYouthNotPathfinder(guest) ? "Youth guest (not a Pathfinder) · " : guestIsChild(guest) ? "Child · " : ""}Age <span translate="no">{guest.age}</span>
                     {guest.email ? <> · <span translate="no">{guest.email}</span></> : ""}
                   </small>
                 </span>
+                {!teamRules && guest.age >= GUEST_NOT_PATHFINDER_MIN_AGE && guest.age <= GUEST_NOT_PATHFINDER_MAX_AGE && (
+                  <label className={styles.mark}>
+                    <input checked={guest.notPathfinder === true} onChange={(event) => setGuestMark(guest.id, event.currentTarget.checked)} type="checkbox" />
+                    <span>Not a Pathfinder (for example, a sibling who isn&apos;t in the club)</span>
+                  </label>
+                )}
                 <button aria-label={`Remove ${guest.firstName} ${guest.lastName}`} className="text-button" onClick={() => removeGuest(guest.id)} type="button">
                   <Trash2 aria-hidden="true" size={14} /> Remove
                 </button>
@@ -690,19 +752,8 @@ export function ClubRegistrationWorkspace({
             <div className="form-grid two-column">
               <label>First name<input autoComplete="off" maxLength={80} name="firstName" required /></label>
               <label>Last name<input autoComplete="off" maxLength={80} name="lastName" required /></label>
-              <label>{workspace.event.ageAsOf ? `Age on ${ageDateText}` : "Age at the event"}<input {...ageInputAttributes} name="age" required type="number" /></label>
-              {!teamRules && (
-                <label>
-                  Who is this?
-                  <select defaultValue="" name="guestType" required>
-                    <option disabled value="">Choose one</option>
-                    <option value="YOUTH">Pathfinder</option>
-                    <option value="ADULT">Adult</option>
-                    {offersChild && <option value="UNDERAGE">Child (not a Pathfinder)</option>}
-                  </select>
-                  {offersChild && <small className="field-help">A child isn&apos;t counted as a Pathfinder and doesn&apos;t take a class seat.</small>}
-                </label>
-              )}
+              <label>{workspace.event.ageAsOf ? `Age on ${ageDateText}` : "Age at the event"}<input {...ageInputAttributes} name="age" onChange={(event) => setGuestAgeText(event.currentTarget.value)} required type="number" value={guestAgeText} /></label>
+              {!teamRules && <ClubGuestTypeFields age={guestAgeText} error={guestTypeProblem} offersChild={offersChild} />}
               <label>
                 Email (optional)
                 <input autoComplete="off" maxLength={254} name="email" type="email" />
@@ -710,7 +761,7 @@ export function ClubRegistrationWorkspace({
               </label>
             </div>
             <div className="club-registration-toolbar">
-              <button className="secondary-button" onClick={() => { setGuestError(""); setAddingGuest(false); }} type="button">Cancel</button>
+              <button className="secondary-button" onClick={() => { setGuestError(""); setGuestTypeProblem(""); setGuestAgeText(""); setAddingGuest(false); }} type="button">Cancel</button>
               <button className="primary-button" type="submit"><UserPlus aria-hidden="true" size={15} /> Add</button>
             </div>
           </form>

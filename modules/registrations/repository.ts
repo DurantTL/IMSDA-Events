@@ -24,6 +24,7 @@ import {
   reservationHeld,
 } from "@/modules/payments/deposit-domain";
 import { formatPersonName } from "@/lib/person-name";
+import { snapshotIsYouthNotPathfinder } from "@/modules/club-registrations/domain";
 
 type RegistrationWithRelations = Awaited<ReturnType<typeof getRegistrationQuery>>[number];
 type RegistrationReadClient = Prisma.TransactionClient | ReturnType<typeof getPrisma>;
@@ -328,6 +329,8 @@ function serializeRegistration(registration: RegistrationWithRelations, director
         position: attendee.position,
         source: profile.source === "PUBLIC_REGISTRATION" ? "PUBLIC_REGISTRATION" as const : "STAFF" as const,
         responses: recordFromJson(attendee.formResponses),
+        // A club guest aged 10 to 17 who is not a Pathfinder (#1728): the stored mark, or the old Child type from 10 to 17.
+        youthGuestNotPathfinder: snapshotIsYouthNotPathfinder(profile),
         checkedIn: Boolean(activeCheckIn),
         checkInId: activeCheckIn?.id ?? null,
         checkedInAt: activeCheckIn?.checkedInAt.toISOString() ?? null,
@@ -423,7 +426,7 @@ export type RegistrationRecord = Omit<SerializedRegistration, "attendees" | "pub
   location?: { id: string; name: string } | null;
   /** Optional like `location`: the place in line at the location while waitlisted there (#599). */
   locationWaitlistPlace?: number | null;
-  attendees: Array<Omit<SerializedRegistration["attendees"][number], "attendeeTypeDefinitionCode"> & { attendeeTypeDefinitionCode?: string | null }>;
+  attendees: Array<Omit<SerializedRegistration["attendees"][number], "attendeeTypeDefinitionCode" | "youthGuestNotPathfinder"> & { attendeeTypeDefinitionCode?: string | null; youthGuestNotPathfinder?: boolean }>;
   publicSubmission: SerializedRegistration["publicSubmission"] extends infer Submission
     ? Submission extends null ? null : Omit<Submission, "attendeeTypeOptions"> & { attendeeTypeOptions?: AttendeeTypeOption[] }
     : never;

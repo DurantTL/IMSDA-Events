@@ -28,9 +28,16 @@ const GUEST_PREFIX = "guest:";
  * Someone going who isn't on the roster (#388), e.g. a visiting parent. For
  * this event only: never added to the roster or kept for another event.
  */
-export type ClubGuest = { id: string; firstName: string; lastName: string; age: number; email: string | null; guestType?: ClubGuestType | undefined };
+export type ClubGuest = { id: string; firstName: string; lastName: string; age: number; email: string | null; guestType?: ClubGuestType | undefined; notPathfinder?: boolean | undefined };
 
 export const MAX_CLUB_GUESTS = 25;
+
+/** A child who isn't a Pathfinder is under 10; from 10 to 17 a guest is a Pathfinder unless marked (#1728). */
+export const GUEST_CHILD_MAX_AGE = 9;
+export const GUEST_NOT_PATHFINDER_MIN_AGE = 10;
+export const GUEST_NOT_PATHFINDER_MAX_AGE = 17;
+export const GUEST_NOT_PATHFINDER_AGE_MESSAGE = "Not a Pathfinder is only for ages 10 to 17.";
+export const GUEST_CHILD_AGE_MESSAGE = "Child is only for guests under 10. For ages 10 to 17, choose Pathfinder and tick Not a Pathfinder if they aren't in the club.";
 
 export const GUEST_TYPES = ["YOUTH", "ADULT", "UNDERAGE"] as const;
 export type ClubGuestType = (typeof GUEST_TYPES)[number];
@@ -47,7 +54,18 @@ export const clubGuestSchema = z.object({
    * Pathfinder (UNDERAGE). Left out on a guest saved before the choice existed, who keeps the type their age gives.
    */
   guestType: z.enum(GUEST_TYPES).optional(),
+  /**
+   * A guest aged 10 to 17 who is not a Pathfinder, for example a sibling who isn't in the club (#1728). Registered and
+   * counted on the club's page like a Child, but shown as a youth guest. Only for ages 10 to 17.
+   */
+  notPathfinder: z.boolean().optional(),
 }).strict().superRefine((guest, context) => {
+  if (guest.notPathfinder && (guest.age < GUEST_NOT_PATHFINDER_MIN_AGE || guest.age > GUEST_NOT_PATHFINDER_MAX_AGE)) {
+    context.addIssue({ code: "custom", path: ["notPathfinder"], message: GUEST_NOT_PATHFINDER_AGE_MESSAGE });
+  }
+  if (guest.notPathfinder && (guest.guestType === "ADULT" || guest.guestType === "UNDERAGE")) {
+    context.addIssue({ code: "custom", path: ["notPathfinder"], message: "Not a Pathfinder is for a youth aged 10 to 17. Choose Pathfinder." });
+  }
   if (guest.guestType === "ADULT" && guest.age < 18) {
     context.addIssue({ code: "custom", path: ["guestType"], message: "An adult must be 18 or older. Choose Child or Pathfinder for someone younger." });
   }
@@ -105,6 +123,11 @@ export const clubRegistrationEditInputSchema = z.object({
   keptGuestIds: z.array(z.string().trim().min(1).max(100)).max(MAX_CLUB_GUESTS),
   keptOffRosterAttendeeIds: z.array(z.string().trim().min(1).max(100)).max(500),
   newGuests: clubGuestsSchema,
+  /**
+   * Whether a kept guest aged 10 to 17 is marked "not a Pathfinder" (#1728), by guest id. A guest left out keeps the mark
+   * they were registered with, so an older client changes nothing.
+   */
+  keptGuestNotPathfinder: z.record(z.string().min(1).max(100), z.boolean()).optional(),
   attendeeResponses: z.record(z.string(), z.record(z.string(), z.unknown())),
   /** Ages typed in for roster people with no birth date on file (#639), by roster member id. */
   rosterAges: rosterAgesSchema.default({}),
@@ -122,7 +145,7 @@ export type ClubRegistrationEditInput = z.input<typeof clubRegistrationEditInput
 /** Guests saved in a draft, dropping anything that no longer reads as one. */
 export function guestsFromJson(value: unknown): ClubGuest[] {
   const parsed = clubGuestsSchema.safeParse(value);
-  return parsed.success ? parsed.data : [];
+  return parsed.success ? parsed.data.map(normalizeLegacyChildGuest) : [];
 }
 
 export function clubGuestClientId(guestId: string) {
@@ -162,7 +185,7 @@ export function guestIsAdult(guest: Pick<ClubGuest, "age">) {
   return guest.age >= 18;
 }
 
-type GuestTypeInput = Pick<ClubGuest, "age"> & { guestType?: ClubGuestType | undefined };
+type GuestTypeInput = Pick<ClubGuest, "age"> & { guestType?: ClubGuestType | undefined; notPathfinder?: boolean | undefined };
 
 /**
  * The type an extra person is registered as (#1666): the director's choice, else the type their age gives, so a guest
@@ -176,6 +199,54 @@ export function guestAttendeeType(guest: GuestTypeInput): ClubGuestType {
 /** A child who is not a Pathfinder: counted on the club's page, takes no class seat, not in the Pathfinder totals. */
 export function guestIsChild(guest: GuestTypeInput) {
   return guestAttendeeType(guest) === "UNDERAGE";
+}
+
+/**
+ * A message when a new guest's type breaks the age rules (#1728): Child is for under 10 only, "Not a Pathfinder" for 10 to 17
+ * only. Null when fine. A guest saved as Child at 10 or older before the rule kept that type; it is only refused when added.
+ */
+export function guestAgeRuleProblem(guest: GuestTypeInput): string | null {
+  if (guest.notPathfinder && (guest.age < GUEST_NOT_PATHFINDER_MIN_AGE || guest.age > GUEST_NOT_PATHFINDER_MAX_AGE)) return GUEST_NOT_PATHFINDER_AGE_MESSAGE;
+  if (guest.guestType === "UNDERAGE" && guest.age > GUEST_CHILD_MAX_AGE) return GUEST_CHILD_AGE_MESSAGE;
+  return null;
+}
+
+/**
+ * A guest aged 10 to 17 marked "not a Pathfinder" (#1728). They stay a youth (type YOUTH, the role the director picked, the
+ * same price and questions as any youth); the mark is stored beside that and read by the totals, labels and class seats.
+ */
+export function guestIsYouthNotPathfinder(guest: GuestTypeInput) {
+  return guest.notPathfinder === true && guest.age >= GUEST_NOT_PATHFINDER_MIN_AGE && guest.age <= GUEST_NOT_PATHFINDER_MAX_AGE;
+}
+
+/**
+ * A guest saved as Child at 10 to 17 under #1666 reads as a youth guest who is not a Pathfinder (#1728): the old Child type
+ * becomes YOUTH with the mark, so the director can untick it. Anyone else is returned as is.
+ */
+export function normalizeLegacyChildGuest<T extends GuestTypeInput>(guest: T): T {
+  if (guest.guestType !== "UNDERAGE" || guest.age < GUEST_NOT_PATHFINDER_MIN_AGE || guest.age > GUEST_NOT_PATHFINDER_MAX_AGE) return guest;
+  return { ...guest, guestType: "YOUTH", notPathfinder: true };
+}
+
+/** A saved attendee of a club registration read as a youth guest who is not a Pathfinder: the mark, or the old Child type from 10 to 17. */
+export function snapshotIsYouthNotPathfinder(snapshot: { temporary?: unknown; temporaryAttendeeType?: unknown; ageOnEventDate?: unknown; notPathfinder?: unknown }) {
+  if (snapshot.temporary !== true) return false;
+  if (snapshot.notPathfinder === true) return true;
+  return snapshot.temporaryAttendeeType === "UNDERAGE" && typeof snapshot.ageOnEventDate === "number"
+    && snapshot.ageOnEventDate >= GUEST_NOT_PATHFINDER_MIN_AGE && snapshot.ageOnEventDate <= GUEST_NOT_PATHFINDER_MAX_AGE;
+}
+
+/**
+ * When a guest saved with the Child role becomes a Pathfinder-priced youth guest (#1728), the form's Child answer is swapped
+ * for its Pathfinder option, so pricing and conditional questions are exactly a youth's. Other answers are left alone.
+ */
+export function childRoleToPathfinder(definition: RegistrationFormDefinition, responses: Record<string, unknown>) {
+  const field = attendeeFields(definition).find((candidate) => candidate.key === "attendee_type" && candidate.options.length > 0);
+  if (!field) return responses;
+  const answer = typeof responses[field.key] === "string" ? String(responses[field.key]).trim().toLowerCase() : "";
+  if (answer !== "child" && answer !== "underage") return responses;
+  const pathfinder = field.options.find((option) => option.trim().toLowerCase() === "pathfinder");
+  return pathfinder ? { ...responses, [field.key]: pathfinder } : responses;
 }
 
 export const CHILD_GUEST_NO_ROLE_MESSAGE = "This form has no Child role, so a child who isn't a Pathfinder can't be added. Choose Pathfinder or Adult.";
