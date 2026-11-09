@@ -3,6 +3,7 @@
 import { ExactValue } from "@/components/exact-value";
 import { useConfirm } from "@/components/use-confirm";
 import { StaffPageHeader } from "@/components/staff-page-header";
+import styles from "./honors-instructors-workspace.module.css";
 import { useState } from "react";
 import { Ban, Save, Send, UserPlus } from "lucide-react";
 import { savedMessage } from "@/components/form-message";
@@ -120,7 +121,7 @@ export function HonorsInstructorsWorkspace({
 
       <section className="panel">
         <div className="section-heading"><div><h2>Invite an instructor</h2></div></div>
-        <form className="form-grid" onSubmit={invite}>
+        <form className={`form-grid ${styles.inviteForm}`} onSubmit={invite}>
           <label>First name<input autoComplete="off" maxLength={100} onChange={(event) => setDraft({ ...draft, firstName: event.target.value })} required value={draft.firstName} /></label>
           <label>Last name<input autoComplete="off" maxLength={100} onChange={(event) => setDraft({ ...draft, lastName: event.target.value })} required value={draft.lastName} /></label>
           <label>Email<input autoComplete="off" maxLength={254} onChange={(event) => setDraft({ ...draft, email: event.target.value })} required type="email" value={draft.email} /></label>
