@@ -1,4 +1,4 @@
-import { safeGetItem, safeSetItem } from "@/lib/safe-storage";
+import { safeGetItem, safeRemoveItem, safeSetItem } from "@/lib/safe-storage";
 
 /**
  * A tiny browser-side list of the last few error ids (#1715). The only thing ever kept is the Next.js error digest, the id
@@ -8,7 +8,7 @@ import { safeGetItem, safeSetItem } from "@/lib/safe-storage";
  * when storage is blocked.
  */
 export const RECENT_ERROR_ID_MAX = 5;
-export const ERROR_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+export const ERROR_ID_PATTERN = /^\d{1,20}(?:@E\d{1,6})?$/;
 
 const STORAGE_KEY = "imsda-recent-error-ids";
 let memoryIds: string[] = [];
@@ -45,6 +45,12 @@ export function recordErrorId(digest: unknown): void {
   const next = cleanIds([digest, ...readRecentErrorIds()]);
   memoryIds = next;
   safeSetItem("session", STORAGE_KEY, JSON.stringify(next));
+}
+
+/** Forgets the ids, for after a report that carried them was sent, so the next report does not resend them. */
+export function clearRecentErrorIds(): void {
+  memoryIds = [];
+  safeRemoveItem("session", STORAGE_KEY);
 }
 
 /** For tests. */

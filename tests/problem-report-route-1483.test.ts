@@ -168,7 +168,7 @@ describe("PATCH /api/admin/problem-reports/[reportId]", () => {
 
 describe("the IT team line", () => {
   it("adds recent error ids to the line for the IT team, and nothing when there are none (#1715)", () => {
-    expect(problemReportAlertDetail({ path: "/sign-in", errorIds: ["a1", "b2"] })).toContain("Error ids a1, b2");
+    expect(problemReportAlertDetail({ path: "/sign-in", errorIds: ["111", "222@E394"] })).toContain("Error ids 111, 222@E394");
     expect(problemReportAlertDetail({ path: "/sign-in" })).not.toContain("Error ids");
   });
 

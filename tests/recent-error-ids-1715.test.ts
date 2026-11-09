@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { readRecentErrorIds, recordErrorId, resetRecentErrorIdsMemory } from "@/lib/recent-error-ids";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearRecentErrorIds, readRecentErrorIds, recordErrorId, resetRecentErrorIdsMemory } from "@/lib/recent-error-ids";
 import { buildProblemReportDetails, problemReportDetailsSchema, type BrowserFacts } from "@/modules/support/problem-report-domain";
 
 /** #1715: recent error ids. Ids only, never messages. Synthetic data only. */
@@ -17,6 +17,10 @@ const facts: BrowserFacts = {
   now: new Date("2026-11-08T15:00:00.000Z"),
 };
 
+afterEach(() => {
+  delete (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+});
+
 beforeEach(() => {
   vi.restoreAllMocks();
   window.sessionStorage.clear();
@@ -25,8 +29,8 @@ beforeEach(() => {
 
 describe("recent error id list", () => {
   it("keeps the newest 5, newest first, without repeats", () => {
-    for (const id of ["a1", "b2", "c3", "d4", "e5", "f6", "c3"]) recordErrorId(id);
-    expect(readRecentErrorIds()).toEqual(["c3", "f6", "e5", "d4", "b2"]);
+    for (const id of ["11", "22", "33", "44", "55", "66", "33"]) recordErrorId(id);
+    expect(readRecentErrorIds()).toEqual(["33", "66", "55", "44", "22"]);
   });
 
   it("ignores anything that is not a plain id, and never keeps an error message or stack", () => {
@@ -50,22 +54,45 @@ describe("recent error id list", () => {
     expect(readRecentErrorIds()).toEqual([]);
     window.sessionStorage.setItem("imsda-recent-error-ids", JSON.stringify({ a: 1 }));
     expect(readRecentErrorIds()).toEqual([]);
-    window.sessionStorage.setItem("imsda-recent-error-ids", JSON.stringify(["ok1", "jane@example.com", 7, "ok1", "ok2", "ok3", "ok4", "ok5", "ok6"]));
-    expect(readRecentErrorIds()).toEqual(["ok1", "ok2", "ok3", "ok4", "ok5"]);
+    window.sessionStorage.setItem("imsda-recent-error-ids", JSON.stringify(["101", "jane@example.com", 7, "101", "102", "103", "104", "105", "106"]));
+    expect(readRecentErrorIds()).toEqual(["101", "102", "103", "104", "105"]);
   });
 
   it("falls back to memory when storage throws", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("full"); });
-    recordErrorId("m1");
-    recordErrorId("m2");
-    expect(readRecentErrorIds()).toEqual(["m2", "m1"]);
+    recordErrorId("201");
+    recordErrorId("202");
+    expect(readRecentErrorIds()).toEqual(["202", "201"]);
+  });
+});
+
+describe("error id format and clearing", () => {
+  it("keeps a real Next digest with an error code, and refuses a plain word", () => {
+    recordErrorId("123456789@E394");
+    recordErrorId("Jane");
+    recordErrorId("123@E");
+    expect(readRecentErrorIds()).toEqual(["123456789@E394"]);
+    expect(problemReportDetailsSchema.parse({ errorIds: ["123456789@E394"] }).errorIds).toEqual(["123456789@E394"]);
+    expect(problemReportDetailsSchema.parse({ errorIds: ["123456789", "Jane"] }).errorIds).toBeUndefined();
+  });
+
+  it("forgets every id, in storage and in memory", () => {
+    recordErrorId("111");
+    recordErrorId("222");
+    clearRecentErrorIds();
+    expect(readRecentErrorIds()).toEqual([]);
+    expect(window.sessionStorage.getItem("imsda-recent-error-ids")).toBeNull();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("full"); });
+    recordErrorId("333");
+    clearRecentErrorIds();
+    expect(readRecentErrorIds()).toEqual([]);
   });
 });
 
 describe("error ids in the technical details", () => {
   it("are included when present and left out when there are none", () => {
-    expect(buildProblemReportDetails({ ...facts, errorIds: ["a1", "b2"] }).errorIds).toEqual(["a1", "b2"]);
+    expect(buildProblemReportDetails({ ...facts, errorIds: ["111", "222"] }).errorIds).toEqual(["111", "222"]);
     expect(buildProblemReportDetails(facts)).not.toHaveProperty("errorIds");
     expect(buildProblemReportDetails({ ...facts, errorIds: [] })).not.toHaveProperty("errorIds");
   });
@@ -81,10 +108,10 @@ describe("error ids in the technical details", () => {
   });
 
   it("are checked again by the schema: bad ids and long lists are dropped", () => {
-    expect(problemReportDetailsSchema.parse({ errorIds: ["a1", "b2"] }).errorIds).toEqual(["a1", "b2"]);
-    expect(problemReportDetailsSchema.parse({ errorIds: ["a1", "jane@example.com"] }).errorIds).toBeUndefined();
-    expect(problemReportDetailsSchema.parse({ errorIds: ["a", "b", "c", "d", "e", "f"] }).errorIds).toBeUndefined();
-    expect(problemReportDetailsSchema.parse({ errorIds: "a1", language: "en" })).toEqual({ language: "en" });
+    expect(problemReportDetailsSchema.parse({ errorIds: ["111", "222"] }).errorIds).toEqual(["111", "222"]);
+    expect(problemReportDetailsSchema.parse({ errorIds: ["111", "jane@example.com"] }).errorIds).toBeUndefined();
+    expect(problemReportDetailsSchema.parse({ errorIds: ["1", "2", "3", "4", "5", "6"] }).errorIds).toBeUndefined();
+    expect(problemReportDetailsSchema.parse({ errorIds: "111", language: "en" })).toEqual({ language: "en" });
   });
 });
 

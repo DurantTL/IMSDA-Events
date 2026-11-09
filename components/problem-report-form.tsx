@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { readRecentErrorIds } from "@/lib/recent-error-ids";
+import { clearRecentErrorIds, readRecentErrorIds } from "@/lib/recent-error-ids";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { EmailInput, emailBlockingMessage } from "@/components/email-input";
 import { FieldError, fieldErrorProps } from "@/components/field-error";
@@ -132,6 +132,7 @@ export function ProblemReportSection() {
         else setError(text);
         return;
       }
+      if (details) clearRecentErrorIds();
       setReference(body.reference ?? "");
       setCopySent(body.copy === "sent");
       setMessage("");
