@@ -42,14 +42,17 @@ a separate owner-approved release PR.
      tab to fields, and so on.
    - A broken rule is a finding, with the rule ID, page, width and what
      happened.
-   - When the change is only layout, styling or copy (nothing a page does,
-     saves, loads or allows), use the ten checks in `docs/SCREEN-AUDIT.md`
-     (SA1 to SA10) in place of the full `docs/SITE-RULES.md` list, and name
-     them in the Rules checked list. If anything in the diff touches
-     behavior, data or permissions, use the full list.
+   - When the change is only layout, styling or copy (no change to what a
+     page does, saves, loads or allows), use the ten checks in
+     `docs/SCREEN-AUDIT.md` (SA1 to SA10) in place of the full
+     `docs/SITE-RULES.md` list, at the same two widths, and list each with a
+     result in the Rules checked list. Also try the site rules for any part
+     the change restyles (for example S1 to S5 when a search box is
+     restyled). If anything in the diff touches behavior, data or
+     permissions, use the full list.
    If no page changed, say so and skip this step.
    A security weakness is never written into the PR, an issue or a comment:
-   this repository is public. Report it to the owner privately (`SECURITY.md`).
+   this repository is public. Stop and tell the owner in the conversation (`SECURITY.md`).
 6. Report only actionable findings, ordered by severity, with exact file and
    line references. Then list verification gaps and decisions separately. Say
    explicitly when no findings remain. End every report with a **Rules

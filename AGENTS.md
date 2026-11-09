@@ -76,9 +76,11 @@ Then `npm run dev`.
   - **Layout, styling or copy only** (no change to what a page does, saves,
     loads or allows; Caleb, November 9, 2026): the browser review uses the ten
     checks in `docs/SCREEN-AUDIT.md` (SA1 to SA10) in place of the full
-    site-rules list, at the same two widths, and lists each with a result.
-    The guard tests and the mobile layout audit still run. If the review finds
-    the change touches behavior, data or permissions, it uses the full list.
+    site-rules list, at the same two widths, and lists each with a result. It
+    also tries the site rules for any part the change restyles (for example
+    S1 to S5 when a search box is restyled). The guard tests and the mobile
+    layout audit still run. If the review finds the change touches behavior,
+    data or permissions, it uses the full list.
 
 ### Rules that tests and the audit enforce
 
@@ -154,8 +156,9 @@ logs, or commits.
 
 This repository is public (Caleb, November 9, 2026). Never write a security
 weakness, or the steps to use one, into an issue, pull request, commit message,
-code comment or document here. Report it to the owner privately (see
-`SECURITY.md`) and fix it from a private note or a private security advisory.
+code comment or document here. Stop and tell the owner in the conversation;
+the fix is then built from a private note or a private security advisory
+(see `SECURITY.md`), with a neutral description in the public PR.
 
 Only a human may approve or perform merging, deployment, production migrations
 or imports, refunds, bulk communications, pricing or capacity changes, identity
