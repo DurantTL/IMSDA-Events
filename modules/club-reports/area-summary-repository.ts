@@ -9,6 +9,7 @@ import {
   type AreaEventClubRow,
 } from "@/modules/club-reports/area-summary-domain";
 import { clubJoinSelect, clubJoinedOn } from "@/modules/club-reports/domain";
+import { loadClubEventPoints } from "@/modules/event-points/awards";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 
 /**
@@ -30,7 +31,7 @@ export async function getAreaClubsSummary(
     select: { id: true, name: true, city: true, parentOrganization: { select: { name: true, city: true } }, ...clubJoinSelect },
   });
   const clubIds = clubs.map((club) => club.id);
-  const [reports, standings, rosterGroups, adultGroups, grants] = await Promise.all([
+  const [reports, standings, rosterGroups, adultGroups, grants, eventPoints] = await Promise.all([
     prisma.clubMonthlyReport.findMany({
       where: { clubYear, organizationId: { in: clubIds } },
       select: { organizationId: true, reportMonth: true, status: true, totalPoints: true, onTimePoints: true, reviewedAt: true },
@@ -58,6 +59,8 @@ export async function getAreaClubsSummary(
       orderBy: { attendeeAccount: { displayName: "asc" } },
       select: { organizationId: true, effectiveFrom: true, effectiveTo: true, revokedAt: true, attendeeAccount: { select: { displayName: true } } },
     }),
+    // Attendance points applied for events in this club year (#1677): counts by club, with the event as the reason.
+    loadClubEventPoints(clubYear, clubIds),
   ]);
   // Counts only, in one batched query; skipped by callers that don't show them.
   const checks = withChecks ? await clubsComplianceReminderCounts(clubIds, clubYear) : new Map();
@@ -80,6 +83,7 @@ export async function getAreaClubsSummary(
       joinedOn: clubJoinedOn(club),
       backgroundChecks: checks.get(club.id) ?? { missing: 0, notInCompliance: 0, expiringSoon: 0 },
       reports: reports.filter((report) => report.organizationId === club.id),
+      attendancePoints: eventPoints.get(club.id),
     }, clubYear, now));
 }
 

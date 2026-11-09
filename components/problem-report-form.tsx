@@ -67,6 +67,7 @@ export function ProblemReportSection() {
   }, [focusRequest]);
   const focusField = (field: "message" | "email") => setFocusRequest((current) => ({ field, n: (current?.n ?? 0) + 1 }));
   const [reference, setReference] = useState("");
+  const [copySent, setCopySent] = useState(false);
   // B6: a typed, unsent report is not lost by leaving the page. The email is prefilled, so only the description counts.
   useUnsavedChangesGuard(message.trim() !== "" && reference === "", "You have typed a problem report that has not been sent. Leave this page and discard it?");
 
@@ -118,7 +119,7 @@ export function ProblemReportSection() {
         headers: { "Content-Type": "application/json", ...check.current?.headers() },
         body: JSON.stringify({ message, email, details, website }),
       });
-      const body = await response.json().catch(() => ({})) as { reference?: string; message?: string; field?: string };
+      const body = await response.json().catch(() => ({})) as { reference?: string; message?: string; field?: string; copy?: string };
       check.current?.settle(body);
       if (!response.ok) {
         if (check.current?.isRejection(body)) return;
@@ -130,6 +131,7 @@ export function ProblemReportSection() {
         return;
       }
       setReference(body.reference ?? "");
+      setCopySent(body.copy === "sent");
       setMessage("");
     } catch {
       check.current?.settle();
@@ -146,7 +148,7 @@ export function ProblemReportSection() {
         {reference ? (
           <p className={styles.thanks} role="status">
             Thanks — reference <span className={styles.reference} translate="no">{reference}</span>. The IT team has it.
-            {email ? " If we need more, we will write to the email you gave." : ""}
+            {copySent ? " We emailed a copy to the email you gave. If we need more, we will write there." : email ? " If we need more, we will write to the email you gave." : ""}
           </p>
         ) : (
           <form className={styles.form} noValidate onSubmit={submit}>

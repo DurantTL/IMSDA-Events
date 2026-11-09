@@ -190,9 +190,12 @@ export function monthlyReportProgress(
   };
 }
 
-/** Year-to-date points: every report's total, plus the yearly registration when it was on time. */
-export function yearToDate(reports: ReadonlyArray<{ totalPoints: number }>, registrationOnTime: boolean) {
-  return reports.reduce((sum, report) => sum + report.totalPoints, 0) + (registrationOnTime ? YEARLY_REGISTRATION_POINTS : 0);
+/**
+ * Year-to-date points: every report's total, plus the yearly registration when it was on time, plus any event attendance
+ * points applied to the club (#1677). Monthly Records points are never changed by event points.
+ */
+export function yearToDate(reports: ReadonlyArray<{ totalPoints: number }>, registrationOnTime: boolean, eventPoints = 0) {
+  return reports.reduce((sum, report) => sum + report.totalPoints, 0) + (registrationOnTime ? YEARLY_REGISTRATION_POINTS : 0) + eventPoints;
 }
 
 /**

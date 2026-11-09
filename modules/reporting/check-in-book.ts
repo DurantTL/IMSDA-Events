@@ -3,7 +3,7 @@ import {
   type RegistrationFormField,
 } from "@/modules/forms/definition";
 import { attendeeAgeKey } from "@/modules/club-registrations/domain";
-import { withLocationColumn, type ClubEventRecord } from "@/modules/reporting/club-event-reports";
+import { attendeeRoleLabel, withLocationColumn, type ClubEventRecord } from "@/modules/reporting/club-event-reports";
 import { isSensitiveField, sensitiveFieldPattern } from "@/modules/forms/sensitive-fields";
 import { isLinkedToBlockedField } from "@/modules/forms/field-dependency-walk";
 import { isFieldSensitive, sectionTitleLookup } from "@/modules/forms/field-flags";
@@ -262,7 +262,7 @@ export function buildCheckInBook(input: BuildCheckInBookInput): CheckInBook {
           firstName: attendee.firstName,
           lastName: attendee.lastName,
           name: formatPersonName(attendee),
-          role: attendee.role ?? "",
+          role: attendeeRoleLabel(attendee),
           age: attendee.ageOnEventDate,
           extra: extraValue(extraField, responsesById.get(attendee.id) ?? {}),
         })),

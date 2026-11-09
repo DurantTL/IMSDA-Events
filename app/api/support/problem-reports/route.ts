@@ -12,6 +12,7 @@ import {
   PROBLEM_REPORT_FAILED_TEXT,
   problemReportInputSchema,
 } from "@/modules/support/problem-report-domain";
+import { sendProblemReportCopy } from "@/modules/support/problem-report-copy";
 import { createProblemReport, storedProblemReportDetails } from "@/modules/support/problem-reports";
 
 /**
@@ -21,7 +22,7 @@ import { createProblemReport, storedProblemReportDetails } from "@/modules/suppo
  * and the signed-in person's email to prefill. Never a secret.
  *
  * POST order: same-origin, the body (its hidden `website` field is the honeypot, checked before the Security check
- * fallback can apply), the rate limit, the Security check with the #1480 fallback for a blocked check, then the write.
+ * fallback can apply), the rate limit, the Security check with the #1480 fallback for a blocked check, then the write and the emailed copy (#1715).
  * Only the known technical-detail fields are kept (see problem-report-domain.ts).
  */
 
@@ -51,9 +52,11 @@ async function postHandler(request: Request) {
       );
     }
 
+    let securityCheckVerified = false;
     const securityCheckFailure = await requireTurnstile(request, {
       action: TURNSTILE_ACTIONS.problemReport,
       fallback: { kind: "public-form", email: input.email ?? null },
+      onVerified: () => { securityCheckVerified = true; },
     });
     if (securityCheckFailure) return applyRateLimitHeaders(securityCheckFailure, rateLimit);
 
@@ -64,13 +67,17 @@ async function postHandler(request: Request) {
       userId = null;
     }
     const release = getReleaseIdentity();
-    const created = await createProblemReport({
+    const details = input.details ? storedProblemReportDetails(input.details, release.sha?.slice(0, 12) ?? release.buildId) : null;
+    const created = await createProblemReport({ message: input.message, email: input.email ?? null, userId, details });
+    // #1715: a copy goes to whoever gave an email, signed in or not, but only for a request whose Security check token was
+    // verified (not the #1480 fallback, not a deployment with the check off). Never throws; the report is already saved.
+    const copy = !securityCheckVerified ? "skipped" : await sendProblemReportCopy(request, {
+      reportId: created.id,
+      reference: created.reference,
       message: input.message,
-      email: input.email ?? null,
-      userId,
-      details: input.details ? storedProblemReportDetails(input.details, release.sha?.slice(0, 12) ?? release.buildId) : null,
+      email: input.email,
     });
-    return applyRateLimitHeaders(Response.json({ reference: created.reference }, { status: 201 }), rateLimit);
+    return applyRateLimitHeaders(Response.json({ reference: created.reference, copy }, { status: 201 }), rateLimit);
   } catch (error) {
     if (error instanceof z.ZodError) {
       const issue = error.issues[0];

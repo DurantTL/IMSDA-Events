@@ -3,7 +3,12 @@ import {
   canTeach,
   defaultTeacherRule,
   requiredTeachers,
+  teacherAgeUnknownLabel,
+  teacherEligibility,
+  teacherEligibilityLabel,
   teacherEntriesSchema,
+  teacherUnderAgeLabel,
+  youngestTeacherAge,
   teacherRuleSchema,
   teacherRuleSummary,
   teacherSettingsSchema,
@@ -74,7 +79,28 @@ describe("club teachers module (#1681)", () => {
     expect(eventModuleDefinition("club-teachers").alwaysOn).toBe(false);
   });
 
-  it("is the only module the scoped (Area Coordinator) path may switch", () => {
-    expect(scopedToggleModuleKeys).toEqual(["club-teachers"]);
+  it("is one of the only modules the scoped (Area Coordinator) path may switch (Camporee scoring #1676 and Attendance points #1677 are the others)", () => {
+    expect(scopedToggleModuleKeys).toEqual(["club-teachers", "event-scoring", "attendance-points"]);
+  });
+});
+
+describe("club teachers must be 18 or older (#1727)", () => {
+  it("refuses 16 and 17 and accepts 18 and over", () => {
+    expect(youngestTeacherAge).toBe(18);
+    expect(teacherEligibility(16)).toBe("under-18");
+    expect(teacherEligibility(17)).toBe("under-18");
+    expect(teacherEligibility(18)).toBe("ok");
+    expect(teacherEligibility(45)).toBe("ok");
+  });
+
+  it("treats an unknown age as not eligible and says why", () => {
+    expect(teacherEligibility(null)).toBe("age-unknown");
+    expect(teacherEligibilityLabel("age-unknown")).toBe(teacherAgeUnknownLabel);
+  });
+
+  it("labels someone under 18 plainly and leaves an eligible teacher unlabelled", () => {
+    expect(teacherEligibilityLabel("under-18")).toBe(teacherUnderAgeLabel);
+    expect(teacherUnderAgeLabel).toBe("Under 18, can't teach");
+    expect(teacherEligibilityLabel("ok")).toBeNull();
   });
 });

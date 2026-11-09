@@ -11,6 +11,7 @@ import {
   eventStatusLabels,
   monthStatusLabels,
   pointsChartDescription,
+  registrationPointsOf,
   sortLeaderboard,
   type AreaClubSummary,
   type LeaderboardSort,
@@ -176,6 +177,8 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
   const max = Math.max(1, ...ranked.map((club) => club.totalPoints));
   const rankOf = new Map(ranked.map((club, index) => [club.id, index + 1]));
   const sorted = filterClubsByName(ranked, query);
+  // Event points (#1677) get a column only once a club has some.
+  const showEvents = clubs.some((club) => club.eventPoints > 0);
   const sortHref = customSortHref ?? ((value: LeaderboardSort) => `${basePath}?year=${encodeURIComponent(clubYear)}&sort=${value}${query ? `&q=${encodeURIComponent(query)}` : ""}`);
   return (
     <>
@@ -215,6 +218,7 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
                   <th role="columnheader" scope="col">Club</th>
                   <th role="columnheader" scope="col">Report points</th>
                   <th role="columnheader" scope="col">Yearly registration</th>
+                  {showEvents && <th role="columnheader" scope="col">Event points</th>}
                   <th role="columnheader" scope="col">Total points</th>
                   {links && <th role="columnheader" scope="col">Supporting records</th>}
                 </tr>
@@ -225,7 +229,8 @@ export function AreaPointsChart({ clubs, clubYear, sort, basePath, query, links,
                     <td {...cardCell("Rank")}>{rankOf.get(club.id)}</td>
                     <th role="rowheader" scope="row" translate="no">{club.name}</th>
                     <td {...cardCell("Report points")}>{formatNumber(club.reportPoints)}</td>
-                    <td {...cardCell("Yearly registration")}>{formatNumber(club.totalPoints - club.reportPoints)}</td>
+                    <td {...cardCell("Yearly registration")}>{formatNumber(registrationPointsOf(club))}</td>
+                    {showEvents && <td {...cardCell("Event points")}>{formatNumber(club.eventPoints)}</td>}
                     <td {...cardCell("Total points")}><strong>{formatNumber(club.totalPoints)}</strong></td>
                     {links && (
                       <td {...cardCell("Supporting records")}>

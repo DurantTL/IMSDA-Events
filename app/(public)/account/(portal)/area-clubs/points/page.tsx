@@ -7,11 +7,12 @@ import { CalendarCheck, ListChecks, Medal, Trophy } from "lucide-react";
 import { CoordinatorSummaryTiles } from "@/components/coordinator-summary-tiles";
 import { AreaClubSearch } from "@/components/area-clubs-views";
 import { PointsBars } from "@/components/club-report-charts";
+import { EventPointsByClub } from "@/components/event-points-by-club";
 import { CoordinatorPointsRanking, ShowTopLink } from "@/components/coordinator-points";
 import { CoordinatorUnavailable } from "@/components/coordinator-overview";
 import { CoordinatorDestinationHeading, CoordinatorExportLink, CoordinatorNoMatch } from "@/components/coordinator-destinations";
 import { logError } from "@/lib/logger";
-import { filterClubsByName, parseClubQuery, parseLeaderboardSort } from "@/modules/club-reports/area-summary-domain";
+import { eventAwardRows, filterClubsByName, parseClubQuery, parseLeaderboardSort } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
 import { POINTS_HELP } from "@/modules/club-reports/coordinator-destinations-domain";
@@ -81,6 +82,7 @@ export default async function AreaPointsPage({ searchParams }: { searchParams: P
               />
               {showAll && clubs.length > POINTS_CHART_LIMIT && <ShowTopLink href={pointsPageHref(BASE_PATH, state)} />}
               <CoordinatorPointsRanking allClubs={allClubs} clubYear={clubYear} open={Boolean(params.sort)} query={query} sorting={serverSort(BASE_PATH, params, COORDINATOR_RANKING_SORT_COLUMNS, COORDINATOR_RANKING_DEFAULT_SORT, { firstDirection: rankingFirstDirection})} />
+              <EventPointsByClub clubYear={clubYear} rows={eventAwardRows(clubs)} />
             </>
           )}
         </>

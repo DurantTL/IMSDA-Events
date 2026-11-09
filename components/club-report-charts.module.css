@@ -111,6 +111,10 @@
 
 .seriesDark { background: var(--imsda-navy); color: #fff; }
 .seriesLight { background: #7fa6bd; color: #00263a; }
+.seriesEvent {
+  background: repeating-linear-gradient(45deg, var(--imsda-navy) 0 4px, #7fa6bd 4px 6px);
+  color: #00263a;
+}
 .seriesHatch {
   background: repeating-linear-gradient(45deg, #ffffff 0 3px, #8a949a 3px 4px);
   color: #1f2a30;
@@ -188,6 +192,7 @@
 
 .barReport { background: var(--imsda-navy); }
 .barRegistration { background: #7fa6bd; }
+.barEvent { background: repeating-linear-gradient(45deg, var(--imsda-navy) 0 4px, #7fa6bd 4px 6px); }
 
 @media (min-width: 640px) {
   .barRow {

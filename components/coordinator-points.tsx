@@ -4,7 +4,7 @@ import { CoordinatorScrollRegion } from "@/components/coordinator-destinations";
 import { SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import { sortOrderText, sortRows, type ServerSort } from "@/lib/list-sort";
-import { filterClubsByName, sortLeaderboard, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
+import { filterClubsByName, registrationPointsOf, sortLeaderboard, type AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
 import { rankingAccessors, type CoordinatorRankingSortColumn } from "@/modules/club-reports/area-table-sort";
 import { supportingRecordMonths } from "@/modules/club-reports/coordinator-destinations-domain";
 import { POINTS_CHART_LIMIT } from "@/modules/club-reports/coordinator-points-domain";
@@ -27,7 +27,9 @@ export function CoordinatorPointsRanking({ allClubs, clubYear, query, sorting, o
   const rankOf = new Map(sortLeaderboard(allClubs, "points").map((club, index) => [club.id, index + 1]));
   const { key, dir } = sorting.order;
   const rows = filterClubsByName(key ? sortRows(sortLeaderboard(allClubs, "points"), key, dir, rankingAccessors(rankOf)) : sortLeaderboard(allClubs, "points"), query);
-  const sortWords: Record<CoordinatorRankingSortColumn, string> = { rank: "rank", name: "club name", reportPoints: "report points", registration: "yearly registration", points: "total points" };
+  const sortWords: Record<CoordinatorRankingSortColumn, string> = { rank: "rank", name: "club name", reportPoints: "report points", registration: "yearly registration", eventPoints: "event points", points: "total points" };
+  // Event points (#1677) get a column only once a club has some, so the table is unchanged until then.
+  const showEvents = allClubs.some((club) => club.eventPoints > 0);
   return (
     <details className={styles.details} open={open || undefined}>
       <summary className={styles.summary}>Show as a table (ranking and supporting records)</summary>
@@ -41,6 +43,7 @@ export function CoordinatorPointsRanking({ allClubs, clubYear, query, sorting, o
               <ColumnHeader column="name" label="Club" sorting={sorting} />
               <ColumnHeader column="reportPoints" label="Report points" sorting={sorting} />
               <ColumnHeader column="registration" label="Yearly registration" sorting={sorting} />
+              {showEvents && <ColumnHeader column="eventPoints" label="Event points" sorting={sorting} />}
               <ColumnHeader column="points" label="Total points" sorting={sorting} />
               <th role="columnheader" scope="col">Supporting records</th>
             </tr>
@@ -53,7 +56,8 @@ export function CoordinatorPointsRanking({ allClubs, clubYear, query, sorting, o
                   <td {...cardCell("Rank")}>{rankOf.get(club.id)}</td>
                   <th role="rowheader" scope="row" translate="no">{club.name}</th>
                   <td {...cardCell("Report points")}>{formatNumber(club.reportPoints)}</td>
-                  <td {...cardCell("Yearly registration")}>{formatNumber(club.totalPoints - club.reportPoints)}</td>
+                  <td {...cardCell("Yearly registration")}>{formatNumber(registrationPointsOf(club))}</td>
+                  {showEvents && <td {...cardCell("Event points")}>{formatNumber(club.eventPoints)}</td>}
                   <td {...cardCell("Total points")}><strong>{formatNumber(club.totalPoints)}</strong></td>
                   <td {...cardCell("Supporting records")}>
                     <span className={styles.records}>

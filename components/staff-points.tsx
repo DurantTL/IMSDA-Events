@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ListPager } from "@/components/list-pager";
 import { PointsBars, ReportSummaryBand } from "@/components/club-report-charts";
+import { EventPointsByClub } from "@/components/event-points-by-club";
+import { eventAwardRows } from "@/modules/club-reports/area-summary-domain";
 import type { StaffPointsView } from "@/modules/club-reports/staff-points-domain";
 import styles from "./staff-points.module.css";
 
@@ -31,6 +33,7 @@ export function StaffPoints({ clubYear, view }: { clubYear: string; view: StaffP
           title={view.expanded ? "All clubs by total points" : "Top 10 clubs by total points"}
         />
       )}
+      <EventPointsByClub clubYear={clubYear} rows={eventAwardRows(view.matches)} />
     </div>
   );
 }

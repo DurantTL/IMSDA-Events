@@ -100,4 +100,16 @@ describe("PUT clubs/[organizationId]/events/[eventId]/teachers (#1681)", () => {
     expect((await clubPut(clubRequest(body), clubCtx)).status).toBe(200);
     expect(mocks.setClubTeachers).toHaveBeenCalledWith("club-1", "event-1", { accountId: "director-1" }, body);
   });
+
+  it("answers 422 with a clear message when a teacher is under 18 or has no known age (#1727)", async () => {
+    mocks.requireRosterAccess.mockResolvedValue({ state: "OPEN", actor: { kind: "ATTENDEE", accountId: "director-1", sessionId: "s1" } });
+    mocks.setClubTeachers.mockRejectedValueOnce(new ClubTeacherError("TEACHER_UNDER_18", "Teachers must be 18 or older. Remove anyone under 18 and name an adult instead."));
+    const under = await clubPut(clubRequest(body), clubCtx);
+    expect(under.status).toBe(422);
+    expect(await under.json()).toMatchObject({ error: "TEACHER_UNDER_18", message: expect.stringContaining("18 or older") });
+    mocks.setClubTeachers.mockRejectedValueOnce(new ClubTeacherError("TEACHER_AGE_UNKNOWN", "A teacher's age is needed. Add the birth date on your roster first."));
+    const unknown = await clubPut(clubRequest(body), clubCtx);
+    expect(unknown.status).toBe(422);
+    expect(await unknown.json()).toMatchObject({ error: "TEACHER_AGE_UNKNOWN", message: expect.stringContaining("birth date") });
+  });
 });

@@ -10,6 +10,12 @@ const dependencies = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 // The registration PDF (#1082) is made after the commit and has its own tests. This fake database has no PDF tables.
 vi.mock("@/modules/registration-pdf/after-commit", () => ({ attachRegistrationPdfAfterCommit: vi.fn(), finishRegistrationChange: vi.fn() }));
+// The team rules run in the amendment's own transaction and are covered by a database script; here the guard stands aside.
+// It is the original everywhere except in tests that switch it off.
+vi.mock("@/modules/club-teams/registration-guard", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/modules/club-teams/registration-guard")>();
+  return { ...original, enforceTeamRegistrationRules: vi.fn(original.enforceTeamRegistrationRules) };
+});
 vi.mock("@/lib/env", () => ({ getServerEnv: dependencies.getServerEnv }));
 vi.mock("@/lib/prisma", () => ({ getPrisma: dependencies.getPrisma }));
 vi.mock("@/modules/registrations/repository", () => ({
@@ -213,7 +219,7 @@ function fixture({
     clubEventRegistration: { findUnique: vi.fn(async (): Promise<{ registrationId: string } | null> => ({ registrationId: "registration-1" })) },
     eventMealSelection: { findMany: vi.fn(async () => []) },
     // The instructor class change log (#1098) reads a removed attendee's picks; there are none.
-    honorEnrollment: { findMany: vi.fn(async () => []) },
+    honorEnrollment: { findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
     registrationAttendee: {
       findMany: vi.fn(async () => registration.attendees.map((a) => ({ id: a.id, personId: a.personId, profileSnapshot: a.profileSnapshot, formResponses: a.formResponses }))),
       count: vi.fn(async () => 0),
@@ -299,7 +305,7 @@ const baseEdit = () => ({
   selectedMemberIds: ["m1"],
   keptGuestIds: [] as string[],
   keptOffRosterAttendeeIds: [] as string[],
-  newGuests: [] as Array<{ id: string; firstName: string; lastName: string; age: number; email: string | null; guestType?: "YOUTH" | "ADULT" | "UNDERAGE" }>,
+  newGuests: [] as Array<{ id: string; firstName: string; lastName: string; age: number; email: string | null; guestType?: "YOUTH" | "ADULT" | "UNDERAGE"; notPathfinder?: boolean }>,
   attendeeResponses: {} as Record<string, Record<string, unknown>>,
   rosterAges: {} as Record<string, number>,
   saveAgeToRosterIds: [] as string[],
@@ -799,6 +805,131 @@ describe("a child added for the event only, on an edit (#1666)", () => {
       ...baseEdit(), keptOffRosterAttendeeIds: ["attendee-m2"], newGuests: [kid],
     }, beforeDeadline)).rejects.toMatchObject({ code: "ATTENDEES_INVALID" });
     expect(prisma.registrationAttendee.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("an event-only guest aged 10 to 17, on an edit (#1728)", () => {
+  const roleDefinition: TestDefinition = {
+    ...baseDefinition,
+    sections: baseDefinition.sections.map((section) => section.id === "roster"
+      ? { ...section, fields: [...section.fields, { id: "a_role", key: "attendee_type", label: "Roster role", helpText: "", type: "RADIO", scope: "ATTENDEE", required: false, options: ["Pathfinder", "TLT", "Staff", "Child"] }] }
+      : section),
+  };
+  const teen = { id: "guestteen001", firstName: "Robin", lastName: "Visitor", age: 13, email: null };
+  const registeredGuest = (age: number, snapshot: Record<string, unknown>, role: string) => {
+    const guest = attendee("attendee-teen", "unused", "Robin", "Visitor", age, {}, { attendee_type: role });
+    guest.profileSnapshot = {
+      firstName: "Robin", lastName: "Visitor", email: null, phone: null, source: "CLUB_REGISTRATION",
+      clubOrganizationId: "club-1", ageOnEventDate: age, temporary: true, clubGuestId: "guestteen001", ...snapshot,
+    };
+    return guest;
+  };
+  const edit = (prisma: ReturnType<typeof fixture>["prisma"], guestMarks: Record<string, boolean> | undefined, role = "Pathfinder") => amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+    ...baseEdit(),
+    keptGuestIds: ["guestteen001"],
+    ...(guestMarks ? { keptGuestNotPathfinder: guestMarks } : {}),
+    attendeeResponses: { "guest:guestteen001": { attendee_type: role } },
+  }, beforeDeadline).then(() => updateFor(prisma, "attendee-teen")!);
+
+  it("stores a marked new guest as a youth with the role the director chose, plus the mark", async () => {
+    const { prisma } = fixture({ definition: roleDefinition });
+    await amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(),
+      keptOffRosterAttendeeIds: ["attendee-m2"],
+      newGuests: [{ ...teen, guestType: "YOUTH", notPathfinder: true }],
+      attendeeResponses: { "guest:guestteen001": { attendee_type: "Child" } },
+    }, beforeDeadline);
+    const created = prisma.registrationAttendee.create.mock.calls[0]![0].data;
+    expect(created.profileSnapshot).toMatchObject({ ageOnEventDate: 13, temporary: true, temporaryAttendeeType: "YOUTH", notPathfinder: true, clubGuestId: "guestteen001" });
+    // Priced and asked as a youth: a Child answer becomes Pathfinder.
+    expect(created.formResponses).toMatchObject({ attendee_type: "Pathfinder" });
+  });
+
+  it("stores an unmarked new guest as a plain Pathfinder", async () => {
+    const { prisma } = fixture({ definition: roleDefinition });
+    await amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(),
+      keptOffRosterAttendeeIds: ["attendee-m2"],
+      newGuests: [{ ...teen, guestType: "YOUTH" }],
+      attendeeResponses: { "guest:guestteen001": { attendee_type: "Pathfinder" } },
+    }, beforeDeadline);
+    const created = prisma.registrationAttendee.create.mock.calls[0]![0].data;
+    expect(created.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH" });
+    expect(created.profileSnapshot).not.toHaveProperty("notPathfinder");
+  });
+
+  it("refuses a new Child aged 10 or older", async () => {
+    const { prisma } = fixture({ definition: roleDefinition });
+    await expect(amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+      ...baseEdit(), keptOffRosterAttendeeIds: ["attendee-m2"], newGuests: [{ ...teen, guestType: "UNDERAGE" }],
+    }, beforeDeadline)).rejects.toMatchObject({ code: "ATTENDEES_INVALID" });
+    expect(prisma.registrationAttendee.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses the mark for a guest under 10 or 18 and over", async () => {
+    for (const age of [9, 18]) {
+      const { prisma } = fixture({ definition: roleDefinition });
+      await expect(amendClubRegistration("club-1", "event-1", { accountId: "director-1" }, {
+        ...baseEdit(), keptOffRosterAttendeeIds: ["attendee-m2"], newGuests: [{ ...teen, age, notPathfinder: true }],
+      }, beforeDeadline)).rejects.toBeTruthy();
+      expect(prisma.registrationAttendee.create).not.toHaveBeenCalled();
+    }
+  });
+
+  it("keeps a registered marked guest's mark when the edit says nothing, and lets the director untick it", async () => {
+    const registered = () => [attendee("attendee-m1", "m1", "Alex", "Sample", 11), registeredGuest(13, { temporaryAttendeeType: "YOUTH", notPathfinder: true }, "Pathfinder")];
+    const kept = await edit(fixture({ definition: roleDefinition, attendees: registered() }).prisma, undefined);
+    expect(kept.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH", notPathfinder: true });
+    const fixtureB = fixture({ definition: roleDefinition, attendees: registered() });
+    const unticked = await edit(fixtureB.prisma, { guestteen001: false });
+    expect(unticked.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH", notPathfinder: false });
+    expect(unticked.formResponses).toMatchObject({ attendee_type: "Pathfinder" });
+  });
+
+  it("reads a guest saved as Child at 13 under #1666 as marked, and re-saves it as a youth with the Pathfinder role", async () => {
+    const legacy = () => [attendee("attendee-m1", "m1", "Alex", "Sample", 11), registeredGuest(13, { temporaryAttendeeType: "UNDERAGE" }, "Child")];
+    const keptMarked = await edit(fixture({ definition: roleDefinition, attendees: legacy() }).prisma, { guestteen001: true }, "Child");
+    expect(keptMarked.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH", notPathfinder: true });
+    expect(keptMarked.formResponses).toMatchObject({ attendee_type: "Pathfinder" });
+    const unticked = await edit(fixture({ definition: roleDefinition, attendees: legacy() }).prisma, { guestteen001: false }, "Child");
+    expect(unticked.profileSnapshot).toMatchObject({ temporaryAttendeeType: "YOUTH", notPathfinder: false });
+    expect(unticked.formResponses).toMatchObject({ attendee_type: "Pathfinder" });
+  });
+
+  it("refuses a changed mark while the guest has classes, and allows an unchanged one", async () => {
+    const registered = () => [attendee("attendee-m1", "m1", "Alex", "Sample", 11), registeredGuest(13, { temporaryAttendeeType: "YOUTH", notPathfinder: true }, "Pathfinder")];
+    const held = fixture({ definition: roleDefinition, attendees: registered() });
+    held.prisma.honorEnrollment.count.mockResolvedValue(1);
+    await expect(edit(held.prisma, { guestteen001: false })).rejects.toMatchObject({ code: "ATTENDEES_INVALID", message: expect.stringContaining("Remove their classes first") });
+    expect(held.prisma.honorEnrollment.count).toHaveBeenCalledWith({ where: { registrationAttendeeId: "attendee-teen" } });
+    const unchanged = fixture({ definition: roleDefinition, attendees: registered() });
+    unchanged.prisma.honorEnrollment.count.mockResolvedValue(1);
+    await expect(edit(unchanged.prisma, { guestteen001: true })).resolves.toBeTruthy();
+  });
+
+  it("on a team event refuses a true mark and never writes the mark, even a false one", async () => {
+    const teamRows = ({
+      eventId: "event-1", allowMultipleTeams: true, minTeamMembers: null, maxTeamMembers: null, maxAlternates: 0,
+      ageAsOf: null, maxMemberAge: null, booksLine: "", levelInfo: [],
+    }) as never;
+    const registered = () => [attendee("attendee-m1", "m1", "Alex", "Sample", 11), registeredGuest(13, { temporaryAttendeeType: "YOUTH" }, "Pathfinder")];
+    const refused = fixture({ definition: roleDefinition, attendees: registered() });
+    refused.prisma.eventTeamSettings.findUnique.mockResolvedValue(teamRows);
+    await expect(edit(refused.prisma, { guestteen001: true })).rejects.toMatchObject({ code: "ATTENDEES_INVALID" });
+    const plain = fixture({ definition: roleDefinition, attendees: registered() });
+    plain.prisma.eventTeamSettings.findUnique.mockResolvedValue(teamRows);
+    const { enforceTeamRegistrationRules } = await import("@/modules/club-teams/registration-guard");
+    vi.mocked(enforceTeamRegistrationRules).mockResolvedValueOnce({ queuedMessageIds: [] });
+    const kept = await edit(plain.prisma, { guestteen001: false });
+    expect(kept.profileSnapshot).not.toHaveProperty("notPathfinder");
+  });
+
+  it("keeps a child under 10 a Child with the Child role, and refuses marking them", async () => {
+    const child = () => [attendee("attendee-m1", "m1", "Alex", "Sample", 11), registeredGuest(5, { temporaryAttendeeType: "UNDERAGE" }, "Child")];
+    const kept = await edit(fixture({ definition: roleDefinition, attendees: child() }).prisma, undefined);
+    expect(kept.profileSnapshot).toMatchObject({ temporaryAttendeeType: "UNDERAGE" });
+    expect(kept.formResponses).toMatchObject({ attendee_type: "Child" });
+    await expect(edit(fixture({ definition: roleDefinition, attendees: child() }).prisma, { guestteen001: true })).rejects.toMatchObject({ code: "ATTENDEES_INVALID" });
   });
 });
 

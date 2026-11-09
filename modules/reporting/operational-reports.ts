@@ -1,4 +1,5 @@
 import { isProtectedAnswerField } from "@/modules/attendee-accounts/registration-answer-policy";
+import { YOUTH_GUEST_ROLE_LABEL } from "@/modules/reporting/club-event-reports";
 import { isHealthTypeField } from "@/modules/forms/field-flags";
 import {
   registrationFormDefinitionSchema,
@@ -40,6 +41,8 @@ export type OperationalReportRegistration = {
     attendeeType: string;
     position: number;
     responses: JsonRecord;
+    /** A club guest aged 10 to 17 who is not a Pathfinder (#1728). */
+    youthGuestNotPathfinder?: boolean;
   }>;
   publicSubmission: {
     responses: JsonRecord;
@@ -606,7 +609,7 @@ export function buildOperationalReport(
         ? attendee.responses
         : registration.publicSubmission?.attendeeResponses[index] ?? {};
       const fallbackType = normalizeWords(attendee.attendeeType.toLocaleLowerCase("en-US").replace(/_/g, " "));
-      const typeLabel = stringAnswer(currentResponses.attendee_type) ?? (fallbackType.charAt(0).toLocaleUpperCase("en-US") + fallbackType.slice(1));
+      const typeLabel = attendee.youthGuestNotPathfinder ? YOUTH_GUEST_ROLE_LABEL : stringAnswer(currentResponses.attendee_type) ?? (fallbackType.charAt(0).toLocaleUpperCase("en-US") + fallbackType.slice(1));
       const typeKey = normalizedIdentity(typeLabel);
       let typeGroup = typeGroups.get(typeKey);
       if (!typeGroup) {
