@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { staffPageTitles } from "@/components/staff-navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { SquarePaymentMatching } from "@/components/square-payment-matching";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -8,7 +9,7 @@ import {
   SquareMatchOperationError,
 } from "@/modules/payments/square-match-repository";
 
-export const metadata: Metadata = { title: "Unmatched Square payments" };
+export const metadata: Metadata = { title: staffPageTitles.squarePayments };
 
 export default async function SquarePaymentsPage({
   searchParams,

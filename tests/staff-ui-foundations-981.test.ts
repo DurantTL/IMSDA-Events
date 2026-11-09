@@ -9,8 +9,8 @@ const css = read("app/globals.css");
 const audit = read("scripts/verify-mobile-layout.ts");
 
 describe("staff UI foundations (#981 batch 1)", () => {
-  it("raises the meta floor to 14px on the staff workspace only, keeping a 12px floor for uppercase labels", () => {
-    expect(css).toMatch(/@media screen \{\s*\.app-shell \{\s*--type-floor: 0\.875rem;\s*--type-label-floor: 0\.75rem;\s*\/\*[^*]*\*\/\s*--type-staff-floor: 0\.875rem;/);
+  it("raises the meta floor to 14px on the staff workspace only, with uppercase labels held to 14px too (#1732)", () => {
+    expect(css).toMatch(/@media screen \{\s*\.app-shell \{\s*--type-floor: 0\.875rem;\s*--type-label-floor: 0\.875rem;\s*\/\*[^*]*\*\/\s*--type-staff-floor: 0\.875rem;/);
     // The :root floors stay as they were (club, account and public pages keep 12px meta text).
     expect(css).toMatch(/@media screen \{\s*:root \{\s*--type-floor: 0\.75rem;\s*--type-body-floor: 0\.875rem;/);
   });
@@ -38,6 +38,24 @@ describe("staff UI foundations (#981 batch 1)", () => {
   it("does not let the colour, file, checkbox and radio rules reach visually hidden inputs", () => {
     expect(css).toContain('input[type="file"]:not(.sr-only, .visually-hidden) {');
     expect(css).toContain('.app-shell input[type="color"]:not(.sr-only, .visually-hidden) {');
+  });
+
+  it("holds staff uppercase labels and the mobile audit to 14px, and keeps the staff controls at 44px at every width (#1732)", () => {
+    expect(audit).toContain("const upperLabelFloorPx = staffTextFloorPx;");
+    expect(audit).not.toMatch(/const upperLabelFloorPx = 12;/);
+    expect(css).toMatch(/\.app-shell \{\s*--type-floor: 0\.875rem;\s*--type-label-floor: 0\.875rem;/);
+    expect(css).toMatch(/\.setup-step \.text-button \{[^}]*min-height: var\(--touch-target, 44px\);/);
+    expect(css).not.toMatch(/\.setup-step \.text-button \{[^}]*min-height: 36px/);
+    expect(css).toMatch(/\.arrival-row button \{[^}]*min-height: var\(--touch-target, 44px\);/);
+    expect(css).toMatch(/:where\(\.filter-field select\) \{ min-height: var\(--target-touch\); \}/);
+    expect(css).toMatch(/\.operations-search-form \.field select \{ min-height: 44px; \}/);
+    // The table headers the issue names read their size through the label floor.
+    expect(css).toMatch(/\.finance-head \{[^}]*max\(var\(--type-label-floor/);
+    expect(css).toMatch(/\.report-table thead th \{[^}]*max\(var\(--type-label-floor/);
+  });
+
+  it("holds the staff event pickers, which render outside .app-shell, to 14px labels (#1732)", () => {
+    expect(css).toMatch(/\.select-event-card \.eyebrow,\s*\.select-event-card \.auth-brand > span small \{ font-size: 0\.875rem; \}/);
   });
 
   it("declares the staff and label floors only on .app-shell, so club, account and public pages keep 12px meta text", () => {

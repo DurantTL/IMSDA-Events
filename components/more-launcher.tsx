@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import type { HTMLAttributes, ReactNode, Ref, RefObject } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -52,8 +52,8 @@ import { eventModuleDefinition, moduleForCard } from "@/modules/event-modules/ca
  * tabs still work.
  */
 function setBackgroundInert(inert: boolean) {
-  // The sidebar and the main content only: the phone tab bar stays live, so a tap on another tab navigates.
-  for (const element of document.querySelectorAll<HTMLElement>(".app-shell > .sidebar, .app-shell > .workspace")) {
+  // The header and the page only: the phone tab bar stays live, so a tap on another tab navigates.
+  for (const element of document.querySelectorAll<HTMLElement>(".app-shell > [data-shell-region]")) {
     element.inert = inert;
   }
 }
@@ -72,8 +72,12 @@ function launcherInitialFocus(
   return { remembered, rememberedCard, target: rememberedCard ?? firstFocus ?? panel?.querySelector<HTMLElement>("a[href]") };
 }
 
+/** A list of links drawn above the cards: "This event" (the event's tabs) and the other areas (#1565). Never filtered by the tool search. */
+export type LauncherSection = { key: string; label: string; items: readonly { key: string; label: string; href: string; current?: boolean }[] };
+
 export function MoreLauncherPanel({
   cards,
+  sections,
   moduleStates,
   destinations,
   sidebarHrefs,
@@ -85,10 +89,13 @@ export function MoreLauncherPanel({
   id,
   panelRef,
   onNavigate,
+  onClose,
   variant,
   style,
 }: {
   cards: readonly MoreDirectoryCard[];
+  /** Links above the cards: "This event" first inside an event, then the other areas. */
+  sections?: readonly LauncherSection[];
   /** Module states for the selected event (#1180, #741 rules): off modules are listed apart from the cards, as a real link or as plain text. */
   moduleStates?: readonly ModuleDestinationEntry[];
   /** The phone sheet carries the destination search (#1177); the desktop sidebar has its own. */
@@ -110,10 +117,13 @@ export function MoreLauncherPanel({
   id?: string;
   panelRef?: Ref<HTMLDivElement>;
   onNavigate?: (card?: { key: string; href: string }) => void;
+  /** The phone sheet's Close button (#1566). */
+  onClose?: () => void;
   variant: "sidebar" | "tab";
   style?: HTMLAttributes<HTMLDivElement>["style"];
 }) {
   const searchId = useId();
+  const titleId = `${searchId}-title`;
   const statusId = `${searchId}-status`;
   const [search, setSearch] = useState("");
   const listed = omitSidebarDuplicates(cards, variant === "sidebar" ? sidebarHrefs : undefined);
@@ -219,10 +229,18 @@ export function MoreLauncherPanel({
       ref={panelRef}
       role="dialog"
       aria-modal={variant === "tab" ? "true" : undefined}
-      aria-label="More tools"
+      aria-label={variant === "tab" ? undefined : "More tools"}
+      aria-labelledby={variant === "tab" ? titleId : undefined}
       style={style}
       tabIndex={-1}
     >
+      {/* The phone sheet names itself and keeps Close in view while a long list scrolls inside it (#1566). */}
+      {variant === "tab" && (
+        <div className="more-launcher-head" inert={Boolean(confirming) || undefined}>
+          <h2 id={titleId}>More</h2>
+          <button type="button" className="more-launcher-close" onClick={() => onClose?.()}><X aria-hidden="true" size={18} /><span>Close</span></button>
+        </div>
+      )}
       {/* While the confirm is open the rest of the panel is inert, to match aria-modal. */}
       {variant === "tab" && destinations && destinations.length > 0 && (
         <div className="more-launcher-destination-search" inert={Boolean(confirming) || undefined}>
@@ -248,8 +266,22 @@ export function MoreLauncherPanel({
         </div>
         <p aria-live="polite" className="more-launcher-search-status" id={statusId} role="status">{launcherSearchStatus(search, matchCount)}</p>
       </div>
-      {listed.every((card) => !card.allowed) && <p className="more-launcher-empty">Everything you can open is in the sidebar.</p>}
+      {listed.every((card) => !card.allowed) && !(sections?.length) && <p className="more-launcher-empty">Everything you can open is in the menus.</p>}
       <div className="more-launcher-columns" inert={confirming ? true : undefined}>
+        {sections?.map((section) => (
+          <section className="more-launcher-group" aria-label={section.label} key={section.key} data-group={section.key}>
+            <h2 className="more-launcher-group-label">{section.label}</h2>
+            <ul>
+              {section.items.map((item) => (
+                <li key={item.key}>
+                  <GuardedLink className="more-launcher-item" href={item.href} aria-current={item.current ? "true" : undefined} onNavigate={() => onNavigate?.()} data-section-item={item.key}>
+                    <span>{item.label}</span>
+                  </GuardedLink>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
         {groups.map(({ group, label, cards: groupCards }) => (
           <section className="more-launcher-group" aria-label={label} key={group} data-group={group}>
             <h2 className="more-launcher-group-label">{label}</h2>
@@ -314,7 +346,7 @@ export function MoreLauncherPanel({
           onKeyDown={onConfirmKeyDown}
         >
           <h3 id="more-launcher-confirm-title">Turn off {eventModuleDefinition(confirming.moduleKey as Parameters<typeof eventModuleDefinition>[0]).title}?</h3>
-          <p id="more-launcher-confirm-body">Its pages and links are hidden for this event. The data is kept, and you can turn it back on from Event modules.</p>
+          <p id="more-launcher-confirm-body">Its pages and links are hidden for this event. The data is kept, and you can turn it back on from Event features.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="more-launcher-confirm-actions button-pair">
             <button className="secondary-button" type="button" ref={cancelRef} onClick={cancelConfirm} disabled={busy}>Cancel</button>
@@ -340,7 +372,9 @@ export function MoreLauncher({
   href,
   className,
   isActive,
+  currentMark,
   cards,
+  sections,
   moduleStates,
   destinations,
   sidebarHrefs,
@@ -358,7 +392,11 @@ export function MoreLauncher({
   href: string;
   className?: string;
   isActive: boolean;
+  /** Overrides the "page" or "true" the trigger says when lit (the phone bar passes "true" when the row above says "page"). */
+  currentMark?: "page" | "true";
   cards: readonly MoreDirectoryCard[];
+  /** "This event" and the other areas, above the cards (#1565). */
+  sections?: readonly LauncherSection[];
   moduleStates?: readonly ModuleDestinationEntry[];
   /** Phone sheet only: the destination search (#1177) sits at the top of the sheet. */
   destinations?: readonly SearchDestination[];
@@ -457,7 +495,7 @@ export function MoreLauncher({
       close("escape");
       return;
     }
-    const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input.destination-search-input, input.more-launcher-search-input, a[href], button.more-launcher-toggle:not([disabled])") ?? []);
+    const items = Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input.destination-search-input, input.more-launcher-search-input, button.more-launcher-close, a[href], button.more-launcher-toggle:not([disabled])") ?? []);
     const current = items.indexOf(document.activeElement as HTMLElement);
     // In the search box the caret keys and Home/End edit the text; only Up, Down and Tab leave it.
     if (document.activeElement instanceof HTMLInputElement && !["ArrowDown", "ArrowUp", "Tab"].includes(event.key)) return;
@@ -475,7 +513,7 @@ export function MoreLauncher({
         ref={triggerRef}
         className={className}
         href={href}
-        aria-current={isActive ? "page" : undefined}
+        aria-current={isActive ? (currentMark ?? (pathname === href.split(/[?#]/)[0] ? "page" : "true")) : undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
@@ -504,6 +542,7 @@ export function MoreLauncher({
           <div className="more-launcher-region" onKeyDown={onPanelKeyDown}>
             <MoreLauncherPanel
               cards={cards}
+              sections={sections}
               moduleStates={moduleStates}
               destinations={destinations}
               sidebarHrefs={sidebarHrefs}
@@ -518,6 +557,7 @@ export function MoreLauncher({
                 close("navigate");
               }}
               panelRef={panelRef}
+              onClose={() => close("toggle")}
               style={variant === "sidebar" && anchor ? { left: anchor.left, bottom: anchor.bottom, maxHeight: `calc(100vh - ${anchor.bottom + 12}px)` } : undefined}
               variant={variant}
             />

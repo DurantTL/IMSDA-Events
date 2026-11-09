@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { opensWithoutEvent } from "@/components/no-event-paths";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { REQUEST_TARGET_HEADER } from "@/modules/access/login-routing";
 import { profileHomeFor, resolveProfileSessions, twoStepQuery } from "@/modules/account-profile/load-profile";
@@ -39,9 +40,7 @@ async function profileRequestQuery(): Promise<URLSearchParams | null> {
 async function isHelpRequest(): Promise<boolean> {
   try {
     const target = (await headers()).get(REQUEST_TARGET_HEADER) ?? "";
-    const path = target.split("?", 1)[0].split("#", 1)[0].replace(/\/+$/, "");
-    // The site content editor (#111) is open to a staff member with no event; the page itself checks the grant.
-    return path === "/help" || path.startsWith("/help/") || path === "/admin/site-content" || path.startsWith("/admin/site-content/");
+    return opensWithoutEvent(target);
   } catch {
     return false;
   }

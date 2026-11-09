@@ -8,6 +8,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { getPrisma } from "@/lib/prisma";
 import { rosterYearView } from "@/modules/club-rosters/domain";
 import { listActiveHonorOptions, listClubHonorsPage } from "@/modules/honors/member-honor-repository";
+import { clubPageHref } from "@/modules/club-reports/club-page-links";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Club honors" };
@@ -42,7 +43,7 @@ export default async function StaffClubHonorsPage({
   ]);
   return (
     <section className="page-stack">
-      <AdminPageHeader path={`/admin/organizations/${organizationId}/club/honors`} parentName={club.name} />
+      <AdminPageHeader path={`/admin/organizations/${organizationId}/club/honors`} parentName={club.name} back={{ href: clubPageHref(organizationId, clubYear), label: `Back to ${club.name}` }} />
       <div className="page-intro">
         <div>
           <p className="eyebrow">Club honors · staff</p>

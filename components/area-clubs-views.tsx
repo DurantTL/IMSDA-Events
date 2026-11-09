@@ -1,3 +1,4 @@
+import navStyles from "@/components/staff-records-nav.module.css";
 import Link from "next/link";
 import { areaHealthHref } from "@/modules/coordinator-health/domain";
 import { ColumnHeader } from "@/components/column-header";
@@ -314,7 +315,7 @@ export function AreaExportLinks({ basePath, clubYear, reports }: { basePath: str
   return (
     <div className="intro-actions">
       {reports.map((report) => (
-        <a className="secondary-button" href={`${basePath}?report=${report.key}&year=${encodeURIComponent(clubYear)}`} key={report.key}>
+        <a className={`secondary-button ${navStyles.target}`} href={`${basePath}?report=${report.key}&year=${encodeURIComponent(clubYear)}`} key={report.key}>
           <Download aria-hidden="true" size={15} /> {report.label}
         </a>
       ))}

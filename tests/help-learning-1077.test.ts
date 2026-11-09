@@ -63,6 +63,7 @@ describe("guide registry", () => {
       "invite-staff",
       "choose-staff-role",
       "publish-registration-form",
+      "find-a-registration",
       "import-with-preview",
       "resolve-email-problem",
       "understand-system-readiness",

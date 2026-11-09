@@ -1,0 +1,17 @@
+/* The account menu's workspace switcher (#1565, #108). */
+.workspaces { display: grid; gap: 0; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.heading { color: var(--muted) !important; font-size: max(var(--type-staff-floor, 0px), 0.875rem) !important; font-weight: 800 !important; letter-spacing: 0.04em; text-transform: uppercase; }
+.workspaces a[aria-current="true"] { background: var(--imsda-navy-soft); box-shadow: inset 4px 0 var(--imsda-gold); color: var(--imsda-navy); font-weight: 800; }
+
+/* The header's account button is at least 44px square (C2). */
+button.trigger { width: 44px; height: 44px; }
+
+/* The account popover as a labelled dialog (#1566): a head with the title and Close that stays in view, and a list that
+   scrolls inside the available height (dvh) so Close is never pushed off a short landscape phone. */
+div.popover { max-height: calc(100vh - 96px); max-height: calc(100dvh - 96px); overflow-y: auto; overscroll-behavior: contain; padding-top: 0; }
+div.popover:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: -3px; }
+.head { position: sticky; z-index: 1; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -15px 8px; border-bottom: 1px solid var(--line); background: var(--card); padding: 10px 15px 8px; }
+.head h2 { margin: 0; color: var(--imsda-navy); font-size: 1.05rem; }
+.close { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; cursor: pointer; }
+.close:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.head .close { width: auto; flex: none; }

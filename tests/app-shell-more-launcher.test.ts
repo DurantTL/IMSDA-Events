@@ -37,20 +37,21 @@ function render(clubEvent: boolean, permissions: readonly ("MANAGE_CHECK_IN" | "
 }
 
 const mobileNav = (markup: string) => markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
-const sidebar = (markup: string) => markup.slice(markup.indexOf('aria-label="Primary navigation"'), markup.indexOf('aria-label="Mobile navigation"'));
+// Desktop has no More item (#1565): the /more directory is the Event setup tab's "All event tools" view, in the tab row.
+const tabRow = (markup: string) => markup.slice(markup.indexOf('data-staff-tabs="true"'), markup.indexOf('aria-label="Mobile navigation"'));
 
 describe("More launcher in the shell (#737)", () => {
   const checkInPlusHealth = ["MANAGE_CHECK_IN", "VIEW_HEALTH_INFORMATION"] as const;
 
   it("shows More on desktop and phone for check-in plus health on a club event", () => {
     const markup = render(true, checkInPlusHealth);
-    expect(sidebar(markup)).toContain("/more?event=event_1");
+    expect(tabRow(markup)).toContain("/more?event=event_1");
     expect(mobileNav(markup)).toContain("/more?event=event_1");
   });
 
   it("hides More on a general event, where the health page does not apply", () => {
     const markup = render(false, checkInPlusHealth);
-    expect(sidebar(markup)).not.toContain("/more?event=event_1");
+    expect(tabRow(markup)).not.toContain("/more?event=event_1");
     expect(mobileNav(markup)).not.toContain("/more?event=event_1");
   });
 

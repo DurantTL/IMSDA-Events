@@ -1,5 +1,10 @@
-The staff workspace frame: a 260px navy sidebar on desktop and a five-slot bottom tab bar on phones.
+The staff workspace frame (#1565): a branded header, an 88px icon rail, one row of tabs per area, and a five-slot bottom bar on phones. There is no sidebar.
 
-- Sidebar runs a vertical `--imsda-navy` to `--imsda-navy-deep` gradient; links are 40px white text, current link gets a 3px `--imsda-gold` inset edge.
-- The phone tab bar sits on white with `--shadow-tabbar`; the active slot has a purple top bar and a navy tint.
-- Staff pages raise every type floor to 14px.
+- Header: the IMAdventist image symbol (42px, links to the calendar), "Find a page or task", Help & learning, Create, the notifications bell and the account menu, which is also the workspace switcher (only the workspaces the person holds).
+- Rail: a vertical `--imsda-navy` to `--imsda-navy-deep` gradient, 88px wide, at most six areas (today Events, Clubs, People, Reports, Admin; Home joins when its pages exist) filtered by role. Items are 14px white text with 64px targets; the current area has a white 10% tint and a 3px `--imsda-gold` inset edge.
+- Tab row: one per area, and inside an event the event's tabs (Event home, Registrations, Check-in, Communications, Money, Reports, Event setup). 48px tabs, 14px weight 800, muted until current; the current tab is navy with a 4px `--imsda-gold` underline. At most eight tabs.
+- Views inside a tab: a bordered strip of at most five buttons, the current one filled `--imsda-navy`. Never a second tab row.
+- Menu line: below 1024px, or when a row would not fit, the row is replaced by the current tab (4px gold underline) and a button named "<Area> menu" or "Event menu". It opens the full list, a sheet on a phone and a dialog on wider screens, with the current item marked by a 4px gold inset edge. A row never scrolls sideways or is cut off.
+- Phone bar: Home, Events, Check-in, Clubs and More on white with `--shadow-tabbar`; the current slot has a 4px gold top bar and a navy tint. More lists "This event" first inside an event.
+- "Where you are" is gold everywhere in staff (the club portal keeps purple). Staff pages raise every type floor to 14px.
+- Phones and tablets (#1566): the changeover between bottom bar, menu line and tab row follows available width and fit, never the device (so iPad split view and 200% zoom behave like any other width). The page runs edge to edge (`viewport-fit=cover`); `env(safe-area-inset-*)` keeps the body, bottom bar, sheets and save bars clear of the notch and home indicator. Every sheet (menu-line dialog, More sheet, account menu and workspace switcher) has a visible title, a Close button that stays in view, first focus, Tab kept inside, Escape with focus returned, and scrolls inside `100dvh`. While a text field has focus on a phone the bottom bar steps aside and a pinned save bar rejoins the page. The selected event or club year stays visible and tabs never change it. See `docs/RESPONSIVE.md`.

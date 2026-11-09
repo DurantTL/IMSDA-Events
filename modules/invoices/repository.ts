@@ -175,6 +175,26 @@ async function loadChurchBasisInputs(client: Client, eventId: string, groupKey: 
   return ordersChurchId ? loadClubOrdersInvoiceInputs(client, eventId, ordersChurchId) : null;
 }
 
+/** The versions of an invoice staff see: a discarded draft is gone from every screen. */
+const liveVersionWhere = { status: { not: "DISCARDED" } } satisfies Prisma.InvoiceVersionWhereInput;
+
+/**
+ * How many invoices of the event are open as a draft: the Invoices page's own "Drafts" number (#1575). Same filter as
+ * `getInvoicesView`: church promo-code invoices left out, discarded versions ignored, and an invoice counts when its
+ * latest version is a draft. Events not billed to organizations have none.
+ */
+export async function countOpenInvoiceDrafts(eventId: string): Promise<number> {
+  const prisma = getPrisma();
+  const event = await prisma.event.findUnique({ where: { id: eventId }, select: { billingMode: true } });
+  if (!event) throw new InvoiceError("That event does not exist.", "EVENT_NOT_FOUND");
+  if (event.billingMode !== "DEFERRED_ORGANIZATION_INVOICE") return 0;
+  const invoices = await prisma.invoice.findMany({
+    where: { eventId, ...notChurchPromoInvoice },
+    select: { versions: { where: liveVersionWhere, orderBy: { revision: "desc" }, take: 1, select: { status: true } } },
+  });
+  return invoices.filter((invoice) => invoice.versions[0]?.status === "DRAFT").length;
+}
+
 export function contactOfGroup(group: BillingGroup | undefined | null): InvoiceContact | null {
   if (!group) return null;
   if (group.party.kind === "ORGANIZATION") {
@@ -1160,7 +1180,7 @@ export async function getInvoicesView(eventId: string): Promise<InvoicesView> {
   const invoices = await prisma.invoice.findMany({
     where: { eventId, ...notChurchPromoInvoice },
     orderBy: { createdAt: "asc" },
-    select: { id: true, groupKey: true, baseNumber: true, versions: { where: { status: { not: "DISCARDED" } }, orderBy: { revision: "desc" }, select: versionSelect } },
+    select: { id: true, groupKey: true, baseNumber: true, versions: { where: liveVersionWhere, orderBy: { revision: "desc" }, select: versionSelect } },
   });
   // An invoice whose drafts were all discarded is hidden, and its group counts as not drafted.
   const liveInvoices = invoices.filter((invoice) => invoice.versions.length > 0);

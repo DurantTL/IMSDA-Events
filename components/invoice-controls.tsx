@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import styles from "@/components/invoice-controls.module.css";
 
 /**
  * Staff controls for the Invoices screens (#167). Every action posts to one endpoint that checks
@@ -143,7 +144,7 @@ export function ReviseForm({
   useUnsavedChangesGuard(reason.trim() !== "" || mode !== startMode);
   return (
     <form
-      className="billing-link-form"
+      className={`billing-link-form ${styles.reviseForm}`}
       onSubmit={(event) => {
         event.preventDefault();
         void run({ action: "revise", invoiceId, mode, reason }).then((ok) => {

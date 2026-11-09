@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Rule B1, round 2 part B (#1458): the admin, events and staff tables sort from their column headers. Synthetic data only.
  */
-const mocks = vi.hoisted(() => ({ getCurrentSession: vi.fn(), load: vi.fn(), listTemplates: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getCurrentSession: vi.fn(), load: vi.fn(), listTemplates: vi.fn(), listEvents: vi.fn() }));
+vi.mock("@/modules/events/repository", () => ({ listEventsForUser: mocks.listEvents }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
@@ -36,6 +37,7 @@ const formNames = (html: string) => [...html.matchAll(/<th[^>]*scope="row"[^>]*>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.listEvents.mockResolvedValue([]);
   mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
 });
 

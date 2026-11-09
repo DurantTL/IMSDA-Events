@@ -35,7 +35,10 @@ export function Invoices({ eventId, view, canFinalize }: { eventId: string; view
   if (!view.isDeferred) {
     return (
       <section className="page-stack">
-        <div className="page-intro"><div><p className="eyebrow">Financial operations</p><h2>Invoices</h2></div></div>
+        <div className="page-intro">
+          <div><p className="eyebrow">Financial operations</p><h2>Invoices</h2></div>
+          <div className="page-intro-actions"><a className="secondary-button" href={`/finance/tools?event=${eventId}`}>Back to More money tools</a></div>
+        </div>
         <EmptyState className="panel empty-state" hint="Nothing to do here. Pick an event that invoices churches and groups after the event." icon={<FileText aria-hidden="true" size={24} />} title="This event is not billed to organizations">Invoices apply to events where churches and groups are invoiced after the event.</EmptyState>
       </section>
     );
@@ -64,6 +67,7 @@ export function Invoices({ eventId, view, canFinalize }: { eventId: string; view
           <a className="secondary-button" href={`/finance/attendance-reconciliation?event=${eventId}`}>Attendance reconciliation</a>
           <a className="secondary-button" href={`/finance/billing-responsibility?event=${eventId}`}>Billing responsibility</a>
           <a className="secondary-button" href={`/finance/invoices/statements?event=${eventId}`}>Statements</a>
+          <a className="secondary-button" href={`/finance/tools?event=${eventId}`}>Back to More money tools</a>
         </div>
       </div>
 

@@ -4,8 +4,9 @@ import { buildAdminSectionNav, type AdminBackLink, type AdminSection, type Admin
 import styles from "./admin-section-header.module.css";
 
 /**
- * The header at the top of every admin page (#1274): the section's name, the section's main pages as the shared tab
- * row (the current one marked), and, on a page deeper than those, one plain "Back to <parent>" link. The links are
+ * The header at the top of every admin page (#1274): the section's name, the page's own views or anchors, and, on a page
+ * deeper than the section's main pages, one plain "Back to <parent>" link. The section's main pages are the shell's one
+ * row of tabs since #1565, so this header no longer draws them a second time. The links are
  * ordinary links to the parent page, never `history.back()`. It draws what `buildAdminSectionNav` decided and nothing
  * else, so a page never shows a link its viewer cannot open.
  */
@@ -13,7 +14,7 @@ export function AdminSectionHeader({ nav }: { nav: AdminSectionNav }) {
   return (
     <div className={styles.header} data-testid="admin-section-header" data-section={nav.section}>
       <p className={`eyebrow ${styles.name}`}>{nav.name}</p>
-      <DashboardTabs label={nav.navLabel} tabs={nav.tabs} />
+      {(nav.localTabs?.length ?? 0) > 1 && <div className={styles.localNavigation}><DashboardTabs label={`${nav.name} page views`} tabs={nav.localTabs!} /></div>}
       {nav.back ? <BackLink href={nav.back.href} variant="staff">{nav.back.label}</BackLink> : null}
     </div>
   );

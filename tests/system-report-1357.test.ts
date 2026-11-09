@@ -287,7 +287,7 @@ describe("providers", () => {
           { id: "go-live", title: "Go-live", items: [] },
         ],
         ticksAvailable: true,
-        summary: { manualDone: 1, manualTotal: 2, automaticAttention: 1 },
+        summary: { manualDone: 1, manualTotal: 2, automaticAttention: 1, automaticUnknown: 0 },
       });
       const report = await loadSystemReport(now);
       const byKey = new Map(report.sections.flatMap((section) => section.signals).map((row) => [row.key, row]));

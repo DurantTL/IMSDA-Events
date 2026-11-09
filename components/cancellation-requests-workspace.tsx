@@ -64,7 +64,7 @@ export function CancellationRequestsWorkspace({
           <p className="eyebrow">Financial operations</p>
           <h2>Cancellation requests</h2>
           <p>
-            Registrants ask to cancel from their private link or account for {eventName}. You decide each request, by name and
+            Refunds for a cancellation start here; nothing is refunded automatically. Registrants ask to cancel from their private link or account for {eventName}. You decide each request, by name and
             with a reason. Approving records your decision only: it does not cancel the registration, refund money or create
             credit. Carrying an approved request out is a separate step that a named person presses, on the request itself.
           </p>

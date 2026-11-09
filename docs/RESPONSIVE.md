@@ -232,13 +232,20 @@ inner scroll; do not put the only close or confirm button below the fold of a
 long form (the card scrolls, so keep Cancel and Save inside the card).
 `ConfirmDialog` is the shared confirmation.
 
+Every staff sheet has a **visible title, a Close button that is always in view, first focus, Tab kept inside, Escape and
+focus returned to the control that opened it**, and a long list scrolls inside it (`max-height` in `dvh`, with the head outside the
+scrolling part or sticky): the menu-line dialog (`StaffMenuDialog`), the phone More sheet (`MoreLauncher`, tab variant) and the account
+menu with the workspace switcher (`StaffAccountMenu`). They all use `useAccessibleDialog`;
+`tests/staff-phone-ipad-1566.test.ts` and `tests/dialogs-shared-hook-1354.test.ts` guard them.
+
 ### Fixed bars
 
-The staff phone tab bar (`.mobile-nav`, 67 px) is fixed; `body` already pads
-by 73 px so the last content clears it. A page-level save bar
-(`.event-savebar`) sits above it (`bottom: 67px`). Do not add another fixed or
+The staff phone tab bar (`.mobile-nav`, 67 px plus the bottom safe-area inset) is fixed; `body` already pads
+by 73 px plus that inset so the last content clears it. A page-level save bar
+(`.event-savebar`) sits above it (`bottom: 67px` plus the inset). Do not add another fixed or
 sticky bar on a phone; the audit fails when bars take more than a third of the
-screen or hide the last line of a page.
+screen or hide the last line of a page. The rest of the device rules (safe areas, landscape, split view,
+zoom and the keyboard) are in "Phones, iPad and the staff shell" below.
 
 ### Type
 
@@ -271,7 +278,7 @@ own or on a wrapper within two levels, or with a boundary under 3:1;
 - **Text floor.** On the staff workspace (`.app-shell`) meta text, help text, chip and table
   sub-lines and captions are at least 14px (`--type-floor` and `--type-staff-floor` are
   `0.875rem` there). Uppercase letter-spaced labels (eyebrows, sidebar group labels, table
-  headers) keep a 12px floor through `--type-label-floor`. Club, account and public pages keep the
+  headers) are 14px too: `--type-label-floor` is `0.875rem` on the staff workspace (#1732). Club, account and public pages keep the
   12px meta floor. Write new small sizes as `max(var(--type-floor, 0px), X)`, or
   `max(var(--type-staff-floor, 0px), X)` for a plain size.
 - **Field rows and filter bars.** A label sits above its control (6px gap, 15px between rows).
@@ -307,3 +314,36 @@ No table scrolls sideways at any width: pick the threshold from the table's real
 Every card keeps its column label (`data-label`), the row header (`th scope="row"`) is the card's heading, and the row's action is the
 last unlabelled cell, shown at the card's foot above a thin divider. `tests/table-cards-guard-1457.test.ts` fails on a new `<table`
 without `table-cards` unless its file is on that test's allow-list.
+
+## Phones, iPad and the staff shell (#1566)
+
+**Width decides, never the device.** Below 1024 px, or whenever the tab row would not fit (`StaffTabRow` measures it with a
+`ResizeObserver` and sets `data-fit="tight"`), the row is the menu line; at 800 px and under the icon rail goes and the five-slot bottom bar
+(Home, Events, Check-in, Clubs, More) appears. Nothing asks for "iPad" or "iPhone". An iPad split view is just a narrower window, so
+507, 678 and 981 px behave like any other width: 507 px is the phone layout (bar plus menu line), 678 and 981 px have the menu line without
+the bar, and 1180 px and up show the tab row if it fits. The same holds for 200% zoom (a 1280 px screen at 200% is a 640 px viewport, 1024 px at 200% is 512 px).
+
+**Safe areas.** `app/layout.tsx` exports `viewport` with `viewportFit: "cover"`, so the page runs under the notch and home
+indicator and `env(safe-area-inset-*)` is real (it is `0` in an ordinary browser tab). `body` pads left, right and top by the inset; fixed
+things pad themselves: the phone bar (left, right, bottom; its height is `67px + inset`, the same figure the save bar, the More sheet and
+its scrim use for `bottom`), the sheets (left, right, bottom) and the page-level save bar (above the bar). Use `env(safe-area-inset-*)`
+for any new fixed element; never a fixed pixel number for a notch.
+
+**Landscape phone (about 844 x 390).** The page is short, so sheets and dialogs cap at `100dvh` minus 24 px (the More sheet at `72dvh`), keep
+their head with Close outside the scrolling part, and scroll inside. The bottom bar keeps its 67 px; the audit checks that it
+takes less than a third of the screen and hides no text.
+
+**The software keyboard.** `StaffKeyboardWatch` (in `AppShell`) sets `data-keyboard="open"` on `<html>` while a text field has focus
+(`opensKeyboard`: text-like inputs, textareas, contenteditable; not checkboxes, buttons or read-only fields). At 800 px and under the stylesheet
+then hides the bottom bar, puts a pinned save bar back into the page flow and lets the More sheet sit on the bottom edge, so a
+focused field is never under a fixed bar. Focus is the signal because it works the same in every browser: iOS Safari ignores the
+`interactive-widget` viewport option and does not always report the keyboard through `visualViewport`. `html` also gets
+`scroll-padding-bottom` while the phone bar exists, so a field scrolled into view stops above the bar and a pinned save bar.
+A hardware keyboard on a tablet never hides anything, because the rules sit inside the phone width query.
+
+**Scope stays put.** Inside an event the event bar names the event and holds its picker; the Clubs area holds the club year picker, and
+every Clubs link carries `?year=` (`withClubYear`) so passing through a page that ignores the year cannot turn it back into the current year. Admin,
+People, Reports and Help show neither picker. Moving between tabs and rail areas keeps the event (`carry`), never replaces it.
+
+**The task check.** `npm run test:staff-phone-tasks` (`scripts/verify-staff-phone-tasks.ts`) walks the task list at 390 and 820 px against a
+production build, as a system administrator and again as check-in staff and kitchen-only staff. It is not in CI (run it locally).

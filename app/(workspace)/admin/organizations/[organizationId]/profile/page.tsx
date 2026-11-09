@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ClubProfileForm } from "@/components/club-profile-form";
 import { canAdministerClubOrganization } from "@/modules/organizations/access";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { allowedReturnTo } from "@/lib/return-to";
+import { clubPageReturnHref } from "@/modules/club-reports/club-page-links";
 import { getClubProfile, listSponsorOptions } from "@/modules/organizations/club-profile-repository";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
@@ -30,11 +30,10 @@ export default async function StaffClubProfilePage({
   const profile = await getClubProfile(organizationId);
   if (!profile) notFound();
   const sponsors = await listSponsorOptions(profile.sponsoringChurchId);
-  const clubHref = `/admin/organizations/${organizationId}/club`;
-  const viaParent = allowedReturnTo(from, [clubHref], "") === clubHref;
+  const parentHref = clubPageReturnHref(from, organizationId);
   return (
     <section className="page-stack">
-      <AdminPageHeader path={`/admin/organizations/${organizationId}/profile`} parentName={profile.name} viaParent={viaParent} />
+      <AdminPageHeader path={`/admin/organizations/${organizationId}/profile`} parentName={profile.name} viaParent={parentHref !== null} back={parentHref ? { href: parentHref, label: `Back to ${profile.name}` } : undefined} />
       <ClubProfileForm
         sponsors={sponsors}
         endpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/profile`}

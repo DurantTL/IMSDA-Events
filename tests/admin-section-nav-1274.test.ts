@@ -232,13 +232,16 @@ describe("back links", () => {
 describe("the rendered header", () => {
   const render = (model: ReturnType<typeof nav>) => renderToStaticMarkup(createElement(AdminSectionHeader, { nav: model }));
 
-  it("names the section, labels the tab row, and marks page and true", () => {
+  it("names the section and leaves the tab row to the shell, while the model still marks page and true", () => {
     const html = render(nav("system", "/admin/people/staff/u1"));
     expect(html).toContain("System administration");
-    expect(html).toContain('aria-label="System administration sections"');
-    expect(html).toMatch(/<a aria-current="true" href="\/admin\/people">People</);
-    expect(html).not.toContain('aria-current="page"');
-    expect(render(nav("system", "/admin/people"))).toMatch(/<a aria-current="page" href="\/admin\/people">People</);
+    // The area's one row of tabs is the shell's (#1565); the page header does not draw it a second time.
+    expect(html).not.toContain('aria-label="System administration sections"');
+    expect(html).not.toContain("<li>");
+    const model = nav("system", "/admin/people/staff/u1");
+    expect(model.navLabel).toBe("System administration sections");
+    expect(model.tabs.find((tab) => tab.key === "people")?.current).toBe("true");
+    expect(nav("system", "/admin/people").tabs.find((tab) => tab.key === "people")?.current).toBe("page");
   });
 
   it("draws the back link as a plain link to the parent, and none on a main page", () => {

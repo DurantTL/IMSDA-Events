@@ -104,7 +104,7 @@ export default async function ClubEventReportsPage({
           <p>Camping coordinator, duties and activities, spiritual milestones, and special roles for {event.name}, built from each club&apos;s registration.{readOnly ? " View only." : ""}</p>
         </div>
         <div className="intro-actions report-actions">
-          <Link className="secondary-button" href={`/more/reports?${eventQuery}`}>Back to reports</Link>
+          <Link className="secondary-button" href={`/more/reports/printouts?${eventQuery}`}>Back to Printouts</Link>
           <Link className="secondary-button" href={`/more/reports/clubs/check-in-book?${eventQuery}`}>Check-in book</Link>
           {usesTeams && <Link className="secondary-button" href={`/more/team-results?${eventQuery}`}>Team results</Link>}
           <PrintReportButton />

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
+import { BackLink } from "@/components/back-link";
 import { LodgingRequestsWorkspace } from "@/components/lodging-requests-workspace";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
@@ -24,16 +25,20 @@ export default async function LodgingRequestsPage({ searchParams }: { searchPara
     return (
       <section className="panel">
         <h2>{staffPageTitles.lodgingRequests}</h2>
-        <p>This event has no lodging property yet. An event administrator chooses one on the <Link href={`/more/lodging?event=${encodeURIComponent(event.id)}`}>Lodging page</Link> first.</p>
+        <p>This event has no lodging property yet. {permissions.includes("CONFIGURE_EVENT") ? <>An event administrator chooses one on the <Link href={`/more/lodging?event=${encodeURIComponent(event.id)}`}>Lodging page</Link> first.</> : "Ask your event administrator to choose one first."}</p>
       </section>
     );
   }
   return (
-    <LodgingRequestsWorkspace
-      eventName={event.name}
-      initialView={view}
-      canConfigure={permissions.includes("CONFIGURE_EVENT")}
-      canExport={permissions.includes("VIEW_REPORTS")}
-    />
+    <>
+      {/* The Lodging page is for event administrators (CONFIGURE_EVENT, as it checks), so others get no link to a closed page (#1735). */}
+      {permissions.includes("CONFIGURE_EVENT") ? <BackLink href={`/more/lodging?event=${encodeURIComponent(event.id)}`} variant="staff">Back to lodging</BackLink> : null}
+      <LodgingRequestsWorkspace
+        eventName={event.name}
+        initialView={view}
+        canConfigure={permissions.includes("CONFIGURE_EVENT")}
+        canExport={permissions.includes("VIEW_REPORTS")}
+      />
+    </>
   );
 }

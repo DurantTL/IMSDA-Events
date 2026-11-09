@@ -84,7 +84,7 @@ describe("phone tab for child routes (#737)", () => {
 
   it("keeps More as the phone's last tab for staff who see Event features, which is a sidebar item only and no phone tab (#965)", () => {
     const tabs = orderedMobileTabs(orderedSidebarItems(new Set<EventPermission>(["CONFIGURE_EVENT", "MANAGE_FINANCE"]), true));
-    expect(tabs.map((item) => item.label)).toEqual(["Dashboard", "Payments", "More"]);
+    expect(tabs.map((item) => item.label)).toEqual(["Event home", "Payments", "More"]);
     // The Event features page is under /more, so on a phone it lights the More tab, and no tab of its own is added.
     expect(mobileActiveTabHref("/more/features", "/more/features")).toBe("/more");
     expect(orderedSidebarItems(new Set<EventPermission>(["CONFIGURE_EVENT"]), true).some((item) => item.href === "/more/features")).toBe(false);

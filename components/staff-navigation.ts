@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  ClipboardCheck,
   ArrowRightLeft,
   Award,
   CheckCircle2,
@@ -36,6 +37,8 @@ import {
   Users,
   UsersRound,
   WalletCards,
+  Printer,
+  Wrench,
 } from "lucide-react";
 import { kitchenCountsPath, type EventPermission } from "@/modules/access/permissions";
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
@@ -53,7 +56,7 @@ export { clubsAdminRecordsHref };
  * phone (#475).
  *
  * The sidebar (#964) is short and grouped. System management and the event
- * picker sit above it, then the daily items (Dashboard, Check-in, Registrations,
+ * picker sit above it, then the daily items (Event home, Check-in, Registrations,
  * Payments, Emails) always visible, then the collapsible "Set up" and "Reports"
  * groups, then More last (the one item with no section). A group with no
  * visible item is left out. System management is not a nav item: the shell draws
@@ -118,7 +121,7 @@ export function withCurrentEvent(href: string, eventId: string | null | undefine
  * which the header used to call "More".
  */
 export const staffPageTitles = {
-  overview: "Dashboard",
+  overview: "Event home",
   checkIn: "Check-in",
   registrationForm: "Registration forms",
   attendeeSetup: "Attendee setup",
@@ -135,7 +138,7 @@ export const staffPageTitles = {
   promoCodes: "Promo codes",
   emails: "Emails",
   more: "More",
-  eventModules: "Event modules",
+  eventSetup: "Event setup",
   eventFeatures: "Event features",
   systemManagement: "System management",
   honorsRosters: "Honors Weekend rosters",
@@ -147,6 +150,7 @@ export const staffPageTitles = {
   clubReports: "Club event reports",
   groupedPackets: "Grouped event packets",
   operationalReports: "Operational reports",
+  printouts: "Printouts",
   clubMonthlyReport: "Club Monthly Record",
   clubMonthlyReports: "Review monthly records",
   clubs: "Clubs",
@@ -174,7 +178,19 @@ export const staffPageTitles = {
   lodgingAssignments: "Lodging assignments",
   issuedAssets: "Issued assets",
   scheduledEmails: "Scheduled emails",
-  ledgerCheck: "Ledger check (shadow)",
+  ledgerCheck: "Ledger check",
+  // The money pages the More money tools view lists (#1575): the titles the pages already carry, named once here.
+  moreMoneyTools: "More money tools",
+  invoices: "Invoices",
+  churchOwed: "Owed by churches",
+  billingResponsibility: "Billing responsibility",
+  scholarshipFund: "Scholarship fund",
+  squarePayments: "Unmatched Square payments",
+  attendanceReconciliation: "Attendance reconciliation",
+  cancellationPolicy: "Cancellation rules",
+  cancellationRequests: "Cancellation requests",
+  // The Registrations tab's grouped page of review queues (#1574).
+  reviewQueues: "Review queues",
 } as const;
 
 /** Help & learning (#1077): not a nav item (the sidebar draws its own link), so it is not in `staffPageTitles`. */
@@ -188,9 +204,13 @@ type SubpageRule = readonly [path: string, match: "exact" | "prefix" | "under", 
  * `prefix` is both.
  */
 const subpageRules: readonly SubpageRule[] = [
+  // Home (#1568): Needs you and Coming up are the two tabs of one area, so the header names the area.
+  ["/home", "prefix", "Home"],
   // Help & learning (#1077) is not a nav item; the sidebar draws its own link.
   ["/help/glossary", "prefix", "Glossary"],
   ["/help", "prefix", helpPageTitle],
+  // Attendee community (#1596): a Communications tab, so the header names it rather than falling back to Event home.
+  ["/community", "prefix", "Attendee community"],
   ["/more/honors/rosters", "prefix", staffPageTitles.honorsRosters],
   ["/more/honors/schedule", "prefix", staffPageTitles.honorsSchedule],
   ["/more/honors/instructors", "prefix", staffPageTitles.honorsInstructors],
@@ -200,9 +220,10 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/reports/clubs/check-in-book", "prefix", staffPageTitles.checkInBook],
   ["/more/reports/clubs", "prefix", staffPageTitles.clubReports],
   ["/more/reports/packets", "prefix", staffPageTitles.groupedPackets],
+  ["/more/reports/printouts", "prefix", staffPageTitles.printouts],
   ["/more/reports", "prefix", staffPageTitles.operationalReports],
   ["/more/features", "prefix", staffPageTitles.eventFeatures],
-  ["/more", "exact", staffPageTitles.eventModules],
+  ["/more", "exact", staffPageTitles.eventSetup],
   ["/more/clubs/reports/", "under", staffPageTitles.clubMonthlyReport],
   ["/more/clubs/reports", "exact", staffPageTitles.clubMonthlyReports],
   ["/more/clubs", "exact", staffPageTitles.clubs],
@@ -221,6 +242,18 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/emergency-plan", "prefix", staffPageTitles.emergencyPlan],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
   ["/more/ledger-health", "prefix", staffPageTitles.ledgerCheck],
+  ["/finance/tools", "prefix", staffPageTitles.moreMoneyTools],
+  ["/people/review-queues", "prefix", staffPageTitles.reviewQueues],
+  // Each money page names itself (#1575), like the Ledger check, instead of the Payments page it used to sit under.
+  // The cancellation request queue is the Money tab's Refunds view, so its heading says Refunds.
+  ["/finance/invoices", "prefix", staffPageTitles.invoices],
+  ["/finance/church-owed", "prefix", staffPageTitles.churchOwed],
+  ["/finance/billing-responsibility", "prefix", staffPageTitles.billingResponsibility],
+  ["/finance/scholarship-fund", "prefix", staffPageTitles.scholarshipFund],
+  ["/finance/square-payments", "prefix", staffPageTitles.squarePayments],
+  ["/finance/attendance-reconciliation", "prefix", staffPageTitles.attendanceReconciliation],
+  ["/finance/cancellation-policy", "prefix", staffPageTitles.cancellationPolicy],
+  ["/finance/cancellation-requests", "prefix", "Refunds"],
   ["/more/kitchen-report/counts", "prefix", staffPageTitles.kitchenCounts],
   ["/more/kitchen-report/closeout", "prefix", staffPageTitles.mealCloseout],
   ["/events-admin", "exact", "Event administration"],
@@ -389,8 +422,11 @@ export const navigation: readonly NavigationItem[] = [
   // Not sidebar items (#964): More cards and parent-page links reach them, and the parent lights up while one is open.
   { href: "/people/attendees", label: staffPageTitles.attendeeList, icon: ListChecks, requiredPermission: "VIEW_SENSITIVE_DATA", sidebarParent: "/people" },
   { href: "/imports", label: staffPageTitles.imports, icon: FileUp, requiredPermission: "MANAGE_IMPORTS", sidebarParent: "/people" },
+  { href: "/people/review-queues", label: staffPageTitles.reviewQueues, icon: ClipboardCheck, requiredAnyPermissions: ["VIEW_SENSITIVE_DATA", "MANAGE_REGISTRATION"], sidebarParent: "/people" },
   { href: "/staff", label: staffPageTitles.team, icon: UserCog, requiredPermission: "MANAGE_STAFF", sidebarParent: "/more" },
   { href: "/more/promo-codes", label: staffPageTitles.promoCodes, icon: TicketPercent, requiredPermission: "MANAGE_FINANCE", sidebarParent: "/finance" },
+  { href: "/finance/tools", label: staffPageTitles.moreMoneyTools, icon: Wrench, requiredPermission: "MANAGE_FINANCE", sidebarParent: "/finance" },
+  { href: "/more/reports/printouts", label: staffPageTitles.printouts, icon: Printer, requiredPermission: "VIEW_REPORTS", sidebarParent: "/more/reports" },
   {
     href: "/more",
     label: staffPageTitles.more,

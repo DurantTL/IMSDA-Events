@@ -268,7 +268,7 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
       { id: "enter-details", text: "Open the account sign-in page. Type your email address and password, then choose Sign in.", alt: "The Account sign in page filled in, with the Sign in button marked." },
       { id: "confirm", text: "The Confirm it's you page opens. Use your passkey, or find the six-digit code in your authenticator app.", alt: "The Confirm it's you page, with the Authenticator code box marked." },
       { id: "enter-code", text: "Type the code. Then choose Continue.", alt: "The Confirm it's you page with the code typed in and the Continue button marked." },
-      { id: "signed-in", text: "You are signed in. Choose Club coordination to see your clubs.", alt: "The account Overview with the Club coordination tab marked." },
+      { id: "signed-in", text: "You are signed in. Choose Club coordination to see your clubs (on a phone, it is in the Account menu).", alt: "The account Overview with the Club coordination tab marked, or the Account menu on a phone." },
     ],
   },
   {
@@ -303,7 +303,7 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
     keywords: ["monthly records", "records", "filed", "submitted", "not submitted", "month", "review", "due the 10th", "step by step", "walkthrough", "screenshots"],
     sourceFiles: [`${AREA}/reports/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/reports/[month]/page.tsx", "components/coordinator-monthly-records.tsx", ...COORDINATOR_SHELL, "components/club-report-charts.tsx", "components/coordinator-monthly-records.module.css", "components/table-card-labels.tsx"],
     steps: [
-      { id: "open-records", text: "On Club coordination, choose Monthly Records.", alt: "The Club overview with the Monthly Records tab marked." },
+      { id: "open-records", text: "On Club coordination, choose Monthly Records (on a phone, it is in the Coordinator menu).", alt: "The Club overview with the Monthly Records tab marked." },
       { id: "pick-month", text: "Pick a month. Each month shows how many clubs filed.", alt: "The Monthly Records page with the month buttons marked." },
       { id: "see-states", text: "Submitted means the club filed. Not submitted means the month ended and nothing is filed.", alt: "The Monthly Records page for one month, with the Submitted count marked." },
       { id: "open-record", text: "Choose a filed month for a club to read its record.", alt: "The table of clubs with a filed month for one club marked." },
@@ -322,7 +322,7 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
     keywords: ["points", "ranking", "leader", "score", "total points", "report points", "chart", "table", "step by step", "walkthrough", "screenshots"],
     sourceFiles: [`${AREA}/points/page.tsx`, "components/coordinator-points.tsx", ...COORDINATOR_SHELL, "components/coordinator-destinations.tsx", "components/coordinator-points.module.css", "components/table-card-labels.tsx"],
     steps: [
-      { id: "open-points", text: "On Club coordination, choose Points.", alt: "The Club overview with the Points tab marked." },
+      { id: "open-points", text: "On Club coordination, choose Points (on a phone, it is in the Coordinator menu).", alt: "The Club overview with the Points tab marked." },
       { id: "chart", text: "The chart ranks the clubs by total points. The leader is shown at the top.", alt: "The Points page with the Points leader card marked." },
       { id: "table", text: "Choose Show as a table to see the full list.", alt: "The Points page with the Show as a table button marked." },
       { id: "table-open", text: "Each row shows the club's points and a link to the records behind them.", alt: "The Points table with the ranking and a club's Records link marked." },

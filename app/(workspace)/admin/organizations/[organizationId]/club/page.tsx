@@ -2,17 +2,21 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Award, Eye, IdCard, UserCog } from "lucide-react";
+import { Eye } from "lucide-react";
 import { ActAsButton } from "@/components/act-as-button";
 import { ClubImportYearMove } from "@/components/club-import-year-move";
 import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
 import { ClubOverview } from "@/components/club-overview";
+import { HubCardGroup } from "@/components/admin-hub";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
+import { canAdministerClubOrganization } from "@/modules/organizations/access";
+import { clubPageHref, clubRelatedCards, directoryReturnHref } from "@/modules/club-reports/club-page-links";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listClubImports } from "@/modules/club-imports/move-year";
 import { staffClubYearView } from "@/modules/club-rosters/domain";
 import { resolveStaffGuardianViewer } from "@/modules/club-rosters/guardians-access";
 import { getPrisma } from "@/lib/prisma";
+import styles from "./club-page.module.css";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
 export const metadata: Metadata = { title: "Open club" };
@@ -32,7 +36,7 @@ export default async function StaffOpenClubPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams?: Promise<{ year?: string | string[] }>;
+  searchParams?: Promise<{ year?: string | string[]; from?: string | string[] }>;
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
@@ -50,22 +54,50 @@ export default async function StaffOpenClubPage({
   const imports = await listClubImports(organizationId);
   // Guardian contacts (#510): staff holding the sensitive-data permission (a system administrator always does).
   const guardianViewer = await resolveStaffGuardianViewer();
+  // Opened from the directory, the back link returns to that exact directory view (year, search, filter, page); anything
+  // that is not a safe same-site directory URL is dropped and the default "Club summary" link is used (#1587).
+  const directoryHref = directoryReturnHref(typeof query?.from === "string" ? query.from : undefined);
   const selfHref = `/admin/organizations/${organizationId}/club`;
-  const fromHere = `?from=${encodeURIComponent(selfHref)}`;
+  const yearHref = (year: string) => (directoryHref
+    ? clubPageHref(organizationId, year, directoryHref)
+    : year === view.currentClubYear ? selfHref : `${selfHref}?year=${encodeURIComponent(year)}`);
+  // Directors, profile and report pages go back to this page in this year (and on to the directory view).
+  const fromHere = `?from=${encodeURIComponent(clubPageHref(organizationId, view.clubYear, directoryHref))}`;
+  const cards = clubRelatedCards({
+    organizationId,
+    clubName: club.name,
+    clubActive: club.isActive,
+    clubYear: view.clubYear,
+    directoryHref,
+    viewer: { canAdministerClub: await canAdministerClubOrganization(user, organizationId), clubsAdministration: true },
+  });
 
   return (
     <section className="page-stack">
-      <AdminPageHeader path={`/admin/organizations/${organizationId}/club`} year={view.clubYear} />
-      <div className="intro-actions club-admin-links">
-        <Link className="secondary-button" href={`/admin/organizations/${organizationId}/directors${fromHere}`}>
-          <UserCog aria-hidden="true" size={14} /> Club admins
-        </Link>
-        <Link className="secondary-button" href={`/admin/organizations/${organizationId}/profile${fromHere}`}>
-          <IdCard aria-hidden="true" size={14} /> Club profile
-        </Link>
-        <Link className="secondary-button" href={`/admin/organizations/${organizationId}/club/honors`}>
-          <Award aria-hidden="true" size={14} /> Honors
-        </Link>
+      <AdminPageHeader
+        path={`/admin/organizations/${organizationId}/club`}
+        year={view.clubYear}
+        back={directoryHref ? { href: directoryHref, label: "Back to Club directory" } : undefined}
+      />
+
+      <div className={`page-intro ${styles.identity}`} data-testid="club-identity">
+        <div>
+          <p className="eyebrow">Open club · view only</p>
+          <h2 className="club-name-heading" title={club.name} translate="no">{club.name}</h2>
+          <dl className={styles.facts}>
+            <div><dt>Sponsoring church</dt><dd translate={club.parentOrganization ? "no" : undefined}>{club.parentOrganization?.name ?? "No church listed"}</dd></div>
+            <div><dt>Status</dt><dd>{club.isActive ? "Active" : "Inactive"}</dd></div>
+            <div><dt>Club year</dt><dd>{view.clubYear}</dd></div>
+          </dl>
+          <p>This is what the club&apos;s director sees. Nothing can be changed here; showing birth dates is recorded.</p>
+        </div>
+      </div>
+
+      <HubCardGroup headingId="club-related-heading" title="This club" cards={cards} testId="club-card" />
+
+      <section aria-labelledby="club-act-as-heading" className={styles.actAs} data-testid="club-act-as">
+        <h2 id="club-act-as-heading" className={styles.actAsHeading}>Act as Director</h2>
+        <p>Separate from the view-only pages above. This opens the club&apos;s director portal with full director powers, attributed to you, for 2 hours.</p>
         <ActAsButton
           access="Full director powers, attributed to you"
           club={club.name}
@@ -74,31 +106,21 @@ export default async function StaffOpenClubPage({
           resultAction="Open the club portal"
           role="Director"
         />
-      </div>
+      </section>
 
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Open club · view only</p>
-          <h2 className="club-name-heading" title={club.name} translate="no">{club.name}</h2>
-          <p>
-            {club.parentOrganization ? <>Sponsored by <span translate="no">{club.parentOrganization.name}</span>. </> : null}
-            {club.isActive ? "" : "This club is inactive. "}
-            This is what the club&apos;s director sees. Nothing can be changed here; showing birth dates is recorded.
-          </p>
-        </div>
-      </div>
+      <h2 className={styles.sectionHeading} id="club-year-overview-heading">Club year overview · {view.clubYear}</h2>
 
       <p className="inline-notice" role="status">
         <Eye aria-hidden="true" size={14} /> View only.{" "}
-        Change club admins or the profile with the buttons above, and file or correct reports from Monthly Records.
+        Change club admins or the profile from the cards above, and file or correct reports from Monthly Records.
       </p>
 
-      <nav aria-label="Roster club year" className="intro-actions club-year-choice">
+      <nav aria-label="Roster club year" className={`intro-actions club-year-choice ${styles.yearChoice}`}>
         {view.choices.map((year) => (
           <Link
             aria-current={year === view.clubYear ? "page" : undefined}
             className={year === view.clubYear ? "primary-button" : "secondary-button"}
-            href={year === view.currentClubYear ? selfHref : `${selfHref}?year=${encodeURIComponent(year)}`}
+            href={yearHref(year)}
             key={year}
           >
             {year}{year === view.currentClubYear ? " (current)" : ""}

@@ -316,7 +316,7 @@ describe("System home page", () => {
     expect(html).toContain('data-value-key="upcoming-events"');
     expect(html).toContain("Work across the platform");
     expect(html).toContain("Open club applications");
-    expect(html).toContain("Review feature requests");
+    expect(html).toContain("Review event module requests");
     expect(html).toContain("Open email problems");
     expect(html).toContain("1 feature request waiting");
     expect(html).toContain("How these numbers differ");

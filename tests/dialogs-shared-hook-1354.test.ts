@@ -23,7 +23,7 @@ vi.mock("@/components/registration-builder/builder-context", () => ({ useBuilder
 
 import { ContextualHelp } from "@/components/contextual-help";
 import { MoreLauncher } from "@/components/more-launcher";
-import { SystemPhoneMenu } from "@/components/system-phone-menu";
+import { StaffTabRow } from "@/components/staff-tab-row";
 import { BuilderSaveQuestionDialog } from "@/components/registration-builder/builder-save-question";
 import { PhoneSheet } from "@/components/registration-builder/builder-phone-sheet";
 import { usePhoneModal } from "@/components/registration-builder/use-phone-modal";
@@ -389,55 +389,61 @@ describe("phone builder sheet", () => {
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
-// 4. System phone menu
+// 4. The menu line's dialog (#1565, replaces the phone System menu)
 // ---------------------------------------------------------------------------------------------------------------------
 
-const systemGroups = [{ key: "g", label: "People", items: [
-  { key: "a", label: "People & access", href: "/admin/people", description: "", active: false },
-  { key: "b", label: "Calendar", href: "/admin/calendar", description: "", active: false },
-] }] as unknown as ComponentProps<typeof SystemPhoneMenu>["groups"];
-const destinations = [{ key: "d1", scope: "System", label: "Invite staff", description: "", href: "/admin/people", keywords: [] }] as unknown as ComponentProps<typeof SystemPhoneMenu>["destinations"];
+const menuTabs = [
+  { key: "a", label: "People & access", href: "/admin/people", current: true },
+  { key: "b", label: "Break-glass and legal holds", href: "/admin/health-access", current: false, views: [{ key: "v", label: "Legal holds", href: "/admin/health-access?view=holds" }] },
+];
 
-describe("system phone menu", () => {
+describe("menu line dialog", () => {
+  beforeAll(() => {
+    // jsdom has no ResizeObserver or matchMedia; the row only measures to decide between tabs and the menu line.
+    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = class { observe() {} disconnect() {} unobserve() {} };
+    window.matchMedia = ((query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false })) as typeof window.matchMedia;
+  });
+
   async function openMenu() {
-    const view = await show(createElement(SystemPhoneMenu, { isSystemAdmin: true, groups: systemGroups, switches: [], destinations }));
-    const trigger = view.container.querySelector<HTMLAnchorElement>(".mobile-nav-system-trigger")!;
+    const view = await show(createElement(StaffTabRow, { label: "People", menuLabel: "People menu", title: "People menu", tabs: menuTabs }));
+    const trigger = view.container.querySelector<HTMLButtonElement>('button[aria-haspopup="dialog"]')!;
     focusOn(trigger);
     await click(trigger);
     await frame();
-    return { trigger, sheet: document.querySelector<HTMLElement>(".system-menu")! };
+    return { trigger, sheet: document.querySelector<HTMLElement>("[data-staff-menu]")! };
   }
 
-  it("focus starts on the sheet itself, not the search field", async () => {
+  it("focus starts on the current item, and every tab and view is listed", async () => {
     const { sheet } = await openMenu();
-    expect(document.activeElement).toBe(sheet);
+    expect(document.activeElement).toBe(sheet.querySelector('[aria-current]'));
     expect(openDialogCount()).toBe(1);
+    expect([...sheet.querySelectorAll("a")].map((link) => link.textContent)).toEqual(["People & access", "Break-glass and legal holds", "Legal holds"]);
   });
 
-  it("Escape closes it and focus returns to the trigger", async () => {
+  it("Escape closes it and focus returns to the menu button", async () => {
     const { trigger } = await openMenu();
     await press("Escape");
-    expect(document.querySelector(".system-menu")).toBeNull();
+    expect(document.querySelector("[data-staff-menu]")).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });
 
   it("Close returns focus, but following a link does not", async () => {
     const { trigger, sheet } = await openMenu();
-    await click(sheet.querySelector(".system-menu-close")!);
+    await click(sheet.querySelector("button")!);
     await frame();
     expect(document.activeElement).toBe(trigger);
     await click(trigger);
     await frame();
     focusOn(document.body);
-    await click(document.querySelector(".system-menu-item")!);
+    await click(document.querySelector("[data-staff-menu] a")!);
     await frame();
-    expect(document.querySelector(".system-menu")).toBeNull();
+    expect(document.querySelector("[data-staff-menu]")).toBeNull();
     expect(document.activeElement).not.toBe(trigger);
   });
 
-  it("Tab and Shift+Tab stay inside, including from the sheet itself", async () => {
+  it("Tab and Shift+Tab stay inside, including from the dialog itself", async () => {
     const { sheet } = await openMenu();
-    const stops = [...sheet.querySelectorAll<HTMLElement>("input, a[href], button")];
+    const stops = [...sheet.querySelectorAll<HTMLElement>("a[href], button")];
     focusOn(stops.at(-1)!);
     await press("Tab");
     expect(document.activeElement).toBe(stops[0]);
@@ -448,35 +454,12 @@ describe("system phone menu", () => {
     expect(document.activeElement).toBe(stops.at(-1));
   });
 
-  it("an Escape the search handles (closing its list, then clearing it) does not close the sheet; an empty one does", async () => {
-    const { sheet, trigger } = await openMenu();
-    const input = sheet.querySelector<HTMLInputElement>("input")!;
-    focusOn(input);
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
-    await act(async () => { setter.call(input, "invite"); input.dispatchEvent(new Event("input", { bubbles: true })); });
-    await press("Escape");
-    expect(document.querySelector(".system-menu")).not.toBeNull();
-    await press("Escape");
-    expect(document.querySelector(".system-menu")).not.toBeNull();
-    expect(input.value).toBe("");
-    await press("Escape");
-    expect(document.querySelector(".system-menu")).toBeNull();
-    expect(document.activeElement).toBe(trigger);
-  });
-
-  it("an outside press closes it without taking focus, and a back/forward step does too", async () => {
+  it("a back/forward step closes it", async () => {
     const { trigger } = await openMenu();
-    focusOn(byId("elsewhere") ?? document.body);
-    await act(async () => { document.body.dispatchEvent(new Event("pointerdown", { bubbles: true })); });
-    await frame();
-    expect(document.querySelector(".system-menu")).toBeNull();
-    expect(trigger.isConnected).toBe(true);
-    await click(trigger);
-    await frame();
     await act(async () => { window.dispatchEvent(new Event("popstate")); });
     await frame();
-    expect(document.querySelector(".system-menu")).toBeNull();
-    expect(document.activeElement).not.toBe(trigger);
+    expect(document.querySelector("[data-staff-menu]")).toBeNull();
+    expect(trigger.isConnected).toBe(true);
   });
 });
 
@@ -498,7 +481,7 @@ describe("More launcher", () => {
     await frame();
     return { trigger, panel: document.querySelector<HTMLElement>(".more-launcher")! };
   }
-  const links = (panel: HTMLElement) => [...panel.querySelectorAll<HTMLElement>("input.destination-search-input, input.more-launcher-search-input, a[href], button.more-launcher-toggle:not([disabled])")];
+  const links = (panel: HTMLElement) => [...panel.querySelectorAll<HTMLElement>("input.destination-search-input, input.more-launcher-search-input, button.more-launcher-close, a[href], button.more-launcher-toggle:not([disabled])")];
 
   it("phone sheet: opens on the first link, Escape closes it and returns focus to the trigger", async () => {
     const { trigger, panel } = await openLauncher("tab");
@@ -509,7 +492,7 @@ describe("More launcher", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("phone sheet: Tab and Shift+Tab walk the links in a loop, and arrows move through them", async () => {
+  it("phone sheet: Tab and Shift+Tab walk Close and the links in a loop, and arrows move through them", async () => {
     const { panel } = await openLauncher("tab");
     const items = links(panel);
     focusOn(items.at(-1)!);
@@ -517,9 +500,12 @@ describe("More launcher", () => {
     expect(document.activeElement).toBe(items[0]);
     await press("Tab", { shiftKey: true });
     expect(document.activeElement).toBe(items.at(-1));
+    // Close comes first, then the search box; Down walks on, and Home/End edit the text while the search box has focus.
     focusOn(items[0]);
     await press("ArrowDown");
     expect(document.activeElement).toBe(items[1]);
+    await press("ArrowDown");
+    expect(document.activeElement).toBe(items[2]);
     await press("End");
     expect(document.activeElement).toBe(items.at(-1));
     // Tab from the sheet itself (nothing focused inside) still enters the loop.

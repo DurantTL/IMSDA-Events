@@ -139,6 +139,19 @@ describe("(workspace) layout for /profile without a staff session", () => {
     expect(await redirectedTo("/help")).toBe("/no-access?from=attendee&next=%2Fhelp");
   });
 
+  it("lets staff with no events through to Home (#1568), and nothing that only starts with it", async () => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", email: "riley@imsda-events.test", globalRole: null } });
+    mocks.getCurrentAttendee.mockResolvedValue(nobody);
+    mocks.listEventsForUser.mockResolvedValue([]);
+    for (const target of ["/home", "/home/", "/home/coming-up", "/home?event=evt_synthetic"]) {
+      mocks.requestTarget = target;
+      await expect(renderLayout()).resolves.toBeTruthy();
+    }
+    expect(await redirectedTo("/homework")).toBe("/no-access");
+    mocks.getCurrentSession.mockResolvedValue({ user: null });
+    expect(await redirectedTo("/home")).toBe("/login?next=%2Fhome");
+  });
+
   it("lets staff with no events through to Homepage & site content (#111), and nothing that only starts with it", async () => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "staff-1", email: "riley@imsda-events.test", globalRole: null } });
     mocks.getCurrentAttendee.mockResolvedValue(nobody);

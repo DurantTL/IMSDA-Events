@@ -202,12 +202,16 @@ describe("granting and revoking the role", () => {
   });
 });
 
-describe("the sidebar link for editors who are not system administrators", () => {
+describe("the Admin area link for editors who are not system administrators", () => {
   it("is drawn only when the shell says the viewer is such an editor, and points at the editor page", async () => {
     const { readFileSync } = await import("node:fs");
     const shell = readFileSync("components/app-shell.tsx", "utf8");
-    expect(shell).toContain("siteContentEditor && (");
-    expect(shell).toContain('href="/admin/site-content"');
+    // The shell hands the flag to the area model (#1565); a no-event editor's Admin tab opens the editor page they may use (#1735).
+    expect(shell).toContain("siteContentEditor,");
+    const { areaTabs } = await import("@/components/staff-areas");
+    const editor = { isSystemAdmin: false, held: [], activeRole: null, hasEvents: false, siteContentEditor: true, healthImport: true, clubYear: null, counts: {} } as const;
+    expect(areaTabs("admin", editor).map((tab) => tab.href)).toEqual(["/admin/site-content"]);
+    expect(areaTabs("admin", { ...editor, siteContentEditor: false })).toEqual([]);
     const workspace = readFileSync("components/workspace-shell.tsx", "utf8");
     expect(workspace).toContain("const siteContentEditor = !isSystemAdmin && (await canManageSiteContent(user));");
   });

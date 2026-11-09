@@ -10,7 +10,7 @@ import {
   eventFeaturesItem,
   navigation,
 } from "@/components/staff-navigation";
-import { systemNavGroups, type SystemNavGroup } from "@/components/system-navigation";
+import { adminHubs, systemNavGroups, type SystemNavGroup } from "@/components/system-navigation";
 import { eventPermissions } from "@/modules/access/permissions";
 
 /**
@@ -89,7 +89,7 @@ const menuRoutes: readonly Menu[] = [
   ["/admin/system-report", "System", "System management", "Catalogs and settings", "System report"],
   ["/admin/pauses", "System", "System management", "Catalogs and settings", "Pause an area"],
   // Event sidebar
-  ["/overview", "Event", "Event sidebar", "Daily", "Dashboard"],
+  ["/overview", "Event", "Event sidebar", "Daily", "Event home"],
   ["/more/kitchen-report/counts", "Event", "Event sidebar", "Daily", "Kitchen counts"],
   ["/check-in", "Event", "Event sidebar", "Daily", "Check-in"],
   ["/people", "Event", "Event sidebar", "Daily", "Registrations"],
@@ -107,8 +107,8 @@ const menuRoutes: readonly Menu[] = [
   ["/imports", "Event", "More directory", "People & clubs", "Imports"],
   ["/staff", "Event", "More directory", "People & clubs", "Team"],
   ["/more/promo-codes", "Event", "More directory", "Sales & content", "Promo codes"],
-  // /more is a real page (Event modules and activity), not a redirect: the launcher trigger and the launcher footer open it.
-  ["/more", "Event", "Event sidebar", "Event tools", "More"],
+  // /more is the Event setup page (grouped cards, then module controls and activity), not a redirect: the Event setup tab, the launcher trigger and the launcher footer open it.
+  ["/more", "Event", "Event sidebar", "Event setup", "Event setup"],
   // More directory cards
   ["/more/honors", "Event", "More directory", "Event tools", "Honors Weekend classes"],
   ["/more/meals", "Event", "More directory", "Sales & content", "Meals"],
@@ -177,20 +177,20 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/more/honors/rosters", "/more/honors", "components/honors-setup-workspace.tsx"],
   ["/more/honors/schedule", "/more/honors", "components/honors-setup-workspace.tsx"],
   ["/more/issued-assets/closeout", "/more/issued-assets", "components/issued-assets-workspace.tsx"],
-  ["/more/kitchen-report", "/more/reports", "app/(workspace)/more/reports/page.tsx"],
+  ["/more/kitchen-report", "/more/reports", "components/staff-event-tabs.ts"],
   ["/more/kitchen-report/closeout", "/more/kitchen-report", "app/(workspace)/more/kitchen-report/page.tsx"],
   ["/more/kitchen-report/scanner-import", "/more/kitchen-report", "app/(workspace)/more/kitchen-report/page.tsx"],
-  ["/more/reports/clubs", "/more/reports", "app/(workspace)/more/reports/page.tsx"],
+  ["/more/reports/clubs", "/more/reports/printouts", "modules/reporting/printouts-model.ts"],
   ["/more/reports/clubs/check-in-book", "/more/reports/clubs", "app/(workspace)/more/reports/clubs/page.tsx"],
   ["/more/reports/clubs/team-form", "/more/team-results", "components/team-results-workspace.tsx"],
   ["/more/reports/clubs/team-form/level", "/more/team-results", "components/team-results-workspace.tsx"],
-  ["/more/reports/packets", "/more/reports", "app/(workspace)/more/reports/page.tsx"],
+  ["/more/reports/packets", "/more/reports/printouts", "modules/reporting/printouts-model.ts"],
   ["/more/team-results", "/more/clubs", "app/(workspace)/more/clubs/page.tsx"],
-  ["/people/directory-review", "/people", "components/people-workspace.tsx"],
-  ["/people/duplicates", "/people", "components/people-workspace.tsx"],
-  ["/people/pending-teams", "/people", "components/people-workspace.tsx"],
-  ["/people/responsible-adults", "/people", "components/people-workspace.tsx"],
-  ["/people/staff-invitations", "/people", "components/people-workspace.tsx"],
+  ["/people/directory-review", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
+  ["/people/duplicates", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
+  ["/people/pending-teams", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
+  ["/people/responsible-adults", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
+  ["/people/staff-invitations", "/people/review-queues", "modules/review-queues/review-queues-model.ts"],
   ["/people/staff-invitations/approvals", "/people/staff-invitations", "app/(workspace)/people/staff-invitations/page.tsx"],
 ];
 
@@ -208,6 +208,14 @@ export function buildRouteMapping(): RouteMappingRow[] {
   rows.push({ route: "/admin", kind: "shell", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "System administration home", group: "System", note: "Opened from the sidebar's System administration link and the phone System menu bar." });
   rows.push({ route: "/admin/problem-reports", kind: "reached", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "Problem reports", group: "/admin", reachedFrom: { parent: "/admin", linkedIn: "app/(workspace)/admin/page.tsx" }, note: "System administrators only. Problems people sent from the Forms help popup, with the technical details they allowed; mark each resolved." });
   rows.push({ route: "/admin/feature-requests", kind: "reached", oldPlace: "System management", scope: "System", destinationPath: "/admin", label: "Feature requests", group: "/admin", reachedFrom: { parent: "/admin", linkedIn: "app/(workspace)/admin/page.tsx" }, note: "System administrators only. Approve or decline event feature requests; the System home only counts them." });
+  for (const hub of Object.values(adminHubs)) {
+    rows.push({ route: hub.href, kind: "shell", oldPlace: "Page link", scope: "System", destinationPath: hub.href, label: `${hub.label} hub`, group: "Admin hubs", note: "New in #1569. Opened from its Admin tab (the Admin area's tab row); a card there opens each destination of the group the person can reach." });
+  }
+  rows.push({ route: "/home", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/home", label: "Home: Needs you", group: "Home", note: "New in #1568. The Home area's first tab and the phone bar's Home slot; every staff member, and it only links to the pages that do the work." });
+  rows.push({ route: "/home/coming-up", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/home/coming-up", label: "Home: Coming up", group: "Home", note: "New in #1568. The Home area's second tab: the upcoming events the person can open." });
+  rows.push({ route: "/finance/tools", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/finance/tools", label: "More money tools", group: "Money", note: "New in #1575. Opened from the Money tab's More money tools view; a card opens each money page the person can reach for this event." });
+  rows.push({ route: "/people/review-queues", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/people/review-queues", label: "Review queues", group: "Registrations", note: "New in #1574. Opened from the Registrations tab's Review queues view; a card opens each review page the person can reach for this event." });
+  rows.push({ route: "/more/reports/printouts", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/more/reports/printouts", label: "Printouts", group: "Reports", note: "New in #1583. Opened from the Reports tab's Printouts view; a card opens each packet, book or form the person can print for this event." });
   rows.push({ route: "/help", kind: "shell", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Help & learning", group: "Help", note: "New in #1077. Opened from the sidebar's pinned Help & learning link and from search; every staff member, including staff with no event." });
   rows.push({ route: "/help/glossary", kind: "reached", oldPlace: "Page link", scope: "Help", destinationPath: "/help", label: "Glossary", group: "/help", reachedFrom: { parent: "/help", linkedIn: "app/(workspace)/help/page.tsx" } });
   rows.push({ route: "/events-admin", kind: "shell", oldPlace: "Page link", scope: "Event", destinationPath: "/events-admin", label: "Events Administrator dashboard", group: "Event administration", note: "The Events Administrator's home, opened from the role switcher. Only people with an active EVENT_ADMIN membership see it, and only for those events." });
@@ -291,7 +299,7 @@ export const reachabilityContexts: readonly DestinationSearchContext[] = [
   { isSystemAdmin: false, selectedEventId: "event_synthetic", permissions: ["MANAGE_KITCHEN_COUNTS"], clubOversight: false, clubEvent: false, clubFormsAccess: false },
 ];
 
-/** Entry points that are not search destinations: the More page (Event modules and activity) opens from the launcher trigger and, for staff who are not system administrators, from the launcher footer. */
+/** Entry points that are not search destinations: the Event setup page (module controls and activity) opens from the launcher trigger and, for staff who are not system administrators, from the launcher footer. */
 export function launcherEntryPaths(): string[] {
   return launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, eventQuery: "" }).map((link) => pathOf(link.href));
 }

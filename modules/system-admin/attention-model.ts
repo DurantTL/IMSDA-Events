@@ -242,6 +242,18 @@ export function attentionButtonName(total: number | null) {
   return `Notifications, ${total} ${total === 1 ? "item needs" : "items need"} attention`;
 }
 
+/** The items that are lists to review, left out of `total` (see `AttentionItem.reviewOnly`). */
+export const reviewOnlyAttentionKeys: readonly AttentionItemKey[] = ["directory-review"];
+
+/**
+ * Whether `summary.total` can be trusted as the count of what is waiting: every check read, or the only ones that could not
+ * be read are review-only lists, which `total` never included. A summary partial for any other reason would understate it.
+ */
+export function attentionTotalIsComplete(summary: Pick<AttentionSummary, "partial" | "unreadable">): boolean {
+  if (!summary.partial) return true;
+  return summary.unreadable.length > 0 && summary.unreadable.every((key) => reviewOnlyAttentionKeys.includes(key));
+}
+
 /** Only a same-site path is accepted from the API; anything else is not rendered as a link. */
 export function isSafeAttentionHref(href: unknown): href is string {
   return typeof href === "string" && href.startsWith("/") && !href.startsWith("//");

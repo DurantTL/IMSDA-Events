@@ -1,22 +1,38 @@
-<!-- @dsCard group="Navigation" height=460 -->
-<div class="ds-stage" style="grid-template-columns:260px 1fr;align-items:start;gap:28px">
-  <aside class="sidebar on-dark" style="border-radius:16px;min-height:400px">
-    <a class="brand" href="#" aria-label="IMAdventist calendar"><img class="brand-symbol" src="../../assets/Brand/imadventist-symbol.png" alt="" aria-hidden="true" width="42" height="42"><span class="brand-words"><strong>IMAdventist</strong><small>Events</small></span></a>
-    <nav aria-label="Staff">
-      <a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Dashboard</a>
-      <a href="#" aria-current="page"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg> Events</a>
-      <a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> People</a>
-      <a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> Reports</a>
-      <a href="#"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</a>
+<!-- @dsCard group="Navigation" height=520 -->
+<div class="ds-stage" style="grid-template-columns:1fr;align-items:start;gap:24px">
+  <div style="display:flex;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--paper);min-height:300px">
+    <nav aria-label="Areas" style="flex:none;width:88px;background:linear-gradient(180deg,var(--imsda-navy) 0%,var(--imsda-navy-deep) 100%);color:#fff;display:grid;align-content:start;gap:4px;padding:12px 8px">
+      <a href="#" style="display:grid;justify-items:center;gap:4px;min-height:64px;align-content:center;color:#fff;text-decoration:none;font-size:.875rem;font-weight:700;border-radius:10px">Home</a>
+      <a href="#" aria-current="true" style="display:grid;justify-items:center;gap:4px;min-height:64px;align-content:center;color:#fff;text-decoration:none;font-size:.875rem;font-weight:700;border-radius:10px;background:rgba(255,255,255,.1);box-shadow:inset 3px 0 var(--imsda-gold)">Events</a>
+      <a href="#" style="display:grid;justify-items:center;gap:4px;min-height:64px;align-content:center;color:#fff;text-decoration:none;font-size:.875rem;font-weight:700;border-radius:10px">Clubs</a>
+      <a href="#" style="display:grid;justify-items:center;gap:4px;min-height:64px;align-content:center;color:#fff;text-decoration:none;font-size:.875rem;font-weight:700;border-radius:10px">Reports</a>
     </nav>
-  </aside>
+    <div style="flex:1;padding:12px 24px">
+      <p style="margin:0 0 6px;font-weight:800;color:var(--imsda-navy)">Fall Camporee 2026</p>
+      <div role="group" aria-label="Fall Camporee 2026" style="display:flex;border-bottom:1px solid var(--line)">
+        <a href="#" style="min-height:48px;display:inline-flex;align-items:center;padding:8px 12px 4px;font-size:.875rem;font-weight:800;color:var(--muted);text-decoration:none;border-bottom:4px solid transparent;margin-bottom:-1px">Event home</a>
+        <a href="#" aria-current="page" style="min-height:48px;display:inline-flex;align-items:center;padding:8px 12px 4px;font-size:.875rem;font-weight:800;color:var(--imsda-navy);text-decoration:none;border-bottom:4px solid var(--imsda-gold);margin-bottom:-1px">Money</a>
+        <a href="#" style="min-height:48px;display:inline-flex;align-items:center;padding:8px 12px 4px;font-size:.875rem;font-weight:800;color:var(--muted);text-decoration:none;border-bottom:4px solid transparent;margin-bottom:-1px">Reports</a>
+      </div>
+      <div role="group" aria-label="Money views" style="display:flex;gap:4px;width:fit-content;margin-top:14px;padding:4px;border:1px solid var(--line);border-radius:14px;background:#fff">
+        <a href="#" aria-current="page" style="min-height:44px;display:inline-flex;align-items:center;padding:8px 15px;border-radius:10px;font-size:.875rem;font-weight:800;background:var(--imsda-navy);color:#fff;text-decoration:none">Payments</a>
+        <a href="#" style="min-height:44px;display:inline-flex;align-items:center;padding:8px 15px;border-radius:10px;font-size:.875rem;font-weight:800;color:var(--muted);text-decoration:none">Balances due</a>
+        <a href="#" style="min-height:44px;display:inline-flex;align-items:center;padding:8px 15px;border-radius:10px;font-size:.875rem;font-weight:800;color:var(--muted);text-decoration:none">Promo codes</a>
+      </div>
+    </div>
+  </div>
   <div style="display:grid;gap:10px;justify-items:center">
     <div style="width:360px;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:var(--paper)">
-      <div style="height:300px;padding:16px"><p class="eyebrow">Events</p><strong>Fall Camporee 2026</strong></div>
+      <div style="padding:12px 16px;min-height:200px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--line)">
+          <span style="min-height:48px;display:inline-flex;align-items:center;padding:8px 10px 4px;font-size:.875rem;font-weight:800;color:var(--imsda-navy);border-bottom:4px solid var(--imsda-gold);margin-bottom:-1px">Money</span>
+          <button type="button" style="min-height:44px;margin-bottom:2px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#f9fbfb;color:var(--imsda-navy);font:inherit;font-size:.875rem;font-weight:700">Event menu &#9662;</button>
+        </div>
+      </div>
       <nav class="mobile-nav" aria-label="Staff">
-        <a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>Home</a><a href="#" class="active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>Events</a><a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/><path d="M20 14v7"/><path d="M14 20h3"/></svg>Check-in</a><a href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>More</a>
+        <a href="#">Home</a><a href="#" class="active">Events</a><a href="#">Check-in</a><a href="#">Clubs</a><a href="#">More</a>
       </nav>
     </div>
-    <p class="ds-caption">Phone width: bottom tab bar.</p>
+    <p class="ds-caption">Below 1024px every tab row is a menu line; the phone adds the bottom bar.</p>
   </div>
 </div>

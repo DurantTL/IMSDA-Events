@@ -1,4 +1,5 @@
 import Link from "next/link";
+import styles from "./event-auto-select-notice.module.css";
 
 /**
  * Rendered once by `AppShell`, for every workspace page reached without
@@ -17,7 +18,7 @@ export function EventAutoSelectNotice({
   switchHref?: string;
 }) {
   return (
-    <div className="inline-notice event-auto-select-notice" role="status">
+    <div className={`inline-notice event-auto-select-notice ${styles.notice}`} role="status">
       <span>Continuing with <strong>{eventName}</strong>.</span>
       <Link className="text-link" href={switchHref}>Switch event</Link>
     </div>

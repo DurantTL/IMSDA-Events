@@ -36,6 +36,17 @@ export function eventToRemember(input: {
   return requestedEventId === lastRememberedId ? null : requestedEventId;
 }
 
+/**
+ * Whether the page needs `router.refresh()` once the remembered event is saved
+ * (#1745). A page whose address names its event (`?event=`) was already rendered
+ * for that event, so the cookie only matters for later visits; refreshing it
+ * anyway can cancel a sort or filter navigation the user just started. Only a
+ * page without `?event=` relies on the remembered event, so only it refreshes.
+ */
+export function refreshAfterRemember(currentSearch: string): boolean {
+  return !new URLSearchParams(currentSearch).get("event");
+}
+
 /** Params tied to the previous event's resources; dropped when switching events. */
 const eventScopedParams = ["q", "status", "template", "version", "message", "new"];
 

@@ -16,7 +16,7 @@ export function ClubRecordsToReview({ rows, month, clubYear }: { rows: RecordToR
         {rows.length} {rows.length === 1 ? "record" : "records"} for {reportMonthLabel(month)} submitted and not reviewed yet.
       </p>
       {rows.length === 0 ? (
-        <p className="report-empty">Nothing is waiting for review.</p>
+        <p className="report-empty">{`Nothing is waiting for review for ${reportMonthLabel(month)}. Show every club to see all submitted records.`}</p>
       ) : (
         <RecordsToReviewTable month={month} rows={rows} />
       )}

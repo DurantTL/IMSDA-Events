@@ -14,6 +14,7 @@ vi.mock("next/link", () => ({
   },
   useLinkStatus: () => ({ pending: mocks.linkPending }),
 }));
+vi.mock("@/components/sign-out-button", () => ({ SignOutButton: () => h("button", { type: "button" }, "Sign out") }));
 import { GuardedLink } from "@/components/guarded-link";
 import { NavigationLink } from "@/components/navigation-link";
 
@@ -162,5 +163,28 @@ describe("real pending navigation", () => {
     expect(container.querySelector('[data-navigation-pending="true"]')).toBeNull();
     await act(async () => release.get("/slow")!());
     expect(container.querySelector('[data-page="/latest"]')).not.toBeNull();
+  });
+});
+
+// The account menu's workspace switcher (#1565) uses the same dirty-form guard as every other staff move.
+describe("workspace selection protects unsaved edits", () => {
+  it("asks once and keeps the current workspace when the person cancels", async () => {
+    const { StaffAccountMenu } = await import("@/components/staff-account-menu");
+    const { staffWorkspaceOptions } = await import("@/modules/access/workspace-contexts");
+    await render(h(StaffAccountMenu, {
+      attendeePreviewHref: "/account",
+      defaultOpen: true,
+      displayName: "Synthetic Staff",
+      email: "staff@imsda-events.test",
+      workspaces: staffWorkspaceOptions({ isSystemAdmin: true, attendeeAccountAvailable: false, staffHref: "/overview?event=synthetic-event", onSystemPage: false }),
+    }));
+    const unregister = registerUnsavedChanges("Keep this synthetic draft?");
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    try {
+      await act(async () => container.querySelector<HTMLAnchorElement>('a[href="/admin"]')!.click());
+      expect(confirm).toHaveBeenCalledOnce();
+      expect(mocks.push).not.toHaveBeenCalled();
+      expect(container.querySelector('a[aria-current="true"]')?.getAttribute("href")).toBe("/overview?event=synthetic-event");
+    } finally { unregister(); confirm.mockRestore(); }
   });
 });

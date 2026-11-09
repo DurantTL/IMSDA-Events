@@ -27,6 +27,7 @@ const NOT_IN_CI = new Set([
   "test:walkthroughs", // help-walkthroughs.yml (#1482)
   "test:club-form-roster-add", // not in ci.yml before the shards (#1233)
   "test:custom-message", // not in ci.yml before the shards (#1233)
+  "test:staff-phone-tasks", // local only, not in CI (#1566)
 ]);
 
 const SHARD_JOB = /^(db-scripts-\d+|http-scripts|club-journeys|event-journeys)$/;

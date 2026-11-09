@@ -55,7 +55,6 @@
   --coral-soft: #fff1ef;
   --gold-text: #805807;
   --shadow: 0 14px 40px rgba(0, 59, 92, 0.08);
-  --sidebar-width: 260px;
   /* #1350: tokens from docs/design-system/tokens.css, same values as the literals they replace. */
   --secondary-bg: #f9fbfb;
   --table-head: #f6f9fa;
@@ -86,13 +85,12 @@
 /* #981: on the staff workspace (.app-shell) meta text is held to the body floor too. Help text,
    chip and table sub-lines, captions and every other size written as max(var(--type-floor), X)
    render at 14px, not 12px. Uppercase letter-spaced labels (eyebrows, sidebar group labels, table
-   headers) read larger than lowercase text of the same size, so they keep a 12px floor through
-   --type-label-floor. Club, account and public pages keep --type-floor at 12px. Not applied in
-   print. scripts/verify-mobile-layout.ts holds every staff page to this. */
+   headers) are 14px too (#1732; --type-label-floor equals the body floor on the staff workspace).
+   Club, account and public pages keep --type-floor at 12px. Not applied in print. scripts/verify-mobile-layout.ts holds every staff page to this. */
 @media screen {
   .app-shell {
     --type-floor: 0.875rem;
-    --type-label-floor: 0.75rem;
+    --type-label-floor: 0.875rem;
     /* Staff-only floor for the sizes that were written as a plain rem (nav items, popovers). */
     --type-staff-floor: 0.875rem;
   }
@@ -517,8 +515,8 @@ textarea:focus-visible {
 
 .skip-link {
   position: fixed;
-  top: 10px;
-  left: 10px;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: max(10px, env(safe-area-inset-left, 0px));
   z-index: 100;
   border-radius: 10px;
   background: white;
@@ -532,23 +530,6 @@ textarea:focus-visible {
 
 .skip-link:focus { transform: translateY(0); }
 
-.sidebar {
-  position: fixed;
-  inset: 0 auto 0 0;
-  z-index: 30;
-  display: flex;
-  width: var(--sidebar-width);
-  flex-direction: column;
-  padding: 25px 18px 20px;
-  /* #567 F-5: at short heights (1440x500) the brand, system link and event
-     picker leave the nav little room, so the whole sidebar scrolls as well. */
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-  scrollbar-width: thin;
-  background: linear-gradient(180deg, var(--imsda-navy) 0%, var(--imsda-navy-deep) 100%);
-  color: white;
-}
 
 .brand {
   display: flex;
@@ -575,100 +556,8 @@ textarea:focus-visible {
   text-transform: uppercase;
 }
 
-.brand,
-.system-navigation,
-.event-workspace-label,
-.event-picker-wrap { flex-shrink: 0; }
+.brand { flex-shrink: 0; }
 
-.system-navigation {
-  display: grid;
-  gap: 7px;
-  margin: 0 4px 22px;
-}
-
-.system-navigation-label,
-.event-workspace-label {
-  color: #b6cbd5;
-  font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.61rem);
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-
-.system-navigation-label { padding-left: 5px; }
-
-.system-navigation-link {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.07);
-  color: white;
-  padding: 10px;
-  text-decoration: none;
-  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
-}
-
-.system-navigation-link:hover {
-  border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.11);
-  transform: translateY(-1px);
-}
-
-.system-navigation-link.active {
-  border-color: rgba(239, 193, 76, 0.48);
-  background: rgba(239, 193, 76, 0.13);
-  box-shadow: inset 3px 0 var(--imsda-gold);
-}
-
-.system-navigation-icon {
-  display: grid;
-  width: 31px;
-  height: 31px;
-  flex: 0 0 31px;
-  place-items: center;
-  border-radius: 9px;
-  background: rgba(239, 193, 76, 0.17);
-  color: var(--imsda-gold);
-}
-
-.system-navigation-link strong,
-.system-navigation-link small { display: block; }
-
-.system-navigation-link strong { font-size: max(var(--type-staff-floor, 0px), 0.75rem); }
-.system-navigation-link small { margin-top: 2px; color: #b8cbd5; font-size: max(var(--type-floor, 0px), 0.59rem); }
-
-.event-workspace-label {
-  display: block;
-  margin: 0 9px 8px;
-}
-
-.event-picker-wrap { margin: 0 4px 20px; }
-
-.event-picker-wrap label {
-  display: block;
-  margin: 0 0 7px 5px;
-  color: #b6cbd5;
-  font-size: max(var(--type-body-floor, 0px), 0.65rem);
-  font-weight: 700;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
-/* The visible "Event workspace" label above names the picker; this one is for screen readers only. */
-.event-picker-wrap label.sr-only { margin: -1px; }
-
-/* Link to the Archived events list (#635); 44px tall for touch. */
-.event-picker-archived-link {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  margin: 2px 0 0 5px;
-  color: #d3e2e8;
-  font-size: max(var(--type-body-floor, 0px), 0.82rem);
-  font-weight: 700;
-  text-decoration: underline;
-}
 
 .select-shell { position: relative; }
 
@@ -693,75 +582,9 @@ textarea:focus-visible {
   transform: translateY(-50%);
 }
 
-/* #468: let the nav scroll inside the fixed sidebar so every link stays
-   reachable at short window heights; the brand and account areas above/below
-   stay fixed since they aren't part of this flex child. */
-.primary-nav {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  min-height: 0;
-  flex: 1 0 180px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  /* Room for the 3px + 3px-offset focus ring and the hover nudge, which the
-     scroll box would otherwise clip; the negative margin keeps the layout. */
-  margin-inline: -6px;
-  padding: 6px;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-  scrollbar-width: thin;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-radius: 12px;
-  color: #b8ccd5;
-  padding: 11px 13px;
-  font-size: max(var(--type-staff-floor, 0px), 0.86rem);
-  font-weight: 600;
-  text-decoration: none;
-  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
-}
-
-.nav-item:hover { color: white; transform: translateX(2px); }
-
-.nav-item.active {
-  background: rgba(255, 255, 255, 0.13);
-  color: white;
-  box-shadow: inset 3px 0 var(--imsda-gold);
-}
-
-.sidebar-foot {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 17px 10px 0;
-}
-
-.sidebar-foot strong,
-.sidebar-foot small { display: block; }
-
-.sidebar-foot strong { font-size: max(var(--type-staff-floor, 0px), 0.76rem); }
-.sidebar-foot small { margin-top: 3px; color: #a9c0ca; font-size: max(var(--type-floor, 0px), 0.68rem); }
-
-.sync-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  margin-top: 5px;
-  border-radius: 50%;
-  background: var(--imsda-gold);
-  box-shadow: 0 0 0 4px rgba(240, 179, 35, 0.15);
-}
 
 .workspace {
   min-height: 100vh;
-  margin-left: var(--sidebar-width);
   padding: 0 38px 54px;
 }
 
@@ -1507,7 +1330,7 @@ textarea:focus-visible {
 .checkin-tools .search-field { padding: 0 4px 0 12px; }
 .arrival-row { grid-template-columns: auto 1fr auto auto; }
 .arrival-time { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.67rem); }
-.arrival-row button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #b8d7ca; border-radius: 9px; background: var(--green-soft); color: var(--green); cursor: pointer; padding: 7px 9px; font-size: max(var(--type-body-floor, 0px), 0.65rem); font-weight: 700; }
+.arrival-row button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #b8d7ca; border-radius: 9px; background: var(--green-soft); color: var(--green); cursor: pointer; min-height: var(--touch-target, 44px); padding: 7px 9px; font-size: max(var(--type-body-floor, 0px), 0.65rem); font-weight: 700; }
 .arrival-row button.undo-button { border-color: #dfc9e8; background: var(--imsda-purple-soft); color: var(--imsda-purple); }
 .arrival-row button:disabled { cursor: not-allowed; opacity: 0.55; }
 .inline-notice { border: 1px solid #b8d7ca; border-radius: 12px; background: var(--green-soft); color: var(--green); padding: 10px 13px; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 600; }
@@ -1548,7 +1371,6 @@ textarea:focus-visible {
 .act-as-banner span:not(.act-as-banner-actions) { flex: 1 1 auto; }
 .act-as-banner-actions { display: flex; align-items: center; gap: 8px; }
 /* The staff workspace's fixed sidebar covers the left edge of a full-width banner, so start the banner beside it (#700). */
-.act-as-banner-shell { margin-left: var(--sidebar-width); }
 @media (max-width: 800px) { .act-as-banner-shell { margin-left: 0; } }
 /* On the account side the banner joins the same 1180px column as the tabs, hero and page body (#722). */
 .act-as-banner-account { max-width: 1180px; margin: 12px auto 0; }
@@ -1858,7 +1680,7 @@ textarea:focus-visible {
   overflow-y: auto;
   place-items: center;
   background: rgba(0, 35, 54, 0.52);
-  padding: 22px;
+  padding: max(22px, env(safe-area-inset-top, 0px)) max(22px, env(safe-area-inset-right, 0px)) max(22px, env(safe-area-inset-bottom, 0px)) max(22px, env(safe-area-inset-left, 0px));
   backdrop-filter: blur(3px);
 }
 
@@ -1981,6 +1803,9 @@ body:has(.auth-page) { padding-bottom: 0; }
 .auth-brand > span small { display: block; }
 .auth-brand > span strong { letter-spacing: 0.08em; }
 .auth-brand > span small { color: var(--muted); font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.62rem); font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+/* #1732: the staff event pickers sit outside .app-shell, so their uppercase labels take the staff 14px here (club and public sign-in keep the 12px floor). */
+.select-event-card .eyebrow,
+.select-event-card .auth-brand > span small { font-size: 0.875rem; }
 .auth-heading { margin-bottom: 22px; }
 .auth-heading h1 { margin: 3px 0 7px; color: var(--ink); font-size: 1.75rem; line-height: 1.15; }
 .auth-heading > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.75rem); line-height: 1.6; }
@@ -2042,6 +1867,10 @@ body:has(.auth-page) { padding-bottom: 0; }
 .staff-list { overflow: hidden; padding: 0; }
 .staff-row { display: grid; grid-template-columns: minmax(230px, 1.25fr) minmax(250px, 1.4fr) 90px 90px; align-items: center; gap: 14px; padding: 13px 17px; }
 .staff-head { border-bottom: 1px solid var(--line); background: #f8fafb; color: var(--muted); font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.62rem); font-weight: 700; text-transform: uppercase; }
+/* Narrower content column (rail, no sidebar, #1565): let the four columns shrink so Access is never cut off from 801px up. */
+@media (min-width: 801px) and (max-width: 1100px) {
+  .staff-row { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.4fr) minmax(70px, 0.5fr) minmax(70px, 0.5fr); gap: 10px; padding-inline: 12px; }
+}
 .staff-record { width: 100%; border: 0; border-bottom: 1px solid #edf2f4; background: white; color: inherit; cursor: pointer; text-align: left; transition: background 140ms ease; }
 .staff-record:last-child { border-bottom: 0; }
 .staff-record:hover { background: #f8fbfc; }
@@ -2584,7 +2413,6 @@ body:has(.auth-page) { padding-bottom: 0; }
 
 @media (max-width: 800px) {
   body { padding-bottom: calc(73px + env(safe-area-inset-bottom)); }
-  .sidebar { display: none; }
   .workspace { margin: 0; padding: 0 16px 35px; }
   /* Staff shell header (#685): title and controls share one row, and the event
      picker gets its own full-width row so the whole event name stays visible
@@ -2640,13 +2468,14 @@ body:has(.auth-page) { padding-bottom: 0; }
   .checkin-hero { display: block; border-radius: 20px; padding: 22px; }
   .hero-capacity { margin-top: 20px; }
   .record-grid { grid-template-columns: 1fr; }
-  .mobile-nav { position: fixed; inset: auto 0 0; z-index: 40; display: flex; min-height: 67px; border-top: 1px solid var(--line); background: white; padding: 4px 4px max(4px, env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(0, 59, 92, 0.07); }
+  .mobile-nav { position: fixed; inset: auto 0 0; z-index: 40; display: flex; min-height: calc(67px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: white; padding: 4px max(4px, env(safe-area-inset-right, 0px)) max(4px, env(safe-area-inset-bottom, 0px)) max(4px, env(safe-area-inset-left, 0px)); box-shadow: 0 -8px 24px rgba(0, 59, 92, 0.07); }
   /* Five equal-width tabs (#711), six for finance staff (#890): each is a 44px+ target; labels are short and never ellipsized. */
   .mobile-nav a { position: relative; display: flex; min-width: 0; min-height: 52px; flex: 1 1 0; padding: 4px 2px 2px; align-items: center; justify-content: center; flex-direction: column; gap: 3px; border-radius: 10px; color: #566a75; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 700; line-height: 1.1; text-decoration: none; }
   .mobile-nav a span { max-width: 100%; white-space: nowrap; }
   .mobile-nav a.active { background: rgba(0, 59, 92, 0.06); color: var(--imsda-navy); }
-  .mobile-nav a.active::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 3px 3px; background: var(--imsda-purple); }
-  .mobile-nav a.active svg { color: var(--imsda-purple); }
+  /* "Where you are" is the staff gold (#1565): a 4px bar on the current item. */
+  .mobile-nav a.active::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 4px; border-radius: 0 0 4px 4px; background: var(--imsda-gold); }
+  .mobile-nav a.active svg { color: var(--imsda-navy); }
   .staff-row { grid-template-columns: minmax(180px, 1fr) minmax(200px, 1fr) 80px; }
   .staff-row > span:last-child { display: none; }
   .import-row { grid-template-columns: minmax(100px, 0.6fr) minmax(140px, 0.8fr) minmax(190px, 1.2fr) minmax(110px, 0.7fr); }
@@ -3835,6 +3664,10 @@ body:has(.auth-page) { padding-bottom: 0; }
   right: 0;
   left: 0;
   z-index: 200;
+  /* Edge to edge, with the content kept clear of a landscape notch (insets are 0 elsewhere). */
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  box-sizing: border-box;
   display: flex;
   height: var(--picker-height, 100dvh);
   flex-direction: column;
@@ -9464,6 +9297,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
      table-cards-wide                        box 860px or narrower
      table-cards-xwide                       box 1100px or narrower (nine-column tables such as the roster)
      table-cards-max                         box 1260px or narrower (the 12-column attendee listing, 78rem wide)
+     table-cards-huge                        box 1380px or narrower (the conference Monthly Record points table, about 1350px)
    A table needs a wrap; a `table-cards` table without a `table-box` container never becomes cards (the audit's table-cards-no-box
    rule). The doubled class (.table-cards.table-cards) beats desktop rules such as `.report-table td:last-child { width: 120px }` and the
    roster/seminar/team nowrap rules without !important. */
@@ -9795,6 +9629,13 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .club-reports-grid table.table-cards-xwide.table-cards-xwide > tbody > tr > td[data-label] { display: flex; align-items: baseline; gap: 6px; padding-left: 0; }
   .club-reports-grid table.table-cards-xwide > tbody > tr > td[data-label]::before { float: none; width: auto; margin: 0 auto 0 0; }
 }
+@container table-box (min-width: 601px) and (max-width: 1380px) {
+  .club-reports-grid table.table-cards-huge.table-cards-huge { min-width: 0; }
+  .club-reports-grid table.table-cards-huge.table-cards-huge > tbody > tr { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); column-gap: 14px; }
+  .club-reports-grid table.table-cards-huge.table-cards-huge > tbody > tr > th[scope="row"] { grid-column: 1 / -1; }
+  .club-reports-grid table.table-cards-huge.table-cards-huge > tbody > tr > td[data-label] { display: flex; align-items: baseline; gap: 6px; padding-left: 0; }
+  .club-reports-grid table.table-cards-huge > tbody > tr > td[data-label]::before { float: none; width: auto; margin: 0 auto 0 0; }
+}
 @container table-box (max-width: 1260px) {
   table.table-cards-max.table-cards-max,
   table.table-cards-max.table-cards-max > tbody,
@@ -9852,6 +9693,77 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   }
   table.table-cards-max.table-cards-max > tbody > tr > td:empty { display: none; }
   table.table-cards-max.table-cards-max > tbody > tr > td[colspan] { display: block; margin-top: 0; padding: 4px 0; border-top: 0; }
+}
+/* table-cards-huge: box 1380px or narrower (the Monthly Record points table is about 1350px wide; the content column is wider since the sidebar left, #1565). */
+@container table-box (max-width: 1380px) {
+  table.table-cards-huge.table-cards-huge > thead:has(.table-sort-button) { position: static; display: block; width: auto; height: auto; margin: 0 0 10px; overflow: visible; clip: auto; white-space: normal; }
+  table.table-cards-huge.table-cards-huge > thead:has(.table-sort-button) > tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  table.table-cards-huge.table-cards-huge > thead:has(.table-sort-button) > tr::before { content: "Sort by"; content: "Sort by" / ""; color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+  table.table-cards-huge.table-cards-huge > thead:has(.table-sort-button) > tr > th { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  table.table-cards-huge.table-cards-huge > thead:has(.table-sort-button) > tr > th:has(> .table-sort-button) { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; background: transparent; }
+  table.table-cards-huge.table-cards-huge > thead:has(.table-sort-button) > tr > th > .table-sort-button {
+    box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card, #fff);
+    color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; letter-spacing: 0; text-transform: none;
+  }
+  table.table-cards-huge.table-cards-huge > thead:has(.table-sort-button) > tr > th:is([aria-sort="ascending"], [aria-sort="descending"]) > .table-sort-button { border-color: var(--imsda-navy); background: var(--imsda-navy-soft, #e6f0f4); }
+}
+@container table-box (max-width: 1380px) {
+  table.table-cards-huge.table-cards-huge,
+  table.table-cards-huge.table-cards-huge > tbody,
+  table.table-cards-huge.table-cards-huge > caption:not(.sr-only) { display: block; width: 100%; box-sizing: border-box; min-width: 0; table-layout: auto; }
+
+  /* A visually hidden caption (.sr-only) is left out above: it stays absolutely
+     positioned and 1px wide. width: 100% on it was as wide as the page plus its
+     offset, which scrolled the document sideways (#737). It stays in the
+     accessibility tree, so the table is still named. */
+
+  /* Visually hidden but still in the accessibility tree: the column headers
+     stay announced, and can never clip. */
+  table.table-cards-huge.table-cards-huge > thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+
+  /* One bordered card per row (#1457). */
+  table.table-cards-huge.table-cards-huge > tbody > tr {
+    display: flex; flex-direction: column; box-sizing: border-box; width: 100%;
+    margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--line, #d6dee2); border-radius: 12px; background: #fff;
+  }
+  table.table-cards-huge.table-cards-huge > tbody > tr > :is(th, td) {
+    display: block; box-sizing: border-box; width: 100%; min-width: 0; margin: 0;
+    border: 0; padding: 4px 0; text-align: left; white-space: normal; overflow-wrap: break-word; word-break: normal; vertical-align: top;
+  }
+
+  /* The row header is the card title, always first (the points table lists
+     Rank before Club, the special-roles table Role before Name). */
+  table.table-cards-huge.table-cards-huge > tbody > tr > th[scope="row"] {
+    order: -1; margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--table-row-line);
+    font-size: max(var(--type-body-floor, 0px), 0.9rem);
+  }
+
+  /* "Header: value" lines. The label floats into a left gutter (negative margin
+     into the cell's padding), so a label that wraps to two lines grows the row
+     instead of overlapping the next one. flow-root contains the float. */
+  table.table-cards-huge.table-cards-huge > tbody > tr > td[data-label] {
+    display: flow-root; padding-left: 8.5rem; font-size: max(var(--type-body-floor, 0px), 0.8rem);
+  }
+  table.table-cards-huge > tbody > tr > td[data-label]::before {
+    content: attr(data-label); content: attr(data-label) / ""; float: left; width: 7.75rem; margin-left: -8.5rem;
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.68rem);
+    overflow-wrap: break-word; text-transform: none; letter-spacing: 0;
+  }
+  /* Long labels and cells that hold controls: label above, value full width. */
+  table.table-cards-huge.table-cards-huge > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea)) { padding-left: 0; }
+  table.table-cards-huge > tbody > tr > td[data-label]:is([data-label-long], :has(button, .team-account-actions, input:not([type="checkbox"], [type="radio"]), select, textarea))::before {
+    float: none; display: block; width: auto; margin: 0 0 2px;
+  }
+  table.table-cards-huge .team-account-actions { flex-wrap: wrap; }
+  /* The row's action sits at the bottom of the card, above a thin divider: unlabelled (sr-only header) action cells are just the controls, wrapping. */
+  table.table-cards-huge.table-cards-huge > tbody > tr > td:not([data-label]) {
+    display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--table-row-line);
+  }
+  table.table-cards-huge.table-cards-huge > tbody > tr > td:empty { display: none; }
+  table.table-cards-huge.table-cards-huge > tbody > tr > td[colspan] { display: block; margin-top: 0; padding: 4px 0; border-top: 0; }
 }
 
 /* Club forms and records (#703). */
@@ -10009,108 +9921,6 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 /* The roster link is part of the help sentence, so it stays inline with the full stop after it. */
 :root .club-going-list .club-roster-age .field-help a { display: inline; min-height: 0; padding-inline: 0; text-decoration: underline; }
 
-/* Staff sidebar: collapse to icons only (#446). Desktop only; the phone layout
-   uses the mobile nav and never shows the sidebar. Text is clipped, not
-   removed, so every link keeps its accessible name. */
-.sidebar-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 0 0 auto;
-  margin: -10px 4px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.17);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.07);
-  color: #d6e3e9;
-  cursor: pointer;
-  padding: 8px 11px;
-  font: inherit;
-  font-size: max(var(--type-staff-floor, 0px), 0.78rem);
-  font-weight: 600;
-}
-.sidebar-toggle:hover { background: rgba(255, 255, 255, 0.13); color: white; }
-
-.sidebar-tooltip {
-  position: fixed;
-  z-index: 60;
-  transform: translateY(-50%);
-  border-radius: 8px;
-  background: var(--imsda-navy-deep);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-  color: white;
-  padding: 6px 10px;
-  font-size: max(var(--type-staff-floor, 0px), 0.78rem);
-  font-weight: 600;
-  pointer-events: none;
-  white-space: nowrap;
-}
-
-@media (min-width: 801px) {
-  html[data-sidebar="collapsed"] { --sidebar-width: 76px; }
-  html[data-sidebar="collapsed"] .sidebar { padding-inline: 10px; }
-
-  html[data-sidebar="collapsed"] .brand { justify-content: center; margin-inline: 0; }
-  html[data-sidebar="collapsed"] .sidebar-toggle { justify-content: center; margin-inline: 0; padding-inline: 0; }
-
-  html[data-sidebar="collapsed"] .brand > .sidebar-link-label,
-  html[data-sidebar="collapsed"] .sidebar-toggle > span,
-  html[data-sidebar="collapsed"] .nav-item > span,
-  html[data-sidebar="collapsed"] .system-navigation-link > .sidebar-link-label,
-  html[data-sidebar="collapsed"] .sidebar-foot > span:last-child {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  /* Headings and the sidebar event picker need room; the header picker replaces it. */
-  html[data-sidebar="collapsed"] .system-navigation-label,
-  html[data-sidebar="collapsed"] .event-workspace-label,
-  html[data-sidebar="collapsed"] .event-picker-wrap { display: none; }
-
-  /* The sidebar picker is gone, so the header picker takes over: the current
-     event stays visible and changeable without expanding the sidebar. */
-  html[data-sidebar="collapsed"] .workspace-header .mobile-event-picker {
-    position: relative;
-    order: 1;
-    display: flex;
-    flex: 0 1 280px;
-    min-width: 0;
-    align-items: center;
-  }
-  html[data-sidebar="collapsed"] .workspace-header .header-actions { order: 2; }
-  html[data-sidebar="collapsed"] .workspace-header .mobile-event-picker select {
-    width: 100%;
-    min-height: 40px;
-    appearance: none;
-    overflow: hidden;
-    border: 1px solid var(--field-border);
-    border-radius: 10px;
-    background: white;
-    color: var(--imsda-navy);
-    padding: 8px 34px 8px 12px;
-    font-size: max(var(--type-body-floor, 0px), 0.78rem);
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  html[data-sidebar="collapsed"] .workspace-header .mobile-event-picker svg { position: absolute; right: 12px; pointer-events: none; }
-
-  html[data-sidebar="collapsed"] .system-navigation { margin-inline: 0; }
-  html[data-sidebar="collapsed"] .system-navigation-link { justify-content: center; }
-  html[data-sidebar="collapsed"] .nav-item { justify-content: center; padding-inline: 0; }
-  html[data-sidebar="collapsed"] .nav-item:hover { transform: none; }
-  html[data-sidebar="collapsed"] .sidebar-foot { justify-content: center; padding-inline: 0; }
-}
-
-@media (max-width: 800px) { .sidebar-toggle, .sidebar-tooltip { display: none; } }
-@media print { .sidebar-tooltip { display: none !important; } }
-
-
-
 /* Filter by answer on People & registrations (#739) */
 .choice-filter { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .choice-filter-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
@@ -10164,6 +9974,8 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   :root { --target-desktop: 36px; --target-touch: 44px; }
   :where(.filter-field select, .report-download, .report-record-link, .roster-csv-actions > a, .roster-csv-actions > button,
     .club-event-action, .check-in-queue-actions button, .check-in-review-list article > button) { min-height: var(--target-desktop); }
+  /* #1732: the filter select is 44px at every width (the rest of the list keeps the compact desktop size). */
+  :where(.filter-field select) { min-height: var(--target-touch); }
 }
 @media screen and ((max-width: 768px) or (pointer: coarse)) {
   :root :is(.filter-field select, .report-download, .report-record-link, .roster-csv-actions > a, .roster-csv-actions > button,
@@ -10231,10 +10043,11 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   .more-launcher-sidebar { display: none; }
   /* Phone: a bottom sheet above the tab bar. */
   .more-launcher-tab {
-    inset: auto 0 calc(67px + env(safe-area-inset-bottom, 0px));
+    inset: auto env(safe-area-inset-right, 0px) calc(67px + env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 0px);
     width: auto;
     max-width: none;
     max-height: min(72vh, calc(100vh - 120px));
+    max-height: min(72dvh, calc(100dvh - 120px - env(safe-area-inset-top, 0px)));
     border-radius: 18px 18px 0 0;
     padding-bottom: 6px;
   }
@@ -10814,13 +10627,13 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { background: var(--paper,
 .setup-step.is-done .setup-step-copy strong { color: var(--muted); font-weight: 600; }
 .setup-step.is-next { background: var(--imsda-gold-soft); }
 .setup-step.is-next .setup-step-copy strong { font-weight: 800; }
-.setup-step .text-button { display: inline-flex; min-height: 36px; align-items: center; gap: 5px; font-weight: 700; white-space: nowrap; }
+.setup-step .text-button { display: inline-flex; min-height: var(--touch-target, 44px); align-items: center; gap: 5px; font-weight: 700; white-space: nowrap; }
 .setup-checklist-guide, .role-guide-link { margin: 8px 0 0; }
 .setup-checklist-guide .text-button, .role-guide-link .text-button { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .setup-step-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 14px; }
 @media (max-width: 480px) {
   .setup-step { grid-template-columns: auto minmax(0, 1fr); }
-  .setup-step .text-button { grid-column: 2; justify-self: start; min-height: 44px; }
+  .setup-step .text-button { grid-column: 2; justify-self: start; }
   .setup-step-actions { grid-column: 2; justify-content: flex-start; }
 }
 
@@ -10900,6 +10713,8 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   .public-registration-attendee.is-sheet {
     position: fixed;
     inset: 0;
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
     z-index: 60;
     display: flex;
     flex-direction: column;
@@ -10934,103 +10749,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .module-request-item small { display: block; margin-top: 2px; color: var(--muted, #5b6b73); }
 .module-request-item p { margin: 8px 0 0; overflow-wrap: anywhere; }
 .module-request-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-
-/* #741 slice 4: fixed staff navigation order.
-   The rhythm is tight (the nav still scrolls inside the sidebar, #468); the
-   group headings and the icons-only rule between groups are in the #964 block.
-   Self-contained block; nothing above this comment is changed by it.
-   (plain comment, not a banner: the #743 block test counts banners) */
-.primary-nav { gap: 1px; }
-.primary-nav .nav-item { padding-block: 6px; }
-.system-navigation { margin-bottom: 12px; }
-.event-workspace-label { margin-bottom: 4px; }
-.event-picker-wrap { margin-bottom: 8px; }
-
-/* Staff sidebar: More stays pinned at the bottom of the nav. When every item is
-   visible (a system admin) the nav scrolls, and More, the last item, sticks to
-   the bottom of that scroll box so it never needs a scroll to reach. DOM and tab
-   order are unchanged; the phone layout hides the sidebar and is not touched. */
-@media (min-width: 801px) {
-  .primary-nav > .nav-item[aria-haspopup="dialog"]:last-child {
-    position: sticky;
-    /* The nav has 6px of padding; stick to the very edge so scrolled items never show in that strip. */
-    bottom: -6px;
-    z-index: 1;
-    /* Opaque so items scroll out of sight beneath it. The same gradient as the
-       sidebar, fixed to the viewport (the sidebar is full height), so it blends in. */
-    background-color: var(--imsda-navy-deep);
-    background-image: linear-gradient(180deg, var(--imsda-navy) 0%, var(--imsda-navy-deep) 100%);
-    background-attachment: fixed;
-    /* At the edge the scroll box would clip an outside focus ring, so draw it inside. */
-    outline-offset: -3px;
-  }
-  /* The hover nudge (a transform) would make the fixed fill fall back to scrolling: no nudge here. */
-  .primary-nav > .nav-item[aria-haspopup="dialog"]:last-child:hover,
-  .primary-nav > .nav-item[aria-haspopup="dialog"]:last-child:focus-visible { transform: none; }
-  /* The active tint is layered over that fill, so the item stays opaque. */
-  .primary-nav > .nav-item.active[aria-haspopup="dialog"]:last-child {
-    background-image: linear-gradient(rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.13)), linear-gradient(180deg, var(--imsda-navy) 0%, var(--imsda-navy-deep) 100%);
-    background-attachment: scroll, fixed;
-  }
-}
-
-/* #964: shorter, grouped staff sidebar. The daily items sit directly in the
-   nav; Set up and Reports are collapsible groups whose heading is a button.
-   Icon-only mode (#446) hides the
-   buttons, keeps every group's links showing (a closed group would otherwise
-   hide destinations with no way to open it) and draws the thin rule between
-   groups. Self-contained block; nothing above this comment is changed by it.
-   (plain comment, not a banner: the #743 block test counts banners) */
-.nav-group { display: grid; gap: 1px; }
-.nav-group-items { display: grid; gap: 1px; }
-.nav-group-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  min-height: 44px;
-  margin: 7px 0 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  /* #93abb6 on the navy gradient is 4.91:1 (#7d97a2 was 3.83:1 at the top). */
-  color: #93abb6;
-  padding: 4px 13px;
-  font: inherit;
-  font-size: max(var(--type-label-floor, var(--type-floor, 0px)), 0.62rem);
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-align: left;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: color 160ms ease, background 160ms ease;
-}
-.nav-group-toggle:hover { color: white; background: rgba(255, 255, 255, 0.07); }
-.nav-group-toggle svg { flex: 0 0 auto; transition: transform 160ms ease; }
-.nav-group-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
-@media (prefers-reduced-motion: reduce) {
-  .nav-group-toggle, .nav-group-toggle svg { transition: none; }
-}
-@media (min-width: 801px) {
-  html[data-sidebar="collapsed"] .nav-group-toggle { display: none; }
-  html[data-sidebar="collapsed"] .nav-group::before {
-    content: "";
-    display: block;
-    height: 1px;
-    margin: 7px 8px 4px;
-    background: rgba(255, 255, 255, 0.16);
-  }
-}
-
-/* Collapsed sidebar: every group's icons show, including groups closed in the expanded sidebar (their toggles are
-   hidden). The base layer's `[hidden] { display: none !important }` beats any unlayered rule, so this one sits in the
-   same layer, where its higher specificity wins. */
-@layer base {
-  @media (min-width: 801px) {
-    html[data-sidebar="collapsed"] .nav-group-items[hidden] { display: grid !important; }
-  }
-}
 
 /* Calendar repeats, office closures and subscribe buttons (#444) */
 .calendar-chip.calendar-closure a, .calendar-chip.calendar-closure span:not(.sr-only) {
@@ -11436,7 +11154,7 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
   display: grid;
   place-items: center;
   background: rgba(4, 12, 18, 0.82);
-  padding: 12px;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
 }
 .event-gallery-dialog {
   display: grid;
@@ -12081,7 +11799,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .app-shell .meta-stack > *, .meta-stack > * { margin: 0; line-height: 1.45; }
 .app-shell :is(.finance-record, .payment-history, .finance-attendee-list, .arrival-row, .attention-row, .check-in-queue-item, .activity-row, .action-card, .record-card, .club-check-in-attendee) :is(strong, small),
 .app-shell .metric-card small,
-.app-shell .system-navigation-link small,
 .app-shell .attendee-summary small { line-height: 1.45; }
 .arrival-row > .meta-stack { justify-items: start; }
 
@@ -12218,6 +11935,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .operations-search-form .operations-search-status { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .operations-search-form .operations-search-status legend { width: 100%; padding: 0; margin-bottom: 6px; }
 .operations-search-form .operations-search-status .checkbox-label { min-height: 44px; }
+.operations-search-form .field select { min-height: 44px; } /* #1732: 44px tap target at every width. */
 .operations-search-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .operations-search-actions .primary-button,
 .operations-search-actions .secondary-button { min-height: 44px; }
@@ -12730,10 +12448,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 /* Work contexts, the phone System menu, guarded links and module states (#1180). New rules only; shared type scale untouched. */
 .work-context { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8125rem); }
 .work-context-kind { flex: none; border-radius: 999px; background: var(--imsda-purple-soft); color: var(--imsda-purple); font-size: max(var(--type-floor, 0px), var(--text-badge)); font-weight: 700; padding: 2px 8px; }
-.work-context[data-context="system"] .work-context-kind { background: var(--imsda-navy-soft); color: var(--imsda-navy); }
-.work-context[data-context="profile"] .work-context-kind { background: var(--imsda-gold-soft); color: var(--ink); }
 @media screen { .work-context-name { min-width: 0; overflow: hidden; color: var(--ink); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; } }
-.work-context-detail { color: var(--muted); }
 .work-context-return { display: inline-flex; min-height: 44px; align-items: center; color: var(--imsda-purple); font-weight: 700; }
 .work-context-return:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .more-launcher-modules { break-inside: avoid; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
@@ -12741,31 +12456,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .more-launcher-modules .more-launcher-item { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
 .more-launcher-modules small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.75rem); }
 .more-launcher-item-static { color: var(--muted); cursor: default; }
-.mobile-nav-system-trigger small { color: var(--muted); font-size: max(var(--type-floor, 0px), 0.62rem); font-weight: 600; }
-.system-menu-scrim { position: fixed; z-index: 65; inset: 0 0 calc(67px + env(safe-area-inset-bottom, 0px)); background: rgba(0, 43, 69, 0.42); }
-@media screen { .system-menu { position: fixed; z-index: 66; inset: auto 0 calc(67px + env(safe-area-inset-bottom, 0px)); display: flex; max-height: min(78vh, calc(100dvh - 96px)); flex-direction: column; overflow: hidden; border-radius: 18px 18px 0 0; background: var(--card); box-shadow: 0 -12px 32px rgba(0, 43, 69, 0.22); } }
-.system-menu:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.system-menu-head { display: flex; flex: none; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding: 14px 16px 10px; }
-.system-menu-head h2 { margin: 0; font-size: 1.05rem; }
-.system-menu-head p { margin: 2px 0 0; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8125rem); }
-.system-menu-close { display: inline-flex; min-width: 44px; min-height: 44px; flex: none; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); cursor: pointer; font: inherit; font-weight: 700; padding: 0 12px; }
-.system-menu-close:focus-visible, .system-menu-item:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
-@media screen { .system-menu-body { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 12px; } }
-.system-menu-search { margin: 8px 8px 4px; }
-.system-menu-search .destination-search-empty { color: var(--muted); }
-.system-menu-group h3 { margin: 12px 8px 4px; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.75rem); letter-spacing: 0.08em; text-transform: uppercase; }
-.system-menu-group ul { margin: 0; padding: 0; list-style: none; }
-.system-menu-item { display: flex; width: 100%; min-height: 44px; align-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; overflow-wrap: anywhere; padding: 8px; text-align: left; text-decoration: none; cursor: pointer; }
-.system-menu-item.active { background: var(--imsda-navy-soft); color: var(--imsda-navy); font-weight: 700; }
-@media (max-width: 800px) {
-  .mobile-nav a.mobile-nav-system-trigger { position: relative; display: flex; min-width: 0; min-height: 52px; flex: 1 1 0; padding: 4px 2px 2px; align-items: center; justify-content: center; flex-direction: column; gap: 3px; border: 0; border-radius: 10px; background: transparent; color: #566a75; cursor: pointer; font: inherit; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 700; line-height: 1.1; }
-  .mobile-nav a.mobile-nav-system-trigger.active { background: rgba(0, 59, 92, 0.06); color: var(--imsda-navy); }
-  .mobile-nav a.mobile-nav-system-trigger:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: -2px; }
-}
-@media (min-width: 801px) {
-  .system-menu, .system-menu-scrim { display: none; }
-}
-
 /* Attendee account Overview (#1175): registration cards in a main column, account and help in a secondary one.
    Own classes only; no shared font-size rule is touched. One column on a phone, with the cards first. */
 .account-header-identity {
@@ -13065,13 +12755,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 @media (min-width: 601px) { .club-form-fill-mode { min-width: 13rem; } }
 .club-form-apply-club { display: grid; gap: 10px; }
 
-/* Clubs Administrator phone bar (#1232): more pages than fit across, so the bar scrolls sideways inside itself; the page never does. */
-@media (max-width: 800px) {
-  .mobile-nav.mobile-nav-scroll { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
-  .mobile-nav.mobile-nav-scroll::-webkit-scrollbar { display: none; }
-  .mobile-nav.mobile-nav-scroll a { flex: 0 0 auto; min-width: 84px; min-height: 52px; padding-inline: 8px; }
-}
-
 /* Public homepage (#1204) and event page status (#1205). Solid navy, no gradient or glass; body text 1rem, labels 0.875rem,
    taps 44px, visible focus. Scoped to the two pages so the calendar and the event heroes keep their own look. */
 .public-home-page .public-home-banner {
@@ -13151,11 +12834,11 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .public-event-help-section a { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; color: var(--imsda-navy); font-weight: 700; }
 
 /* Staff navigation and page arrival (#1300): no layout movement, extra requests or artificial waits. */
-:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle) {
+:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button) {
   transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 100ms ease;
 }
 
-:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle):active:not(:disabled):not([aria-disabled="true"]) {
+:is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button):active:not(:disabled):not([aria-disabled="true"]) {
   transform: translateY(1px);
 }
 
@@ -13203,7 +12886,7 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
     background-size: 100% 2px;
     background-position: center calc(100% - 2px);
   }
-  :is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button, .nav-group-toggle):active { transform: none; }
+  :is(.app-shell, .account-portal) :where(.primary-button, .secondary-button, .text-button, .icon-button):active { transform: none; }
 }
 
 /* Small confirmations (#1211): a short check-mark pop once, decoration only; none under reduced motion. */
@@ -13321,17 +13004,6 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
 .settings-saved-detail { font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
 .settings-save-row :is(.primary-button, .secondary-button) { min-height: 44px; }
 .platform-settings-workspace .field-error { display: block; margin: 4px 0 0; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-/* The club year picker in the Clubs sidebar (#1245): a real GET form under the search. Hidden when the sidebar is icons-only. */
-.clubs-year-form { flex-shrink: 0; display: grid; gap: 6px; margin: 0 4px 14px; }
-.clubs-year-form label { margin: 0 0 0 5px; color: #b6cbd5; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-.clubs-year-controls { display: flex; gap: 8px; }
-.clubs-year-controls select { flex: 1 1 auto; min-width: 0; min-height: 44px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 12px; background: rgba(255, 255, 255, 0.09); color: #fff; cursor: pointer; padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
-.clubs-year-controls select option { color: var(--ink); }
-.clubs-year-controls button { flex: 0 0 auto; min-height: 44px; min-width: 44px; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 12px; background: rgba(255, 255, 255, 0.16); color: #fff; cursor: pointer; padding: 0 14px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
-@media (min-width: 801px) {
-  html[data-sidebar="collapsed"] .clubs-year-form { display: none; }
-}
-
 /* Reviewed monthly records and required club forms (#1246). */
 .club-report-review { display: grid; gap: 6px; justify-items: start; }
 .club-report-review button { min-height: 44px; }
@@ -13620,6 +13292,32 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 /* The status word is already worded (#1453): do not capitalize every word of it. */
 .detail-grid strong.status-word-value { text-transform: none; }
 
+/* Phones, iPad split view and the keyboard (#1566, docs/RESPONSIVE.md). The page runs edge to edge (viewport-fit=cover in
+   app/layout.tsx), so a notch or rounded corner is a safe-area inset: the body keeps content clear of it, and each fixed
+   bar pads by it. All zero in an ordinary browser tab. */
+body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); padding-top: env(safe-area-inset-top, 0px); }
+/* A field scrolled into view stops above the fixed bottom bar and a pinned save bar, never under them. */
+@media (max-width: 800px) {
+  html:has(.mobile-nav) { scroll-padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+}
+/* While a text field has focus on a phone the keyboard owns the bottom of the screen: the bottom bar slides out of the way (the script
+   in components/staff-keyboard-watch.tsx sets data-keyboard), a pinned save bar rejoins the page flow instead of covering the field. */
+@media (max-width: 800px) {
+  /* Slid off the bottom, not display:none: it stays focusable, so a dialog that closes while the keyboard is up can still give focus back to More (the watch then brings the bar back). */
+  html[data-keyboard="open"] .mobile-nav { transform: translateY(calc(100% + 12px)); box-shadow: none; }
+  /* The body keeps its bar-height bottom padding while the bar is away, so focusing a field never changes the page height. */
+  html[data-keyboard="open"] .event-savebar.is-pinned { position: static; }
+  html[data-keyboard="open"] .more-launcher-scrim { inset: 0; }
+  html[data-keyboard="open"] .more-launcher-tab { bottom: env(safe-area-inset-bottom, 0px); max-height: calc(100dvh - 24px); }
+}
+/* The More sheet's head: a visible label and Close, kept in view while a long list scrolls inside the sheet. */
+.more-launcher-tab { padding-top: 0; }
+.more-launcher-head { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 -16px 8px; border-bottom: 1px solid var(--line); background: var(--card); padding: 12px 16px 8px; }
+.more-launcher-head h2 { margin: 0; color: var(--imsda-navy); font-size: 1.15rem; }
+.more-launcher-close { display: inline-flex; width: auto; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); padding: 0 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; cursor: pointer; }
+.more-launcher-close:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.more-launcher-sidebar .more-launcher-head { display: none; }
+
 /* Registration form builder editor shell (#1132): a top bar, the live form canvas and one sidebar with tabs.
    Tablets and desktops only; the component renders it from 768px up and phones keep the earlier layout.
    Every rule is new and prefixed fb-; no existing rule or font size is changed. Small text is 0.875rem or larger. */
@@ -13811,15 +13509,8 @@ a.calendar-year-day:focus-visible { outline: 3px solid var(--focus-ring); outlin
 .destination-search-scope[data-scope="profile"] { background: var(--imsda-gold-soft); color: var(--ink); }
 .destination-search-description { grid-column: 1 / -1; color: var(--muted); font-size: max(var(--type-floor, 0px), 0.8125rem); }
 .destination-search-empty { margin: 6px 2px 0; color: #dbe7ee; font-size: max(var(--type-body-floor, 0px), 0.875rem); }
-.sidebar-destination-search { flex-shrink: 0; margin: 0 4px 14px; }
-.sidebar-search-button { display: none; }
 .more-launcher-destination-search { margin-bottom: 10px; }
 .more-launcher-destination-search .destination-search-empty { color: var(--muted); }
-/* Collapsed sidebar: an icon button opens the sidebar and focuses the field. */
-html[data-sidebar="collapsed"] .sidebar .destination-search { display: none; }
-html[data-sidebar="collapsed"] .sidebar-search-button { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.1); color: #fff; cursor: pointer; }
-html[data-sidebar="collapsed"] .sidebar-search-button:hover { background: rgba(255, 255, 255, 0.18); }
-html[data-sidebar="collapsed"] .sidebar-search-button:focus-visible { outline: 2px solid var(--focus-ring-on-dark); outline-offset: 2px; }
 @media (max-width: 768px) {
   .destination-search-input { font-size: 1rem; }
 }
@@ -13844,7 +13535,7 @@ html[data-sidebar="collapsed"] .sidebar-search-button:focus-visible { outline: 2
 @media (max-width: 767px) {
   .fb-shell[data-inspector="closed"] .fb-sidebar { display: none; }
   .fb-shell[data-inspector="open"] .fb-main { display: none; }
-  .fb-shell[data-inspector="open"] .fb-sidebar { position: fixed; inset: 0; z-index: 50; flex: 1 1 auto; box-sizing: border-box; width: 100%; max-width: none; max-height: none; border: 0; border-radius: 0; }
+  .fb-shell[data-inspector="open"] .fb-sidebar { position: fixed; inset: 0; padding-right: env(safe-area-inset-right, 0px); padding-left: env(safe-area-inset-left, 0px); z-index: 50; flex: 1 1 auto; box-sizing: border-box; width: 100%; max-width: none; max-height: none; border: 0; border-radius: 0; }
   .fb-shell[data-inspector="open"] .fb-resize-handle { display: none; }
   .fb-shell[data-inspector="open"] .fb-inspector-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); background: var(--card); padding: 8px 12px; }
   .fb-inspector-title { flex: 1 1 auto; margin: 0; min-width: 0; color: var(--imsda-navy); font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; text-align: center; }
@@ -13921,7 +13612,7 @@ html[data-sidebar="collapsed"] .sidebar-search-button:focus-visible { outline: 2
    and Preview bar, full-screen sheets for settings, Add question and Move. New rules only, all prefixed fb-; no existing rule or
    shared font size is changed. Every control is at least 44px; small text is 0.875rem or larger. */
 .fb-inspector-note, .fb-inspector-notices { display: none; }
-.fb-phone-sheet { position: fixed; z-index: 200; right: 0; left: 0; }
+.fb-phone-sheet { position: fixed; z-index: 200; right: 0; left: 0; box-sizing: border-box; padding-right: env(safe-area-inset-right, 0px); padding-left: env(safe-area-inset-left, 0px); }
 .fb-phone-sheet-full { top: var(--picker-top, 0px); height: var(--picker-height, 100dvh); }
 .fb-phone-sheet-menu { top: 0; bottom: 0; }
 .fb-phone-sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 43, 69, 0.42); }

@@ -18,6 +18,11 @@ import {
   clubsAdminHrefs,
 } from "@/modules/club-reports/clubs-admin-home-model";
 import { ActAsButton } from "@/components/act-as-button";
+import { AdminHub } from "@/components/admin-hub";
+import { clubsAdminHrefForYear } from "@/components/staff-navigation";
+import { healthRecordsEnabled } from "@/modules/health-records/flag";
+import { buildHubView, type HubViewer } from "@/modules/system-admin/admin-hubs-model";
+import { lateRecordCount, loadHubMetrics } from "@/modules/system-admin/admin-hubs-repository";
 import { ClubApplicationApprove, NewClubsRegion } from "@/components/club-application-approve";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { ClubDirectoryCards } from "@/components/club-directory";
@@ -45,6 +50,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   const query = parseClubQuery(params.q);
   const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN";
 
+  const hubViewer: HubViewer = { isSystemAdmin: viewer === "SYSTEM_ADMIN", clubsAdmin: true, siteContentEditor: false, healthImport: healthRecordsEnabled() };
   const [clubs, events, applications, waitingCount, requiredForms] = await Promise.all([
     getAreaClubsSummary(clubYear, now, { backgroundChecks: false }),
     listAreaClubEvents(clubYear),
@@ -52,6 +58,25 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
     countWaitingNewClubApplications(viewer),
     getRequiredFormsStatus(clubYear),
   ]);
+  // The destination cards' live status, for the club year picked here: the clubs, late records and waiting applications come
+  // from this page's own reads (not read twice); the rest read on their own and show "Unavailable" when they cannot be read.
+  let lateRecords: number | null = null;
+  try {
+    lateRecords = lateRecordCount(clubs, clubYear, now);
+  } catch {
+    lateRecords = null;
+  }
+  const hubValues = await loadHubMetrics("club-administration", hubViewer, now, {
+    clubYear,
+    known: { clubs: clubs.length, lateRecords, applicationsWaiting: waitingCount },
+  });
+  // The club pages that read ?year= keep the year the viewer picked (#1566).
+  const hubView = buildHubView("club-administration", hubViewer, hubValues, ["clubs", "applicationsWaiting"]);
+  const hubViewForYear = {
+    ...hubView,
+    groups: hubView.groups.map((group) => ({ ...group, cards: group.cards.map((card) => ({ ...card, href: clubsAdminHrefForYear(card.href, params.year ? clubYear : null) })) })),
+    action: hubView.action ? { ...hubView.action, href: clubsAdminHrefForYear(hubView.action.href, params.year ? clubYear : null) } : null,
+  };
   const home = buildClubsAdminHome({ clubYear, now, clubs, events, applications, waitingCount, requiredForms, query });
   const { counts, nextEvent, registeredClubs } = home;
   const viewAllCount = query ? registeredClubs.matchCount : registeredClubs.total;
@@ -136,6 +161,8 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
           {nextEvent && <> · <strong>{nextEvent.people}</strong> people registered for {nextEvent.name}</>}
         </p>
       </section>
+
+      <AdminHub view={hubViewForYear} />
 
       <NewClubsRegion headingId="new-clubs-heading">
       <section className={`panel ${styles.panel}`} id="new-clubs" aria-labelledby="new-clubs-heading">
@@ -222,7 +249,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
             </p>
             {/* Everyone who reaches this page administers every club event: a system administrator, or a Clubs Administrator (#1643). */}
             <div className={styles.eventLinks}>
-              <Link className={`primary-button ${styles.linkButton}`} href={`/overview?event=${eventParam}`}>Manage event</Link>
+              <Link className={`secondary-button ${styles.linkButton}`} href={`/overview?event=${eventParam}`}>Manage event</Link>
               <Link className={`secondary-button ${styles.linkButton}`} href={`/more/kitchen-report?event=${eventParam}`}>Kitchen report</Link>
             </div>
           </>

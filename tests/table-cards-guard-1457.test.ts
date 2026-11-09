@@ -221,7 +221,7 @@ describe("every table is the shared card pattern or is allow-listed (rule B3, #1
   it("sizes every card label from the staff floor (14px on staff pages), keeping the portal's own floor", () => {
     const css = readFileSync(path.join(root, "app/globals.css"), "utf8");
     const labelRules = css.split("\n").filter((line) => line.includes("content: attr(data-label)") || /font-weight: 700; font-size: max\(var\(--type-staff-floor/.test(line));
-    expect(css.match(/font-weight: 700; font-size: max\(var\(--type-staff-floor, 0px\), var\(--type-floor, 0px\), 0\.68rem\);/g)).toHaveLength(5);
+    expect(css.match(/font-weight: 700; font-size: max\(var\(--type-staff-floor, 0px\), var\(--type-floor, 0px\), 0\.68rem\);/g)).toHaveLength(6);
     expect(css).not.toContain("font-weight: 700; font-size: max(var(--type-floor, 0px), 0.68rem);");
     expect(labelRules.length).toBeGreaterThan(5);
   });
@@ -237,7 +237,7 @@ describe("every table is the shared card pattern or is allow-listed (rule B3, #1
 
 describe("sorting stays usable on cards (#1457, #1458)", () => {
   const globals = readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
-  it.each(["table-cards", "table-cards-tablet", "table-cards-wide", "table-cards-xwide", "table-cards-max"])(
+  it.each(["table-cards", "table-cards-tablet", "table-cards-wide", "table-cards-xwide", "table-cards-max", "table-cards-huge"])(
     "%s shows its sortable headers as a visible Sort by row of 44px buttons in card mode",
     (variant) => {
       const head = `table.${variant}.${variant} > thead:has(.table-sort-button)`;

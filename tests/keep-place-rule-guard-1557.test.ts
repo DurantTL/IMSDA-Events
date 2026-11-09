@@ -24,6 +24,7 @@ function sourceFiles(dir: string): string[] {
 const RAW_GET_FORMS: Record<string, { forms: number; why: string }> = {
   "app/(public)/account/(portal)/clubs/[organizationId]/exports/class-tracking/page.tsx": { forms: 1, why: "report options; the Download buttons need a real GET" },
   "app/(public)/account/(portal)/clubs/[organizationId]/exports/honors/page.tsx": { forms: 1, why: "report options (AutoSubmitForm); the Download buttons need a real GET" },
+  "components/forms-create/forms-create-section.tsx": { forms: 1, why: "Create a form event picker (rendered once per event-scoped card); navigates to the builder, not a filter" },
   "app/(workspace)/check-in/badges/page.tsx": { forms: 1, why: "badge print controls; the print buttons need a real GET" },
   "app/(workspace)/more/reports/clubs/check-in-book/page.tsx": { forms: 1, why: "report options; the print buttons need a real GET" },
   "components/area-club-search-form.tsx": { forms: 1, why: "search as you type (useListNavigation)" },

@@ -12,7 +12,10 @@ subagents. The agents live in `.claude/agents/`.
   Caleb needs to do.
 - **Human-only steps:** Caleb merges PRs and runs production migrations
   himself. Never merge or deploy.
-- **PRs:** target `main`, open ready for review (not draft), use the repository
+- **PRs:** target `main` by default. For staff redesign #1565–#1596, branch
+  from and target `codex/neon-preview-setup` under AGENTS.md's development
+  exception; compare/review against that base. Production promotion is a
+  separate owner-approved release PR. Open ready for review (not draft), use the repository
   template. Add the `mobile-check` label only for shared layout changes (app
   shell, navigation, shared CSS in `app/globals.css`); a page-level change
   relies on the local mobile audit the build already runs, plus the weekly
@@ -50,6 +53,8 @@ subagents. The agents live in `.claude/agents/`.
 
 1. **Worktree:** create it yourself. `isolation: "worktree"` fails in cloud
    sessions.
+   - For staff redesign #1565–#1596, replace `origin/main` below with
+     `origin/codex/neon-preview-setup` and fetch that branch first.
    - `git fetch origin main && git worktree add -b claude/issue-<n>-<slug> .claude/worktrees/issue-<n> origin/main`
    - then, inside it, `npm ci --ignore-scripts && npx prisma generate`.
 2. **Implementer:** give it the issue number, the worktree path, what you

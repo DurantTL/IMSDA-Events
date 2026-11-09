@@ -11,7 +11,7 @@ import { FEATURE_REQUEST_READ_LIMIT } from "@/modules/system-admin/home-model";
 import styles from "../system-admin.module.css";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
-export const metadata: Metadata = { title: "Feature requests" };
+export const metadata: Metadata = { title: "Event module requests" };
 
 /** The feature-request review queue, moved off the System home (#1228) so the home changes nothing. System administrators only. */
 export default async function FeatureRequestsPage() {
@@ -31,7 +31,7 @@ export default async function FeatureRequestsPage() {
       <AdminSectionHeaderFor path="/admin/feature-requests" section="system" />
       <section className="panel module-requests" id="module-requests" aria-labelledby="module-requests-heading">
         <div className={styles.sectionHeading}>
-          <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Feature requests</h2><p>Event admins asking for a feature to be turned on. Approving turns it on for that event; declining needs a reason. Only the buttons in this list decide a request.</p></div>
+          <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Event module requests</h2><p>Event admins asking for a feature to be turned on. Approving turns it on for that event; declining needs a reason. Only the buttons in this list decide a request.</p></div>
           <span>{requests ? `${requests.length >= FEATURE_REQUEST_READ_LIMIT ? `${FEATURE_REQUEST_READ_LIMIT}+` : requests.length} waiting` : "Unavailable"}</span>
         </div>
         {requests === null

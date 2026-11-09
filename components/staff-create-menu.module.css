@@ -1,0 +1,33 @@
+.trigger {
+  min-height: 44px;
+  font-size: max(var(--type-staff-floor, 0px), .875rem);
+}
+
+.dialog { width: min(100%, 34rem); }
+.dialog .close { min-width: 44px; min-height: 44px; }
+.choices { display: grid; gap: 8px; }
+
+.choices .choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  justify-content: stretch;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--imsda-navy);
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), .875rem);
+  text-align: start;
+  text-decoration: none;
+}
+
+.choice:hover { background: var(--imsda-navy-soft); }
+.choice strong, .choice small { display: block; font-size: inherit; }
+.choice:focus-visible, .trigger:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 3px; }
+
+/* #1566 owns phone action placement. */
+@media (max-width: 800px) { .menu { display: none; } }

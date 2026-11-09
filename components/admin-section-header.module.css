@@ -1,4 +1,4 @@
-/* The section header on every admin page (#1274): the section name, the section's tab row, and a back link on a deeper page. */
+/* The section header on every admin page (#1274): the section name, the page's own views or anchors, and a back link on a deeper page. The section's tab row is the shell's (#1565). */
 .header {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -26,4 +26,12 @@
 .header > * {
   min-width: 0;
   max-width: 100%;
+}
+
+/* The shell's icon rail and tab row own the section's destinations; only the page's own views and anchors show here, at every width. */
+.localNavigation { display: block; }
+
+@media (min-width: 801px) {
+  .header { padding-top: 0; margin-bottom: 0; }
+  .header .name { display: none; }
 }

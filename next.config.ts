@@ -32,6 +32,12 @@ const SESSION_COOKIE_MISSING = [
 ];
 
 const nextConfig: NextConfig = {
+  // Build hosts can expose many CPUs without enough memory for one worker per
+  // CPU. Keep page-generation memory bounded on Render and in local builds.
+  experimental: {
+    cpus: 2,
+    staticGenerationMaxConcurrency: 2,
+  },
   // No "X-Powered-By: Next.js" (#1401).
   poweredByHeader: false,
   // The Content-Security-Policy is not set here: proxy.ts sends it per

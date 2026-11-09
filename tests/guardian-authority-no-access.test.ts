@@ -99,6 +99,14 @@ describe("a responsible adult gets no access from the declaration", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("the Review queues page reads only the review count, never the declaration itself (#1574)", () => {
+    const directory = "modules/review-queues";
+    const mentions = readdirSync(directory)
+      .filter((name) => /\.(ts|tsx)$/.test(name))
+      .flatMap((name) => readFileSync(join(directory, name), "utf8").split("\n").filter((line) => /guardian-authority|guardianAuthority|getGuardianReview/.test(line)));
+    expect(mentions).toEqual(['import { countGuardianReviewItems } from "@/modules/guardian-authority/repository";']);
+  });
+
   it("the one place the declaration is read for another purpose lists names and codes only", async () => {
     const { RESPONSIBLE_ADULT_CSV_HEADERS } = await import("@/modules/guardian-authority/export");
     expect(RESPONSIBLE_ADULT_CSV_HEADERS.join(" ")).not.toMatch(/health|medical|allerg|insurance|dietary|incident|email|phone|address|birth|payment|balance/i);

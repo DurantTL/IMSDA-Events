@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { staffPageTitles } from "@/components/staff-navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { AttendanceReconciliation } from "@/components/attendance-reconciliation";
 import { LocationFilter } from "@/components/location-filter";
@@ -6,7 +7,7 @@ import { getAttendanceReconciliationView } from "@/modules/attendance-reconcilia
 import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { resolveEventContext } from "@/modules/events/selection";
 
-export const metadata: Metadata = { title: "Attendance reconciliation" };
+export const metadata: Metadata = { title: staffPageTitles.attendanceReconciliation };
 
 export default async function AttendanceReconciliationPage({ searchParams }: { searchParams: Promise<{ event?: string; location?: string; version?: string }> }) {
   const { event: requested, location: requestedLocation, version } = await searchParams;

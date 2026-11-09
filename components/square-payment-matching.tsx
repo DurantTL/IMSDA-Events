@@ -474,7 +474,7 @@ export function SquarePaymentMatching({
       <p className="quiet-copy">
         Reviewing the last {windowDays} days ·{" "}
         {unavailable ? "Square was not reached" : `${examined} completed Square payments examined`} ·{" "}
-        <Link href={`/finance?event=${eventId}`}>Back to finance</Link>
+        <Link href={`/finance/tools?event=${eventId}`}>Back to More money tools</Link>
       </p>
     </section>
   );

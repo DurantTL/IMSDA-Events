@@ -80,6 +80,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
+import { phoneMaxWidthPx } from "../components/more-launcher-model";
 import { clubYearChoices } from "../modules/club-rosters/domain";
 import { defaultPublicClubFormsSettings } from "../modules/club-forms/public-index-settings-domain";
 
@@ -156,8 +157,8 @@ const staffTextFloorExceptions: Array<{ selector: string; reason: string }> = [
   { selector: ".badge-sheet", reason: "the badge print preview shows the printed label at its real print size (Avery sheets are drawn in inches)" },
   { selector: ".sr-only, .visually-hidden", reason: "visually hidden text is not shown" },
 ];
-/** Uppercase, letter-spaced labels (eyebrows, sidebar group labels) may be 12px: they read larger than lowercase text of the same size. */
-const upperLabelFloorPx = 12;
+/** Uppercase, letter-spaced labels (eyebrows, sidebar group labels, table headers) are held to the same 14px floor as other staff text (#1732). */
+const upperLabelFloorPx = staffTextFloorPx;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
@@ -312,8 +313,8 @@ const pages: PageSpec[] = [
   staff("overview", "/overview"),
   // The Events Administrator dashboard (#1227): the event-admin test user holds an EVENT_ADMIN membership. It takes no ?event=.
   { name: "staff-events-admin", path: "/events-admin", role: "event-admin", expectText: /Event administration/ },
-  // The section header (#1274) on an event page: the event-admin test user administers this event, so its tabs show.
-  { name: "staff-events-admin-people-header", path: `/people?event=${eventId}`, role: "event-admin", expectText: /Event administration/i },
+  // The event tabs (#1565) on an event page: the event-admin test user administers this event, so its Registrations tab shows and the "Events" crumb leads back to Event administration.
+  { name: "staff-events-admin-people-header", path: `/people?event=${eventId}`, role: "event-admin", expectText: /Registrations/i },
   staff("people-registrations", "/people"),
   // Email selected (#850): the dialog with Custom message (unpublished, so its notice and link show) and the announcement hint.
   staff("people-email-selected", "/people"),
@@ -323,11 +324,17 @@ const pages: PageSpec[] = [
   staff("event-staff", "/staff"),
   staff("finance", "/finance"),
   staff("finance-invoices", "/finance/invoices"),
+  // Statements list (#1576): no seeded invoice, so the invoice and statement detail routes are not audited here.
+  staff("finance-invoice-statements", "/finance/invoices/statements"),
   staff("finance-church-owed", "/finance/church-owed"),
   // The event's scholarship fund (#398): a long sponsor name, a pledge, and an award on a cancelled registration.
   staff("finance-scholarship-fund", "/finance/scholarship-fund"),
   staff("finance-cancellation-policy", "/finance/cancellation-policy"),
   staff("finance-square-payments", "/finance/square-payments"),
+  // More money tools (#1575): the other finance pages as grouped cards. The Refunds view is the cancellation queue, audited below as cancellation-staff-queue.
+  { ...staff("finance-tools", "/finance/tools"), expectText: /Invoices and churches/ },
+  // Review queues (#1574): the registration review pages as grouped cards.
+  { ...staff("people-review-queues", "/people/review-queues"), expectText: /People and families/ },
   staff("lodging", "/more/lodging"),
   staff("lodging-requests", "/more/lodging/requests"),
   staff("lodging-assignments", "/more/lodging/assignments"),
@@ -371,6 +378,8 @@ const pages: PageSpec[] = [
   staff("program-assignments", "/more/program-assignments"),
   staff("club-forms-staff", "/more/club-forms"),
   staff("reports-packets", "/more/reports/packets"),
+  // Printouts (#1583): the packets, books and forms as grouped cards. The audit's event is a general one, so the club cards are hidden and the packets group shows.
+  { ...staff("reports-printouts", "/more/reports/printouts"), expectText: /Packets, books and rosters/ },
   staff("responsible-adults", "/people/responsible-adults"),
   staff("directory-review", "/people/directory-review"),
   staff("person-matches", "/people/matches", "system-admin"),
@@ -407,8 +416,17 @@ const pages: PageSpec[] = [
   staff("communications-scheduled", `/communications/scheduled?event=${blocksEventId}`, "system-admin"),
   staff("communications-scheduled-new", `/communications/scheduled?event=${blocksEventId}&new=1`, "system-admin"),
   staff("registration-builder", "/registration-builder"),
+  // Home (#1568): the work waiting for this person, and the upcoming events they can open.
+  { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
+  { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
   // Staff, as a system administrator.
   staff("system-home", "/admin", "system-admin"),
+  // The Admin hub pages (#1569): key numbers, one main action, then every destination as a card with its live status.
+  { ...staff("admin-hub-events", "/admin/hubs/events", "system-admin"), expectText: /Start something/ },
+  { ...staff("admin-hub-clubs", "/admin/hubs/clubs", "system-admin"), expectText: /Directory/ },
+  { ...staff("admin-hub-people", "/admin/hubs/people", "system-admin"), expectText: /Health records/ },
+  { ...staff("admin-hub-forms", "/admin/hubs/forms", "system-admin"), expectText: /Building blocks/ },
+  { ...staff("admin-hub-catalogs", "/admin/hubs/catalogs", "system-admin"), expectText: /Website and email/ },
   // Break-glass and legal holds (#1617). The audit server runs with HEALTH_RECORDS_ENABLED off, so the page skips the
   // acknowledgment gate and shows the real grants and holds.
   { ...staff("health-access", "/admin/health-access", "system-admin"), expectText: /Legal holds/ },
@@ -416,6 +434,7 @@ const pages: PageSpec[] = [
   staff("system-problem-reports", "/admin/problem-reports", "system-admin"),
   // The Clubs Administrator dashboard (#1226), opened as a system administrator.
   { name: "clubs-admin-dashboard", path: "/admin/clubs", role: "system-admin", expectText: /Club administration/, flow: "workspace-navigation" },
+  { name: "admin-all-forms", path: "/admin/forms", role: "system-admin", expectText: /Create a form/ },
   // Creating an event asks for start and end times next to the dates (#1406).
   { name: "staff-event-setup-blank", path: "/event-setup", role: "system-admin", expectText: /Start time/ },
   { name: "staff-event-setup-from-template", path: "/event-setup/from-template", role: "system-admin", expectText: /Start time/ },
@@ -3234,7 +3253,10 @@ function layoutSnapshotInPage() {
   const rects: Record<string, [number, number, number, number]> = {};
   const all = Array.from(document.body.querySelectorAll("*"));
   all.forEach((el, index) => {
-    if (el.closest('[role="listbox"], .sr-only, .back-to-top-button, script, style')) return;
+    // The phone bottom bars (.mobile-nav, and the club portal's [data-club-phone-bar], #1641) are fixed chrome: the staff one
+    // slides away while a text field has focus (#1566), and both stay put on screen while the page scrolls, so their links
+    // change document coordinates on purpose; that is not the page shifting.
+    if (el.closest('[role="listbox"], .sr-only, .back-to-top-button, .mobile-nav, [data-club-phone-bar], script, style')) return;
     const style = getComputedStyle(el);
     if (style.display === "none" || style.visibility === "hidden" || style.position === "fixed") return;
     const rect = el.getBoundingClientRect();
@@ -3787,14 +3809,18 @@ async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: n
     });
     // Two genuine links in the same browser turn: the last destination must win,
     // even when the first route has not finished fetching. No router mocks or fake product delays.
-    const destination = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-testid="admin-section-header"] nav a[href]'))
-        .filter((link) => new URL(link.href).pathname !== location.pathname && !link.hash);
+    // The icon rail (#1565) at desktop widths, the phone bottom bar below it. Both are plain links through the unsaved-changes guard.
+    const rail = page.locator("#primary-navigation");
+    const useRail = await rail.isVisible();
+    const destination = await page.evaluate((useRail: boolean) => {
+      const selector = useRail ? '#primary-navigation a[href]' : '.mobile-nav a[href]:not([aria-haspopup])';
+      const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(selector))
+        .filter((link) => link.getClientRects().length > 0 && new URL(link.href).pathname !== location.pathname && !link.hash);
       if (links.length < 2) throw new Error("The dashboard needs two navigation destinations for the rapid-click check");
       links[0]!.click();
       links[1]!.click();
       return links[1]!.href;
-    });
+    }, useRail);
     await page.waitForURL(destination, { timeout: 30_000 });
     await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading], .shell-loading'), undefined, { timeout: 30_000 });
     await page.waitForFunction(() => Number(document.getElementById("workspace-content")?.dataset.navigationAudit) > 0, undefined, { timeout: 5000 });
@@ -3818,6 +3844,50 @@ async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: n
   }
 }
 
+type PortalMenuEntry = { href: string; ok: boolean; current: boolean };
+
+/**
+ * The club portal's and coordinator's menus (#1641), opened for real: the menu line's button, or on a phone the bottom bar and
+ * its More, must reach exactly the tabs the row has (the strip's links stay in the page, hidden, so they are the reference);
+ * every entry is a 44px target inside the window, one entry is marked `aria-current`, Escape closes the menu and gives focus
+ * back to what opened it, and the page itself never scrolls sideways.
+ */
+async function auditPortalMenus(page: Page) {
+  const root = page.locator("[data-club-portal-nav]").first();
+  if (!(await root.count())) return;
+  const pathOf = (href: string) => new URL(href, "http://x.test").pathname + new URL(href, "http://x.test").hash;
+  const tabHrefs = (await root.locator(":scope > div > nav a").evaluateAll((links: Element[]) => links.map((link: Element) => link.getAttribute("href") ?? ""))).map(pathOf).sort();
+  const bar = root.locator("[data-club-phone-bar]");
+  const barShown = (await bar.count()) > 0 && (await bar.isVisible());
+  const menuButton = root.locator("[data-club-portal-menu-line] button");
+  // With room the strip is the row: there is no menu to open.
+  if (!barShown && !(await menuButton.isVisible())) return;
+  const opener = barShown ? bar.locator("a[aria-haspopup]") : menuButton;
+  const barHrefs = barShown ? (await bar.locator("a:not([aria-haspopup])").evaluateAll((links: Element[]) => links.map((link: Element) => link.getAttribute("href") ?? ""))).map(pathOf) : [];
+  if (barShown && !(await opener.count())) {
+    // Five tabs or fewer: the bar holds every tab and there is no More.
+    if ([...barHrefs].sort().join("|") !== tabHrefs.join("|")) throw new Error("The phone bar without More does not reach exactly the row's tabs");
+  } else {
+    if (!(await opener.isVisible())) throw new Error("The menu button is not visible although the tabs are hidden");
+    await opener.click();
+    const dialog = page.locator("[data-club-portal-menu]");
+    await dialog.waitFor({ state: "visible", timeout: 5000 });
+    const entries: PortalMenuEntry[] = await dialog.locator("li a").evaluateAll((links: Element[]) => links.map((link: Element) => {
+      const box = link.getBoundingClientRect();
+      return { href: link.getAttribute("href") ?? "", ok: box.height >= 43.5 && box.left >= 0 && box.right <= window.innerWidth + 1, current: link.hasAttribute("aria-current") };
+    }));
+    const reached = [...barHrefs, ...entries.map((entry: PortalMenuEntry) => pathOf(entry.href))].sort();
+    if (reached.join("|") !== tabHrefs.join("|")) throw new Error(`The menu${barShown ? " and phone bar" : ""} reach ${reached.length} destinations, the row has ${tabHrefs.length}`);
+    if (entries.some((entry: PortalMenuEntry) => !entry.ok)) throw new Error("A menu entry is under 44px tall or outside the window");
+    const currentCount = entries.filter((entry: PortalMenuEntry) => entry.current).length;
+    if (currentCount > 1) throw new Error(`${currentCount} menu entries are marked aria-current`);
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached", timeout: 5000 });
+    if (!(await opener.evaluate((element: Element) => element === document.activeElement))) throw new Error("Escape did not give focus back to the menu button");
+  }
+  if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) throw new Error("The page scrolls sideways");
+}
+
 /** Attendee links stay reachable from club/coordinator pages, and real transitions retain the account surface (#1302). */
 async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: number) {
   const before = page.url();
@@ -3832,6 +3902,7 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
         return animate(frames, options);
       };
     });
+    await auditPortalMenus(page);
     // The "Your account" drop-down sits in the club and coordinator masthead row (#1555); the details element itself carries the class.
     const menu = page.locator(".account-workspace-menu:visible");
     if (await menu.count()) {
@@ -3850,7 +3921,13 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
       await menu.locator("summary").click();
       await menu.locator('a[href="/account/registrations"]').click();
     } else {
-      await page.locator('.account-portal-tabs a[href="/account/registrations"]').click();
+      const tab = page.locator('.account-portal-tabs a[href="/account/registrations"]');
+      if (await tab.isVisible()) await tab.click();
+      else {
+        // Below 1024px (or when the row is tight) the tabs are the menu line (#1641): open the menu and follow the link there.
+        await page.locator(".account-portal-tabs [data-club-portal-menu-line] button").click();
+        await page.locator('[data-club-portal-menu] a[href="/account/registrations"]').click();
+      }
     }
     await page.waitForURL(`${baseUrl}/account/registrations`, { timeout: 30_000 });
     await page.waitForFunction(() => !document.querySelector('[data-navigation-pending="true"], [data-workspace-loading]'), undefined, { timeout: 30_000 });
@@ -3877,12 +3954,134 @@ async function waitForShell(page: Page) {
 }
 
 /** The #996 rules: squeezed text, an action bar over text when the page opens (scroll 0), and the loading screen. */
+/**
+ * The staff shell's one row of tabs (#1565): it shows either the tabs or the menu line, never both and never neither; it is the menu
+ * line only when the tabs would not fit, at any width (#1734); the tabs never run past their line and never scroll sideways; and the menu button
+ * stays inside the window. Runs in the page.
+ */
+function staffTabRowInPage(): string[] {
+  const problems: string[] = [];
+  for (const line of Array.from(document.querySelectorAll<HTMLElement>("[data-staff-tabs]"))) {
+    const tabs = line.querySelector<HTMLElement>(":scope > nav");
+    const menu = line.querySelector<HTMLElement>("[data-staff-menu-line]");
+    if (!tabs || !menu) { problems.push("a tab row has no tabs or no menu line"); continue; }
+    const tabsStyle = getComputedStyle(tabs);
+    const tabsShown = tabsStyle.display !== "none" && tabsStyle.visibility !== "hidden";
+    const menuShown = getComputedStyle(menu).display !== "none";
+    if (tabsShown && menuShown) problems.push("the tabs and the menu line both show");
+    if (!tabsShown && !menuShown) problems.push("neither the tabs nor the menu line show");
+    // #1734: a row collapses to the menu line only when it would not fit, at every width: never just because the screen is narrow.
+    const hiddenList = tabs.querySelector<HTMLElement>("ul");
+    if (menuShown && hiddenList && hiddenList.getBoundingClientRect().width > 0 && hiddenList.getBoundingClientRect().width <= line.clientWidth) problems.push(`the tab row became the menu line at ${window.innerWidth}px though its ${Math.round(hiddenList.getBoundingClientRect().width)}px fits in ${line.clientWidth}px`);
+    if (tabsShown) {
+      const list = tabs.querySelector<HTMLElement>("ul");
+      if (list && list.getBoundingClientRect().width > line.clientWidth + 1) problems.push(`the tab row is ${Math.round(list.getBoundingClientRect().width)}px in a ${line.clientWidth}px line`);
+      if (tabs.scrollWidth > tabs.clientWidth + 1) problems.push("the tab row scrolls sideways or is cut off");
+    }
+    if (menuShown) {
+      const button = menu.querySelector<HTMLElement>("button");
+      const box = button?.getBoundingClientRect();
+      if (!button || !box || box.right > window.innerWidth + 1 || box.left < -1) problems.push("the menu button is outside the window");
+      else if (!/ menu/i.test(button.textContent ?? "")) problems.push(`the menu button is named "${(button.textContent ?? "").trim()}", not "<Area> menu" or "Event menu"`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * The phone header's search (#1734), at 800px and narrower: a search icon button of at least 44px with the name "Find a page or
+ * task" opens the same search, and on Check-in at 390px the page's own search box is in the first screen (its top above the
+ * 844px viewport's bottom, and above the phone bar). Runs in the page.
+ */
+function phoneHeaderSearchInPage(): string[] {
+  const problems: string[] = [];
+  if (window.innerWidth > 800) return problems;
+  const toggle = Array.from(document.querySelectorAll<HTMLElement>("header button[aria-label='Find a page or task']")).find((el) => el.getBoundingClientRect().width > 0);
+  if (document.getElementById("destination-search-input")) {
+    if (!toggle) problems.push("the phone header has no search icon button named \"Find a page or task\"");
+    else {
+      const box = toggle.getBoundingClientRect();
+      if (box.width < 43.5 || box.height < 43.5) problems.push(`the phone header search button is ${Math.round(box.width)}x${Math.round(box.height)}px`);
+    }
+  }
+  if (location.pathname === "/check-in" && window.innerWidth === 390) {
+    const field = Array.from(document.querySelectorAll<HTMLInputElement>("main input")).find((el) => /Search name, club, or confirmation code/i.test(el.placeholder) && el.getBoundingClientRect().width > 0);
+    if (!field) problems.push("Check-in has no visible attendee search box");
+    else if (field.getBoundingClientRect().top > 560) problems.push(`on Check-in the search box starts ${Math.round(field.getBoundingClientRect().top)}px down, not in the first screen (limit 560px)`);
+  }
+  return problems;
+}
+
+/**
+ * The club portal's and Area Coordinator's tab row (#1641): it shows the tabs, the menu line or (club pages on a phone) the
+ * bottom bar, never two and never none; below 1024px it is never the strip; the strip never runs past its line or scrolls
+ * sideways; the menu button and the bar stay inside the window with 44px targets. Runs in the page.
+ */
+function portalTabRowInPage(): string[] {
+  const problems: string[] = [];
+  const shown = (element: Element | null) => {
+    if (!element) return false;
+    const style = getComputedStyle(element);
+    return style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
+  };
+  for (const root of Array.from(document.querySelectorAll<HTMLElement>("[data-club-portal-nav]"))) {
+    const line = root.querySelector<HTMLElement>(":scope > div");
+    const tabs = line?.querySelector<HTMLElement>(":scope > nav") ?? null;
+    const menu = root.querySelector<HTMLElement>("[data-club-portal-menu-line]");
+    const bar = root.querySelector<HTMLElement>("[data-club-phone-bar]");
+    if (!line || !tabs || !menu) { problems.push("a portal tab row has no tabs or no menu line"); continue; }
+    const tabsShown = shown(tabs);
+    const menuShown = shown(menu);
+    const barShown = shown(bar);
+    const phone = window.innerWidth <= 800;
+    if (bar && phone && !barShown) problems.push("the phone bar is missing on a phone");
+    if (barShown && !phone) problems.push(`the phone bar shows above 800px (${window.innerWidth}px)`);
+    if (barShown && (tabsShown || menuShown)) problems.push("the phone bar and the tab row both show");
+    if (!barShown) {
+      if (tabsShown && menuShown) problems.push("the tabs and the menu line both show");
+      if (!tabsShown && !menuShown) problems.push("neither the tabs, the menu line nor the phone bar show");
+    }
+    if (window.innerWidth < 1024 && tabsShown) problems.push(`the tab row shows below 1024px (${window.innerWidth}px)`);
+    const list = tabs.querySelector<HTMLElement>("ul");
+    if (tabsShown) {
+      if (list && list.getBoundingClientRect().width > line.clientWidth + 1) problems.push(`the tab row is ${Math.round(list.getBoundingClientRect().width)}px in a ${line.clientWidth}px line`);
+      if (tabs.scrollWidth > tabs.clientWidth + 1) problems.push("the tab row scrolls sideways or is cut off");
+    }
+    if (menuShown) {
+      const button = menu.querySelector<HTMLElement>("button");
+      const box = button?.getBoundingClientRect();
+      if (!button || !box || box.right > window.innerWidth + 1 || box.left < -1) problems.push("the menu button is outside the window");
+      else {
+        if (box.height < 43.5) problems.push(`the menu button is ${Math.round(box.height)}px tall`);
+        if (!/ menu/i.test(button.textContent ?? "")) problems.push(`the menu button is named "${(button.textContent ?? "").trim()}", not "Club menu" or "Coordinator menu"`);
+      }
+    }
+    if (barShown && bar) {
+      const links = Array.from(bar.querySelectorAll<HTMLElement>("a"));
+      if (bar.querySelector("button")) problems.push("the phone bar holds a button (it is a navigation bar, not an action bar)");
+      if (links.length < 2 || links.length > 5) problems.push(`the phone bar has ${links.length} items`);
+      for (const link of links) {
+        const box = link.getBoundingClientRect();
+        if (box.left < -1 || box.right > window.innerWidth + 1) problems.push(`the phone bar item "${(link.textContent ?? "").trim()}" is outside the window`);
+        if (box.height < 43.5 || box.width < 43.5) problems.push(`the phone bar item "${(link.textContent ?? "").trim()}" is ${Math.round(box.width)}x${Math.round(box.height)}px`);
+      }
+      // The page ends above the bar: the body reserves at least the bar's height, so no text is left under it.
+      const reserved = Number.parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+      if (reserved < bar.getBoundingClientRect().height - 1) problems.push(`the page reserves ${Math.round(reserved)}px under its content for a ${Math.round(bar.getBoundingClientRect().height)}px phone bar`);
+    }
+  }
+  return problems;
+}
+
 async function auditSqueezeAndBars(page: Page, name: string, width: number) {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(60);
   if (await page.evaluate(shellLoadingInPage)) record("loading-screen", name, width, 'the page still shows "Loading IMAdventist…" when it is measured');
   for (const problem of await page.evaluate(squeezedTextInPage)) record("squeezed-text", name, width, problem);
   for (const problem of await page.evaluate(barOverTextInPage)) record("bar-over-text", name, width, problem);
+  for (const problem of await page.evaluate(staffTabRowInPage)) record("staff-tab-row", name, width, problem);
+  for (const problem of await page.evaluate(phoneHeaderSearchInPage)) record("phone-header-search", name, width, problem);
+  for (const problem of await page.evaluate(portalTabRowInPage)) record("portal-tab-row", name, width, problem);
 }
 
 async function auditPage(page: Page, spec: PageSpec, width: number, prefix: string) {
@@ -4044,7 +4243,21 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   // The More launcher's Turn off confirm (#810): open the launcher, press the first Turn off, and the
   // confirm must fit, say the data is kept, and every control in it must be a big enough tap target.
   // It is cancelled, never confirmed, so no module is changed.
-  if (spec.name === "staff-more-launcher-admin") {
+  // The launcher with Turn off toggles exists only on a phone (800px or narrower); wider windows use the page.
+  if (spec.name === "staff-more-launcher-admin" && width > phoneMaxWidthPx) {
+    const desktopName = `${spec.name} (features page)`;
+    const before = page.url();
+    try {
+      await page.goto(`${baseUrl}/more/features`, { waitUntil: "load" });
+      if ((await page.locator('button[aria-label$="Press to turn off."]:visible, button[aria-label$="Press to turn on."]:visible').count()) === 0) {
+        record("dialog-open-failed", desktopName, width, "a system administrator sees no feature switch on /more/features");
+      }
+    } catch (error) {
+      record("dialog-open-failed", desktopName, width, (error as Error).message.split("\n")[0] ?? "failed");
+    }
+    if (page.url() !== before) await page.goto(before, { waitUntil: "load" });
+  }
+  if (spec.name === "staff-more-launcher-admin" && width <= phoneMaxWidthPx) {
     const launcherName = `${spec.name} (turn off confirm)`;
     try {
       await page.locator('a[aria-haspopup="dialog"]:visible').first().click({ timeout: 3000 });

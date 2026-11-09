@@ -4,28 +4,24 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildMoreDirectoryCards,
-  canShowMoreLauncher,
-  matchesVisibility,
-  mobileNavigationOrder,
   navigation,
-  orderedSidebarItems,
   resolveClubsAndChurchesEntry,
-  sidebarSections,
 } from "@/components/staff-navigation";
-import { launcherFooterLinks, omitSidebarDuplicates } from "@/components/more-launcher-model";
+import { areaTabs, staffAreaOrder, staffPlaceFor, type StaffArea } from "@/components/staff-areas";
+import { buildStaffNavigation, type StaffNavigation } from "@/components/staff-navigation-model";
+import { launcherFooterLinks } from "@/components/more-launcher-model";
 import { eventPermissions, eventRoles, rolePermissions, type EventPermission } from "@/modules/access/permissions";
+import type { AdminRole } from "@/modules/access/admin-roles-domain";
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
 import { canAccessOperationalHealth } from "@/modules/operations/access";
 import { canManageProgramAssignments } from "@/modules/program-assignments/access";
 
 /**
- * #475: every page the desktop sidebar can reach for a role must be
- * reachable from phone navigation for that role, and nothing may appear on
- * phone that the role can't open. Both surfaces read
- * `components/staff-navigation.ts`, so this test builds the two reachable
- * sets from that single source and compares them per role, rather than
- * hand-listing pages (which is exactly what let the sidebar and the phone
- * "More" directory drift before #475).
+ * #475, rewritten for the rail and tab rows (#1565): a phone and a desktop reach exactly the same pages for a role.
+ * Desktop is the rail, each area's one row of tabs, the event's tabs and their views. Phone is the bottom bar, the More
+ * sheet and the menu line, which lists the same row. Both come from `buildStaffNavigation`, the one function the shell
+ * draws, so this test compares the two sets per role instead of hand-listing pages (which is what let the sidebar and the
+ * phone "More" directory drift before #475).
  */
 
 vi.mock("next/navigation", () => ({
@@ -53,6 +49,14 @@ type Scenario = {
   /** System administrator, or Event Admin of a current event (#610). */
   clubFormsAccess: boolean;
 };
+
+/** The admin roles a scenario holds: an Event Admin holds the Events role, a system administrator the Clubs and System views. */
+function adminRolesOf(scenario: Scenario): AdminRole[] {
+  const roles: AdminRole[] = [];
+  if (!scenario.isSystemAdmin && (scenario.name.startsWith("EVENT_ADMIN") || scenario.name === "EVENT_ADMIN")) roles.push("EVENTS_ADMIN");
+  if (scenario.isSystemAdmin) roles.push("CLUBS_ADMIN", "SYSTEM_ADMIN");
+  return roles;
+}
 
 const roleScenarios: Scenario[] = eventRoles.map((role) => ({
   name: role,
@@ -220,71 +224,95 @@ const moreOnlyPages: Record<string, (scenario: Scenario) => boolean> = {
   "/more/promo-codes": (scenario) => has(scenario, "MANAGE_FINANCE"),
 };
 
-const moreItem = navigation.find((item) => item.href === "/more");
-if (!moreItem) throw new Error("navigation has no /more entry");
-
-/** What the shell renders: the More launcher follows the cards the user may open (#737). */
-function moreLauncherVisible(scenario: Scenario): boolean {
-  return canShowMoreLauncher({
-    item: moreItem!,
-    permissions: scenario.permissions,
-    clubOversight: scenario.clubOversight,
-    clubEvent: scenario.clubEvent,
+/** The shell's own navigation for a scenario, on a page of the given path (an event page by default). */
+function navFor(scenario: Scenario, pathname = "/overview"): StaffNavigation {
+  const held = adminRolesOf(scenario);
+  return buildStaffNavigation({
+    pathname,
+    search: new URLSearchParams("event=event_1"),
     isSystemAdmin: scenario.isSystemAdmin,
-    clubFormsAccess: false,
+    adminRoleView: held.length > 0 ? { held, active: held.at(-1)!, counts: {}, healthImport: true } : null,
+    siteContentEditor: false,
+    hasEvents: true,
+    selectedEvent: {
+      id: "event_1",
+      permissions: scenario.permissions,
+      clubOversight: scenario.clubOversight,
+      clubEvent: scenario.clubEvent,
+      clubFormsAccess: scenario.clubFormsAccess,
+      // Nothing hidden by a module rule: this test is about permissions, not module state.
+      hiddenCardKeys: [],
+    },
   });
 }
 
-function allowedMoreCardHrefs(scenario: Scenario): string[] {
-  return buildMoreDirectoryCards({
-    permissions: scenario.permissions,
-    clubOversight: scenario.clubOversight,
-    clubEvent: scenario.clubEvent,
-    isSystemAdmin: scenario.isSystemAdmin,
-    clubFormsAccess: scenario.clubFormsAccess,
-    eventQuery: "",
-  })
-    .filter((card) => card.allowed)
-    .map((card) => card.href);
+/** An href without the event the shell adds to it, so the same page compares equal from both surfaces. */
+function normal(href: string): string {
+  const url = new URL(href, "https://events.example.test");
+  url.searchParams.delete("event");
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+const pathOnly = (href: string) => normal(href).split(/[?#]/)[0];
+
+/** A representative page in each area, so the shell draws that area's row. */
+const areaPages: Record<StaffArea, string> = { home: "/home", events: "/events-admin", clubs: "/admin/clubs", people: "/admin/people", reports: "/admin/analytics", admin: "/admin" };
+
+function rowHrefs(navigationResult: StaffNavigation): string[] {
+  return navigationResult.rowTabs.flatMap((tab) => [tab.href, ...(tab.views ?? []).map((view) => view.href)]);
+}
+
+/** Every page of the area's one row, tabs and views, as the shell draws it on a page in that area. */
+function areaRows(scenario: Scenario, areas: readonly StaffArea[]): string[] {
+  return areas.flatMap((area) => rowHrefs(navFor(scenario, areaPages[area])));
+}
+
+const eventsRowPage = "/overview";
+
+function cardHrefs(navigationResult: StaffNavigation): string[] {
+  return navigationResult.launcherCards.filter((card) => card.allowed).map((card) => card.href);
 }
 
 /**
- * Destinations the desktop sidebar links to for this scenario (#964): the
- * daily items, the Set up and Reports groups (open or closed, they are links),
- * and the "/more" gateway, plus "Clubs and churches" when it applies. Attendee
- * list, Imports, Team and Promo codes are no longer here: they are More-only
- * pages below. The More page's cards are deliberately not included, so they are
- * checked independently.
+ * What a desktop reaches: the rail, every area's row, the event's tabs and views, and the /more directory's cards
+ * (Event setup > "All event tools", present exactly when it has something to list).
  */
-function sidebarDestinations(scenario: Scenario): Set<string> {
-  const granted = new Set(scenario.permissions);
-  const hrefs = [
-    ...sidebarSections(granted).flatMap((view) => view.items.map((item) => item.href)),
-    // The More link follows its own permission rule here, as before #964.
-    ...orderedSidebarItems(granted, matchesVisibility(moreItem!, granted)).filter((item) => item.href === "/more").map((item) => item.href),
-  ];
-  const clubsAndChurches = resolveClubsAndChurchesEntry(scenario);
-  if (clubsAndChurches.visible) hrefs.push(clubsAndChurches.href);
-  return new Set(hrefs);
+function desktopDestinations(scenario: Scenario): Set<string> {
+  const desktop = navFor(scenario, eventsRowPage);
+  const areas = desktop.rail.map((item) => item.area);
+  const eventRow = rowHrefs(desktop);
+  const toolsListed = eventRow.some((href) => pathOnly(href) === "/more");
+  return new Set([
+    ...desktop.rail.map((item) => item.href),
+    ...areaRows(scenario, areas.filter((area) => area !== "events")),
+    ...rowHrefs(navFor(scenario, areaPages.events)),
+    ...eventRow,
+    ...(toolsListed ? cardHrefs(desktop) : []),
+  ].map(normal));
 }
 
 /**
- * Destinations reachable from a phone: the visible bottom tabs, plus every
- * card the "More" directory shows — but only when the More tab itself is
- * visible, since otherwise the phone has no way to open that page.
+ * What a phone reaches: the bottom bar, the More sheet (This event, the other areas, the event's tools) and, once on an
+ * area's page, the menu line, which lists that area's row. An area is entered from the bar or More.
  */
 function phoneDestinations(scenario: Scenario): Set<string> {
-  const granted = new Set(scenario.permissions);
-  const tabHrefs = navigation
-    .filter((item) => (mobileNavigationOrder as readonly string[]).includes(item.href))
-    .filter((item) => matchesVisibility(item, granted))
-    .map((item) => item.href);
-  const moreHrefs = moreLauncherVisible(scenario) ? allowedMoreCardHrefs(scenario) : [];
-  // The launcher's footer links (#965): "Event features" is the phone's way to the sidebar's Event features item.
-  const footerHrefs = moreLauncherVisible(scenario)
-    ? launcherFooterLinks({ isSystemAdmin: scenario.isSystemAdmin, canRequestFeature: false, eventQuery: "" }).filter((link) => link.key === "event-features").map((link) => link.href)
-    : [];
-  return new Set([...tabHrefs, ...moreHrefs, ...footerHrefs]);
+  const phone = navFor(scenario, eventsRowPage);
+  const bar = phone.phoneItems;
+  const hasMore = bar.some((item) => item.key === "more");
+  const entered = new Set([...bar.map((item) => normal(item.href)), ...(hasMore ? phone.launcherSections.flatMap((section) => section.items.map((item) => normal(item.href))) : [])]);
+  const reachableAreas = staffAreaOrder.filter((area) => {
+    const landing = phone.rail.find((item) => item.area === area)?.href;
+    return Boolean(landing) && entered.has(normal(landing!));
+  });
+  const eventRow = rowHrefs(phone);
+  const toolsListed = hasMore && cardHrefs(phone).length > 0;
+  return new Set([
+    ...entered,
+    ...areaRows(scenario, reachableAreas.filter((area) => area !== "events")),
+    ...(reachableAreas.includes("events") ? rowHrefs(navFor(scenario, areaPages.events)) : []),
+    ...eventRow,
+    // The More sheet lists every card the event's tools allow, with the "/more" page behind it.
+    ...(toolsListed ? cardHrefs(phone) : []),
+  ].map(normal));
 }
 
 /**
@@ -303,9 +331,9 @@ const deniedOnPhone: Record<string, readonly string[]> = {
   READ_ONLY_STAFF: [...configPages, "/more", "/more/health", "/more/reports", "/people", "/check-in", "/registration-builder", "/more/program-assignments", "/finance", "/more/promo-codes", "/communications", "/community", "/staff", "/imports", ...clubPages],
   // #1029: kitchen staff hold only the kitchen counts permission, so the phone shows them none of these.
   KITCHEN_STAFF: [...configPages, "/overview", "/more", "/more/health", "/more/reports", "/people", "/check-in", "/registration-builder", "/more/program-assignments", "/finance", "/more/promo-codes", "/communications", "/community", "/staff", "/imports", ...clubPages],
-  // #481: a GENERAL event shows no club features, even for a system admin
-  // (who still reaches the directory from System management, not the phone).
-  "SYSTEM_ADMIN on a GENERAL event": ["/admin/organizations", "/more/clubs", "/more/club-assignments"],
+  // #481: a GENERAL event shows no club features, even for a system admin. The directory is the Clubs area's tab for a
+  // system administrator on any event (System management), so it is no longer denied; the event's own club pages are.
+  "SYSTEM_ADMIN on a GENERAL event": ["/more/clubs", "/more/club-assignments"],
   "EVENT_ADMIN with club oversight on a CLUB-audience event": ["/admin/organizations", "/more/event-health"],
   "REGISTRATION_MANAGER on a CLUB-audience event (no oversight)": ["/more/clubs", "/admin/organizations", "/more/event-health", ...configPages],
   "custom: CHECK_IN_STAFF plus CONFIGURE_EVENT": ["/more/reports", "/more/program-assignments", "/finance", "/staff", "/imports", "/community", ...clubPages],
@@ -316,40 +344,55 @@ const deniedOnPhone: Record<string, readonly string[]> = {
   "custom: CHECK_IN_STAFF plus VIEW_HEALTH_INFORMATION on a CLUB-audience event": [...configPages, "/more/reports", "/more/health", "/finance", "/staff", "/imports", "/community", "/more/clubs", "/admin/organizations", "/more/club-assignments"],
 };
 
-describe("phone navigation reaches every page the desktop sidebar reaches (#475)", () => {
+/** Cards in the More directory that a person with club oversight, a system administrator and so on may open, as `allowedMoreCardHrefs` did. */
+function allowedMoreCardHrefs(scenario: Scenario): string[] {
+  return buildMoreDirectoryCards({
+    permissions: scenario.permissions,
+    clubOversight: scenario.clubOversight,
+    clubEvent: scenario.clubEvent,
+    isSystemAdmin: scenario.isSystemAdmin,
+    clubFormsAccess: scenario.clubFormsAccess,
+    eventQuery: "",
+  }).filter((card) => card.allowed).map((card) => card.href);
+}
+
+describe("a phone reaches exactly the pages a desktop reaches (#475, #1565)", () => {
   for (const scenario of scenarios) {
     describe(scenario.name, () => {
-      it("reaches every sidebar destination on phone", () => {
-        const desktop = sidebarDestinations(scenario);
+      it("reaches the same pages on phone and desktop, no more and no fewer", () => {
+        const desktop = desktopDestinations(scenario);
         const phone = phoneDestinations(scenario);
         const missingOnPhone = [...desktop].filter((href) => !phone.has(href));
+        const extraOnPhone = [...phone].filter((href) => !desktop.has(href));
         expect(missingOnPhone, `phone navigation is missing: ${missingOnPhone.join(", ")}`).toEqual([]);
+        expect(extraOnPhone, `phone navigation has more than desktop: ${extraOnPhone.join(", ")}`).toEqual([]);
       });
 
-      it("shows only More cards the sidebar reaches or whose page guard admits the scenario", () => {
-        const desktop = sidebarDestinations(scenario);
+      it("shows only More cards whose page guard admits the scenario, or that a tab already reaches", () => {
+        const desktopPaths = new Set([...desktopDestinations(scenario)].map(pathOnly));
         const unexplained = allowedMoreCardHrefs(scenario).filter((href) => {
-          if (desktop.has(href)) return false;
           const guard = moreOnlyPages[href];
-          return !guard || !guard(scenario);
+          return !guard?.(scenario) && !(desktopPaths.has(href) && !moreOnlyPages[href]);
         });
         expect(unexplained, `More shows cards the role can't open: ${unexplained.join(", ")}`).toEqual([]);
       });
 
-      it("shows a More card for every More-only page its guard admits", () => {
-        const phone = phoneDestinations(scenario);
-        const moreVisible = moreLauncherVisible(scenario);
+      it("reaches a page for every More-only page its guard admits, on phone and desktop alike", () => {
+        const phonePaths = new Set([...phoneDestinations(scenario)].map(pathOnly));
+        const desktopPaths = new Set([...desktopDestinations(scenario)].map(pathOnly));
         for (const [href, guard] of Object.entries(moreOnlyPages)) {
-          const expected = moreVisible && guard(scenario);
-          expect(phone.has(href), `${href} on phone`).toBe(expected);
+          expect(phonePaths.has(href), `${href} on phone`).toBe(guard(scenario));
+          expect(desktopPaths.has(href), `${href} on desktop`).toBe(guard(scenario));
         }
       });
 
       it("never reaches the pages the scenario is denied", () => {
-        const denied = deniedOnPhone[scenario.name] ?? [];
-        const phone = phoneDestinations(scenario);
-        const leaked = denied.filter((href) => phone.has(href));
-        expect(leaked, `phone reaches denied pages: ${leaked.join(", ")}`).toEqual([]);
+        // "/more" is the directory itself; anyone with the event view has its emergency-plan card, so it is not denied to them.
+        const denied = (deniedOnPhone[scenario.name] ?? []).filter((href) => !(href === "/more" && has(scenario, "VIEW_EVENT")));
+        const phone = new Set([...phoneDestinations(scenario)].map(pathOnly));
+        const desktop = new Set([...desktopDestinations(scenario)].map(pathOnly));
+        expect(denied.filter((href) => phone.has(href)), "phone reaches denied pages").toEqual([]);
+        expect(denied.filter((href) => desktop.has(href)), "desktop reaches denied pages").toEqual([]);
       });
     });
   }
@@ -361,7 +404,7 @@ describe("phone navigation reaches every page the desktop sidebar reaches (#475)
     }
   });
 
-  it("gives a system admin on a GENERAL event neither club destination on phone (#481)", () => {
+  it("gives a system admin on a GENERAL event no club destination in the event, and the directory through System management (#481)", () => {
     const scenario: Scenario = {
       name: "SYSTEM_ADMIN on a GENERAL event billed to an organization",
       permissions: eventPermissions,
@@ -370,10 +413,12 @@ describe("phone navigation reaches every page the desktop sidebar reaches (#475)
       clubEvent: false,
       clubFormsAccess: true,
     };
-    const phone = phoneDestinations(scenario);
-    expect(phone.has("/admin/organizations")).toBe(false);
+    const phone = new Set([...phoneDestinations(scenario)].map(pathOnly));
     expect(phone.has("/more/clubs")).toBe(false);
-    expect(sidebarDestinations(scenario).has("/admin/organizations")).toBe(false);
+    expect(phone.has("/more/club-assignments")).toBe(false);
+    // The directory is the Clubs area's tab for a system administrator, whatever the event; it is not an event card.
+    expect(phone.has("/admin/organizations")).toBe(true);
+    expect(allowedMoreCardHrefs(scenario)).not.toContain("/admin/organizations");
     expect(resolveClubsAndChurchesEntry(scenario).visible).toBe(false);
   });
 
@@ -390,76 +435,94 @@ describe("phone navigation reaches every page the desktop sidebar reaches (#475)
     expect(hrefs).toContain("/admin/organizations");
   });
 
-  it("renders the phone bottom tabs from the same source as the sidebar for a full-access role", () => {
-    const events = [{
-      id: "event_1",
-      slug: "womens-retreat-2026",
-      name: "Women's Retreat 2026",
-      permissions: eventPermissions,
-    }];
+  it("renders the phone bottom bar from the same source as the rail and the tabs for a full-access role", () => {
+    const events = [{ id: "event_1", slug: "womens-retreat-2026", name: "Women's Retreat 2026", permissions: eventPermissions }];
     const markup = renderToStaticMarkup(
       createElement(
         AppShellElement,
-        {
-          events,
-          user: { displayName: "Casey Full Access", email: "full@imsda-events.test" },
-        },
+        { events, user: { displayName: "Casey Full Access", email: "full@imsda-events.test", globalRole: "SYSTEM_ADMIN" }, adminRoleView: { held: ["CLUBS_ADMIN", "SYSTEM_ADMIN"], active: "SYSTEM_ADMIN", counts: {} } },
         createElement("p", null, "Workspace content"),
       ),
     );
-    const mobileNav = markup.slice(markup.indexOf('<nav class="mobile-nav"'));
-    // Five tabs (#711), plus Payments for finance staff (#890); Promo codes live in More.
-    const hrefs = [...mobileNav.matchAll(/<a [^>]*href="([^"?]+)\?/g)].map((match) => match[1]);
-    expect(hrefs).toEqual(["/overview", "/people", "/check-in", "/finance", "/communications", "/more"]);
-    const labels = [...mobileNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]);
-    expect(labels).toEqual(["Home", "People", "Check-in", "Pay", "Emails", "More"]);
-    expect(mobileNav).not.toContain("promo-codes");
+    const bar = markup.slice(markup.indexOf('<nav class="mobile-nav"'));
+    const hrefs = [...bar.matchAll(/<a [^>]*href="([^"?]+)/g)].map((match) => match[1]);
+    expect(hrefs).toEqual(["/home", "/admin/calendar", "/check-in", "/admin/clubs", "/more"]);
+    expect([...bar.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1])).toEqual(["Home", "Events", "Check-in", "Clubs", "More"]);
+    // The same links the rail offers.
+    const rail = markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf("</nav>", markup.indexOf('id="primary-navigation"')));
+    for (const href of ["/home", "/admin/calendar", "/admin/clubs"]) expect(rail).toContain(`href="${href}`);
   });
 
-  it("keeps every item that left the sidebar out of it, and reachable from a More card (#964)", () => {
+  it("keeps every page that left the sidebar reachable as a view or a More card, with the permission it had (#964, #1565)", () => {
     const removed = ["/people/attendees", "/imports", "/staff", "/more/promo-codes"];
     const fullAccess: Scenario = { name: "full", permissions: eventPermissions, isSystemAdmin: true, clubOversight: true, clubEvent: true, clubFormsAccess: true };
-    const sidebar = sidebarDestinations(fullAccess);
+    const desktop = new Set([...desktopDestinations(fullAccess)].map(pathOnly));
+    const phone = new Set([...phoneDestinations(fullAccess)].map(pathOnly));
     const cards = allowedMoreCardHrefs(fullAccess);
     for (const href of removed) {
       expect(navigation.find((item) => item.href === href)?.sidebar, `${href} is not a sidebar item`).toBeUndefined();
-      expect(sidebar.has(href), `${href} not in the sidebar`).toBe(false);
       expect(cards, `${href} has a More card`).toContain(href);
-      expect(phoneDestinations(fullAccess).has(href), `${href} on phone`).toBe(true);
+      expect(desktop.has(href), `${href} on desktop`).toBe(true);
+      expect(phone.has(href), `${href} on phone`).toBe(true);
     }
-    // The permission each needed in the sidebar still gates it.
     for (const href of removed) {
       const permission = navigation.find((item) => item.href === href)?.requiredPermission;
       expect(permission, href).toBeTruthy();
       const without = { ...fullAccess, permissions: eventPermissions.filter((entry) => entry !== permission) };
       expect(allowedMoreCardHrefs(without), `${href} without ${permission}`).not.toContain(href);
+      expect(new Set([...phoneDestinations(without)].map(pathOnly)).has(href), `${href} on phone without ${permission}`).toBe(false);
     }
   });
 
-  it("has no Payments card in More (it is a phone tab, #890); Promo codes stay behind MANAGE_FINANCE", () => {
-    const base = { clubOversight: false, clubEvent: false, isSystemAdmin: false, clubFormsAccess: false, eventQuery: "?event=e1" };
-    const withFinance = buildMoreDirectoryCards({ ...base, permissions: ["MANAGE_FINANCE"] });
-    const allowed = withFinance.filter((card) => card.allowed).map((card) => card.href);
-    expect(allowed).toContain("/more/promo-codes?event=e1");
-    expect(withFinance.map((card) => card.href)).not.toContain("/finance?event=e1");
-    const without = buildMoreDirectoryCards({ ...base, permissions: ["VIEW_REPORTS"] }).filter((card) => card.allowed);
-    expect(without.map((card) => card.href)).not.toContain("/more/promo-codes?event=e1");
+  it("has Payments and Refunds only in the Money views, and Promo codes behind MANAGE_FINANCE", () => {
+    const withFinance = navFor({ name: "finance", permissions: ["MANAGE_FINANCE", "VIEW_EVENT"], isSystemAdmin: false, clubOversight: false, clubEvent: false, clubFormsAccess: false });
+    const money = withFinance.eventTabs.find((tab) => tab.key === "money");
+    expect(money?.views.map((view) => view.label)).toEqual(["Payments", "Balances due", "Refunds", "Promo codes", "More money tools"]);
+    expect(withFinance.eventTabs.map((tab) => tab.label)).not.toContain("Payments");
+    expect(withFinance.launcherCards.filter((card) => card.allowed).map((card) => card.href)).toContain("/more/promo-codes?event=event_1");
+    const without = navFor({ name: "reports", permissions: ["VIEW_REPORTS"], isSystemAdmin: false, clubOversight: false, clubEvent: false, clubFormsAccess: false });
+    expect(without.launcherCards.filter((card) => card.allowed).map((card) => card.href)).not.toContain("/more/promo-codes?event=event_1");
+    expect(footerKeys()).toContain("event-features");
+  });
+
+  it("opens every rail item on a page where that same item is current, for every role", () => {
+    for (const scenario of scenarios) {
+      for (const item of navFor(scenario).rail) {
+        const url = new URL(item.href, "https://events.example.test");
+        expect(staffPlaceFor(url.pathname, url.searchParams).area, `${scenario.name} ${item.label}`).toBe(item.area);
+      }
+    }
+  });
+
+  it("starts every phone bar with Home (/home) and ends it with More, whatever the role", () => {
+    for (const scenario of scenarios) {
+      const bar = navFor(scenario).phoneItems;
+      if (bar.length === 0) continue;
+      // Home opens its own page (#1568), so no other item shares it and no page has two bar links.
+      expect(bar[0], scenario.name).toMatchObject({ key: "home", href: expect.stringMatching(/^\/home/) });
+      const paths = bar.map((item) => new URL(item.href, "https://events.example.test").pathname);
+      expect(new Set(paths).size, scenario.name).toBe(paths.length);
+      const more = bar.findIndex((item) => item.key === "more");
+      if (more >= 0) expect(more, scenario.name).toBe(bar.length - 1);
+      expect(bar.length, scenario.name).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it("never shows a tab row with more than eight tabs or a tab with more than five views", () => {
+    for (const scenario of scenarios) {
+      for (const area of staffAreaOrder) {
+        const row = navFor(scenario, areaPages[area]).rowTabs;
+        expect(row.length, `${scenario.name} ${area}`).toBeLessThanOrEqual(8);
+        for (const tab of row) expect(tab.views?.length ?? 0, `${scenario.name} ${area} ${tab.label}`).toBeLessThanOrEqual(5);
+      }
+      const eventRow = navFor(scenario).rowTabs;
+      expect(eventRow.length, scenario.name).toBeLessThanOrEqual(8);
+      for (const tab of eventRow) expect(tab.views?.length ?? 0, `${scenario.name} ${tab.label}`).toBeLessThanOrEqual(5);
+    }
+    expect(areaTabs("admin", { isSystemAdmin: true, held: ["SYSTEM_ADMIN"], activeRole: "SYSTEM_ADMIN", hasEvents: false, siteContentEditor: false, healthImport: true, clubYear: null, counts: {} })).toHaveLength(6);
   });
 });
 
-describe("More launcher without sidebar duplicates (#967)", () => {
-  for (const role of eventRoles) {
-    it(`loses no destination for ${role}: each allowed card is in the desktop launcher or the sidebar, and the phone sheet keeps all`, () => {
-      const permissions = rolePermissions[role];
-      const cards = buildMoreDirectoryCards({ permissions, clubOversight: true, clubEvent: true, isSystemAdmin: false, clubFormsAccess: true, eventQuery: "?event=event_1" });
-      const allowed = cards.filter((card) => card.allowed);
-      const sidebarHrefs = new Set(sidebarSections(new Set(permissions)).flatMap((view) => view.items.map((item) => item.href)));
-      const desktop = omitSidebarDuplicates(cards, sidebarHrefs).filter((card) => card.allowed);
-      for (const card of allowed) {
-        expect(desktop.includes(card) || sidebarHrefs.has(card.href.split("?")[0])).toBe(true);
-      }
-      for (const card of desktop) expect(sidebarHrefs.has(card.href.split("?")[0])).toBe(false);
-      expect(omitSidebarDuplicates(cards, undefined).filter((card) => card.allowed)).toEqual(allowed);
-    });
-  }
-});
+function footerKeys() {
+  return launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: false, eventQuery: "" }).map((link) => link.key);
+}

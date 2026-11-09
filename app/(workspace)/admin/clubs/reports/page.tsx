@@ -1,3 +1,4 @@
+import navStyles from "@/components/staff-records-nav.module.css";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
@@ -34,17 +35,19 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
   const toReviewRows = review === REVIEW_FILTER
     ? recordsToReview(await getAreaClubsSummary(clubYear, now, { backgroundChecks: false }), reviewMonth)
     : null;
+  // Moving to another year keeps the filter the person is on (#1588); the month follows the chosen year.
+  const yearLinkTail = toReviewRows ? `&review=${REVIEW_FILTER}` : "";
   return (
     <>
       <AdminPageHeader path="/admin/clubs/reports" year={clubYear} />
       <StaffPageHeader
         extra={(
           <>
-            <Link className="secondary-button" href={`/admin/clubs/reports?year=${label(start - 1)}`}>← {label(start - 1)}</Link>
-            {clubYear !== current && <Link className="secondary-button" href={`/admin/clubs/reports?year=${label(start + 1)}`}>{label(start + 1)} →</Link>}
+            <Link className={`secondary-button ${navStyles.target}`} href={`/admin/clubs/reports?year=${label(start - 1)}${yearLinkTail}`}>← {label(start - 1)}</Link>
+            {clubYear !== current && <Link className={`secondary-button ${navStyles.target}`} href={`/admin/clubs/reports?year=${label(start + 1)}${yearLinkTail}`}>{label(start + 1)} →</Link>}
           </>
         )}
-        primary={<Link className="secondary-button" href="/admin/clubs/reports/year-end">Year-End Reports</Link>}
+        primary={<Link className={`secondary-button ${navStyles.target}`} href="/admin/clubs/reports/year-end">Year-End Reports</Link>}
       />
       {toReviewRows ? (
         <ClubRecordsToReview clubYear={clubYear} month={reviewMonth} rows={toReviewRows} />

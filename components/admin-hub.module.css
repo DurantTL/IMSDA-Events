@@ -1,0 +1,202 @@
+/* Admin hub pages (#1569): key numbers, one main action, then card groups. Cards fill their row and never scroll sideways. */
+.hub {
+  display: grid;
+  gap: 24px;
+  padding-bottom: 32px;
+}
+
+.intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+
+.introText {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.5;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--touch-target, 44px);
+  border-radius: var(--radius-sm);
+  background: var(--imsda-navy);
+  padding: 0 18px;
+  color: white;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+/* A main action with nothing waiting behind it is a plain link, not a filled button (#1733). */
+.action.actionQuiet {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--imsda-navy);
+  font-weight: 700;
+}
+
+/* The stats use the shared .metric-grid and .metric-card; this fits them to the count so a row is never left with a lone card:
+   1 across the row, 2, 3 or 4 across, four as 2 x 2 on an iPad, one per row on a phone. */
+ul.stats {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+ul.stats[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+ul.stats[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ul.stats[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+ul.stats[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+ul.stats[data-count] > li:last-child { grid-column: auto; }
+
+@media (max-width: 1024px) {
+  ul.stats[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  ul.stats[data-count] { grid-template-columns: minmax(0, 1fr); }
+}
+
+.stat {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 16px 14px 20px;
+}
+
+.stat[data-unavailable="true"] {
+  border-style: dashed;
+}
+
+.stat .statValue {
+  font-size: 1.6rem;
+  overflow-wrap: anywhere;
+}
+
+.stat[data-unavailable="true"] .statValue {
+  color: var(--gold-text);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+}
+
+.stat .statLabel {
+  margin: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.stat .statNote {
+  color: var(--gold-text);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.group {
+  display: grid;
+  gap: 10px;
+}
+
+.groupHeading {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* Cards fill their row: 1, 2, 3 or 4 across, 5 as 3 + 2 and 6 as 3 + 3. Four become 2 x 2 on an iPad, one per row on a phone. */
+.cards {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cards > li {
+  display: flex;
+  min-width: 0;
+}
+
+.cards[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
+.cards[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cards[data-count="3"],
+.cards[data-count="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cards[data-count="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cards[data-count="5"] { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.cards[data-count="5"] > li { grid-column: span 2; }
+.cards[data-count="5"] > li:nth-child(n + 4) { grid-column: span 3; }
+
+@media (max-width: 1024px) {
+  .cards[data-count="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .cards[data-count] { grid-template-columns: minmax(0, 1fr); }
+  .cards[data-count] > li,
+  .cards[data-count="5"] > li:nth-child(n + 4) { grid-column: auto; }
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target, 44px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 14px 16px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* The status chip sits on its own line under the title, so it is in the same place on every card (#1747). */
+.cardTop {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.cardTitle {
+  min-width: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.cardText {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* The colours are the shared .status-chip; the staff shell raises its text to 14px. This only lets long words wrap. */
+.chip {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.card:hover {
+  border-color: var(--imsda-navy);
+}

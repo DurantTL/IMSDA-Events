@@ -110,7 +110,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     label: "Forms",
     collapsedByDefault: false,
     items: [
-      { href: "/admin/forms", label: "All forms", description: "Every club, general and event form in one list.", icon: ListChecks },
+      { href: "/admin/forms", label: "All forms", description: "Club, general information and event information forms in one list. Registration forms are built inside each event.", icon: ListChecks },
       { href: "/admin/club-forms", label: "Club forms", description: "The forms clubs fill in for events.", icon: ClipboardList },
       { href: "/admin/club-forms/public-page", label: "Public club forms page", description: "Which forms visitors see on the public Club forms page, with preview and publish.", icon: Megaphone },
       { href: "/admin/form-templates", label: "Form templates", description: "The registration forms event staff start from.", icon: FileStack },
@@ -137,6 +137,24 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     ],
   },
 ];
+
+/**
+ * The five Admin hub pages (#1569), one per Admin tab. Not part of `systemNavGroups` (the /admin dashboard, the sidebar and
+ * Find a page draw those, so the hubs are not in the search); they are registered here so the Admin tabs can look them up
+ * (`registeredDestination`) and the route map lists them.
+ */
+export type AdminHubKey = "events" | "clubs" | "people" | "forms" | "catalogs";
+
+export const adminHubs: Record<AdminHubKey, { href: string; label: string; title: string; description: string }> = {
+  events: { href: "/admin/hubs/events", label: "Events", title: "Events", description: "Creating events, the public calendar, templates and requests from event staff." },
+  clubs: { href: "/admin/hubs/clubs", label: "Clubs", title: "Clubs", description: "The club directory, club records, and new clubs. Day-to-day club work lives in the Clubs area." },
+  people: { href: "/admin/hubs/people", label: "People", title: "People", description: "Who can sign in, what they can reach, and sealed health records." },
+  forms: { href: "/admin/hubs/forms", label: "Forms", title: "Forms", description: "Every form, and the templates and saved questions forms are built from." },
+  catalogs: { href: "/admin/hubs/catalogs", label: "Catalogs and settings", title: "Catalogs and settings", description: "System health, the website and email, catalogs clubs choose from, and platform settings." },
+};
+
+/** The groups the /admin dashboard draws as its task directory; every other group is a Common tasks group there (#1228). */
+export const adminDirectoryGroups: readonly SystemNavGroup[] = systemNavGroups.filter((group) => group.key === "system-catalogs");
 
 function isAtOrBelow(pathname: string, path: string): boolean {
   return pathname === path || pathname.startsWith(`${path}/`);
@@ -189,6 +207,11 @@ type SystemTitleRule = readonly [path: RegExp, title: string];
  * management.
  */
 const systemTitleRules: readonly SystemTitleRule[] = [
+  [/^\/admin\/hubs\/events(\/|$)/, adminHubs.events.title],
+  [/^\/admin\/hubs\/clubs(\/|$)/, adminHubs.clubs.title],
+  [/^\/admin\/hubs\/people(\/|$)/, adminHubs.people.title],
+  [/^\/admin\/hubs\/forms(\/|$)/, adminHubs.forms.title],
+  [/^\/admin\/hubs\/catalogs(\/|$)/, adminHubs.catalogs.title],
   [/^\/event-setup\/from-template(\/|$)/, "Start from template"],
   [/^\/event-setup\/copy(\/|$)/, "Copy from a past event"],
   [/^\/event-setup(\/|$)/, "Create an event"],
@@ -243,7 +266,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/analytics(\/|$)/, "Public analytics"],
   [/^\/admin\/settings(\/|$)/, "Platform settings"],
   [/^\/admin\/pauses(\/|$)/, "Pause an area"],
-  [/^\/admin\/feature-requests(\/|$)/, "Feature requests"],
+  [/^\/admin\/feature-requests(\/|$)/, "Event module requests"],
   [/^\/admin\/problem-reports(\/|$)/, "Problem reports"],
 ];
 

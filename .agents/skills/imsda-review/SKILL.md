@@ -9,6 +9,11 @@ Accept exactly one positive PR number, or review the current branch against
 `origin/main` when called from a build before its PR exists. Read root
 `AGENTS.md` before acting.
 
+For staff redesign #1565–#1596, use `origin/codex/neon-preview-setup` instead
+of `origin/main` in the pre-PR comparisons below, as directed by AGENTS.md.
+The reviewed PR targets the development branch; production promotion remains
+a separate owner-approved release PR.
+
 ## Workflow
 
 1. Confirm `gh` authentication and read the PR metadata, linked issue, complete

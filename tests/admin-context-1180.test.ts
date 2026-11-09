@@ -18,7 +18,6 @@ vi.mock("@/components/sign-out-button", () => ({
 }));
 
 import { AppShell } from "@/components/app-shell";
-import { SystemPhoneMenu } from "@/components/system-phone-menu";
 import { buildSearchDestinations, searchDestinations } from "@/components/destination-search-model";
 import { moduleDestinationStates, moduleStateLabels } from "@/components/module-destination-states";
 import { createLinkNavigationListener, handleGuardedLinkClick } from "@/components/link-guard";
@@ -36,6 +35,7 @@ import {
   systemMenuReturnsFocus,
   systemMenuStillAllowed,
   workContextSwitches,
+  showsWorkContextChip,
 } from "@/components/work-context-model";
 import { alwaysOnModuleKeys, disabledModuleCardKeys, eventModuleCatalog, type EventModuleKey } from "@/modules/event-modules/catalog";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
@@ -92,15 +92,26 @@ describe("distinct work contexts", () => {
     expect(handoff).toMatchObject({ method: "post", href: "/api/auth/switch-to-attendee", label: "My registrations" });
   });
 
-  it("shows the active context in the header for System, an event and the profile page", () => {
-    const system = render("admin", "/admin/people");
-    expect(system).toContain('class="work-context" data-context="system"');
-    expect(system).toContain("System administration");
-    expect(system).toContain("All events");
+  it("drops the place line where the rail, tabs or event bar already name the place (#1733)", () => {
+    // System, Home and the account page: the tab row and heading say where you are.
+    for (const [role, path] of [["admin", "/admin/people"], ["admin", "/home"], ["limited", "/profile"]] as const) {
+      expect(render(role, path), path).not.toContain('class="work-context"');
+    }
+    // An event page: the event bar and tab row carry the event name once, not a second time under the heading.
     const event = render("admin", "/people");
-    expect(event).toContain('data-context="event"');
+    expect(event).not.toContain('class="work-context"');
     expect(event).toContain("Synthetic Event One");
-    expect(render("limited", "/profile")).toContain('data-context="profile"');
+  });
+
+  it("keeps the place line only for an event that nothing else on the page names", () => {
+    const event = { kind: "event" as const, kindLabel: "Event", label: "Synthetic Event One", detail: "" };
+    const input = { context: event, eventName: "Synthetic Event One", pageTitle: "Settings", shownPlaceNames: ["Staff"] };
+    expect(showsWorkContextChip(input)).toBe(true);
+    expect(showsWorkContextChip({ ...input, shownPlaceNames: ["Synthetic Event One"] })).toBe(false);
+    expect(showsWorkContextChip({ ...input, pageTitle: "Synthetic Event One setup" })).toBe(false);
+    expect(showsWorkContextChip({ ...input, eventName: null })).toBe(false);
+    expect(showsWorkContextChip({ ...input, context: { ...event, kind: "system", label: "System administration" } })).toBe(false);
+    expect(showsWorkContextChip({ ...input, context: { ...event, label: "No event selected" } })).toBe(false);
   });
 });
 
@@ -134,18 +145,24 @@ describe("the selected event is kept", () => {
   it("renders System pages with zero events", () => {
     const markup = render("admin", "/admin", { events: false, search: "" });
     expect(markup).toContain("System administration");
-    expect(markup).toContain("System menu");
+    expect(markup).toContain("Admin menu");
+    expect(markup).not.toContain('id="event-picker"');
     expect(buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false }).filter((entry) => entry.scope === "System")).toHaveLength(systemNavGroups.flatMap((group) => group.items).length + 1);
   });
 });
 
 describe("deliberate entry and return", () => {
   it("lets an administrator step into an event and get back to System, keeping that event", () => {
+    // In an event, the rail's Admin item is the way back to System, and it carries the event.
     const inEvent = render("admin", "/people");
-    expect(inEvent).toContain("Back to System");
-    expect(inEvent).toContain('href="/admin?event=evt_one"');
-    const inSystem = render("admin", "/admin");
-    expect(inSystem).toContain('href="/overview?event=evt_one"');
+    const rail = inEvent.slice(inEvent.indexOf('id="primary-navigation"'), inEvent.indexOf("</nav>", inEvent.indexOf('id="primary-navigation"')));
+    expect(rail).toContain('href="/admin?event=evt_one"');
+    expect(inEvent).toContain("‹ Events");
+    // On a System page the Events area opens an event by name, guarded, and the rail keeps the event.
+    const inSystem = render("admin", "/admin/calendar");
+    expect(inSystem).toContain('id="event-opener"');
+    expect(inSystem).toContain('aria-label="Open an event"');
+    expect(inSystem).toContain("Synthetic Event One");
   });
 
   it("offers no way into System to anyone else", () => {
@@ -153,68 +170,34 @@ describe("deliberate entry and return", () => {
       const markup = render(role, "/overview");
       expect(markup, role).not.toContain("Back to System");
       expect(markup, role).not.toContain("Global administration");
+      expect(markup, role).not.toContain('href="/admin');
     }
   });
 });
 
-describe("phone System menu", () => {
+describe("the System destinations on the phone", () => {
   it("lists exactly the desktop System destinations, grouped the same way", () => {
     const groups = systemMenuGroups({ isSystemAdmin: true, pathname: "/admin/people", selectedEventId: "evt_one" });
     expect(groups.map((group) => [group.label, group.items.map((item) => item.label)])).toEqual(
       systemNavGroups.map((group) => [group.label, group.items.map((item) => item.label)]),
     );
     expect(groups.flatMap((group) => group.items).filter((item) => item.active).map((item) => item.label)).toEqual(["People & access"]);
+    expect(systemMenuGroups({ isSystemAdmin: false, pathname: "/admin", selectedEventId: "evt_one" })).toEqual([]);
+    expect(systemMenuStillAllowed({ isSystemAdmin: false })).toBe(false);
+    expect(systemMenuReturnsFocus("navigate")).toBe(false);
+    expect(systemMenuReturnsFocus("escape")).toBe(true);
   });
 
-  it("replaces the event tabs on a System page and keeps them on event pages", () => {
+  it("uses the same bar on a System page as everywhere: Home, Events, Check-in, Clubs and More, with the menu line for the area", () => {
     const system = render("admin", "/admin/people");
     const bar = system.slice(system.indexOf('aria-label="Mobile navigation"'));
-    expect(bar).toContain("System menu");
-    expect(bar).toContain("All events");
-    expect(bar).not.toContain("Registrations");
-    expect(bar).not.toContain("Check-in");
-    const event = render("admin", "/people");
-    expect(event.slice(event.indexOf('aria-label="Mobile navigation"'))).not.toContain("System menu");
-  });
-
-  it("closes, scrolls, returns focus and traps Tab as the sheet is written", () => {
-    const source = read("components/system-phone-menu.tsx");
-    expect(source).toContain('role="dialog"');
-    expect(source).toContain('aria-modal="true"');
-    expect(source).toContain("system-menu-close");
-    // Focus return, Escape and the Tab loop moved to the shared dialog hook (#1354).
-    expect(source).toContain("useAccessibleDialog<HTMLDivElement>(showing");
-    expect(source).toMatch(/returnFocus: \(\) => \(systemMenuReturnsFocus\(closeReason\.current\) \? triggerRef\.current : null\)/);
-    expect(read("components/use-accessible-dialog.ts")).toContain('event.key === "Escape"');
-    expect(source).toContain("setBackgroundInert(false)");
-    expect(systemMenuReturnsFocus("close")).toBe(true);
-    expect(systemMenuReturnsFocus("escape")).toBe(true);
-    expect(systemMenuReturnsFocus("outside")).toBe(true);
-    expect(systemMenuReturnsFocus("navigate")).toBe(false);
-    const css = read("app/globals.css");
-    expect(css).toMatch(/\.system-menu \{[^}]*max-height: min\(78vh/);
-    expect(css).toMatch(/\.system-menu-body \{[^}]*overflow-y: auto/);
-    expect(css).toMatch(/\.system-menu-close:focus-visible/);
-  });
-
-  it("draws nothing for a viewer who is not a system administrator, and a removed role closes it", () => {
-    const groups = systemMenuGroups({ isSystemAdmin: false, pathname: "/admin", selectedEventId: "evt_one" });
-    expect(groups).toEqual([]);
-    expect(systemMenuStillAllowed({ isSystemAdmin: false })).toBe(false);
-    navState.pathname = "/admin";
-    expect(renderToStaticMarkup(createElement(SystemPhoneMenu, { isSystemAdmin: false, groups: [], switches: [] }))).toBe("");
-    expect(renderToStaticMarkup(createElement(SystemPhoneMenu, { isSystemAdmin: true, groups: [], switches: [] }))).toContain("System menu");
-    expect(read("components/system-phone-menu.tsx")).toMatch(/if \(open && \(openedOn !== pathname \|\| !allowed\)\) setOpen\(false\)/);
-  });
-
-  it("keeps the phone bar a bar of links, like the More tab: the trigger falls back to the System home", () => {
-    navState.pathname = "/admin";
-    const bar = renderToStaticMarkup(createElement(SystemPhoneMenu, { isSystemAdmin: true, groups: [], switches: [] }));
+    expect(bar).not.toContain("System menu");
+    for (const label of ["Home", "Events", "Check-in", "Clubs", "More"]) expect(bar).toContain(`<span>${label}</span>`);
+    // The area's tab row becomes the menu line below 1024px: its own button names the area.
+    expect(system).toContain("People menu");
+    expect(system).toContain('data-staff-menu-line="true"');
     // The phone layout audit treats a fixed bar holding a button as an action bar that must not cover text (#996).
     expect(bar).not.toContain("<button");
-    const trigger = bar.match(/<a [^>]*class="mobile-nav-system-trigger"[^>]*>/)?.[0] ?? "";
-    expect(trigger).toContain('href="/admin"');
-    expect(trigger).toContain('aria-haspopup="dialog"');
   });
 });
 
@@ -224,15 +207,15 @@ describe("role separation", () => {
     expect(showsSystemChrome({ isSystemAdmin: true, pathname: "/people" })).toBe(false);
     expect(showsSystemChrome({ isSystemAdmin: false, pathname: "/admin" })).toBe(false);
     const admin = render("admin", "/admin");
-    expect(admin).toContain("System menu");
-    expect(admin).toContain("Platform settings");
+    expect(admin).toContain("<span>Admin</span>");
+    expect(admin).toContain("System administration");
   });
 
   it.each(["attendee-like", "director", "coordinator", "limited"] as const)("gives a %s no system sidebar or menu, even on a System address", (role) => {
     for (const pathname of ["/overview", "/admin", "/admin/people"]) {
       const markup = render(role, pathname);
-      expect(markup, `${role} ${pathname}`).not.toContain("System menu");
-      expect(markup, `${role} ${pathname}`).not.toContain("Platform settings");
+      expect(markup, `${role} ${pathname}`).not.toContain("<span>Admin</span>");
+      expect(markup, `${role} ${pathname}`).not.toContain("Admin menu");
       expect(markup, `${role} ${pathname}`).not.toContain("Global administration");
       expect(markup, `${role} ${pathname}`).not.toContain('data-context="system"');
     }
@@ -475,9 +458,10 @@ describe("unsaved-changes guard", () => {
     expect(guarded).toMatch(/router\.replace\(href, \{ scroll: scrollNow \}\)/);
     expect(guarded).toContain("replace={replace}");
     expect(read("components/use-unsaved-changes-guard.ts")).toContain("createLinkNavigationListener");
-    const menu = read("components/system-phone-menu.tsx");
-    expect(menu).not.toMatch(/<Link\b/);
-    expect(menu).toContain("guardedNavigate(() => form.submit())");
+    for (const file of ["components/staff-rail.tsx", "components/staff-tab-row.tsx", "components/staff-menu-dialog.tsx", "components/staff-view-strip.tsx", "components/staff-phone-bar.tsx"]) {
+      expect(read(file), file).not.toMatch(/<Link\b|<a href=/);
+      expect(read(file), file).toMatch(/GuardedLink/);
+    }
     expect(read("components/more-launcher.tsx").match(/<GuardedLink/g)?.length).toBeGreaterThanOrEqual(3);
     expect(read("components/shell-event-selection.ts")).toMatch(/return guard\(\(\) => \{\s*commit\(eventId\);\s*push\(/);
     expect(read("components/staff-account-menu.tsx")).not.toMatch(/<Link\b/);
@@ -486,13 +470,10 @@ describe("unsaved-changes guard", () => {
 });
 
 describe("phone search on System pages", () => {
-  it("puts the destination search at the top of the System sheet, over the same authorized destinations", () => {
-    const source = read("components/system-phone-menu.tsx");
-    expect(source.indexOf("<DestinationSearch")).toBeGreaterThan(0);
-    expect(source.indexOf("<DestinationSearch")).toBeLessThan(source.indexOf("groups.map("));
-    expect(source).toContain("escapeBubbles");
-    expect(source).toContain('onNavigated={() => close("navigate")}');
-    expect(read("components/app-shell.tsx")).toContain("destinations={searchDestinations}");
+  it("puts the destination search at the top of the phone More sheet, over the same authorized destinations", () => {
+    const bar = read("components/staff-phone-bar.tsx");
+    expect(bar).toContain("destinations={launcher.destinations}");
+    expect(read("components/app-shell.tsx")).toContain("destinations: searchDestinations");
     const admin = buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false });
     expect(searchDestinations(admin, "invite staff").map((entry) => entry.label)).toContain("People & access");
     const other = buildSearchDestinations({ isSystemAdmin: false, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false });
@@ -512,14 +493,14 @@ describe("styles and wording", () => {
   });
 
   it("keeps screen-only overflow rules under @media screen", () => {
-    for (const selector of [".work-context-name", ".system-menu", ".system-menu-body"]) {
+    for (const selector of [".work-context-name"]) {
       expect(css, selector).toMatch(new RegExp(`@media screen \\{ \\${selector} \\{[^}]*overflow`));
     }
   });
 
   it("never uses the retired screening words", () => {
     const words = ["background", "check"].join(" ");
-    for (const file of ["components/work-context-model.ts", "components/module-destination-states.ts", "components/route-mapping.ts", "components/link-guard.ts", "components/guarded-link.tsx", "components/system-phone-menu.tsx", "tests/admin-context-1180.test.ts"]) {
+    for (const file of ["components/work-context-model.ts", "components/module-destination-states.ts", "components/route-mapping.ts", "components/link-guard.ts", "components/guarded-link.tsx", "tests/admin-context-1180.test.ts"]) {
       expect(read(file).toLowerCase(), file).not.toContain(words);
     }
   });

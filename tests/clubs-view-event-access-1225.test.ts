@@ -3,7 +3,7 @@ import type { ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-/** #1225 review: a Clubs Administrator with any event membership keeps the event picker and sidebar in the Clubs view. */
+/** #1565: event access stays reachable through the rail's Events item, outside the Clubs tab row. */
 vi.mock("next/navigation", () => ({
   usePathname: () => "/admin/clubs/summary",
   useRouter: () => ({ push: vi.fn() }),
@@ -21,17 +21,24 @@ const shell = (events: Parameters<typeof AppShell>[0]["events"]) => renderToStat
 );
 
 describe("the Clubs view and event access", () => {
-  it("keeps the event picker and event sidebar for a Clubs Administrator who holds an event membership (any role)", () => {
+  it("offers the Events workspace for a Clubs Administrator with event membership", () => {
     const html = shell([{ id: "evt_a", slug: "a", name: "Event A", permissions: ["VIEW_SENSITIVE_DATA"] }]);
-    expect(html).toContain('id="event-picker"');
+    expect(html).not.toContain('id="event-picker"');
     expect(html).toContain("Club summary");
-    expect(html).toContain('href="/people?event=evt_a"');
+    // The rail's Events item opens the first tab this person can open in the event (no event view, so Registrations)...
+    const rail = html.split('id="primary-navigation"')[1]?.split("</nav>")[0] ?? "";
+    expect(rail).toContain('href="/people?event=evt_a"');
+    expect(rail).toContain("<span>Events</span>");
+    // ...and the Clubs row never lists event pages.
+    const tabs = html.split('data-staff-tabs="true"')[1]?.split("</nav>")[0] ?? "";
+    expect(tabs).not.toContain("/people");
   });
 
-  it("hides the event picker and event sidebar only when there is no event at all", () => {
+  it("does not offer Events when there is no event membership or Events role", () => {
     const html = shell([]);
     expect(html).not.toContain('id="event-picker"');
     expect(html).toContain("Club summary");
     expect(html).not.toContain('href="/people');
+    expect(html).not.toContain("<span>Events</span>");
   });
 });

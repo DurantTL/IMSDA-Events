@@ -1112,6 +1112,11 @@ function staffQueueWhere(filter: StaffQueueFilter, now: Date): Prisma.MemberTran
   }
 }
 
+/** How many transfers the staff queue holds for a filter (#1569), with the same rule the queue page lists them by. */
+export async function countStaffTransferQueue(filter: StaffQueueFilter = "open", now = new Date()) {
+  return getPrisma().memberTransfer.count({ where: staffQueueWhere(filter, now) });
+}
+
 /** The conference staff queue (#489): overdue, declined, unmatched, pending, or every open transfer. */
 export async function listStaffTransferQueue(filter: StaffQueueFilter = "open", now = new Date()) {
   const transfers = await getPrisma().memberTransfer.findMany({

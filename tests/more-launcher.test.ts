@@ -135,11 +135,11 @@ describe("launcher footer", () => {
     ]);
   });
 
-  it("offers an Event Admin Event features, Event modules and activity plus Request a feature, now that requests exist (#741 slice 3, #965)", () => {
+  it("offers an Event Admin Event features, Event setup and activity plus Request a feature, now that requests exist (#741 slice 3, #965)", () => {
     expect(moduleRequestsEnabled).toBe(true);
     expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, eventQuery: "?event=event_1" })).toEqual([
       { key: "event-features", label: "Event features", href: "/more/features?event=event_1" },
-      { key: "event-modules", label: "Event modules and activity", href: "/more?event=event_1" },
+      { key: "event-modules", label: "Event setup and activity", href: "/more?event=event_1" },
       { key: "request-feature", label: "Request a feature", href: "/more?event=event_1#request-a-feature" },
     ]);
     // Anyone who may not request gets no link, and a system administrator turns modules on directly.
@@ -148,8 +148,8 @@ describe("launcher footer", () => {
   });
 
   it("is ready to offer Request a feature, only where permitted, once the flag is on", () => {
-    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event modules and activity", "Request a feature"]);
-    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: false, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event modules and activity"]);
+    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: true, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event setup and activity", "Request a feature"]);
+    expect(launcherFooterLinks({ isSystemAdmin: false, canRequestFeature: false, requestsEnabled: true, eventQuery: "?event=event_1" }).map((link) => link.label)).toEqual(["Event features", "Event setup and activity"]);
   });
 });
 
@@ -201,14 +201,14 @@ describe("launcher panel markup", () => {
     expect(markup).toContain('href="/more/club-forms?event=event_1"');
   });
 
-  it("shows Event features to everyone, the old Manage event modules link to no one, and Event modules and activity to staff who are not system administrators", () => {
+  it("shows Event features to everyone, the old Manage event modules link to no one, and Event setup and activity to staff who are not system administrators", () => {
     expect(render(true)).toContain('data-footer="event-features"');
     expect(render(true)).toContain(">Event features<");
     expect(render(true)).toContain('href="/more/features?event=event_1"');
     expect(render(true)).not.toContain("Manage event modules");
     expect(render(false)).toContain(">Event features<");
     expect(render(false)).not.toContain("Manage event modules");
-    expect(render(false)).toContain(">Event modules and activity<");
+    expect(render(false)).toContain(">Event setup and activity<");
     expect(render(false)).toContain('href="/more?event=event_1"');
     expect(render(false)).not.toContain("Request a feature");
     expect(render(true)).not.toContain("Request a feature");
@@ -334,23 +334,25 @@ describe("launcher in the shell", () => {
     ),
   );
 
-  it("keeps More last in the sidebar and the phone tabs, as a link that opens the launcher", () => {
+  it("keeps More last in the phone bar, as a link that opens the launcher, and All event tools last in the Event setup views", () => {
     const markup = shell();
-    const nav = markup.slice(markup.indexOf('aria-label="Primary navigation"'), markup.indexOf('class="sidebar-foot"'));
-    expect(nav.lastIndexOf("/more?event=event_1")).toBeGreaterThan(nav.lastIndexOf("/communications?event=event_1"));
-    expect(nav).toContain('aria-haspopup="dialog"');
-    expect(nav).toContain('aria-expanded="false"');
+    // Desktop: no sidebar and no More item; the /more directory is the Event setup tab's "All event tools" view.
+    expect(markup).not.toContain('class="sidebar"');
+    expect(markup).toContain('href="/more?event=event_1"');
     const tabs = markup.slice(markup.indexOf('aria-label="Mobile navigation"'));
-    expect(tabs.match(/<a /g)).toHaveLength(6);
-    expect(tabs.lastIndexOf("/more?event=event_1")).toBeGreaterThan(tabs.lastIndexOf("/communications?event=event_1"));
+    // Home (#1568), Events, Check-in and More: Home is its own page now, so it no longer folds into Events.
+    expect(tabs.match(/<a /g)).toHaveLength(4);
+    expect(tabs.indexOf('href="/home?event=event_1"')).toBeGreaterThan(-1);
+    expect(tabs.indexOf('href="/home?event=event_1"')).toBeLessThan(tabs.indexOf("/overview?event=event_1"));
+    expect(tabs.lastIndexOf("/more?event=event_1")).toBeGreaterThan(tabs.lastIndexOf("/check-in?event=event_1"));
     expect(tabs).toContain('aria-haspopup="dialog"');
   });
 
-  it("renders the launcher closed, and keeps the sidebar collapse button", () => {
+  it("renders the launcher closed, and has no sidebar collapse button", () => {
     const markup = shell();
     expect(markup).not.toContain('role="dialog"');
-    expect(markup).toContain("sidebar-toggle");
-    expect(markup).toContain("Collapse sidebar");
+    expect(markup).not.toContain("sidebar-toggle");
+    expect(markup).not.toContain("Collapse sidebar");
   });
 
   it("no longer pins the club directory in the sidebar", () => {
@@ -467,18 +469,18 @@ describe("launcher search and sidebar duplicates (#967)", () => {
     const markup = renderToStaticMarkup(
       createElement(MoreLauncherPanel, { cards, sidebarHrefs: sidebarHrefsFor(["MANAGE_FORMS"]), isSystemAdmin: false, eventQuery: "?event=event_1", variant: "sidebar" }),
     );
-    expect(markup).toContain("Everything you can open is in the sidebar.");
+    expect(markup).toContain("Everything you can open is in the menus.");
     expect(markup).not.toContain("data-card=");
     // The phone sheet has no sidebar, so it lists the card and shows no such line.
     const phone = renderToStaticMarkup(createElement(MoreLauncherPanel, { cards, isSystemAdmin: false, eventQuery: "?event=event_1", variant: "tab" }));
     expect(phone).toContain('data-card="registration-builder"');
-    expect(phone).not.toContain("Everything you can open is in the sidebar.");
+    expect(phone).not.toContain("Everything you can open is in the menus.");
   });
 
   it("drops footer links that are sidebar items on desktop by exact path, and keeps every footer link on the phone", () => {
     const links = [
       { key: "event-features", label: "Synthetic features", href: "/more/features?event=event_1" },
-      { key: "event-modules", label: "Event modules and activity", href: "/more?event=event_1" },
+      { key: "event-modules", label: "Event setup and activity", href: "/more?event=event_1" },
     ];
     expect(omitSidebarFooterLinks(links, new Set(["/more/features"])).map((link) => link.key)).toEqual(["event-modules"]);
     expect(omitSidebarFooterLinks(links, new Set(["/more/featuresx"])).map((link) => link.key)).toEqual(["event-features", "event-modules"]);
@@ -491,11 +493,26 @@ describe("launcher search and sidebar duplicates (#967)", () => {
     expect(render("tab")).toContain('data-footer="event-modules"');
   });
 
-  it("passes the drawn sidebar hrefs to the sidebar launcher only, never the phone tab", () => {
-    const source = readFileSync("components/app-shell.tsx", "utf8");
-    expect(source.match(/sidebarHrefs=/g)).toHaveLength(1);
-    const sidebarUse = source.indexOf("sidebarHrefs=");
-    expect(source.lastIndexOf('variant="sidebar"', sidebarUse)).toBeGreaterThan(source.lastIndexOf('variant="tab"', sidebarUse));
-    expect(source).toContain("must stay exactly what is drawn");
+  it("uses the launcher only as the phone More sheet, with This event first (#1565)", () => {
+    const shellSource = readFileSync("components/app-shell.tsx", "utf8");
+    expect(shellSource).not.toContain("<MoreLauncher");
+    expect(shellSource).not.toContain("sidebarHrefs");
+    const bar = readFileSync("components/staff-phone-bar.tsx", "utf8");
+    expect(bar).toContain('variant="tab"');
+    expect(bar).not.toContain('variant="sidebar"');
+    expect(bar).not.toContain("sidebarHrefs");
+    const sections = renderToStaticMarkup(createElement(MoreLauncherPanel, {
+      cards: [],
+      sections: [
+        { key: "this-event", label: "This event", items: [{ key: "home", label: "Event home", href: "/overview?event=event_1", current: true }] },
+        { key: "areas", label: "Areas", items: [{ key: "reports", label: "Reports", href: "/admin/analytics" }] },
+      ],
+      isSystemAdmin: false,
+      eventQuery: "?event=event_1",
+      variant: "tab",
+    }));
+    expect(sections.indexOf("This event")).toBeGreaterThan(-1);
+    expect(sections.indexOf("This event")).toBeLessThan(sections.indexOf("Areas"));
+    expect(sections).toContain('aria-current="true"');
   });
 });

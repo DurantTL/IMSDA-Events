@@ -13,26 +13,29 @@ import {
   type StaffRecordSortColumn,
   type StaffRecordsView,
 } from "@/modules/club-reports/staff-monthly-records-domain";
+import { withRecordFrom } from "@/modules/club-reports/record-return-domain";
 import styles from "./staff-monthly-records.module.css";
 
 type Props = {
   clubYear: string;
   view: StaffRecordsView;
   links: { clubHref: (id: string) => string; reportHref: (id: string, month: string) => string };
+  /** The club page this view was opened from (#1588): kept on the view's own month, filter and sort links so "Back to <club>" stays. */
+  fromClub?: string | null;
 };
 
 /** Staff Monthly Records (#1313): month picker, summary band, chart and the clubs table. Presentational; the numbers come from the domain module. */
-export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
+export function StaffMonthlyRecords({ clubYear, view, links, fromClub = null }: Props) {
   const here = (options: { month?: string; showAll?: boolean; expanded?: boolean; query?: string | null } = {}) =>
-    staffRecordsHref({
+    withRecordFrom(staffRecordsHref({
       clubYear, month: options.month ?? view.month,
       query: options.query === null ? undefined : options.query ?? view.query,
       showAll: options.showAll ?? view.showAllClubs, expanded: options.expanded ?? false, order: view.order,
-    });
-  const sortLink = (column: StaffRecordSortColumn) => `${sortHref("/admin/clubs/summary", {
+    }), fromClub);
+  const sortLink = (column: StaffRecordSortColumn) => withRecordFrom(`${sortHref("/admin/clubs/summary", {
     year: clubYear, view: "records", month: view.month, q: view.query || undefined,
     show: view.showAllClubs ? "all" : undefined, all: view.expanded ? "1" : undefined,
-  }, column, view.order)}#monthly-records`;
+  }, column, view.order)}#monthly-records`, fromClub);
   const sortedBy = view.order.key ? { club: "club name", record: `${view.monthLabel} record`, points: "points" }[view.order.key] : null;
   const filtered = view.query !== "" || !view.showAllClubs;
   return (
@@ -88,7 +91,7 @@ export function StaffMonthlyRecords({ clubYear, view, links }: Props) {
           <p className={styles.empty}>
             {view.query && !view.showAllClubs && view.totalClubs > 0 ? <>No clubs that need attention match this search. <Link href={here({ showAll: true })} prefetch={false}>Search all clubs for “{view.query}”</Link>.</> : view.totalClubs === 0 ? "No active clubs for this club year."
               : view.query ? "No clubs match this search. Try another club or church name."
-              : `Nothing needs attention for ${view.monthLabel}. Every record is reviewed or not yet due.`}
+              : <>{`Nothing needs attention for ${view.monthLabel}. Every record is reviewed or not yet due.`} <Link href={here({ showAll: true })} prefetch={false}>Show all clubs</Link>.</>}
           </p>
         ) : (
           <>

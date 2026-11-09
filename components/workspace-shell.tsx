@@ -15,6 +15,7 @@ import { eventsNeedingModuleState } from "@/modules/event-modules/shell-scope";
 import { countEventsAdminWaiting } from "@/modules/events/events-admin-home-repository";
 import { loadWorkspaceEventContext } from "@/modules/events/selection";
 import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
+import { attentionTotalIsComplete } from "@/modules/system-admin/attention-model";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { canManageSiteContent } from "@/modules/access/site-content-editor";
@@ -47,7 +48,7 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
   // Club forms (#610): one answer per user, from the same helper `resolveStaffViewer`
   // uses (system admin, or EVENT_ADMIN of any event that has not ended).
   // The admin role switcher (#1225): the roles held (read from the database now, so a revoke applies at once) and what is
-  // waiting in each. The counts are for the pills only; a count that cannot be read is left off, never shown as zero.
+  // waiting in each. The counts are for the pills and the Home tab's Needs you count (#1568); a count that cannot be read is left off, never shown as zero.
   const adminRoleView = await resolveAdminRoleView(user);
   // A Site content editor who is not a system administrator reaches Homepage & site content from the sidebar (#111).
   const siteContentEditor = !isSystemAdmin && (await canManageSiteContent(user));
@@ -69,7 +70,10 @@ export async function WorkspaceShell({ anyStaffWithoutEvents = false, children }
       ? countWaitingNewClubApplications(isSystemAdmin ? "SYSTEM_ADMIN" : "CLUBS_ADMIN").then((count) => { adminRoleCounts.CLUBS_ADMIN = count; }).catch(() => undefined)
       : undefined,
     isSystemAdmin
-      ? getAdminAttentionSummary().then((summary) => { adminRoleCounts.SYSTEM_ADMIN = summary.total; }).catch(() => undefined)
+      ? getAdminAttentionSummary().then((summary) => {
+        // A summary with an unreadable alert check understates the total, so the pill and the Home tab's count are left off; an unreadable review-only list is not in the total (#1568).
+        if (attentionTotalIsComplete(summary)) adminRoleCounts.SYSTEM_ADMIN = summary.total;
+      }).catch(() => undefined)
       : undefined,
   ]);
   const shellEvents = events.map((event) => ({

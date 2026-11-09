@@ -26,7 +26,7 @@ const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? 
 const when = (iso: string | null) => (iso ? formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" }) : "");
 
 
-export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canManageMoney, canConfigure, canUpdateFacility }: {
+export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canManageMoney, canConfigure, canUpdateFacility, canOpenDesk }: {
   eventId: string;
   eventName: string;
   report: CloseoutReport;
@@ -34,6 +34,8 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
   canManageMoney: boolean;
   canConfigure: boolean;
   canUpdateFacility: boolean;
+  /** The issue desk (/check-in/assets) needs MANAGE_CHECK_IN; without it a holder is plain text (#1735). */
+  canOpenDesk: boolean;
 }) {
   const router = useRouter();
   const base = `/api/events/${encodeURIComponent(eventId)}/assets`;
@@ -60,7 +62,7 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     finally { setBusy(false); }
   }
 
-  const deskHref = (attendeeId: string | null) => (attendeeId ? `/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(attendeeId)}` : null);
+  const deskHref = (attendeeId: string | null) => (canOpenDesk && attendeeId ? `/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(attendeeId)}` : null);
   const holder = (row: { holderLabel: string; deskAttendeeId: string | null }) => { const href = deskHref(row.deskAttendeeId); return href ? <a href={href}>{row.holderLabel}</a> : <>{row.holderLabel}</>; };
   const download = (section: string) => <p><ExportLink className="secondary-button report-download" href={csv(section)}>Download CSV</ExportLink></p>;
   const ctx: TableContext = { holder, download, canManageMoney, busy, post };
@@ -191,7 +193,7 @@ function ExceptionsTable({ ctx, rows }: { ctx: TableContext; rows: ExceptionRow[
 
 /** A short fixed list (one row per asset kind, a reconciliation tally), so not sortable (#1458). */
 function TypesTable({ rows }: { rows: TypeReconciliation[] }) {
-  return <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-tablet">
+  return <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-wide">
     <caption className="sr-only">Units issued, returned, lost, damaged and still out, by kind</caption>
     <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">Went out</th><th role="columnheader" scope="col">Returned</th><th role="columnheader" scope="col">Lost</th><th role="columnheader" scope="col">Damaged</th><th role="columnheader" scope="col">Withdrawn in error</th><th role="columnheader" scope="col">Replaced, unaccounted</th><th role="columnheader" scope="col">Still out</th><th role="columnheader" scope="col">Reconciles</th></tr></thead>
     <tbody role="rowgroup">{rows.map((row) => <tr role="row" key={row.typeId}>

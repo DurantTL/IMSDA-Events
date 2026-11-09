@@ -26,9 +26,10 @@ export const areaClubsNavItems: AccountNavItem[] = coordinatorNavItems();
 
 /**
  * The Area Coordinator's task tabs (#657, #1555): the club portal's own tab strip (`ClubPortalNav`), so both portals
- * look the same: a full-width white row, left-aligned, a purple underline on the current tab, and on a phone a row
- * that scrolls sideways with no arrow buttons. Active matching (`alsoMatchPrefix`) is the shared one.
+ * look the same: a full-width white row, left-aligned, a purple underline on the current tab. When the row does not fit
+ * (below 1024px, or too many tabs) it becomes the menu line with a "Coordinator menu" button (#1641); it never scrolls
+ * sideways. Active matching (`alsoMatchPrefix`) is the shared one.
  */
 export function AreaClubsSubNav({ items = areaClubsNavItems }: { items?: AccountNavItem[] }) {
-  return <ClubPortalNav items={items} label="Club coordination" />;
+  return <ClubPortalNav items={items} label="Club coordination" menuLabel="Coordinator menu" />;
 }

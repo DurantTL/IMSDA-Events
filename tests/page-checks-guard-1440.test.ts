@@ -145,19 +145,18 @@ describe("C4: a fixed bar must not cover text", () => {
    */
   const reviewed: Record<string, string> = {
     ".skip-link": "overlay: skip link, only visible on focus",
-    ".sidebar": "shell: the staff sidebar column",
     ".modal-backdrop": "overlay: dialog backdrop covers the page on purpose",
     ".mobile-nav": "bar: phone bottom navigation, links only; the audit watches it",
     ".searchable-select-picker": "overlay: open option list, closes on selection",
     ".team-more-menu-list": "overlay: open menu",
-    ".sidebar-tooltip": "overlay: hover tooltip, no controls",
     ".more-launcher": "overlay: phone More sheet",
     ".more-launcher-scrim": "overlay: sheet backdrop",
     ".back-to-top-button": "bar: one 44px corner button; the audit's back-to-top check proves it sits on no other control",
     ".public-registration-attendee.is-sheet": "overlay: phone attendee sheet",
     ".event-gallery-backdrop": "overlay: gallery backdrop",
-    ".system-menu-scrim": "overlay: menu backdrop",
-    ".system-menu": "overlay: open menu",
+    ".phoneBar": "bar: the club portal's phone bottom navigation, links only (More is a link trigger); the audit watches it (club-portal-nav.module.css)",
+    ".scrim": "overlay: the menu line's dialog backdrop (staff-shell and club-portal-nav modules)",
+    ".dialog": "overlay: the menu line's dialog, a sheet on a phone (staff-shell and club-portal-nav modules)",
     '.fb-shell[data-inspector="open"] .fb-sidebar': "overlay: builder inspector takes the whole phone screen",
     ".fb-phone-sheet": "overlay: builder phone sheet",
   };

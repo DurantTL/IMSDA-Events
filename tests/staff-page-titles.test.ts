@@ -15,7 +15,7 @@ const pageFile = (path: string) => join(root, "app/(workspace)", path, "page.tsx
 describe("staff page names (#685)", () => {
   it("uses one name per section in the navigation", () => {
     const labelByHref = Object.fromEntries(navigation.map((item) => [item.href, item.label]));
-    expect(labelByHref["/overview"]).toBe("Dashboard");
+    expect(labelByHref["/overview"]).toBe("Event home");
     expect(labelByHref["/people"]).toBe("Registrations");
     expect(labelByHref["/finance"]).toBe("Payments");
     expect(labelByHref["/more/promo-codes"]).toBe("Promo codes");
@@ -32,7 +32,7 @@ describe("staff page names (#685)", () => {
     expect(byHref["/more/promo-codes"]).toBe(titles.promoCodes);
     // The sidebar's own items, as the target names them.
     expect(navigation.filter((item) => item.sidebar).map((item) => item.label)).toEqual([
-      "Dashboard", "Kitchen counts", "Check-in", "Registrations", "Payments", "Emails",
+      "Event home", "Kitchen counts", "Check-in", "Registrations", "Payments", "Emails",
       "Event settings", "Registration forms", "Attendee setup", "Tags",
       "Operational reports", "Operational health",
     ]);
@@ -44,7 +44,7 @@ describe("staff page names (#685)", () => {
     for (const href of mobileNavigationOrder) {
       expect(navigation.find((item) => item.href === href)?.label).toBeTruthy();
     }
-    expect(navigation.find((item) => item.href === "/overview")?.label).toBe("Dashboard");
+    expect(navigation.find((item) => item.href === "/overview")?.label).toBe("Event home");
     expect(navigation.find((item) => item.href === "/people")?.label).toBe("Registrations");
     expect(navigation.every((item) => !("mobileLabel" in item))).toBe(true);
   });
@@ -58,6 +58,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/reports/clubs/check-in-book")).toBe("Check-in book");
     expect(staffSubpageTitle("/more/reports/clubs/packet/org_1")).toBe("Club packet");
     expect(staffSubpageTitle("/more/reports/packets")).toBe("Grouped event packets");
+    expect(staffSubpageTitle("/more/reports/printouts")).toBe("Printouts");
     expect(staffSubpageTitle("/more/clubs")).toBe("Clubs");
     expect(staffSubpageTitle("/more/clubs/org_1")).toBe("Club");
     expect(staffSubpageTitle("/more/clubs/reports")).toBe("Review monthly records");
@@ -71,8 +72,8 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/lodging/assignments")).toBe("Lodging assignments");
     expect(staffSubpageTitle("/more/issued-assets")).toBe("Issued assets");
     expect(staffSubpageTitle("/more/program-assignments/run_1")).toBe("Assignment roster");
-    // /more is the Event modules page (#810): its header names it, while the tab keeps "More".
-    expect(staffSubpageTitle("/more")).toBe("Event modules");
+    // /more is the Event setup page (#1586, was Event modules #810): its header names it.
+    expect(staffSubpageTitle("/more")).toBe("Event setup");
     // The Event features page (#965) is its own page under /more.
     expect(staffSubpageTitle("/more/features")).toBe("Event features");
     expect(staffSubpageTitle("/people")).toBeNull();
@@ -119,23 +120,25 @@ describe("staff page names (#685)", () => {
     const pages: Record<string, string> = {
       overview: "overview", registrations: "people", attendeeList: "people/attendees", kitchenReport: "more/kitchen-report", kitchenCounts: "more/kitchen-report/counts", mealCloseout: "more/kitchen-report/closeout", payments: "finance", registrationForm: "registration-builder",
       emails: "communications", team: "staff", imports: "imports", systemManagement: "admin", checkIn: "check-in",
-      more: "more", eventModules: "more", eventFeatures: "more/features", honors: "more/honors", honorsRosters: "more/honors/rosters", honorsSchedule: "more/honors/schedule", honorsInstructors: "more/honors/instructors", promoCodes: "more/promo-codes",
+      more: "more", eventSetup: "more", eventFeatures: "more/features", honors: "more/honors", honorsRosters: "more/honors/rosters", honorsSchedule: "more/honors/schedule", honorsInstructors: "more/honors/instructors", promoCodes: "more/promo-codes",
       attendeeSetup: "more/attendee-configuration", tags: "more/tags", eventSettings: "more/event-settings",
       clubPacket: "more/reports/clubs/packet/[organizationId]", checkInBook: "more/reports/clubs/check-in-book",
-      clubReports: "more/reports/clubs", groupedPackets: "more/reports/packets", operationalReports: "more/reports",
+      clubReports: "more/reports/clubs", groupedPackets: "more/reports/packets", printouts: "more/reports/printouts", operationalReports: "more/reports",
       clubMonthlyReport: "more/clubs/reports/[organizationId]/[month]", clubMonthlyReports: "more/clubs/reports",
       clubs: "more/clubs", clubTeachers: "more/club-teachers", eventScoring: "more/event-scoring", attendancePoints: "more/attendance-points", club: "more/clubs/[organizationId]", clubForm: "more/club-forms/[submissionId]",
       clubForms: "more/club-forms", eventHealth: "more/event-health", clubAssignments: "more/club-assignments", eventContent: "more/event-content",
       eventPatches: "more/event-patches", emergencyPlan: "more/emergency-plan", operationalHealth: "more/health", merchandise: "more/merchandise", lodging: "more/lodging", meals: "more/meals", lodgingRequests: "more/lodging/requests", lodgingAssignments: "more/lodging/assignments", issuedAssets: "more/issued-assets", scheduledEmails: "communications/scheduled", ledgerCheck: "more/ledger-health",
       assignmentRoster: "more/program-assignments/[runId]", programAssignments: "more/program-assignments",
       teamResults: "more/team-results", teamForm: "more/reports/clubs/team-form", formResponses: "information-forms/responses",
+      reviewQueues: "people/review-queues", moreMoneyTools: "finance/tools", invoices: "finance/invoices", churchOwed: "finance/church-owed", billingResponsibility: "finance/billing-responsibility", scholarshipFund: "finance/scholarship-fund",
+      squarePayments: "finance/square-payments", attendanceReconciliation: "finance/attendance-reconciliation", cancellationPolicy: "finance/cancellation-policy", cancellationRequests: "finance/cancellation-requests",
     };
     expect(Object.keys(pages).sort()).toEqual(Object.keys(staffPageTitles).sort());
     for (const [key, path] of Object.entries(pages)) {
       const file = pageFile(path);
       expect(existsSync(file), file).toBe(true);
-      // "more" is the nav label; the /more page itself is titled eventModules.
-      expect(readFileSync(file, "utf8"), file).toContain(`title: staffPageTitles.${key === "more" ? "eventModules" : key}`);
+      // "more" is the nav label; the /more page itself is titled eventSetup.
+      expect(readFileSync(file, "utf8"), file).toContain(`title: staffPageTitles.${key === "more" ? "eventSetup" : key}`);
     }
   });
 });
