@@ -79,7 +79,7 @@ describe("More money tools loaders (#1575)", () => {
     expect(logError).toHaveBeenCalledTimes(3);
   });
 
-  it("reads one Square page at most and gives up after a few seconds, so the card never holds the page up (#1747)", async () => {
+  it("gives up on the Square list after a few seconds, so the card never holds the page up (#1747)", async () => {
     vi.useFakeTimers();
     try {
       listUnmatchedSquarePayments.mockReturnValue(new Promise(() => {}));
@@ -88,7 +88,8 @@ describe("More money tools loaders (#1575)", () => {
       const values = await pending;
       expect(values.unmatchedSquare).toBeNull();
       expect(values.churchFlags).toBe(1);
-      expect(listUnmatchedSquarePayments).toHaveBeenCalledWith({ maxPages: 1 });
+      // The whole list the Square page reads, so "OK" never stands for payments it did not read.
+      expect(listUnmatchedSquarePayments).toHaveBeenCalledWith();
     } finally {
       vi.useRealTimers();
     }

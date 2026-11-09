@@ -68,10 +68,11 @@ const readers: Record<MoneyMetricKey, (context: Context) => Promise<number>> = {
   // The pages' own test for "This event is not billed to organizations" (billing mode is not deferred organization invoicing).
   billedToOrganizations: async (context) => ((await billing(context)).isDeferred ? 1 : 0),
   attendanceApproved: async ({ eventId }) => ((await hasApprovedReconciliation(eventId)) ? 1 : 0),
-  // The Unmatched Square payments page's own list, bounded (#1747): one Square page, and no more than a few seconds, so this
-  // card can never hold up the page. Not configured, unreachable or too slow throws, so the card says "Unavailable", never "None waiting".
+  // The Unmatched Square payments page's own list, the whole of it (#1747), so "OK" never stands for payments it did not read.
+  // It gets a few seconds at most, so this card can never hold up the page: not configured, unreachable or too slow throws,
+  // and the card says "Unavailable", never "OK".
   unmatchedSquare: () => withTimeout(async () => {
-    const { findings, unreachableSquare } = await listUnmatchedSquarePayments({ maxPages: 1 });
+    const { findings, unreachableSquare } = await listUnmatchedSquarePayments();
     if (unreachableSquare) throw new Error("Square could not be reached");
     return findings.length;
   }, squareTimeoutMs),
