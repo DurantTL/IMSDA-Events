@@ -24,6 +24,9 @@
 /* The matches open over the page, not in the header's flow: an open list grew the header by hundreds of pixels and moved the page under the pointer. */
 .search :global(.destination-search-list) { position: absolute; z-index: 40; top: 100%; right: 0; left: 0; max-height: min(60dvh, 26rem); margin-top: 6px; box-shadow: 0 12px 28px rgba(0, 43, 69, 0.18); }
 .search :global(.destination-search-empty) { position: absolute; z-index: 40; top: 100%; right: 0; left: 0; margin: 6px 0 0; border: 1px solid var(--line); border-radius: var(--field-radius); background: var(--card); padding: 10px 12px; box-shadow: 0 12px 28px rgba(0, 43, 69, 0.18); }
+.searchToggle { display: none; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 10px; background: var(--secondary-bg, #f9fbfb); color: var(--imsda-navy); padding: 0; cursor: pointer; }
+.searchToggle:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
+.searchToggle[aria-expanded="true"] { box-shadow: inset 0 -4px var(--imsda-gold); }
 .topActions { display: flex; min-width: 0; align-items: center; gap: 8px; margin-left: auto; }
 .topLink {
   display: inline-flex;
@@ -104,7 +107,9 @@
   font-weight: 700;
 }
 .pickerShell svg { position: absolute; right: 10px; pointer-events: none; }
-.archivedLink { display: inline-flex; min-height: 44px; align-items: center; color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.pickerPhoneLabel { display: none; }
+.archivedLink { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; gap: 6px; color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.archivedIcon { display: none; }
 
 /* ---------- the one row of tabs, and its menu line ---------- */
 .tabline { position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 8px; border-bottom: 1px solid var(--line); }
@@ -166,12 +171,8 @@
 .menuline .menuButton { width: auto; flex: none; }
 .menuButton:focus-visible { outline: 3px solid var(--imsda-purple); outline-offset: 2px; }
 
-/* Below 1024px, or when the row would not fit (the script sets data-fit="tight"), the row is the menu line. The tabs stay
-   in the page, hidden but still measurable, so the row can come back when there is room. Nothing scrolls sideways. */
-@media (max-width: 1023.98px) {
-  .tabs { display: none; }
-  .menuline { display: flex; }
-}
+/* Only when the row would not fit (the script sets data-fit="tight"), at any width, the row is the menu line (#1734). The tabs
+   stay in the page, hidden but still measurable, so the row can come back when there is room. Nothing scrolls sideways. */
 .tabline[data-fit="tight"] .tabs { position: absolute; left: 0; height: 0; visibility: hidden; pointer-events: none; }
 .tabline[data-fit="tight"] .menuline { display: flex; }
 
@@ -286,12 +287,31 @@
 @media (max-width: 800px) {
   .topbar { min-height: 56px; gap: 8px; padding: 6px 16px; }
   .brandText { display: none; }
+  /* On a phone the search icon button opens the same search on its own row under the header (#1734). */
+  .topbar { flex-wrap: wrap; }
   .search { display: none; }
+  .search[data-open="true"] { display: block; order: 10; flex: 1 1 100%; max-width: none; margin: 0 0 4px; }
+  /* An icon button in the header row beside help, alerts and the account; the global phone rule makes .secondary-button full width, so the size is pinned here. */
+  .topbar .searchToggle { display: inline-flex; flex: none; width: 44px; margin-left: auto; }
+  .topActions { margin-left: 0; }
   .rail { display: none; }
   .page { padding: 0 16px 35px; }
   .topLink span { display: none; }
   .topLink { min-width: 44px; justify-content: center; padding: 0; }
-  .eventTools { margin-left: 0; width: 100%; }
+  /* The event's name and "Switch event" share one row (#1734). The select keeps the tap but shows the label, not the name again. */
+  .eventBar { flex-wrap: wrap; gap: 0 8px; padding-top: 8px; }
+  .eventBar .crumb { flex: none; }
+  /* The name keeps room for its words (never broken mid-word); the switcher drops to its own line only when the name cannot fit beside it. */
+  .eventName { flex: 1 1 7rem; min-width: 7rem; font-size: 1.05rem; line-height: 1.2; overflow-wrap: break-word; word-break: normal; }
+  .eventTools { flex: none; margin-left: auto; width: auto; }
+  .pickerShell select { max-width: none; color: transparent; padding-right: 34px; }
+  .pickerShell select option { color: var(--ink); }
+  .pickerShell .pickerPhoneLabel { position: absolute; left: 12px; display: block; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; pointer-events: none; white-space: nowrap; }
+  .pickerShell select { width: 6.25rem; }
+  /* On a phone Archived events is a 44px icon link beside the switcher (named by its aria-label), so the row stays one row. */
+  .eventTools { gap: 0; }
+  .archivedText { display: none; }
+  .archivedIcon { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -3955,8 +3955,8 @@ async function waitForShell(page: Page) {
 
 /** The #996 rules: squeezed text, an action bar over text when the page opens (scroll 0), and the loading screen. */
 /**
- * The staff shell's one row of tabs (#1565): it shows either the tabs or the menu line, never both and never neither; below
- * 1024px it is always the menu line; the tabs never run past their line and never scroll sideways; and the menu button
+ * The staff shell's one row of tabs (#1565): it shows either the tabs or the menu line, never both and never neither; it is the menu
+ * line only when the tabs would not fit, at any width (#1734); the tabs never run past their line and never scroll sideways; and the menu button
  * stays inside the window. Runs in the page.
  */
 function staffTabRowInPage(): string[] {
@@ -3970,7 +3970,9 @@ function staffTabRowInPage(): string[] {
     const menuShown = getComputedStyle(menu).display !== "none";
     if (tabsShown && menuShown) problems.push("the tabs and the menu line both show");
     if (!tabsShown && !menuShown) problems.push("neither the tabs nor the menu line show");
-    if (window.innerWidth < 1024 && tabsShown) problems.push(`the tab row shows below 1024px (${window.innerWidth}px)`);
+    // #1734: a row collapses to the menu line only when it would not fit, at every width: never just because the screen is narrow.
+    const hiddenList = tabs.querySelector<HTMLElement>("ul");
+    if (menuShown && hiddenList && hiddenList.getBoundingClientRect().width > 0 && hiddenList.getBoundingClientRect().width <= line.clientWidth) problems.push(`the tab row became the menu line at ${window.innerWidth}px though its ${Math.round(hiddenList.getBoundingClientRect().width)}px fits in ${line.clientWidth}px`);
     if (tabsShown) {
       const list = tabs.querySelector<HTMLElement>("ul");
       if (list && list.getBoundingClientRect().width > line.clientWidth + 1) problems.push(`the tab row is ${Math.round(list.getBoundingClientRect().width)}px in a ${line.clientWidth}px line`);
@@ -3982,6 +3984,30 @@ function staffTabRowInPage(): string[] {
       if (!button || !box || box.right > window.innerWidth + 1 || box.left < -1) problems.push("the menu button is outside the window");
       else if (!/ menu/i.test(button.textContent ?? "")) problems.push(`the menu button is named "${(button.textContent ?? "").trim()}", not "<Area> menu" or "Event menu"`);
     }
+  }
+  return problems;
+}
+
+/**
+ * The phone header's search (#1734), at 800px and narrower: a search icon button of at least 44px with the name "Find a page or
+ * task" opens the same search, and on Check-in at 390px the page's own search box is in the first screen (its top above the
+ * 844px viewport's bottom, and above the phone bar). Runs in the page.
+ */
+function phoneHeaderSearchInPage(): string[] {
+  const problems: string[] = [];
+  if (window.innerWidth > 800) return problems;
+  const toggle = Array.from(document.querySelectorAll<HTMLElement>("header button[aria-label='Find a page or task']")).find((el) => el.getBoundingClientRect().width > 0);
+  if (document.getElementById("destination-search-input")) {
+    if (!toggle) problems.push("the phone header has no search icon button named \"Find a page or task\"");
+    else {
+      const box = toggle.getBoundingClientRect();
+      if (box.width < 43.5 || box.height < 43.5) problems.push(`the phone header search button is ${Math.round(box.width)}x${Math.round(box.height)}px`);
+    }
+  }
+  if (location.pathname === "/check-in" && window.innerWidth === 390) {
+    const field = Array.from(document.querySelectorAll<HTMLInputElement>("main input")).find((el) => /Search name, club, or confirmation code/i.test(el.placeholder) && el.getBoundingClientRect().width > 0);
+    if (!field) problems.push("Check-in has no visible attendee search box");
+    else if (field.getBoundingClientRect().top > 560) problems.push(`on Check-in the search box starts ${Math.round(field.getBoundingClientRect().top)}px down, not in the first screen (limit 560px)`);
   }
   return problems;
 }
@@ -4054,6 +4080,7 @@ async function auditSqueezeAndBars(page: Page, name: string, width: number) {
   for (const problem of await page.evaluate(squeezedTextInPage)) record("squeezed-text", name, width, problem);
   for (const problem of await page.evaluate(barOverTextInPage)) record("bar-over-text", name, width, problem);
   for (const problem of await page.evaluate(staffTabRowInPage)) record("staff-tab-row", name, width, problem);
+  for (const problem of await page.evaluate(phoneHeaderSearchInPage)) record("phone-header-search", name, width, problem);
   for (const problem of await page.evaluate(portalTabRowInPage)) record("portal-tab-row", name, width, problem);
 }
 

@@ -6,12 +6,12 @@ import { StaffViewerProvider } from "@/components/staff-viewer-context";
 import type { HelpViewer } from "@/modules/help/visibility";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, LifeBuoy } from "lucide-react";
+import { Archive, ChevronDown, LifeBuoy } from "lucide-react";
 import { EventAutoSelectNotice } from "@/components/event-auto-select-notice";
 import { rememberLastUsedEvent } from "@/components/remember-last-event";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
 import { ClubsYearSelector } from "@/components/clubs-year-selector";
-import { DestinationSearch } from "@/components/destination-search";
+import { StaffHeaderSearch } from "@/components/staff-header-search";
 import { GuardedLink } from "@/components/guarded-link";
 import { WorkspaceContent, workspacePageKey } from "@/components/workspace-content";
 import { moduleDestinationStates } from "@/components/module-destination-states";
@@ -282,8 +282,16 @@ export function AppShell({
         {!selectedEventId && <option value="" disabled>Choose an event</option>}
         {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
       </select>
+      {/* On a phone the select shows this short label (the select's own name stays "Switch event"), not the event's name again; the select still takes the tap. */}
+      <span className={styles.pickerPhoneLabel} aria-hidden="true">Switch</span>
       <ChevronDown aria-hidden="true" size={16} />
     </span>
+  );
+  // Archived events sits with the switcher (#1734): a link, not a select option, so arrowing through the choices never navigates away.
+  const archivedLink = (
+    <GuardedLink className={styles.archivedLink} href="/archived-events" aria-label="Archived events">
+      <Archive aria-hidden="true" size={18} className={styles.archivedIcon} /><span className={styles.archivedText}>Archived events</span>
+    </GuardedLink>
   );
   const openPicker = pickerEvents.length > 0 && place.area === "events" && !place.inEvent ? (
     <span className={styles.pickerShell}>
@@ -301,9 +309,7 @@ export function AppShell({
       <StaffKeyboardWatch />
       <header className={styles.topbar} data-shell-region>
         <BrandLink guarded className={styles.brand} wordmark={<span className={styles.brandText}><strong>{PRODUCT_NAME}</strong><small>Events</small></span>} />
-        <div className={styles.search}>
-          <DestinationSearch destinations={searchDestinations} inputId={destinationSearchInputId} />
-        </div>
+        <StaffHeaderSearch destinations={searchDestinations} inputId={destinationSearchInputId} />
         <div className={styles.topActions}>
           <GuardedLink className={styles.topLink} href={withCurrentEvent("/help", selectedEventId)} aria-label={helpPageTitle} aria-current={isHelpRoute ? "page" : undefined}>
             <LifeBuoy aria-hidden="true" size={18} /><span>{helpPageTitle}</span>
@@ -328,7 +334,7 @@ export function AppShell({
               <span className={styles.eventName}>{selectedEvent.name}</span>
               <div className={styles.eventTools}>
                 <span className={styles.picker}>{picker}</span>
-                <GuardedLink className={styles.archivedLink} href="/archived-events">Archived events</GuardedLink>
+                {archivedLink}
               </div>
             </div>
           )}
