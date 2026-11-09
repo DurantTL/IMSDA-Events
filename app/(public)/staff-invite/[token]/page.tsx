@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { BackToEventsLink } from "@/components/back-to-events-link";
 import { BrandLink } from "@/components/brand-link";
 import { StaffInvitationRegistration } from "@/components/staff-invitation-registration";
-import { INVITATION_EXPIRED_MESSAGE, INVITATION_UNAVAILABLE_MESSAGE } from "@/modules/staff-invitations/domain";
+import { INVITATION_UNAVAILABLE_MESSAGE } from "@/modules/staff-invitations/domain";
 import { getInvitationExperience } from "@/modules/staff-invitations/repository";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,7 @@ export default async function StaffInvitePage({ params }: PageProps) {
   if (experience.state === "EXPIRED") {
     return (
       <StateCard eyebrow={experience.event.name} heading="This link has expired">
-        <p>{INVITATION_EXPIRED_MESSAGE}</p>
+        <p>Ask the event office for a new invitation.</p>
         {experience.event.supportContact && <p>Event office: {experience.event.supportContact}</p>}
       </StateCard>
     );

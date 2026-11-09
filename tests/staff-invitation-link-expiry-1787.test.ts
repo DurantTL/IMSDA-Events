@@ -18,7 +18,7 @@ type Row = {
   supersededAt: Date | null;
 };
 
-const state = vi.hoisted(() => ({ rows: [] as unknown[], messages: [] as unknown[] }));
+const state = vi.hoisted(() => ({ rows: [] as unknown[], messages: [] as unknown[], staleReads: [] as Date[] }));
 
 const event = {
   id: "event-1", slug: "synthetic-event", name: "Synthetic Event", startsAt: new Date("2027-03-01T15:00:00Z"), endsAt: new Date("2027-03-03T15:00:00Z"),
@@ -49,7 +49,9 @@ const fake = {
   staffInvitation: {
     findUnique: async ({ where }: { where: { id: string } }) => {
       const row = rows().find((entry) => entry.id === where.id);
-      return row ? { ...row, event } : null;
+      // A test can queue earlier window starts for the next reads, as if another change landed between the reads.
+      const queued = state.staleReads.shift();
+      return row ? { ...row, ...(queued ? { linkIssuedAt: queued } : {}), event } : null;
     },
     findFirst: async ({ where }: { where: Record<string, unknown> }) => rows().find((row) => matches(row, where)) ?? null,
     findMany: async ({ where }: { where: Record<string, unknown> }) => rows().filter((row) => matches(row, where)),
@@ -119,6 +121,7 @@ beforeEach(() => {
   vi.setSystemTime(at(0));
   state.rows = [makeRow()];
   state.messages = [];
+  state.staleReads = [];
 });
 
 afterEach(() => {
@@ -177,6 +180,15 @@ describe("opening and submitting through a link (#1787)", () => {
     row.revokedAt = null;
     row.supersededAt = issued;
     expect(await getInvitationExperience(token, at(30))).toEqual({ state: "UNAVAILABLE" });
+  });
+
+  it("re-checks expiry inside the submit transaction", async () => {
+    const token = tokenOf(makeRow());
+    // The first read (before the transaction) sees a fresh window; the one inside it sees the window had run out.
+    state.staleReads = [at(10), issued];
+    const error = await submitInvitationRegistration(token, { firstName: "Ada", lastName: "Synthetic" }, at(14)).catch((caught: unknown) => caught);
+    expect((error as StaffInvitationError).code).toBe("INVITATION_EXPIRED");
+    expect(rows()[0]!.registeredAt).toBeNull();
   });
 
   it("refuses a submission through an expired link with INVITATION_EXPIRED (410)", async () => {

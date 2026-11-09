@@ -42,7 +42,7 @@ registrations that come back wait for the office to approve them in one batch. T
 - Each invitation email carries that person's personal link in its body in the outbox (the same as club invites do with their
   sign-up link). The link is a bearer link, and the exposure is limited: it allows one registration, which waits for the office,
   and the office can reissue it (every earlier copy stops working) or revoke it.
-- The invite list shows Not sent, Sent, Delivery failed (from the message's own status), Registered (waiting), Approved, Declined
+- The invite list shows Not sent, Sent, Delivery failed (from the message's own status), Registered (waiting), Approved, Declined,
   Link expired and Revoked.
 
 **Registering through a link** (public, no account)
