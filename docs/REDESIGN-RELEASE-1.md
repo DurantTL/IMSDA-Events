@@ -15,7 +15,7 @@ Evidence for merging the staff redesign branch `codex/neon-preview-setup` into `
 | Club director and Area Coordinator journeys, 1280 and 390 px, local | Pass |
 | Site rules (browser) on the journey pages | 0 failures (table below) |
 | Mobile layout audit, full (360, 390, 768, 1024) | Pass after one local-setup false alarm (see below) |
-| Mobile layout audit, eight-width set (adds 861, 980, 1180, 1280) | WIDTHS_RESULT |
+| Mobile layout audit, eight-width set (adds 861, 980, 1180, 1280) | Pass (980 page and width combinations at 861, 980, 1180, 1280, on the merged tip) |
 | Role crawl, 8 roles, about 710 pages | 3 dead ends found and fixed (#1752); nothing else open |
 | Database migrations on the branch | **None** (no change under `prisma/` versus main) |
 
@@ -143,7 +143,7 @@ The event journeys (attendee and event staff pages) and the club journeys (club 
 ### 3. Mobile layout audit
 
 - **Full run** (360, 390, 768, 1024 px): 976 page and width combinations, 1,601 dialogs, 6,343 form fields. The only finding was the public staff invitation form at all four widths ("does not show Register for"). The cause was my local setup: the app ran with CI's `MANAGE_LINK_DERIVATION_SECRET` while the audit script used the empty `.env` value, so the link the audit built was rejected. Re-run with matching secrets: **all mobile layout checks passed**.
-- **Eight-width set** (shared shell change): 360, 390, 768 and 1024 come from the full run above. The other four widths (861, 980, 1180, 1280) ran on the merged tip: WIDTHS_DETAIL
+- **Eight-width set** (shared shell change): 360, 390, 768 and 1024 come from the full run above. The other four widths (861, 980, 1180, 1280) ran on the merged tip: 980 page and width combinations, 1,313 dialogs and 6,027 form fields, with **all mobile layout checks passed** (0 findings, 0 page script errors).
 
 ### 4. Gaps (stated, not hidden)
 
