@@ -16,7 +16,7 @@ import { GuardedLink } from "@/components/guarded-link";
 import { WorkspaceContent, workspacePageKey } from "@/components/workspace-content";
 import { moduleDestinationStates } from "@/components/module-destination-states";
 import { buildSearchDestinations } from "@/components/destination-search-model";
-import { eventToRemember, resolveShellEvent, switchEvent } from "@/components/shell-event-selection";
+import { eventToRemember, refreshAfterRemember, resolveShellEvent, switchEvent } from "@/components/shell-event-selection";
 import { createEventHrefFor, isSystemWorkspacePath } from "@/components/system-navigation";
 import { isEventModuleKey } from "@/modules/event-modules/catalog";
 import { AdminAttentionBell } from "@/components/admin-attention-bell";
@@ -226,6 +226,14 @@ export function AppShell({
     shownPlaceNames: [eventBarShown ? selectedEvent?.name : null, place.inEvent ? selectedEvent?.name : staffAreaMeta[place.area].label],
   });
 
+  // Saves the event as the remembered one, then refreshes only a page that relies on it (#1745): a page whose address
+  // names its event is already right, and refreshing it can cancel a sort or filter the user just chose.
+  function rememberEvent(eventId: string) {
+    return rememberLastUsedEvent(eventId).then(() => {
+      if (refreshAfterRemember(window.location.search)) router.refresh();
+    });
+  }
+
   // An event named in the URL becomes the remembered selection (#616), so the
   // next page without `?event=` keeps it instead of falling back to the default.
   const lastRememberedId = useRef<string | null>(defaultEventId);
@@ -238,8 +246,7 @@ export function AppShell({
     });
     if (toRemember) {
       lastRememberedId.current = toRemember;
-      // Refresh once the cookie is set so the server default catches up.
-      void rememberLastUsedEvent(toRemember).then(() => router.refresh());
+      void rememberEvent(toRemember);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedEventId, knownEventIds]);
@@ -255,7 +262,8 @@ export function AppShell({
         // Remembered for the next sign-in (#108 queue 1); never blocks the switch.
         lastRememberedId.current = id;
         setSeenEventId(id);
-        void rememberLastUsedEvent(id).then(() => router.refresh());
+        // The switch goes to an address that names the event, so no refresh is needed (#1745).
+        void rememberLastUsedEvent(id);
       },
       push: (href) => router.push(href),
     });
@@ -266,7 +274,7 @@ export function AppShell({
     void guardedNavigate(() => {
       lastRememberedId.current = eventId;
       setSeenEventId(eventId);
-      void rememberLastUsedEvent(eventId).then(() => router.refresh());
+      void rememberLastUsedEvent(eventId);
       router.push(`/overview?event=${encodeURIComponent(eventId)}`);
     });
   }
