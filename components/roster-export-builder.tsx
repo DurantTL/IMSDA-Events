@@ -31,7 +31,14 @@ type FormatsResponse = { formats?: RosterExportFormatRecord[]; format?: RosterEx
 type ChosenColumn = { key: string; header: string };
 
 /** The Area Coordinator's use of this builder (#1760): pick clubs, GET preview and CSV, no renaming, no saved formats, nothing sensitive. */
-export type CoordinatorExportSetup = { clubs: { id: string; name: string }[]; initialClubIds: string[]; clubYear: string };
+export type CoordinatorExportSetup = {
+  clubs: { id: string; name: string }[];
+  initialClubIds: string[];
+  clubYear: string;
+  /** Start on "Pick clubs" with nothing chosen (a `?club=` that is not an available club). */
+  startPicking?: boolean;
+  notice?: string;
+};
 
 function withDefaultHeader(key: RosterExportColumnKey): RosterExportColumn {
   return { key, header: ROSTER_EXPORT_COLUMNS[key].header };
@@ -64,7 +71,7 @@ export function RosterExportBuilder({
     ? (isCoordinatorRosterExportColumnKey(key) ? coordinatorRosterExportHeader(key) : key)
     : ROSTER_EXPORT_COLUMNS[key as RosterExportColumnKey].header);
   const [clubChoice, setClubChoice] = useState<{ all: boolean; ids: string[] }>({
-    all: !coordinator || coordinator.initialClubIds.length === 0,
+    all: !coordinator || (!coordinator.startPicking && coordinator.initialClubIds.length === 0),
     ids: coordinator?.initialClubIds ?? [],
   });
   const [columns, setColumns] = useState<ChosenColumn[]>(
@@ -115,15 +122,14 @@ export function RosterExportBuilder({
 
   const noClubsChosen = Boolean(coordinator) && !clubChoice.all && clubChoice.ids.length === 0;
 
-  /** The coordinator route's query: ordered column keys, the clubs (or all) and the year. */
-  function coordinatorQuery(forPreview: boolean) {
-    const params = new URLSearchParams({
-      columns: columns.map((column) => column.key).join(","),
-      clubs: clubChoice.all ? "all" : clubChoice.ids.join(","),
-      year: coordinator?.clubYear ?? "",
+  /** The coordinator route's JSON body: ordered column keys, the clubs (or "all") and the year. */
+  function coordinatorBody(forPreview: boolean) {
+    return JSON.stringify({
+      columns: columns.map((column) => column.key),
+      clubs: clubChoice.all ? "all" : clubChoice.ids,
+      year: coordinator?.clubYear,
+      preview: forPreview,
     });
-    if (forPreview) params.set("preview", "1");
-    return `/api/attendee/area-clubs/roster-export?${params.toString()}`;
   }
 
   function moveColumn(index: number, delta: -1 | 1) {
@@ -148,7 +154,13 @@ export function RosterExportBuilder({
     setBusy(true);
     try {
       const response = coordinator
-        ? await fetch(coordinatorQuery(mode === "preview"), { credentials: "same-origin", cache: "no-store" })
+        ? await fetch("/api/attendee/area-clubs/roster-export", {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: coordinatorBody(mode === "preview"),
+        })
         : await fetch(base, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -234,6 +246,7 @@ export function RosterExportBuilder({
   }
 
   const blockedByBirthDateAccess = !coordinator && columns.some((column) => column.key === "birthDate") && !canSeeBirthDates;
+  const clubsHint = noClubsChosen ? "Choose at least one club, or All clubs, to preview or download." : null;
   const canRun = columns.length > 0 && !blockedByBirthDateAccess && (!needsConfirmation || confirmSensitive) && !noClubsChosen;
 
   return (
@@ -249,6 +262,7 @@ export function RosterExportBuilder({
         </p>
       )}
 
+      {coordinator?.notice && <p className="status-chip gold" role="status">{coordinator.notice}</p>}
       {coordinator && (
         <CoordinatorClubPicker
           allClubs={clubChoice.all}
@@ -365,11 +379,11 @@ export function RosterExportBuilder({
       {error && <p className="status-chip coral" role="alert">{error}</p>}
       {notice && <p className="status-chip green" role="status">{notice}</p>}
 
-      {noClubsChosen && <p className="field-help">Choose at least one club, or All clubs, to preview or download.</p>}
+      <DisabledHint id="roster-export-clubs-hint" reason={clubsHint} />
 
       <div className="form-actions">
-        <button className="secondary-button" disabled={busy || !canRun} onClick={() => request("preview")} type="button">Preview</button>
-        <button className="primary-button" disabled={busy || !canRun} onClick={() => request("csv")} type="button">Download CSV</button>
+        <button aria-describedby={disabledHintId(clubsHint, "roster-export-clubs-hint")} className="secondary-button" disabled={busy || !canRun} onClick={() => request("preview")} type="button">Preview</button>
+        <button aria-describedby={disabledHintId(clubsHint, "roster-export-clubs-hint")} className="primary-button" disabled={busy || !canRun} onClick={() => request("csv")} type="button">Download CSV</button>
       </div>
 
       {preview && (

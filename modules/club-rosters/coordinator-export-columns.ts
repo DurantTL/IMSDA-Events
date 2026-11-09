@@ -49,39 +49,32 @@ export function coordinatorRosterExportHeader(key: CoordinatorRosterExportColumn
 /** The most clubs one request may name (the whole conference is well under this). */
 export const COORDINATOR_ROSTER_EXPORT_MAX_CLUBS = 500;
 
-function listParam(values: string[]) {
-  return values.flatMap((value) => value.split(",")).map((value) => value.trim()).filter(Boolean);
-}
-
 /**
- * The route's query string, parsed: `columns` (ordered keys, comma separated or repeated), `clubs` (`all`, or ids),
- * `year` and `preview`. Anything outside the allow-list is a ZodError (a 400), never silently dropped.
+ * The route's JSON body, parsed: `columns` (ordered keys), `clubs` (`"all"`, or ids), `year` and `preview`. Anything
+ * outside the allow-list is a ZodError (a 400), never silently dropped. A POST body, not a query string (a download is
+ * audited, so it must never be a link another site can trigger).
  */
-export function parseCoordinatorRosterExportParams(params: URLSearchParams) {
-  const columns = listParam(params.getAll("columns"));
-  const clubs = listParam(params.getAll("clubs"));
-  return z.object({
-    columns: z.array(z.string())
-      .min(1, "Choose at least one column.")
-      .max(COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS.length, "Choose each column only once.")
-      .refine((keys) => new Set(keys).size === keys.length, { message: "Choose each column only once." })
-      .refine((keys) => keys.every(isCoordinatorRosterExportColumnKey), { message: "One of those columns is not available to Area Coordinators." }),
-    clubs: z.array(z.string().min(1).max(64))
-      .min(1, "Choose all clubs or at least one club.")
-      .max(COORDINATOR_ROSTER_EXPORT_MAX_CLUBS, "Too many clubs chosen."),
-    year: z.string().optional(),
-    preview: z.boolean(),
-  }).strict().transform((value) => ({
-    columns: value.columns as CoordinatorRosterExportColumnKey[],
-    clubs: value.clubs.length === 1 && value.clubs[0] === "all" ? ("all" as const) : [...new Set(value.clubs)],
-    year: value.year,
-    preview: value.preview,
-  })).parse({
-    columns,
-    clubs,
-    year: params.get("year") ?? undefined,
-    preview: params.get("preview") === "1",
-  });
+export const coordinatorRosterExportBodySchema = z.object({
+  columns: z.array(z.string())
+    .min(1, "Choose at least one column.")
+    .max(COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS.length, "Choose each column only once.")
+    .refine((keys) => new Set(keys).size === keys.length, { message: "Choose each column only once." })
+    .refine((keys) => keys.every(isCoordinatorRosterExportColumnKey), { message: "One of those columns is not available to Area Coordinators." }),
+  clubs: z.union([
+    z.literal("all"),
+    z.array(z.string().min(1).max(64)).min(1, "Choose all clubs or at least one club.").max(COORDINATOR_ROSTER_EXPORT_MAX_CLUBS, "Too many clubs chosen."),
+  ]),
+  year: z.string().max(16).optional(),
+  preview: z.boolean().default(false),
+}).strict().transform((value) => ({
+  columns: value.columns as CoordinatorRosterExportColumnKey[],
+  clubs: value.clubs === "all" ? ("all" as const) : [...new Set(value.clubs)],
+  year: value.year,
+  preview: value.preview,
+}));
+
+export function parseCoordinatorRosterExportBody(body: unknown) {
+  return coordinatorRosterExportBodySchema.parse(body);
 }
 
 export type CoordinatorRosterExportRow = {

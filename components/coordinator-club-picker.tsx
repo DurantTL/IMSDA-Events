@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Search } from "lucide-react";
+import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
+import { useClientSearch } from "@/components/search-as-you-type";
 import styles from "./coordinator-club-picker.module.css";
 
 /** The clubs whose name contains the typed text (any case). Empty text keeps every club (S1). */
@@ -25,8 +27,8 @@ export function CoordinatorClubPicker({
   selectedIds: string[];
   onChange: (next: { all: boolean; ids: string[] }) => void;
 }) {
-  const [filter, setFilter] = useState("");
-  const shown = filterPickerClubs(clubs, filter);
+  const search = useClientSearch();
+  const shown = filterPickerClubs(clubs, search.term);
   const selected = new Set(selectedIds);
 
   function toggle(id: string, checked: boolean) {
@@ -49,22 +51,28 @@ export function CoordinatorClubPicker({
       </label>
       {!allClubs && (
         <>
-          <label className={styles.filter} htmlFor="coordinator-club-filter">
-            Find a club
-            <input
-              autoComplete="off"
-              id="coordinator-club-filter"
-              onChange={(event) => setFilter(event.target.value)}
-              placeholder="Club name"
-              type="text"
-              value={filter}
-            />
-          </label>
+          <div className={styles.filter}>
+            <label htmlFor="coordinator-club-filter">Find a club</label>
+            <span className="search-field" onMouseDown={focusSearchInput}>
+              <Search aria-hidden="true" size={16} />
+              <input
+                autoComplete="off"
+                id="coordinator-club-filter"
+                {...search.inputProps}
+                placeholder="Club name"
+                type="search"
+              />
+              <SearchClearButton onClear={() => search.setValue("")} visible={search.value !== ""} />
+            </span>
+          </div>
           <p aria-live="polite" className={styles.help} role="status">
             {selected.size} chosen. {shown.length} of {clubs.length} clubs listed.
           </p>
           {shown.length === 0 ? (
-            <p className={styles.help}>No club name matches “{filter}”.</p>
+            <p className={styles.help}>
+              No club name matches “{search.term}”.{" "}
+              <button className="text-button" onClick={() => search.setValue("")} type="button">Clear</button>
+            </p>
           ) : (
             <ul aria-label="Clubs" className={styles.list}>
               {shown.map((club) => (

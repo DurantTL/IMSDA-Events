@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { Download } from "lucide-react";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
 import { notFound } from "next/navigation";
 import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
+import styles from "./area-club-page.module.css";
 import { ClubOverview } from "@/components/club-overview";
 import { getPrisma } from "@/lib/prisma";
 import { canSeeIssuesTextForAreaClub } from "@/modules/background-checks/notes-access";
@@ -36,21 +38,23 @@ export default async function AreaClubPage({ params }: { params: Promise<{ organ
 
   return (
     <>
-    <p>
-      <Link className="secondary-button" href={`/account/area-clubs/roster-export?club=${encodeURIComponent(organizationId)}`}>Export this club&apos;s roster</Link>
-    </p>
-    <ClubOverview
-      portalView
-      backgroundChecks={{ includeNotes }}
-      honorsHref={`/account/area/${organizationId}/honors`}
-      organizationId={organizationId}
-      reportHref={(month) => `/account/area/${organizationId}/reports/${month}`}
-      reportsEditable={false}
-      // School type and church membership, view only (#1758): an active Area Coordinator (checked above) sees them for
-      // every active club, since coordinators work conference-wide until areas exist (#843).
-      schoolDetails
-    />
-    {guardianViewer && <ClubGuardiansPanel emptyHelp={<CoordinatorSetupHelp context="emergency contacts" id="club-no-emergency-contacts" />} organizationId={organizationId} viewer={guardianViewer} />}
+      <p>
+        <Link className={styles.exportLink} href={`/account/area-clubs/roster-export?club=${encodeURIComponent(organizationId)}`}>
+          <Download aria-hidden="true" size={15} /> Export this club&apos;s roster
+        </Link>
+      </p>
+      <ClubOverview
+        portalView
+        backgroundChecks={{ includeNotes }}
+        honorsHref={`/account/area/${organizationId}/honors`}
+        organizationId={organizationId}
+        reportHref={(month) => `/account/area/${organizationId}/reports/${month}`}
+        reportsEditable={false}
+        // School type and church membership, view only (#1758): an active Area Coordinator (checked above) sees them for
+        // every active club, since coordinators work conference-wide until areas exist (#843).
+        schoolDetails
+      />
+      {guardianViewer && <ClubGuardiansPanel emptyHelp={<CoordinatorSetupHelp context="emergency contacts" id="club-no-emergency-contacts" />} organizationId={organizationId} viewer={guardianViewer} />}
     </>
   );
 }

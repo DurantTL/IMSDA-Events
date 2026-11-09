@@ -18,12 +18,15 @@ export default async function AreaRosterExportPage({ searchParams }: { searchPar
   const params = await searchParams;
   const clubs = (await listClubsForArea()).map((club) => ({ id: club.organizationId, name: club.name }));
   const clubYear = resolveAreaClubYear(params.year);
-  const initialClubIds = params.club && clubs.some((club) => club.id === params.club) ? [params.club] : [];
+  const requested = params.club;
+  const found = Boolean(requested) && clubs.some((club) => club.id === requested);
+  const initialClubIds = found && requested ? [requested] : [];
+  const missing = Boolean(requested) && !found;
   return (
     <>
       <CoordinatorDestinationHeading clubYear={clubYear} title="Export rosters" />
       <p className="quiet-copy">Every download is logged. Birth dates and contact details are never included.</p>
-      <RosterExportBuilder coordinator={{ clubs, initialClubIds, clubYear }} />
+      <RosterExportBuilder coordinator={{ clubs, initialClubIds, clubYear, ...(missing ? { startPicking: true, notice: "That club isn't available. Choose clubs below." } : {}) }} />
     </>
   );
 }

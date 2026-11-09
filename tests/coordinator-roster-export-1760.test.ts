@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   accountNeedsSecondStep: vi.fn(),
   currentStaffActingContext: vi.fn(),
   getCurrentSession: vi.fn(),
+  rejectCrossOriginRequest: vi.fn(),
   writeAuditLog: vi.fn(),
   listRoster: vi.fn(),
   complianceStatuses: vi.fn(),
@@ -24,6 +25,8 @@ vi.mock("@/lib/prisma", () => ({
     clubsAdministratorGrant: { findFirst: async () => null },
   }),
 }));
+vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
+vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: vi.fn(async () => []) }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: mocks.accountNeedsSecondStep }));
@@ -35,13 +38,13 @@ vi.mock("@/modules/club-rosters/repository", async (importOriginal) => ({
 }));
 vi.mock("@/modules/background-checks/repository", () => ({ clubRosterComplianceStatuses: mocks.complianceStatuses }));
 
-import { GET } from "@/app/api/attendee/area-clubs/roster-export/route";
+import * as routeModule from "@/app/api/attendee/area-clubs/roster-export/route";
 import {
   COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS,
   COORDINATOR_ROSTER_EXPORT_COLUMNS,
   DEFAULT_COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS,
   buildCoordinatorRosterTable,
-  parseCoordinatorRosterExportParams,
+  parseCoordinatorRosterExportBody,
   sortCoordinatorRosterRows,
 } from "@/modules/club-rosters/coordinator-export-columns";
 import { ROSTER_EXPORT_PREVIEW_ROW_LIMIT } from "@/modules/club-rosters/export-columns";
@@ -67,12 +70,25 @@ function asCoordinator() {
   mocks.currentStaffActingContext.mockResolvedValue(null);
 }
 
-function call(query: string) {
-  return GET(new Request(`${URL_BASE}?${query}`));
+/** A same-origin POST, with the old query-string style shorthand: `columns=a,b&clubs=all|x,y&preview=1`. */
+function call(query: string, init: { origin?: boolean } = {}) {
+  const params = new URLSearchParams(query);
+  const clubsText = params.get("clubs");
+  const body: Record<string, unknown> = {
+    columns: (params.get("columns") ?? "").split(",").filter(Boolean),
+    preview: params.get("preview") === "1",
+  };
+  if (clubsText) body.clubs = clubsText === "all" ? "all" : clubsText.split(",");
+  return routeModule.POST(new Request(URL_BASE, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...(init.origin === false ? { origin: "https://evil.example" } : { origin: "https://events.imsda.test" }) },
+    body: JSON.stringify(body),
+  }));
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.rejectCrossOriginRequest.mockReturnValue(null);
   mocks.writeAuditLog.mockResolvedValue({});
   mocks.getCurrentSession.mockResolvedValue({ user: null });
   mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
@@ -156,8 +172,8 @@ describe("the column allow-list (#1760)", () => {
     expect((await call("columns=club")).status).toBe(400);
   });
 
-  it("parses ordered, comma separated or repeated keys", () => {
-    const parsed = parseCoordinatorRosterExportParams(new URLSearchParams("columns=role,club&columns=age&clubs=a,b&preview=1"));
+  it("parses ordered keys and de-duplicates clubs", () => {
+    const parsed = parseCoordinatorRosterExportBody({ columns: ["role", "club", "age"], clubs: ["a", "b", "a"], preview: true });
     expect(parsed).toMatchObject({ columns: ["role", "club", "age"], clubs: ["a", "b"], preview: true });
   });
 });
@@ -279,5 +295,47 @@ describe("club picker filter (#1760, S1 and S4)", () => {
     expect(filterPickerClubs(clubs, "   ")).toHaveLength(2);
     expect(filterPickerClubs(clubs, "FALC")).toEqual([clubs[1]]);
     expect(filterPickerClubs(clubs, "zzz")).toEqual([]);
+  });
+});
+
+describe("same-origin POST only (#1760 review)", () => {
+  it("refuses a cross-origin request, reads nothing and writes no audit entry", async () => {
+    asCoordinator();
+    mocks.rejectCrossOriginRequest.mockReturnValue(Response.json({ message: "Cross-origin request refused." }, { status: 403 }));
+    const response = await call("columns=club&clubs=all", { origin: false });
+    expect(response.status).toBe(403);
+    expect(mocks.listRoster).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("has no GET handler, so a link from another site cannot start an export", () => {
+    expect("GET" in routeModule).toBe(false);
+    expect(Object.keys(routeModule).filter((key) => ["GET", "PUT", "PATCH", "DELETE"].includes(key))).toEqual([]);
+  });
+});
+
+describe("act-as through a Clubs Administrator (#1760 review)", () => {
+  it("is allowed and audited with the act-as id", async () => {
+    mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", userId: "staff-2", actAsId: "actas-2", viaClubsAdministrator: true });
+    expect((await call("columns=club&clubs=all")).status).toBe(200);
+    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ actorUserId: "staff-2", metadata: { actAsId: "actas-2" } });
+  });
+});
+
+describe("the director export stays the director's (#1760 review)", () => {
+  it("still refuses an Area Coordinator who is not that club's director (director route, 404)", async () => {
+    asCoordinator();
+    const { POST: directorExport } = await import("@/app/api/attendee/clubs/[organizationId]/roster/export/route");
+    const response = await directorExport(
+      new Request("https://events.imsda.test/x", {
+        method: "POST",
+        headers: { origin: "https://events.imsda.test", "content-type": "application/json" },
+        body: JSON.stringify({ columns: [{ key: "firstName", header: "First" }] }),
+      }),
+      { params: Promise.resolve({ organizationId: "club-a" }) },
+    );
+    expect(response.status).toBe(404);
+    expect(mocks.listRoster).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 });
