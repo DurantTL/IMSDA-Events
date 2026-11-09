@@ -845,7 +845,8 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
   if (!forLink || forLink.revokedAt || forLink.registeredAt) {
     throw new StaffInvitationError(forLink?.registeredAt ? "INVITATION_USED" : "INVITATION_UNAVAILABLE", forLink?.registeredAt ? "This link has already been used to register." : INVITATION_UNAVAILABLE_MESSAGE);
   }
-  if (invitationLinkExpired(forLink, now)) throw new StaffInvitationError("INVITATION_EXPIRED", INVITATION_EXPIRED_MESSAGE);
+  // An event that no longer takes registrations answers "unavailable" first, as the page does: a new invitation would not help.
+  if (eventAcceptsInvitationRegistration(forLink.event, now) && invitationLinkExpired(forLink, now)) throw new StaffInvitationError("INVITATION_EXPIRED", INVITATION_EXPIRED_MESSAGE);
   const eventForm = await loadEventFormDefinition(getPrisma(), forLink.eventId);
   if (input.answers.length > party.length) throw new StaffInvitationError("INVALID_PARTY", "There are more answer sets than people in the registration.");
   let childNumber = 0;
@@ -861,7 +862,7 @@ export async function submitInvitationRegistration(token: string, rawInput: unkn
     if (invitation.registeredAt) {
       throw new StaffInvitationError("INVITATION_USED", "This link has already been used to register.");
     }
-    if (invitationLinkExpired(invitation, now)) throw new StaffInvitationError("INVITATION_EXPIRED", INVITATION_EXPIRED_MESSAGE);
+    if (eventAcceptsInvitationRegistration(invitation.event, now) && invitationLinkExpired(invitation, now)) throw new StaffInvitationError("INVITATION_EXPIRED", INVITATION_EXPIRED_MESSAGE);
     const event = invitation.event;
     const eventStartDate = calendarDateInEventTimeZone(event.startsAt, event.timezone);
     const holder = await tx.person.upsert({
