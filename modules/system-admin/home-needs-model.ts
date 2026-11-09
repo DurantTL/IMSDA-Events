@@ -248,7 +248,7 @@ export function comingUpDates(start: Date, end: Date, timeZone: string): string 
 
 /**
  * The events this person can open that have not ended, soonest first. The upcoming rule is the System home's
- * `isUpcomingEvent`: not archived and `endsAt >= now`. A published event says "Published"; the rest say "Not published",
+ * `isUpcomingEvent`: not archived and `endsAt >= now`. A published event says "Published"; the rest say "Draft",
  * in words.
  */
 export function buildComingUp(sources: readonly ComingUpEventSource[], now: Date): ComingUpEvent[] {
@@ -261,7 +261,7 @@ export function buildComingUp(sources: readonly ComingUpEventSource[], now: Date
       name: event.name,
       dates: comingUpDates(event.startsAt, event.endsAt, event.timezone),
       place: event.location?.trim() || "Location not set",
-      status: event.isPublished ? { text: "Published", tone: "ok" } : { text: "Not published", tone: "draft" },
+      status: event.isPublished ? { text: "Published", tone: "ok" } : { text: "Draft", tone: "draft" },
       href: `/overview?event=${encodeURIComponent(event.id)}`,
     }));
 }

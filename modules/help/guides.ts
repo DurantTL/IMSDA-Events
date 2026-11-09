@@ -211,7 +211,7 @@ export const helpGuides: readonly HelpGuide[] = [
     steps: [
       "Open Registrations and check the event name. Each row is one party: its attendees, submitted choices, payments, emails and status in one record.",
       "Type in Search people to find a name, email address or confirmation code. The list narrows as you type.",
-      "Use the filter beside the search box for a quick cut such as Balance due or Waitlisted.",
+      "Use the filter after the search box for a quick cut such as Balance due or Waitlisted.",
       "Open Advanced search for more filters (status, attendee type, source, payment, check-in, tag and form answers). It searches the whole event and pages the results.",
       "The count line says how many registrations are shown, and how many people are expected. When the list is sorted, a short note says how.",
       "Times on a registration are shown in the event's own time zone.",

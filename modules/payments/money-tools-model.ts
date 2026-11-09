@@ -109,10 +109,11 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         // A live Square read over the page's default window, not scoped to one event (#1747): the count waiting to be matched.
         href: "/finance/square-payments",
         title: staffPageTitles.squarePayments,
-        description: "Square payments that no registration has claimed yet, ready to match by hand.",
+        description: "Square payments that no registration has claimed yet, ready to match by hand. The status counts payments across all events, not only this one.",
         gate: finance,
         metrics: ["unmatchedSquare"],
-        status: (read) => (read("unmatchedSquare")! > 0 ? count(read("unmatchedSquare")!, "review", "waiting to match") : { tone: "ok", text: "None waiting" }),
+        // Health words only (site rule B12): the count is in the card text on the page itself.
+        status: (read) => (read("unmatchedSquare")! > 0 ? { tone: "warn", text: "Needs attention" } : { tone: "ok", text: "OK" }),
       },
       {
         href: "/finance/attendance-reconciliation",

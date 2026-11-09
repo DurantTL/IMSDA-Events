@@ -7,3 +7,7 @@
 }
 .countLine > :global(.list-pager) { padding: 6px 0; }
 .countLine > :global(.sort-order-note) { margin: 0; }
+
+/* The Help button sits in the actions row with no row or margin of its own. */
+.helpSlot > * { margin: 0; }
+.countLine > :global(.count-badge) { margin: 0; }

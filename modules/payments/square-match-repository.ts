@@ -47,6 +47,8 @@ export async function listUnmatchedSquarePayments(
   options: {
     days?: number;
     configuration?: SquareRuntimeConfiguration;
+    /** Square pages to read (default: the reconciliation report's own limit). */
+    maxPages?: number;
   } = {},
 ): Promise<{
   findings: SquareReconciliationFinding[];
@@ -68,7 +70,7 @@ export async function listUnmatchedSquarePayments(
   const report = await collectSquareReconciliationReport(
     getPrisma(),
     configuration,
-    { beginTime },
+    { beginTime, maxPages: options.maxPages },
   );
   return {
     findings: report.findings.filter(isActionable),

@@ -226,8 +226,10 @@ describe("Needs you model (#1568)", () => {
     expect(clear.allClear).toBe(true);
     const html = renderToStaticMarkup(createElement(NeedsYouPage, { view: clear, comingUp: { events, nextStep: null } }));
     expect(html).toMatch(/data-testid="home-all-clear"[^>]*><svg[^>]*aria-hidden="true"/);
-    expect(html).toContain('href="/overview?event=evt_1"');
-    expect(html).toContain("Open Synthetic Camporee");
+    // The one event link is the Coming up row; the empty state's own next step is Help, not a repeat of it.
+    expect(html.match(/href="\/overview\?event=evt_1"/g)).toHaveLength(1);
+    expect(html).toMatch(/data-testid="home-all-clear-next"[^>]*>Open Help</);
+    expect(html).not.toContain("Open Synthetic Camporee");
     expect(html.indexOf("Nothing needs you right now.")).toBeLessThan(html.indexOf("home-needs-coming-up"));
     expect(html).toContain("Synthetic Camporee");
     const none = renderToStaticMarkup(createElement(NeedsYouPage, { view: clear, comingUp: { events: [], nextStep: comingUpNextStep(["EVENTS_ADMIN"], false) } }));
@@ -281,7 +283,7 @@ describe("Coming up model (#1568)", () => {
       now,
     );
     expect(list.map((event) => event.id)).toEqual(["now", "soon", "late"]);
-    expect(list[1]).toMatchObject({ place: "Location not set", status: { text: "Not published" }, href: "/overview?event=soon" });
+    expect(list[1]).toMatchObject({ place: "Location not set", status: { text: "Draft" }, href: "/overview?event=soon" });
     expect(plain(list[1].dates)).toBe("Dec 1 – 3, 2026");
     expect(list[0].status.text).toBe("Published");
   });

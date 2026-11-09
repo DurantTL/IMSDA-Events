@@ -79,6 +79,30 @@ describe("More money tools loaders (#1575)", () => {
     expect(logError).toHaveBeenCalledTimes(3);
   });
 
+  it("reads one Square page at most and gives up after a few seconds, so the card never holds the page up (#1747)", async () => {
+    vi.useFakeTimers();
+    try {
+      listUnmatchedSquarePayments.mockReturnValue(new Promise(() => {}));
+      const pending = loadMoneyToolMetrics(finance, "evt_1", now);
+      await vi.advanceTimersByTimeAsync(3100);
+      const values = await pending;
+      expect(values.unmatchedSquare).toBeNull();
+      expect(values.churchFlags).toBe(1);
+      expect(listUnmatchedSquarePayments).toHaveBeenCalledWith({ maxPages: 1 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not log an error when Square is simply not set up, but logs a real failure (#1747)", async () => {
+    listUnmatchedSquarePayments.mockRejectedValue(Object.assign(new Error("Square is not configured for this site."), { code: "SQUARE_NOT_CONFIGURED" }));
+    expect((await loadMoneyToolMetrics(finance, "evt_1", now)).unmatchedSquare).toBeNull();
+    expect(logError).not.toHaveBeenCalled();
+    listUnmatchedSquarePayments.mockRejectedValue(new Error("boom"));
+    await loadMoneyToolMetrics(finance, "evt_1", now);
+    expect(logError).toHaveBeenCalledTimes(1);
+  });
+
   it("makes the unmatched Square count unavailable when Square is not configured or cannot be reached (#1747)", async () => {
     listUnmatchedSquarePayments.mockRejectedValue(new Error("Square is not configured for this site."));
     expect((await loadMoneyToolMetrics(finance, "evt_1", now)).unmatchedSquare).toBeNull();

@@ -296,6 +296,7 @@ export function PeopleWorkspace({
   emailSuppressions = { registrations: {}, attendees: {} },
   responsibleAdults = {},
   filtersAfterSearch,
+  helpSlot,
   locationId = null,
   matchingPersonFilter = false,
   pageScoped = false,
@@ -328,6 +329,8 @@ export function PeopleWorkspace({
   responsibleAdults?: Record<string, { adultName: string | null; noneOfUs: boolean; ageUnknown: boolean }>;
   /** Advanced search and the other filters, shown right after the simple search box (#1747). */
   filtersAfterSearch?: ReactNode;
+  /** The page's Help button, shown beside Start registration so it takes no row of its own (#1747). */
+  helpSlot?: ReactNode;
   /** The location filter (#413) the CSV export follows; null exports every location. */
   locationId?: string | null;
   /** The list was narrowed by a choice answer (#739): each row holds at least one matching person. */
@@ -867,7 +870,7 @@ export function PeopleWorkspace({
       <div className="page-intro people-intro">
         <h2 className="duplicate-page-title">{staffPageTitles.registrations}</h2>
         <div className="intro-actions">
-          <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}{canEdit && pendingTeamCount > 0 && !locationId && !pageScoped ? ` · ${pendingTeamsLabel(pendingTeamCount)}` : ""}</span>
+          {helpSlot ? <div className={listStyles.helpSlot}>{helpSlot}</div> : null}
           {canEdit && <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a>}
           <ActionsMenu>
             {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
@@ -883,6 +886,7 @@ export function PeopleWorkspace({
         </div>
       </div>
       <div className={listStyles.countLine}>
+        <span className="count-badge"><UsersRound aria-hidden="true" size={17} /> {expectedPeople} expected{pageScoped ? " on this page" : ""}{canEdit && pendingTeamCount > 0 && !locationId && !pageScoped ? ` · ${pendingTeamsLabel(pendingTeamCount)}` : ""}</span>
       <ListPager
         label="Registrations shown"
         noun={`${matchingPersonFilter ? "registrations with a matching person" : "registrations"}${pageScoped ? " on this page of the search results" : ""}`}

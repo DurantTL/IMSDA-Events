@@ -21,11 +21,19 @@ describe("Registrations list order (#1747)", () => {
     canEdit: false,
     canEmail: false,
     filtersAfterSearch: createElement("p", null, "ADVANCED-FILTERS-MARKER"),
+    helpSlot: createElement("p", null, "HELP-MARKER"),
   }));
 
   it("puts the simple search first and the filters after it", () => {
     expect(markup.indexOf("Search people")).toBeGreaterThan(-1);
     expect(markup.indexOf("Search people")).toBeLessThan(markup.indexOf("ADVANCED-FILTERS-MARKER"));
+  });
+
+  it("keeps Help in the actions row and the expected count on the count line", () => {
+    const counts = markup.indexOf("expected");
+    expect(markup.indexOf("HELP-MARKER")).toBeGreaterThan(markup.indexOf("intro-actions"));
+    expect(markup.indexOf("HELP-MARKER")).toBeLessThan(counts);
+    expect(markup.slice(markup.lastIndexOf('<div class="', counts), counts)).toContain("countLine");
   });
 
   it("no longer carries the explanatory paragraph on the page", () => {

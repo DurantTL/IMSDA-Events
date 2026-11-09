@@ -137,9 +137,10 @@ describe("More money tools model (#1575)", () => {
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 0, policyInEffect: 0 })).toEqual({ tone: "draft", text: "No rules set" });
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 2, policyInEffect: 0 })).toEqual({ tone: "soon", text: "None in effect yet" });
     expect(statusOf(staffPageTitles.cancellationPolicy, { policyVersions: 2, policyInEffect: 1 })).toEqual({ tone: "ok", text: "In effect" });
-    expect(statusOf(staffPageTitles.squarePayments, allMetrics(finance, 1))).toEqual({ tone: "review", text: "1 waiting to match" });
-    expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: 4 })).toEqual({ tone: "review", text: "4 waiting to match" });
-    expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: 0 })).toEqual({ tone: "ok", text: "None waiting" });
+    expect(statusOf(staffPageTitles.squarePayments, allMetrics(finance, 1))).toEqual({ tone: "warn", text: "Needs attention" });
+    expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: 4 })).toEqual({ tone: "warn", text: "Needs attention" });
+    expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: 0 })).toEqual({ tone: "ok", text: "OK" });
+    expect(cards({}).find((card) => card.title === staffPageTitles.squarePayments)?.description).toContain("across all events");
     expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: null })).toEqual(UNAVAILABLE_STATUS);
     const billing = (extra: MoneyMetricValues) => statusOf(staffPageTitles.billingResponsibility, { ...zero, ...extra });
     expect(billing({})).toEqual({ tone: "ok", text: "All recorded" });

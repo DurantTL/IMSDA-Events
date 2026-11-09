@@ -107,8 +107,7 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
   if (filter) searchParamsForLinks.set("filter", filter);
   return <>
       <AdminPageHeader path="/people" eventId={event.id} />
-      <StaffContextualHelp guideId="find-a-registration" event={requested} />
-    <PeopleWorkspace filtersAfterSearch={<>
+    <PeopleWorkspace helpSlot={<StaffContextualHelp guideId="find-a-registration" event={requested} />} filtersAfterSearch={<>
     <OperationsSearchBar
       basePath="/people"
       carry={{ filter }}

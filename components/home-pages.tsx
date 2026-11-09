@@ -49,9 +49,8 @@ function Item({ item }: { item: NeedsItem }) {
  * when every read worked and found nothing; a read that failed says "Unavailable".
  */
 export function NeedsYouPage({ view, comingUp = null }: { view: NeedsView; comingUp?: { events: ComingUpEvent[] | null; nextStep: { href: string; label: string } | null } | null }) {
-  // The next step from an empty Needs you (#1747): the soonest event, else the page the Coming up list would offer, else Help.
-  const soonest = comingUp?.events?.[0];
-  const nextStep = soonest ? { href: soonest.href, label: `Open ${soonest.name}` } : (comingUp?.nextStep ?? { href: "/help", label: "Open Help" });
+  // The next step from an empty Needs you (#1747): never a link the Coming up list below already holds, so it is Help.
+  const nextStep = { href: "/help", label: "Open Help" };
   return (
     <div className={styles.home} data-testid="home-needs-you">
       {view.noAdminRole ? (
