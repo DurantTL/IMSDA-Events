@@ -71,7 +71,7 @@ export function CoordinatorClubPicker({
           {shown.length === 0 ? (
             <p className={styles.help}>
               No club name matches “{search.term}”.{" "}
-              <button className="text-button" onClick={() => search.setValue("")} type="button">Clear</button>
+              <button className="text-button" onClick={() => search.setValue("")} type="button">Clear filters</button>
             </p>
           ) : (
             <ul aria-label="Clubs" className={styles.list}>
