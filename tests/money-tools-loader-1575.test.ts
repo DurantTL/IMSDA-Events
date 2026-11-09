@@ -88,7 +88,7 @@ describe("More money tools loaders (#1575)", () => {
       const values = await pending;
       expect(values.unmatchedSquare).toBeNull();
       expect(values.churchFlags).toBe(1);
-      // The whole list the Square page reads, so "OK" never stands for payments it did not read.
+      // The same list the Square page reads, so the chip and that page agree.
       expect(listUnmatchedSquarePayments).toHaveBeenCalledWith();
     } finally {
       vi.useRealTimers();
