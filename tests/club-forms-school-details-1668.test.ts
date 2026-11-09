@@ -29,7 +29,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAudi
 import { rosterSchoolDetailsVisible } from "@/modules/club-rosters/school-details-access";
 import { buildClubFormsCsv } from "@/modules/club-forms/csv";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
-import { parseClubFormTemplate, restrictedFieldKeys, viewerCanWriteForClub, type ClubFormsViewer } from "@/modules/club-forms/domain";
+import { parseClubFormTemplate, restrictedFieldKeys, viewerCanSeeSchoolDetails, viewerCanWriteForClub, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { rosterPrefillFromAnswers } from "@/modules/club-forms/roster-mapping";
 import { getSubmissionForViewer } from "@/modules/club-forms/submissions";
 
@@ -93,6 +93,11 @@ describe("the form view (Area Coordinator and staff pages)", () => {
     expect(viewerCanWriteForClub(areaCoordinator, "club-a")).toBe(false);
     expect(viewerCanWriteForClub(clubsAdmin, "club-a")).toBe(false);
     expect(viewerCanWriteForClub(leader, "club-a")).toBe(true);
+  });
+
+  it("never shows an Area Coordinator the school details of a \"Not listed\" submission (no club, #1229)", () => {
+    expect(viewerCanSeeSchoolDetails(areaCoordinator, null)).toBe(false);
+    expect(viewerCanSeeSchoolDetails(areaCoordinator, "club-a")).toBe(true);
   });
 
   it.each([["an Event Admin", eventAdmin], ["a Clubs Administrator acting as director", clubsAdminActingAsLeader]])("hides the values from %s", async (_label, viewer) => {

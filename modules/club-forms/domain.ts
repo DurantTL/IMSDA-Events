@@ -430,7 +430,8 @@ export function viewerCanSeeSchoolDetails(viewer: ClubFormsViewer, organizationI
     const viaClubsAdministrator = viewer.actor.kind === "STAFF_ACTING" && viewer.actor.viaClubsAdministrator === true;
     return organizationId !== null && viewer.organizationId === organizationId && !viaClubsAdministrator;
   }
-  if (viewer.kind === "AREA_COORDINATOR") return true;
+  // Never for a "Not listed" submission (no club, #1229), which is conference staff's alone.
+  if (viewer.kind === "AREA_COORDINATOR") return organizationId !== null;
   return viewer.systemAdmin || viewer.clubsAdministrator;
 }
 
