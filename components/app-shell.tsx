@@ -291,6 +291,7 @@ export function AppShell({
       <select
         id="event-picker"
         aria-label="Switch event"
+        title={selectedEvent ? selectedEvent.name : undefined}
         value={selectedEventId}
         onChange={(event) => selectEvent(event.target.value)}
       >
@@ -298,6 +299,8 @@ export function AppShell({
         {pickerEvents.map((event) => <option value={event.id} key={event.id}>{event.archived ? `${event.name} (archived)` : event.name}</option>)}
         <option value={archivedChoice}>Archived events…</option>
       </select>
+      {/* A native select clips a long name mid-word; this label shows it with an ellipsis instead, and the select's title gives the full name (#1753). */}
+      <span className={styles.pickerNameLabel} aria-hidden="true">{selectedEvent ? (selectedEvent.archived ? `${selectedEvent.name} (archived)` : selectedEvent.name) : "Choose an event"}</span>
       {/* On a phone the select shows this short label (the select's own name stays "Switch event"), not the event's name again; the select still takes the tap. */}
       <span className={styles.pickerPhoneLabel} aria-hidden="true">Switch</span>
       <ChevronDown aria-hidden="true" size={16} />
