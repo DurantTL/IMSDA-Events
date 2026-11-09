@@ -51,7 +51,7 @@ beforeEach(() => {
 describe("what staff acting as an Area Coordinator may change", () => {
   it("lists every coordinator route that changes data", () => {
     const writes = routeFiles(API_ROOT)
-      .filter((path) => /export const (POST|PUT|PATCH|DELETE)\b/.test(readFileSync(path, "utf8")))
+      .filter((path) => /export (const|async function|function) (POST|PUT|PATCH|DELETE)\b/.test(readFileSync(path, "utf8")))
       .map((path) => relative(API_ROOT, path).split("\\").join("/"))
       .sort();
     expect(writes).toEqual(Object.keys(WRITE_ROUTES).sort());

@@ -470,6 +470,8 @@ export function buildRoleWhere(filters: PeopleFilters, scope: PeopleScope, now =
  * or club staff) in a CLUB-type organization that is current or scheduled to start, a current Area Coordinator, and a
  * current Clubs Administrator. A role that was revoked or has ended does not count. A staff login whose linked website
  * account is a club person is the same person, so it is listed too.
+ * A role in a club that has been made inactive still counts, on purpose: the person still holds a club role, and the
+ * Clubs Administrator needs to find them to end it.
  */
 export function clubPeopleWhere(now = new Date()): Required<PeopleRoleWhere> {
   const account = {

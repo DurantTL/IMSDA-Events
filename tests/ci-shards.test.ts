@@ -77,7 +77,7 @@ describe("CI database-script shards (#1233)", () => {
       .filter((name) => !NOT_IN_CI.has(name))
       .sort();
     expect([...placements.keys()].sort()).toEqual(expected);
-    expect(expected).toHaveLength(106);
+    expect(expected).toHaveLength(107);
   });
 
   it("keeps the scripts that need the app in the shard that starts it", () => {
