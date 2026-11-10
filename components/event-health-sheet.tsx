@@ -1,4 +1,5 @@
 import styles from "./event-health-sheet.module.css";
+import { cardCell } from "@/components/table-card-labels";
 import { HEALTH_TEXT, type HealthAttendeeRow, type HealthClubSheet } from "@/modules/coordinator-health/domain";
 
 function formatDate(value: string | null) {
@@ -26,36 +27,36 @@ export function EventHealthSheet({ clubs, clubLinks, attendeeHref }: { clubs: He
         <section className="panel" key={`${club.organizationId}:${club.teamKey ?? ""}`} aria-labelledby={`health-${club.organizationId}${club.teamKey ? `-${club.teamKey.replace(/[^a-z0-9]+/g, "-")}` : ""}`}>
           <h3 id={`health-${club.organizationId}${club.teamKey ? `-${club.teamKey.replace(/[^a-z0-9]+/g, "-")}` : ""}`} translate="no">{club.clubName}</h3>
           {clubLinks && (
-            <p className="field-help">
+            <p className={`field-help ${styles.clubLinks}`}>
               <a href={clubLinks(club.organizationId).view}>This club only</a>{" · "}
               <a href={clubLinks(club.organizationId).sheet}>Printable sheet for this club</a>
             </p>
           )}
           {club.attendees.length === 0 ? <p className="quiet-copy">No attendees on this club&apos;s active registration.</p> : (
             <div className="report-table-wrap">
-              <table className="report-table">
+              <table className="report-table table-cards" role="table">
                 <caption className="sr-only">{club.clubName} health information</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Attendee</th>
-                    <th scope="col">{HEALTH_TEXT.dietaryLabel}</th>
-                    <th scope="col">{HEALTH_TEXT.medicalFlagLabel}</th>
-                    <th scope="col">{HEALTH_TEXT.medicationsLabel}</th>
-                    <th scope="col">{HEALTH_TEXT.emergencyLabel}</th>
+                <thead role="rowgroup">
+                  <tr role="row">
+                    <th role="columnheader" scope="col">Attendee</th>
+                    <th role="columnheader" scope="col">{HEALTH_TEXT.dietaryLabel}</th>
+                    <th role="columnheader" scope="col">{HEALTH_TEXT.medicalFlagLabel}</th>
+                    <th role="columnheader" scope="col">{HEALTH_TEXT.medicationsLabel}</th>
+                    <th role="columnheader" scope="col">{HEALTH_TEXT.emergencyLabel}</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody role="rowgroup">
                   {club.attendees.map((attendee) => (
-                    <tr key={attendee.attendeeId}>
+                    <tr role="row" key={attendee.attendeeId}>
                       {attendeeHref && attendee.rosterMemberId ? (
-                        <th scope="row">
+                        <th role="rowheader" scope="row">
                           <a className={styles.attendeeLink} href={attendeeHref(club.organizationId, attendee.rosterMemberId)}><span translate="no">{attendee.name}</span><span className="sr-only">: Health Record</span></a>
                         </th>
-                      ) : <th scope="row" translate="no">{attendee.name}</th>}
-                      <td translate={attendee.dietary ? "no" : undefined}>{attendee.dietary ?? "None entered"}</td>
-                      <td>{attendee.medicalFlag ?? "Not answered"}</td>
-                      <td>{HEALTH_TEXT.medicationsValue}</td>
-                      <td>
+                      ) : <th role="rowheader" scope="row" translate="no">{attendee.name}</th>}
+                      <td {...cardCell(HEALTH_TEXT.dietaryLabel)} translate={attendee.dietary ? "no" : undefined}>{attendee.dietary ?? "None entered"}</td>
+                      <td {...cardCell(HEALTH_TEXT.medicalFlagLabel)}>{attendee.medicalFlag ?? "Not answered"}</td>
+                      <td {...cardCell(HEALTH_TEXT.medicationsLabel)}>{HEALTH_TEXT.medicationsValue}</td>
+                      <td {...cardCell(HEALTH_TEXT.emergencyLabel)}>
                         {attendee.emergencyContacts.length === 0 ? (emergencyNote(attendee) ?? "None on file") : (
                           <>
                           <ul>
@@ -78,7 +79,7 @@ export function EventHealthSheet({ clubs, clubLinks, attendeeHref }: { clubs: He
           )}
         </section>
       ))}
-      <p className="field-help">{HEALTH_TEXT.dietaryHelp} {HEALTH_TEXT.medicalFlagHelp} {HEALTH_TEXT.medicationsHelp}</p>
+      <p className={`field-help ${styles.footnote}`}>{HEALTH_TEXT.dietaryHelp} {HEALTH_TEXT.medicalFlagHelp} {HEALTH_TEXT.medicationsHelp}</p>
       <p className="inline-notice error" role="note"><strong>{HEALTH_TEXT.confidential}</strong></p>
     </div>
   );

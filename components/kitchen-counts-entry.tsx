@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
-import { kitchenCountKindLabels, kitchenCountKinds, KITCHEN_COUNT_MAX, KITCHEN_NOTE_MAX, type KitchenCountKind } from "@/modules/meals/kitchen-count-kinds";
+import { kitchenColumnDefinitions, kitchenCountKindLabels, kitchenCountKinds, KITCHEN_COUNT_MAX, KITCHEN_NOTE_MAX, type KitchenCountKind } from "@/modules/meals/kitchen-count-kinds";
+import styles from "./meals-kitchen.module.css";
 
 export type KitchenEntryService = {
   key: string;
@@ -66,8 +67,9 @@ function CountForm({ eventId, service, kind }: { eventId: string; service: Kitch
         <label htmlFor={`${id}-q`}>{kindLabel}<span className="sr-only"> for {service.label}</span>
           <input id={`${id}-q`} name="quantity" type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" maxLength={String(KITCHEN_COUNT_MAX).length}
             value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="Not entered"
-            aria-invalid={invalid ? true : undefined} aria-describedby={invalid ? `${id}-msg ${id}-by` : `${id}-by`} />
+            aria-invalid={invalid ? true : undefined} aria-describedby={invalid ? `${id}-msg ${id}-def ${id}-by` : `${id}-def ${id}-by`} />
         </label>
+        <p className={`field-help ${styles.help}`} id={`${id}-def`}>{kitchenColumnDefinitions[kind]}</p>
         <label htmlFor={`${id}-n`}>Note (optional)<span className="sr-only"> for {kindLabel.toLowerCase()}, {service.label}</span>
           <input id={`${id}-n`} name="note" type="text" maxLength={KITCHEN_NOTE_MAX} value={note} onChange={(event) => setNote(event.target.value)} autoComplete="off" aria-describedby={`${id}-nh`} />
         </label>
@@ -94,8 +96,12 @@ export function KitchenCountsEntry({ eventId, services }: { eventId: string; ser
     <div className="kitchen-entry-list">
       {services.map((service) => (
         <section className="panel kitchen-entry-card" key={service.key} aria-labelledby={`svc-${service.key.replace(/[^a-z0-9]/gi, "-")}`}>
-          <h3 id={`svc-${service.key.replace(/[^a-z0-9]/gi, "-")}`}>{service.label}</h3>
-          <p className="field-help">Ordered {service.ordered} · Served {service.served} (from the scanner; not changed by anything entered here)</p>
+          <h3 className={styles.wrap} id={`svc-${service.key.replace(/[^a-z0-9]/gi, "-")}`}>{service.label}</h3>
+          <p className={`field-help ${styles.help}`}><strong>Ordered {service.ordered}</strong> · <strong>Served {service.served}</strong></p>
+          <dl className={`field-help ${styles.definitions}`}>
+            <div><dt className="sr-only">Ordered</dt><dd>{kitchenColumnDefinitions.ordered}</dd></div>
+            <div><dt className="sr-only">Served</dt><dd>{kitchenColumnDefinitions.served} Nothing entered here changes it.</dd></div>
+          </dl>
           {kitchenCountKinds.map((kind) => <CountForm key={kind} eventId={eventId} service={service} kind={kind} />)}
         </section>
       ))}
