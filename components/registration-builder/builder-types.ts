@@ -136,6 +136,8 @@ export type BuilderWorkspaceProps = {
   templates: TemplateView[];
   focusTarget?: { formId: string; fieldId: string } | null;
   canEditNotifications?: boolean;
+  /** Registration forms only (#1572): shows a "Registrations" link to the event's people list. The page decides it with the check `/people` makes; `/people` checks again. */
+  canViewRegistrations?: boolean;
   /** System administrators only (#1065); the server checks it again on every save. */
   canSaveAsTemplate?: boolean;
   /** For tests: `classic` uses the earlier layout (form list, section cards, preview column); `auto` (the default) uses the editor shell (#1132), which adapts to phone width (#1071). */

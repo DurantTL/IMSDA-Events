@@ -58,6 +58,7 @@ type Menu = readonly [route: string, scope: DestinationScope, oldPlace: RouteMap
 
 const menuRoutes: readonly Menu[] = [
   // System management groups (systemNavGroups)
+  ["/admin/events", "System", "System management", "Events", "All events"],
   ["/event-setup", "System", "System management", "Events", "Create an event"],
   ["/admin/calendar", "System", "System management", "Events", "Conference calendar"],
   ["/event-setup/copy", "System", "System management", "Events", "Copy from a past event"],
@@ -157,9 +158,9 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/check-in/assets", "/check-in", "components/check-in-workspace.tsx"],
   ["/check-in/badges", "/check-in", "components/check-in-workspace.tsx"],
   ["/check-in/passes", "/check-in", "components/check-in-workspace.tsx"],
-  ["/communications/scheduled", "/communications", "components/communications-workspace.tsx"],
+  ["/communications/scheduled", "/communications", "components/staff-event-tabs.ts"],
   ["/admin/event-templates/from-event", "/admin/event-templates", "components/event-template-list.tsx"],
-  ["/event-setup/from-template", "/event-setup", "app/(workspace)/event-setup/page.tsx"],
+  ["/event-setup/from-template", "/event-setup", "components/event-start-choices.tsx"],
   ["/finance/attendance-reconciliation", "/finance", "components/finance-workspace.tsx"],
   ["/finance/billing-responsibility", "/finance", "components/finance-workspace.tsx"],
   ["/finance/cancellation-policy", "/finance", "components/finance-workspace.tsx"],
@@ -176,7 +177,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/more/honors/instructors", "/more/honors", "modules/honors/honors-views-model.ts"],
   ["/more/honors/rosters", "/more/honors", "modules/honors/honors-views-model.ts"],
   ["/more/honors/schedule", "/more/honors", "modules/honors/honors-views-model.ts"],
-  ["/more/issued-assets/closeout", "/more/issued-assets", "components/issued-assets-workspace.tsx"],
+  ["/more/issued-assets/closeout", "/more/issued-assets", "components/issued-assets-views-model.ts"],
   ["/more/kitchen-report", "/more/reports", "components/staff-event-tabs.ts"],
   ["/more/kitchen-report/closeout", "/more/kitchen-report", "app/(workspace)/more/kitchen-report/page.tsx"],
   ["/more/kitchen-report/scanner-import", "/more/kitchen-report", "app/(workspace)/more/kitchen-report/page.tsx"],

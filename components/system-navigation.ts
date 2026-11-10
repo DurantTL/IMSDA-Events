@@ -4,6 +4,7 @@ import {
   Award,
   CalendarCheck,
   CalendarPlus,
+  CalendarRange,
   CheckCircle2,
   HeartPulse,
   Church,
@@ -76,6 +77,7 @@ export const systemNavGroups: readonly SystemNavGroup[] = [
     label: "Events",
     collapsedByDefault: false,
     items: [
+      { href: "/admin/events", label: "All events", description: "Every current event, with dates and status.", icon: CalendarRange },
       { href: "/event-setup", label: "Create an event", description: "Start a new event, blank or from a template.", icon: CalendarPlus },
       { href: "/admin/calendar", label: "Conference calendar", description: "Turn a calendar item into a registration event, and add, edit and publish the public calendar visitors see.", icon: CalendarCheck },
       { href: "/event-setup/copy", label: "Copy from a past event", description: "Start from last year's event settings and forms.", icon: Copy },
@@ -255,6 +257,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/master-award-rules(\/|$)/, "Master Award rules"],
   [/^\/admin\/(people|team|accounts)(\/|$)/, "People & access"],
   [/^\/admin\/health-access(\/|$)/, "Break-glass and legal holds"],
+  [/^\/admin\/events(\/|$)/, "All events"],
   [/^\/admin\/calendar(\/|$)/, "Conference calendar"],
   [/^\/admin\/event-templates\/from-event(\/|$)/, "Save an event as a template"],
   [/^\/admin\/event-templates\/[^/]+(\/|$)/, "Edit event template"],

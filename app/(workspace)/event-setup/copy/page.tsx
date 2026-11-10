@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { StepPage } from "@/components/page-templates/step-page";
 import { CopyFromPastEvent } from "@/components/copy-from-past-event";
+import { EventStartChoices } from "@/components/event-start-choices";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listEventsForUser } from "@/modules/events/repository";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
@@ -25,9 +26,9 @@ export default async function CopyFromPastEventPage() {
   }));
 
   return (
-    // The copy flow keeps its own steps (choose, preview, created) in the client component, so no step number is shown here.
+    // The copy flow keeps its own steps (choose, preview, created) in the client component, which draws the step line.
     <StepPage header={{ title: "Copy from a past event", description: "Start from a past event's settings and forms." }}>
-      <CopyFromPastEvent sources={sources} />
+      <CopyFromPastEvent sources={sources} intro={<EventStartChoices current="copy" />} />
     </StepPage>
   );
 }

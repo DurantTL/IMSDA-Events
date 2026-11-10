@@ -91,7 +91,7 @@ describe("Check-in opens on Search and Scan", () => {
 
   it("puts the scan and search tools before the heading, the status line and the roster", () => {
     expect(html.startsWith('<section class="page-stack"><div class="checkin-tools">')).toBe(true);
-    expect(before(html, 'class="checkin-tools"', 'class="checkin-hero"')).toBe(true);
+    expect(before(html, 'class="checkin-tools"', 'class="checkin-hero ')).toBe(true);
     expect(before(html, "Search arrivals", "Ready for arrivals")).toBe(true);
     expect(before(html, "Search arrivals", "Expected attendees")).toBe(true);
     expect(before(html, "Search arrivals", "check-in-network-status")).toBe(true);

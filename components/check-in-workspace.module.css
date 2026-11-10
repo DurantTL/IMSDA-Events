@@ -1,0 +1,16 @@
+/* The check-in desk (#1577): search and scan lead, so the checked-in tally is one compact strip under them. */
+.tally.tally { margin: 0; gap: 12px 20px; border-radius: var(--radius-card); padding: 10px 16px; box-shadow: none; }
+.tally.tally::after { display: none; }
+.tally.tally h2 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.05rem); }
+.tally.tally p:not(:global(.hero-eyebrow)) { max-width: none; }
+.tally.tally :global(.hero-eyebrow) { display: none; }
+.tally.tally :global(.checkin-tallies) { flex: none; flex-wrap: nowrap; gap: 8px; margin: 0; }
+.tally.tally :global(.checkin-tallies) span { min-width: 0; padding: 6px 12px; border-radius: var(--radius-sm); }
+.tally.tally :global(.checkin-tallies) strong { display: inline; font-size: max(var(--type-staff-floor, 0px), 1.05rem); }
+.tally.tally :global(.checkin-tallies) small { display: inline; margin-left: 6px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+@media (max-width: 720px) {
+  .tally.tally { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .tally.tally :global(.checkin-tallies) { flex-wrap: wrap; }
+}
+/* Long names wrap inside their row rather than pushing the row wider than the screen. */
+.roster :global(.meta-stack) { min-width: 0; overflow-wrap: anywhere; }

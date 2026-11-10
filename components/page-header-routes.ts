@@ -11,15 +11,30 @@
 export type PageOwnsHeaderRoute = { pattern: string; notSegments?: readonly string[] };
 
 export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
+  { pattern: "/admin/events" },
+  { pattern: "/communications" },
+  { pattern: "/communications/scheduled" },
+  { pattern: "/community" },
   { pattern: "/event-setup" },
   { pattern: "/event-setup/from-template" },
   { pattern: "/event-setup/copy" },
   { pattern: "/more/reports/printouts" },
+  { pattern: "/more/issued-assets" },
+  { pattern: "/more/issued-assets/closeout" },
+  { pattern: "/more/merchandise" },
   { pattern: "/admin/club-supplies/conference-orders" },
   { pattern: "/admin/club-supplies" },
   { pattern: "/admin/honors" },
   { pattern: "/admin/master-award-rules" },
   { pattern: "/more/clubs/[organizationId]", notSegments: ["reports"] },
+  { pattern: "/admin/club-forms" },
+  { pattern: "/admin/club-forms/[templateKey]", notSegments: ["public-page"] },
+  { pattern: "/more/club-forms" },
+  { pattern: "/more/club-forms/[submissionId]" },
+  { pattern: "/information-forms" },
+  { pattern: "/information-forms/responses" },
+  { pattern: "/admin/information-forms" },
+  { pattern: "/admin/information-forms/[formId]/responses" },
 ];
 
 function segmentsOf(path: string) {

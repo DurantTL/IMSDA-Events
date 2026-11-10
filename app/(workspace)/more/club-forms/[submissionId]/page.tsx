@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
+import { PageHeader } from "@/components/page-header";
 import { ClubFormSubmissionView } from "@/components/club-form-submission-view";
 import { PrintFormButton } from "@/components/club-forms-actions";
 import { resolveStaffViewer } from "@/modules/club-forms/access";
@@ -23,7 +23,13 @@ export default async function StaffClubFormPage({
   const [{ submissionId }, { event }] = await Promise.all([params, searchParams]);
   const viewer = await resolveStaffViewer();
   if (!viewer) {
-    return <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" whoToAsk="a system administrator" />;
+    // The page draws its own title (#1573), so the restricted state keeps the page's one h1 too.
+    return (
+      <>
+        <PageHeader title={staffPageTitles.clubForm} />
+        <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" whoToAsk="a system administrator" />
+      </>
+    );
   }
   const submission = await getSubmissionForViewer(viewer, submissionId).catch((error: unknown) => {
     if (error instanceof ClubFormError && error.code === "SUBMISSION_NOT_FOUND") return null;
@@ -33,9 +39,13 @@ export default async function StaffClubFormPage({
 
   return (
     <section className="page-stack club-form-page">
-      <div className="club-form-page-actions intro-actions">
-        <BackLink href={`/more/club-forms${event ? `?event=${encodeURIComponent(event)}` : ""}`} variant="staff">Back to club forms</BackLink>
-        <PrintFormButton />
+      {/* The wrapper is the class the print rules already hide, so the header (back link, title, Print) does not print. */}
+      <div className="club-form-page-actions">
+        <PageHeader
+          back={{ href: `/more/club-forms${event ? `?event=${encodeURIComponent(event)}` : ""}`, label: "Back to submissions" }}
+          secondary={<PrintFormButton />}
+          title={staffPageTitles.clubForm}
+        />
       </div>
       <ClubFormSubmissionView submission={submission} />
     </section>

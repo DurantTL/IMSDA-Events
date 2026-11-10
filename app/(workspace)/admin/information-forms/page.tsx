@@ -1,5 +1,5 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { ListPage } from "@/components/page-templates/list-page";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { InformationFormsHome } from "@/components/information-forms-home";
@@ -22,10 +22,11 @@ export default async function AdminInformationFormsPage() {
   const { forms, templates } = await loadInformationFormsHome({ scope: "GENERAL" });
 
   return (
-    <section className="page-stack">
+    <>
       <AdminSectionHeaderFor path="/admin/information-forms" section="system" />
-      <StaffPageHeader description="Surveys and interest forms that belong to no event. Open one to build it in the form builder." />
-      <InformationFormsHome config={generalInformationConfig()} forms={forms} templates={templates} />
-    </section>
+      <ListPage header={{ title: "Information forms", description: "Surveys and interest forms that belong to no event. Open one to build it in the form builder." }}>
+        <InformationFormsHome config={generalInformationConfig()} forms={forms} templates={templates} />
+      </ListPage>
+    </>
   );
 }
