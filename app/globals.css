@@ -68,6 +68,10 @@
   --radius-panel: 19px;
   --radius-modal: 20px;
   --radius-pill: 999px;
+  /* #1771: radii named by job, aliases of the values above so nothing moves. */
+  --radius-element: var(--field-radius); /* buttons, fields, small controls */
+  --radius-container: var(--radius-card); /* cards and panels */
+  --radius-overlay: var(--radius-modal); /* dialogs, sheets, menus */
 }
 
 /* #743: on screen the floors apply at every size. Measured before: desktop admin
@@ -110,7 +114,7 @@
 :where(.app-shell, .account-portal, .auth-form, [role="dialog"])
   :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"]), select, textarea) {
   border: 1px solid var(--field-border);
-  border-radius: var(--field-radius);
+  border-radius: var(--radius-element);
   background-color: var(--field-bg);
   color: var(--ink);
   padding: 9px 11px;
@@ -666,7 +670,7 @@ textarea:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-weight: 700;
 }
 
@@ -1069,7 +1073,7 @@ textarea:focus-visible {
 /* The native clear "x" is hidden inside a .search-field (it has its own 44px clear button); other search inputs keep it. */
 .search-field input[type="search"]::-webkit-search-cancel-button, .search-field input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
 .secondary-button,
-.primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: var(--target-touch, 44px); border-radius: 10px; cursor: pointer; padding: 9px 12px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; transition: background-color 120ms, border-color 120ms; }
+.primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: var(--target-touch, 44px); border-radius: var(--radius-element); cursor: pointer; padding: 9px 12px; font-size: max(var(--type-body-floor, 0px), 0.7rem); font-weight: 700; transition: background-color 120ms, border-color 120ms; }
 .secondary-button { border: 1px solid var(--line); background: #f9fbfb; color: var(--imsda-navy); text-decoration: none; }
 .primary-button { border: 1px solid var(--imsda-navy); background: var(--imsda-navy); color: white; }
 .primary-button:hover:not(:disabled) { background: var(--imsda-navy-deep); border-color: var(--imsda-navy-deep); }
@@ -1083,7 +1087,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 7px;
   border: 1px solid var(--field-border);
-  border-radius: var(--field-radius);
+  border-radius: var(--radius-element);
   background: var(--field-bg);
   color: var(--imsda-navy);
   padding: 0 8px 0 12px;
@@ -1334,7 +1338,7 @@ textarea:focus-visible {
 .arrival-row button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #b8d7ca; border-radius: 9px; background: var(--green-soft); color: var(--green); cursor: pointer; min-height: var(--touch-target, 44px); padding: 7px 9px; font-size: max(var(--type-body-floor, 0px), 0.65rem); font-weight: 700; }
 .arrival-row button.undo-button { border-color: #dfc9e8; background: var(--imsda-purple-soft); color: var(--imsda-purple); }
 .arrival-row button:disabled { cursor: not-allowed; opacity: 0.55; }
-.inline-notice { border: 1px solid #b8d7ca; border-radius: 12px; background: var(--green-soft); color: var(--green); padding: 10px 13px; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 600; }
+.inline-notice { border: 1px solid #b8d7ca; border-radius: var(--radius-container); background: var(--green-soft); color: var(--green); padding: 10px 13px; font-size: max(var(--type-floor, 0px), 0.7rem); font-weight: 600; }
 .draft-created-guide-banner {
   display: grid;
   gap: 12px;
@@ -1689,7 +1693,7 @@ textarea:focus-visible {
   width: min(620px, 100%);
   max-height: calc(100vh - 44px);
   overflow-y: auto;
-  border-radius: 20px;
+  border-radius: var(--radius-overlay);
   background: white;
   padding: 22px;
   box-shadow: 0 28px 80px rgba(0, 25, 40, 0.3);
