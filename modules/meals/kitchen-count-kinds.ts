@@ -9,3 +9,14 @@ export const kitchenCountKindLabels: Record<KitchenCountKind, string> = {
 
 export const KITCHEN_COUNT_MAX = 100_000;
 export const KITCHEN_NOTE_MAX = 500;
+
+/** The short definitions shown with the report's columns (screen and the counts page). Here, with the kinds, so a client component can show them too. */
+export const kitchenColumnDefinitions = {
+  ordered: "Ordered: café meal tickets sold for the service, on live registrations. Not a count of food.",
+  served: "Served: meals the café scanner recorded as eaten. Comes only from the imported scanner results.",
+  PREPARED: "Prepared: portions the kitchen made, as the kitchen entered them.",
+  WASTED: "Wasted: prepared portions thrown away, as the kitchen entered them.",
+  DONATED: "Donated: prepared portions given away outside the event, as the kitchen entered them.",
+  TRANSFERRED: "Transferred: prepared portions sent to another service or group, as the kitchen entered them.",
+  variance: "Variance: prepared minus served. Positive means more was made than eaten. Blank until prepared is entered.",
+} as const;

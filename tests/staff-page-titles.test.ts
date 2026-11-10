@@ -65,7 +65,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/clubs/reports/org_1/2028-08")).toBe("Club Monthly Record");
     expect(staffSubpageTitle("/more/club-forms")).toBe("Club forms");
     expect(staffSubpageTitle("/more/club-forms/sub_1")).toBe("Club form");
-    expect(staffSubpageTitle("/more/merchandise")).toBe("Merchandise catalog");
+    expect(staffSubpageTitle("/more/merchandise")).toBe("Merchandise");
     expect(staffSubpageTitle("/more/lodging")).toBe("Lodging");
     expect(staffSubpageTitle("/more/meals")).toBe("Meals");
     expect(staffSubpageTitle("/more/lodging/requests")).toBe("Lodging requests");
@@ -118,7 +118,7 @@ describe("staff page names (#685)", () => {
 
   it("has every page's <title> read the shared constant", () => {
     const pages: Record<string, string> = {
-      overview: "overview", registrations: "people", attendeeList: "people/attendees", kitchenReport: "more/kitchen-report", kitchenCounts: "more/kitchen-report/counts", mealCloseout: "more/kitchen-report/closeout", payments: "finance", registrationForm: "registration-builder",
+      overview: "overview", registrations: "people", attendeeList: "people/attendees", kitchenReport: "more/kitchen-report", kitchenCounts: "more/kitchen-report/counts", scannerResults: "more/kitchen-report/scanner-import", mealCloseout: "more/kitchen-report/closeout", payments: "finance", registrationForm: "registration-builder",
       emails: "communications", team: "staff", imports: "imports", systemManagement: "admin", checkIn: "check-in",
       more: "more", eventSetup: "more", eventFeatures: "more/features", honors: "more/honors", honorsRosters: "more/honors/rosters", honorsSchedule: "more/honors/schedule", honorsInstructors: "more/honors/instructors", promoCodes: "more/promo-codes",
       attendeeSetup: "more/attendee-configuration", tags: "more/tags", eventSettings: "more/event-settings",

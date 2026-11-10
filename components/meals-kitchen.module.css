@@ -1,0 +1,104 @@
+/* Shared by the meals and kitchen pages (#1579): long meal names wrap instead of widening a card, and new help lines in
+   these layouts sit directly under what they describe (the global .field-help has a negative top margin). */
+.wrap {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.help {
+  margin: 4px 0 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.definitions {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.definitions dd {
+  margin: 0;
+}
+
+.printOnly {
+  display: none;
+}
+
+@media print {
+  .printOnly {
+    display: block;
+  }
+}
+
+/* The page header is screen chrome: a printed kitchen report is the tables only (#787). */
+@media print {
+  .printHide {
+    display: none !important;
+  }
+}
+
+/* Meals setup forms (#1579): each label sits above its field in a responsive grid (one column on a phone), with room
+   between rows so a focus outline never lands on the next label or the heading. */
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 20px 16px;
+  align-items: start;
+  margin-top: 12px;
+}
+
+.fieldGrid > h4 {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+}
+
+.fieldGrid label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fieldGrid label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.fieldGrid :is(input:not([type="checkbox"]), select) {
+  width: 100%;
+  min-height: 44px;
+}
+
+.fieldGrid :is(button, fieldset, p) {
+  grid-column: 1 / -1;
+}
+
+.fieldGrid button {
+  min-height: 44px;
+  justify-self: start;
+}
+
+.fieldGrid fieldset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+}
+
+.check {
+  min-height: 44px;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rowActions button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+}

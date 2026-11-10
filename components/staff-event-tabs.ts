@@ -72,7 +72,6 @@ const nav = (href: string): NavigationItem => {
 };
 const byNav = (href: string) => (_: EventTabsContext, permissions: ReadonlySet<EventPermission>) => matchesVisibility(nav(href), permissions);
 const holds = (permission: EventPermission) => (_: EventTabsContext, permissions: ReadonlySet<EventPermission>) => permissions.has(permission);
-const anyOf = (...list: EventPermission[]) => (_: EventTabsContext, permissions: ReadonlySet<EventPermission>) => list.some((permission) => permissions.has(permission));
 
 const overviewVisible = (_: EventTabsContext, permissions: ReadonlySet<EventPermission>) =>
   permissions.has("VIEW_EVENT") && matchesVisibility(nav("/overview"), permissions);
@@ -148,8 +147,11 @@ export const eventTabSpecs: readonly TabSpec[] = [
     views: [
       { key: "operational", label: staffPageTitles.operationalReports, href: "/more/reports", visible: byNav("/more/reports") },
       { key: "health", label: staffPageTitles.operationalHealth, href: "/more/health", visible: (context) => canAccessOperationalHealth(context.permissions) },
-      { key: "kitchen", label: staffPageTitles.kitchenReport, href: "/more/kitchen-report", visible: holds("VIEW_REPORTS"), alsoOwns: ["/more/kitchen-report/closeout", "/more/kitchen-report/scanner-import"] },
-      { key: "kitchen-counts", label: staffPageTitles.kitchenCounts, href: kitchenCountsPath, visible: anyOf("MANAGE_KITCHEN_COUNTS", "VIEW_REPORTS") },
+      // One kitchen view per viewer (#1579). Report holders get Kitchen report, which also owns the counts, scanner results and
+      // closeout pages (the in-page "Meals and kitchen pages" strip moves between those). Kitchen-only staff get Kitchen counts.
+      // Both specs share the key "kitchen" and are never visible together, so the Reports tab lights exactly one view.
+      { key: "kitchen", label: staffPageTitles.kitchenReport, href: "/more/kitchen-report", visible: holds("VIEW_REPORTS"), alsoOwns: [kitchenCountsPath, "/more/kitchen-report/closeout", "/more/kitchen-report/scanner-import"] },
+      { key: "kitchen", label: staffPageTitles.kitchenCounts, href: kitchenCountsPath, visible: (context, permissions) => holds("MANAGE_KITCHEN_COUNTS")(context, permissions) && !permissions.has("VIEW_REPORTS") },
       // Group packets and the club event pages (reports, check-in book, team forms and their detail pages) are reached from the
       // Printouts cards, which light this view as their parent (#1583). It shows when at least one card would.
       {

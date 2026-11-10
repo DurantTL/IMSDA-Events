@@ -354,6 +354,7 @@ const pages: PageSpec[] = [
   // Check-out for a person with keys out, a held cash deposit, a lost key and a charge (#214), and the closeout.
   staff("issued-assets-checkout", `/check-in/assets?attendee=${P}_reg_attendee_3_0`),
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
+  staff("merchandise", "/more/merchandise"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
   // Meal money closeout (#212): the money table, the exceptions and their review forms.
@@ -362,6 +363,8 @@ const pages: PageSpec[] = [
   staff("kitchen-counts", "/more/kitchen-report/counts"),
   // The same page as a Kitchen staff user (#1029): no event view, so the sidebar and phone tabs show only Kitchen counts.
   staff("kitchen-counts-as-kitchen-staff", "/more/kitchen-report/counts", "kitchen"),
+  // Meals setup (#1579): the views strip, the services and orders as phone cards, and the price grid.
+  staff("meals-setup", "/more/meals"),
   staff("more-menu", "/more"),
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
@@ -417,6 +420,7 @@ const pages: PageSpec[] = [
   staff("check-in-badges", "/check-in/badges"),
   staff("check-in-passes", "/check-in/passes"),
   staff("communications", "/communications"),
+  staff("community", "/community"),
   // The template editor with attachments, a picture and a button (#824), and a draft announcement with attachments.
   staff("communications-editor", `/communications?event=${blocksEventId}&view=templates`, "system-admin"),
   staff("communications-announcement-attachments", `/communications?event=${blocksEventId}`, "system-admin"),
@@ -495,6 +499,8 @@ const pages: PageSpec[] = [
   staff("system-report", "/admin/system-report", "system-admin"),
   staff("club-supplies", "/admin/club-supplies", "system-admin"),
   staff("club-forms", "/admin/club-forms", "system-admin"),
+  // Submitted club forms with no event (#1573): they sit in Admin -> Forms, not in an event's shell.
+  { name: "staff-club-forms-submissions-no-event", path: "/more/club-forms", role: "system-admin" },
   // The club form settings page, with the "Email these addresses when this form is submitted" box (#1017).
   staff("club-form-alerts", "/admin/club-forms/off_premises_permission_slip", "system-admin"),
   // The form template library and its editor (#1064).
