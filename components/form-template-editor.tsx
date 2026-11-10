@@ -136,8 +136,8 @@ export function FormTemplateEditor(props: FormTemplateEditorProps) {
       <div className="builder-status-row">
         <span className={`status-chip ${source === "APP" ? "gold" : "purple"}`}>Version {version}</span>
         <span>{sourceLabel(source)}</span>
-        <span>{props.usedByForms} {props.usedByForms === 1 ? "form" : "forms"} created from it</span>
-        {dirty && <span role="status">Unsaved changes</span>}
+        <span className="count-badge">{props.usedByForms} {props.usedByForms === 1 ? "form" : "forms"} created from it</span>
+        {dirty && <span className="status-chip gold" role="status">Unsaved changes</span>}
       </div>
       <div className="builder-title-row">
         <label>Template name<input autoComplete="off" name="form-template-name" value={name} maxLength={120} onChange={(event) => { setName(event.target.value); setDirty(true); }} /></label>
@@ -145,7 +145,7 @@ export function FormTemplateEditor(props: FormTemplateEditorProps) {
         <label className="field-wide">Description<input autoComplete="off" name="form-template-description" value={description} maxLength={500} onChange={(event) => { setDescription(event.target.value); setDirty(true); }} /></label>
         <button className="primary-button" type="button" disabled={busy !== null || !dirty || !name.trim() || !audience.trim()} onClick={saveTemplate}><Save size={15} aria-hidden="true" /> {busy === "save" ? "Saving…" : "Save new version"}</button>
       </div>
-      <p className="field-help">Each save creates a new version and keeps the old ones. A template version holds the form&apos;s questions and settings only. It does not include meal plans, lodging inventory, cancellation policies, messages, people, answers or registrations.</p>
+      <p className="field-help">Each save creates a new version and keeps the old ones. Forms already created from this template keep the version they were created with. A template version holds the form&apos;s questions and settings only. It does not include meal plans, lodging inventory, cancellation policies, messages, people, answers or registrations.</p>
       {props.repairingUnreadable && <p className="inline-notice error" role="alert">The stored definition could not be read, so this opens the code&apos;s copy. Saving stores a new, readable version.</p>}
       {source === "APP" && !props.appCreated && <p className="field-help">This template was edited in the app, so code updates no longer apply to it.</p>}
     </section>
@@ -167,7 +167,7 @@ export function FormTemplateEditor(props: FormTemplateEditorProps) {
     </div>}
     <section className="panel" aria-label="Version history">
       <h3>Versions</h3>
-      <ul>{history.map((entry) => <li key={entry.version}>Version {entry.version}: {sourceLabel(entry.source).toLowerCase()}{entry.createdBy ? `, by ${entry.createdBy}` : ""}, {entry.createdAt.slice(0, 16).replace("T", " ")} UTC</li>)}
+      <ul>{history.map((entry, index) => <li key={entry.version}><span className={`status-chip ${index === 0 ? "green" : "neutral"}`}>{index === 0 ? "Current" : "Earlier version"}</span> Version {entry.version}: {sourceLabel(entry.source).toLowerCase()}{entry.createdBy ? `, by ${entry.createdBy}` : ""}, {entry.createdAt.slice(0, 16).replace("T", " ")} UTC</li>)}
         {history.length === 0 && <li>Version {version}: from the code. No older versions are stored yet.</li>}</ul>
     </section>
     <BuilderDialogs />

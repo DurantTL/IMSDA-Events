@@ -1,0 +1,75 @@
+/* The event template editor (#1593): status line, action bar and version list. */
+.statusLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.dirty {
+  color: var(--gold-text);
+  font-weight: 700;
+}
+
+.payload {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.actionBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.actionBar > :is(button, a) {
+  min-height: var(--touch-target);
+}
+
+.versions {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.version {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--card);
+  padding: 8px 12px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.copyNote {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.hints {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+@media (max-width: 640px) {
+  .actionBar > :is(button, a) {
+    flex: 1 1 100%;
+  }
+}
