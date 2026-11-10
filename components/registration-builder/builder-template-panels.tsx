@@ -6,17 +6,17 @@ import { templatesForPicker } from "@/modules/forms/definition";
 import { useBuilder } from "./builder-context";
 
 /** Only system administrators can open the libraries, so only they see the links; event staff pick templates and cannot change them (#1593). */
-function ManageLibrariesLine() {
+function ManageLibrariesLine({ updatesDraft = false }: { updatesDraft?: boolean }) {
   const { canSaveAsTemplate } = useBuilder();
   if (!canSaveAsTemplate) return null;
-  return <p className="field-help">Using a template copies it; editing it later does not change forms already made. Manage the <Link href="/admin/form-templates">Form templates</Link> or the <Link href="/admin/question-library">Question library</Link>.</p>;
+  return <p className="field-help">Using a template copies it; editing it later does not change forms already made{updatesDraft ? ", unless you choose to update a draft from a template here" : ""}. Manage the <Link href="/admin/form-templates">Form templates</Link> or the <Link href="/admin/question-library">Question library</Link>.</p>;
 }
 
 export function BuilderDraftTemplatePanel() {
   const { selectedForm, busy, showDraftTemplates, setShowDraftTemplates, setDraftTemplateTarget, setDraftTemplateError, eventAudience, eventBillingMode, templates } = useBuilder();
   if (!showDraftTemplates || !selectedForm) return null;
   return (
-    <section className="panel builder-template-panel" aria-labelledby="draft-template-picker-title"><div className="section-heading"><div><p className="eyebrow">Keep the same form and web address</p><h2 id="draft-template-picker-title">Update the draft of {selectedForm.name} from a template</h2></div><button className="icon-button modal-close-button" aria-label="Close templates" type="button" onClick={() => setShowDraftTemplates(false)}><X size={18} /></button></div><ManageLibrariesLine /><div className="template-card-grid">{templatesForPicker(templates, eventAudience, eventBillingMode).map((template) => <article className="template-card" key={template.key}><span><Layers3 size={20} /></span><small>{template.audience}</small><h3>{template.name}</h3><p>{template.description}</p><div>{template.sectionCount} sections · {template.fieldCount} fields</div><button className="secondary-button" type="button" disabled={busy !== null} onClick={() => { setDraftTemplateError(""); setDraftTemplateTarget({ key: template.key, name: template.name, versionId: template.versionId }); }}>Use for the draft <ChevronRight size={15} /></button></article>)}</div></section>
+    <section className="panel builder-template-panel" aria-labelledby="draft-template-picker-title"><div className="section-heading"><div><p className="eyebrow">Keep the same form and web address</p><h2 id="draft-template-picker-title">Update the draft of {selectedForm.name} from a template</h2></div><button className="icon-button modal-close-button" aria-label="Close templates" type="button" onClick={() => setShowDraftTemplates(false)}><X size={18} /></button></div><ManageLibrariesLine updatesDraft /><div className="template-card-grid">{templatesForPicker(templates, eventAudience, eventBillingMode).map((template) => <article className="template-card" key={template.key}><span><Layers3 size={20} /></span><small>{template.audience}</small><h3>{template.name}</h3><p>{template.description}</p><div>{template.sectionCount} sections · {template.fieldCount} fields</div><button className="secondary-button" type="button" disabled={busy !== null} onClick={() => { setDraftTemplateError(""); setDraftTemplateTarget({ key: template.key, name: template.name, versionId: template.versionId }); }}>Use for the draft <ChevronRight size={15} /></button></article>)}</div></section>
   );
 }
 

@@ -54,7 +54,7 @@ export default async function AdminFormTemplatesPage({ searchParams }: { searchP
       <TemplateLibrariesGuide current="form" />
       <section className="panel dense-rows">
         {templates.length === 0 ? (
-          <p className={`quiet-copy ${styles.empty}`}>There are no form templates yet. Create one below as a copy of another template.</p>
+          <p className={`quiet-copy ${styles.empty}`}>There are no form templates yet. A new template is made as a copy of an existing one, so the library needs one to start from.</p>
         ) : (
         <div className="report-table-wrap">
           {sorting.order.key && <SortOrderNote>{sortOrderText(templateSortLabels[sorting.order.key].label, sorting.order.dir, templateSortLabels[sorting.order.key].kind)}</SortOrderNote>}
@@ -72,7 +72,7 @@ export default async function AdminFormTemplatesPage({ searchParams }: { searchP
                     <span className={styles.stack}>
                       {template.unreadable
                         ? <span className="status-chip coral">Needs repair</span>
-                        : <span className={`status-chip ${template.source === "APP" ? "gold" : "neutral"}`}>Version {template.version}</span>}
+                        : <span className={`status-chip neutral`}>Version {template.version}</span>}
                       <span className={styles.note}>{template.source === "APP" ? "Edited in the app" : "From the code"}{template.updatedBy ? ` · by ${template.updatedBy}` : ""}</span>
                       {template.unreadable && <span className={styles.problem}>The stored definition cannot be read. {template.appCreated ? "Event staff cannot pick it." : "Event staff get the code's copy until you save it."}</span>}
                     </span>

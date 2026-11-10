@@ -59,7 +59,7 @@ export function FormTemplateCopy({ templates }: { templates: Array<{ key: string
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <div>
-        <SubmitButton className="primary-button" disabled={name.trim().length < 2 || !sourceKey} label="Create template" submitting={saving} submittingLabel="Creating…" />
+        <SubmitButton className="secondary-button" disabled={name.trim().length < 2 || !sourceKey} label="Create template" submitting={saving} submittingLabel="Creating…" />
       </div>
     </form>
   );

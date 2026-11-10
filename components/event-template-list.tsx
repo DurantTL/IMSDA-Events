@@ -101,13 +101,13 @@ export function EventTemplateList({ initialTemplates }: EventTemplateListProps) 
   const active = templates.filter((template) => template.status !== "ARCHIVED");
   const archived = templates.filter((template) => template.status === "ARCHIVED");
 
-  function renderRow(template: EventTemplateRecord) {
+  function renderRow(template: EventTemplateRecord, Heading: "h3" | "h4" = "h3") {
     const row = eventTemplateRowModel(template);
     return (
       <li className={styles.row} key={template.id}>
         <div className={styles.body}>
           <div className={styles.titleLine}>
-            <h3 className={styles.name}>{template.name}</h3>
+            <Heading className={styles.name}>{template.name}</Heading>
             <span className={`status-chip ${row.statusChip.tone}`}>{row.statusChip.label}</span>
             <span className="status-chip neutral">{row.audienceLabel}</span>
           </div>
@@ -139,11 +139,11 @@ export function EventTemplateList({ initialTemplates }: EventTemplateListProps) 
           </div>
         ) : (
           <>
-            <ul className={styles.rows}>{active.map(renderRow)}</ul>
+            <ul className={styles.rows}>{active.map((template) => renderRow(template))}</ul>
             {archived.length > 0 ? (
               <>
                 <h3 className={styles.name}>Archived</h3>
-                <ul className={styles.rows}>{archived.map(renderRow)}</ul>
+                <ul className={styles.rows}>{archived.map((template) => renderRow(template, "h4"))}</ul>
               </>
             ) : null}
           </>
@@ -205,7 +205,7 @@ export function EventTemplateList({ initialTemplates }: EventTemplateListProps) 
           <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} />
         </label>
         <div>
-          <button type="button" className="primary-button" disabled={creating || name.trim().length < 2} onClick={createTemplate}>
+          <button type="button" className="secondary-button" disabled={creating || name.trim().length < 2} onClick={createTemplate}>
             {creating ? "Creating…" : "Create template"}
           </button>
         </div>

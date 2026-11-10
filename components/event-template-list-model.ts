@@ -48,10 +48,10 @@ export function eventTemplateRowModel(template: EventTemplateRecord): EventTempl
   const availabilityLine = archived
     ? "Not offered in Create event while archived."
     : needsRepair
-      ? "Not offered in Create event: the published version no longer passes validation."
+      ? "Shown in Create event but can't be chosen: the published version no longer passes validation."
       : published
         ? "Offered in Create event. New events start with a copy of the published version."
-        : "Not offered in Create event until a version is published.";
+        : "Shown in Create event but can't be chosen until a version is published.";
 
   return {
     statusChip,
@@ -67,4 +67,10 @@ export function templateVersionChip(status: string): TemplateChip {
   if (status === "DRAFT") return { label: "Draft", tone: "gold" };
   if (status === "PUBLISHED") return { label: "Published", tone: "green" };
   return { label: "Earlier version", tone: "neutral" };
+}
+
+/** The status chip in the editor: an archived template shows Archived (neutral), otherwise its current version's state. */
+export function editorStatusChip(isArchived: boolean, versionStatus: string | undefined): TemplateChip {
+  if (isArchived) return { label: "Archived", tone: "neutral" };
+  return templateVersionChip(versionStatus ?? "DRAFT");
 }

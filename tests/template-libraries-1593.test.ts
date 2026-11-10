@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { eventTemplateRowModel, templateVersionChip } from "@/components/event-template-list-model";
+import { editorStatusChip, eventTemplateRowModel, templateVersionChip } from "@/components/event-template-list-model";
 import { TemplateLibrariesGuide, templateLibraries } from "@/components/template-libraries-guide";
 import type { EventTemplateRecord } from "@/modules/event-templates/repository";
 
@@ -33,7 +33,7 @@ describe("the three template libraries guide (#1593)", () => {
       expect(markup).not.toContain(`href="${own.href}"`);
       for (const other of templateLibraries.filter((library) => library.key !== current)) expect(markup).toContain(`href="${other.href}"`);
       expect(markup).toContain("(this page)");
-      expect((markup.match(/aria-current="page"/g) ?? []).length).toBe(1);
+      expect(markup).not.toContain("aria-current");
     });
   }
 
@@ -56,7 +56,7 @@ describe("an event template row (#1593)", () => {
     const row = eventTemplateRowModel(record({ status: "DRAFT", canApply: false, versions: [version()] as never }));
     expect(row.statusChip).toEqual({ label: "Draft", tone: "gold" });
     expect(row.versionLine).toBe("Version 1 is a draft");
-    expect(row.availabilityLine).toContain("until a version is published");
+    expect(row.availabilityLine).toContain("can't be chosen until a version is published");
   });
 
   it("shows a published template with a newer draft, and says new events copy the published version", () => {
@@ -88,6 +88,12 @@ describe("an event template row (#1593)", () => {
   it("labels club and general audiences in words", () => {
     expect(eventTemplateRowModel(record({ audience: "CLUB" })).audienceLabel).toBe("Club events");
     expect(eventTemplateRowModel(record()).audienceLabel).toBe("General events");
+  });
+
+  it("shows an archived template's editor status as Archived, neutral", () => {
+    expect(editorStatusChip(true, "PUBLISHED")).toEqual({ label: "Archived", tone: "neutral" });
+    expect(editorStatusChip(false, "DRAFT")).toEqual({ label: "Draft", tone: "gold" });
+    expect(editorStatusChip(false, undefined).label).toBe("Draft");
   });
 
   it("keeps older published versions as history", () => {

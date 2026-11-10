@@ -6,7 +6,7 @@ import { hasUnsavedTemplateEdits, publishDisabledReason, saveDisabledReason, UNS
 import type { EventTemplateRecord } from "@/modules/event-templates/repository";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { savedMessage } from "@/components/form-message";
-import { templateVersionChip } from "@/components/event-template-list-model";
+import { editorStatusChip, templateVersionChip } from "@/components/event-template-list-model";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import styles from "./event-template-editor.module.css";
 
@@ -62,7 +62,7 @@ export function EventTemplateEditor({ initialTemplate }: EventTemplateEditorProp
   );
   // Unsaved edits to an editable template are protected from an accidental leave (#1593); an archived template is read-only.
   useUnsavedChangesGuard(hasUnsavedEdits && !isArchived);
-  const statusChip = templateVersionChip(isArchived ? "ARCHIVED" : version?.status ?? "DRAFT");
+  const statusChip = editorStatusChip(isArchived, version?.status);
   const saveReason = saveDisabledReason({ isArchived, saving });
   const publishReason = publishDisabledReason({ isArchived, isDraft, publishing });
 

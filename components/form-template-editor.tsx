@@ -134,7 +134,7 @@ export function FormTemplateEditor(props: FormTemplateEditorProps) {
   return <BuilderContext.Provider value={model}><section className="page-stack builder-workspace">{confirmDialog}
     <section className="panel builder-editor-head">
       <div className="builder-status-row">
-        <span className={`status-chip ${source === "APP" ? "gold" : "purple"}`}>Version {version}</span>
+        <span className={`status-chip neutral`}>Version {version}</span>
         <span>{sourceLabel(source)}</span>
         <span className="count-badge">{props.usedByForms} {props.usedByForms === 1 ? "form" : "forms"} created from it</span>
         {dirty && <span className="status-chip gold" role="status">Unsaved changes</span>}

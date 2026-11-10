@@ -24,7 +24,7 @@ export function TemplateLibrariesGuide({ current }: { current: TemplateLibraryKe
     <section className={`panel ${styles.guide}`} aria-label="The three template libraries" data-testid="template-libraries-guide">
       <ul className={styles.list}>
         {templateLibraries.map((library) => (
-          <li className={`${styles.item} ${library.key === current ? styles.current : ""}`} key={library.key} aria-current={library.key === current ? "page" : undefined}>
+          <li className={`${styles.item} ${library.key === current ? styles.current : ""}`} key={library.key}>
             {library.key === current ? (
               <p className={styles.name}>{library.name}<span className={styles.here}>(this page)</span></p>
             ) : (
