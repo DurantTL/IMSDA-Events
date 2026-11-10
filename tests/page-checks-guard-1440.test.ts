@@ -76,15 +76,23 @@ describe("C2: tap targets are at least 44px", () => {
     const compound = lastCompound(part);
     return /(button|btn|trigger|toggle|tab|close|action|link|open[A-Z]|select)/i.test(compound) && !/(icon|marker|avatar|badge|::before|::after)/i.test(compound);
   };
-  // A rule that only applies where a mouse is the pointer is not a phone tap target.
-  const desktopOnly = (rule: CssRule) => rule.at.some((at) => /min-width:\s*(7[7-9]\d|[89]\d\d|\d{4})px|pointer:\s*fine|hover:\s*hover|print/.test(at));
-  const small = modules.flatMap((module) => module.rules.flatMap((rule) => {
-    if (desktopOnly(rule) || !selectorParts(rule.selector).some(tapLike)) return [];
+  // Only print is exempt: a printed page has no tap target. A mouse-only or wide-screen media query is not an exemption (#1775);
+  // the one allowed shorter size is the dense-row token (--touch-target-dense), which is not a plain pixel size, so it never
+  // shows up here. Where that token may appear is checked below.
+  const printOnly = (rule: CssRule) => rule.at.some((at) => /print/.test(at));
+  const shortTargets = (file: string, rules: CssRule[]) => rules.flatMap((rule) => {
+    if (printOnly(rule) || !selectorParts(rule.selector).some(tapLike)) return [];
     return (["height", "min-height"] as const).flatMap((property) => {
       const px = plainPx(declared(rule.body, property));
-      return px !== null && px < 44 ? [`${module.file}:${rule.line} ${rule.selector} { ${property}: ${declared(rule.body, property)} }`] : [];
+      return px !== null && px < 44 ? [`${file}:${rule.line} ${rule.selector} { ${property}: ${declared(rule.body, property)} }`] : [];
     });
-  }));
+  });
+  const small = modules.flatMap((module) => shortTargets(module.file, module.rules));
+  /** The one media block that may hold the dense token: a mouse or trackpad, 1024px and wider. */
+  const inDenseBlock = (rule: CssRule) => rule.at.some((at) => /pointer:\s*fine/.test(at) && /min-width:\s*1024px/.test(at));
+  const denseUses = (file: string, rules: CssRule[]) => rules
+    .filter((rule) => /var\(--touch-target-dense/.test(rule.body))
+    .map((rule) => ({ file, rule, ok: inDenseBlock(rule) && /\.dense-rows\b/.test(rule.selector) }));
 
   it("keeps the 44px token", () => {
     expect(globalsCss).toMatch(/:root \{[^}]*--touch-target: 44px;/);
@@ -98,6 +106,39 @@ describe("C2: tap targets are at least 44px", () => {
     const [rule] = cssRules(".saveButton { min-height: 40px; }");
     expect(selectorParts(rule!.selector).some(tapLike)).toBe(true);
     expect(plainPx(declared(rule!.body, "min-height"))).toBeLessThan(44);
+  });
+
+  it("keeps the dense-row token (#1775) at 36px, set once", () => {
+    expect(globalsCss).toMatch(/:root \{[^}]*--touch-target-dense: 36px;/);
+    expect(globalsCss.match(/--touch-target-dense:/g)).toHaveLength(1);
+  });
+
+  it("uses the dense token only on .dense-rows rules inside the pointer: fine, min-width: 1024px block", () => {
+    const uses = [...denseUses("app/globals.css", globalsRules), ...modules.flatMap((module) => denseUses(module.file, module.rules))];
+    expect(uses.length).toBeGreaterThan(0);
+    expect(uses.filter((use) => !use.ok).map((use) => `${use.file}:${use.rule.line} ${use.rule.selector}`)).toEqual([]);
+  });
+
+  it("lets a dense-token rule inside the block pass and fails the same rule outside it, or a raw 36px inside it (the scanner itself)", () => {
+    const block = "@media (pointer: fine) and (min-width: 1024px) {";
+    const dense = ".dense-rows .rowButton { min-height: var(--touch-target-dense); }";
+    const [inside] = cssRules(`${block} ${dense} }`);
+    const [outside] = cssRules(dense);
+    const [rawInside] = cssRules(`${block} .dense-rows .rowButton { min-height: 36px; } }`);
+    const [wrongBlock] = cssRules(`@media (pointer: fine) { ${dense} }`);
+    expect(shortTargets("x", [inside!])).toEqual([]);
+    expect(inDenseBlock(inside!)).toBe(true);
+    expect(inDenseBlock(outside!)).toBe(false);
+    expect(inDenseBlock(wrongBlock!)).toBe(false);
+    expect(shortTargets("x", [rawInside!])).toHaveLength(1);
+    expect(shortTargets("x", [outside!])).toEqual([]);
+  });
+
+  it("fails a short button rule even in a mouse-only or wide-screen block (the scanner itself)", () => {
+    const [fine] = cssRules("@media (pointer: fine) { .rowButton { min-height: 36px; } }");
+    const [wide] = cssRules("@media (min-width: 1280px) { .rowButton { min-height: 36px; } }");
+    expect(shortTargets("x", [fine!])).toHaveLength(1);
+    expect(shortTargets("x", [wide!])).toHaveLength(1);
   });
 
   it("keeps the phone tap-target block and the audit that measures it", () => {

@@ -32,7 +32,7 @@ IMAdventist (Events & Club Ministry) is the Iowa-Missouri Conference's event and
 
 ## Layout, shape and depth
 
-- Tap targets are at least 44px (`touch-target`); public calls to action are 48px (`target-cta`).
+- Tap targets are at least 44px (`touch-target`); public calls to action are 48px (`target-cta`). The one exception (#1775, L13): inside a staff table or list row marked `dense-rows`, with a mouse or trackpad (`pointer: fine`) at 1024px and wider, row actions, row links, compact selects and the row's select box may be `touch-target-dense` (36px). Touch and any screen under 1024px stay 44px, and no page sets its own smaller size.
 - Radii: `radius-field` 10px for fields and buttons, `radius-card` for panels, `radius-modal` for dialogs, `radius-pill` for chips.
 - Radii by job (#1771), same values as the older tokens: `--radius-element` (10px) for buttons, fields and small controls; `--radius-container` (12px) for cards and panels; `--radius-overlay` (20px) for dialogs, sheets and menus; `--radius-pill` (999px) for chips and pills. Use these in new CSS. The older radius tokens stay.
 - App tokens (#1350): `--secondary-bg`, `--table-head`, `--touch-target` and the radii `--radius-sm`, `--radius-card`, `--radius-info`, `--radius-panel`, `--radius-modal`, `--radius-pill` now exist in `app/globals.css`, with the same values as in `tokens.css`.

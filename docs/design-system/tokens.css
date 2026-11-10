@@ -117,6 +117,7 @@
   --workspace-width: 1420px;
   --sidebar-width: 260px;
   --touch-target: 44px;
+  --touch-target-dense: 36px;
   --target-desktop: 36px;
   --target-cta: 48px;
   --radius-sm: 8px;
