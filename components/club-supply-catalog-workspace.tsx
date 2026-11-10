@@ -89,9 +89,9 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
   const registerAction = useRegisterCatalogAction();
   const reading = busy && !preview;
   useEffect(() => {
-    registerAction({ run: () => fileRef.current?.click(), busy: reading });
+    registerAction({ run: () => fileRef.current?.click(), busy: reading, blocked: busy });
     return () => registerAction(null);
-  }, [registerAction, reading]);
+  }, [registerAction, reading, busy]);
 
   /** Close, Cancel, Escape and the backdrop: a save in flight waits, and typed work asks first. */
   async function closeEditor() {
@@ -259,7 +259,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
         {error && <div className="inline-notice error" role="alert">{error}</div>}
         <div className={catalogStyles.toolbar}>
-          <input accept=".csv,text/csv" aria-label="Upload CSV file" className="sr-only" disabled={busy} onChange={chooseFile} ref={fileRef} tabIndex={-1} type="file" />
+          <input accept=".csv,text/csv" aria-label="Upload CSV file" aria-hidden="true" className="sr-only" disabled={busy} onChange={chooseFile} ref={fileRef} tabIndex={-1} type="file" />
           <span className={catalogStyles.toolbarTools}>
             <ExportLink className="text-button" href={TEMPLATE_HREF}><Download aria-hidden="true" size={14} /> CSV template</ExportLink>
           </span>
@@ -436,7 +436,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
               )}
               <div className={`form-actions ${catalogStyles.dialogActions}`}>
                 <button className="secondary-button" disabled={toggling === editedItem.id} onClick={() => void closeEditor()} type="button">Cancel</button>
-                <button aria-disabled={toggling === editedItem.id || undefined} className="primary-button" type="submit">{toggling === editedItem.id ? "Saving…" : "Save supplier"}</button>
+                <button aria-disabled={toggling === editedItem.id || undefined} className={`primary-button ${catalogStyles.held}`} type="submit">{toggling === editedItem.id ? "Saving…" : "Save supplier"}</button>
               </div>
             </form>
           </section>

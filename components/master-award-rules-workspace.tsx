@@ -215,13 +215,13 @@ function RuleEditor({
       {error && <p className="inline-notice error" role="alert">{error}</p>}
       <div className={`form-actions ${catalogStyles.dialogActions}`}>
         <button className="secondary-button" disabled={busy} onClick={onCancel} type="button">Cancel</button>
-        <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => save()} type="button">{saving === "save" ? "Saving…" : "Save changes"}</button>
+        <button aria-disabled={busy || undefined} className={`secondary-button ${catalogStyles.held}`} onClick={() => save()} type="button">{saving === "save" ? "Saving…" : "Save changes"}</button>
         {rule.status !== "ACTIVE" ? (
-          <button aria-disabled={busy || !checked || undefined} className="primary-button" onClick={() => { if (checked) void save("ACTIVE"); }} type="button">
+          <button aria-disabled={busy || !checked || undefined} className={`primary-button ${catalogStyles.held}`} onClick={() => { if (checked) void save("ACTIVE"); }} type="button">
             <CheckCircle2 aria-hidden="true" size={16} /> {saving === "ACTIVE" ? "Saving…" : "Save and activate"}
           </button>
         ) : (
-          <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => save("INACTIVE")} type="button">{saving === "INACTIVE" ? "Saving…" : "Deactivate"}</button>
+          <button aria-disabled={busy || undefined} className={`secondary-button ${catalogStyles.held}`} onClick={() => save("INACTIVE")} type="button">{saving === "INACTIVE" ? "Saving…" : "Deactivate"}</button>
         )}
       </div>
     </div>
@@ -257,9 +257,9 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
   const registerAction = useRegisterCatalogAction();
   const reading = busy && !preview;
   useEffect(() => {
-    registerAction({ run: () => fileRef.current?.click(), busy: reading });
+    registerAction({ run: () => fileRef.current?.click(), busy: reading, blocked: busy });
     return () => registerAction(null);
-  }, [registerAction, reading]);
+  }, [registerAction, reading, busy]);
 
   async function closeEditor() {
     if (busyRef.current) return;
@@ -342,7 +342,7 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
         </ul>
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
         {error && <div className="inline-notice error" role="alert">{error}</div>}
-        <input accept=".json,application/json" aria-label="Upload rules file" className="sr-only" disabled={busy} onChange={chooseFile} ref={fileRef} tabIndex={-1} type="file" />
+        <input accept=".json,application/json" aria-label="Upload rules file" aria-hidden="true" className="sr-only" disabled={busy} onChange={chooseFile} ref={fileRef} tabIndex={-1} type="file" />
         <details className={catalogStyles.importHelp}>
           <summary>How the rules import works</summary>
           <p className="field-help">

@@ -261,7 +261,7 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
               </label>
               <div className={`form-actions ${styles.dialogActions}`}>
                 <button className="secondary-button" disabled={saving} onClick={() => void closeEditor()} type="button">Cancel</button>
-                <button aria-disabled={saving || undefined} className="primary-button" type="submit">
+                <button aria-disabled={saving || undefined} className={`primary-button ${styles.held}`} type="submit">
                   <Save aria-hidden="true" size={16} />
                   {saving ? " Saving…" : " Save honor"}
                 </button>

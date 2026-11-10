@@ -20,3 +20,6 @@
 .importHelp summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .dialogActions { flex-wrap: wrap; }
 .dialogActions > button { flex: 1 1 8rem; justify-content: center; }
+
+/* A button that stays focusable while it cannot be used (aria-disabled) still looks unavailable. */
+.held[aria-disabled="true"] { cursor: not-allowed; opacity: 0.58; }
