@@ -43,7 +43,7 @@ export function ClubFormCreate({ templates }: { templates: Array<{ key: string; 
 
   return (
     <form className="panel form-stack" onSubmit={create}>
-      <h3>New form</h3>
+      <h2>New form</h2>
       <p className="field-help">A new form starts off. Build it, publish it, then turn it on when it is ready.</p>
       <div className="form-grid two-column">
         <label>Name

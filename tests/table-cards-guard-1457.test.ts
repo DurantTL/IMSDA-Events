@@ -73,7 +73,6 @@ const allowList: Record<string, { tables: number; reason: string }> = {
   "components/staff-monthly-records.tsx": { tables: 1, reason: "Has its own two-line row layout (#1298), switched by the card's width; move it onto table-cards in a follow-up." },
   "app/(public)/account/(portal)/area/[organizationId]/forms/page.tsx": { tables: 1, reason: fits },
   "app/(public)/account/(portal)/clubs/[organizationId]/events/[eventId]/schedule/page.tsx": { tables: 1, reason: fits },
-  "app/(workspace)/more/club-forms/page.tsx": { tables: 1, reason: fits },
   "app/(workspace)/more/honors/rosters/page.tsx": { tables: 4, reason: fits },
   "app/(workspace)/more/kitchen-report/scanner-import/page.tsx": { tables: 1, reason: fits },
   "app/(workspace)/more/program-assignments/[runId]/page.tsx": { tables: 1, reason: fits },
