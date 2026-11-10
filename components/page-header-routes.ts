@@ -20,6 +20,7 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/admin/club-forms" },
   { pattern: "/admin/club-forms/[templateKey]", notSegments: ["public-page"] },
   { pattern: "/more/club-forms" },
+  { pattern: "/more/club-forms/[submissionId]" },
 ];
 
 function segmentsOf(path: string) {

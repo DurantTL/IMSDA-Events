@@ -91,13 +91,19 @@ describe("where the submissions pages sit in the shell (#1573)", () => {
     expect(shell.eventTabs.length).toBeGreaterThan(0);
   });
 
-  it("draws no Admin tabs and lights no rail item for an Event Admin on the no-event URL", () => {
-    for (const selected of [true, false]) {
-      const shell = nav({ isSystemAdmin: false, search: "", selected });
-      expect(shell.place.area).toBe("admin");
-      expect(shell.rowTabs).toEqual([]);
-      expect(shell.rail.some((item) => item.area === "admin")).toBe(false);
-      expect(shell.rail.filter((item) => item.area === shell.place.area)).toEqual([]);
+  it("keeps the event shell for an Event Admin with no Admin area on the no-event URL (the alert email link)", () => {
+    for (const path of ["/more/club-forms", "/more/club-forms/sub_1"]) {
+      const shell = buildStaffNavigation({
+        pathname: path,
+        search: new URLSearchParams(""),
+        isSystemAdmin: false,
+        adminRoleView: null,
+        siteContentEditor: false,
+        hasEvents: true,
+        selectedEvent: { id: "event_1", permissions: [], clubFormsAccess: true, hiddenCardKeys: [] },
+      });
+      expect(shell.place).toEqual({ area: "events", tab: null, view: null, inEvent: true });
+      expect(shell.rail.some((item) => item.area === "events")).toBe(true);
     }
   });
 });
@@ -219,8 +225,30 @@ describe("the submitted club forms pages (#1573)", () => {
 
   it("keeps the audited load and the access checks of the detail page, with one back link that reads Back to submissions", () => {
     expect(submission).toContain("getSubmissionForViewer(viewer, submissionId)");
-    expect(submission.match(/<BackLink\b/g)).toHaveLength(1);
-    expect(submission).toContain('variant="staff">Back to submissions</BackLink>');
+    expect(submission.match(/back=\{\{/g)).toHaveLength(1);
+    expect(submission).not.toContain("BackLink");
+    expect(submission).toContain('label: "Back to submissions"');
+    expect(submission).toContain("title={staffPageTitles.clubForm}");
+    expect(submission).toContain("secondary={<PrintFormButton />}");
     expect(submission).toContain("`/more/club-forms${event ? `?event=${encodeURIComponent(event)}` : \"\"}`");
+  });
+});
+
+describe("the submission page header does not print (#1573)", () => {
+  it("sits inside the wrapper the print rules already hide, in the restricted state too", () => {
+    expect(submission).toMatch(/<div className="club-form-page-actions">\s*<PageHeader/);
+    expect(read("app/globals.css")).toMatch(/@media print \{\s*\.sidebar[^}]*\.club-form-page-actions[^}]*display: none !important/);
+    expect(submission).toContain("<PageHeader title={staffPageTitles.clubForm} />");
+    expect(submission).toContain("<ClubFormSubmissionView");
+  });
+
+  it("is listed as a page that draws its own header", () => {
+    expect(read("components/page-header-routes.ts")).toContain('pattern: "/more/club-forms/[submissionId]"');
+  });
+});
+
+describe("the On or Off help says what the switch does (#1573)", () => {
+  it("names each verified effect", () => {
+    for (const phrase of ["private links work", "opens its public application", "public club forms page link to it", "Missing forms view", "Area Coordinators", "Everything already filled in is kept"]) expect(definitions).toContain(phrase);
   });
 });

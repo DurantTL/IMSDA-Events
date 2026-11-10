@@ -65,14 +65,12 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
         <p className="quiet-copy">Who fills it in and whether it is required are set on the <Link href="/admin/club-forms">Club forms list</Link>.</p>
       </section>
       {view.customized && <p className="field-help">Edited in the app; code updates no longer apply to this form.</p>}
-      {view.draftStale ? (
+      {view.draftStale && (
         <ClubFormDraftDiscard
           message={`This draft was started on version ${view.draftBaseVersion ?? "?"}, but the form is now on version ${view.version}. ${STALE_DRAFT_MESSAGE}`}
           templateKey={view.key}
         />
-      ) : view.draftBaseVersion !== null && (view.draft !== null || view.draftUnreadable)
-        ? <p className="field-help">This draft was started on version {view.draftBaseVersion}.</p>
-        : null}
+      )}
       {user.globalRole === "SYSTEM_ADMIN"
         ? <ClubFormAlertRecipients initialEmails={view.alertRecipients} key={`${view.key}-${view.alertRecipients.join(",")}`} templateKey={view.key} />
         : <p className="inline-notice" role="status">Who is emailed when this form is submitted is set by a system administrator.</p>}

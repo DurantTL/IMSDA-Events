@@ -303,7 +303,7 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   if (under(pathname, "/more/club-forms") && !params.get("event")) return place("admin", "hub-forms", "/admin/club-forms");
   if (isEventScopedPath(pathname)) return { area: "events", tab: null, view: null, inEvent: true };
 
-  if (pathname === "/admin")return place("admin", "system-administration");
+  if (pathname === "/admin") return place("admin", "system-administration");
   if (under(pathname, adminHubs.events.href)) return place("admin", "hub-events");
   if (under(pathname, adminHubs.clubs.href)) return place("admin", "hub-clubs");
   if (under(pathname, adminHubs.people.href)) return place("admin", "hub-people");
