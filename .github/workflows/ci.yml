@@ -150,6 +150,8 @@ jobs:
       - run: npm run test:group-registration
       # Real-database check of the one-active-act-as-per-session index and racing starts (#442).
       - run: npm run test:staff-act-as
+      # Real-database check of who the People & access list holds (#1788): a Clubs Administrator lists club people only (a current or scheduled club role in a club, a current Area Coordinator, a current Clubs Administrator), with or without a search, and a system administrator still lists everyone.
+      - run: npm run test:people-club-scope
       # Real-database check of the staff User to AttendeeAccount link (#554 slice a): nullable and unlinked by default, unique (one account, one user), both sides must exist, ON DELETE SET NULL on the account and no effect on it when the user goes, and the one-sign-in switch off by default.
       - run: npm run test:user-attendee-link
       # Real-database check of one account per person, slice (b) (#554): with the switch off activation links nothing; with it on a new staff user gets a verified linked attendee account, unverified or already-linked accounts are never taken, a reset links nothing, and no attendee password, Google or email-code sign-in yields a staff session.

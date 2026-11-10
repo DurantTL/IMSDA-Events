@@ -54,5 +54,13 @@ export default async function StaffInvitePage({ params }: PageProps) {
       </StateCard>
     );
   }
+  if (experience.state === "EXPIRED") {
+    return (
+      <StateCard eyebrow={experience.event.name} heading="This link has expired">
+        <p>Ask the event office for a new invitation.</p>
+        {experience.event.supportContact && <p>Event office: {experience.event.supportContact}</p>}
+      </StateCard>
+    );
+  }
   return <StaffInvitationRegistration event={experience.event} person={experience.person} questions={experience.questions} token={token} />;
 }

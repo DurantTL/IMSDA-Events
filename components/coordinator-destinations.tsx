@@ -56,6 +56,7 @@ export function CoordinatorExportLink({ clubYear, kind }: { clubYear: string; ki
         <ExportLink className="secondary-button" href={`${EXPORT_PATH}?report=${kind}&year=${encodeURIComponent(clubYear)}`}>
           <Download aria-hidden="true" size={15} /> {fullYearExportLabel(clubYear, kind)}
         </ExportLink>
+        <Link className="text-button" href={`/account/area-clubs/reports/export?year=${encodeURIComponent(clubYear)}`}>More export options</Link>
       </div>
       <p className="field-help">The CSV covers the full club year for every available club. It does not change with the search below.</p>
     </div>
