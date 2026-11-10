@@ -439,9 +439,9 @@ export function CalendarAdminWorkspace({
         <h2 id="calendar-scope" className={styles.scopeTitle}>What this changes on the public calendar</h2>
         <ul className={styles.scopeList}>
           <li>Published events appear automatically. Hide one, or give it a category, on the Events tab.</li>
-          <li>A calendar entry marked On calendar appears too. A Draft stays off it.</li>
+          <li>A calendar entry marked On calendar appears too, unless it is hidden here or no longer in its source. A Draft stays off it.</li>
           <li>A date marked Deadline stays off the public calendar. It shows to clubs and Area Coordinators as a deadline, with reminders.</li>
-          <li>Calendar entries are not registration events. Use Add registration on an entry to start an event from it, or link it to an event you already have.</li>
+          <li>Calendar entries are not registration events. Use Add registration on an entry to start one, or link it to an existing event.</li>
         </ul>
       </section>
 

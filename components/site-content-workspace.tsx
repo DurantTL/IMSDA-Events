@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Eye, Plus, Save, Send, Trash2, Undo2 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -124,6 +124,25 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
   const dirty = JSON.stringify(content) !== savedJson || note !== savedNote;
   const patch = (next: Partial<HubContent>) => setContent((current) => ({ ...current, ...next }));
   const eventById = new Map(events.map((event) => [event.id, event]));
+  // After an add, focus moves to the new item's first field: the add button that was pressed is gone or has moved (empty state).
+  const pendingFocus = useRef<string | null>(null);
+  const [addCount, setAddCount] = useState(0);
+  useEffect(() => {
+    if (!pendingFocus.current) return;
+    document.querySelector<HTMLElement>(`[data-focus-id="${pendingFocus.current}"]`)?.focus();
+    pendingFocus.current = null;
+  }, [addCount]);
+  const focusNew = (id: string) => { pendingFocus.current = id; setAddCount((count) => count + 1); };
+  const addNotice = () => {
+    const id = newId();
+    focusNew(id);
+    patch({ notices: [...content.notices, { id, level: "INFO", message: "" }] });
+  };
+  const addAnnouncement = () => {
+    const id = newId();
+    focusNew(id);
+    patch({ announcements: [...content.announcements, { id, title: "", body: "" }] });
+  };
 
   async function run(work: () => Promise<string>) {
     setBusy(true);
@@ -221,7 +240,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
               : <span className="status-chip neutral">No unpublished changes</span>}
         </p>
         <p className={styles.scope}>
-          <strong>What this changes on the public site:</strong> the homepage and its Announcements and Featured sections, the notice banner on the homepage, calendar and events pages, the header links on the public pages, the homepage footer, and the Category choices on the events page.
+          <strong>What this changes on the public site:</strong> the homepage and its Announcements and Featured sections, the notice banner on the homepage, calendar and events pages, the footer on the public pages, and the Category choices on the events page.
           Everything here is plain text. Visitors see nothing until you publish, and every step is recorded.
         </p>
         <label className={styles.stack}>
@@ -235,7 +254,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
           <button className="secondary-button" disabled={busy || !hasDraft} onClick={() => void onDiscard()} type="button"><Trash2 aria-hidden="true" size={16} /> Discard draft</button>
         </div>
         <p className={styles.note}>
-          Save draft keeps your changes for later. Preview opens the saved draft in a new tab, and it has a Back to the editor link. Publish shows the draft to visitors.
+          Save draft keeps your changes for later. Preview opens the saved draft in a new tab, and it has a Back to the editor link. Publish saves any unsaved edits and shows the draft to visitors.
         </p>
         <div aria-live="polite" className={styles.status} id={statusId} role="status">
           {message}
@@ -250,7 +269,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
         <p className={`field-help ${styles.help}`}>A banner at the top of the homepage, the calendar and the events pages. Use it for closures and urgent news. Up to {limits.notices}.</p>
         <div className={styles.stack}>
           {content.notices.length === 0 && (
-            <EmptyState action={{ label: "Add a notice", onClick: () => patch({ notices: [{ id: newId(), level: "INFO", message: "" }] }) }} actionClass="secondary-button" announce={false} canCreate className={`empty-state ${styles.empty}`} title="No notices">No banner is showing on the public pages.</EmptyState>
+            <EmptyState action={{ label: "Add a notice", onClick: addNotice }} actionClass="secondary-button" announce={false} canCreate className={`empty-state ${styles.empty}`} title="No notices">No banner is showing on the public pages.</EmptyState>
           )}
           {content.notices.map((notice, index) => {
             const update = (next: Partial<HubNotice>) => patch({ notices: replaceAt(content.notices, index, { ...notice, ...next }) });
@@ -258,7 +277,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
               <div className={styles.item} key={notice.id}>
                 <div className={styles.fields}>
                   <label>Level
-                    <select onChange={(event) => update({ level: event.target.value as NoticeLevel })} value={notice.level}>
+                    <select data-focus-id={notice.id} onChange={(event) => update({ level: event.target.value as NoticeLevel })} value={notice.level}>
                       {noticeLevels.map((level) => <option key={level} value={level}>{noticeLevelLabels[level]}</option>)}
                     </select>
                   </label>
@@ -278,7 +297,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
             );
           })}
           {content.notices.length > 0 && content.notices.length < limits.notices && (
-            <div><button className="secondary-button" onClick={() => patch({ notices: [...content.notices, { id: newId(), level: "INFO", message: "" }] })} type="button"><Plus aria-hidden="true" size={16} /> Add a notice</button></div>
+            <div><button className="secondary-button" onClick={addNotice} type="button"><Plus aria-hidden="true" size={16} /> Add a notice</button></div>
           )}
         </div>
       </section>
@@ -288,7 +307,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
         <p className={`field-help ${styles.help}`}>Short items in the Announcements section of the homepage. The section is hidden while none are showing. Up to {limits.announcements}.</p>
         <div className={styles.stack}>
           {content.announcements.length === 0 && (
-            <EmptyState action={{ label: "Add an announcement", onClick: () => patch({ announcements: [{ id: newId(), title: "", body: "" }] }) }} actionClass="secondary-button" announce={false} canCreate className={`empty-state ${styles.empty}`} title="No announcements">The Announcements section is hidden on the homepage while there are none.</EmptyState>
+            <EmptyState action={{ label: "Add an announcement", onClick: addAnnouncement }} actionClass="secondary-button" announce={false} canCreate className={`empty-state ${styles.empty}`} title="No announcements">The Announcements section is hidden on the homepage while there are none.</EmptyState>
           )}
           {content.announcements.map((announcement, index) => {
             const update = (next: Partial<HubAnnouncement>) => patch({ announcements: replaceAt(content.announcements, index, { ...announcement, ...next }) });
@@ -296,7 +315,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
               <div className={styles.item} key={announcement.id}>
                 <div className={styles.fields}>
                   <label className={styles.wide}>Title <span className={styles.count}>({announcement.title.length}/{limits.announcementTitle})</span>
-                    <input maxLength={limits.announcementTitle} onChange={(event) => update({ title: event.target.value })} value={announcement.title} />
+                    <input data-focus-id={announcement.id} maxLength={limits.announcementTitle} onChange={(event) => update({ title: event.target.value })} value={announcement.title} />
                   </label>
                   <label className={styles.wide}>Text <span className={styles.count}>({announcement.body.length}/{limits.announcementBody})</span>
                     <textarea maxLength={limits.announcementBody} onChange={(event) => update({ body: event.target.value })} rows={3} value={announcement.body} />
@@ -314,7 +333,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
             );
           })}
           {content.announcements.length > 0 && content.announcements.length < limits.announcements && (
-            <div><button className="secondary-button" onClick={() => patch({ announcements: [...content.announcements, { id: newId(), title: "", body: "" }] })} type="button"><Plus aria-hidden="true" size={16} /> Add an announcement</button></div>
+            <div><button className="secondary-button" onClick={addAnnouncement} type="button"><Plus aria-hidden="true" size={16} /> Add an announcement</button></div>
           )}
         </div>
       </section>

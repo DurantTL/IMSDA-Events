@@ -24,7 +24,7 @@ export default async function SiteContentPage() {
     <>
       {user.globalRole === "SYSTEM_ADMIN" ? <AdminSectionHeaderFor path="/admin/site-content" section="system" /> : null}
       <PageHeader
-        description="Edit the public homepage, notices, header links and footer, then preview and publish them."
+        description="Edit the public homepage, notices and footer, then preview and publish them."
         title="Homepage & site content"
       />
       <SiteContentWorkspace

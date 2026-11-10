@@ -31,7 +31,6 @@
 .item textarea, .item input { overflow-wrap: anywhere; }
 @media (max-width: 639px) {
   .actions > button, .actions > a { flex: 1 1 100%; justify-content: center; }
-  .actions > button.primary-button { order: -1; }
   .rowButtons { width: 100%; }
   .rowButtons button { flex: 1 1 0; justify-content: center; }
   .history li > button { width: 100%; justify-content: center; }

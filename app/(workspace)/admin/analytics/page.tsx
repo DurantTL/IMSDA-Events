@@ -8,6 +8,7 @@ import { SortOrderNote } from "@/components/list-sort";
 import { serverSort, sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { formatDateRange } from "@/modules/calendar/domain";
 import { conferenceToday } from "@/modules/calendar/repository";
 import { getAnalyticsSummary, type MetricRow } from "@/modules/public-metrics/repository";
 import styles from "./analytics.module.css";
@@ -24,7 +25,7 @@ type TableRow = { cells: string[]; values?: SortValue[] };
 const COLUMN_KEYS = ["c0", "c1", "c2", "c3"] as const;
 type ColumnKey = typeof COLUMN_KEYS[number];
 
-function Table({ caption, head, rows, empty = "Nothing counted yet. Counts appear as visitors use the public site.", sortBy, search }: { caption: string; head: string[]; rows: TableRow[]; empty?: string; sortBy?: string; search?: Record<string, string | string[] | undefined> }) {
+function Table({ caption, head, rows, empty = "Nothing counted yet.", sortBy, search }: { caption: string; head: string[]; rows: TableRow[]; empty?: string; sortBy?: string; search?: Record<string, string | string[] | undefined> }) {
   // Sortable from its headers (#1458) when the page names this table's address prefix; a short fixed list passes none.
   const sorting: ServerSort<ColumnKey> | undefined = sortBy && search ? serverSort<ColumnKey>("/admin/analytics", search, COLUMN_KEYS.slice(0, head.length), { key: null, dir: "asc" }, { prefix: sortBy }) : undefined;
   const accessors = Object.fromEntries(COLUMN_KEYS.map((key, index) => [key, (row: TableRow) => (row.values ? row.values[index] : row.cells[index])])) as Record<ColumnKey, (row: TableRow) => SortValue>;
@@ -72,7 +73,7 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
           title="Public analytics"
         />
         <section aria-labelledby="analytics-intro" className="panel">
-          <div className="section-heading"><div><p className="eyebrow">{summary.from} to {summary.to}</p><h2 id="analytics-intro">What is counted</h2></div></div>
+          <div className="section-heading"><div><p className="eyebrow">{formatDateRange(summary.from, summary.to)}</p><h2 id="analytics-intro">What is counted</h2></div></div>
           <p className={`field-help ${styles.help}`}>
             Daily counts only. Nothing here identifies a person, a device, a search or a private event.
             Visitors who send a Global Privacy Control or Do Not Track signal are not counted, and the staff workspace is never measured. Rows older than 400 days are deleted.
@@ -117,6 +118,7 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
           <Table
             caption="Sign-ins by method"
             head={["Method", "Worked", "Failed", "Success rate"]}
+            empty="Nothing counted yet. Sign-ins appear here once someone signs in."
             rows={summary.logins.map((row) => ({ cells: [row.surface, String(row.success), String(row.failure), pct(row.success, row.success + row.failure)], values: [row.surface, row.success, row.failure, rate(row.success, row.success + row.failure)] }))}
             search={search}
             sortBy="method"
