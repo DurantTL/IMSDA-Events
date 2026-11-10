@@ -26,7 +26,7 @@ export type DirectoryStatusTone = "green" | "gold" | "purple" | "coral" | "neutr
  * availability words in `scripts/support/site-rules-checks`). A lifecycle state with no word of its own takes the nearest
  * approved one, and an archived event shows none (the Archived events page says so in its title).
  */
-export const directoryStatusWords = ["Draft", "Published", "Registration closed", "Closed"] as const;
+export const directoryStatusWords = ["Draft", "Published", "Registration closed"] as const;
 export type DirectoryStatusWord = typeof directoryStatusWords[number];
 
 export const statusWordFor: Record<EventLifecycleStateName, DirectoryStatusWord | null> = {
@@ -37,10 +37,11 @@ export const statusWordFor: Record<EventLifecycleStateName, DirectoryStatusWord 
   REGISTRATION_CLOSED: "Registration closed",
   // Public, with registration left to the dates, as Published is.
   IN_PROGRESS: "Published",
-  // Registration is closed by the state itself in all three.
-  COMPLETE: "Closed",
-  FINANCIAL_RECONCILIATION: "Closed",
-  CLOSED: "Closed",
+  // Registration is closed by the state itself in all three, and the event stays on the public site: the same
+  // words Event home and the public page use for them, so one filter choice finds every closed event.
+  COMPLETE: "Registration closed",
+  FINANCIAL_RECONCILIATION: "Registration closed",
+  CLOSED: "Registration closed",
   ARCHIVED: null,
 };
 
@@ -48,7 +49,6 @@ const toneFor: Record<DirectoryStatusWord, DirectoryStatusTone> = {
   Draft: "neutral",
   Published: "green",
   "Registration closed": "gold",
-  Closed: "neutral",
 };
 
 export type EventDirectoryRow = {

@@ -314,7 +314,7 @@ describe("the create pages still mount the same client components (#1570)", () =
 
 describe("status words, fields and announcements (#1570 review)", () => {
   // The publishing and availability words B12 also allows on an event (site-rule-checks: "Published", AVAILABILITY_WORDS).
-  const approved = [...APPROVED_STATUS_WORDS, "Published", "Registration closed", "Closed"];
+  const approved = [...APPROVED_STATUS_WORDS, "Published", "Registration closed"];
 
   it("renders only approved words for every lifecycle state, and none for an archived event", () => {
     for (const state of eventLifecycleStates) {
@@ -323,7 +323,7 @@ describe("status words, fields and announcements (#1570 review)", () => {
     }
     for (const word of directoryStatusWords) expect(approved).toContain(word);
     expect(statusWordFor.ARCHIVED).toBeNull();
-    expect(statusWordFor).toMatchObject({ TEST: "Draft", IN_PROGRESS: "Published", COMPLETE: "Closed", FINANCIAL_RECONCILIATION: "Closed", CLOSED: "Closed" });
+    expect(statusWordFor).toMatchObject({ TEST: "Draft", IN_PROGRESS: "Published", COMPLETE: "Registration closed", FINANCIAL_RECONCILIATION: "Registration closed", CLOSED: "Registration closed" });
     for (const word of ["Test", "In progress", "Complete", "Financial reconciliation", "Archived"]) expect(directoryStatusWords).not.toContain(word);
   });
 
