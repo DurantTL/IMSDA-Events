@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Eye, Plus, Save, Send, Trash2, Undo2 } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 import { useConfirm } from "@/components/use-confirm";
 import { homeFeaturedLimit } from "@/modules/events/featured-domain";
 import {
@@ -205,8 +206,8 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
       <section aria-labelledby="site-content-state" className="panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Public homepage</p>
-            <h2 id="site-content-state">Homepage &amp; site content</h2>
+            <p className="eyebrow">Draft and publishing</p>
+            <h2 id="site-content-state">Where this stands</h2>
           </div>
         </div>
         <p className={styles.stateBar}>
@@ -219,30 +220,38 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
               ? <span className="status-chip gold">Draft not published</span>
               : <span className="status-chip neutral">No unpublished changes</span>}
         </p>
-        <p className={styles.note}>
-          Everything here is plain text. Save a draft, preview it, then publish. Visitors see nothing until you publish, and every step is recorded.
+        <p className={styles.scope}>
+          <strong>What this changes on the public site:</strong> the homepage and its Announcements and Featured sections, the notice banner on the homepage, calendar and events pages, the header links on the public pages, the homepage footer, and the Category choices on the events page.
+          Everything here is plain text. Visitors see nothing until you publish, and every step is recorded.
         </p>
         <label className={styles.stack}>
           <span>Note for the history (optional) <span className={styles.count}>({note.length}/{limits.revisionNote})</span></span>
           <input maxLength={limits.revisionNote} onChange={(event) => setNote(event.target.value)} value={note} />
         </label>
-        <div className={styles.actions}>
-          <button className="primary-button" disabled={busy || !dirty} onClick={() => void onSave()} type="button"><Save aria-hidden="true" size={16} /> Save draft</button>
+        <div className={styles.actions} role="group" aria-label="Save, preview and publish">
+          <button className="secondary-button" disabled={busy || !dirty} onClick={() => void onSave()} type="button"><Save aria-hidden="true" size={16} /> Save draft</button>
           <a aria-disabled={!hasDraft} className="secondary-button" href={hasDraft ? "/admin/site-content/preview" : undefined} rel="noopener" target="_blank"><Eye aria-hidden="true" size={16} /> Preview<span className="sr-only"> (opens in a new tab)</span></a>
           <button className="primary-button" disabled={busy || (!hasDraft && !dirty)} onClick={() => void onPublish()} type="button"><Send aria-hidden="true" size={16} /> Publish</button>
           <button className="secondary-button" disabled={busy || !hasDraft} onClick={() => void onDiscard()} type="button"><Trash2 aria-hidden="true" size={16} /> Discard draft</button>
         </div>
+        <p className={styles.note}>
+          Save draft keeps your changes for later. Preview opens the saved draft in a new tab, and it has a Back to the editor link. Publish shows the draft to visitors.
+        </p>
         <div aria-live="polite" className={styles.status} id={statusId} role="status">
           {message}
           {error ? <span className={styles.error} role="alert">{error}</span> : null}
         </div>
         {dirty && <p className={styles.note}>Save the draft before you preview, so the preview shows these changes.</p>}
+        {!dirty && !hasDraft && <p className={styles.note}>Preview is available once there is a saved draft.</p>}
       </section>
 
       <section aria-labelledby="site-content-notices" className="panel">
         <div className="section-heading"><div><h2 id="site-content-notices">Notices</h2></div></div>
-        <p className="field-help" style={{ margin: "4px 0 0" }}>A banner at the top of the homepage, the calendar and the events pages. Use it for closures and urgent news. Up to {limits.notices}.</p>
+        <p className={`field-help ${styles.help}`}>A banner at the top of the homepage, the calendar and the events pages. Use it for closures and urgent news. Up to {limits.notices}.</p>
         <div className={styles.stack}>
+          {content.notices.length === 0 && (
+            <EmptyState action={{ label: "Add a notice", onClick: () => patch({ notices: [{ id: newId(), level: "INFO", message: "" }] }) }} actionClass="secondary-button" announce={false} canCreate className={`empty-state ${styles.empty}`} title="No notices">No banner is showing on the public pages.</EmptyState>
+          )}
           {content.notices.map((notice, index) => {
             const update = (next: Partial<HubNotice>) => patch({ notices: replaceAt(content.notices, index, { ...notice, ...next }) });
             return (
@@ -268,7 +277,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
               </div>
             );
           })}
-          {content.notices.length < limits.notices && (
+          {content.notices.length > 0 && content.notices.length < limits.notices && (
             <div><button className="secondary-button" onClick={() => patch({ notices: [...content.notices, { id: newId(), level: "INFO", message: "" }] })} type="button"><Plus aria-hidden="true" size={16} /> Add a notice</button></div>
           )}
         </div>
@@ -276,8 +285,11 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
 
       <section aria-labelledby="site-content-announcements" className="panel">
         <div className="section-heading"><div><h2 id="site-content-announcements">Announcements</h2></div></div>
-        <p className="field-help" style={{ margin: "4px 0 0" }}>Short items in the Announcements section of the homepage. The section is hidden while none are showing. Up to {limits.announcements}.</p>
+        <p className={`field-help ${styles.help}`}>Short items in the Announcements section of the homepage. The section is hidden while none are showing. Up to {limits.announcements}.</p>
         <div className={styles.stack}>
+          {content.announcements.length === 0 && (
+            <EmptyState action={{ label: "Add an announcement", onClick: () => patch({ announcements: [{ id: newId(), title: "", body: "" }] }) }} actionClass="secondary-button" announce={false} canCreate className={`empty-state ${styles.empty}`} title="No announcements">The Announcements section is hidden on the homepage while there are none.</EmptyState>
+          )}
           {content.announcements.map((announcement, index) => {
             const update = (next: Partial<HubAnnouncement>) => patch({ announcements: replaceAt(content.announcements, index, { ...announcement, ...next }) });
             return (
@@ -301,7 +313,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
               </div>
             );
           })}
-          {content.announcements.length < limits.announcements && (
+          {content.announcements.length > 0 && content.announcements.length < limits.announcements && (
             <div><button className="secondary-button" onClick={() => patch({ announcements: [...content.announcements, { id: newId(), title: "", body: "" }] })} type="button"><Plus aria-hidden="true" size={16} /> Add an announcement</button></div>
           )}
         </div>
@@ -309,7 +321,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
 
       <section aria-labelledby="site-content-sections" className="panel">
         <div className="section-heading"><div><h2 id="site-content-sections">Homepage sections</h2></div></div>
-        <p className="field-help" style={{ margin: "4px 0 0" }}>Choose which sections show, their order, and their headings. A blank heading keeps the standard one.</p>
+        <p className={`field-help ${styles.help}`}>Choose which sections show, their order, and their headings. A blank heading keeps the standard one.</p>
         <div className={styles.stack}>
           {content.sections.map((section, index) => (
             <div className={styles.item} key={section.key}>
@@ -334,7 +346,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
 
       <section aria-labelledby="site-content-featured" className="panel">
         <div className="section-heading"><div><h2 id="site-content-featured">Featured events</h2></div></div>
-        <p className="field-help" style={{ margin: "4px 0 0" }}>
+        <p className={`field-help ${styles.help}`}>
           Pick up to {homeFeaturedLimit} events for the homepage, in order. Only public, published events show. With none picked, the homepage uses the events marked featured in their settings.
         </p>
         <div className={styles.stack}>
@@ -368,13 +380,13 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
 
       <section aria-labelledby="site-content-nav" className="panel">
         <div className="section-heading"><div><h2 id="site-content-nav">Header links</h2></div></div>
-        <p className="field-help" style={{ margin: "4px 0 0" }}>Extra links in the header of the public pages, before Sign in. Up to {limits.navLinks}.</p>
+        <p className={`field-help ${styles.help}`}>Extra links in the header of the public pages, before Sign in. Up to {limits.navLinks}.</p>
         <LinkRows links={content.navLinks} max={limits.navLinks} onChange={(navLinks) => patch({ navLinks })} what="header link" />
       </section>
 
       <section aria-labelledby="site-content-footer" className="panel">
         <div className="section-heading"><div><h2 id="site-content-footer">Footer</h2></div></div>
-        <p className="field-help" style={{ margin: "4px 0 0" }}>The bottom of the homepage. The help phone and email are set in Platform settings and still show.</p>
+        <p className={`field-help ${styles.help}`}>The bottom of the homepage. The help phone and email are set in Platform settings and still show.</p>
         <div className={styles.stack}>
           <label>Verse or tagline <span className={styles.count}>({(content.footer.verse ?? "").length}/{limits.verse})</span>
             <input maxLength={limits.verse} onChange={(event) => patch({ footer: { ...content.footer, verse: event.target.value } })} value={content.footer.verse ?? ""} />
@@ -388,7 +400,7 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
 
       <section aria-labelledby="site-content-categories" className="panel">
         <div className="section-heading"><div><h2 id="site-content-categories">Calendar categories</h2></div></div>
-        <p className="field-help" style={{ margin: "4px 0 0" }}>
+        <p className={`field-help ${styles.help}`}>
           Shape the Category choices on the events page. Hiding a category only removes the choice: its events stay listed. Names are not case sensitive.
         </p>
         <div className={styles.fields}>
@@ -408,7 +420,9 @@ export function SiteContentWorkspace({ initialContent, draft, published, draftDi
             {history.map((revision) => (
               <li key={revision.id}>
                 <span className={styles.historyText}>
-                  <strong>{revision.status === "PUBLISHED" ? "Showing now" : "Earlier version"}{revision.restoredFromId ? " (restored)" : ""}</strong>
+                  <strong>
+                    <span className={`status-chip ${revision.status === "PUBLISHED" ? "green" : "neutral"}`}>{revision.status === "PUBLISHED" ? "Showing now" : "Earlier version"}{revision.restoredFromId ? " (restored)" : ""}</span>
+                  </strong>
                   <span>{when(revision.publishedAt ?? revision.createdAt)} by {revision.publishedByName ?? revision.createdByName ?? "someone no longer on the team"}</span>
                   {revision.note && <span>{revision.note}</span>}
                 </span>

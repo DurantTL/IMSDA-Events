@@ -6,3 +6,4 @@
 .table th, .table td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; overflow-wrap: anywhere; }
 .table thead th { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .table tbody th { font-weight: 600; }
+.help { margin: 4px 0 0; }

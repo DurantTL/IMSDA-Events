@@ -100,7 +100,7 @@ describe("row and card actions (#981 batch 3)", () => {
 
   it("calendar entries keep Edit and move Hide, Reset and Remove into a menu", () => {
     const source = read("components/calendar-admin-workspace.tsx");
-    const row = source.slice(source.indexOf('<div className="calendar-admin-actions">'), source.indexOf("<CalendarEntryRegistration"));
+    const row = source.slice(source.indexOf('<div className={`calendar-admin-actions ${styles.rowActions}`}>'), source.indexOf("<CalendarEntryRegistration"));
     expect(row.indexOf("Edit")).toBeLessThan(row.indexOf("<ActionsMenu"));
     expect(row.indexOf("Remove")).toBeGreaterThan(row.indexOf("<ActionsMenu"));
     expect(row).toContain("onClick={() => remove(entry)}");

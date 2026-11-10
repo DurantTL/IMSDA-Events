@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { PageHeader } from "@/components/page-header";
 import { SiteContentWorkspace } from "@/components/site-content-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
@@ -22,6 +23,10 @@ export default async function SiteContentPage() {
   return (
     <>
       {user.globalRole === "SYSTEM_ADMIN" ? <AdminSectionHeaderFor path="/admin/site-content" section="system" /> : null}
+      <PageHeader
+        description="Edit the public homepage, notices, header links and footer, then preview and publish them."
+        title="Homepage & site content"
+      />
       <SiteContentWorkspace
         draft={state.draft}
         draftDiffers={state.draftDiffers}

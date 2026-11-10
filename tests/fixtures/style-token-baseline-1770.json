@@ -33,7 +33,6 @@
     "components/registration-signatures-panel.module.css": 1,
     "components/security-check/security-check.module.css": 7,
     "components/sign-in-code-form.module.css": 3,
-    "components/site-content-workspace.module.css": 2,
     "components/site-notices-view.module.css": 5,
     "components/staff-monthly-records.module.css": 5,
     "components/staff-shell.module.css": 9,

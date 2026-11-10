@@ -1,7 +1,7 @@
 "use client";
 
 import { ListPager } from "@/components/list-pager";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import styles from "./calendar-admin-workspace.module.css";
 import { sliceFromCount } from "@/lib/pagination";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { TabList, TabPanel } from "@/components/tab-list";
@@ -435,14 +435,15 @@ export function CalendarAdminWorkspace({
 
   return (
     <section className="page-stack calendar-admin">
-      <StaffPageHeader
-        description="Published events appear on the public calendar automatically. Hide any that shouldn't, give them a category, and add dates for things registered elsewhere. A date marked Deadline stays off the public calendar and shows to clubs and Area Coordinators as a deadline, with reminders."
-        primary={(
-          <a className="secondary-button" href="/calendar" rel="noreferrer" target="_blank">
-            <CalendarDays aria-hidden="true" size={15} /> View public calendar
-          </a>
-        )}
-      />
+      <section aria-labelledby="calendar-scope" className={`panel ${styles.scope}`}>
+        <h2 id="calendar-scope" className={styles.scopeTitle}>What this changes on the public calendar</h2>
+        <ul className={styles.scopeList}>
+          <li>Published events appear automatically. Hide one, or give it a category, on the Events tab.</li>
+          <li>A calendar entry marked On calendar appears too. A Draft stays off it.</li>
+          <li>A date marked Deadline stays off the public calendar. It shows to clubs and Area Coordinators as a deadline, with reminders.</li>
+          <li>Calendar entries are not registration events. Use Add registration on an entry to start an event from it, or link it to an event you already have.</li>
+        </ul>
+      </section>
 
       <TabList
         label="Calendar settings"
@@ -483,6 +484,7 @@ export function CalendarAdminWorkspace({
           <EntryForm
             eyebrow="New entry"
             heading="Add a date to the calendar"
+            id="calendar-new-entry"
             choices={publicFilters}
             onSubmit={(body) => call("/api/admin/calendar/entries", "POST", body, body.isPublished ? "Added to the public calendar." : "Saved as a draft.")}
             saving={saving}
@@ -497,7 +499,7 @@ export function CalendarAdminWorkspace({
               </div>
             </div>
             {entryList.totalAll === 0 ? (
-              <EmptyState announce={false} hint="Use the form above to add dates for events that aren't registered here, such as rallies or camporees." icon={<CalendarDays aria-hidden="true" size={27} />} title="No entries yet">The calendar has no entries of its own.</EmptyState>
+              <EmptyState action={{ label: "Add a date", href: "#calendar-new-entry" }} actionClass="secondary-button" announce={false} canCreate icon={<CalendarDays aria-hidden="true" size={27} />} title="No entries yet">The calendar has no entries of its own. Add dates for events that aren&apos;t registered here, such as rallies or camporees.</EmptyState>
             ) : (
               <>
               <EntryFiltersBar
@@ -553,14 +555,14 @@ export function CalendarAdminWorkspace({
               {entries.length === 0 ? (
                 <NoMatchesState clear={{ onClick: resetEntryFilters }} known={`The calendar has ${entryList.totalAll} ${entryList.totalAll === 1 ? "entry" : "entries"} in all.`} noun="entries" query={search.term} />
               ) : (
-              <ul className="calendar-admin-list">
+              <ul className={`calendar-admin-list ${styles.rows}`}>
                 {slice.items.map((entry) => (
                   <li className="calendar-entry-row" key={entry.id}>
                     <label className="calendar-row-select">
                       <input checked={selected.has(entry.id)} onChange={() => toggleSelected(entry.id)} type="checkbox" />
                       <span className="sr-only">Select {entry.title}</span>
                     </label>
-                    <div className="calendar-entry-text">
+                    <div className={`calendar-entry-text ${styles.entryText}`}>
                       <strong>{entry.title}</strong>
                       <small>
                         {formatDateRange(entry.startsOn, entry.endsOn)}
@@ -581,7 +583,7 @@ export function CalendarAdminWorkspace({
                         {entry.locallyEditedFields.length > 0 && <span className="status-chip">Edited here</span>}
                       </span>
                     </div>
-                    <div className="calendar-admin-actions">
+                    <div className={`calendar-admin-actions ${styles.rowActions}`}>
                       <button aria-haspopup="dialog" aria-label={`Edit ${entry.title}`} className="secondary-button" disabled={saving} onClick={(event) => beginEdit(entry, event.currentTarget)} type="button">
                         <Pencil aria-hidden="true" size={14} /> Edit
                       </button>
@@ -661,7 +663,7 @@ export function CalendarAdminWorkspace({
             </div>
           </div>
           {events.length === 0 ? (
-            <EmptyState announce={false} hint="Create an event first; published events then appear here." icon={<CalendarDays aria-hidden="true" size={27} />} title="No upcoming events">There are no upcoming events to show on the calendar.</EmptyState>
+            <EmptyState action={{ label: "Create an event", href: "/event-setup" }} actionClass="secondary-button" announce={false} canCreate icon={<CalendarDays aria-hidden="true" size={27} />} title="No upcoming events">There are no upcoming events to show on the calendar. Published events appear here.</EmptyState>
           ) : (
             <>
             <div className="calendar-filters filter-bar-stack">
@@ -680,7 +682,7 @@ export function CalendarAdminWorkspace({
             {shownEvents.length === 0 ? (
               <NoMatchesState clear={{ onClick: () => setEventListParams({ events: "" }) }} known={`${events.length} ${events.length === 1 ? "event is" : "events are"} on the calendar page in all.`} noun="events" query="" />
             ) : (
-            <ul className="calendar-admin-list">
+            <ul className={`calendar-admin-list ${styles.rows}`}>
               {shownEvents.map((event) => {
                 const visible = event.isPublished && event.showOnCalendar;
                 return (
@@ -697,7 +699,7 @@ export function CalendarAdminWorkspace({
                       </span>
                     </div>
                     <form
-                      className="calendar-admin-actions"
+                      className={`calendar-admin-actions ${styles.rowActions}`}
                       key={event.calendarCategory}
                       onChange={categoryEdits.track(`category-${event.id}`)}
                       ref={categoryEdits.gone(`category-${event.id}`)}
@@ -807,6 +809,7 @@ function EntryForm({
   error = "",
   eyebrow,
   heading,
+  id,
   onCancel,
   onSubmit,
   saving,
@@ -819,6 +822,8 @@ function EntryForm({
   error?: string;
   eyebrow?: string;
   heading?: string;
+  /** The form's anchor, so an empty list can link to it. */
+  id?: string;
   onCancel?: () => void;
   onSubmit: (body: EntryBody) => Promise<boolean>;
   saving: boolean;
@@ -874,7 +879,7 @@ function EntryForm({
   }
 
   return (
-    <form className={editing ? "form-stack calendar-entry-form" : "panel form-stack"} onChange={edits.track("entry", entryFormTracking)} onSubmit={submit}>
+    <form className={editing ? "form-stack calendar-entry-form" : "panel form-stack"} id={id} onChange={edits.track("entry", entryFormTracking)} onSubmit={submit}>
       {heading && (
         <div className="section-heading">
           <div>
