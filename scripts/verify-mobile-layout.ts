@@ -36,7 +36,8 @@
  *    and a table clipped by its box or sticking out of it is `table-wider-than-box` (#997);
  *  - sticky bars (#996): when a page opens, no sticky or fixed action bar (one holding a button) sits on top of text;
  *  - the shell's "Loading IMAdventist…" fallback is waited out before anything is measured, and a page that never
- *    leaves it is a finding;
+ *    leaves it is a finding. Every page a step opens goes through `gotoSettled`, and a "should be there" check waits for the
+ *    element with `appears` instead of counting at once (#1829, #1830), so a slow run is not reported as a page bug;
  *  - a full-page screenshot of every page and width, saved as an artifact.
  *
  * Every layout assertion is made for every page at every width. A finding that
@@ -90,6 +91,7 @@ loadEnvConfig(process.cwd());
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Page = any;
 type Context = any;
+type Locator = any;
 type Browser = any;
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -3437,7 +3439,7 @@ async function auditFilterCombobox(page: Page, spec: PageSpec, width: number, pr
   if (!labelText) return;
   const name = `${spec.name} (${labelText} filter list)`;
   const combobox = page.locator('.club-roster-tools input[role="combobox"]:visible').first();
-  if ((await combobox.count()) === 0) {
+  if (!(await appears(combobox))) {
     record("dialog-open-failed", name, width, `no ${labelText} combobox in the filter row`);
     return;
   }
@@ -3499,9 +3501,9 @@ async function auditFilterCombobox(page: Page, spec: PageSpec, width: number, pr
       await page.keyboard.press("ArrowDown");
       await page.keyboard.press("ArrowDown");
       const active = await combobox.getAttribute("aria-activedescendant");
-      if (!active || (await page.locator(`[id="${active}"]`).count()) === 0) record("filter-list-keyboard", name, width, `${state}: no active option after the arrow keys (aria-activedescendant=${active})`);
+      if (!active || !(await appears(page.locator(`[id="${active}"]`), 3000, "attached"))) record("filter-list-keyboard", name, width, `${state}: no active option after the arrow keys (aria-activedescendant=${active})`);
       const controls = await combobox.getAttribute("aria-controls");
-      if (!controls || (await page.locator(`[id="${controls}"][role="listbox"]`).count()) === 0) record("filter-list-keyboard", name, width, `${state}: aria-controls does not point at the listbox`);
+      if (!controls || !(await appears(page.locator(`[id="${controls}"][role="listbox"]`), 3000, "attached"))) record("filter-list-keyboard", name, width, `${state}: aria-controls does not point at the listbox`);
       await page.keyboard.press("Escape");
       await page.waitForTimeout(80);
       if ((await combobox.getAttribute("aria-expanded")) !== "false") record("filter-list-keyboard", name, width, `${state}: Escape did not close the list`);
@@ -3803,7 +3805,7 @@ async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, p
 async function auditPendingTeamsFlow(page: Page, spec: PageSpec, width: number, prefix: string) {
   const name = `${spec.name} (reject form open)`;
   try {
-    await page.goto(`${baseUrl}${spec.path}`, { waitUntil: "load" });
+    await gotoSettled(page, `${baseUrl}${spec.path}`);
     await page.locator(".pending-team-reject:visible").first().click({ timeout: 5000 });
     await page.waitForTimeout(200);
     await auditState(page, name, width, `${prefix}-reject-open`);
@@ -3867,7 +3869,7 @@ async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: n
   } finally {
     await page.emulateMedia({ reducedMotion: "reduce" });
     // Restore the instrumented method and leave the next page a fresh document.
-    await page.goto(before, { waitUntil: "load" });
+    await gotoSettled(page, before);
   }
 }
 
@@ -3941,7 +3943,7 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
       });
       if (!fit) throw new Error("Account destinations overflow or have undersized touch targets");
       for (const href of ["/account/registrations", "/account/profile", "/account/help"]) {
-        if (!(await menu.locator(`a[href="${href}"]`).count())) throw new Error(`Missing account destination ${href}`);
+        if (!(await appears(menu.locator(`a[href="${href}"]`), 5000, "attached"))) throw new Error(`Missing account destination ${href}`);
       }
       await page.keyboard.press("Escape");
       if (await menu.getAttribute("open") !== null) throw new Error("Escape did not close the account menu");
@@ -3970,7 +3972,7 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
     record("audit-failed", `${spec.name} (portal navigation)`, width, (error as Error).message.split("\n")[0] ?? "failed");
   } finally {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto(before, { waitUntil: "load" });
+    await gotoSettled(page, before);
   }
 }
 
@@ -3978,6 +3980,26 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
 async function waitForShell(page: Page) {
   return page.waitForFunction(() => !document.querySelector(".shell-loading") && !/Loading IMAdventist/.test(document.body.innerText), undefined, { timeout: 20_000 })
     .then(() => true, () => false);
+}
+
+/**
+ * The one place the audit opens a page inside a step (#1830): go there, then wait out the shell's loading fallback, so what is
+ * measured or clicked next is the page and not its "Loading IMAdventist…" screen. Never call `page.goto` anywhere else.
+ */
+async function gotoSettled(page: Page, url: string, options: { timeout?: number } = {}) {
+  const response = await page.goto(url, { waitUntil: "load", ...options });
+  await waitForShell(page);
+  return response;
+}
+
+/**
+ * Presence check that waits (#1829): true as soon as the element is visible, false when it has not shown up after `timeoutMs`.
+ * Use it for "this should be there"; an instant `.count()` right after a click or a fetch races the page and fails on a slow run.
+ * Pass `"attached"` when the element only has to exist. Where a step calls it and ignores the answer, it is only a wait before a
+ * count that follows and reports what was found, so the selector there matches the measurement's `:visible`-ness.
+ */
+async function appears(locator: Locator, timeoutMs = 10_000, state: "visible" | "attached" = "visible") {
+  return locator.first().waitFor({ state, timeout: timeoutMs }).then(() => true, () => false);
 }
 
 /** The #996 rules: squeezed text, an action bar over text when the page opens (scroll 0), and the loading screen. */
@@ -4115,7 +4137,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   const url = `${baseUrl}${spec.path}`;
   // "load", then a bounded wait for quiet: Next prefetches every visible link, so
   // the network is not always idle on a busy page.
-  const response = await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+  const response = await gotoSettled(page, url, { timeout: 60_000 });
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => undefined);
   const status = response?.status() ?? 0;
   const finalPath = new URL(page.url()).pathname;
@@ -4231,7 +4253,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== before) await page.goto(before, { waitUntil: "load" });
+    if (page.url() !== before) await gotoSettled(page, before);
   }
 
   // The bulk honor popup (#819), with its type-to-search list open and narrowed and
@@ -4264,7 +4286,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== bulkBefore) await page.goto(bulkBefore, { waitUntil: "load" });
+    if (page.url() !== bulkBefore) await gotoSettled(page, bulkBefore);
   }
 
   // The More launcher's Turn off confirm (#810): open the launcher, press the first Turn off, and the
@@ -4275,14 +4297,14 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     const desktopName = `${spec.name} (features page)`;
     const before = page.url();
     try {
-      await page.goto(`${baseUrl}/more/features`, { waitUntil: "load" });
-      if ((await page.locator('button[aria-label$="Press to turn off."]:visible, button[aria-label$="Press to turn on."]:visible').count()) === 0) {
+      await gotoSettled(page, `${baseUrl}/more/features`);
+      if (!(await appears(page.locator('button[aria-label$="Press to turn off."]:visible, button[aria-label$="Press to turn on."]:visible')))) {
         record("dialog-open-failed", desktopName, width, "a system administrator sees no feature switch on /more/features");
       }
     } catch (error) {
       record("dialog-open-failed", desktopName, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== before) await page.goto(before, { waitUntil: "load" });
+    if (page.url() !== before) await gotoSettled(page, before);
   }
   if (spec.name === "staff-more-launcher-admin" && width <= phoneMaxWidthPx) {
     const launcherName = `${spec.name} (turn off confirm)`;
@@ -4290,7 +4312,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await page.locator('a[aria-haspopup="dialog"]:visible').first().click({ timeout: 3000 });
       await page.waitForTimeout(250);
       const toggle = page.locator(".more-launcher [data-module-toggle]:visible").first();
-      if ((await toggle.count()) === 0) {
+      if (!(await appears(toggle))) {
         record("dialog-open-failed", launcherName, width, "a system administrator sees no Turn off control in the More launcher");
       } else {
         await toggle.scrollIntoViewIfNeeded({ timeout: 3000 });
@@ -4419,10 +4441,12 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await search.fill("mobilecheck");
       await page.waitForTimeout(150);
       const boxes = taught.locator('[data-testid="honor-multi-options"] input[type="checkbox"]:visible');
+      await appears(boxes);
       const listed = await boxes.count();
       if (listed < 4) record("dialog-open-failed", `${spec.name} (several honors)`, width, `the honor search listed ${listed} synthetic honors, expected 4`);
       for (let index = 0; index < Math.min(listed, 3); index += 1) await boxes.nth(index).check({ timeout: 3000 });
       await page.waitForTimeout(150);
+      await appears(taught.locator('ul[aria-label^="Chosen honors"] li:visible'));
       const chosen = await taught.locator('ul[aria-label^="Chosen honors"] li:visible').count();
       if (chosen !== 3) record("dialog-open-failed", `${spec.name} (several honors)`, width, `expected 3 chosen honors, found ${chosen}`);
       await auditBuilder("add form, several honors chosen", "several-honors-add");
@@ -4433,6 +4457,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await prerequisiteSearch.fill("mobilecheck");
       await page.waitForTimeout(150);
       await prerequisite.locator('[data-testid="honor-multi-prerequisite-options"] input[type="checkbox"]:visible').first().check({ timeout: 3000 });
+      await appears(prerequisite.locator('ul[aria-label^="Chosen prerequisite honors"] li:visible'));
       const prerequisiteChosen = await prerequisite.locator('ul[aria-label^="Chosen prerequisite honors"] li:visible').count();
       if (prerequisiteChosen !== 1) record("dialog-open-failed", `${spec.name} (several honors)`, width, `expected 1 chosen prerequisite honor, found ${prerequisiteChosen}`);
       await auditBuilder("add form, a prerequisite honor chosen", "prerequisite-add");
@@ -4440,13 +4465,14 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await edit.scrollIntoViewIfNeeded({ timeout: 3000 });
       await edit.click({ timeout: 3000 });
       await page.waitForTimeout(250);
+      await appears(page.locator('[data-testid="honor-multi-taught"]:visible').first().locator('ul[aria-label^="Chosen honors"] li:visible'));
       const editChosen = await page.locator('[data-testid="honor-multi-taught"]:visible').first().locator('ul[aria-label^="Chosen honors"] li:visible').count();
       if (editChosen < 4) record("dialog-open-failed", `${spec.name} (several honors)`, width, `the edit form listed ${editChosen} chosen honors, expected the class's 4`);
       await auditBuilder("edit form, class with four honors", "several-honors-edit");
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (several honors)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== builderBefore) await page.goto(builderBefore, { waitUntil: "load" });
+    if (page.url() !== builderBefore) await gotoSettled(page, builderBefore);
   }
 
   // The template editor with attachments (#824): the attachments list, the picture picker and the button form each
@@ -4466,13 +4492,14 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await page.waitForTimeout(300);
       const attachments = page.locator(".message-attachments-field:visible").first();
       await attachments.scrollIntoViewIfNeeded({ timeout: 5000 });
+      await appears(attachments.locator("li"));
       const listed = await attachments.locator("li").count();
       if (listed !== 2) record("dialog-open-failed", `${spec.name} (attachments)`, width, `the attachments list showed ${listed} files, expected the template's 2`);
       await auditEditor("attachments listed", "attachments");
       await page.locator('button[aria-label="Insert image"]:visible').first().click({ timeout: 5000 });
       await page.waitForTimeout(150);
-      const pictures = await page.locator(".message-editor-image-list li:visible").count();
-      if (pictures < 1) record("dialog-open-failed", `${spec.name} (picture picker)`, width, "the picker listed no uploaded picture");
+      const picturesShown = await appears(page.locator(".message-editor-image-list li:visible"));
+      if (!picturesShown) record("dialog-open-failed", `${spec.name} (picture picker)`, width, "the picker listed no uploaded picture");
       await auditEditor("picture picker open", "picture-picker");
       await page.locator('button[aria-label="Insert image"]:visible').first().click({ timeout: 5000 });
       await page.locator('button[aria-label="Button link"]:visible').first().click({ timeout: 5000 });
@@ -4482,7 +4509,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (attachments editor)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== editorBefore) await page.goto(editorBefore, { waitUntil: "load" });
+    if (page.url() !== editorBefore) await gotoSettled(page, editorBefore);
   }
 
   // The Custom message template (#850) starts blank and unpublished: its explanation, empty fields and the shorter token
@@ -4505,7 +4532,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (custom message)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== customBefore) await page.goto(customBefore, { waitUntil: "load" });
+    if (page.url() !== customBefore) await gotoSettled(page, customBefore);
   }
 
   // Email selected (#850): tick a registration, open the dialog, and look at Custom message (not yet published for
@@ -4528,22 +4555,23 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await page.waitForTimeout(400);
       const select = page.locator('[role="dialog"] select').first();
       await select.selectOption("CUSTOM_MESSAGE", { timeout: 5000 });
-      await page.waitForTimeout(600);
-      const notice = await page.locator('[role="dialog"]:has-text("Custom message template has not been published")').count();
-      if (notice === 0) record("dialog-open-failed", `${spec.name} (custom message)`, width, "the dialog did not say the custom message is unpublished");
+      // The notice shows only once the dialog's preview fetch has come back (#1829), so wait for it instead of counting at once.
+      const noticeShown = await appears(page.locator('[role="dialog"]:has-text("Custom message template has not been published")'));
+      if (!noticeShown) record("dialog-open-failed", `${spec.name} (custom message)`, width, "the dialog did not say the custom message is unpublished");
+      // Read after the notice has appeared: Send is only settled once the preview has answered.
       const sendDisabled = await page.locator('[role="dialog"] button.primary-button').first().isDisabled();
       if (!sendDisabled) record("dialog-open-failed", `${spec.name} (custom message)`, width, "Send is enabled while the custom message is unpublished");
       await auditDialog("custom message unpublished", "email-selected-custom");
       await select.selectOption("EVENT_ANNOUNCEMENT", { timeout: 5000 });
       await page.waitForTimeout(400);
-      if ((await page.locator('[role="dialog"]:has-text("Formatting:")').count()) === 0) record("dialog-open-failed", `${spec.name} (announcement)`, width, "the announcement message has no formatting hint");
+      if (!(await appears(page.locator('[role="dialog"]:has-text("Formatting:")')))) record("dialog-open-failed", `${spec.name} (announcement)`, width, "the announcement message has no formatting hint");
       await auditDialog("event announcement hint", "email-selected-announcement");
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (email selected)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== peopleBefore) await page.goto(peopleBefore, { waitUntil: "load" });
+    if (page.url() !== peopleBefore) await gotoSettled(page, peopleBefore);
   }
 
   // Scanner name search (#889): open the scanner, search a first name several registrations share, and the pick list
@@ -4562,7 +4590,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       const open = await page.evaluate(auditInPage, { touch, cards: width <= cardsMaxWidth, minTarget: touchTarget, tolerance: touchTolerance });
       if (open.scrollWidth > open.innerWidth) record("horizontal-scroll", stateName, width, `page is ${open.scrollWidth}px wide in a ${open.innerWidth}px window; sticking out: ${open.overflowers.join("; ") || "(nothing identified)"}`);
       for (const target of open.smallTargets) record("small-tap-target", stateName, width, target);
-      if ((await page.locator('[role="dialog"] button:has-text("Start camera"):visible').count()) === 0) record("dialog-open-failed", stateName, width, "the camera button is missing after a name search");
+      if (!(await appears(page.locator('[role="dialog"] button:has-text("Start camera"):visible')))) record("dialog-open-failed", stateName, width, "the camera button is missing after a name search");
       if (takeShots) await page.screenshot({ path: `${prefix}-scanner-name-search.jpg`, type: "jpeg", quality: 60 });
     } catch (error) {
       const seen = await page.locator('[role="dialog"]').first().innerText({ timeout: 1000 }).catch(() => "(no dialog)");
@@ -4570,7 +4598,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== checkInBefore) await page.goto(checkInBefore, { waitUntil: "load" });
+    if (page.url() !== checkInBefore) await gotoSettled(page, checkInBefore);
   }
 
   // Retry failed (#860): the review is open (scope picker, counts, skip reasons, confirm) and fits the screen.
@@ -4589,7 +4617,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (retry failed review)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== deliveriesBefore) await page.goto(deliveriesBefore, { waitUntil: "load" });
+    if (page.url() !== deliveriesBefore) await gotoSettled(page, deliveriesBefore);
   }
 
   // A draft announcement with attachments (#824): the edit dialog lists them and fits the screen.
@@ -4603,6 +4631,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       const edit = page.locator('button:has-text("Edit draft"):visible').first();
       await edit.click({ timeout: 5000 });
       await page.waitForTimeout(250);
+      await appears(page.locator('[role="dialog"] .message-attachments-field li:visible'));
       const listed = await page.locator('[role="dialog"] .message-attachments-field li:visible').count();
       if (listed !== 2) record("dialog-open-failed", `${spec.name} (draft attachments)`, width, `the draft's dialog listed ${listed} attachments, expected 2`);
       const fit = await page.evaluate(dialogFitInPage);
@@ -4617,7 +4646,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== draftBefore) await page.goto(draftBefore, { waitUntil: "load" });
+    if (page.url() !== draftBefore) await gotoSettled(page, draftBefore);
   }
 
   // The floating Honor and Class filter lists, the Orders button descriptions and Back to top (the owner's Oct 13 request).
@@ -4661,7 +4690,7 @@ async function denseRowsAudit(browser: Browser, cookie: { name: string; value: s
       for (const spec of denseRowPages) {
         const label = `${spec.name} ${pointer}`;
         try {
-          await page.goto(`${baseUrl}${spec.path}`, { waitUntil: "load", timeout: 60_000 });
+          await gotoSettled(page, `${baseUrl}${spec.path}`, { timeout: 60_000 });
           await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => undefined);
           await waitForShell(page);
           await page.waitForTimeout(150);

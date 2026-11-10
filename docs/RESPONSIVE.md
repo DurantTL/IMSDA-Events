@@ -98,7 +98,9 @@ may break anywhere), `bar-over-text` (when a page opens, a sticky or fixed actio
 holds a button sits on top of text; an action bar stays in the page flow until the reader
 has scrolled past the heading or intro, see `usePinAfterScroll`), and `loading-screen` (the
 shell's "Loading IMSDA Events…" is waited out before measuring, and a page that never leaves
-it is a finding). The sign-in, recovery, calendar and club-directory pages and the
+it is a finding). The audit opens every page through one helper
+(`gotoSettled`) that waits the loading screen out, and checks that something is present with a wait (`appears`), never an
+instant count, so a slow run is not reported as a page bug (#1829, #1830; `tests/mobile-audit-waits-1829.test.ts`). The sign-in, recovery, calendar and club-directory pages and the
 invalid-link states are in `pages`.
 
 **Rules added in #997** (they run on every page): `table-wider-than-box` (601 px and over: a data table wider than
