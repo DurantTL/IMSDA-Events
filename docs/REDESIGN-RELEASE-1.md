@@ -220,8 +220,8 @@ Presentation and navigation only. URLs, permissions, server checks, the Sterling
 
 | Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
 |---|---|---|---|---|
-| `/check-in` | Event → Check-in | Search and scan lead; the checked-in tally is a compact strip; the Saved on this device queue and its states keep their own look; "Open as a station" panel; long names wrap | Pending review | - |
-| `/check-in/badges` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pending review | - |
-| `/check-in/passes` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pending review | - |
-| `/check-in/assets` | Check-in → Tools | Already on the shared header pattern; no change | Pending review | - |
-| `/check-in-station` | Check-in → Open as a station | Header bar with the station name and the event beneath; Money, then Who is here?, then Check in and Next person; "Go to Check-in" link on the not-active screen; safe-area padding | Pending review | - |
+| `/check-in` | Event → Check-in | Search and scan lead; the checked-in tally is a compact strip; the Saved on this device queue and its states keep their own look; "Open as a station" panel; long names wrap | Pass (SA1 to SA10, S1, S2, S4, B10, B12) | Offline, queued and storage-unavailable states and camera scanning: desk queue code and styles are unchanged |
+| `/check-in/badges` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pass | - |
+| `/check-in/passes` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pass | - |
+| `/check-in/assets` | Check-in → Tools | Already on the shared header pattern; no change | Pass (viewed; no change) | - |
+| `/check-in-station` | Check-in → Open as a station | Header bar with the station name and the event beneath; Money, then Who is here?, then Check in and Next person; "Go to Check-in" link on the not-active screen; safe-area padding | Pass at 1280, 820 and 390 (SA1 to SA10, L5, B10, B12) | A person held by the screening gate, and safe-area insets on a real iPhone or iPad |

@@ -114,6 +114,8 @@ export function CheckInStationsPanel({
       {stations.length === 0 ? (
         <p className={styles.cisPanelHelp}>No stations are active for this event.</p>
       ) : (
+        <>
+        <h3 className={styles.cisPanelSub}>Active stations</h3>
         <ul className={styles.cisPanelList}>
           {stations.map((station) => (
             <li key={station.id}>
@@ -136,6 +138,7 @@ export function CheckInStationsPanel({
             </li>
           ))}
         </ul>
+        </>
       )}
     </section>
   );
