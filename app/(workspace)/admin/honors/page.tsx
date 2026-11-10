@@ -1,6 +1,8 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { CatalogActionProvider, CatalogHeaderButton } from "@/components/catalog-header-action";
+import { ListPage } from "@/components/page-templates/list-page";
 import { HonorCatalogWorkspace } from "@/components/honor-catalog-workspace";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -17,7 +19,11 @@ export default async function HonorCatalogPage() {
   return (
     <>
       <AdminPageHeader path="/admin/honors" />
-      <HonorCatalogWorkspace initialHonors={await listHonors()} />
+      <CatalogActionProvider>
+      <ListPage header={{ title: "Honor catalog", description: "The honors clubs can earn, kept in one list that every Honors Weekend site offers from.", primary: <CatalogHeaderButton icon="add" label="Add honor" /> }}>
+        <HonorCatalogWorkspace initialHonors={await listHonors()} />
+      </ListPage>
+      </CatalogActionProvider>
     </>
   );
 }

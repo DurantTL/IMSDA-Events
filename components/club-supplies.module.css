@@ -1,6 +1,5 @@
 /* Club supply catalog (#531): staff import and catalog, and club stock. Built to hold at 390px. */
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.upload { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
 .counts li { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 9px 11px; background: #fbfcfd; }
 .counts strong { color: var(--imsda-navy); font-size: 1.05rem; }
