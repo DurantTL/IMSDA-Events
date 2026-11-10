@@ -400,7 +400,7 @@ export function OrganizationDirectoryWorkspace({
                   {organization.externalIdentities.length === 0 && (
                     <p>
                       No provider identifier linked yet.{" "}
-                      <button aria-label={`Link a provider identifier for ${organization.name}`} className={styles.textButton} onClick={() => beginIdentity(organization)} type="button">Link provider</button>
+                      <button aria-label={`Link a provider identifier for ${organization.name}`} className={`text-button ${styles.textButton}`} onClick={() => beginIdentity(organization)} type="button">Link provider</button>
                     </p>
                   )}
                 </div>
@@ -580,7 +580,7 @@ export function OrganizationDirectoryWorkspace({
                     {editor.check?.blockers.length ? "Close" : "Cancel"}
                   </button>
                   {editor.check && editor.check.blockers.length === 0 && (
-                    <HeldSaveButton className="primary-button lifecycle-danger-button" held={saving} heldLabel="Deleting…" icon={<Trash2 aria-hidden="true" size={15} />} label={`Delete ${editor.check.name}`} />
+                    <HeldSaveButton danger held={saving} heldLabel="Deleting…" icon={<Trash2 aria-hidden="true" size={15} />} label={`Delete ${editor.check.name}`} />
                   )}
                 </div>
               </form>

@@ -178,7 +178,7 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
             {!saved && (
               <p className={styles.note}>
                 Save is at the top of the page.{" "}
-                <button className={styles.textButton} onClick={() => document.getElementById(HEADER_ACTION_ID)?.focus()} type="button">Go to Save</button>
+                <button className={`text-button ${styles.textButton}`} onClick={() => document.getElementById(HEADER_ACTION_ID)?.focus()} type="button">Go to Save</button>
               </p>
             )}
           </div>

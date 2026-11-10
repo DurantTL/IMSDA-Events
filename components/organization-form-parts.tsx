@@ -31,19 +31,20 @@ export function SaveResult({ result, slot }: { result: SaveResultState | null; s
  * `disabled`, so keyboard focus is not lost. It reads "Saving…" and looks dimmed. The form's own submit handler must
  * also return early while `held`, because Enter in a field submits the form without a click.
  */
-export function HeldSaveButton({ held, label, heldLabel = "Saving…", icon, id, className = "primary-button" }: {
+export function HeldSaveButton({ held, label, heldLabel = "Saving…", icon, id, danger = false }: {
   held: boolean;
   label: string;
   heldLabel?: string;
   icon?: ReactNode;
   id?: string;
-  className?: string;
+  /** The destructive look (delete), on top of the shared filled button. */
+  danger?: boolean;
 }) {
   return (
     <button
       aria-busy={held || undefined}
       aria-disabled={held || undefined}
-      className={`${className} ${styles.held}`}
+      className={danger ? `primary-button lifecycle-danger-button ${styles.held}` : `primary-button ${styles.held}`}
       id={id}
       onClick={(event) => { if (held) event.preventDefault(); }}
       type="submit"
@@ -55,9 +56,9 @@ export function HeldSaveButton({ held, label, heldLabel = "Saving…", icon, id,
 }
 
 /** A plain action button held the same way while something is saving: still focusable, dimmed, and a click does nothing. */
-export function HeldButton({ held, onAction, children, className = "secondary-button", ariaLabel }: { held: boolean; onAction: () => void; children: ReactNode; className?: string; ariaLabel?: string }) {
+export function HeldButton({ held, onAction, children, ariaLabel }: { held: boolean; onAction: () => void; children: ReactNode; ariaLabel?: string }) {
   return (
-    <button aria-disabled={held || undefined} aria-label={ariaLabel} className={`${className} ${styles.held}`} onClick={() => { if (!held) onAction(); }} type="button">
+    <button aria-disabled={held || undefined} aria-label={ariaLabel} className={`secondary-button ${styles.held}`} onClick={() => { if (!held) onAction(); }} type="button">
       {children}
     </button>
   );
