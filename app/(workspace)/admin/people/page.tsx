@@ -58,7 +58,9 @@ export default async function PeopleAccessPage({
     <>
       <AdminPageHeader path="/admin/people" />
       <StaffPageHeader
-        description="Everyone with a staff login or a website account, and what each person can reach."
+        description={full
+          ? "Everyone with a staff login or a website account, and what each person can reach."
+          : "Club people: club directors and club staff, Area Coordinators and Clubs Administrators, and the club roles each one holds."}
         primary={(
           <>
             <InvitePerson clubOptions={clubOptions} eventOptions={eventOptions} scope={viewer.scope} />
