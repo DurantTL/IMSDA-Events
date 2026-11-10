@@ -86,6 +86,7 @@ import {
 import {
   getYearEndView,
   listYearEndReportsForYear,
+  getYearEndClubDetail,
   reopenYearEndReport,
   saveYearEndReport,
   yearEndPrefill,
@@ -746,5 +747,42 @@ describe("the club portal page", () => {
     directed("club-1", "DIRECTOR");
     mocks.reportFindUnique.mockResolvedValue(stored({ status: "SUBMITTED", firstSubmittedAt: new Date("2026-10-01T15:00:00Z") }));
     expect(JSON.stringify(await ClubYearEndReportPage(pageParams("club-1")))).toContain('"readOnly":true');
+  });
+});
+
+describe("staff year-end detail (#1843)", () => {
+  const club = { type: "CLUB", name: "Alpha", parentOrganization: { name: "Test Church" } };
+  const grant = { organizationId: "club-1", effectiveFrom: new Date("2026-01-01T00:00:00Z"), effectiveTo: null, revokedAt: null, attendeeAccount: { displayName: "Dana Example" } };
+
+  it("a draft shows its status and directors but no report or numbers", async () => {
+    mocks.orgFindUnique.mockResolvedValue(club);
+    mocks.reportFindUnique.mockResolvedValue(stored({ status: "DRAFT", prefill: { memberMale57: 9 }, manual: { baptismAdult: 4 } }));
+    mocks.grantFindMany.mockResolvedValue([grant]);
+    const detail = await getYearEndClubDetail("club-1", "2026-27", new Date("2027-02-01T12:00:00Z"));
+    expect(detail).toMatchObject({ name: "Alpha", church: "Test Church", status: "DRAFT", directors: ["Dana Example"], report: null, late: false, submittedAt: null });
+    expect(JSON.stringify(detail)).not.toContain("memberMale57");
+  });
+
+  it("a missing report is NONE with no report", async () => {
+    mocks.orgFindUnique.mockResolvedValue(club);
+    mocks.reportFindUnique.mockResolvedValue(null);
+    expect(await getYearEndClubDetail("club-1", "2026-27")).toMatchObject({ status: "NONE", report: null, directors: [] });
+  });
+
+  it("a submitted report returns its snapshot", async () => {
+    mocks.orgFindUnique.mockResolvedValue(club);
+    mocks.reportFindUnique.mockResolvedValue(stored({
+      status: "SUBMITTED", prefill: { memberMale57: 3 }, firstSubmittedAt: new Date("2027-04-09T15:00:00Z"), submittedAt: new Date("2027-04-09T15:00:00Z"),
+    }));
+    const detail = await getYearEndClubDetail("club-1", "2026-27");
+    expect(detail?.status).toBe("SUBMITTED");
+    expect(detail?.late).toBe(true);
+    expect(detail?.report?.resolved.memberMale57?.value).toBe(3);
+  });
+
+  it("is null for an organization that is not a club", async () => {
+    mocks.orgFindUnique.mockResolvedValue({ type: "CHURCH", name: "Test Church", parentOrganization: null });
+    mocks.reportFindUnique.mockResolvedValue(null);
+    expect(await getYearEndClubDetail("church-1", "2026-27")).toBeNull();
   });
 });

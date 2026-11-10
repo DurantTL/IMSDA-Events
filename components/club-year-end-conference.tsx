@@ -4,7 +4,7 @@ import { ExportLink } from "@/components/export-link";
 import { useMemo, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Download, Search } from "lucide-react";
-import { formatReportYearDueDate, yearEndProgress } from "@/modules/club-reports/year-end-domain";
+import { formatReportYearDueDate } from "@/modules/club-reports/year-end-domain";
 import {
   DEFAULT_YEAR_END_TAB,
   YEAR_END_LIST_PATH,
@@ -66,7 +66,6 @@ export function ClubYearEndConference({ reportYear, initialRows, initialQuery = 
   const slice = paginate(sorted.rows, Number(params.page), YEAR_END_PAGE_SIZE);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const progress = yearEndProgress(rows);
   const counts = yearEndStatusCounts(rows);
   const tabCounts = yearEndTabCounts(rows);
   // A link into a club's detail carries this list's address, so its back link restores the same view (#1557).
@@ -93,34 +92,23 @@ export function ClubYearEndConference({ reportYear, initialRows, initialQuery = 
     }
   }
 
-  const header = (column: keyof typeof YEAR_END_SORT) => {
-    const props = sorted.headerProps(column);
-    return <SortableHeader {...props} onSort={() => { props.onSort(); resetPage(); }} />;
-  };
+  const sortBy = (column: keyof typeof YEAR_END_SORT) => { sorted.headerProps(column).onSort(); resetPage(); };
+  const filtersSet = tab !== DEFAULT_YEAR_END_TAB || search.value.trim() !== "";
+  const clearSearch = () => { search.setValue(""); resetPage(); };
+  const clearFilters = () => { search.setValue(""); setParams({ tab: DEFAULT_YEAR_END_TAB, page: "1" }, "push"); };
   const tabItems = YEAR_END_TABS.map((key) => ({
     key,
     id: `year-end-tab-${key}`,
     panelId: "year-end-panel",
     label: `${YEAR_END_TAB_LABELS[key]} (${tabCounts[key]})`,
   }));
-  const emptyText = rows.length === 0
-    ? `No active clubs for ${reportYear}.`
-    : search.term.trim() !== ""
-      ? "No club matches that search. Clear the search to see every club in this tab."
-      : tab === "needs-review"
-        ? "No submitted reports are waiting. Open Not submitted to see clubs that have not filed yet."
-        : "Every club has submitted its report.";
-
   return (
     <section className="page-stack">
       <div className="page-intro">
         <div>
           <p className="eyebrow">{`Clubs · Pathfinder year ${reportYear}`}</p>
           <h2>Year-End Reports</h2>
-          <p>
-            Due {formatReportYearDueDate(reportYear)}. <strong>{progress.submitted}</strong> submitted,{" "}
-            <strong>{progress.missing}</strong> missing{progress.drafts > 0 ? ` (${progress.drafts} still a draft)` : ""}.
-          </p>
+          <p>Due {formatReportYearDueDate(reportYear)}.</p>
         </div>
         <ExportLink className="secondary-button" href={`/api/admin/club-reports/year-end/export?year=${reportYear}`}>
           <Download aria-hidden="true" size={16} /> Download CSV
@@ -153,14 +141,32 @@ export function ClubYearEndConference({ reportYear, initialRows, initialQuery = 
               placeholder="Find a club, church or director"
               type="search"
             />
-            <SearchClearButton onClear={() => { search.setValue(""); resetPage(); }} visible={search.value !== ""} />
+            <SearchClearButton onClear={clearSearch} visible={search.value !== ""} />
           </label>
+          {filtersSet && <button className={`secondary-button ${styles.action}`} onClick={clearFilters} type="button">Clear filters</button>}
           <SearchResultStatus message={`${plural(filtered.length, "club", "clubs")} listed.`} />
         </div>
       </div>
       <TabPanel className={styles.panel} id="year-end-panel" tabId={`year-end-tab-${tab}`}>
         {filtered.length === 0 ? (
-          <div className="panel"><p className="report-empty">{emptyText}</p></div>
+          <div className="panel">
+            {rows.length === 0 ? <p className="report-empty">{`No active clubs for ${reportYear}.`}</p> : search.term.trim() !== "" ? (
+              <>
+                <p className="report-empty">No club matches that search in this tab.</p>
+                <button className={`secondary-button ${styles.action}`} onClick={clearSearch} type="button">Clear search</button>
+              </>
+            ) : tab === "needs-review" ? (
+              <>
+                <p className="report-empty">No submitted reports are waiting.</p>
+                <button className={`secondary-button ${styles.action}`} onClick={() => setParams({ tab: "not-submitted", page: "1" }, "push")} type="button">Show not submitted</button>
+              </>
+            ) : (
+              <>
+                <p className="report-empty">Every club has submitted its report.</p>
+                <button className={`secondary-button ${styles.action}`} onClick={() => setParams({ tab: "needs-review", page: "1" }, "push")} type="button">Show needs review</button>
+              </>
+            )}
+          </div>
         ) : (
           <>
             <ListPager label="Year-End Reports pages" noun="clubs" nounOne="club" onPage={(page) => setParams({ page: String(page) }, "push")} part="count" slice={slice} />
@@ -170,11 +176,11 @@ export function ClubYearEndConference({ reportYear, initialRows, initialQuery = 
                 <caption className="sr-only">{`Year-End Reports for ${reportYear}`}</caption>
                 <thead role="rowgroup">
                   <tr role="row">
-                    {header("club")}
-                    {header("church")}
+                    <SortableHeader {...sorted.headerProps("club")} onSort={() => sortBy("club")} />
+                    <SortableHeader {...sorted.headerProps("church")} onSort={() => sortBy("church")} />
                     <th role="columnheader">Directors</th>
-                    {header("status")}
-                    {header("membership")}
+                    <SortableHeader {...sorted.headerProps("status")} onSort={() => sortBy("status")} />
+                    <SortableHeader {...sorted.headerProps("membership")} onSort={() => sortBy("membership")} />
                     <th role="columnheader"><span className="sr-only">Actions</span></th>
                   </tr>
                 </thead>

@@ -6,7 +6,7 @@ import { ClubYearEndReportForm } from "@/components/club-year-end-report-form";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { yearEndBackLink, yearEndStatusLabel } from "@/modules/club-reports/year-end-list-domain";
-import { formatReportYearDueDate, isReportYear, reportYearSpanLabel } from "@/modules/club-reports/year-end-domain";
+import { formatReportYearDueDate, isReportYear, latestStartedReportYear, reportYearSpanLabel, reportYearStart } from "@/modules/club-reports/year-end-domain";
 import { getYearEndClubDetail } from "@/modules/club-reports/year-end-repository";
 
 export const metadata: Metadata = { title: "Club Year-End Reports" };
@@ -28,7 +28,7 @@ export default async function StaffClubYearEndPage({
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const { organizationId, year } = await params;
   const { from } = await searchParams;
-  if (!isReportYear(year)) notFound();
+  if (!isReportYear(year) || reportYearStart(year) > reportYearStart(latestStartedReportYear(new Date()))) notFound();
   const detail = await getYearEndClubDetail(organizationId, year);
   if (!detail) notFound();
   const report = detail.report;
