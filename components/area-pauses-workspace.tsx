@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { StaffPageHeader } from "@/components/staff-page-header";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   areaPauseDefinitions,
@@ -27,6 +26,7 @@ export function AreaPausesWorkspace({ initialPauses }: { initialPauses: AreaPaus
   const [rowErrors, setRowErrors] = useState<Partial<Record<AreaPauseKey, string>>>({});
   const [notice, setNotice] = useState("");
 
+  const pausedCount = areaPauseDefinitions.filter((definition) => pauses.find((entry) => entry.area === definition.key)?.paused).length;
   const statusOf = (area: AreaPauseKey) => pauses.find((entry) => entry.area === area);
 
   async function change(definition: AreaPauseDefinition, paused: boolean) {
@@ -67,10 +67,10 @@ export function AreaPausesWorkspace({ initialPauses }: { initialPauses: AreaPaus
   }
 
   return (
-    <section className="page-stack">
-      <StaffPageHeader
-        description="Stop one part of the site for a few minutes while something is fixed. People who try to save get a friendly message and nothing they typed is lost. Pages stay open to read. Everything is running until you pause it."
-      />
+    <div className="page-stack">
+      <p className={styles.summary} data-testid="pause-summary" role="status">
+        <span className={`status-chip ${pausedCount > 0 ? "gold" : "green"}`}>{pausedCount > 0 ? `${pausedCount} of ${areaPauseDefinitions.length} paused` : "Nothing paused"}</span>
+      </p>
 
       {notice && <p className="inline-notice" role="status">{notice}</p>}
 
@@ -128,6 +128,6 @@ export function AreaPausesWorkspace({ initialPauses }: { initialPauses: AreaPaus
           </>
         )}
       </ConfirmDialog>
-    </section>
+    </div>
   );
 }

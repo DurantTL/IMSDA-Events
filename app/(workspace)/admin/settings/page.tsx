@@ -9,6 +9,7 @@ import { getHomepageMinistriesForAdmin } from "@/modules/system-admin/homepage-m
 import { getEnvironmentStatusForViewer } from "@/modules/system-admin/environment-status";
 import { getPlatformSettings } from "@/modules/system-admin/platform-settings";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { FormPage } from "@/components/page-templates/form-page";
 
 export const metadata: Metadata = { title: "Platform settings" };
 
@@ -20,12 +21,14 @@ export default async function PlatformSettingsPage() {
   return (
     <>
       <AdminSectionHeaderFor path="/admin/settings" section="system" />
+      <FormPage header={{ title: "Platform settings", description: "Identity for the platform as a whole, and the defaults a newly created event starts from." }}>
       <PlatformSettingsWorkspace
         initialSettings={await getPlatformSettings()}
         initialMinistries={await getHomepageMinistriesForAdmin()}
         initialSignIn={{ enabled: await isUnifiedSignInEnabled(), linkCheck: await getSignInLinkCheck() }}
         environmentStatus={getEnvironmentStatusForViewer(user)}
       />
+      </FormPage>
     </>
   );
 }

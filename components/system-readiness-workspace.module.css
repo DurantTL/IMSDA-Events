@@ -112,3 +112,19 @@
   min-height: 44px;
   align-items: center;
 }
+
+/* The one-line state under the page title: what needs attention and when it was checked. */
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.summary span {
+  color: var(--muted, #5b6470);
+}

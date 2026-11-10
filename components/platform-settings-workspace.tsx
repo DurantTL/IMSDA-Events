@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { StaffPageHeader } from "@/components/staff-page-header";
 import { useEffect, useRef, useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useConfirm } from "@/components/use-confirm";
@@ -26,6 +25,19 @@ import { HomepageMinistriesEditor } from "@/components/homepage-ministries-edito
 import type { HomepageMinistry } from "@/modules/system-admin/homepage-ministries-domain";
 import type { EnvironmentStatus } from "@/modules/system-admin/environment-status";
 import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-settings";
+import styles from "./platform-settings-workspace.module.css";
+
+/** Who owns each group on this page, in the order the groups appear: a quick map, not a second copy of the settings. */
+const settingOwnership = [
+  { id: "one-sign-in-heading", name: "One sign-in", owner: "Affects everyone" },
+  { id: "platform-identity-heading", name: "Organization", owner: "Central value" },
+  { id: "platform-defaults-heading", name: "New event defaults", owner: "A template copy; each event can override" },
+  { id: "platform-homepage-heading", name: "Homepage help contact", owner: "Central value" },
+  { id: "platform-email-layout-heading", name: "Email header and footer", owner: "Central value" },
+  { id: "platform-invoices-heading", name: "Invoice PDF header", owner: "Central value" },
+  { id: "platform-alerts-heading", name: "Alert addresses", owner: "Owned by Email" },
+  { id: "platform-advanced-heading", name: "Technical settings", owner: "Central value" },
+] as const;
 
 type Draft = PlatformSettingsDraft;
 
@@ -358,14 +370,23 @@ export function PlatformSettingsWorkspace({
   const statusLabel = settingsSaveState({ saving, dirty, outcome: shownOutcome?.kind ?? null }).label;
 
   return (
-    <section className="page-stack platform-settings-workspace">
-      <StaffPageHeader description="Identity for the platform as a whole, and the defaults a newly created event starts from." />
-
+    <div className="page-stack platform-settings-workspace">
       <p className="settings-scope-note">
         These settings are platform-wide, not tied to whichever event is open. Values that belong to one event are on{" "}
         <Link className="text-button" href="/more/event-settings">Event settings</Link>. Your own sign-in is on{" "}
         <Link className="text-button" href="/profile">My profile and security</Link>.
       </p>
+
+      <nav aria-label="Where each platform setting lives" className={styles.ownershipMap} data-testid="settings-ownership-map">
+        <ul>
+          {settingOwnership.map((group) => (
+            <li key={group.id}>
+              <a href={`#${group.id}`}>{group.name}</a>
+              <span>{group.owner}</span>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
       <section className="panel" aria-labelledby="one-sign-in-heading">
         <div className="section-heading">
@@ -394,7 +415,7 @@ export function PlatformSettingsWorkspace({
         {signInError && <p className="form-error" role="alert">{signInError}</p>}
         {signInNotice && <p className="inline-notice" role="status">{signInNotice}</p>}
         <div className="form-actions">
-          <button className="primary-button" type="button" disabled={signInBusy} onClick={() => void changeSignIn(!signIn.enabled)}>
+          <button className="secondary-button" type="button" disabled={signInBusy} onClick={() => void changeSignIn(!signIn.enabled)}>
             {signIn.enabled ? "Turn one sign-in off" : "Turn one sign-in on"}
           </button>
         </div>
@@ -681,6 +702,6 @@ export function PlatformSettingsWorkspace({
       </p>
 
       <HomepageMinistriesEditor initial={initialMinistries.ministries} updatedAt={initialMinistries.updatedAt} updatedByName={initialMinistries.updatedByName} />
-    </section>
+    </div>
   );
 }
