@@ -7,6 +7,8 @@ import {
   type CloseoutRow, type CloseoutTotals, type MealCases, type ReviewedException,
 } from "@/modules/meals/closeout";
 import { eventLocalDateTime } from "@/modules/meals/scanner-import";
+import styles from "./meals-kitchen.module.css";
+import { kitchenColumnDefinitions } from "@/modules/meals/kitchen-count-kinds";
 
 type Closeout = {
   rows: CloseoutRow[];
@@ -25,7 +27,7 @@ export const closeoutDefinitions = [
   ["Ordered and served", "Active café tickets by case: paid, complimentary (no charge), conference-paid, walk-up. Served is what the scanner shows as eaten, never changed by kitchen counts."],
   ["Served on cancelled tickets or registrations", "Meals eaten on a ticket cancelled afterwards, or on a registration that is no longer submitted or confirmed. They stay served and are kept apart from the cases above."],
   ["Billed to conference", "Conference-paid meals served times the rate on file for each order. A meal with no rate is an exception, not zero."],
-  ["Kitchen counts", "Prepared, wasted, donated and transferred, as entered. Shown for reading: they are not charges and not proof of revenue."],
+  ["Kitchen counts", `${kitchenColumnDefinitions.PREPARED} ${kitchenColumnDefinitions.WASTED} ${kitchenColumnDefinitions.DONATED} ${kitchenColumnDefinitions.TRANSFERRED} Shown for reading: they are not charges and not proof of revenue, and each is kept apart from Ordered and Served.`],
 ] as const;
 
 const cases = (value: MealCases) => `${value.paid} paid · ${value.complimentary} complimentary · ${value.conference} conference · ${value.walkUp} walk-up`;
@@ -34,7 +36,7 @@ const kitchenFigure = (value: number | null) => (value === null ? "—" : String
 function MoneyRow({ name, row, header }: { name: string; row: CloseoutTotals; header?: boolean }) {
   return (
     <tr role="row" className={header ? "served-total" : undefined}>
-      <th role="rowheader" scope="row">{name}</th>
+      <th className={styles.wrap} role="rowheader" scope="row">{name}</th>
       <td role="cell" data-label="Charges and credits">
         <strong><Money cents={row.net} /></strong>
         <span className="field-help served-split"><Money cents={row.charges} /> charged · <Money cents={row.credits} /> credited</span>

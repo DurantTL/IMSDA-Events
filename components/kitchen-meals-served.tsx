@@ -2,6 +2,7 @@ import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { Download, FileUp } from "lucide-react";
 import type { ServedFigures, ServedReport } from "@/modules/meals/served-report";
+import styles from "./meals-kitchen.module.css";
 
 /** One figure with its payer split underneath, so a narrow screen never needs three columns per measure. */
 function Figure({ figures }: { figures: ServedFigures }) {
@@ -47,6 +48,11 @@ export function KitchenMealsServed({
         <p>No café meal tickets have been sold for this event.</p>
       ) : (
         <>
+          <dl className={`field-help ${styles.definitions}`} data-testid="served-definitions">
+            <div><dt className="sr-only">Sold</dt><dd>Sold: café meal tickets for live registrations. Not a count of food.</dd></div>
+            <div><dt className="sr-only">Served</dt><dd>Served: meals the café scanner recorded as eaten, including any on tickets cancelled afterwards (shown apart, and not in Sold).</dd></div>
+            <div><dt className="sr-only">Not used</dt><dd>Not used: sold tickets the scanner has not recorded as eaten (Sold minus Served, leaving out meals on cancelled tickets).</dd></div>
+          </dl>
           {!anyImport && <p className="inline-notice" role="status">No scanner results have been imported yet, so nothing shows as served.</p>}
           <div className="report-table-wrap"><table role="table" className="report-table report-table-auto table-cards">
             <caption className="sr-only">Meals sold, served and not used, by service</caption>
@@ -54,7 +60,7 @@ export function KitchenMealsServed({
             <tbody role="rowgroup">
               {report.rows.map((row) => (
                 <tr key={row.key} role="row">
-                  <th role="rowheader" scope="row"><Link href={drillHref(row.key)}>{row.label}<span className="sr-only"> ticket details</span></Link></th>
+                  <th className={styles.wrap} role="rowheader" scope="row"><Link href={drillHref(row.key)}>{row.label}<span className="sr-only"> ticket details</span></Link></th>
                   <td role="cell" data-label="Sold"><Figure figures={row.sold} /></td>
                   <td role="cell" data-label="Served"><Figure figures={row.served} />{row.servedOnCancelled.total > 0 && <span className="field-help served-split">includes {row.servedOnCancelled.total} on cancelled tickets</span>}</td>
                   <td role="cell" data-label="Not used"><Figure figures={row.notUsed} /></td>

@@ -1,0 +1,23 @@
+.stack { display: grid; gap: var(--gap-page); }
+.card { display: grid; gap: var(--gap-sm); min-width: 0; }
+.cardHead { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--gap-sm); }
+.titleRow { display: flex; flex: 1 1 14rem; flex-wrap: wrap; align-items: center; gap: var(--gap-xs); min-width: 0; }
+.name { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.kindLine { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.counts { margin: 0; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.9375rem); font-weight: 700; }
+.policy { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--gap-xs); }
+.actions > button { min-height: var(--touch-target); }
+.items { margin-top: var(--gap-xs); min-width: 0; }
+.items :is(th, td) { overflow-wrap: anywhere; }
+.items > summary { min-height: var(--touch-target); display: flex; align-items: center; cursor: pointer; font-weight: 700; }
+.editor { max-width: 650px; }
+.editor form > :global(.form-actions) { position: sticky; bottom: calc(var(--pad-modal) * -1); margin: 0 calc(var(--pad-modal) * -1) calc(var(--pad-modal) * -1); padding: 12px var(--pad-modal); border-top: 1px solid var(--line); background: var(--card); }
+.dialogSection { display: grid; gap: var(--gap-sm); }
+.dialogSection + .dialogSection { margin-top: var(--gap-form-stack); border-top: 1px solid var(--line); padding-top: var(--gap-form-stack); }
+.dialogSection h3 { margin: 0; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.dialogSection p { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+@media (max-width: 520px) {
+  .actions { width: 100%; }
+  .actions > button { flex: 1 1 8rem; }
+}

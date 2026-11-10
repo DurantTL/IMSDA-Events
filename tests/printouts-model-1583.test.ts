@@ -16,10 +16,28 @@ describe("Reports tab views (#1583)", () => {
   it("keeps the five views, in order, with Printouts opening the new page", () => {
     const tab = reports(["VIEW_REPORTS", "MANAGE_KITCHEN_COUNTS", "VIEW_EVENT"]);
     const labels = tab.views.map((entry) => entry.label);
-    expect(labels.filter((label) => label !== "Operational health")).toEqual(["Operational reports", "Kitchen report", "Kitchen counts", "Printouts"]);
+    expect(labels.filter((label) => label !== "Operational health")).toEqual(["Operational reports", "Kitchen report", "Printouts"]);
     expect(tab.views.at(-1)).toMatchObject({ label: "Printouts", href: "/more/reports/printouts?event=evt_1" });
     expect(tab.views.length).toBeLessThanOrEqual(maxViewsPerTab);
     expect(eventTabSpecs.find((spec) => spec.key === "reports")!.views.length).toBeLessThanOrEqual(maxViewsPerTab);
+  });
+
+  it("shows exactly one kitchen view: Kitchen report for report holders, Kitchen counts for kitchen-only staff (#1579)", () => {
+    const kitchen = (permissions: EventPermission[]) => reports(permissions).views.filter((entry) => entry.key === "kitchen").map((entry) => [entry.label, entry.href]);
+    expect(kitchen(["VIEW_REPORTS", "MANAGE_KITCHEN_COUNTS"])).toEqual([["Kitchen report", "/more/kitchen-report?event=evt_1"]]);
+    expect(kitchen(["VIEW_REPORTS"])).toEqual([["Kitchen report", "/more/kitchen-report?event=evt_1"]]);
+    // Kitchen-only staff have one view, so the tab shows no strip and opens the counts page.
+    const only = buildEventTabs(context(["MANAGE_KITCHEN_COUNTS"])).find((tab) => tab.key === "reports")!;
+    expect(only.views).toEqual([]);
+    expect(only.href).toBe("/more/kitchen-report/counts?event=evt_1");
+  });
+
+  it("lights the Reports tab and its Kitchen view on all four kitchen pages (#1579)", () => {
+    for (const path of ["/more/kitchen-report", "/more/kitchen-report/counts", "/more/kitchen-report/scanner-import", "/more/kitchen-report/closeout"]) {
+      expect(currentEventPlace(path, new URLSearchParams("")), path).toEqual({ tab: "reports", view: "kitchen" });
+    }
+    // Meals setup stays an Event setup page.
+    expect(currentEventPlace("/more/meals", new URLSearchParams("")).tab).toBe("setup");
   });
 
   it("shows Printouts only when the viewer can see a card", () => {
