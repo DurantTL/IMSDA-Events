@@ -116,7 +116,7 @@ const waitingClubApplications = (v: StaffAreaViewer) => v.counts.CLUBS_ADMIN;
 
 /**
  * The tab rows. Registry destinations are named by href; a tab whose page does not exist yet is not here (#1559: menus never
- * list planned work). Left out for that reason: Events > "All events" (no in-shell all-events list yet).
+ * list planned work).
  */
 export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
   // Home (#1568): the work waiting for this person, then the events coming up. Every staff viewer has both; each page reads
@@ -126,6 +126,8 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
     { key: "coming-up", destination: homeDestinations.comingUp.href, visible: () => true },
   ],
   events: [
+    // All events (#1570): every current event, for System Administrators. An Event Administrator's own events are Event administration.
+    { key: "all-events", destination: "/admin/events", visible: sys },
     { key: "event-administration", destination: eventsAdminHomeItem.href, visible: events },
     { key: "calendar", destination: "/admin/calendar", visible: sys },
     { key: "create", destination: "/event-setup", visible: sys },
@@ -298,6 +300,9 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   if (pathname === homeDestinations.comingUp.href) return place("home", "coming-up");
   if (pathname === homeDestinations.needsYou.href) return place("home", "needs-you");
   if (under(pathname, "/help") || under(pathname, "/profile")) return place("home", null);
+  // Submitted club forms belong to the clubs, not to an event (#1573): with no `event` parameter they sit in Admin -> Forms beside
+  // the definitions. With one (the person came from that event's More card) they stay in the event shell.
+  if (under(pathname, "/more/club-forms") && !params.get("event")) return place("admin", "hub-forms", "/admin/club-forms");
   if (isEventScopedPath(pathname)) return { area: "events", tab: null, view: null, inEvent: true };
 
   if (pathname === "/admin") return place("admin", "system-administration");
@@ -309,6 +314,7 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   // A card on the Events hub, so it lights the Events tab and not the /admin fallback below.
   if (under(pathname, "/admin/feature-requests")) return place("admin", "hub-events");
   if (pathname === "/events-admin") return place("events", "event-administration");
+  if (under(pathname, "/admin/events")) return place("events", "all-events");
   if (under(pathname, "/event-setup")) return place("events", pathname === "/event-setup/copy" ? "copy" : "create");
   if (under(pathname, "/admin/calendar")) return place("events", "calendar");
   if (under(pathname, "/admin/event-templates")) return place("events", "templates");

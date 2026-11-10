@@ -1,9 +1,10 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
-import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClubsFormsMissingList } from "@/components/clubs-forms-missing-list";
+import { ClubFormsViewsStrip } from "@/components/club-forms-views-strip";
+import { ListPage } from "@/components/page-templates/list-page";
 import { ClubFormCreate } from "@/components/club-form-create";
 import { ClubFormSync } from "@/components/club-form-sync";
 import { ClubFormFillMode } from "@/components/club-form-fill-mode";
@@ -58,8 +59,18 @@ export default async function AdminClubFormsPage({ searchParams }: { searchParam
   const params = await searchParams;
   const view = typeof params.view === "string" ? params.view : undefined;
   const year = typeof params.year === "string" ? params.year : undefined;
+  // The page draws its own titled header (#1573), so both views share it: the same title, the strip, the Missing forms view current.
+  const description = "Forms clubs fill in for their members or send by private link.";
+  const publicPageLink = <Link className="secondary-button" href="/admin/club-forms/public-page">Public club forms page</Link>;
   if (view === "missing") {
-    return <ClubsFormsMissingList clubYear={resolveAreaClubYear(year)} clubs={clubsWithFormsMissing(await getRequiredFormsStatus(resolveAreaClubYear(year)))} />;
+    return (
+      <>
+        <AdminPageHeader path="/admin/club-forms" year={year} />
+        <ListPage header={{ title: "Club forms", description, secondary: publicPageLink, below: <ClubFormsViewsStrip administration current="missing" year={year} /> }}>
+          <ClubsFormsMissingList clubYear={resolveAreaClubYear(year)} clubs={clubsWithFormsMissing(await getRequiredFormsStatus(resolveAreaClubYear(year)))} />
+        </ListPage>
+      </>
+    );
   }
   const templates = await listClubFormTemplatesForAdmin();
   // A short list in the code's order until someone clicks a header (#1458); the keys are on a fixed list.
@@ -69,16 +80,31 @@ export default async function AdminClubFormsPage({ searchParams }: { searchParam
   const clubYear = clubYearFor(new Date());
   const baseUrl = getServerEnv().APP_BASE_URL;
 
-  return (
-    <section className="page-stack">
-      <AdminPageHeader path="/admin/club-forms" />
-      <StaffPageHeader
-        description="Forms clubs fill in for their members or send by private link. Every form starts off. A form that is on shows in each club's Forms tab for its director and deputy. Wording that is drafted from the conference's summaries should be checked against the official forms before you turn a form on."
-        primary={<><Link className="secondary-button" href="/admin/club-forms/public-page">Public club forms page</Link><Link className="secondary-button" href="/more/club-forms">See submitted forms</Link></>}
-      />
+  const notices = (
+    <>
+      <p className="inline-notice" role="status">
+        Every form starts off. A form that is on shows in each club&apos;s Forms tab for its director and deputy. Wording that is drafted from the conference&apos;s summaries should be checked against the official forms before you turn a form on.
+      </p>
+      <ClubFormCreate templates={templates.filter((template) => template.version > 0).map((template) => ({ key: template.key, name: template.name }))} />
       {user.globalRole === "SYSTEM_ADMIN"
         ? <ClubFormSync pendingCount={templates.filter((template) => template.needsSync).length} />
         : <p className="inline-notice" role="status">Bringing form templates up to date with the code is done by a system administrator.</p>}
+      <section aria-labelledby="club-forms-help-heading" className="panel">
+        <h2 id="club-forms-help-heading">Where each setting is</h2>
+        <ul>
+          <li><strong>On or Off.</strong> Turning a form on lets every club&apos;s director and deputy use it. It also makes the form&apos;s private links work, opens its public application if it is an open application, lets the public club forms page link to it, and counts it on the Missing forms view when it is required. Turning it off stops all of that and hides it from clubs. Everything already filled in is kept. Publishing a new version is a separate step in Edit: build it, publish it, then turn it on when it is ready.</li>
+          <li><strong>Who fills it in.</strong> Choose families and individuals, club forms or an open application. The choice saves as soon as you pick it. An open application also shows its public address to copy and a button to close or reopen it for the club year.</li>
+          <li><strong>Required.</strong> Choose not required, once per club each year, or each member of the roles you pick each year, then press Save. Only forms that are on count as missing on the Missing forms view.</li>
+          <li><strong>Edit.</strong> Opens the form builder. Changes are saved as a draft; publishing makes a new version for new fills, and forms already filled in keep the version they were filled in on.</li>
+        </ul>
+      </section>
+    </>
+  );
+
+  return (
+    <>
+      <AdminPageHeader path="/admin/club-forms" />
+      <ListPage header={{ title: "Club forms", description, secondary: publicPageLink, below: <ClubFormsViewsStrip administration current="definitions" /> }} notices={notices}>
       <section className="panel">
         <div className="report-table-wrap card-box">
           {sorting.order.key && <SortOrderNote>{sortOrderText(formSortLabels[sorting.order.key].label, sorting.order.dir, formSortLabels[sorting.order.key].kind)}</SortOrderNote>}
@@ -139,7 +165,7 @@ export default async function AdminClubFormsPage({ searchParams }: { searchParam
           </table>
         </div>
       </section>
-      <ClubFormCreate templates={templates.filter((template) => template.version > 0).map((template) => ({ key: template.key, name: template.name }))} />
-    </section>
+      </ListPage>
+    </>
   );
 }

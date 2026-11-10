@@ -169,7 +169,7 @@ export const staffPageTitles = {
   eventPatches: "Event patches",
   emergencyPlan: "Emergency plan",
   operationalHealth: "Operational health",
-  merchandise: "Merchandise catalog",
+  merchandise: "Merchandise",
   assignmentRoster: "Assignment roster",
   programAssignments: "Seminar assignments",
   lodging: "Lodging",

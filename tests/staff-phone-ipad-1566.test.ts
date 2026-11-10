@@ -203,12 +203,5 @@ describe("deep pages light their parent tab, rail area and phone item (#1566)", 
     for (const file of ["app/(workspace)/more/lodging/assignments/page.tsx", "app/(workspace)/more/lodging/requests/page.tsx"]) {
       expect(read(file), file).toContain("<LodgingViewsStrip");
     }
-    for (const [file, href] of [
-      ["app/(workspace)/more/issued-assets/closeout/page.tsx", "/more/issued-assets?event="],
-    ]) {
-      const source = read(file);
-      expect(source, file).toContain("<BackLink");
-      expect(source, file).toContain(href);
-    }
   });
 });

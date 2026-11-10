@@ -8,7 +8,8 @@ import { InformationFormsHome } from "@/components/information-forms-home";
 import { loadInformationFormsHome, loadInformationFormView } from "@/components/information-forms-page-data";
 import { eventInformationConfig, informationListHref } from "@/components/registration-builder/information-mode";
 import { RegistrationBuilderWorkspace } from "@/components/registration-builder-workspace";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { ListPage } from "@/components/page-templates/list-page";
+import { PageHeader } from "@/components/page-header";
 import { resolveEventContext } from "@/modules/events/selection";
 
 export const metadata: Metadata = { title: "Information forms" };
@@ -23,7 +24,13 @@ export default async function InformationFormsPage({ searchParams }: { searchPar
   const { event: requested, form: formId } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FORMS")) {
-    return <AccessRestricted title="Information form access is restricted" detail="Event administrators and registration managers can create, preview, and publish information forms for an event." whoToAsk="your event administrator" />;
+    // The page draws its own title (#1572) in every state, so the restricted state keeps the page's one h1 too.
+    return (
+      <>
+        <PageHeader title="Information forms" />
+        <AccessRestricted title="Information form access is restricted" detail="Event administrators and registration managers can create, preview, and publish information forms for an event." whoToAsk="your event administrator" />
+      </>
+    );
   }
   const { user } = await getCurrentSession();
   const config = eventInformationConfig(event, user?.globalRole === "SYSTEM_ADMIN");
@@ -32,10 +39,9 @@ export default async function InformationFormsPage({ searchParams }: { searchPar
   if (!formId) {
     const { forms, templates } = await loadInformationFormsHome(target);
     return (
-      <section className="page-stack">
-        <StaffPageHeader description={`Surveys and interest forms for ${event.name}. Open one to build it in the form builder.`} />
+      <ListPage header={{ title: "Information forms", description: `Surveys and interest forms for ${event.name}. Open one to build it in the form builder.` }}>
         <InformationFormsHome config={config} forms={forms} templates={templates} />
-      </section>
+      </ListPage>
     );
   }
 
@@ -44,6 +50,7 @@ export default async function InformationFormsPage({ searchParams }: { searchPar
   const listHref = informationListHref(config);
   return (
     <section className="page-stack">
+      <PageHeader title="Information forms" />
       <BuilderPhoneNotice backHref={listHref} backLabel="Back to information forms" builderName="information form builder" />
       <div className="builder-phone-hidden">
         <BuilderDeviceHint />

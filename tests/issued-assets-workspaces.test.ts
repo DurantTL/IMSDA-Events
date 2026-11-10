@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -28,29 +30,64 @@ const catalog: CatalogView = {
 };
 
 describe("issued-assets configuration screen", () => {
-  const html = renderToStaticMarkup(createElement(IssuedAssetsWorkspace, { eventId: "ev1", eventName: "Camp Meeting 2027", initialCatalog: catalog }));
+  const html = renderToStaticMarkup(createElement(IssuedAssetsWorkspace, { eventId: "ev1", initialCatalog: catalog, canOpenDesk: true }));
 
-  it("lets staff add a kind of item, with behaviour, holders, room link and policy references", () => {
+  it("gives each kind a stock card with a status chip, visible Edit and Add items buttons, and its policy facts (#1581)", () => {
     expect(html).toContain("Add a kind of item");
-    expect(html).toContain("Numbered (one holder at a time)");
-    expect(html).toContain("Quantity (a lot of identical items)");
-    expect(html).toContain("Room-linked");
-    expect(html).toContain("Deposit policy reference");
-    expect(html).toContain("Usual cash deposit per holder");
-    expect(html).toContain("If an item is missing or damaged");
-    expect(html).toContain("Replacement fee for one item");
-    expect(html).toContain("Usual cash deposit $10.00. Replacement fee $25.00.");
+    expect(html).toContain(">Dorm room key</h2>");
+    expect(html).toContain('<span class="status-chip green">Active</span>');
+    expect(html).toContain('aria-label="Edit Dorm room key">Edit</button>');
+    expect(html).toContain('aria-label="Add items to Welcome packet">Add items</button>');
+    expect(html).toContain("Room-linked. Deposit policy: CM26 key deposit. Usual cash deposit $10.00. Replacement fee $25.00.");
   });
 
-  it("offers a numbered range for a numbered kind only", () => {
-    expect(html.match(/Add a numbered range/g)).toHaveLength(1);
-    expect(html).toContain("K-201 through K-260");
+  it("keeps the add and edit forms out of the page: they open in a dialog (#1581)", () => {
+    expect(html).not.toContain("Numbered (one holder at a time)");
+    expect(html).not.toContain("Add a numbered range");
+    expect(html).not.toContain('role="dialog"');
   });
 
-  it("shows stock in words and links to the check-in desk", () => {
+  it("shows stock in words and links to the check-in desk only when the viewer may open it", () => {
     expect(html).toContain("1 in stock, 1 out");
     expect(html).toContain("90 in stock, 10 out");
     expect(html).toContain("/check-in/assets?event=ev1");
+    expect(html).toContain("Issue and return desk");
+    const closed = renderToStaticMarkup(createElement(IssuedAssetsWorkspace, { eventId: "ev1", initialCatalog: catalog, canOpenDesk: false }));
+    expect(closed).not.toContain("/check-in/assets");
+    expect(closed).not.toContain("Issue and return desk");
+  });
+
+  it("marks a switched-off kind with a neutral Inactive chip, the word rule B12 allows", () => {
+    const off = renderToStaticMarkup(createElement(IssuedAssetsWorkspace, { eventId: "ev1", initialCatalog: { ...catalog, types: [{ ...catalog.types[0], active: false }] }, canOpenDesk: false }));
+    expect(off).toContain('<span class="status-chip neutral">Inactive</span>');
+  });
+
+  it("explains an empty inventory and offers the next step (#1581)", () => {
+    const empty = renderToStaticMarkup(createElement(IssuedAssetsWorkspace, { eventId: "ev1", initialCatalog: { truncated: false, types: [], assets: [] }, canOpenDesk: false }));
+    expect(empty).toContain("No kinds of item yet");
+    expect(empty).toContain("Add a kind of item, such as a dorm room key");
+    expect(empty.match(/Add a kind of item/g)!.length).toBeGreaterThanOrEqual(3);
+    expect(empty.match(/class="primary-button"/g)).toHaveLength(1);
+  });
+
+  it("turns the items table into cards on a phone and never lets the card widen the page (#1581, rule B3)", () => {
+    expect(html).toContain("table-cards");
+    const css = readFileSync(join(process.cwd(), "components/issued-assets-workspace.module.css"), "utf8");
+    expect(css).toMatch(/\.card \{[^}]*min-width: 0;/);
+    expect(css).toMatch(/\.items \{[^}]*min-width: 0;/);
+  });
+
+  it("says 1 item or 1 lot in the singular", () => {
+    const one = renderToStaticMarkup(createElement(IssuedAssetsWorkspace, { eventId: "ev1", initialCatalog: { ...catalog, types: [{ ...catalog.types[0], assetCount: 1 }], assets: [catalog.assets[0]] }, canOpenDesk: false }));
+    expect(one).toContain("1 item;");
+    expect(one).toContain(">1 item</summary>");
+  });
+
+  it("keeps the sortable items table, with its screen-reader labels, under the card", () => {
+    expect(html).toContain("<details");
+    expect(html).toContain("Condition of K-214");
+    expect(html).toContain("Status of K-214");
+    expect(html).toContain("Location of K-214");
   });
 });
 
