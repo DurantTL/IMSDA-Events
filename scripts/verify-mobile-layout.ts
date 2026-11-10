@@ -304,6 +304,7 @@ const pages: PageSpec[] = [
   area("points", "/account/area-clubs/points"),
   area("reports", "/account/area-clubs/reports"),
   area("roster-export", "/account/area-clubs/roster-export"),
+  area("records-export", "/account/area-clubs/reports/export"),
   area("club-home", `/account/area/${clubA}`),
   area("club-report", `/account/area/${clubA}/reports/${reportMonth}`),
   // No area club Orders page (#918): club Orders are not an Area Coordinator's to see; the route answers 404.

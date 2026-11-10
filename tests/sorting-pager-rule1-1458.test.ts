@@ -65,6 +65,7 @@ const unsortedTables: Record<string, string> = {
   "components/member-class-history.tsx": "set order: classes in class order",
   "components/notifications-workspace.tsx": "short fixed list: settings table",
   "components/roster-export-builder.tsx": "set order: preview in the CSV's column order",
+  "components/records-export-builder.tsx": "set order: preview in the CSV's column order",
   "components/club-report-column-builder.tsx": "set order: preview in the CSV's column order",
 };
 
