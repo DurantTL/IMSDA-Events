@@ -1,10 +1,13 @@
 "use client";
 
 import { EventSetupHelp } from "@/components/event-setup-help";
+import { StaffPageHeader } from "@/components/staff-page-header";
+import labels from "@/components/lodging-labels.module.css";
+import { cardCell } from "@/components/table-card-labels";
+import { lodgingNightsLine } from "@/modules/lodging/lodging-views-model";
 import { useState } from "react";
 import { useEditedForms } from "@/components/use-edited-forms";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
-import { staffPageTitles } from "@/components/staff-navigation";
 import {
   lodgingCategories,
   lodgingCategoryLabels,
@@ -39,7 +42,7 @@ function describeUnit(unit: LodgingUnitView) {
   return parts.join(", ");
 }
 
-export function LodgingWorkspace({ eventName, initialView, canSetRates }: { eventName: string; initialView: LodgingView; canSetRates: boolean }) {
+export function LodgingWorkspace({ eventName, initialView, canSetRates, canSeeRegistrationPages }: { eventName: string; initialView: LodgingView; canSetRates: boolean; /** The viewer also manages registrations, so the Requests and Assignments pages are theirs to open. */ canSeeRegistrationPages: boolean }) {
   const [view, setView] = useState(initialView);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -60,11 +63,8 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
   }
 
   return <div className="settings-stack">
-    <div className="page-intro"><div>
-      <p className="eyebrow">Event configuration</p>
-      <h2 className="duplicate-page-title">{staffPageTitles.lodging}</h2>
-      <p>Rooms, beds and sites for {eventName}, night by night. This is inventory only: nobody is assigned here (guests are placed on the <a href={`/more/lodging/assignments?event=${encodeURIComponent(view.eventId)}`}>Lodging assignments</a> page). Hotel details on the event settings page are separate and never counted as on-site lodging. What guests asked for is on the <a href={`/more/lodging/requests?event=${encodeURIComponent(view.eventId)}`}>Lodging requests</a> page.</p>
-    </div></div>
+    <StaffPageHeader description={`Rooms, beds and sites for ${eventName}, night by night. This is inventory only: nobody is assigned here, and a guest's request is not a placement.`} />
+    {view.property ? <p className={labels.context}><span><strong>{view.property.name}</strong></span><span>{lodgingNightsLine(view.nights)}</span></p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
 
@@ -85,15 +85,16 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
     </section> : <>
       <section className="panel">
         <h3>{view.property.name}</h3>
+        <p className="field-hint">Hotel details on the event settings page are separate and never counted as on-site lodging.{canSeeRegistrationPages ? " What guests asked for is under Requests; who is placed where is under Assignments." : ""}</p>
         <p>Property layout version {view.property.templateVersion}.{" "}
           {view.property.currentTemplateVersion !== view.property.templateVersion ? <>
             <span role="status">Version {view.property.currentTemplateVersion} is available. Capacities for this event stay as they are until you update.</span>{" "}
             <button type="button" className="secondary-button" disabled={busy} onClick={() => void run(() => call(`${base}/layout`, "POST", {}), "Updated to the latest property layout.")}>Update to latest property layout</button>
           </> : "This event uses the latest layout."}</p>
-        {view.nights.length === 0 ? <p>This event has no bookable nights.</p> : <div className="table-wrap"><table className="report-table report-table-auto">
+        {view.nights.length === 0 ? <p>This event has no bookable nights.</p> : <div className="table-wrap"><table className="report-table report-table-auto table-cards" role="table">
           <caption>People the inventory takes, by night</caption>
-          <thead><tr><th scope="col">Night</th><th scope="col">Capacity in service</th></tr></thead>
-          <tbody>{view.totalsByNight.map((row) => <tr key={row.night}><td>{row.night}</td><td>{row.capacity}{row.unlimited ? " plus tent camping (no fixed limit)" : ""}</td></tr>)}</tbody>
+          <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Night</th><th role="columnheader" scope="col">Capacity in service</th></tr></thead>
+          <tbody role="rowgroup">{view.totalsByNight.map((row) => <tr key={row.night} role="row"><th role="rowheader" scope="row">{row.night}</th><td {...cardCell("Capacity in service")}>{row.capacity}{row.unlimited ? " plus tent camping (no fixed limit)" : ""}</td></tr>)}</tbody>
         </table></div>}
       </section>
 
@@ -102,9 +103,9 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
       <section className="panel">
         <h3>Lodging rates</h3>
         <p>No rate means lodging is included or free. A tent with power uses the tent rate unless it has its own.</p>
-        {canSetRates ? <div className="table-wrap"><table className="report-table report-table-auto">
-          <thead><tr><th scope="col">Category</th><th scope="col">Current rate</th><th scope="col">Set</th></tr></thead>
-          <tbody>{lodgingCategories.map((category) => <RateRow key={category} category={category} view={view} base={base} busy={busy} run={run} />)}</tbody>
+        {canSetRates ? <div className="table-wrap"><table className="report-table report-table-auto table-cards table-cards-wide" role="table">
+          <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Category</th><th role="columnheader" scope="col">Current rate</th><th role="columnheader" scope="col">Set</th></tr></thead>
+          <tbody role="rowgroup">{lodgingCategories.map((category) => <RateRow key={category} category={category} view={view} base={base} busy={busy} run={run} />)}</tbody>
         </table></div> : <p>Only staff who manage finance can set rates.{" "}
           {Object.keys(view.rates).length === 0 ? "None are set." : lodgingCategories.filter((category) => view.rates[category]).map((category) => `${lodgingCategoryLabels[category]}: ${formatRate(view.rates[category]!)}`).join("; ")}</p>}
       </section>
@@ -134,9 +135,9 @@ function BuildingUnits({ building, nights, base, busy, run }: {
   const sorted = useTableSort(building.units, UNIT_SORT);
   return <section className="panel">
     <h3>{building.name}</h3>
-    <div className="table-wrap">{sorted.note}<table className="report-table report-table-auto">
-      <thead><tr>{sorted.header("unit", "Unit")}{sorted.header("details", "Details")}{sorted.header("sleeps", "Sleeps up to")}{sorted.header("nights", "Nights in service")}{sorted.header("unavailable", "Unavailable")}{sorted.header("holds", "Holds")}</tr></thead>
-      <tbody>{sorted.rows.map((unit) => <UnitRow key={unit.eventUnitId} unit={unit} nights={nights} base={base} busy={busy} run={run} />)}</tbody>
+    <div className="table-wrap">{sorted.note}<table className="report-table report-table-auto table-cards table-cards-wide" role="table">
+      <thead role="rowgroup"><tr role="row">{sorted.header("unit", "Unit")}{sorted.header("details", "Details")}{sorted.header("sleeps", "Sleeps up to")}{sorted.header("nights", "Nights in service")}{sorted.header("unavailable", "Unavailable")}{sorted.header("holds", "Holds")}</tr></thead>
+      <tbody role="rowgroup">{sorted.rows.map((unit) => <UnitRow key={unit.eventUnitId} unit={unit} nights={nights} base={base} busy={busy} run={run} />)}</tbody>
     </table></div>
   </section>;
 }
@@ -160,10 +161,14 @@ function UnitRow({ unit, nights, base, busy, run }: {
   useUnsavedChangesGuard(edits.dirty);
   const holdKeys = ["newHold", ...unit.holds.map((hold) => `release:${hold.id}`)];
   return <>
-    <tr>
-      <th scope="row">{unit.name}{unit.retired ? " (Retired)" : ""}</th>
-      <td>{describeUnit(unit)}{unit.notes ? ` (${unit.notes})` : ""}</td>
-      <td>
+    <tr role="row">
+      <th role="rowheader" scope="row">{unit.name}{unit.retired ? " (Retired)" : ""}
+        {unit.unavailable || activeHolds.length > 0 ? <ul className={labels.row} aria-label={`State of ${unit.name}`}>
+          {unit.unavailable ? <li className={labels.state}>Unavailable</li> : null}
+          {activeHolds.length > 0 ? <li className={labels.state}>{activeHolds.length === 1 ? "On hold" : `${activeHolds.length} holds`}</li> : null}
+        </ul> : null}</th>
+      <td {...cardCell("Details")}>{describeUnit(unit)}{unit.notes ? ` (${unit.notes})` : ""}</td>
+      <td {...cardCell("Sleeps up to")}>
         <form onChange={edits.track("capacity")} onSubmit={(event) => {
           event.preventDefault();
           const raw = String(new FormData(event.currentTarget).get("capacity") ?? "").trim();
@@ -171,30 +176,30 @@ function UnitRow({ unit, nights, base, busy, run }: {
         }}>
           <label className="sr-only" htmlFor={`cap-${unit.eventUnitId}`}>Sleeps up to for {unit.name}</label>
           <input id={`cap-${unit.eventUnitId}`} name="capacity" type="number" min={0} max={500} defaultValue={unit.capacityOverride ?? ""} placeholder={unit.defaultCapacity === null ? "no limit" : String(unit.defaultCapacity)} />
-          <button type="submit" disabled={busy}>Save</button>
+          <button type="submit" className="secondary-button" disabled={busy}>Save</button>
         </form>
       </td>
-      <td>{nightsInService(unit)} of {nights.length}</td>
-      <td>
+      <td {...cardCell("Nights in service")}>{nightsInService(unit)} of {nights.length}</td>
+      <td {...cardCell("Unavailable")}>
         <label><input type="checkbox" checked={unit.unavailable} disabled={busy} onChange={(event) => void run(() => call(`${base}/units/${unit.eventUnitId}`, "PATCH", { unavailable: event.target.checked }), `${unit.name} updated.`)} /> Unavailable</label>
       </td>
-      <td><button type="button" className="secondary-button" aria-expanded={open} onClick={() => { if (open) edits.clear(...holdKeys); setOpen(!open); }}>{activeHolds.length} active, {unit.holds.length} total</button></td>
+      <td {...cardCell("Holds")}><button type="button" className="secondary-button" aria-expanded={open} onClick={() => { if (open) edits.clear(...holdKeys); setOpen(!open); }}>{activeHolds.length} active, {unit.holds.length} total</button></td>
     </tr>
-    {open ? <tr><td colSpan={6}>
+    {open ? <tr role="row"><td colSpan={6} role="cell">
       {unit.holds.length === 0 ? <p>No holds yet.</p> : <ul>{unit.holds.map((hold) => <li key={hold.id}>
         <strong>{({ STAFF: "Staff hold", MAINTENANCE: "Maintenance", SAFETY: "Safety", DAMAGE: "Damage" } as Record<string, string>)[hold.kind] ?? hold.kind}</strong>: {hold.reason}, {hold.firstNight} to {hold.lastNight}{hold.active ? "" : ` (released: ${hold.releaseReason})`}
-        {hold.staleDefault ? <span role="alert"> This default hold no longer covers every night of the event. <button type="button" disabled={busy || nights.length === 0} onClick={() => void run(() => call(`${base}/holds/${hold.id}`, "PATCH", { action: "change_window", firstNight: nights[0], lastNight: nights[nights.length - 1] }), "Hold extended to cover the event.")}>Extend to cover the event</button></span> : null}
+        {hold.staleDefault ? <span role="alert"> This default hold no longer covers every night of the event. <button type="button" className="secondary-button" disabled={busy || nights.length === 0} onClick={() => void run(() => call(`${base}/holds/${hold.id}`, "PATCH", { action: "change_window", firstNight: nights[0], lastNight: nights[nights.length - 1] }), "Hold extended to cover the event.")}>Extend to cover the event</button></span> : null}
         <ul>{hold.history.map((entry, index) => <li key={index}>{entry.type.toLowerCase().replace("_", " ")} on {entry.at.slice(0, 10)}{entry.reason ? `: ${entry.reason}` : ""}{entry.firstNight ? ` (${entry.firstNight} to ${entry.lastNight})` : ""}</li>)}</ul>
-        {hold.active ? <form onChange={edits.track(`release:${hold.id}`)} onSubmit={(event) => {
+        {hold.active ? <form className={labels.stack} onChange={edits.track(`release:${hold.id}`)} onSubmit={(event) => {
           event.preventDefault();
           const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
           void run(() => call(`${base}/holds/${hold.id}`, "PATCH", { action: "release", reason }), "Hold released.").then((ok) => { if (ok) edits.clear(`release:${hold.id}`); });
         }}>
           <label>Reason for releasing <input name="reason" required maxLength={300} /></label>
-          <button type="submit" disabled={busy}>Release hold</button>
+          <button type="submit" className="secondary-button" disabled={busy}>Release hold</button>
         </form> : null}
       </li>)}</ul>}
-      <form onChange={edits.track("newHold")} onSubmit={(event) => {
+      <form className={labels.stack} onChange={edits.track("newHold")} onSubmit={(event) => {
         event.preventDefault();
         const formElement = event.currentTarget;
         const form = new FormData(formElement);
@@ -211,7 +216,7 @@ function UnitRow({ unit, nights, base, busy, run }: {
         <label>Reason <input name="reason" required maxLength={300} /></label>
         <label>First night <input name="firstNight" type="date" required defaultValue={nights[0]} /></label>
         <label>Last night <input name="lastNight" type="date" required defaultValue={nights[nights.length - 1]} /></label>
-        <button type="submit" disabled={busy || nights.length === 0}>Place hold</button>
+        <button type="submit" className="secondary-button" disabled={busy || nights.length === 0}>Place hold</button>
       </form>
     </td></tr> : null}
   </>;
@@ -228,11 +233,11 @@ function RateRow({ category, view, base, busy, run }: {
   // Typed work in this category's rate form: any field off its starting value. Saving or removing the rate clears it (#1468).
   const edits = useEditedForms();
   useUnsavedChangesGuard(edits.dirty);
-  return <tr>
-    <th scope="row">{lodgingCategoryLabels[category]}</th>
-    <td>{rate ? formatRate(rate) : category === "TENT_WITH_POWER" && view.rates.TENT ? "Uses the tent rate" : "Included or free"}</td>
+  return <tr role="row">
+    <th role="rowheader" scope="row">{lodgingCategoryLabels[category]}</th>
+    <td {...cardCell("Current rate")}>{rate ? formatRate(rate) : category === "TENT_WITH_POWER" && view.rates.TENT ? "Uses the tent rate" : "Included or free"}</td>
     {/* Keyed on the saved rate so a save re-mounts the form with defaults that match what is shown ("12.5" becomes "12.50"). */}
-    <td><form key={rate ? `${rate.amountCents}:${rate.basis}:${rate.minimumNights ?? ""}` : "none"} onChange={edits.track("rate")} onSubmit={(event) => {
+    <td {...cardCell("Set")}><form key={rate ? `${rate.amountCents}:${rate.basis}:${rate.minimumNights ?? ""}` : "none"} onChange={edits.track("rate")} onSubmit={(event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const dollars = Number(form.get("amount"));
@@ -245,8 +250,8 @@ function RateRow({ category, view, base, busy, run }: {
       <label>Amount ($) <input name="amount" type="number" min={0} step="0.01" required defaultValue={rate ? (rate.amountCents / 100).toFixed(2) : ""} /></label>
       <label>Basis <select name="basis" defaultValue={rate?.basis ?? "PER_UNIT_NIGHT"}>{lodgingRateBases.map((basis) => <option key={basis} value={basis}>{lodgingRateBasisLabels[basis]}</option>)}</select></label>
       <label>Minimum nights <input name="minimumNights" type="number" min={1} max={30} defaultValue={rate?.minimumNights ?? ""} /></label>
-      <button type="submit" disabled={busy}>Save rate</button>
-      {rate ? <button type="button" disabled={busy} onClick={(event) => {
+      <button type="submit" className="secondary-button" disabled={busy}>Save rate</button>
+      {rate ? <button type="button" className="secondary-button" disabled={busy} onClick={(event) => {
         const formElement = event.currentTarget.form;
         void run(() => call(`${base}/rates`, "PUT", { category, rate: null }), `${lodgingCategoryLabels[category]} rate removed.`).then((ok) => {
           if (ok) {

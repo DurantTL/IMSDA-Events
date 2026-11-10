@@ -10361,6 +10361,13 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
   :root .builder-actions > .primary-button { min-height: var(--target-touch, 44px); }
 }
 
+/* The shared confirm dialog keeps 44px buttons and a 44px close icon on a landscape phone (wider than 768px, so the phone rules above
+   miss it, but short or touch), where the 36px desktop size for .form-actions buttons would otherwise apply (#1578). */
+@media screen and ((max-height: 500px) or (pointer: coarse)) {
+  :root .confirm-dialog .form-actions > button,
+  :root .confirm-dialog .modal-close-button { min-width: 44px; min-height: var(--target-touch, 44px); }
+}
+
 /* --- Heading hierarchy ------------------------------------------------------
    Floored subtitles (14px body, 12px meta) made some card and panel headings
    smaller than the text under them. On screen these headings are at least 1rem. */
@@ -10887,7 +10894,6 @@ p.field-help.earned-help > a { display: inline !important; min-height: 0 !import
 .lodging-assign-hall { display: grid; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); gap: 10px; align-items: start; }
 .lodging-assign-hall-side { display: grid; gap: 10px; }
 .lodging-assign-corridor { align-self: stretch; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--la-off); color: var(--muted); writing-mode: vertical-rl; letter-spacing: 0.2em; font-size: max(var(--type-staff-floor, 0px), 0.8rem); text-transform: uppercase; }
-.lodging-assign-confirm { border: 2px solid var(--la-warn-edge); background: var(--la-warn); }
 .lodging-assign-panels { display: grid; gap: 16px; }
 .lodging-assign-exceptions { display: grid; gap: 8px; margin: 0; padding-left: 18px; }
 .lodging-assign-exceptions p { margin: 2px 0 0; }

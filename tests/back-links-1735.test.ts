@@ -1,7 +1,9 @@
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// #1735: "Back to lodging" shows only to a viewer who may open the target page, which checks CONFIGURE_EVENT. The issued item pages link to each other through a strip that makes the same check (#1581, tests/issued-assets-views-1581.test.ts).
+// #1735: a page links only to pages the viewer may open. The lodging pages (#1578) carry the Lodging views strip, which offers Inventory only to
+// viewers with CONFIGURE_EVENT, and their no-property panel links the Lodging page only to them. The issued item pages link to each other through
+// a strip that makes the same check (#1581, tests/issued-assets-views-1581.test.ts).
 const mocks = vi.hoisted(() => ({ permissions: [] as string[] }));
 
 vi.mock("server-only", () => ({}));
@@ -14,24 +16,25 @@ vi.mock("@/modules/lodging/assignment-view", () => ({ getAssignmentWorkspace: as
 vi.mock("@/components/lodging-requests-workspace", () => ({ LodgingRequestsWorkspace: () => null }));
 vi.mock("@/components/lodging-assignments-workspace", () => ({ LodgingAssignmentsWorkspace: () => null }));
 
-import { BackLink } from "@/components/back-link";
+import { LodgingViewsStrip } from "@/components/lodging-views-strip";
+import { lodgingViews } from "@/modules/lodging/lodging-views-model";
 import LodgingAssignmentsPage from "@/app/(workspace)/more/lodging/assignments/page";
 import LodgingRequestsPage from "@/app/(workspace)/more/lodging/requests/page";
 
-function backLinks(node: ReactNode): ReactElement[] {
-  if (!node || typeof node !== "object") return [];
-  if (Array.isArray(node)) return node.flatMap(backLinks);
-  const element = node as ReactElement<{ children?: ReactNode }>;
-  return [...(element.type === BackLink ? [element] : []), ...backLinks(element.props?.children)];
-}
-
 const search = { searchParams: Promise.resolve({ event: "evt_1" }) };
-const pages = [
-  { name: "lodging requests", render: () => LodgingRequestsPage(search), registrar: "MANAGE_REGISTRATION", href: "/more/lodging?event=evt_1" },
-  { name: "lodging assignments", render: () => LodgingAssignmentsPage(search), registrar: "MANAGE_REGISTRATION", href: "/more/lodging?event=evt_1" },
+const lodgingPages = [
+  { name: "lodging requests", render: () => LodgingRequestsPage(search), registrar: "MANAGE_REGISTRATION" },
+  { name: "lodging assignments", render: () => LodgingAssignmentsPage(search), registrar: "MANAGE_REGISTRATION" },
 ];
 
 beforeEach(() => { mocks.permissions = []; noProperty.on = false; });
+
+function strips(node: ReactNode): ReactElement<{ eventId: string; access: { inventory: boolean; registrations: boolean } }>[] {
+  if (!node || typeof node !== "object") return [];
+  if (Array.isArray(node)) return node.flatMap(strips);
+  const element = node as ReactElement<{ children?: ReactNode; eventId: string; access: { inventory: boolean; registrations: boolean } }>;
+  return [...(element.type === LodgingViewsStrip ? [element] : []), ...strips(element.props?.children)];
+}
 
 function linkHrefs(node: ReactNode): string[] {
   if (!node || typeof node !== "object") return [];
@@ -47,7 +50,7 @@ function text(node: ReactNode): string {
 }
 
 describe("no-property panel links the Lodging page only to event administrators (#1735)", () => {
-  for (const page of pages.slice(0, 2)) {
+  for (const page of lodgingPages) {
     it(`${page.name}: registrar sees plain text, event admin sees the link`, async () => {
       noProperty.on = true;
       mocks.permissions = ["MANAGE_REGISTRATION"];
@@ -60,18 +63,15 @@ describe("no-property panel links the Lodging page only to event administrators 
   }
 });
 
-describe("back links only to pages the viewer may open (#1735)", () => {
-  for (const page of pages) {
-    it(`${page.name}: no link for staff without CONFIGURE_EVENT`, async () => {
+describe("the Lodging views strip offers Inventory only to those who may open it (#1578, #1735)", () => {
+  for (const page of lodgingPages) {
+    it(`${page.name}: no Inventory link for staff without CONFIGURE_EVENT, one for an event administrator`, async () => {
       mocks.permissions = [page.registrar];
-      expect(backLinks(await page.render())).toEqual([]);
-    });
-    it(`${page.name}: a link for an event administrator`, async () => {
+      const [registrarStrip] = strips(await page.render());
+      expect(lodgingViews(registrarStrip.props.eventId, registrarStrip.props.access).map((view) => view.label)).toEqual(["Requests", "Assignments"]);
       mocks.permissions = [page.registrar, "CONFIGURE_EVENT"];
-      const links = backLinks(await page.render());
-      const props = links[0].props as { href: string };
-      expect(links).toHaveLength(1);
-      expect(props.href).toBe(page.href);
+      const [adminStrip] = strips(await page.render());
+      expect(lodgingViews(adminStrip.props.eventId, adminStrip.props.access).map((view) => view.href)).toContain("/more/lodging?event=evt_1");
     });
   }
 });

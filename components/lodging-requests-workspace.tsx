@@ -1,6 +1,10 @@
 "use client";
 
 import { ExportLink } from "@/components/export-link";
+import { StaffPageHeader } from "@/components/staff-page-header";
+import labels from "@/components/lodging-labels.module.css";
+import { cardCell } from "@/components/table-card-labels";
+import { lodgingNightsLine } from "@/modules/lodging/lodging-views-model";
 import { SubmitButton } from "@/components/submit-button";
 import { useState, type FormEvent } from "react";
 import { useEditedForms } from "@/components/use-edited-forms";
@@ -58,8 +62,7 @@ export const REQUEST_SORT_SENSITIVE: Record<RequestColumn, ColumnSpec<LodgingReq
  * keep-together and keep-apart rules. This screen assigns nobody; rooms are assigned on the Lodging assignments page. The accessibility columns
  * appear only when the server sent them, which it does for staff holding VIEW_SENSITIVE_DATA.
  */
-export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure, canExport }: {
-  eventName: string;
+export function LodgingRequestsWorkspace({ initialView, canConfigure, canExport }: {
   initialView: StaffLodgingRequestsView;
   canConfigure: boolean;
   canExport: boolean;
@@ -100,12 +103,11 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
   const activeRules = view.rules.filter((rule) => !rule.ended);
 
   return <div className="settings-stack">
-    <div className="page-intro"><div>
-      <p className="eyebrow">Registration</p>
-      <h2 className="duplicate-page-title">Lodging requests</h2>
-      <p>What guests asked for at {eventName}. A request is a preference, never an assignment: nobody is placed in a room here (use Lodging assignments for that). Roommate requests count as mutual only when both sides ask or staff approve, and no contact details are shown.</p>
-      {canExport ? <p><ExportLink className="secondary-button" href={`/api/events/${view.eventId}/exports/lodging-requests`}>Download requests (CSV)</ExportLink></p> : null}
-    </div></div>
+    <StaffPageHeader
+      actions={canExport ? <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-requests`}>Download requests (CSV)</ExportLink></li> : undefined}
+      description="What guests asked for. A request is a preference, never an assignment: nobody is placed here. Roommate requests count as mutual only when both sides ask or staff approve, and no contact details are shown."
+    />
+    <p className={labels.context}><span>{lodgingNightsLine(view.nights)}</span><span>Requests only: nobody is assigned here.</span></p>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
     {chargeChange !== null ? <p className="form-error" role="status" data-testid="charge-change">
@@ -129,15 +131,15 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
         <label><input type="checkbox" name="collects" defaultChecked={view.settings.collectsPreferences} /> Registrants choose a lodging type (turn off for club events, where staff assign)</label>
         <label>Last day to change <input type="date" name="deadline" defaultValue={view.settings.preferencesDeadline ?? ""} /></label>
         <p className="field-hint">Blank follows the registration close date. Right now registrants can change their choice through {view.settings.effectiveDeadline}{view.settings.deadlinePassed ? " (passed)" : ""}.</p>
-        <label>When a type is full <select name="fullBehavior" defaultValue={view.settings.fullBehavior}>
+        <label className={labels.fit}>When a type is full <select name="fullBehavior" defaultValue={view.settings.fullBehavior}>
           {fullBehaviors.map((value) => <option key={value} value={value}>{value === "SHOW_FULL" ? "Show \"Full\"" : "Show \"Full\" and let guests join a lodging waitlist"}</option>)}
         </select></label>
         <SubmitButton label="Save settings" submitting={busy} submittingLabel="Saving…" />
       </form> : <p>{view.settings.collectsPreferences ? "Registrants choose a lodging type" : "Registrants do not choose lodging (staff assign)"}; changes close after {view.settings.effectiveDeadline}; a full type shows {view.settings.fullBehavior === "WAITLIST" ? "\"Full\" and guests can join a lodging waitlist" : "\"Full\""}. Event administrators change these.</p>}
-      <div className="table-wrap"><table className="report-table report-table-auto">
+      <div className="table-wrap"><table className="report-table report-table-auto table-cards table-cards-tablet" role="table">
         <caption>Lodging types offered</caption>
-        <thead><tr><th scope="col">Type</th><th scope="col">Units in service</th><th scope="col">Asking (rooms or people)</th><th scope="col">Rate</th></tr></thead>
-        <tbody>{view.offered.map((row) => <tr key={row.category}><th scope="row">{row.label}</th><td>{row.unitsInService}</td><td>{row.requested} {row.inRooms ? (row.requested === 1 ? "room" : "rooms") : (row.requested === 1 ? "person" : "people")}</td><td>{row.rate ? formatRate(row.rate) : "Included or free"}</td></tr>)}</tbody>
+        <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Type</th><th role="columnheader" scope="col">Units in service</th><th role="columnheader" scope="col">Asking (rooms or people)</th><th role="columnheader" scope="col">Rate</th></tr></thead>
+        <tbody role="rowgroup">{view.offered.map((row) => <tr key={row.category} role="row"><th role="rowheader" scope="row">{row.label}</th><td {...cardCell("Units in service")}>{row.unitsInService}</td><td {...cardCell("Asking")}>{row.requested} {row.inRooms ? (row.requested === 1 ? "room" : "rooms") : (row.requested === 1 ? "person" : "people")}</td><td {...cardCell("Rate")}>{row.rate ? formatRate(row.rate) : "Included or free"}</td></tr>)}</tbody>
       </table></div>
     </section>
 
@@ -145,7 +147,7 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
       <h3 id="lodging-queue">Needs a look ({view.queue.filter((item) => !item.acknowledged).length})</h3>
       <label><input type="checkbox" checked={showAcknowledged} onChange={(event) => setShowAcknowledged(event.target.checked)} /> Show items already acknowledged</label>
       {queue.length === 0 ? <p>Nothing needs review.</p> : <ul>{queue.map((item) => <li key={`${item.key}:${item.fingerprint}`}>
-        <strong>{reviewKindLabels[item.kind]}</strong>{item.sensitive ? " (restricted)" : ""}{item.acknowledged ? " (acknowledged)" : ""}
+        {item.acknowledged ? <strong>Acknowledged:</strong> : <span className="status-chip purple">To review</span>} <strong>{reviewKindLabels[item.kind]}</strong>{item.sensitive ? " (restricted)" : ""}
         <p>{item.title}. {item.detail}</p>
         {item.roommateRequestId && !item.acknowledged ? <form ref={edits.gone(`roommate:${item.key}`)} onChange={edits.track(`roommate:${item.key}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
@@ -158,8 +160,8 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
         }}>
           <label>Reason <input name="reason" required maxLength={300} /></label>
           <span className="field-hint">No medical details.</span>
-          <button type="submit" value="approve" disabled={busy || item.kind !== "ONE_SIDED_ROOMMATE"}>Approve as mutual</button>
-          <button type="submit" value="decline" disabled={busy}>Decline</button>
+          <button type="submit" className="secondary-button" value="approve" disabled={busy || item.kind !== "ONE_SIDED_ROOMMATE"}>Approve as mutual</button>
+          <button type="submit" className="secondary-button" value="decline" disabled={busy}>Decline</button>
         </form> : null}
         {!item.acknowledged ? <form ref={edits.gone(`ack:${item.key}`)} onChange={edits.track(`ack:${item.key}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
@@ -171,20 +173,20 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
           });
         }}>
           {item.sensitive ? null : <><label>Note <input name="note" required maxLength={300} /></label><span className="field-hint">No medical details.</span></>}
-          <button type="submit" disabled={busy}>Acknowledge</button>
+          <button type="submit" className="secondary-button" disabled={busy}>Acknowledge</button>
         </form> : null}
       </li>)}</ul>}
     </section>
 
     <section className="panel" aria-labelledby="lodging-requests-table">
       <h3 id="lodging-requests-table">Requests ({view.requests.length})</h3>
-      {view.requests.length === 0 ? <p>No one has asked for lodging yet.</p> : <div className="table-wrap">{requestSort.note}<table className="report-table report-table-auto">
-        <thead><tr>
+      {view.requests.length === 0 ? <p>No one has asked for lodging yet.</p> : <div className="table-wrap">{requestSort.note}<table className={`report-table report-table-auto table-cards table-cards-max ${labels.requestsTable}`} role="table">
+        <thead role="rowgroup"><tr role="row">
           {requestSort.header("registration", "Registration")}{requestSort.header("type", "Type")}{requestSort.header("nights", "Nights")}{requestSort.header("people", "People")}{requestSort.header("rooms", "Rooms")}
           {view.canSeeSensitive ? fullSort.header("ground", "Ground floor") : null}{view.canSeeSensitive ? fullSort.header("accessible", "Accessible room") : null}
-          {requestSort.header("private", "Private room")}{requestSort.header("household", "Household")}<th scope="col">Roommates</th>{requestSort.header("version", "Version")}<th scope="col">Change</th>
+          {requestSort.header("private", "Private room")}{requestSort.header("household", "Household")}<th role="columnheader" scope="col">Roommates</th>{requestSort.header("version", "Version")}<th role="columnheader" scope="col"><span className="sr-only">Change</span></th>
         </tr></thead>
-        <tbody>{requestSort.rows.map((request) => <RequestRow key={request.requestId} request={request} view={view} base={base} busy={busy} run={run} />)}</tbody>
+        <tbody role="rowgroup">{requestSort.rows.map((request) => <RequestRow key={request.requestId} request={request} view={view} base={base} busy={busy} run={run} />)}</tbody>
       </table></div>}
     </section>
 
@@ -205,7 +207,7 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
         }}>
           <label>Reason for ending <input name="reason" required maxLength={300} /></label>
           <span className="field-hint">No medical details.</span>
-          <button type="submit" disabled={busy}>End rule</button>
+          <button type="submit" className="secondary-button" disabled={busy}>End rule</button>
         </form>
       </li>)}</ul>}
       {view.rules.some((rule) => rule.ended) ? <details>
@@ -225,9 +227,9 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
           if (ok) { formElement.reset(); edits.clear("addRule"); }
         });
       }}>
-        <label>Rule <select name="kind">{lodgingRuleKinds.map((kind) => <option key={kind} value={kind}>{lodgingRuleKindLabels[kind]}</option>)}</select></label>
-        <label>Person <select name="personAId" required>{view.people.map((person) => <option key={person.personId} value={person.personId}>{person.name} ({person.registration})</option>)}</select></label>
-        <label>Other person (not for a split) <select name="personBId"><option value="">None</option>{view.people.map((person) => <option key={person.personId} value={person.personId}>{person.name} ({person.registration})</option>)}</select></label>
+        <label className={labels.fit}>Rule <select name="kind">{lodgingRuleKinds.map((kind) => <option key={kind} value={kind}>{lodgingRuleKindLabels[kind]}</option>)}</select></label>
+        <label className={labels.fit}>Person <select name="personAId" required>{view.people.map((person) => <option key={person.personId} value={person.personId}>{person.name} ({person.registration})</option>)}</select></label>
+        <label className={labels.fit}>Other person (not for a split) <select name="personBId"><option value="">None</option>{view.people.map((person) => <option key={person.personId} value={person.personId}>{person.name} ({person.registration})</option>)}</select></label>
         <label>First night <input type="date" name="effectiveFrom" /></label>
         <label>Last night <input type="date" name="effectiveUntil" /></label>
         <label>Reason <input name="reason" required maxLength={300} /></label>
@@ -247,21 +249,21 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
   const mutual = request.roommates.filter((row) => row.direction === "OUT" && row.status === "MUTUAL").length;
   const waiting = request.roommates.filter((row) => row.direction === "OUT" && row.status === "ONE_SIDED").length;
   return <>
-    <tr>
-      <th scope="row">{request.registration}{request.afterDeadline ? " (changed after the deadline)" : ""}</th>
-      <td>{request.category ? lodgingCategoryLabels[request.category] : "No preference"}</td>
-      <td>{request.firstNight ? `${request.firstNight} to ${request.lastNight}` : "Whole event"}</td>
-      <td>{request.partySize}</td>
-      <td>{request.category ? request.roomCount : "—"}{request.bringsExtraBedding ? " (bringing sleeping bags or air mattresses)" : ""}</td>
-      {view.canSeeSensitive ? <td>{request.groundFloorNeeded ? "Yes" : "No"}</td> : null}
-      {view.canSeeSensitive ? <td>{request.accessibleRoomNeeded ? "Yes" : "No"}</td> : null}
-      <td>{request.privateRoomRequested ? "Yes" : "No"}</td>
-      <td>{request.householdPreference === "TOGETHER" ? "Together" : "Flexible"}</td>
-      <td>{mutual} mutual, {waiting} waiting</td>
-      <td>{request.version}</td>
-      <td><button type="button" className="secondary-button" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Close" : "Details"}</button></td>
+    <tr role="row">
+      <th role="rowheader" scope="row">{request.registration}{request.afterDeadline ? " (changed after the deadline)" : ""}</th>
+      <td {...cardCell("Type")}>{request.category ? lodgingCategoryLabels[request.category] : "No preference"}</td>
+      <td {...cardCell("Nights")}>{request.firstNight ? `${request.firstNight} to ${request.lastNight}` : "Whole event"}</td>
+      <td {...cardCell("People")}>{request.partySize}</td>
+      <td {...cardCell("Rooms")}>{request.category ? request.roomCount : "—"}{request.bringsExtraBedding ? " (bringing sleeping bags or air mattresses)" : ""}</td>
+      {view.canSeeSensitive ? <td {...cardCell("Ground floor")}>{request.groundFloorNeeded ? "Yes" : "No"}</td> : null}
+      {view.canSeeSensitive ? <td {...cardCell("Accessible room")}>{request.accessibleRoomNeeded ? "Yes" : "No"}</td> : null}
+      <td {...cardCell("Private room")}>{request.privateRoomRequested ? "Yes" : "No"}</td>
+      <td {...cardCell("Household")}>{request.householdPreference === "TOGETHER" ? "Together" : "Flexible"}</td>
+      <td {...cardCell("Roommates")}>{mutual} mutual, {waiting} waiting</td>
+      <td {...cardCell("Version")}>{request.version}</td>
+      <td {...cardCell(null)}><button type="button" className={`secondary-button ${labels.nowrap}`} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Close" : "Details"}<span className="sr-only"> for {request.registration}</span></button></td>
     </tr>
-    {open ? <tr><td colSpan={view.canSeeSensitive ? 12 : 10}>
+    {open ? <tr role="row"><td colSpan={view.canSeeSensitive ? 12 : 10} role="cell">
       <h4>History ({request.history.length} version{request.history.length === 1 ? "" : "s"})</h4>
       <ul>{request.history.map((entry) => <li key={entry.version}>Version {entry.version}, {entry.at.slice(0, 10)}, by {entry.source.toLowerCase().replace("_", " ")}: {entry.category ? lodgingCategoryLabels[entry.category] : "no preference"}{entry.reason ? `. Reason: ${entry.reason}` : ""}{entry.afterDeadline ? " (after the deadline)" : ""}</li>)}</ul>
       {request.roommates.length > 0 ? <>
@@ -277,13 +279,13 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
           }}>
             <label>Reason <input name="reason" required maxLength={300} /></label>
             <span className="field-hint">No medical details.</span>
-            <button type="submit" disabled={busy}>Withdraw</button>
+            <button type="submit" className="secondary-button" disabled={busy}>Withdraw</button>
           </form> : null}
         </li>)}</ul>
       </> : null}
       {request.churchSponsored ? <p role="note" className="usage-note"><strong>Church-sponsored registration.</strong> {CHURCH_SHARE_AUTOMATIC} Record only the registrant&apos;s share in Payments.</p> : null}
       <h4>Change this request (staff)</h4>
-      <form ref={edits.gone("change")} onChange={edits.track("change")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
+      <form className={labels.stack} ref={edits.gone("change")} onChange={edits.track("change")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const formElement = event.currentTarget;
         const form = new FormData(formElement);
@@ -307,7 +309,7 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
           }
         });
       }}>
-        <label>Type <select name="category" defaultValue={request.category ?? ""}><option value="">No preference</option>{lodgingCategories.map((category) => <option key={category} value={category}>{lodgingCategoryLabels[category]}</option>)}</select></label>
+        <label className={labels.fit}>Type <select name="category" defaultValue={request.category ?? ""}><option value="">No preference</option>{lodgingCategories.map((category) => <option key={category} value={category}>{lodgingCategoryLabels[category]}</option>)}</select></label>
         <label>First night <input type="date" name="firstNight" defaultValue={request.firstNight ?? ""} /></label>
         <label>Last night <input type="date" name="lastNight" defaultValue={request.lastNight ?? ""} /></label>
         <label>People <input type="number" name="partySize" min={1} max={100} defaultValue={request.partySize} required /></label>

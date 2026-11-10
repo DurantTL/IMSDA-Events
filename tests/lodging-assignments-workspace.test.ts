@@ -40,7 +40,7 @@ const view = (extra: Partial<AssignmentWorkspaceView> = {}): AssignmentWorkspace
   exceptions: [], waitlist: [], notices: [], counts: { placed: 1, unplaced: 1, waitingOnList: 0, exceptions: 0 }, ...extra,
 });
 
-const render = (props: Partial<Parameters<typeof LodgingAssignmentsWorkspace>[0]> = {}) => renderToStaticMarkup(createElement(LodgingAssignmentsWorkspace, { eventName: "Camp Meeting", initialView: view(), canConfigure: true, canExport: true, ...props }));
+const render = (props: Partial<Parameters<typeof LodgingAssignmentsWorkspace>[0]> = {}) => renderToStaticMarkup(createElement(LodgingAssignmentsWorkspace, { initialView: view(), canConfigure: true, canExport: true, ...props }));
 
 describe("the staff assignment workspace", () => {
   it("offers a keyboard and touch alternative to dragging: select a person, then assign here", () => {

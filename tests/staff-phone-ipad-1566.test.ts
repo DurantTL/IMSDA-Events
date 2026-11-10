@@ -199,13 +199,9 @@ describe("deep pages light their parent tab, rail area and phone item (#1566)", 
   });
 
   it("has an in-app way back on the deep pages that were missing one", () => {
-    for (const [file, href] of [
-      ["app/(workspace)/more/lodging/assignments/page.tsx", "/more/lodging?event="],
-      ["app/(workspace)/more/lodging/requests/page.tsx", "/more/lodging?event="],
-    ]) {
-      const source = read(file);
-      expect(source, file).toContain("<BackLink");
-      expect(source, file).toContain(href);
+    // The lodging pages carry the Lodging views strip (#1578) instead of a back link.
+    for (const file of ["app/(workspace)/more/lodging/assignments/page.tsx", "app/(workspace)/more/lodging/requests/page.tsx"]) {
+      expect(read(file), file).toContain("<LodgingViewsStrip");
     }
   });
 });
