@@ -56,6 +56,7 @@ function tone(status: InvitationStatus) {
     case "SENT":
       return "green";
     case "REGISTERED":
+    case "EXPIRED":
     case "NOT_SENT":
       return "gold";
     case "DELIVERY_FAILED":
@@ -178,7 +179,7 @@ export function StaffInvitationList({ eventId, rows, counts, query, total, total
                       {row.confirmationCode && <><br /><span className="field-help">{row.confirmationCode}</span></>}
                     </td>
                     <td data-label="Actions">
-                      <InvitationRowActions id={row.id} reinvitable={row.reinvitable} reissuable={row.reissuable} usable={row.usable} />
+                      <InvitationRowActions id={row.id} reinvitable={row.reinvitable} reissuable={row.reissuable} usable={row.usable && !row.expired} />
                     </td>
                   </tr>
                 ))}

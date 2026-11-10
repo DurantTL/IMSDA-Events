@@ -499,6 +499,36 @@ async function main() {
   assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("zed"), group: "STAFF", approval: "WAITING" } })), "an approval without a registration is refused");
   assert(await caught(prisma.staffInvitation.create({ data: { eventId, email: email("yan"), group: "STAFF", linkVersion: 0 } })), "link version zero is refused");
 
+  // ---- A link opens for 14 days (#1787) ---------------------------------------------------------------------------------
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const expiring = await prisma.staffInvitation.create({ data: { eventId, email: email("expiring"), group: "STAFF", linkIssuedAt: new Date(Date.now() - 15 * DAY_MS) } });
+  const expiringToken = invitationToken(expiring);
+  const expiringRow = (await repo.listInvitations(eventId, { filters: { status: "ALL", group: "ALL", search: "expiring" } as never, sort: { key: null, dir: "asc" }, page: 1 })).rows.find((entry) => entry.email === email("expiring"));
+  assert(expiringRow?.status === "EXPIRED" && expiringRow.expired, "an unregistered link issued 15 days ago lists as expired");
+  const expiredOnly = await repo.listInvitations(eventId, { filters: { status: "EXPIRED", group: "ALL", search: "" } as never, sort: { key: null, dir: "asc" }, page: 1 });
+  assert(expiredOnly.rows.some((entry) => entry.id === expiring.id) && expiredOnly.counts.EXPIRED === expiredOnly.total && expiredOnly.counts.EXPIRED >= 1, "it is in the Expired filter and count");
+  for (const status of ["NOT_SENT", "SENT", "DELIVERY_FAILED"] as const) {
+    assert(!(await repo.listInvitations(eventId, { filters: { status, group: "ALL", search: "expiring" } as never, sort: { key: null, dir: "asc" }, page: 1 })).rows.some((entry) => entry.id === expiring.id), `and not in ${status}`);
+  }
+  assert((await repo.getInvitationExperience(expiringToken)).state === "EXPIRED", "opening it says expired");
+  await expectCode(repo.submitInvitationRegistration(expiringToken, { firstName: "Exp", lastName: "Iring" }), "INVITATION_EXPIRED", "submitting through an expired link");
+  assert((await prisma.staffInvitation.findUniqueOrThrow({ where: { id: expiring.id } })).registeredAt === null, "nothing was registered");
+  await expectCode(repo.copyInvitationLink(eventId, userId, expiring.id), "INVITATION_UNAVAILABLE", "copying an expired link");
+  const expiredPreview = await repo.previewInvitationSend(eventId, [expiring.id]);
+  assert(expiredPreview.willSend === 1, "an expired link can be sent again");
+  await repo.sendInvitations(eventId, userId, { ids: [expiring.id], digest: expiredPreview.digest });
+  const renewed = await prisma.staffInvitation.findUniqueOrThrow({ where: { id: expiring.id } });
+  assert(renewed.linkVersion === expiring.linkVersion + 1 && Date.now() - renewed.linkIssuedAt.getTime() < 60_000, "sending it again moves to a new link version and restarts the 14 days");
+  assert((await repo.getInvitationExperience(expiringToken)).state === "UNAVAILABLE", "the old link stays dead");
+  assert((await repo.getInvitationExperience(invitationToken(renewed))).state === "OPEN", "the new link opens");
+  assert((await prisma.messageOutbox.findFirstOrThrow({ where: { eventId, recipientEmail: email("expiring") } })).bodyTextSnapshot.includes(encodeURIComponent(invitationToken(renewed))), "the email carries the new link");
+  const inWindow = await prisma.staffInvitation.create({ data: { eventId, email: email("inwindow"), group: "STAFF", linkIssuedAt: new Date(Date.now() - 5 * DAY_MS) } });
+  const inWindowPreview = await repo.previewInvitationSend(eventId, [inWindow.id]);
+  await repo.sendInvitations(eventId, userId, { ids: [inWindow.id], digest: inWindowPreview.digest });
+  const inWindowAfter = await prisma.staffInvitation.findUniqueOrThrow({ where: { id: inWindow.id } });
+  assert(inWindowAfter.linkVersion === inWindow.linkVersion && inWindowAfter.linkIssuedAt.getTime() > inWindow.linkIssuedAt.getTime() + 4 * DAY_MS, "sending a link still in its window keeps it and restarts the 14 days");
+  assert((await repo.getInvitationExperience(invitationToken(inWindow))).state === "OPEN", "the same link still opens");
+
   // ---- The list is searched, filtered, ordered and paged in the database (#1492) -----------------------------------------
   const { INVITATION_STATUSES, INVITATION_STATUS_LABEL } = await import("../modules/staff-invitations/domain");
   const listQuery = await import("../modules/staff-invitations/list-query");
