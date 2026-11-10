@@ -69,14 +69,15 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
     <div className="page-stack">
       <p className={styles.summary} data-testid="readiness-summary" role="status">
         <strong>
-          {summary.automaticAttention === 0
-            ? "No automatic check needs attention."
-            : `${summary.automaticAttention} automatic ${summary.automaticAttention === 1 ? "check needs" : "checks need"} attention.`}{" "}
+          {[
+            summary.automaticAttention > 0 ? `${summary.automaticAttention} automatic ${summary.automaticAttention === 1 ? "check needs" : "checks need"} attention.` : null,
+            summary.automaticUnknown > 0 ? `${summary.automaticUnknown} could not be checked.` : null,
+            summary.automaticAttention === 0 && summary.automaticUnknown === 0 ? "No automatic check needs attention." : null,
+          ].filter(Boolean).join(" ")}{" "}
           {readiness.ticksAvailable
             ? `${summary.manualDone} of ${summary.manualTotal} manual items ticked.`
             : "Manual ticks could not be read."}
         </strong>
-        <span>Checked {formatDate(readiness.generatedAt)}.</span>
       </p>
 
       {error && <p className="form-error" role="alert">{error}</p>}

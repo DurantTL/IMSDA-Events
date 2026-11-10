@@ -68,7 +68,7 @@ export function AreaPausesWorkspace({ initialPauses }: { initialPauses: AreaPaus
 
   return (
     <div className="page-stack">
-      <p className={styles.summary} data-testid="pause-summary" role="status">
+      <p className={styles.summary} data-testid="pause-summary">
         <span className={`status-chip ${pausedCount > 0 ? "gold" : "green"}`}>{pausedCount > 0 ? `${pausedCount} of ${areaPauseDefinitions.length} paused` : "Nothing paused"}</span>
       </p>
 

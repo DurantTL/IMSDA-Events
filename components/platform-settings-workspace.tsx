@@ -25,19 +25,23 @@ import { HomepageMinistriesEditor } from "@/components/homepage-ministries-edito
 import type { HomepageMinistry } from "@/modules/system-admin/homepage-ministries-domain";
 import type { EnvironmentStatus } from "@/modules/system-admin/environment-status";
 import type { PlatformSettingsRecord } from "@/modules/system-admin/platform-settings";
-import styles from "./platform-settings-workspace.module.css";
 
-/** Who owns each group on this page, in the order the groups appear: a quick map, not a second copy of the settings. */
+/** Who owns each group on this page, shown as a chip on the group's heading. */
 const settingOwnership = [
   { id: "one-sign-in-heading", name: "One sign-in", owner: "Affects everyone" },
   { id: "platform-identity-heading", name: "Organization", owner: "Central value" },
-  { id: "platform-defaults-heading", name: "New event defaults", owner: "A template copy; each event can override" },
+  { id: "platform-defaults-heading", name: "New event defaults", owner: "A template copy" },
   { id: "platform-homepage-heading", name: "Homepage help contact", owner: "Central value" },
   { id: "platform-email-layout-heading", name: "Email header and footer", owner: "Central value" },
   { id: "platform-invoices-heading", name: "Invoice PDF header", owner: "Central value" },
   { id: "platform-alerts-heading", name: "Alert addresses", owner: "Owned by Email" },
   { id: "platform-advanced-heading", name: "Technical settings", owner: "Central value" },
 ] as const;
+
+function OwnerChip({ id }: { id: (typeof settingOwnership)[number]["id"] }) {
+  const owner = settingOwnership.find((group) => group.id === id)!.owner;
+  return <span className="status-chip neutral" data-owner-chip="">{owner}</span>;
+}
 
 type Draft = PlatformSettingsDraft;
 
@@ -377,22 +381,11 @@ export function PlatformSettingsWorkspace({
         <Link className="text-button" href="/profile">My profile and security</Link>.
       </p>
 
-      <nav aria-label="Where each platform setting lives" className={styles.ownershipMap} data-testid="settings-ownership-map">
-        <ul>
-          {settingOwnership.map((group) => (
-            <li key={group.id}>
-              <a href={`#${group.id}`}>{group.name}</a>
-              <span>{group.owner}</span>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
       <section className="panel" aria-labelledby="one-sign-in-heading">
         <div className="section-heading">
           <div>
             <p className="eyebrow"><KeyRound aria-hidden="true" size={14} /> One sign-in</p>
-            <h2 id="one-sign-in-heading">One sign-in for staff and attendees</h2>
+            <h2 id="one-sign-in-heading">One sign-in for staff and attendees</h2><OwnerChip id="one-sign-in-heading" />
           </div>
         </div>
         <p className="settings-ownership"><strong>Affects everyone.</strong> Turning it on or off changes every sign-in page right away.</p>
@@ -428,7 +421,7 @@ export function PlatformSettingsWorkspace({
           <div className="section-heading">
             <div>
               <p className="eyebrow"><Building2 aria-hidden="true" size={14} /> Organization</p>
-              <h2 id="platform-identity-heading">Who this platform belongs to</h2>
+              <h2 id="platform-identity-heading">Who this platform belongs to</h2><OwnerChip id="platform-identity-heading" />
             </div>
           </div>
           <p className="settings-ownership"><strong>Central value.</strong> Used everywhere the organization name and logo appear.</p>
@@ -456,7 +449,7 @@ export function PlatformSettingsWorkspace({
           <div className="section-heading">
             <div>
               <p className="eyebrow"><CalendarPlus aria-hidden="true" size={14} /> New event defaults</p>
-              <h2 id="platform-defaults-heading">What a new event starts from</h2>
+              <h2 id="platform-defaults-heading">What a new event starts from</h2><OwnerChip id="platform-defaults-heading" />
             </div>
           </div>
           <p className="settings-ownership">
@@ -496,7 +489,7 @@ export function PlatformSettingsWorkspace({
           <div className="section-heading">
             <div>
               <p className="eyebrow"><Megaphone aria-hidden="true" size={14} /> Public homepage</p>
-              <h2 id="platform-homepage-heading">Homepage help contact</h2>
+              <h2 id="platform-homepage-heading">Homepage help contact</h2><OwnerChip id="platform-homepage-heading" />
             </div>
           </div>
           <p className="settings-ownership"><strong>Central value.</strong> Shown on the public front page right away.</p>
@@ -520,7 +513,7 @@ export function PlatformSettingsWorkspace({
           <div className="section-heading">
             <div>
               <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Email</p>
-              <h2 id="platform-email-layout-heading">Email header and footer</h2>
+              <h2 id="platform-email-layout-heading">Email header and footer</h2><OwnerChip id="platform-email-layout-heading" />
             </div>
           </div>
           <p className="settings-ownership"><strong>Central value.</strong> Every email sent after you save uses these.</p>
@@ -555,7 +548,7 @@ export function PlatformSettingsWorkspace({
           <div className="section-heading">
             <div>
               <p className="eyebrow"><FileText aria-hidden="true" size={14} /> Invoices</p>
-              <h2 id="platform-invoices-heading">Invoice PDF header</h2>
+              <h2 id="platform-invoices-heading">Invoice PDF header</h2><OwnerChip id="platform-invoices-heading" />
             </div>
           </div>
           <p className="settings-ownership">
@@ -601,7 +594,7 @@ export function PlatformSettingsWorkspace({
           <div className="section-heading">
             <div>
               <p className="eyebrow"><Mail aria-hidden="true" size={14} /> Alerts</p>
-              <h2 id="platform-alerts-heading">Alert addresses</h2>
+              <h2 id="platform-alerts-heading">Alert addresses</h2><OwnerChip id="platform-alerts-heading" />
             </div>
           </div>
           <p className="settings-ownership"><strong>Owned by Email.</strong> Nothing here is edited on this page.</p>
@@ -615,7 +608,7 @@ export function PlatformSettingsWorkspace({
           <div className="section-heading">
             <div>
               <p className="eyebrow"><Wrench aria-hidden="true" size={14} /> Advanced</p>
-              <h2 id="platform-advanced-heading">Technical settings</h2>
+              <h2 id="platform-advanced-heading">Technical settings</h2><OwnerChip id="platform-advanced-heading" />
             </div>
           </div>
           <p className="field-help">

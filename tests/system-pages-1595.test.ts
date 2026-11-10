@@ -186,6 +186,23 @@ describe("readiness page (#1595)", () => {
     expect(html).toContain("never shown as OK");
   });
 
+  it("never gives the all-clear line while a check could not be read", () => {
+    const unread = renderToStaticMarkup(createElement(SystemReadinessWorkspace, { initialReadiness: readiness() }));
+    expect(unread).toContain("1 could not be checked.");
+    expect(unread).not.toContain("No automatic check needs attention.");
+    const clear = renderToStaticMarkup(createElement(SystemReadinessWorkspace, { initialReadiness: readiness({ summary: { manualDone: 0, manualTotal: 1, automaticAttention: 0, automaticUnknown: 0 } }) }));
+    expect(clear).toContain("No automatic check needs attention.");
+    expect(clear).not.toContain("could not be checked.</strong>");
+    const both = renderToStaticMarkup(createElement(SystemReadinessWorkspace, { initialReadiness: readiness({ summary: { manualDone: 0, manualTotal: 1, automaticAttention: 2, automaticUnknown: 1 } }) }));
+    expect(both).toContain("2 automatic checks need attention. 1 could not be checked.");
+    expect(both).not.toContain("No automatic check needs attention.");
+  });
+
+  it("says Checked once", () => {
+    const html = renderToStaticMarkup(createElement(SystemReadinessWorkspace, { initialReadiness: readiness() }));
+    expect((html.match(/Checked [A-Z][a-z]{2} \d/g) ?? []).length).toBe(1);
+  });
+
   it("says when manual ticks could not be read instead of showing zero ticked", () => {
     const html = renderToStaticMarkup(createElement(SystemReadinessWorkspace, { initialReadiness: readiness({ ticksAvailable: false }) }));
     expect(html).toContain("Manual ticks could not be read.");
@@ -212,7 +229,7 @@ describe("system report (#1595)", () => {
   it("keeps Check again and the connection test as outlined buttons beside the title", async () => {
     mocks.loadSystemReport.mockResolvedValue(buildSystemReport([signal("unavailable")], new Date("2026-11-01T15:00:00Z")));
     const html = renderToStaticMarkup(await SystemReportPage());
-    expect(html).toContain("Check again");
+    expect(html).toMatch(/<a class="secondary-button" href="\/admin\/system-report">[^]*Check again/);
     expect(html).toContain("Test connections");
     expect(filledCount(html.slice(0, html.indexOf('data-testid="report-glance"')))).toBe(0);
   });
@@ -258,7 +275,8 @@ describe("settings and email stay presentation-only, with no secret values (#159
   it("names who owns each group of settings and keeps the existing ownership lines", () => {
     const workspace = read("components/platform-settings-workspace.tsx");
     for (const owner of ["Affects everyone", "Central value", "Owned by Email"]) expect(workspace).toContain(owner);
-    expect(workspace).toContain('data-testid="settings-ownership-map"');
+    expect(workspace).not.toContain("settings-ownership-map");
+    expect(workspace).toContain("data-owner-chip");
     expect(workspace).toContain("A template copy");
     expect(read(`${dir}/settings/page.tsx`)).toContain("<FormPage");
   });

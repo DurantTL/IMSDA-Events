@@ -126,5 +126,5 @@
 }
 
 .summary span {
-  color: var(--muted, #5b6470);
+  color: var(--muted);
 }
