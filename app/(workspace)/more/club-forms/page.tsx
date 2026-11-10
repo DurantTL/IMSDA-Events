@@ -5,7 +5,10 @@ import Link from "next/link";
 import { Download } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { GetFilterForm } from "@/components/get-filter-form";
-import { ListPager } from "@/components/list-pager";
+import { ClubFormsViewsStrip } from "@/components/club-forms-views-strip";
+import { PageHeader } from "@/components/page-header";
+import { ListPage } from "@/components/page-templates/list-page";
+import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote } from "@/components/list-sort";
 import { serverSort, sortOrderText } from "@/lib/list-sort";
 import { parsePageParam } from "@/lib/pagination";
@@ -41,7 +44,13 @@ export default async function StaffClubFormsPage({
   const { event, form, club } = params;
   const viewer = await resolveStaffViewer();
   if (!viewer) {
-    return <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" whoToAsk="a system administrator" />;
+    // The page draws its own title (#1573), so the restricted state keeps the page's one h1 too.
+    return (
+      <>
+        <PageHeader title={staffPageTitles.clubForms} />
+        <AccessRestricted detail="Club forms are for system administrators, Clubs Administrators and Event Admins of a current event." title="Club forms are restricted" whoToAsk="a system administrator" />
+      </>
+    );
   }
   // The sort and the page run in the query, with the viewer's own scoping, so the count is the whole filtered list (#1458).
   const sorting = serverSort<ClubFormSortColumn>("/more/club-forms", params, CLUB_FORM_SORT_COLUMNS, { key: null, dir: "asc" });
@@ -64,79 +73,86 @@ export default async function StaffClubFormsPage({
     ? `/api/staff/club-forms/export?form=${encodeURIComponent(form)}${club ? `&club=${encodeURIComponent(club)}` : ""}`
     : null;
 
+  const canReadBirthDates = viewer.systemAdmin || viewer.clubsAdministrator;
+
   return (
-    <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Conference staff</p>
-          <h2 className="duplicate-page-title">{staffPageTitles.clubForms}</h2>
-          <p>
-            Submitted forms by club.{" "}
-            {viewer.sensitiveAnswers
-              ? "You can read health and conduct answers; each time you open a form that has them, it is recorded. "
-              : "Health and conduct answers show as Restricted for your role. "}
-            Emergency contact and physician and clinic answers on the Off-Premises Permission Slip and the Transportation Passenger List are plain, so everyone who can see those forms sees them.{" "}
-            {viewer.systemAdmin || viewer.clubsAdministrator
-              ? `As a ${viewer.systemAdmin ? "system administrator" : "Clubs Administrator"} you can also read birth dates.`
-              : "Birth dates show as Restricted: only the club's own director and deputies, system administrators and Clubs Administrators can read them."}
-          </p>
-        </div>
-      </div>
+    <ListPage
+      header={{
+        title: staffPageTitles.clubForms,
+        description: "Submitted forms by club.",
+        below: <ClubFormsViewsStrip administration={canReadBirthDates} current="submissions" event={event} />,
+      }}
+      notices={(
+        <p className="inline-notice" role="status">
+          {viewer.sensitiveAnswers
+            ? "You can read health and conduct answers; each time you open a form that has them, it is recorded. "
+            : "Health and conduct answers show as Restricted for your role. "}
+          Emergency contact and physician and clinic answers on the Off-Premises Permission Slip and the Transportation Passenger List are plain, so everyone who can see those forms sees them.{" "}
+          {canReadBirthDates
+            ? `As a ${viewer.systemAdmin ? "system administrator" : "Clubs Administrator"} you can also read birth dates.`
+            : "Birth dates show as Restricted: only the club's own director and deputies, system administrators and Clubs Administrators can read them."}
+        </p>
+      )}
+      filters={(
+        <section className="panel">
+          <GetFilterForm action="/more/club-forms" className="club-form-filter">
+            {event && <input name="event" type="hidden" value={event} />}
+            {sorting.order.key && <><input name="sort" type="hidden" value={sorting.order.key} /><input name="dir" type="hidden" value={sorting.order.dir} /></>}
+            <label>Form
+              <select defaultValue={form ?? ""} name="form">
+                <option value="">All forms</option>
+                {templates.map((template) => <option key={template.key} value={template.key}>{template.name}{template.enabled ? "" : " (off)"}</option>)}
+              </select>
+            </label>
+            <label>Club
+              <select defaultValue={club ?? ""} name="club">
+                <option value="">All clubs</option>
+                {clubs.map((choice) => <option key={choice.organizationId} value={choice.organizationId}>{choice.name}</option>)}
+              </select>
+            </label>
+            <button className="secondary-button" type="submit">Filter</button>
+            {exportHref
+              ? <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={14} /> Download CSV (non-sensitive columns)</ExportLink>
+              : <small className="field-help">Choose one form to download its CSV.</small>}
+          </GetFilterForm>
+        </section>
+      )}
+      pager={{ hrefFor: pageHref, label: "Submitted club forms", noun: "forms", nounOne: "form", slice: { from: list.total === 0 ? 0 : (list.page - 1) * list.pageSize + 1, to: (list.page - 1) * list.pageSize + rows.length, page: list.page, pageCount: list.pageCount, total: list.total } }}
+    >
       <section className="panel">
-        <GetFilterForm action="/more/club-forms" className="club-form-filter">
-          {event && <input name="event" type="hidden" value={event} />}
-          {sorting.order.key && <><input name="sort" type="hidden" value={sorting.order.key} /><input name="dir" type="hidden" value={sorting.order.dir} /></>}
-          <label>Form
-            <select defaultValue={form ?? ""} name="form">
-              <option value="">All forms</option>
-              {templates.map((template) => <option key={template.key} value={template.key}>{template.name}{template.enabled ? "" : " (off)"}</option>)}
-            </select>
-          </label>
-          <label>Club
-            <select defaultValue={club ?? ""} name="club">
-              <option value="">All clubs</option>
-              {clubs.map((choice) => <option key={choice.organizationId} value={choice.organizationId}>{choice.name}</option>)}
-            </select>
-          </label>
-          <button className="secondary-button" type="submit">Filter</button>
-          {exportHref
-            ? <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={14} /> Download CSV (non-sensitive columns)</ExportLink>
-            : <small className="field-help">Choose one form to download its CSV.</small>}
-        </GetFilterForm>
         {list.total === 0 ? (
           <p className="quiet-copy">No submitted forms match.</p>
         ) : (
-          <div className="report-table-wrap">
+          <div className="report-table-wrap card-box">
             {sorting.order.key && <SortOrderNote>{sortOrderText(sortLabels[sorting.order.key], sorting.order.dir, sorting.order.key === "submitted" ? "date" : "text")}</SortOrderNote>}
-            <table className="report-table">
+            <table role="table" className="report-table table-cards table-cards-wide">
               <caption className="sr-only">Submitted club forms</caption>
-              <thead>
-                <tr>
+              <thead role="rowgroup">
+                <tr role="row">
                   <ColumnHeader column="club" label="Club" sorting={sorting} />
                   <ColumnHeader column="form" label="Form" sorting={sorting} />
                   <ColumnHeader column="subject" label="Member or subject" sorting={sorting} />
                   <ColumnHeader column="submitted" label="Submitted" sorting={sorting} />
                   <ColumnHeader column="entered" label="Entered" sorting={sorting} />
-                  <th scope="col"><span className="sr-only">Open</span></th>
+                  <th role="columnheader" scope="col"><span className="sr-only">Open</span></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {rows.map((row) => (
-                  <tr key={row.id}>
-                    <th scope="row" translate="no">{row.organizationName}</th>
-                    <td>{row.templateName}</td>
-                    <td translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
-                    <td>{formatDate(row.submittedAt)}</td>
-                    <td>{row.enteredVia === "LINK" ? "Private link" : "Club director"}</td>
-                    <td><Link className="secondary-button" href={`/more/club-forms/${row.id}${eventQuery}`}>Open</Link></td>
+                  <tr role="row" key={row.id}>
+                    <th role="rowheader" scope="row" translate="no">{row.organizationName}</th>
+                    <td {...cardCell("Form")}>{row.templateName}</td>
+                    <td {...cardCell("Member or subject")} translate={row.subjectName ? "no" : undefined}>{row.subjectName || "Not named"}</td>
+                    <td {...cardCell("Submitted")}>{formatDate(row.submittedAt)}</td>
+                    <td {...cardCell("Entered")}>{row.enteredVia === "LINK" ? "Private link" : "Club director"}</td>
+                    <td {...cardCell(null)}><Link className="secondary-button" href={`/more/club-forms/${row.id}${eventQuery}`}>Open</Link></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-        <ListPager hrefFor={pageHref} label="Submitted club forms" noun="forms" nounOne="form" slice={{ from: list.total === 0 ? 0 : (list.page - 1) * list.pageSize + 1, to: (list.page - 1) * list.pageSize + rows.length, page: list.page, pageCount: list.pageCount, total: list.total }} />
       </section>
-    </section>
+    </ListPage>
   );
 }

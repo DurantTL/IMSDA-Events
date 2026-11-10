@@ -113,7 +113,7 @@ export default async function PrintableNameBadgesPage({
       <style>{badgePrintPageRule}</style>
       <div className="page-intro badge-print-intro">
         <div>
-          <p className="eyebrow">Convention preparation</p>
+          <p className="eyebrow">Check-in</p>
           <h2>Printable attendee name badges</h2>
           <p>
             Print the active roster for {event.name} on the matching Avery

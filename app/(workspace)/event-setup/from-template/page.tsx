@@ -8,6 +8,7 @@ import { formatDateRange } from "@/modules/calendar/domain";
 import { getCalendarEntryPrefill } from "@/modules/calendar/event-links";
 import { listEventTemplates } from "@/modules/event-templates/repository";
 import { StartFromTemplate } from "@/components/start-from-template";
+import { EventStartChoices } from "@/components/event-start-choices";
 import { templateFeatureDefaults } from "@/modules/event-templates/feature-defaults";
 
 export const metadata: Metadata = { title: "Start from template" };
@@ -46,7 +47,7 @@ export default async function StartFromTemplatePage({ searchParams }: { searchPa
               The event is linked to it, so the calendar shows the pair once.
             </p>
           )}
-          <p><Link href={`/event-setup${carry}#blank-event`}>Start blank</Link> instead: fill in the event details by hand.</p>
+          <EventStartChoices current="template" carry={carry} />
         </>
       )}
     >

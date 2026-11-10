@@ -202,7 +202,6 @@ describe("deep pages light their parent tab, rail area and phone item (#1566)", 
     for (const [file, href] of [
       ["app/(workspace)/more/lodging/assignments/page.tsx", "/more/lodging?event="],
       ["app/(workspace)/more/lodging/requests/page.tsx", "/more/lodging?event="],
-      ["app/(workspace)/more/issued-assets/closeout/page.tsx", "/more/issued-assets?event="],
     ]) {
       const source = read(file);
       expect(source, file).toContain("<BackLink");

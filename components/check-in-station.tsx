@@ -2,6 +2,7 @@
 
 import { Money } from "@/components/exact-value";
 import { CheckCircle2, CreditCard, ShieldAlert, Square } from "lucide-react";
+import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -184,6 +185,9 @@ export function CheckInStationScreen({
         <section className={styles.cisCard}>
           <h1>Check-in station</h1>
           <p>This station is not active. Ask a staff member to start it again from Check-in.</p>
+          <p className={styles.cisActions}>
+            <Link href="/check-in" className={`secondary-button ${styles.large}`}>Go to Check-in</Link>
+          </p>
         </section>
       </main>
     );
@@ -194,11 +198,11 @@ export function CheckInStationScreen({
 
   return (
     <main className={styles.cisShell}>
-      <header className={styles.cisHeader}>
+      <header className={styles.cisBar}>
         <div>
-          <p className={styles.cisEyebrow}>Check-in station</p>
-          <h1>{eventName}</h1>
-          <p className={styles.cisSub}>{stationLabel ? `Station: ${stationLabel}` : "Staff-run station"}</p>
+          {stationLabel && <p className={styles.cisEyebrow}>Check-in station</p>}
+          <h1>{stationLabel || "Check-in station"}</h1>
+          <p className={styles.cisSub}>{eventName}</p>
         </div>
         <button type="button" className={`secondary-button ${styles.large}`} onClick={() => { setStopError(""); setStopping(true); }}>
           Stop station
@@ -236,48 +240,6 @@ export function CheckInStationScreen({
         <section className={styles.cisCard} aria-labelledby="cis-family-title">
           <h2 id="cis-family-title">Registration <span translate="no">{family.confirmationCode}</span></h2>
           {allDone && <p className={styles.cisOk}><CheckCircle2 aria-hidden="true" size={18} /> Everyone on this registration is checked in.</p>}
-          <ul className={styles.cisPeople}>
-            {family.attendees.map((person) => {
-              const result = results[person.id];
-              return (
-                <li key={person.id} className={styles.cisPerson}>
-                  {person.checkedIn || person.needsDeskReview ? (
-                    <span className={styles.cisPersonBody}>
-                      <strong>{person.firstName} {person.lastName}</strong>
-                      <span className={styles.cisType}>{stationAttendeeTypeLabel(person.attendeeType)}</span>
-                      {person.checkedIn
-                        ? <span className={`${styles.cisStatus} ${styles.cisStatusOk}`}>{result ? stationResultLabel(result) : "Checked in"}</span>
-                        : <span className={`${styles.cisStatus} ${styles.cisStatusHold}`}>Needs desk review - send to the check-in desk</span>}
-                    </span>
-                  ) : (
-                    <label className={`${styles.cisPersonBody} ${styles.cisPersonPick}`}>
-                      <input type="checkbox" checked={selected.has(person.id)} onChange={() => toggle(person.id)} />
-                      <span>
-                        <strong>{person.firstName} {person.lastName}</strong>
-                        <span className={styles.cisType}>{stationAttendeeTypeLabel(person.attendeeType)}</span>
-                        {result && <span className={`${styles.cisStatus} ${styles.cisStatusHold}`}>{stationResultLabel(result)}</span>}
-                      </span>
-                    </label>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          {selectable.length > 0 && (
-            <p className={styles.cisHelp}>Untick anyone who is not here, then confirm.</p>
-          )}
-          <div className={styles.cisActions}>
-            <button
-              type="button"
-              className={`primary-button ${styles.large}`}
-              disabled={busy !== "" || selected.size === 0}
-              onClick={confirmCheckIn}
-            >
-              {busy === "confirm" ? "Checking in..." : `Confirm check-in${selected.size ? ` (${selected.size})` : ""}`}
-            </button>
-            <button type="button" className={`secondary-button ${styles.large}`} onClick={reset} disabled={busy !== ""}>Next person</button>
-          </div>
-
           <PaymentPanel
             family={family}
             canRecordPayments={canRecordPayments}
@@ -286,6 +248,51 @@ export function CheckInStationScreen({
             busy={busy === "payment"}
             setBusy={(value) => setBusy(value ? "payment" : "")}
           />
+          <section className={styles.cisWho} aria-labelledby="cis-who-title">
+            <h3 id="cis-who-title">Who is here?</h3>
+            <ul className={styles.cisPeople}>
+              {family.attendees.map((person) => {
+                const result = results[person.id];
+                return (
+                  <li key={person.id} className={styles.cisPerson}>
+                    {person.checkedIn || person.needsDeskReview ? (
+                      <span className={styles.cisPersonBody}>
+                        <strong>{person.firstName} {person.lastName}</strong>
+                        <span className={styles.cisType}>{stationAttendeeTypeLabel(person.attendeeType)}</span>
+                        {person.checkedIn
+                          ? <span className={`${styles.cisStatus} ${styles.cisStatusOk}`}>{result ? stationResultLabel(result) : "Checked in"}</span>
+                          : <span className={`${styles.cisStatus} ${styles.cisStatusHold}`}>Needs desk review - send to the check-in desk</span>}
+                      </span>
+                    ) : (
+                      <label className={`${styles.cisPersonBody} ${styles.cisPersonPick}`}>
+                        <input type="checkbox" checked={selected.has(person.id)} onChange={() => toggle(person.id)} />
+                        <span>
+                          <strong>{person.firstName} {person.lastName}</strong>
+                          <span className={styles.cisType}>{stationAttendeeTypeLabel(person.attendeeType)}</span>
+                          {result && <span className={`${styles.cisStatus} ${styles.cisStatusHold}`}>{stationResultLabel(result)}</span>}
+                        </span>
+                      </label>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            {selectable.length > 0 && (
+              <p className={styles.cisHelp}>Untick anyone who is not here yet.</p>
+            )}
+            <div className={styles.cisActions}>
+              <button
+                type="button"
+                className={`primary-button ${styles.large}`}
+                disabled={busy !== "" || selected.size === 0}
+                onClick={confirmCheckIn}
+              >
+                {busy === "confirm" ? "Checking in..." : `Check in${selected.size ? ` (${selected.size})` : ""}`}
+              </button>
+              <button type="button" className={`secondary-button ${styles.large}`} onClick={reset} disabled={busy !== ""}>Next person</button>
+            </div>
+
+          </section>
         </section>
       )}
 
@@ -400,7 +407,7 @@ function PaymentPanel({
 
   return (
     <section className={styles.cisPayment} aria-labelledby="cis-payment-title">
-      <h3 id="cis-payment-title">Payment</h3>
+      <h3 id="cis-payment-title">Money</h3>
       {payment.state === "BILLED_TO_GROUP" && <p className={styles.cisOk}>Billed to the church/group. Nothing to collect here.</p>}
       {payment.state === "PAID" && <p className={styles.cisOk}><CheckCircle2 aria-hidden="true" size={18} /> Paid</p>}
       {payment.state === "DUE" && (
