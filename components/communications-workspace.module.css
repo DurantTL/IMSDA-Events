@@ -1,0 +1,5 @@
+/* Long unbroken text in an announcement (a title or message) wraps instead of pushing the page sideways (#1585). */
+.wrap {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

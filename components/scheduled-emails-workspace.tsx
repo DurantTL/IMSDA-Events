@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CalendarClock, CheckCircle2, Plus, RefreshCw } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { PageHeader } from "@/components/page-header";
+import { staffPageTitles } from "@/components/staff-navigation";
 import { scheduleDiscardPrompt, scheduleEditorIsDirty, scheduleEditorSnapshot } from "@/components/announcement-draft-dirty";
 import { useConfirm } from "@/components/use-confirm";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -307,7 +308,8 @@ export function ScheduledEmailsWorkspace({
   return (
     <section className="page-stack scheduled-emails-workspace">
       {confirmDialog}
-      <StaffPageHeader
+      <PageHeader
+        title={staffPageTitles.scheduledEmails}
         description={`Emails that go out later, at a time in ${eventName}'s own time zone (${eventTimezone}). Nothing is sent until a person approves it.`}
         primary={(
           <button className="primary-button" type="button" ref={newScheduleRef} onClick={() => void openNew()} disabled={busy}>
@@ -431,7 +433,7 @@ export function ScheduledEmailsWorkspace({
 
       {schedules.length === 0 && !form ? (
         <>
-          <EmptyState action={{ label: "Schedule an email", onClick: () => void openNew() }} canCreate={!busy} icon={<CalendarClock aria-hidden="true" size={22} />} title="No emails are scheduled">Scheduled emails go out to attendees at a set time, such as before a deadline.</EmptyState>
+          <EmptyState action={{ label: "Schedule an email", onClick: () => void openNew() }} actionClass="secondary-button" canCreate={!busy} icon={<CalendarClock aria-hidden="true" size={22} />} title="No emails are scheduled">Scheduled emails go out to attendees at a set time, such as before a deadline.</EmptyState>
           <EventSetupHelp context="scheduled emails" id="scheduled-emails-none" />
         </>
       ) : (
