@@ -4,6 +4,7 @@ import { useMemo, useState, type DragEvent, type FormEvent } from "react";
 import { ExportLink } from "@/components/export-link";
 import chips from "@/components/lodging-chips.module.css";
 import assign from "@/components/lodging-assign.module.css";
+import { useConfirm } from "@/components/use-confirm";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import {
@@ -73,7 +74,7 @@ function wantedRange(person: PersonCard, nights: readonly string[]) {
   return { first: person.wantedFirstNight ?? nights[0]!, last: person.wantedLastNight ?? nights[nights.length - 1]! };
 }
 
-export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigure, canExport }: {
+export function LodgingAssignmentsWorkspace({ initialView, canConfigure, canExport }: {
   eventName: string;
   initialView: AssignmentWorkspaceView;
   canConfigure: boolean;
@@ -86,7 +87,8 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<{ occupantKey: string; moveAssignmentId?: string } | null>(null);
   const [moveReason, setMoveReason] = useState(defaultMoveReason);
-  const [pendingSpecial, setPendingSpecial] = useState<{ unit: UnitCard; personKeys: string[] } | null>(null);
+  // The special-use confirmation is the shared accessible dialog: focus moves in, Escape cancels, focus returns to the button.
+  const { confirm, confirmDialog } = useConfirm();
   const searchBox = useClientSearch();
   const search = searchBox.term;
   const [filter, setFilter] = useState<"all" | "unassigned" | "assigned">("unassigned");
@@ -150,12 +152,21 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
     return [person, ...person.householdKeys.map((key) => peopleByKey.get(key)).filter((member): member is PersonCard => Boolean(member && member.active && member.asksForLodging && member.placements.length === 0))];
   }
 
-  async function placeMany(people: PersonCard[], target: { kind: "UNIT"; unit: UnitCard } | { kind: "BUCKET"; bucketId: string; label: string }, confirmSpecialUse = false) {
-    if (target.kind === "UNIT" && target.unit.specialUse && !confirmSpecialUse) {
-      setPendingSpecial({ unit: target.unit, personKeys: people.map((person) => person.occupantKey) });
-      return;
+  function askSpecialUse(unit: UnitCard, people: PersonCard[]) {
+    return confirm({
+      title: `${unit.name} is a special-use room`,
+      body: <p>It is set aside for a particular group. Place {people.map((person) => person.name).join(", ")} there anyway?</p>,
+      confirmLabel: "Yes, place them there",
+      cancelLabel: "No, keep my selection",
+    });
+  }
+
+  async function placeMany(people: PersonCard[], target: { kind: "UNIT"; unit: UnitCard } | { kind: "BUCKET"; bucketId: string; label: string }) {
+    let confirmedSpecialUse = false;
+    if (target.kind === "UNIT" && target.unit.specialUse) {
+      if (!(await askSpecialUse(target.unit, people))) return;
+      confirmedSpecialUse = true;
     }
-    setPendingSpecial(null);
     const place = target.kind === "UNIT" ? { kind: "UNIT" as const, eventUnitId: target.unit.eventUnitId } : { kind: "BUCKET" as const, bucketId: target.bucketId };
     const where = target.kind === "UNIT" ? target.unit.name : target.label;
     const moving = selected?.moveAssignmentId ? people.length === 1 : false;
@@ -163,7 +174,7 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
     const ok = await run(() => callLodging(`${base}/assignments`, "POST", {
       action: "place",
       reason: moving ? moveReason : "Assigned by staff",
-      placements: people.map((person) => placementFor(person, place, moving ? "MOVE" : "ASSIGN", confirmSpecialUse, moving && move ? { first: move.firstNight, last: move.lastNight } : undefined)),
+      placements: people.map((person) => placementFor(person, place, moving ? "MOVE" : "ASSIGN", confirmedSpecialUse, moving && move ? { first: move.firstNight, last: move.lastNight } : undefined)),
     }), people.length === 1 ? `${people[0]!.name} placed in ${where}.` : `${people.length} people placed in ${where}.`);
     if (ok) { setSelected(null); setMoveReason(defaultMoveReason); }
   }
@@ -220,8 +231,12 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
       if (person && placement) {
         void (async () => {
           const place = target.kind === "UNIT" ? { kind: "UNIT" as const, eventUnitId: target.unit.eventUnitId } : { kind: "BUCKET" as const, bucketId: target.bucketId };
-          if (target.kind === "UNIT" && target.unit.specialUse) { setPendingSpecial({ unit: target.unit, personKeys: [person.occupantKey] }); return; }
-          const moved = await run(() => callLodging(`${base}/assignments`, "POST", { action: "place", reason: moveReason, placements: [placementFor(person, place, "MOVE", false, { first: placement.firstNight, last: placement.lastNight })] }), `${person.name} moved.`);
+          let confirmedSpecialUse = false;
+          if (target.kind === "UNIT" && target.unit.specialUse) {
+            if (!(await askSpecialUse(target.unit, [person]))) return;
+            confirmedSpecialUse = true;
+          }
+          const moved = await run(() => callLodging(`${base}/assignments`, "POST", { action: "place", reason: moveReason, placements: [placementFor(person, place, "MOVE", confirmedSpecialUse, { first: placement.firstNight, last: placement.lastNight })] }), `${person.name} moved.`);
           setSelected(null);
           if (moved) setMoveReason(defaultMoveReason);
         })();
@@ -377,33 +392,24 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
   ];
 
   return <div className="settings-stack lodging-assign">
+    {confirmDialog}
     <StaffPageHeader
       actions={canExport ? <>{lodgingExports.map(({ report, label }) => <li key={report}><ExportLink href={lodgingExportHref(view.eventId, report)}>{label}</ExportLink></li>)}</> : undefined}
       description="Place guests in rooms and sites. The server checks every night, so two people cannot be given the last bed. Every move keeps who did it and why, and nothing here changes a registration's charge."
     />
-    <div className={chips.context} aria-label="Lodging context">
-      <span><strong>{eventName}</strong></span><span>{view.propertyName}</span><span>{lodgingNightsLine(nights)}</span>
+    <div className={chips.context}>
+      <span><strong>{view.propertyName}</strong></span><span>{lodgingNightsLine(nights)}</span>
     </div>
     <ul className={chips.row} aria-label="Assignment counts">
-      <li className={`${chips.chip} ${chips.assignment}`}>{view.counts.placed} assigned</li>
-      <li className={`${chips.chip} ${chips.request}`}>{view.counts.unplaced} not assigned yet</li>
-      <li className={`${chips.chip} ${chips.review}`}>{view.counts.waitingOnList} on the waitlist</li>
-      <li className={`${chips.chip} ${chips.review}`}>{view.counts.exceptions} to look at</li>
+      <li className="status-chip green">{view.counts.placed} assigned</li>
+      <li className="status-chip neutral">{view.counts.unplaced} not assigned yet</li>
+      <li className="status-chip neutral">{view.counts.waitingOnList} on the waitlist</li>
+      <li className="status-chip purple">{view.counts.exceptions} to look at</li>
     </ul>
-    <div role="status" aria-live="polite" className="lodging-assign-live">
+    <div role="status" aria-live="polite" className={`lodging-assign-live ${chips.live}`}>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {notice ? <p className="usage-note">{notice}</p> : null}
     </div>
-    {pendingSpecial ? <div className={`panel lodging-assign-confirm ${assign.review}`} role="alertdialog" aria-labelledby="la-special-title">
-      <h3 id="la-special-title">{pendingSpecial.unit.name} is a special-use room</h3>
-      <p>It is set aside for a particular group. Place {pendingSpecial.personKeys.map((key) => peopleByKey.get(key)?.name).filter(Boolean).join(", ")} there anyway?</p>
-      <button type="button" className="primary-button" disabled={busy} onClick={() => {
-        const people = pendingSpecial.personKeys.map((key) => peopleByKey.get(key)).filter((person): person is PersonCard => Boolean(person));
-        void placeMany(people, { kind: "UNIT", unit: pendingSpecial.unit }, true);
-      }}>Yes, place them there</button>
-      <button type="button" className="secondary-button" onClick={() => setPendingSpecial(null)}>No, keep my selection</button>
-    </div> : null}
-
     <nav aria-label="Lodging sections" className="lodging-assign-tabs">
       {tabs.map(([key, label]) => <button key={key} type="button" className={tab === key ? "primary-button" : "secondary-button"} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>)}
     </nav>
@@ -428,8 +434,8 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
             <button type="button" aria-pressed={selected?.occupantKey === person.occupantKey && !selected?.moveAssignmentId} disabled={!person.active} onClick={() => setSelected(selected?.occupantKey === person.occupantKey && !selected?.moveAssignmentId ? null : { occupantKey: person.occupantKey })}>
               <span className="lodging-assign-chip-name">{person.name}{person.kind === "PLACEHOLDER" ? " (expected)" : ""}{person.people > 1 ? ` x${person.people}` : ""}</span>
               {person.placements.length > 0
-                ? <span className={`${chips.chip} ${chips.assignment}`}>Assigned: {person.placements.map((placement) => `${placement.label} (${range(placement.firstNight, placement.lastNight)})`).join(", ")}</span>
-                : <span className={`${chips.chip} ${chips.request}`}>Not assigned yet</span>}
+                ? <span className={`status-chip green ${chips.wrap}`}>Assigned: {person.placements.map((placement) => `${placement.label} (${range(placement.firstNight, placement.lastNight)})`).join(", ")}</span>
+                : <span className="status-chip neutral">Not assigned yet</span>}
               <span className="lodging-assign-chip-meta">
                 {person.registrationCode ?? "not registered yet"}
                 {person.category ? `, asked for ${lodgingCategoryLabels[person.category]}` : ""}

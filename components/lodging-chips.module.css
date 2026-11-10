@@ -1,38 +1,24 @@
-/* Lodging status chips (#1578): inventory state, a guest's request, a review item and an actual assignment each read differently,
-   in words as well as colour. A request is never drawn like an assignment. */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  padding: 2px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--card);
-  color: var(--ink);
-  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  font-weight: 700;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
+/* Lodging view pieces (#1578). The chips themselves are the shared `.status-chip` tones (site rule L4); this only adds the dashed
+   outline that marks "what a guest asked for" and the layout around the chips. */
 
-/* What a guest asked for: dashed outline, so it never looks like a placement. */
-.request { border-style: dashed; border-color: var(--imsda-purple); background: var(--imsda-purple-soft); color: var(--imsda-purple); }
+/* A request or preference: the neutral chip with a dashed outline, so it never looks like a placement. */
+.dashed { border-style: dashed; }
 
-/* A real placement by staff: solid and filled. */
-.assignment { border-color: var(--imsda-navy); background: var(--imsda-navy); color: var(--card); }
-
-/* Something staff have to look at. */
-.review { border-color: var(--imsda-gold); background: var(--imsda-gold-soft); color: var(--ink); }
-
-/* The state of a room or site: capacity, holds, unavailable. */
-.inventory { border-color: var(--line); background: var(--imsda-navy-soft); color: var(--imsda-navy); }
+/* A chip that holds a long place and date list wraps instead of running off the screen. */
+.wrap { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
 
-/* The night, site and building a view is showing, kept under the header on every Lodging page. */
-.context { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+/* The property and night window a view is showing, kept under the header on every Lodging page. */
+.context { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .context strong { color: var(--ink); }
 
 /* The small label above who is assigned to a room or site. */
 .assignedLabel { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+
+/* A labelled select never grows past its box, so a long option cannot widen the page. */
+.fit { display: block; min-width: 0; max-width: 100%; }
+.fit select { box-sizing: border-box; min-width: 0; max-width: 100%; }
+
+/* The live message stays in view where the person is working, however far down the page they are. */
+.live { align-self: start; position: sticky; top: 8px; z-index: 5; min-height: 1px; }

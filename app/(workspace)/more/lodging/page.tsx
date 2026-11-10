@@ -19,5 +19,5 @@ export default async function LodgingPage({ searchParams }: { searchParams: Prom
     return <>{strip}<AccessRestricted title="Lodging is restricted" detail="Event administrators can review and set up lodging inventory for this event." whoToAsk="your event administrator" /></>;
   }
   const view = await getLodgingView(event.id);
-  return <>{strip}<LodgingWorkspace eventName={event.name} initialView={view} canSetRates={permissions.includes("MANAGE_FINANCE")} /></>;
+  return <>{strip}<LodgingWorkspace eventName={event.name} initialView={view} canSetRates={permissions.includes("MANAGE_FINANCE")} canSeeRegistrationPages={permissions.includes("MANAGE_REGISTRATION")} /></>;
 }
