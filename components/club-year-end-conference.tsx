@@ -153,7 +153,7 @@ export function ClubYearEndConference({ reportYear, initialRows, initialQuery = 
             {rows.length === 0 ? <p className="report-empty">{`No active clubs for ${reportYear}.`}</p> : search.term.trim() !== "" ? (
               <>
                 <p className="report-empty">No club matches that search in this tab.</p>
-                <button className={`secondary-button ${styles.action}`} onClick={clearSearch} type="button">Clear search</button>
+                <button className={`secondary-button ${styles.action}`} onClick={clearFilters} type="button">Clear filters</button>
               </>
             ) : tab === "needs-review" ? (
               <>
