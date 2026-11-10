@@ -13666,7 +13666,8 @@ body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-are
   .fb-form-name { flex: 1 1 0; min-width: 0; }
   .fb-form-switch { flex: 1 1 0; min-width: 0; }
   .fb-form-switch select { width: 100%; max-width: none; }
-  .fb-nav { flex: 1 1 100%; flex-wrap: nowrap; gap: 4px; overflow-x: auto; order: 5; }
+  /* The links wrap onto a second line when they do not fit (#1572): no row scrolls sideways. */
+  .fb-nav { flex: 1 1 100%; min-width: 0; flex-wrap: wrap; gap: 4px; order: 5; }
   .fb-nav a { flex: 0 0 auto; white-space: nowrap; font-size: 0.9375rem; }
   .fb-nav a[href="#builder-editor"] { display: none; }
   .fb-version-chips { flex: 1 1 100%; order: 6; }
