@@ -264,3 +264,24 @@ describe("saved layouts with filters", () => {
     })).rejects.toMatchObject({ status: 403 });
   });
 });
+
+describe("fix round: empty clubs and the legacy location key", () => {
+  it("refuses an explicit empty club list instead of reading it as all clubs", async () => {
+    for (const route of [staffPost, coordinatorPost]) {
+      mocks.currentAreaCoordinator.mockResolvedValue({ id: "acct-1" });
+      expect((await route(post({ action: "preview", columns: ["name"], filters: { clubIds: [] } }), context)).status).toBe(400);
+    }
+    expect((await staffPost(post({ action: "save-layout", name: "Empty", columns: ["name"], filters: { clubIds: [] } }), context)).status).toBe(400);
+  });
+
+  it("accepts a top-level locationId as an alias for filters.locationId, and refuses two different ones", async () => {
+    const alias = await staffPost(post({ action: "preview", columns: ["club"], locationId: "loc-1" }), context);
+    expect(((await alias.json()) as { totalRows: number }).totalRows).toBe(2);
+    expect(mocks.getClubEventRecords.mock.calls.at(-1)![1]).toMatchObject({ locationId: "loc-1" });
+    const same = await staffPost(post({ action: "preview", columns: ["club"], locationId: "loc-1", filters: { locationId: "loc-1" } }), context);
+    expect(same.status).toBe(200);
+    const differ = await staffPost(post({ action: "preview", columns: ["club"], locationId: "loc-1", filters: { locationId: "loc-2" } }), context);
+    expect(differ.status).toBe(400);
+    expect((await staffPost(post({ action: "preview", columns: ["club"], locationId: "loc-foreign" }), context)).status).toBe(400);
+  });
+});

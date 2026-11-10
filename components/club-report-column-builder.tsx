@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { DisabledHint, disabledHintId } from "@/components/disabled-hint";
 import { CoordinatorClubPicker } from "@/components/coordinator-club-picker";
 import { useConfirm } from "@/components/use-confirm";
 import { CLUB_REPORT_ROLE_OPTIONS } from "@/modules/reporting/club-report-filters";
@@ -48,8 +49,17 @@ export function ClubReportColumnBuilder({ endpoint, eventName, options, defaultK
   const [allClubs, setAllClubs] = useState(true);
   const [clubIds, setClubIds] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
-  const [location, setLocation] = useState(locationId && locations.some((entry) => entry.id === locationId) ? locationId : "");
+  const pageLocation = locationId && locations.some((entry) => entry.id === locationId) ? locationId : "";
+  const [location, setLocation] = useState(pageLocation);
   const [preview, setPreview] = useState<Table | null>(null);
+  // The staff page's own location filter can change while this stays mounted (a layout name may be half typed), so the
+  // builder follows it instead of being remounted.
+  const [seenPageLocation, setSeenPageLocation] = useState(pageLocation);
+  if (seenPageLocation !== pageLocation) {
+    setSeenPageLocation(pageLocation);
+    setLocation(pageLocation);
+    setPreview(null);
+  }
   const [busy, setBusy] = useState(false);
   const [working, setWorking] = useState<"preview" | "csv" | "print" | "save" | null>(null);
   const [nameError, setNameError] = useState("");
@@ -77,7 +87,7 @@ export function ClubReportColumnBuilder({ endpoint, eventName, options, defaultK
   }
 
   const clubFilter = allClubs ? [] : clubIds;
-  const filtersActive = clubFilter.length > 0 || roles.length > 0 || location !== "";
+  const filtersActive = clubFilter.length > 0 || roles.length > 0 || location !== "" || (!allClubs && clubs.length > 0);
   // Roles and clubs only: this is what a saved layout keeps. A location belongs to one event and is never saved.
   const layoutFilters = { ...(roles.length ? { roles } : {}), ...(clubFilter.length ? { clubIds: clubFilter } : {}) };
 
@@ -196,7 +206,9 @@ export function ClubReportColumnBuilder({ endpoint, eventName, options, defaultK
     setNotice(`Loaded "${layout.name}".`);
   }
 
-  const none = chosen.length === 0;
+  const noClubTicked = !allClubs && clubIds.length === 0;
+  const none = chosen.length === 0 || noClubTicked;
+  const clubHint = noClubTicked ? "Tick at least one club, or choose All clubs." : null;
 
   return (
     <div className={styles.builder}>
@@ -232,7 +244,7 @@ export function ClubReportColumnBuilder({ endpoint, eventName, options, defaultK
         </ul>
       </fieldset>
 
-      {none ? <p className={styles.message}>Choose at least one column.</p> : (
+      {chosen.length === 0 ? <p className={styles.message}>Choose at least one column.</p> : (
         <div className={styles.group}>
           <p className={styles.groupTitle} id={`${ids}-order`}>Order</p>
           <ol aria-labelledby={`${ids}-order`} className={styles.order}>
@@ -292,10 +304,11 @@ export function ClubReportColumnBuilder({ endpoint, eventName, options, defaultK
       {error && <p className={`status-chip coral ${styles.message}`} role="alert">{error}</p>}
       {notice && <p className={`status-chip green ${styles.message}`} role="status">{notice}</p>}
 
+      <DisabledHint id={`${ids}-club-hint`} reason={clubHint} />
       <div className={styles.actions}>
-        <button className="secondary-button" disabled={busy || none} onClick={() => run("preview")} type="button">{working === "preview" ? "Working…" : "Preview"}</button>
-        <button className="secondary-button" disabled={busy || none} onClick={() => run("print")} type="button">{working === "print" ? "Working…" : "Print"}</button>
-        <button className="primary-button" disabled={busy || none} onClick={() => run("csv")} type="button">{working === "csv" ? "Downloading…" : "Download CSV"}</button>
+        <button className="secondary-button" aria-describedby={disabledHintId(clubHint, `${ids}-club-hint`)} disabled={busy || none} onClick={() => run("preview")} type="button">{working === "preview" ? "Working…" : "Preview"}</button>
+        <button className="secondary-button" aria-describedby={disabledHintId(clubHint, `${ids}-club-hint`)} disabled={busy || none} onClick={() => run("print")} type="button">{working === "print" ? "Working…" : "Print"}</button>
+        <button className="primary-button" aria-describedby={disabledHintId(clubHint, `${ids}-club-hint`)} disabled={busy || none} onClick={() => run("csv")} type="button">{working === "csv" ? "Downloading…" : "Download CSV"}</button>
       </div>
       <p className={`field-help ${styles.excelHelp}`}>The CSV opens in Excel with names and accents intact.</p>
 

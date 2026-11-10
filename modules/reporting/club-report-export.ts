@@ -131,6 +131,8 @@ export async function resolveClubReportFilters(
   allowedLocationId: string | null = null,
 ): Promise<ResolvedClubReportFilters> {
   const roles = checkedRoles(requested?.roles);
+  // An explicit empty club list is refused, not read as "all clubs": no filter at all is the way to say that.
+  if (requested?.clubIds && requested.clubIds.length === 0) throw invalidFilter("Choose at least one club, or leave the club filter off.");
   const clubIds = requested?.clubIds?.length
     ? checkedClubIds(requested.clubIds, new Set((await listRegisteredClubs(eventId)).map((club) => club.id)))
     : [];

@@ -35,7 +35,7 @@ const clubIdValues = z.array(z.string().max(64)).max(500);
 const reportFilters = z.object({ roles: roleValues.optional(), clubIds: clubIdValues.optional(), locationId: z.string().max(64).nullish() }).strict();
 const layoutFilters = z.object({ roles: roleValues.optional(), clubIds: clubIdValues.optional() }).strict();
 export const clubReportRequestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.enum(["preview", "csv", "print"]), columns: columnKeys, filters: reportFilters.optional() }).strict(),
+  z.object({ action: z.enum(["preview", "csv", "print"]), columns: columnKeys, filters: reportFilters.optional(), /** Legacy alias of filters.locationId, sent by a page script from before #1762 during a deploy. */ locationId: z.string().max(64).nullish() }).strict(),
   z.object({ action: z.literal("save-layout"), name: z.string().trim().min(1, "Name the layout.").max(80), columns: columnKeys, filters: layoutFilters.optional() }).strict(),
   z.object({ action: z.literal("delete-layout"), layoutId: z.string().min(1).max(64) }).strict(),
 ]);
@@ -66,9 +66,14 @@ export async function handleClubReportRequest(input: {
     await deleteClubReportLayout(input.eventId, input.viewer, input.actor, request.layoutId);
     return Response.json({ layouts: await listClubReportLayouts(input.eventId, input.viewer) }, { headers: noStore });
   }
-  const allowedLocationId = input.resolveLocation ? await input.resolveLocation(request.filters?.locationId) : null;
+  const legacyLocation = request.locationId || null;
+  if (legacyLocation && request.filters?.locationId && request.filters.locationId !== legacyLocation) {
+    return Response.json({ error: "INVALID_FILTER", message: "Two different locations were sent." }, { status: 400, headers: noStore });
+  }
+  const requestedFilters = legacyLocation ? { ...request.filters, locationId: legacyLocation } : request.filters;
+  const allowedLocationId = input.resolveLocation ? await input.resolveLocation(requestedFilters?.locationId) : null;
   // Refused before any attendee is read: an unknown role, an unregistered club or a foreign location is a 400.
-  const filters = await resolveClubReportFilters(input.eventId, request.filters, allowedLocationId);
+  const filters = await resolveClubReportFilters(input.eventId, requestedFilters, allowedLocationId);
   const result = await runClubReport({ eventId: input.eventId, viewer: input.viewer, actor: input.actor, columns: request.columns, mode: request.action, filters });
   if (request.action === "csv" && "csv" in result && typeof result.csv === "string") {
     return csvDownloadResponse(result.csv, exportFileName({ scope: await eventFileScope(input.eventId), kind: "club-attendee-report" }));
