@@ -12,6 +12,7 @@
 .heading {
   margin: 0;
   font-size: max(var(--type-staff-floor, 0px), 1.075rem);
+  font-weight: 700;
 }
 
 .text {
@@ -46,6 +47,15 @@
 
 .actions > button {
   min-height: 44px;
+}
+
+/* Phones: the shared buttons stretch a secondary button to the full width, so Install and Not now share the row evenly. */
+@media (max-width: 600px) {
+  .actions > button {
+    flex: 1 1 0;
+    width: auto;
+    justify-content: center;
+  }
 }
 
 .restore {
