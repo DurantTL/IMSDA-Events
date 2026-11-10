@@ -427,6 +427,8 @@ const pages: PageSpec[] = [
   staff("communications-scheduled", `/communications/scheduled?event=${blocksEventId}`, "system-admin"),
   staff("communications-scheduled-new", `/communications/scheduled?event=${blocksEventId}&new=1`, "system-admin"),
   staff("registration-builder", "/registration-builder"),
+  // The event's information forms list (#1572): the titled list page with its description and the form cards.
+  { ...staff("information-forms", "/information-forms"), expectText: /Information forms/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },

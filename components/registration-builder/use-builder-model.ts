@@ -16,7 +16,7 @@ import { useBuilderState } from "./use-builder-state";
 // builds it once and shares it through BuilderContext, so each zone of the
 // editor can be moved or wrapped without threading props.
 export function useBuilderModel(props: BuilderWorkspaceProps, askConfirm: ReturnType<typeof useConfirm>["confirm"]) {
-  const { eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications = false, canSaveAsTemplate = false, mealPlanPrices = {} } = props;
+  const { eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications = false, canViewRegistrations = false, canSaveAsTemplate = false, mealPlanPrices = {} } = props;
   const state = useBuilderState(props);
   // An information form has no event policies to point an acknowledgment at (#1149).
   const derived = useBuilderDerived(props.information ? null : eventId, state);
@@ -59,7 +59,7 @@ export function useBuilderModel(props: BuilderWorkspaceProps, askConfirm: Return
       setDirty(false);
     },
   };
-  return { mealPlanPrices, eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications, canSaveAsTemplate, ...state, ...derived, ...edits, ...removal, ...actions, editBackup };
+  return { mealPlanPrices, eventId, eventSlug, eventName, eventAudience, eventBillingMode, canEditNotifications, canViewRegistrations, canSaveAsTemplate, ...state, ...derived, ...edits, ...removal, ...actions, editBackup };
 }
 
 export type BuilderModel = ReturnType<typeof useBuilderModel>;
