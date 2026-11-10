@@ -168,6 +168,9 @@ Pages finished after the release-1 merge, one row per page, added by each child'
 | `/more/program-assignments` | #1580 | Event setup → Program card | Header without a repeated title; preview says it is not saved, applied runs say they are frozen history | Pass | - |
 | `/more/program-assignments/[runId]` | #1580 | Seminar assignments | Staff back link; the field name stays as a printed heading | Not opened | The seed has no assignment run (needs a published ranked-choice form); code and tests only |
 | `/more/team-results` | #1580 | Club event pages | Level views (Area, Conference, Union) as a views strip with counts; header without a repeated title | Pass (empty state, 0 teams) | Conference and Union levels with teams: the seed has no teams |
+| `/communications` | #1585 | Communications tab → Emails view | Titled header with the filled New announcement (announcements view only); the Scheduled emails sentence is gone because the views strip has it; eyebrows that repeated a heading are removed; review steps, send buttons and confirm steps unchanged | TBD (main session) | TBD (main session) |
+| `/communications/scheduled` | #1585 | Communications tab → Scheduled emails view | Titled header with New schedule as the one filled button; empty state button outlined; long names wrap; approve review and time formatting unchanged | TBD (main session) | TBD (main session) |
+| `/community` | #1585 | Communications tab → Attendee community view | Titled "Attendee community" header; Attendee preview is the outlined link; Messages button removed (the strip has Emails); eyebrows removed; long posts wrap | TBD (main session) | TBD (main session) |
 
 ## Also in the merge (not redesign pages)
 

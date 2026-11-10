@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
+import { PageHeader } from "@/components/page-header";
 import { ScheduledEmailsWorkspace } from "@/components/scheduled-emails-workspace";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { listScheduledEmails } from "@/modules/communications/scheduled-email-repository";
@@ -20,12 +21,16 @@ export default async function ScheduledEmailsPage({
   const { event: requested, new: openNew } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_COMMUNICATIONS")) {
+    // The page draws its own title (#1772), so the restricted state keeps the page's one h1 too.
     return (
-      <AccessRestricted
-        title="Scheduled emails are restricted"
-        detail="Scheduling or approving email needs communications access."
-        whoToAsk="your event administrator"
-      />
+      <>
+        <PageHeader title={staffPageTitles.scheduledEmails} />
+        <AccessRestricted
+          title="Scheduled emails are restricted"
+          detail="Scheduling or approving email needs communications access."
+          whoToAsk="your event administrator"
+        />
+      </>
     );
   }
   const schedules = await listScheduledEmails(event.id);

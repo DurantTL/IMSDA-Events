@@ -10,7 +10,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SubmitRetryNotice } from "@/components/submit-retry-notice";
 import { submitJson, unavailableMessage } from "@/lib/submit-json";
 import { EMAIL_PROBLEM, inlineFieldProblem, isEmail, problemMessage } from "@/lib/field-validation";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -100,6 +99,9 @@ import type {
   FailedMessagesRetryResult,
 } from "@/modules/communications/retry-failed-domain";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
+import { staffPageTitles } from "@/components/staff-navigation";
+import styles from "./communications-workspace.module.css";
 
 /** The delivery log is re-read this often while messages are queued or sending and the tab is visible (#860). */
 export const DELIVERY_REFRESH_INTERVAL_MS = 20_000;
@@ -1502,44 +1504,37 @@ export function CommunicationsWorkspace({
   return (
     <section className="page-stack communications-workspace">
       {confirmDialog}
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Event communications</p>
-          <h2>Messages & announcements</h2>
-          <p>
-            Manage attendee updates, registration confirmations, and delivery history for {eventName}.
-            {canManage && <> To send an email later, at a time in the event&apos;s time zone, use <Link href={`/communications/scheduled?event=${eventId}`}>Scheduled emails</Link>.</>}
-          </p>
-        </div>
-        {canManage && view === "announcements" && (
+      <PageHeader
+        title={staffPageTitles.emails}
+        description={`Announcements, reminders and the delivery record for ${eventName}.`}
+        primary={canManage && view === "announcements" ? (
           <button className="primary-button" type="button" onClick={() => openDraftEditor(blankAnnouncementValues, [], null)}>
             <Plus aria-hidden="true" size={17} /> New announcement
           </button>
-        )}
-      </div>
-
-      {canManage && (
-        <TabList
-          label="Communication tools"
-          className="communications-tabs"
-          selectedClassName="active"
-          activation="manual"
-          selectedKey={view}
-          onSelect={(key) => void changeView(key as CommunicationsView)}
-          tabs={tabs.map(({ id, label, icon: Icon }) => ({
-            key: id,
-            id: communicationsTabId(id),
-            // Only the open view is in the page (and only once its data is), so only its tab names a panel.
-            panelId: view === id && (id === "announcements" || messaging) ? communicationsPanelId(id) : undefined,
-            label: (
-              <>
-                <Icon aria-hidden="true" size={17} /> {label}
-                {id === "deliveries" && messaging && <span>{Object.values(messaging.counts).reduce((sum, count) => sum + count, 0)}</span>}
-              </>
-            ),
-          }))}
-        />
-      )}
+        ) : undefined}
+        below={canManage ? (
+          <TabList
+            label="Communication tools"
+            className="communications-tabs"
+            selectedClassName="active"
+            activation="manual"
+            selectedKey={view}
+            onSelect={(key) => void changeView(key as CommunicationsView)}
+            tabs={tabs.map(({ id, label, icon: Icon }) => ({
+              key: id,
+              id: communicationsTabId(id),
+              // Only the open view is in the page (and only once its data is), so only its tab names a panel.
+              panelId: view === id && (id === "announcements" || messaging) ? communicationsPanelId(id) : undefined,
+              label: (
+                <>
+                  <Icon aria-hidden="true" size={17} /> {label}
+                  {id === "deliveries" && messaging && <span>{Object.values(messaging.counts).reduce((sum, count) => sum + count, 0)}</span>}
+                </>
+              ),
+            }))}
+          />
+        ) : undefined}
+      />
 
       {siteUpdating && !draftOpen && <SubmitRetryNotice message={siteUpdating} busy={saving} onRetry={() => retryRef.current?.()} />}
       {error && !draftOpen && <div className="inline-notice error" role="alert"><AlertTriangle size={17} aria-hidden="true" /> {error}</div>}
@@ -1558,8 +1553,8 @@ export function CommunicationsWorkspace({
                     <span className="status-chip coral" title="Sent to people who opted out of announcements">Essential</span>
                   )}
                 </div>
-                <h3>{announcement.title}</h3>
-                <p>{announcement.body}</p>
+                <h3 className={styles.wrap}>{announcement.title}</h3>
+                <p className={styles.wrap}>{announcement.body}</p>
                 <footer>
                   <span>All attendees · {friendlyStatus(announcement.priority)}</span>
                   <span>{announcement.publishedAt ? new Date(announcement.publishedAt).toLocaleDateString() : "Not published"}</span>
@@ -1618,14 +1613,13 @@ export function CommunicationsWorkspace({
             ))}
             {announcements.length === 0 && (
               <>
-                <EmptyState action={{ label: "New announcement", onClick: () => openDraftEditor(blankAnnouncementValues, [], null) }} canCreate={canManage} className="empty-state panel" hint="Ask an event administrator to create one when attendees need an update." icon={<Megaphone aria-hidden="true" size={24} />} title="No announcements yet">Create a draft when attendees need an event-feed update.</EmptyState>
+                <EmptyState action={{ label: "New announcement", onClick: () => openDraftEditor(blankAnnouncementValues, [], null) }} actionClass="secondary-button" canCreate={canManage} className="empty-state panel" hint="Ask an event administrator to create one when attendees need an update." icon={<Megaphone aria-hidden="true" size={24} />} title="No announcements yet">Create a draft when attendees need an event-feed update.</EmptyState>
                 <EventSetupHelp context="announcements" id="announcements-none" />
               </>
             )}
           </section>
           <aside className="panel audience-panel">
             <span className="announcement-icon purple"><Send aria-hidden="true" size={20} /></span>
-            <p className="eyebrow">Feed & email</p>
             <h2>Publish first, email deliberately</h2>
             <p>Publishing updates the event page and attendee hub. A separate confirmed action emails active registration contacts using the central sender and this event’s display name and reply-to.</p>
             <ul><li>Staff-reviewed drafts</li><li>No automatic email on publish</li><li>Audited, event-scoped broadcasts</li></ul>
@@ -1947,7 +1941,7 @@ export function CommunicationsWorkspace({
         <ViewPanel managed={canManage} view="templates">
         <div className="message-template-layout">
           <aside className="panel message-template-list">
-            <div className="section-heading"><div><p className="eyebrow">Future messages</p><h2>Templates</h2></div></div>
+            <div className="section-heading"><div><h2>Templates</h2></div></div>
             <div>
               {messaging.templates.map((template) => (
                 <button
@@ -2014,7 +2008,6 @@ export function CommunicationsWorkspace({
                 <button className="primary-button" type="submit" disabled={saving || !templateDirty || templateCheck.hasErrors}><Save size={16} aria-hidden="true" /> {saving ? "Publishing…" : "Publish new version"}</button>
               </div>
               <div className="message-version-history">
-                <p className="eyebrow">Immutable history</p>
                 {selectedTemplate.versions.map((version) => (
                   <div key={version.id}>
                     <span><strong>Version {version.versionNumber}</strong><small>{version.createdBy ?? "System default"} · {new Date(version.createdAt).toLocaleString()}</small></span>
@@ -2062,7 +2055,6 @@ export function CommunicationsWorkspace({
                 </details>
               </article>
               <form className="panel message-test-form" onSubmit={createTestCapture}>
-                <p className="eyebrow">Test the workflow</p>
                 <h2>{testRealDelivery ? "Send a real test message" : "Capture a test message"}</h2>
                 <p>
                   {testRealDelivery
@@ -2152,7 +2144,7 @@ export function CommunicationsWorkspace({
           </section>
           <section className="panel message-delivery-panel">
             <div className="message-delivery-toolbar">
-              <div><p className="eyebrow">Transactional outbox</p><h2>Delivery log</h2><p>Local preview, provider acceptance, and final delivery events are kept as separate facts.</p></div>
+              <div><h2>Delivery log</h2><p>Local preview, provider acceptance, and final delivery events are kept as separate facts.</p></div>
               <div className="message-delivery-actions">
                 <button className="secondary-button" type="button" onClick={refreshDeliveries} disabled={refreshingDeliveries}>
                   <RefreshCw className={refreshingDeliveries ? "spin" : ""} size={16} aria-hidden="true" /> Refresh
@@ -2311,7 +2303,6 @@ export function CommunicationsWorkspace({
                       <pre className="message-body-snapshot">{withPreviewLinks(selectedMessage.bodyText)}</pre>
                     </details>
                     <div className="message-attempts">
-                      <p className="eyebrow">Attempt history</p>
                       {selectedMessage.attempts.map((attempt) => (
                         <div key={attempt.id}>
                           <span className={`message-attempt-dot ${attempt.status.toLowerCase()}`} />
@@ -2433,7 +2424,7 @@ export function CommunicationsWorkspace({
         <ViewPanel managed={canManage} view="settings">
         <div className="message-settings-layout">
           <form className="panel message-settings-form" onSubmit={saveSettings}>
-            <div className="section-heading"><div><p className="eyebrow">Event-level configuration</p><h2>Sender & notifications</h2><p>These values are snapshotted onto future outbox rows.</p></div></div>
+            <div className="section-heading"><div><h2>Sender & notifications</h2><p>These values are snapshotted onto future outbox rows.</p></div></div>
             <p className="message-delivery-state" data-state={messaging.settings.deliveryReason === "PAUSED" ? "paused" : messaging.settings.deliveryMode === "EXTERNAL_EMAIL" ? "on" : "capture"} role="status">
               {messaging.settings.deliveryReason === "PAUSED"
                 ? "Paused by a system administrator"
@@ -2456,7 +2447,6 @@ export function CommunicationsWorkspace({
           </form>
           <aside className="panel message-boundary-card">
             <span>{messaging.settings.providerConfigured ? <Send size={22} aria-hidden="true" /> : <FlaskConical size={22} aria-hidden="true" />}</span>
-            <p className="eyebrow">Delivery readiness</p>
             <h2>{messaging.settings.providerConfigured ? "Email provider is configured" : "Real email is locked"}</h2>
             <p>{messaging.settings.providerConfigured ? "Real delivery is on for every event unless a system administrator pauses it. Local template tests remain previews." : "Local preview exercises rendering, outbox idempotency, attempts, and staff review without transmitting attendee data."}</p>
             <ul><li>Provider API: {messaging.settings.providerConfigured ? "configured" : "not configured"}</li><li>Delivery webhook: {messaging.settings.webhookConfigured ? "configured" : "not configured"}</li><li>Registration commits before processing</li><li>Retries preserve the original message snapshot</li></ul>
@@ -2470,7 +2460,7 @@ export function CommunicationsWorkspace({
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) void requestDraftClose(); }}>
           <section className="modal-card" ref={draftDialogRef} role="dialog" aria-modal="true" aria-labelledby="draft-title" tabIndex={-1}>
             <div className="modal-head">
-              <div><p className="eyebrow">Attendee event feed</p><h2 id="draft-title">{draftPrefill?.editId ? "Edit announcement draft" : draftPrefill ? "Send a correction" : "Create an announcement"}</h2></div>
+              <div><h2 id="draft-title">{draftPrefill?.editId ? "Edit announcement draft" : draftPrefill ? "Send a correction" : "Create an announcement"}</h2></div>
               <button className="icon-button modal-close-button" type="button" onClick={() => void requestDraftClose()} aria-label="Close dialog"><X aria-hidden="true" size={18} /></button>
             </div>
             {draftPrefill?.editId && (

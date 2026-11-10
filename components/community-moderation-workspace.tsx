@@ -6,6 +6,7 @@ import { Eye, Flag, MessageSquareWarning, Save, ShieldCheck, UsersRound } from "
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { EmptyState } from "@/components/empty-state";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import styles from "./community-moderation-workspace.module.css";
 
 type StaffCommunity = {
   eventId: string;
@@ -194,7 +195,6 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
       <section className="panel community-settings-panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Safety and availability</p>
             <h2>Community controls</h2>
             <p>Discussion remains private to verified attendees with active registrations.</p>
           </div>
@@ -237,7 +237,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
 
       <section className="panel community-reports-panel">
         <div className="section-heading">
-          <div><p className="eyebrow">Private moderation queue</p><h2>Open attendee reports</h2></div>
+          <div><h2>Open attendee reports</h2></div>
           <ShieldCheck size={21} aria-hidden="true" />
         </div>
         {community.reports.length === 0 ? (
@@ -245,12 +245,12 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
         ) : community.reports.map((report) => (
           <article className="community-report-card" key={report.id}>
             <header><strong>{report.reason.toLowerCase()}</strong><time>{when(report.createdAt)}</time></header>
-            <p>“{report.postBody}”</p>
+            <p className={styles.wrap}>“{report.postBody}”</p>
             <dl>
-              <div><dt>Post author</dt><dd>{report.authorName} · {report.authorEmail}</dd></div>
-              <div><dt>Reported by</dt><dd>{report.reporterName} · {report.reporterEmail}</dd></div>
+              <div><dt>Post author</dt><dd className={styles.wrap}>{report.authorName} · {report.authorEmail}</dd></div>
+              <div><dt>Reported by</dt><dd className={styles.wrap}>{report.reporterName} · {report.reporterEmail}</dd></div>
             </dl>
-            {report.detail && <p><strong>Reporter detail:</strong> {report.detail}</p>}
+            {report.detail && <p className={styles.wrap}><strong>Reporter detail:</strong> {report.detail}</p>}
             <form onChange={(event) => trackForm(`report:${report.id}`, event.currentTarget, "RESOLVED", "")} onSubmit={(event) => reportForm(event, report.id)}>
               <select defaultValue="RESOLVED" name="status">
                 <option value="RESOLVED">Resolve after review</option>
@@ -265,7 +265,7 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
 
       <section className="panel community-post-review">
         <div className="section-heading">
-          <div><p className="eyebrow">Discussion review</p><h2>Posts and replies</h2></div>
+          <div><h2>Posts and replies</h2></div>
           <a className="secondary-button" href={`/account/events/${encodeURIComponent(community.eventSlug)}?preview=staff`}>
             <Eye size={15} aria-hidden="true" /> Preview attendee view
           </a>
@@ -275,10 +275,10 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
         ) : posts.map((post) => (
           <article className="community-staff-post" key={post.id}>
             <header>
-              <div><strong>{post.authorName}</strong><small>{post.authorEmail}</small></div>
+              <div className={styles.wrap}><strong>{post.authorName}</strong><small>{post.authorEmail}</small></div>
               <span className={`status-chip ${post.status === "PUBLISHED" ? "green" : "gold"}`}>{post.status.toLowerCase()}</span>
             </header>
-            <p>{post.body}</p>
+            <p className={styles.wrap}>{post.body}</p>
             <small>{when(post.createdAt)} · {post.openReports} open reports{post.authorDeletedAt ? ` · author deleted ${when(post.authorDeletedAt)}` : ""}{post.lastEditedAt ? ` · last edited ${when(post.lastEditedAt)}` : ""}</small>
             {post.revisions.length > 0 && (
               <details className="community-revision-history">
@@ -297,8 +297,8 @@ export function CommunityModerationWorkspace({ community }: { community: StaffCo
             </form>
             {post.replies.map((reply) => (
               <article className="community-staff-reply" key={reply.id}>
-                <header><div><strong>{reply.authorName}</strong><small>{reply.authorEmail}</small></div><span>{reply.status.toLowerCase()}</span></header>
-                <p>{reply.body}</p>
+                <header><div className={styles.wrap}><strong>{reply.authorName}</strong><small>{reply.authorEmail}</small></div><span>{reply.status.toLowerCase()}</span></header>
+                <p className={styles.wrap}>{reply.body}</p>
                 <small>{when(reply.createdAt)}{reply.authorDeletedAt ? ` · author deleted ${when(reply.authorDeletedAt)}` : ""}{reply.lastEditedAt ? ` · last edited ${when(reply.lastEditedAt)}` : ""}</small>
                 {reply.revisions.length > 0 && (
                   <details className="community-revision-history">
