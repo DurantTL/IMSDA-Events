@@ -6,7 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * #1788 (Caleb, 2026-11-09): staff acting as an Area Coordinator see what a coordinator sees and may do exactly two
  * things that change data: email a club-form link, and change shared club report layouts. Every other coordinator
  * change needs the coordinator's own account. This pins that list, so a new change route under the coordinator's API
- * has to be added here on purpose.
+ * has to be added here on purpose. The two coordinator exports (#1760 roster, #1761 Monthly Records) are POST routes
+ * that change no club data: they only read and write an audit entry, under the staff user and the act-as, so acting
+ * staff may use them like the coordinator's other reads.
  */
 
 vi.mock("server-only", () => ({}));
@@ -32,6 +34,9 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "events/[eventId]/club-teachers/route.ts": { gate: "requireAreaCoordinatorTeacherActor", actingStaff: "refused" },
   "events/[eventId]/event-scoring/route.ts": { gate: "requireAreaCoordinatorScoringActor", actingStaff: "refused" },
   "team-permissions/[permissionId]/route.ts": { gate: "currentAreaCoordinator", actingStaff: "refused" },
+  // Exports (#1760, #1761): POST only for the cross-site check; they write only the audit log, never club data.
+  "roster-export/route.ts": { gate: "resolveAreaCoordinatorViewer", actingStaff: "allowed" },
+  "records-export/route.ts": { gate: "resolveAreaCoordinatorViewer", actingStaff: "allowed" },
 };
 
 function routeFiles(dir: string): string[] {
@@ -64,9 +69,9 @@ describe("what staff acting as an Area Coordinator may change", () => {
     expect(source).not.toContain("currentStaffActingContext");
   });
 
-  it("allows exactly the club-form link email and the shared report layouts", () => {
+  it("allows exactly the club-form link email, the shared report layouts and the two audited exports", () => {
     const allowed = Object.entries(WRITE_ROUTES).filter(([, route]) => route.actingStaff === "allowed").map(([file]) => file);
-    expect(allowed).toEqual(["[organizationId]/forms/links/route.ts", "events/[eventId]/report-columns/route.ts"]);
+    expect(allowed).toEqual(["[organizationId]/forms/links/route.ts", "events/[eventId]/report-columns/route.ts", "roster-export/route.ts", "records-export/route.ts"]);
   });
 
   it("lets acting staff send a club-form link, recorded under the staff user and the act-as", async () => {
