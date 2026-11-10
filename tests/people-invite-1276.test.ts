@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 /**
  * #1276: the one Invite a person. The real gates, schemas and modules run; the session, the database and the outbound
@@ -530,6 +530,10 @@ describe("accepting an Area Coordinator invite", () => {
   });
 
   it("is reachable only from the person's own signed-in account", async () => {
+    // The route reads the real clock; pin it before the fixture's expiry (2026-11-10).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-05T12:00:00Z"));
+    onTestFinished(() => vi.useRealTimers());
     mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null });
     expect((await areaInviteAccept(post("/api/attendee/area-coordinator-invites/aci-1/accept", {}), ctx({ inviteId: "aci-1" }))).status).toBe(401);
     mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-acc", verifiedEmail: "pat@example.test" }, via: "staff" });
