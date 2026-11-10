@@ -167,6 +167,24 @@ describe("the issued item dialogs (#1581)", () => {
     expect(dialog()).toBeNull();
   });
 
+  it("names the change that saved, the one that failed and the one not tried yet", async () => {
+    await open();
+    await openWith("Edit");
+    await click(field("roomLinked"));
+    await click(dialog()!.querySelector<HTMLInputElement>('input[name="kinds"]:checked')!);
+    await typeInto(field("depositDollars"), "15");
+    let call = 0;
+    reply = () => (++call === 1 ? json({ result: {}, catalog }) : json({ message: "That holder is in use." }, 400));
+    await submitForm(dialog()!.querySelector("form")!);
+    await flush();
+    // The policy request is never sent once the one before it fails.
+    expect(requests).toHaveLength(2);
+    const alert = dialog()!.querySelector('[role="alert"]')!.textContent!;
+    expect(alert).toContain("The Room-linked change was saved.");
+    expect(alert).toContain("The change to who it can be issued to could not be saved: That holder is in use.");
+    expect(alert).toContain("Not tried yet: the policy and money change.");
+  });
+
   it("shows Saving… on the button while a save is in flight", async () => {
     await open();
     await openWith("Add a kind of item");

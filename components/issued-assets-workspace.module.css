@@ -9,6 +9,7 @@
 .actions { display: flex; flex-wrap: wrap; gap: var(--gap-xs); }
 .actions > button { min-height: var(--touch-target); }
 .items { margin-top: var(--gap-xs); min-width: 0; }
+.items :is(th, td) { overflow-wrap: anywhere; }
 .items > summary { min-height: var(--touch-target); display: flex; align-items: center; cursor: pointer; font-weight: 700; }
 .editor { max-width: 650px; }
 .editor form > :global(.form-actions) { position: sticky; bottom: calc(var(--pad-modal) * -1); margin: 0 calc(var(--pad-modal) * -1) calc(var(--pad-modal) * -1); padding: 12px var(--pad-modal); border-top: 1px solid var(--line); background: var(--card); }

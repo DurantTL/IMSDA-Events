@@ -243,12 +243,13 @@ function EditTypeForm({ type, base, busy, run, fail, onPartial, report, onCancel
       if (!ok) {
         if (saved.length === 0) { fail(reason); return; }
         // Say what was stored and what was not.
-        fail(`${saved.join(" ")} ${request.failed} could not be saved: ${reason}`);
+        const untried = requests.slice(requests.indexOf(request) + 1).map((later) => later.failed.replace(/^The /, "the "));
+        fail(`${saved.join(" ")} ${request.failed} could not be saved: ${reason}${untried.length > 0 ? ` Not tried yet: ${untried.join("; ")}.` : ""}`);
         onPartial();
         setStart(moved);
         return;
       }
-      saved.push(request.done);
+      saved.push(request.body.active === undefined ? `${request.failed} was saved.` : request.done);
       moved = { ...moved, ...request.saved };
     }
     edit.clear();
