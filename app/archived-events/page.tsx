@@ -49,6 +49,7 @@ export default async function ArchivedEventsPage({ searchParams }: { searchParam
             rows={buildDirectoryRows(events)}
             hrefFor={(id) => `/overview?event=${encodeURIComponent(id)}`}
             defaultSort={{ key: "dates", dir: "desc" }}
+            showStatus={false}
             noEvents={{ title: "No archived events", text: "There are no archived events." }}
           />
         </ListPage>

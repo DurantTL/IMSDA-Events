@@ -1,9 +1,12 @@
 import { createElement as createTypedElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { eventLifecycleStates } from "@/modules/events/lifecycle-state";
 import { EventDirectory } from "@/components/event-directory";
 import {
   buildDirectoryRows,
+  directoryStatusWords,
+  statusWordFor,
   directoryStatusOptions,
   directorySortAccessors,
   filterDirectoryRows,
@@ -14,6 +17,7 @@ import { eventStartChoices, EventStartChoices } from "@/components/event-start-c
 import { CopyFromPastEvent } from "@/components/copy-from-past-event";
 import { areaTabs, markCurrentTab, railItems, staffPlaceFor, type StaffAreaViewer } from "@/components/staff-areas";
 import { sortRows } from "@/lib/list-sort";
+import { APPROVED_STATUS_WORDS } from "../scripts/support/site-rule-checks";
 import { source } from "./helpers/page-sources-1772";
 
 // #1570: the event directory (search, status filter, sorting, paging, empty states), All events, the start choices and the
@@ -63,16 +67,16 @@ function directory(rows: ReturnType<typeof buildDirectoryRows>, searchParams: Re
 }
 
 describe("the directory rows (#1570)", () => {
-  it("uses the status words the app already has for an event, and Archived for an archived one", () => {
+  it("uses only approved status words, and none for an archived event", () => {
     const rows = buildDirectoryRows([...sample, event("e4", "Old Event", 2, { archivedAt: new Date("2027-04-01T00:00:00Z") })]);
-    expect(rows.map((row) => row.statusLabel)).toEqual(["Published", "Draft", "Registration closed", "Archived"]);
+    expect(rows.map((row) => row.status)).toEqual(["Published", "Draft", "Registration closed", null]);
     expect(rows[0]!.dates).toContain("2027");
     expect(rows[1]!.place).toBe("");
   });
 
   it("reads an event with no lifecycle facts (the archive list) as archived, and a legacy null from isPublished", () => {
-    expect(buildDirectoryRows([{ ...event("a", "A", 1), archivedAt: new Date(), isPublished: undefined, lifecycleState: undefined }])[0]!.statusLabel).toBe("Archived");
-    expect(buildDirectoryRows([{ ...event("b", "B", 1), lifecycleState: null, isPublished: false }])[0]!.statusLabel).toBe("Draft");
+    expect(buildDirectoryRows([{ ...event("a", "A", 1), archivedAt: new Date(), isPublished: undefined, lifecycleState: undefined }])[0]!.status).toBeNull();
+    expect(buildDirectoryRows([{ ...event("b", "B", 1), lifecycleState: null, isPublished: false }])[0]!.status).toBe("Draft");
   });
 
   it("searches name, dates, place and status with every word needed, and filters by status", () => {
@@ -80,13 +84,14 @@ describe("the directory rows (#1570)", () => {
     expect(filterDirectoryRows(rows, { q: "", status: null })).toHaveLength(3);
     expect(filterDirectoryRows(rows, { q: "sample camp", status: null }).map((row) => row.id)).toEqual(["e1", "e3"]); // the place; the draft has none
     expect(filterDirectoryRows(rows, { q: "meeting draft", status: null }).map((row) => row.id)).toEqual(["e2"]);
-    expect(filterDirectoryRows(rows, { q: "", status: "DRAFT" }).map((row) => row.id)).toEqual(["e2"]);
+    expect(filterDirectoryRows(rows, { q: "", status: "Draft" }).map((row) => row.id)).toEqual(["e2"]);
     expect(filterDirectoryRows(rows, { q: "zzz", status: null })).toEqual([]);
   });
 
   it("offers only the statuses present, in lifecycle order, and ignores an unknown status in the address", () => {
-    expect(directoryStatusOptions(buildDirectoryRows(sample)).map((option) => option.label)).toEqual(["Draft", "Published", "Registration closed"]);
-    expect(parseDirectoryStatus("DRAFT")).toBe("DRAFT");
+    expect(directoryStatusOptions(buildDirectoryRows(sample))).toEqual(["Draft", "Published", "Registration closed"]);
+    expect(parseDirectoryStatus("Draft")).toBe("Draft");
+    expect(parseDirectoryStatus("DRAFT")).toBeNull();
     expect(parseDirectoryStatus("nonsense")).toBeNull();
     expect(parseDirectoryStatus(undefined)).toBeNull();
   });
@@ -186,7 +191,7 @@ describe("All events (#1570)", () => {
   }
 
   it("sends everyone but a System Administrator to /no-access, as /event-setup does, and reads no events for them", async () => {
-    await expect(render("USER")).rejects.toThrow("redirect:/no-access?from=event-setup");
+    await expect(render("USER")).rejects.toThrow("redirect:/no-access?from=system");
     await expect(render(null)).rejects.toThrow("redirect:/login");
     expect(repo.listEventsForUser).not.toHaveBeenCalled();
     expect(source("app/(workspace)/event-setup/page.tsx")).toContain('redirect("/no-access?from=event-setup")');
@@ -304,5 +309,68 @@ describe("the create pages still mount the same client components (#1570)", () =
     const copy = source("components/copy-from-past-event.tsx");
     expect(copy).toContain('"/api/event-clones/preview"');
     expect(copy).toContain("crypto.randomUUID()");
+  });
+});
+
+describe("status words, fields and announcements (#1570 review)", () => {
+  // The publishing and availability words B12 also allows on an event (site-rule-checks: "Published", AVAILABILITY_WORDS).
+  const approved = [...APPROVED_STATUS_WORDS, "Published", "Registration closed", "Closed"];
+
+  it("renders only approved words for every lifecycle state, and none for an archived event", () => {
+    for (const state of eventLifecycleStates) {
+      const word = statusWordFor[state];
+      if (word !== null) expect(approved, state).toContain(word);
+    }
+    for (const word of directoryStatusWords) expect(approved).toContain(word);
+    expect(statusWordFor.ARCHIVED).toBeNull();
+    expect(statusWordFor).toMatchObject({ TEST: "Draft", IN_PROGRESS: "Published", COMPLETE: "Closed", FINANCIAL_RECONCILIATION: "Closed", CLOSED: "Closed" });
+    for (const word of ["Test", "In progress", "Complete", "Financial reconciliation", "Archived"]) expect(directoryStatusWords).not.toContain(word);
+  });
+
+  it("has no Status column, filter or chip on the Archived events list", () => {
+    const rows = buildDirectoryRows([event("a", "Old", 1, { archivedAt: new Date(), lifecycleState: null, isPublished: undefined }), event("b", "Older", 2, { archivedAt: new Date(), lifecycleState: null, isPublished: undefined })]);
+    const markup = directory(rows, {}, { showStatus: false });
+    expect(markup).not.toContain("Status");
+    expect(markup).not.toContain("status-chip");
+    expect(markup).not.toContain("Archived");
+    expect(source("app/archived-events/page.tsx")).toContain("showStatus={false}");
+  });
+
+  it("draws the search box with the shared look and a 44px select, the same on every page", () => {
+    const markup = directory(buildDirectoryRows(sample));
+    expect(markup).toMatch(/<label class="search-field [^"]*">/);
+    expect(markup).toMatch(/<select class="[^"]*select[^"]*"/);
+    const css = source("components/event-directory.module.css");
+    const select = /\.select \{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(select).toContain("min-height: var(--touch-target, 44px)");
+    expect(select).toContain("border: 1px solid var(--field-border)");
+    expect(select).toContain("background: var(--field-bg)");
+    expect(css).not.toMatch(/#[0-9a-f]{3,6}\b/i);
+  });
+
+  it("keeps the kept params and the order when clearing filters, including unavailable=1", () => {
+    const rows = buildDirectoryRows([event("only", "Only event", 3)]);
+    const markup = directory(rows, { q: "zzz", sort: "event", dir: "desc", page: "2" }, { keepParams: { unavailable: "1" } });
+    const hrefs = [...markup.matchAll(/href="(\/admin\/events\?[^"]*)"/g)].map((match) => match[1]!.replace(/&amp;/g, "&"));
+    const clear = hrefs.filter((href) => !href.includes("page=") && href.includes("unavailable=1") && !href.includes("q="));
+    expect(clear.length).toBeGreaterThan(0);
+    for (const href of clear) {
+      const params = new URLSearchParams(href.split("?")[1]);
+      expect(params.get("unavailable")).toBe("1");
+      expect(params.get("sort")).toBe("event");
+      expect(params.get("dir")).toBe("desc");
+      expect(params.has("q")).toBe(false);
+    }
+    // Without kept params or an order, Clear is the bare path.
+    expect(directory(buildDirectoryRows(sample), { q: "zzz" })).toContain('href="/admin/events"');
+  });
+
+  it("announces zero results in the same live region as the count", () => {
+    const none = directory(buildDirectoryRows(sample), { q: "zzz" });
+    expect(none).toMatch(/<div role="status"><p class="quiet-copy">No events match “zzz”\.<\/p><\/div>/);
+    const some = directory(buildDirectoryRows(sample), { q: "meeting" });
+    expect(some).toMatch(/<div role="status"><div class="list-pager"><span class="quiet-copy">Showing 1–1 of 1 matching event/);
+    expect(count(some, /role="status"/g)).toBe(1);
+    expect(count(none, /role="status"/g)).toBe(1);
   });
 });

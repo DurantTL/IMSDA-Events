@@ -17,9 +17,32 @@
   min-width: 0;
 }
 
+/* The select draws its own field look so it measures the same on every page that uses the directory (the sign-in-style card
+   pages have no workspace field styles). The search box uses the shared .search-field look. */
+.select {
+  display: block;
+  width: 100%;
+  min-height: var(--touch-target, 44px);
+  margin-top: 4px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-sm);
+  background: var(--field-bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  padding: 0 12px;
+}
+
+.select:hover {
+  border-color: var(--field-border-hover);
+}
+
 .status {
   flex: 0 1 200px;
   min-width: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
 }
 
 .filters button {

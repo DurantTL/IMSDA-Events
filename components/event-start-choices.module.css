@@ -41,7 +41,7 @@
 
 .title {
   color: var(--imsda-navy);
-  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
   font-weight: 800;
   overflow-wrap: anywhere;
 }

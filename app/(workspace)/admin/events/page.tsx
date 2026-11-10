@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function AllEventsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
-  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=event-setup");
+  if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
 
   const params = await searchParams;
   // The same read the workspace's event switcher uses: current events (archived left out), all of them for a system administrator.
