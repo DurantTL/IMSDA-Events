@@ -241,6 +241,8 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/event-content", "prefix", staffPageTitles.eventContent],
   ["/more/event-patches", "prefix", staffPageTitles.eventPatches],
   ["/more/emergency-plan", "prefix", staffPageTitles.emergencyPlan],
+  // A member's health record (#1584): the title never carries the person's name.
+  ["/more/health-records/", "under", "Health record"],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
   ["/more/ledger-health", "prefix", staffPageTitles.ledgerCheck],
   ["/finance/tools", "prefix", staffPageTitles.moreMoneyTools],

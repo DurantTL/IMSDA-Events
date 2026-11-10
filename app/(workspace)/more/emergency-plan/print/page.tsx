@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Download } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
 import { EmergencyReferenceSheetView } from "@/components/emergency-reference-sheet";
+import { RestrictedPageHeader } from "@/components/restricted-page-header";
 import { PrintReportButton } from "@/components/print-report-button";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { isModuleEnabled } from "@/modules/event-modules/service";
@@ -60,20 +61,28 @@ export default async function EmergencyPlanPrintPage({ searchParams }: { searchP
     sheet = buildEmergencyReferenceSheet(published.snapshot, published);
   }
 
-  const actions = (
-    <>
-      {back}
-      {versionNumber !== null && (
-        <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/emergency-plan/export?version=${versionNumber}`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
+  const header = (
+    <RestrictedPageHeader
+      action={(
+        <>
+          <PrintReportButton label="Print the reference" primary />
+          {versionNumber !== null && (
+            <ExportLink className="secondary-button" href={`/api/events/${encodeURIComponent(event.id)}/emergency-plan/export?version=${versionNumber}`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
+          )}
+        </>
       )}
-      <PrintReportButton label="Print the reference" />
-    </>
+      back={{ href: `/more/emergency-plan?${eventQuery}`, label: "Back to the emergency plan" }}
+      description={versionNumber !== null ? `Printing published version ${versionNumber} of this event's emergency plan.` : "A preview of the unpublished draft. It is not a published version."}
+      locked={false}
+      purpose={versionNumber !== null ? "Printable reference" : "Draft preview"}
+    />
   );
 
   return (
     <>
       <style>{"@page { size: letter portrait; margin: 0.6in 0.6in 0.6in 0.6in; }"}</style>
-      <EmergencyReferenceSheetView actions={actions} generatedAtIso={new Date().toISOString()} sheet={sheet} />
+      {header}
+      <EmergencyReferenceSheetView generatedAtIso={new Date().toISOString()} sheet={sheet} />
     </>
   );
 }
