@@ -12,3 +12,6 @@ export const BRAND_APPLE_TOUCH_PATH = "/brand/imadventist-apple-touch.png";
 export const BRAND_CALENDAR_LABEL = `${PRODUCT_NAME} calendar`;
 /** The public discovery pages' logo goes to the Home page instead (#1561). */
 export const BRAND_HOME_LABEL = `${PRODUCT_NAME} home`;
+/** Square copies of the symbol for the staff saved app's manifest (#1567). */
+export const BRAND_ICON_192_PATH = "/brand/imadventist-symbol-192.png";
+export const BRAND_ICON_512_PATH = "/brand/imadventist-symbol-512.png";

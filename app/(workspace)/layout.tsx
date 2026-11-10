@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { opensWithoutEvent } from "@/components/no-event-paths";
+import { PRODUCT_NAME } from "@/lib/brand";
+import { STAFF_APP_COLOR, STAFF_MANIFEST_PATH } from "@/lib/staff-web-app";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { REQUEST_TARGET_HEADER } from "@/modules/access/login-routing";
 import { profileHomeFor, resolveProfileSessions, twoStepQuery } from "@/modules/account-profile/load-profile";
@@ -15,7 +17,15 @@ export const dynamic = "force-dynamic";
  * `robots.ts` disallows are never fetched by obeying crawlers, so the tag
  * matters mainly for workspace paths it does not list (for example /admin).
  */
-export const metadata: Metadata = { robots: { index: false, follow: false } };
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+  // The staff saved app (#1567): the manifest is linked only from here, so public pages do not offer it.
+  manifest: STAFF_MANIFEST_PATH,
+  appleWebApp: { capable: true, title: PRODUCT_NAME, statusBarStyle: "default" },
+};
+
+// Merges with the root viewport (width, scale, viewport-fit=cover stay).
+export const viewport: Viewport = { themeColor: STAFF_APP_COLOR };
 
 /**
  * The recorded request query when the request target is `/profile` (#646),
