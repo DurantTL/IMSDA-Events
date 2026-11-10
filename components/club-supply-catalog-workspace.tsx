@@ -1,11 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { ExportLink } from "@/components/export-link";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { useConfirm } from "@/components/use-confirm";
+import { staffPageTitles } from "@/components/staff-navigation";
+import catalogStyles from "@/components/catalog-workspace.module.css";
 import { useMemo, useState } from "react";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
-import { Check, Download, FileUp, Package, RefreshCw, Upload } from "lucide-react";
+import { Check, Download, FileUp, Package, RefreshCw, Upload, X } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
 import type { ClubSupplyImportSummary, MergedNumberConflict, RepeatedCatalogNumber } from "@/modules/club-supplies/catalog-csv";
 import { type ClubSupplySection, clubSupplySectionLabels, clubSupplySections } from "@/modules/club-supplies/domain";
@@ -71,10 +74,30 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
   const [draftSupplier, setDraftSupplier] = useState<"ADVENTSOURCE" | "CONFERENCE">("ADVENTSOURCE");
   const [draftPrice, setDraftPrice] = useState("");
   const [priceError, setPriceError] = useState("");
+  // A failed save shows in the editor, so the typed values stay (#1590).
+  const [editorError, setEditorError] = useState("");
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   // A changed supplier or price that is not saved yet.
   const editedItem = editing ? items.find((item) => item.id === editing) : undefined;
   const originalPrice = editedItem?.unitPriceCents == null ? "" : (editedItem.unitPriceCents / 100).toFixed(2);
-  useUnsavedChangesGuard(Boolean(editedItem) && (draftSupplier !== editedItem!.supplier || (draftSupplier === "CONFERENCE" && draftPrice.trim() !== originalPrice)));
+  const editorDirty = Boolean(editedItem) && (draftSupplier !== editedItem!.supplier || (draftSupplier === "CONFERENCE" && draftPrice.trim() !== originalPrice));
+  useUnsavedChangesGuard(editorDirty);
+  const editorRef = useAccessibleDialog<HTMLElement>(Boolean(editedItem), closeEditor);
+
+  /** Close, Cancel, Escape and the backdrop: a save in flight waits, and typed work asks first. */
+  async function closeEditor() {
+    if (toggling) return;
+    if (editorDirty && !(await askConfirm({
+      title: `Discard changes to ${editedItem?.name ?? "this item"}`,
+      body: <p>The supplier or price has changes that haven&apos;t been saved. Discarding closes the editor and loses them.</p>,
+      confirmLabel: "Discard changes",
+      cancelLabel: "Keep editing",
+      destructive: true,
+    }))) return;
+    setEditing(null);
+    setPriceError("");
+    setEditorError("");
+  }
 
   async function send(body: Record<string, unknown>) {
     const response = await fetch("/api/admin/club-supplies/import", {
@@ -161,6 +184,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
     setDraftSupplier(item.supplier);
     setDraftPrice(item.unitPriceCents === null ? "" : (item.unitPriceCents / 100).toFixed(2));
     setPriceError("");
+    setEditorError("");
     setError("");
     setNotice("");
   }
@@ -168,6 +192,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
   async function saveOrdering(item: ClubSupplyItemRecord) {
     setToggling(item.id);
     setPriceError("");
+    setEditorError("");
     setError("");
     setNotice("");
     try {
@@ -186,7 +211,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
       setEditing(null);
       setNotice(`Saved. ${item.name} is now ${draftSupplier === "CONFERENCE" ? "supplied by the conference" : "supplied by AdventSource"}.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The supplier could not be saved.");
+      setEditorError(caught instanceof Error ? caught.message : "The supplier could not be saved.");
     } finally {
       setToggling(null);
     }
@@ -209,183 +234,211 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
     ["Merged rows with another number", preview.summary.mergedNumberConflicts],
   ] : [];
 
+  const uploadAction = (
+    <label className={`primary-button ${styles.upload}`}>
+      <FileUp aria-hidden="true" size={16} /> {busy && !preview ? "Reading…" : "Upload CSV"}
+      <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={chooseFile} type="file" />
+    </label>
+  );
+
   return (
-    <section className="page-stack">
-      <StaffPageHeader description="AdventSource items clubs order and keep in stock: insignia, event patches, uniform apparel, honor patches, and master awards. Each size is its own item because each size has its own catalog number. Items the conference supplies itself (the shoulder patches and pin) are ordered from the youth department instead." />
-      <p className="field-help"><Link href="/admin/club-supplies/conference-orders">Conference club orders</Link>: the patches and pins clubs have ordered, to fill and bill to their churches.</p>
-
-      {notice && <div className="inline-notice success" role="status">{notice}</div>}
-      {error && <div className="inline-notice error" role="alert">{error}</div>}
-
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Import</p>
-            <h2>Update the catalog from CSV</h2>
-          </div>
-        </div>
-        <p className="field-help">
-          Columns: Section, Item, Catalog Number, and an optional Active (Yes or No). Items are matched by section and
-          name, not by number; a repeated catalog number is only a warning. A missing column or blank cell keeps what
-          is saved: numbers are never cleared, and each item keeps its active setting. The reference file is <code>docs/reference/adventsource-club-catalog.csv</code>. Nothing is saved
-          until you confirm the preview.
+    <>
+      <section className="page-stack">
+        <p className={catalogStyles.definition} data-catalog-definition="">
+          This list defines each item. Active items can be ordered by clubs; inactive items can&apos;t be newly ordered. Changing an item, its
+          supplier or its price here does not change the quantities or prices on orders already placed.
         </p>
-        <div className={styles.actions}>
-          <ExportLink className="secondary-button" href={TEMPLATE_HREF}><Download aria-hidden="true" size={14} /> CSV template</ExportLink>
-          <label className={`secondary-button ${styles.upload}`}>
-            <FileUp aria-hidden="true" size={14} /> {busy && !preview ? "Reading…" : "Upload CSV"}
-            <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={chooseFile} type="file" />
-          </label>
+        <ul aria-label="Related pages" className={catalogStyles.links}>
+          <li><span className={catalogStyles.linksLabel}>Orders clubs have placed:</span> <Link href="/admin/club-supplies/conference-orders">Conference club orders</Link></li>
+          <li><span className={catalogStyles.linksLabel}>Items sold at an event are set up on</span> <Link href="/more/merchandise">{staffPageTitles.merchandise}</Link></li>
+        </ul>
+        {notice && <div className="inline-notice success" role="status">{notice}</div>}
+        {error && <div className="inline-notice error" role="alert">{error}</div>}
+        <div className={catalogStyles.toolbar}>
+          {uploadAction}
+          <span className={catalogStyles.toolbarTools}>
+            <ExportLink className="text-button" href={TEMPLATE_HREF}><Download aria-hidden="true" size={14} /> CSV template</ExportLink>
+          </span>
         </div>
-      </section>
+        <details className={catalogStyles.importHelp}>
+          <summary>How the CSV import works</summary>
+          <p className="field-help">
+            Columns: Section, Item, Catalog Number, and an optional Active (Yes or No). Items are matched by section and
+            name, not by number; a repeated catalog number is only a warning. A missing column or blank cell keeps what
+            is saved: numbers are never cleared, and each item keeps its active setting. The reference file is <code>docs/reference/adventsource-club-catalog.csv</code>. Nothing is saved
+            until you confirm the preview.
+          </p>
+        </details>
 
-      {preview && (
-        <section className="panel" aria-labelledby="club-supply-preview-title">
+        {preview && (
+          <section className="panel" aria-labelledby="club-supply-preview-title">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Dry run · nothing saved yet</p>
+                <h2 id="club-supply-preview-title">Preview</h2>
+              </div>
+              <span className="count-badge">{`${preview.summary.rows} rows`}</span>
+            </div>
+            <ul className={styles.counts}>
+              {counts.map(([label, value]) => <li key={label}><strong>{value}</strong><span>{label}</span></li>)}
+            </ul>
+            {preview.mergedNumberConflicts.length > 0 && (
+              <ul className={styles.warnings} aria-label="Merged rows with a different catalog number">
+                {preview.mergedNumberConflicts.map((entry) => (
+                  <li key={entry.line}>
+                    Row {entry.line} repeats row {entry.duplicateOfLine} with number <code>{entry.catalogNumber}</code>; the item keeps <code>{entry.keptCatalogNumber}</code>.
+                  </li>
+                ))}
+              </ul>
+            )}
+            {preview.repeatedNumbers.length > 0 && (
+              <ul className={styles.warnings} aria-label="Repeated catalog numbers">
+                {preview.repeatedNumbers.map((entry) => (
+                  <li key={entry.catalogNumber}>
+                    <code>{entry.catalogNumber}</code> is on {entry.count} items (rows {entry.lines.slice(0, 6).join(", ")}{entry.lines.length > 6 ? ", …" : ""}).
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className={`report-table-wrap ${styles.previewTable}`}>
+              <table className="report-table">
+                <thead><tr><th>Row</th><th>Item</th><th>Section</th><th>What happens</th></tr></thead>
+                <tbody>
+                  {preview.steps.map((step) => (
+                    <tr key={step.line}>
+                      <td>{step.line}</td>
+                      <td translate="no">{step.name || "—"}</td>
+                      <td>{step.section ? clubSupplySectionLabels[step.section] : "—"}</td>
+                      <td><span className={`status-chip ${actionTone[step.action]}`}>{actionLabels[step.action]}</span> {step.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="form-actions">
+              <button className="secondary-button" disabled={busy} onClick={() => { setPreview(null); setStale(false); }} type="button">Cancel</button>
+              {stale ? (
+                <button className="secondary-button" disabled={busy} onClick={() => runPreview(preview.csv)} type="button">
+                  <RefreshCw aria-hidden="true" size={16} /> Refresh preview
+                </button>
+              ) : (
+                <button className="secondary-button" disabled={busy || changes === 0} onClick={confirm} type="button">
+                  <Upload aria-hidden="true" size={16} /> {busy ? "Saving…" : changes === 0 ? "Nothing to save" : `Confirm ${changes} change${changes === 1 ? "" : "s"}`}
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        <section className="panel dense-rows">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Dry run · nothing saved yet</p>
-              <h2 id="club-supply-preview-title">Preview</h2>
+              <h2>Items</h2>
             </div>
-            <span className="count-badge">{`${preview.summary.rows} rows`}</span>
+            <span className="count-badge">{`${items.length} items`}</span>
           </div>
-          <ul className={styles.counts}>
-            {counts.map(([label, value]) => <li key={label}><strong>{value}</strong><span>{label}</span></li>)}
-          </ul>
-          {preview.mergedNumberConflicts.length > 0 && (
-            <ul className={styles.warnings} aria-label="Merged rows with a different catalog number">
-              {preview.mergedNumberConflicts.map((entry) => (
-                <li key={entry.line}>
-                  Row {entry.line} repeats row {entry.duplicateOfLine} with number <code>{entry.catalogNumber}</code>; the item keeps <code>{entry.keptCatalogNumber}</code>.
-                </li>
-              ))}
-            </ul>
-          )}
-          {preview.repeatedNumbers.length > 0 && (
-            <ul className={styles.warnings} aria-label="Repeated catalog numbers">
-              {preview.repeatedNumbers.map((entry) => (
-                <li key={entry.catalogNumber}>
-                  <code>{entry.catalogNumber}</code> is on {entry.count} items (rows {entry.lines.slice(0, 6).join(", ")}{entry.lines.length > 6 ? ", …" : ""}).
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className={`report-table-wrap ${styles.previewTable}`}>
-            <table className="report-table">
-              <thead><tr><th>Row</th><th>Item</th><th>Section</th><th>What happens</th></tr></thead>
-              <tbody>
-                {preview.steps.map((step) => (
-                  <tr key={step.line}>
-                    <td>{step.line}</td>
-                    <td translate="no">{step.name || "—"}</td>
-                    <td>{step.section ? clubSupplySectionLabels[step.section] : "—"}</td>
-                    <td><span className={`status-chip ${actionTone[step.action]}`}>{actionLabels[step.action]}</span> {step.message}</td>
-                  </tr>
+          {items.length === 0 ? (
+            <EmptyState hint="Use Upload CSV with the reference file to start the catalog." icon={<Package aria-hidden="true" size={27} />} title="No items yet">The supply catalog has no items.</EmptyState>
+          ) : (
+            <>
+              <div className={styles.filters}>
+                <label>
+                  Section
+                  <select onChange={(event) => setSection(event.target.value as ClubSupplySection | "")} value={section}>
+                    <option value="">All sections</option>
+                    {clubSupplySections.map((value) => <option key={value} value={value}>{clubSupplySectionLabels[value]}</option>)}
+                  </select>
+                </label>
+                <label>
+                  Search
+                  <input {...search.inputProps} placeholder="Name or catalog number" type="search" />
+                </label>
+              </div>
+              <p className="quiet-copy">{`${visible.length} shown`}</p>
+              <SearchResultStatus message={`${visible.length} shown.`} />
+              <ul className={catalogStyles.rowList}>
+                {visible.map((item) => (
+                  <li className={catalogStyles.rowCard} key={item.id}>
+                    <span className={catalogStyles.rowText}>
+                      <strong translate="no">{item.name}</strong>
+                      <small className={catalogStyles.detail}>
+                        {clubSupplySectionLabels[item.section]}
+                        {" · "}{item.catalogNumber ? <>No. <code>{item.catalogNumber}</code></> : "No catalog number"}
+                        {item.sizeLabel ? ` · ${item.sizeLabel}` : ""}
+                        {item.honorCode ? ` · Honor ${item.honorCode}` : ""}
+                        {" · "}{item.supplier === "CONFERENCE" ? <>Conference-supplied, {item.unitPriceCents === null ? "no price set" : <><Money cents={item.unitPriceCents} /> each</>}</> : "AdventSource"}
+                      </small>
+                    </span>
+                    <span className={`row-actions ${catalogStyles.rowMeta}`}>
+                      <span className={`status-chip ${item.isActive ? "green" : "gold"}`}>{item.isActive ? "Active" : "Inactive"}</span>
+                      <button
+                        aria-label={`Supplier and price: ${item.name}`}
+                        className="secondary-button"
+                        disabled={toggling === item.id}
+                        onClick={() => startEditing(item)}
+                        type="button"
+                      >
+                        Supplier and price
+                      </button>
+                      <button
+                        aria-label={`${item.isActive ? "Mark inactive" : "Mark active"}: ${item.name}`}
+                        className="secondary-button"
+                        disabled={toggling === item.id}
+                        onClick={() => toggle(item)}
+                        type="button"
+                      >
+                        {item.isActive ? "Mark inactive" : <><Check aria-hidden="true" size={14} /> Mark active</>}
+                      </button>
+                    </span>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="form-actions">
-            <button className="secondary-button" disabled={busy} onClick={() => { setPreview(null); setStale(false); }} type="button">Cancel</button>
-            {stale ? (
-              <button className="primary-button" disabled={busy} onClick={() => runPreview(preview.csv)} type="button">
-                <RefreshCw aria-hidden="true" size={16} /> Refresh preview
-              </button>
-            ) : (
-              <button className="primary-button" disabled={busy || changes === 0} onClick={confirm} type="button">
-                <Upload aria-hidden="true" size={16} /> {busy ? "Saving…" : changes === 0 ? "Nothing to save" : `Confirm ${changes} change${changes === 1 ? "" : "s"}`}
-              </button>
-            )}
-          </div>
+              </ul>
+            </>
+          )}
         </section>
-      )}
+      </section>
 
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Catalog</p>
-            <h2>Items</h2>
-          </div>
-          <span className="count-badge">{`${items.length} items`}</span>
-        </div>
-        {items.length === 0 ? (
-          <EmptyState hint="Import the reference file above to start the catalog." icon={<Package aria-hidden="true" size={27} />} title="No items yet">The supply catalog has no items.</EmptyState>
-        ) : (
-          <>
-            <div className={styles.filters}>
+      {editedItem && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) void closeEditor(); }} role="presentation">
+          <section aria-labelledby="supply-editor-title" aria-modal="true" className="modal-card" ref={editorRef} role="dialog" tabIndex={-1}>
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow">Supplier and price</p>
+                <h2 id="supply-editor-title" translate="no">{editedItem.name}</h2>
+              </div>
+              <button aria-label="Close supplier editor" className="icon-button modal-close-button" disabled={toggling === editedItem.id} onClick={() => void closeEditor()} type="button">
+                <X aria-hidden="true" size={18} />
+              </button>
+            </div>
+            <form
+              className="form-stack"
+              onSubmit={(event) => { event.preventDefault(); void saveOrdering(editedItem); }}
+            >
+              {editorError && <div className={`inline-notice error ${catalogStyles.editorError}`} role="alert">{editorError}</div>}
+              <p className={catalogStyles.editorNote}>Orders already placed keep their quantities and prices.</p>
               <label>
-                Section
-                <select onChange={(event) => setSection(event.target.value as ClubSupplySection | "")} value={section}>
-                  <option value="">All sections</option>
-                  {clubSupplySections.map((value) => <option key={value} value={value}>{clubSupplySectionLabels[value]}</option>)}
+                Supplied by
+                <select onChange={(event) => setDraftSupplier(event.target.value as "ADVENTSOURCE" | "CONFERENCE")} value={draftSupplier}>
+                  <option value="ADVENTSOURCE">AdventSource</option>
+                  <option value="CONFERENCE">The conference</option>
                 </select>
               </label>
-              <label>
-                Search
-                <input {...search.inputProps} placeholder="Name or catalog number" type="search" />
-              </label>
-            </div>
-            <p className="quiet-copy">{`${visible.length} shown`}</p>
-            <SearchResultStatus message={`${visible.length} shown.`} />
-            <ul className={styles.itemList}>
-              {visible.map((item) => (
-                <li className={styles.itemRow} key={item.id}>
-                  <span className={styles.itemText}>
-                    <strong translate="no">{item.name}</strong>
-                    <small>
-                      {clubSupplySectionLabels[item.section]}
-                      {" · "}{item.catalogNumber ? <>No. <code>{item.catalogNumber}</code></> : "No catalog number"}
-                      {item.sizeLabel ? ` · ${item.sizeLabel}` : ""}
-                      {item.honorCode ? ` · Honor ${item.honorCode}` : ""}
-                      {" · "}{item.supplier === "CONFERENCE" ? <>Conference-supplied, {item.unitPriceCents === null ? "no price set" : <><Money cents={item.unitPriceCents} /> each</>}</> : "AdventSource"}
-                    </small>
-                  </span>
-                  <span className={styles.itemControls}>
-                    <span className={`status-chip ${item.isActive ? "green" : "gold"}`}>{item.isActive ? "Active" : "Inactive"}</span>
-                    <button
-                      aria-label={`Supplier and price: ${item.name}`}
-                      className="secondary-button"
-                      disabled={toggling === item.id}
-                      onClick={() => (editing === item.id ? setEditing(null) : startEditing(item))}
-                      type="button"
-                    >
-                      Supplier and price
-                    </button>
-                    <button
-                      aria-label={`${item.isActive ? "Mark inactive" : "Mark active"}: ${item.name}`}
-                      className="secondary-button"
-                      disabled={toggling === item.id}
-                      onClick={() => toggle(item)}
-                      type="button"
-                    >
-                      {item.isActive ? "Mark inactive" : <><Check aria-hidden="true" size={14} /> Mark active</>}
-                    </button>
-                  </span>
-                  {editing === item.id && (
-                    <span className={styles.orderingEditor}>
-                      <label>
-                        Supplied by
-                        <select onChange={(event) => setDraftSupplier(event.target.value as "ADVENTSOURCE" | "CONFERENCE")} value={draftSupplier}>
-                          <option value="ADVENTSOURCE">AdventSource</option>
-                          <option value="CONFERENCE">The conference</option>
-                        </select>
-                      </label>
-                      {draftSupplier === "CONFERENCE" && (
-                        <label>
-                          Price each (dollars)
-                          <input aria-describedby={priceError ? `price-error-${item.id}` : undefined} aria-invalid={priceError ? true : undefined} inputMode="decimal" onChange={(event) => setDraftPrice(event.target.value)} placeholder="1.25" type="text" value={draftPrice} />
-                          {priceError && <small className="field-error-message" id={`price-error-${item.id}`}>{priceError}</small>}
-                        </label>
-                      )}
-                      <button className="primary-button" disabled={toggling === item.id} onClick={() => saveOrdering(item)} type="button">{toggling === item.id ? "Saving…" : "Save supplier"}</button>
-                      <button className="secondary-button" disabled={toggling === item.id} onClick={() => setEditing(null)} type="button">Cancel</button>
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
-    </section>
+              {draftSupplier === "CONFERENCE" && (
+                <label>
+                  Price each (dollars)
+                  <input aria-describedby={priceError ? `price-error-${editedItem.id}` : undefined} aria-invalid={priceError ? true : undefined} inputMode="decimal" onChange={(event) => setDraftPrice(event.target.value)} placeholder="1.25" type="text" value={draftPrice} />
+                  {priceError && <small className="field-error-message" id={`price-error-${editedItem.id}`}>{priceError}</small>}
+                </label>
+              )}
+              <div className="form-actions">
+                <button className="secondary-button" disabled={toggling === editedItem.id} onClick={() => void closeEditor()} type="button">Cancel</button>
+                <button className="primary-button" disabled={toggling === editedItem.id} type="submit">{toggling === editedItem.id ? "Saving…" : "Save supplier"}</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+      {confirmDialog}
+    </>
   );
 }

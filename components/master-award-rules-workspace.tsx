@@ -1,8 +1,13 @@
 "use client";
 
-import { StaffPageHeader } from "@/components/staff-page-header";
-import { useState } from "react";
-import { AlertTriangle, CheckCircle2, FileUp, Plus, Trash2, Trophy, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2, FileUp, Pencil, Plus, Trash2, Trophy, X } from "lucide-react";
+import { NavigationLink as Link } from "@/components/navigation-link";
+import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import { EmptyState } from "@/components/empty-state";
+import catalogStyles from "@/components/catalog-workspace.module.css";
 import styles from "@/components/club-supplies.module.css";
 import ruleStyles from "@/components/master-award-rules.module.css";
 import { masterAwardStatusLabels, masterAwardStatusTone } from "@/modules/earned-awards/domain";
@@ -41,10 +46,15 @@ function RuleEditor({
   rule,
   choices,
   onSaved,
+  onDirtyChange,
+  onCancel,
 }: {
   rule: MasterAwardRuleRecord;
   choices: RuleChoices;
   onSaved: (rules: MasterAwardRuleRecord[], message: string) => void;
+  /** Whether the form holds work that is not saved, so the dialog can ask before it closes. */
+  onDirtyChange: (dirty: boolean) => void;
+  onCancel: () => void;
 }) {
   const [groups, setGroups] = useState<DraftGroup[]>(() => draftGroups(rule));
   const [itemId, setItemId] = useState(rule.itemId ?? "");
@@ -54,6 +64,15 @@ function RuleEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const listId = `master-award-honors-${rule.id}`;
+  const snapshot = (value: { groups: DraftGroup[]; itemId: string; note: string; checked: boolean }) => JSON.stringify([
+    value.groups.map((group) => [group.minimum, group.honors.map((honor) => honor.id)]), value.itemId, value.note, value.checked,
+  ]);
+  const [saved] = useState(() => snapshot({ groups, itemId, note, checked }));
+  const dirty = snapshot({ groups, itemId, note, checked }) !== saved;
+  useEffect(() => {
+    onDirtyChange(dirty);
+    return () => onDirtyChange(false);
+  }, [dirty, onDirtyChange]);
 
   function addHonor(index: number) {
     const text = (adding[index] ?? "").trim().toLowerCase();
@@ -181,7 +200,8 @@ function RuleEditor({
         </label>
       )}
       {error && <p className="inline-notice error" role="alert">{error}</p>}
-      <div className={styles.actions}>
+      <div className="form-actions">
+        <button className="secondary-button" disabled={busy} onClick={onCancel} type="button">Cancel</button>
         <button className="secondary-button" disabled={busy} onClick={() => save()} type="button">Save changes</button>
         {rule.status !== "ACTIVE" ? (
           <button className="primary-button" disabled={busy || !checked} onClick={() => save("ACTIVE")} type="button">
@@ -207,6 +227,25 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // The focused editor for one rule: closed until the rule's Review button opens it (#1590).
+  const [openRuleId, setOpenRuleId] = useState<string | null>(null);
+  const [ruleDirty, setRuleDirty] = useState(false);
+  const openRule = rules.find((rule) => rule.id === openRuleId) ?? null;
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
+  useUnsavedChangesGuard(Boolean(openRule) && ruleDirty);
+  const editorRef = useAccessibleDialog<HTMLElement>(Boolean(openRule), closeEditor);
+
+  async function closeEditor() {
+    if (ruleDirty && !(await askConfirm({
+      title: `Discard changes to ${openRule?.name ?? "this rule"}`,
+      body: <p>This rule has changes that haven&apos;t been saved. Discarding closes the editor and loses them.</p>,
+      confirmLabel: "Discard changes",
+      cancelLabel: "Keep editing",
+      destructive: true,
+    }))) return;
+    setRuleDirty(false);
+    setOpenRuleId(null);
+  }
 
   async function send(body: Record<string, unknown>) {
     const response = await fetch("/api/admin/master-award-rules/import", {
@@ -264,107 +303,138 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
     ["Honors unmatched", preview.plan.summary.honorsUnmatched],
   ] : [];
 
+  const uploadAction = (
+    <label className={`primary-button ${styles.upload}`}>
+      <FileUp aria-hidden="true" size={16} /> {busy && !preview ? "Reading…" : "Upload rules file"}
+      <input accept=".json,application/json" className="sr-only" disabled={busy} onChange={chooseFile} type="file" />
+    </label>
+  );
+
   return (
-    <section className="page-stack">
-      <StaffPageHeader description="Each rule has honor groups with a minimum; the award is earned when every group reaches its minimum. Rules come from the club's spreadsheet, so review each one, then activate it. Clubs see progress only for active rules." />
-      {notice && <div className="inline-notice success" role="status">{notice}</div>}
-      {error && <div className="inline-notice error" role="alert">{error}</div>}
-
-      <section className="panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Import</p>
-            <h2>Import rules as drafts</h2>
-          </div>
-        </div>
-        <p className="field-help">
-          Upload <code>docs/reference/master-award-rules.json</code>. Rules already on file are never changed. Honors are
-          matched to the honor list by name; the preview lists any that don&apos;t match. Nothing is saved until you confirm.
+    <>
+      <section className="page-stack">
+        <p className={catalogStyles.definition} data-catalog-definition="">
+          A rule is the definition; progress is worked out from the active rules each time a club views it, so changing a rule changes the progress
+          clubs see from then on. It does not change honors members have already earned. Imported rules are drafts until you review and activate them.
         </p>
-        <div className={styles.actions}>
-          <label className={`secondary-button ${styles.upload}`}>
-            <FileUp aria-hidden="true" size={14} /> {busy && !preview ? "Reading…" : "Upload rules file"}
-            <input accept=".json,application/json" className="sr-only" disabled={busy} onChange={chooseFile} type="file" />
-          </label>
-        </div>
-      </section>
+        <ul aria-label="Related pages" className={catalogStyles.links}>
+          <li><span className={catalogStyles.linksLabel}>Honors in a rule come from the</span> <Link href="/admin/honors">Honor catalog</Link></li>
+        </ul>
+        {notice && <div className="inline-notice success" role="status">{notice}</div>}
+        {error && <div className="inline-notice error" role="alert">{error}</div>}
+        <div className={catalogStyles.toolbar}>{uploadAction}</div>
+        <details className={catalogStyles.importHelp}>
+          <summary>How the rules import works</summary>
+          <p className="field-help">
+            Upload <code>docs/reference/master-award-rules.json</code>. Rules already on file are never changed. Honors are
+            matched to the honor list by name; the preview lists any that don&apos;t match. Nothing is saved until you confirm.
+          </p>
+        </details>
 
-      {preview && (
-        <section aria-labelledby="master-award-preview" className="panel">
+        {preview && (
+          <section aria-labelledby="master-award-preview" className="panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Dry run</p>
+                <h2 id="master-award-preview">What this import would do</h2>
+              </div>
+            </div>
+            <ul className={styles.counts}>
+              {counts.map(([label, value]) => <li key={label}><strong>{value}</strong><span>{label}</span></li>)}
+            </ul>
+            <ul className={ruleStyles.steps}>
+              {preview.plan.steps.map((step) => (
+                <li key={step.normalizedName}>
+                  <strong translate="no">{step.name}</strong>
+                  <small>{step.action === "ADD" ? "Will be added as a draft" : "Already on file: left as it is"}{step.itemId ? "" : " · no catalog item found"}</small>
+                  {step.action === "ADD" && step.reasons.map((reason) => (
+                    <small className={ruleStyles.reason} key={reason}><AlertTriangle aria-hidden="true" size={12} /> {reason}</small>
+                  ))}
+                </li>
+              ))}
+            </ul>
+            {preview.plan.unmatched.length > 0 && (
+              <>
+                <h3 className={ruleStyles.subhead}>Honors that matched nothing ({preview.plan.unmatched.length})</h3>
+                <ul className={ruleStyles.unmatchedList}>
+                  {preview.plan.unmatched.map((entry) => <li key={`${entry.award}:${entry.honor}`}><span translate="no">{entry.honor}</span> <small>in {entry.award}</small></li>)}
+                </ul>
+              </>
+            )}
+            <div className="form-actions">
+              <button className="secondary-button" disabled={busy} onClick={() => setPreview(null)} type="button">Cancel</button>
+              <button className="secondary-button" disabled={busy || preview.plan.summary.added === 0} onClick={confirm} type="button">
+                <CheckCircle2 aria-hidden="true" size={16} /> {busy ? "Saving…" : `Save ${preview.plan.summary.added} draft rule${preview.plan.summary.added === 1 ? "" : "s"}`}
+              </button>
+            </div>
+          </section>
+        )}
+
+        <section className="panel dense-rows" aria-labelledby="master-award-rule-list">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Dry run</p>
-              <h2 id="master-award-preview">What this import would do</h2>
+              <h2 id="master-award-rule-list"><Trophy aria-hidden="true" size={16} /> Rules</h2>
             </div>
+            <span className="count-badge">{rules.length} {rules.length === 1 ? "rule" : "rules"}</span>
           </div>
-          <ul className={styles.counts}>
-            {counts.map(([label, value]) => <li key={label}><strong>{value}</strong><span>{label}</span></li>)}
-          </ul>
-          <ul className={ruleStyles.steps}>
-            {preview.plan.steps.map((step) => (
-              <li key={step.normalizedName}>
-                <strong translate="no">{step.name}</strong>
-                <small>{step.action === "ADD" ? "Will be added as a draft" : "Already on file: left as it is"}{step.itemId ? "" : " · no catalog item found"}</small>
-                {step.action === "ADD" && step.reasons.map((reason) => (
-                  <small className={ruleStyles.reason} key={reason}><AlertTriangle aria-hidden="true" size={12} /> {reason}</small>
-                ))}
-              </li>
-            ))}
-          </ul>
-          {preview.plan.unmatched.length > 0 && (
-            <>
-              <h3 className={ruleStyles.subhead}>Honors that matched nothing ({preview.plan.unmatched.length})</h3>
-              <ul className={ruleStyles.unmatchedList}>
-                {preview.plan.unmatched.map((entry) => <li key={`${entry.award}:${entry.honor}`}><span translate="no">{entry.honor}</span> <small>in {entry.award}</small></li>)}
-              </ul>
-            </>
+          {rules.length === 0 ? (
+            <EmptyState hint="Use Upload rules file to import the reviewed rules as drafts." icon={<Trophy aria-hidden="true" size={27} />} title="No rules yet">There are no Master Award rules.</EmptyState>
+          ) : (
+            <ul className={catalogStyles.rowList}>
+              {rules.map((rule) => (
+                <li className={catalogStyles.rowCard} key={rule.id}>
+                  <span className={catalogStyles.rowText}>
+                    <strong translate="no">{rule.name}</strong>
+                    <small className={catalogStyles.detail}>
+                      {rule.groups.map((group) => `${group.minimum} of ${group.honors.length + group.unmatchedHonorNames.length}`).join(" + ")}
+                      {rule.itemName ? ` · ${rule.itemName}` : " · no catalog item linked"}
+                    </small>
+                    {rule.reviewNote && <small className={catalogStyles.detail}>{rule.reviewNote}</small>}
+                  </span>
+                  <span className={`row-actions ${catalogStyles.rowMeta}`}>
+                    <span className={`status-chip ${masterAwardStatusTone[rule.status]}`}>{masterAwardStatusLabels[rule.status]}</span>
+                    {rule.status !== "ACTIVE" && <span className="status-chip gold">Not used for club progress</span>}
+                    {rule.needsManualCheck && <span className="status-chip coral">Manual check</span>}
+                    <button
+                      aria-label={`Review ${rule.name}`}
+                      className="secondary-button"
+                      onClick={() => { setOpenRuleId(rule.id); setRuleDirty(false); setNotice(""); setError(""); }}
+                      type="button"
+                    >
+                      <Pencil aria-hidden="true" size={14} /> Review
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
-          <div className={styles.actions}>
-            <button className="primary-button" disabled={busy || preview.plan.summary.added === 0} onClick={confirm} type="button">
-              <CheckCircle2 aria-hidden="true" size={16} /> {busy ? "Saving…" : `Save ${preview.plan.summary.added} draft rule${preview.plan.summary.added === 1 ? "" : "s"}`}
-            </button>
-            <button className="text-button" disabled={busy} onClick={() => setPreview(null)} type="button">Cancel</button>
-          </div>
         </section>
-      )}
-
-      <section className="panel" aria-labelledby="master-award-rule-list">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Rules</p>
-            <h2 id="master-award-rule-list"><Trophy aria-hidden="true" size={16} /> Review and activate ({rules.length})</h2>
-          </div>
-        </div>
-        {rules.length === 0 ? (
-          <p className="quiet-copy">No rules yet. Import the rules file above.</p>
-        ) : (
-          <ul className={ruleStyles.rules}>
-            {rules.map((rule) => (
-              <li key={rule.id}>
-                <details>
-                  <summary>
-                    <span translate="no"><strong>{rule.name}</strong></span>
-                    <span className={ruleStyles.badges}>
-                      <span className={`status-chip ${masterAwardStatusTone[rule.status]}`}>{masterAwardStatusLabels[rule.status]}</span>
-                      {rule.needsManualCheck && <span className="status-chip coral">Manual check</span>}
-                    </span>
-                  </summary>
-                  <p className="field-help">
-                    {rule.groups.map((group) => `${group.minimum} of ${group.honors.length + group.unmatchedHonorNames.length}`).join(" + ")}
-                    {rule.itemName ? ` · ${rule.itemName}` : " · no catalog item linked"}
-                  </p>
-                  <RuleEditor
-                    choices={choices}
-                    key={JSON.stringify([rule.groups, rule.itemId, rule.status, rule.needsManualCheck])}
-                    onSaved={(next, message) => { setRules(next); setNotice(message); setError(""); }}
-                    rule={rule}
-                  />
-                </details>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
-    </section>
+
+      {openRule && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) void closeEditor(); }} role="presentation">
+          <section aria-labelledby="master-award-editor-title" aria-modal="true" className="modal-card modal-card-wide" ref={editorRef} role="dialog" tabIndex={-1}>
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow">Review rule</p>
+                <h2 id="master-award-editor-title" translate="no">{openRule.name}</h2>
+              </div>
+              <button aria-label="Close rule editor" className="icon-button modal-close-button" onClick={() => void closeEditor()} type="button">
+                <X aria-hidden="true" size={18} />
+              </button>
+            </div>
+            <RuleEditor
+              choices={choices}
+              key={openRule.id}
+              onCancel={() => void closeEditor()}
+              onDirtyChange={setRuleDirty}
+              onSaved={(next, message) => { setRules(next); setNotice(message); setError(""); setRuleDirty(false); setOpenRuleId(null); }}
+              rule={openRule}
+            />
+          </section>
+        </div>
+      )}
+      {confirmDialog}
+    </>
   );
 }

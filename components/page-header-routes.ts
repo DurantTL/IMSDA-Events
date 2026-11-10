@@ -16,6 +16,9 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/event-setup/copy" },
   { pattern: "/more/reports/printouts" },
   { pattern: "/admin/club-supplies/conference-orders" },
+  { pattern: "/admin/club-supplies" },
+  { pattern: "/admin/honors" },
+  { pattern: "/admin/master-award-rules" },
   { pattern: "/more/clubs/[organizationId]", notSegments: ["reports"] },
 ];
 
