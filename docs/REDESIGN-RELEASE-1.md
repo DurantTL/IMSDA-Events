@@ -213,6 +213,7 @@ Browser checks ran on a seeded local database with synthetic data, at 1280 and 3
 | `/admin/club-forms/[templateKey]` | Definitions list | Form name as the title; read-only Form status (on or off, version, draft, filled in) with a link to where requirements are set | Pass, for a form that is on and one that is off with a past submission | Stale and unreadable drafts: not produced in the browser; text checked against the code |
 | `/more/club-forms` | Admin → Forms when opened without an event; the event's More card keeps the event | Strip (hidden for people who can open only Submissions); privacy notice kept word for word; cards on a phone | Pass; filters, sort, paging and CSV unchanged; restricted state passes | The "No submitted forms match" state: source only |
 | `/more/club-forms/[submissionId]` | Submissions list | Own title, "Back to submissions", Print; no unrelated event named; prints as before | Pass; restricted state passes; opening is still recorded and birth dates still hidden from people without access (checked through the module) | A submission with a protected birth date on screen: the local app has no encryption key |
+
 ## Coverage after release 1: form pages (#1572, #1596 ledger)
 
 Browser checks ran on a seeded local database with synthetic data, at 1280 and 390 px. The viewers were a system admin, an event admin, a registration manager and read-only staff.
