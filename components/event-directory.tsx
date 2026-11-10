@@ -82,9 +82,11 @@ export function EventDirectory({
 
   if (rows.length === 0) {
     return (
-      <EmptyState announce={false} headingLevel={2} title={noEvents.title} action={noEvents.action} actionClass="secondary-button" canCreate={Boolean(noEvents.action)}>
-        {noEvents.text}
-      </EmptyState>
+      <div className={styles.directory} data-testid="event-directory">
+        <EmptyState announce={false} headingLevel={2} title={noEvents.title} action={noEvents.action} actionClass="secondary-button" canCreate={Boolean(noEvents.action)}>
+          {noEvents.text}
+        </EmptyState>
+      </div>
     );
   }
 

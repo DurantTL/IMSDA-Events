@@ -5,6 +5,24 @@
   min-width: 0;
 }
 
+/* The directory is a staff list wherever it is drawn. "Choose an event" and "Archived events" sit outside the staff
+   shell, so they take the staff text floors here (chips, the sort line and help text at 14px, as inside the shell). */
+@media screen {
+  .directory {
+    --type-floor: 0.875rem;
+    --type-label-floor: 0.875rem;
+    --type-staff-floor: 0.875rem;
+  }
+}
+
+/* The empty state's heading is an h2 here (it follows the page's h1); the shared look styles an h3. */
+.directory :global(.empty-state) h2 {
+  margin: 10px 0 3px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 700;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
