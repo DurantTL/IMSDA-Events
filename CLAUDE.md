@@ -20,9 +20,13 @@ subagents. The agents live in `.claude/agents/`.
   run (Caleb, October 29). Never delete branches.
 - **Three builds at most:** never run more than three builds at once (Caleb,
   November 9). Keep moving through approved issues without re-asking.
-- **Fable for build sessions:** new build sessions started from the
-  project-manager session run on Fable (`claude-fable-5-2`, Caleb, November 9).
-  The agent model rules below still apply inside each session.
+- **Build session model:** new build sessions started from the
+  project-manager session run on Opus (`claude-opus-5-5`), not Fable (Caleb,
+  November 10: no Fable resets left). The agent model rules below still apply
+  inside each session.
+- **Redesign coverage notes:** each build writes its #1596 coverage rows to its
+  own file, `docs/redesign-coverage/<issue>.md`, instead of appending to
+  `docs/REDESIGN-RELEASE-1.md`, so parallel PRs don't conflict.
 - **Base branch:** don't merge `main` into an open PR unless there is a real
   conflict.
 - **No scheduled check-ins:** don't schedule check-ins on PRs. PR event

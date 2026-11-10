@@ -2,6 +2,7 @@
 
 import { ExportLink } from "@/components/export-link";
 import { PhoneInput } from "@/components/phone-input";
+import { RestrictedPageHeader } from "@/components/restricted-page-header";
 import { useEffect, useId, useRef, useState } from "react";
 import { Download, Plus, Printer, Trash2 } from "lucide-react";
 import styles from "@/components/emergency-plan-workspace.module.css";
@@ -126,16 +127,11 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Event safety</p>
-          <h2>Emergency plan</h2>
-          <p>
-            Where to gather, where to shelter, what to do, and who to call for <span translate="no">{eventName}</span>. Procedural
-            information only: never enter attendee, medical, custody or incident details here.
-          </p>
-        </div>
-      </div>
+      <RestrictedPageHeader
+        description={<>Where to gather, where to shelter, what to do, and who to call for <span translate="no">{eventName}</span>. Procedural information only: never enter attendee, medical, custody or incident details here.</>}
+        locked={false}
+        purpose="Event safety"
+      />
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       {problems.length > 0 && (
@@ -147,7 +143,11 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
       {!canEdit && <p className="inline-notice" role="status">You can read and print the plan. Event administrators edit and publish it.</p>}
 
       {canEdit && (
-        <>
+        <section className={`${styles.zone} ${styles.draftZone}`} aria-labelledby={field("draft-zone")}>
+          <div className={styles.zoneHead}>
+            <h2 id={field("draft-zone")}>Draft plan</h2>
+            <p className={styles.hint}>The working copy event administrators edit. It is not printed until it is published.</p>
+          </div>
           <section className={`panel ${styles.block}`} aria-labelledby={field("locations")}>
             <h3 id={field("locations")}>Assembly locations and shelters</h3>
             <p className={`field-help ${styles.help}`}>Informational only. These do not reserve space or link to lodging.</p>
@@ -259,9 +259,14 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
             <a className="secondary-button" href={`/more/emergency-plan/print?${eventQuery}&draft=1`}>Preview draft</a>
             {dirty && <span className={styles.hint}>Save the draft before publishing.</span>}
           </div>
-        </>
+        </section>
       )}
 
+      <section className={`${styles.zone} ${styles.publishedZone}`} aria-labelledby={field("published-zone")}>
+        <div className={styles.zoneHead}>
+          <h2 id={field("published-zone")}>Published plan and printing</h2>
+          <p className={styles.hint}>Numbered versions, frozen when published. The current version is the one printed by default.</p>
+        </div>
       {!canEdit && (
         <section className={`panel ${styles.block}`}>
           <h3>Printed copies</h3>
@@ -275,7 +280,7 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
           <ul className={styles.versions}>
             {versions.map((version) => (
               <li className={styles.version} key={version.versionNumber}>
-                <span><strong>Version {version.versionNumber}</strong>{version.versionNumber === latest?.versionNumber ? " (latest)" : ""}<br /><span className={styles.hint}>Published {version.publishedLabel}</span></span>
+                <span><strong>Version {version.versionNumber}</strong>{version.versionNumber === latest?.versionNumber ? <> <span className="status-chip green">Current version</span></> : ""}<br /><span className={styles.hint}>Published {version.publishedLabel}</span></span>
                 <span className={styles.actions}>
                   <a className="secondary-button" href={`/more/emergency-plan/print?${eventQuery}&version=${version.versionNumber}`}><Printer aria-hidden="true" size={15} /> Print version {version.versionNumber}</a>
                   <ExportLink className="secondary-button" href={`${base}/export?version=${version.versionNumber}`}><Download aria-hidden="true" size={15} /> Download CSV for version {version.versionNumber}</ExportLink>
@@ -284,6 +289,7 @@ export function EmergencyPlanWorkspace({ eventId, eventName, initialDraft, versi
             ))}
           </ul>
         )}
+      </section>
       </section>
     </section>
   );

@@ -1,0 +1,25 @@
+/* Honor, award-rule and club-supply catalogs (#1590). Tokens only; fields and dialogs use the shared global classes. */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.toolbar > label { flex: 1 1 220px; min-width: 0; }
+.toolbarTools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.definition { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.55; }
+.links { display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; margin: 0; padding: 0; list-style: none; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.links li { display: inline-flex; flex-wrap: wrap; align-items: center; column-gap: 6px; min-height: 44px; }
+.links a { display: inline-flex; align-items: center; min-height: 44px; color: var(--imsda-purple); text-decoration: underline; text-underline-offset: 3px; }
+.linksLabel { color: var(--muted); }
+.name { overflow-wrap: anywhere; }
+.detail { display: block; font-weight: 400; margin-top: 2px; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
+.editorNote { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.55; }
+.editorError { margin: 0; overflow-wrap: anywhere; }
+.rowList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rowCard { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; min-width: 0; }
+.rowText { display: grid; flex: 1 1 220px; gap: 2px; min-width: 0; }
+.rowText strong { color: var(--imsda-navy); overflow-wrap: anywhere; }
+.rowMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.importHelp { margin: 0 0 12px; }
+.importHelp summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.dialogActions { flex-wrap: wrap; }
+.dialogActions > button { flex: 1 1 8rem; justify-content: center; }
+
+/* A button that stays focusable while it cannot be used (aria-disabled) still looks unavailable. */
+.held[aria-disabled="true"] { cursor: not-allowed; opacity: 0.58; }

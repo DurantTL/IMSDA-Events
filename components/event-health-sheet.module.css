@@ -9,3 +9,24 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* "This club only" and "Printable sheet" links: 44px tap targets, and the shared help text's negative top margin is overridden (#1584). */
+.clubLinks:global(.field-help) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  margin: 4px 0 0;
+}
+
+.clubLinks a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  overflow-wrap: anywhere;
+}
+
+.footnote:global(.field-help) {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
