@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { MapPin, Save } from "lucide-react";
-import { FormMessage, notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
-import { SubmitButton } from "@/components/submit-button";
+import { notSavedMessage, restoreFocusAfterSave, savedMessage } from "@/components/form-message";
+import { HeldSaveButton, SaveResult, type SaveResultState } from "@/components/organization-form-parts";
+import styles from "@/components/organization-pages.module.css";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { ChurchLocationRecord } from "@/modules/organizations/church-location-repository";
 import { displayCoordinate, numberOrNull } from "@/components/church-location-coordinates";
@@ -34,8 +36,7 @@ export function ChurchLocationForm({
 }) {
   const [location, setLocation] = useState(initialLocation);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [result, setResult] = useState<SaveResultState | null>(null);
   const [cityText, setCityText] = useState(initialLocation.city);
   const [stateText, setStateText] = useState(initialLocation.state);
   const [zipText, setZipText] = useState(initialLocation.zip);
@@ -62,15 +63,16 @@ export function ChurchLocationForm({
   function handlePin(latitude: number, longitude: number) {
     setLatitudeText(displayCoordinate(latitude));
     setLongitudeText(displayCoordinate(longitude));
-    setNotice("");
+    setResult((current) => (current?.tone === "success" ? null : current));
   }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Enter in a field submits without a click, and the Save button stays focusable while saving, so hold here too.
+    if (saving) return;
     const form = new FormData(event.currentTarget);
     setSaving(true);
-    setError("");
-    setNotice("");
+    setResult(null);
     try {
       const response = await fetch(endpoint, {
         method: "PATCH",
@@ -93,24 +95,30 @@ export function ChurchLocationForm({
       setZipText(result.location.zip);
       setLatitudeText(result.location.latitude !== null ? displayCoordinate(result.location.latitude) : "");
       setLongitudeText(result.location.longitude !== null ? displayCoordinate(result.location.longitude) : "");
-      setNotice(savedMessage());
+      setResult({ tone: "success", text: savedMessage(), slot: "form" });
     } catch (caught) {
-      setError(notSavedMessage(caught instanceof Error ? caught.message : "The church location could not be saved."));
+      setResult({ tone: "error", text: notSavedMessage(caught instanceof Error ? caught.message : "The church location could not be saved."), slot: "form" });
     } finally {
       setSaving(false);
       restoreFocusAfterSave("church-location-save");
     }
   }
 
+  const sourceText = location.source === "IMPORT"
+    ? "Comes from the eAdventist import."
+    : location.source === "GEOCODED"
+      ? "Comes from an accepted address lookup."
+      : location.source === "MANUAL"
+        ? "Set by hand."
+        : "No location on file yet. Enter the town below, or use Find map locations to look up a point from the church's address.";
+
   return (
-    <form className="panel form-stack" key={location.updatedAt ?? "new"} onChange={() => setNotice("")} onSubmit={save}>
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">{location.name}</p>
-          <h2>Church location</h2>
-        </div>
-      </div>
-      <div className="form-grid two-column">
+    <form className={`panel form-stack ${styles.stack}`} key={location.updatedAt ?? "new"} onChange={() => setResult((current) => (current?.tone === "success" ? null : current))} onSubmit={save}>
+      <p className={styles.statusLine}>
+        <strong>Source</strong> {sourceText}
+        {location.source === null && <Link className={styles.textLink} href="/admin/organizations/map-locations">Find map locations</Link>}
+      </p>
+      <div className={styles.fieldGrid}>
         <label>
           City or town
           <input maxLength={120} name="city" onChange={(event) => setCityText(event.target.value)} value={cityText} placeholder="e.g. Des Moines" />
@@ -124,7 +132,7 @@ export function ChurchLocationForm({
           <input maxLength={10} name="zip" onChange={(event) => setZipText(event.target.value)} value={zipText} placeholder="e.g. 50309 or 50309-1234" />
         </label>
       </div>
-      <div className="form-grid two-column">
+      <div className={styles.fieldGrid}>
         <label>
           Latitude
           <input
@@ -161,18 +169,16 @@ export function ChurchLocationForm({
       {entryMode === "map" && (
         <ChurchLocationMapPicker latitude={pinLatitude} longitude={pinLongitude} onChange={handlePin} />
       )}
-      <p className="field-help">
+      <p className={styles.note}>
         {entryMode === "map"
           ? "Click the map to place the church's pin, or drag an existing pin to adjust it. Coordinates fill in above; switch to manual entry to type them instead."
           : "Latitude and longitude are typed in by hand, from a source you trust. Give both or leave both blank, or use “Pick on map” instead."}
         {" "}Saving here marks this location as set by hand, so imports and “Find map locations” leave it alone.
-        {location.source === "IMPORT" && " It currently comes from the eAdventist import."}
-        {location.source === "GEOCODED" && " It currently comes from an accepted address lookup."}
         {" "}A church without coordinates still lists its clubs; it just won&apos;t have a pin on the map.
       </p>
-      <div>
-        <SubmitButton id="church-location-save" icon={<Save aria-hidden="true" size={16} />} iconSize={16} label="Save location" submitting={saving} submittingLabel="Saving…" />
-        {error ? <FormMessage message={error} tone="error" /> : notice ? <FormMessage message={notice} tone="success" /> : null}
+      <div className={styles.saveRow}>
+        <HeldSaveButton id="church-location-save" held={saving} icon={<Save aria-hidden="true" size={16} />} label="Save location" />
+        <SaveResult result={result} slot="form" />
       </div>
     </form>
   );

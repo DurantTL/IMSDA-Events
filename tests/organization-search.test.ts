@@ -175,7 +175,8 @@ describe("directory layout (#723)", () => {
 
   it("uses the filter bar, page heading and summary line", () => {
     expect(page).toContain("OrganizationSearchControls");
-    expect(page).toContain('className="page-intro"');
+    expect(page).toContain("<ListPage");
+    expect(page).toContain('title: "Organization directory"');
     expect(page).toContain("org-result-summary");
     expect(css).toMatch(/\.org-filter-bar \{[^}]*flex-wrap: wrap/);
     expect(css).toMatch(/\.org-filter-field input,\s*\.org-filter-field select \{[^}]*border: 1px solid/);

@@ -58,7 +58,7 @@ describe("event setup pages sit in the staff workspace (#981 batch 3)", () => {
 describe("row and card actions (#981 batch 3)", () => {
   it("organization cards keep Edit and put the rest, with Delete last and destructive, in a menu", () => {
     const source = read("components/organization-directory-workspace.tsx");
-    const actions = source.slice(source.indexOf("<div className={styles.actions}>"));
+    const actions = source.slice(source.indexOf("<div className={`${styles.actions} row-actions`}>"));
     expect(actions).toContain("<ActionsMenu");
     expect(actions.indexOf("Edit")).toBeLessThan(actions.indexOf("<ActionsMenu"));
     expect(actions.indexOf("Link provider")).toBeGreaterThan(actions.indexOf("<ActionsMenu"));

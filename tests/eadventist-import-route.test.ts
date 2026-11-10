@@ -135,12 +135,13 @@ describe("the upload preview screen (#649)", () => {
     expect(html).toContain("Map location will be created.");
     expect(html).toContain("Possible match — choose");
     expect(html).toContain("Choose…");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Save 3 changes/);
+    // Save is the page header's button (#1592) and is held while a choice is waiting (tests/staff-organizations-1592.test.ts).
+    expect(html).toContain("1 possible match needs a choice before you can save.");
     expect(html).toContain("Link to Sample Pines SDA");
     expect(html).toContain("Create new");
     expect(html).toContain("Disbanded 03/01/2024 on file — review");
     expect(html).toContain("Matches the existing church");
-    expect(html).toContain("Save 3 changes");
+    expect(html).toContain("Nothing is saved yet. These are proposed changes.");
     expect(html).toContain("Unknown organization type");
   });
 });

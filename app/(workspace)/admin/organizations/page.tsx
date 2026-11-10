@@ -2,6 +2,8 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { OrganizationDirectoryWorkspace } from "@/components/organization-directory-workspace";
+import { OrganizationActionProvider, OrganizationHeaderButton } from "@/components/organization-header-action";
+import { ListPage } from "@/components/page-templates/list-page";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { getOrganizationSummary, listSponsorOptions, listOrganizationsPage } from "@/modules/organizations/repository";
@@ -13,8 +15,8 @@ export const metadata: Metadata = { title: "Clubs and churches" };
 
 /**
  * The page's Tools menu (#981). Monthly Records, Club summary, Member transfers, New club
- * applications and Sterling Volunteers are System management sidebar items, so they are not
- * repeated here; these are the sub-pages the sidebar does not list.
+ * applications and Sterling Volunteers have their own places in System management, so they are not
+ * repeated here; these are the sub-pages that are not listed there.
  */
 function organizationTools(healthImport: boolean): { href: string; label: string }[] {
   return [
@@ -46,16 +48,26 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
   return (
     <>
       <AdminSectionHeaderFor path="/admin/organizations" section="system" />
-      <OrganizationDirectoryWorkspace
-        tools={organizationTools(healthRecordsEnabled())}
-        sponsorOptions={sponsorOptions}
-        filters={{ q: query, kind: kind ?? "", status }}
-        organizations={list.organizations}
-        page={list.page}
-        pageSize={list.pageSize}
-        summary={summary}
-        total={list.total}
-      />
+      <OrganizationActionProvider>
+        <ListPage
+          header={{
+            title: "Clubs and churches",
+            description: "Churches and the clubs each one sponsors, with their provider identifiers kept apart from their names.",
+            primary: <OrganizationHeaderButton icon="add" label="Add church or club" />,
+            tools: organizationTools(healthRecordsEnabled()),
+          }}
+        >
+          <OrganizationDirectoryWorkspace
+            sponsorOptions={sponsorOptions}
+            filters={{ q: query, kind: kind ?? "", status }}
+            organizations={list.organizations}
+            page={list.page}
+            pageSize={list.pageSize}
+            summary={summary}
+            total={list.total}
+          />
+        </ListPage>
+      </OrganizationActionProvider>
     </>
   );
 }

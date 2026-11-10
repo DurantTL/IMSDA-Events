@@ -457,6 +457,10 @@ const pages: PageSpec[] = [
   staff("calendar-admin", "/admin/calendar", "system-admin"),
   staff("churches-clubs", "/admin/organizations", "system-admin"),
   staff("churches-clubs-directory", "/admin/organizations/directory", "system-admin"),
+  // The System organization contact and location pages (#1592), opened for a church with a club under it.
+  staff("church-billing-contact", `/admin/organizations/${churchA}/billing`, "system-admin"),
+  staff("church-pastor-contact", `/admin/organizations/${churchA}/pastor`, "system-admin"),
+  staff("church-location", `/admin/organizations/${churchA}/location`, "system-admin"),
   staff("club-invites", "/admin/clubs/invites", "system-admin"),
   staff("club-applications", "/admin/clubs/applications", "system-admin"),
   staff("club-reports-summary", "/admin/clubs/summary", "system-admin"),

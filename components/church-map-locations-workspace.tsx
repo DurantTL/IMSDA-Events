@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { MapPin } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { HeldButton } from "@/components/organization-form-parts";
+import { useRegisterOrganizationAction } from "@/components/organization-header-action";
+import styles from "@/components/organization-pages.module.css";
 import { cardCell } from "@/components/table-card-labels";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import type { GeocodeReviewItem } from "@/modules/organizations/church-geocoding";
@@ -20,7 +22,9 @@ const LOCATION_SORT: Record<"church" | "address" | "result", ColumnSpec<GeocodeR
 /**
  * "Find map locations" (#724). Staff start the lookup, then review the
  * results: accept a match, adjust the point on the church's location page, or
- * skip. Nothing reaches the public map until a match is accepted.
+ * skip. Nothing reaches the public map until a match is accepted. The page
+ * header's one filled button starts the lookup (#1592); a match is a proposal
+ * until it is accepted.
  */
 export function ChurchMapLocationsWorkspace({ enabled, eligible, items }: { enabled: boolean; eligible: number; items: GeocodeReviewItem[] }) {
   const router = useRouter();
@@ -28,6 +32,15 @@ export function ChurchMapLocationsWorkspace({ enabled, eligible, items }: { enab
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const sorted = useTableSort(items, LOCATION_SORT);
+  const latest = useRef<() => void>(() => {});
+  const run_ = useCallback(() => latest.current(), []);
+  const registerAction = useRegisterOrganizationAction();
+  const blocked = !enabled || eligible === 0 || busy !== null;
+  const looking = busy === "run";
+  useEffect(() => {
+    registerAction({ run: run_, busy: looking, blocked, label: "Find map locations", busyLabel: "Looking up…" });
+    return () => registerAction(null);
+  }, [registerAction, run_, looking, blocked]);
 
   async function post(url: string, body?: unknown) {
     const response = await fetch(url, {
@@ -57,6 +70,11 @@ export function ChurchMapLocationsWorkspace({ enabled, eligible, items }: { enab
     }
   }
 
+  // The latest handler is kept in an effect, so the stable `run_` the header button calls is never stale.
+  useEffect(() => {
+    latest.current = () => { if (!blocked) void run(); };
+  });
+
   async function decide(item: GeocodeReviewItem, decision: "accept" | "skip") {
     setBusy(item.organizationId);
     setError("");
@@ -81,18 +99,17 @@ export function ChurchMapLocationsWorkspace({ enabled, eligible, items }: { enab
       )}
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
-      <p className="field-help">
+      <p className={styles.note}>
         {eligible} {eligible === 1 ? "church has" : "churches have"} a street address and no map point yet. Only each church&apos;s public street
         address, city, state and ZIP are sent to the U.S. Census Bureau geocoder. Groups that meet in homes, towns-only addresses and locations set by hand are never sent.
+        {" "}Nothing reaches the public map until you accept a match.
       </p>
-      <div>
-        <button className="primary-button" disabled={!enabled || busy !== null || eligible === 0} onClick={() => void run()} type="button">
-          <MapPin aria-hidden="true" size={16} /> {busy === "run" ? "Looking up…" : "Find map locations"}
-        </button>
-      </div>
       <p className="org-result-summary" role="status">
         {items.length} {items.length === 1 ? "result" : "results"} to review.
       </p>
+      {items.length === 0 && enabled && eligible > 0 && (
+        <p className={styles.note}>Nothing is waiting for review. Choose Find map locations at the top of the page to look up the churches that need a point.</p>
+      )}
       {items.length > 0 && (
         <div className="report-table-wrap">
           {sorted.note}
@@ -100,8 +117,8 @@ export function ChurchMapLocationsWorkspace({ enabled, eligible, items }: { enab
             <thead role="rowgroup">
               <tr role="row">
                 {sorted.header("church", "Church")}
-                {sorted.header("address", "Address")}
-                {sorted.header("result", "Result")}
+                {sorted.header("address", "Address on file")}
+                {sorted.header("result", "Proposed location")}
                 <th role="columnheader" scope="col"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -109,25 +126,28 @@ export function ChurchMapLocationsWorkspace({ enabled, eligible, items }: { enab
               {sorted.rows.map((item) => (
                 <tr key={item.organizationId} role="row">
                   <th className="org-cell-name" role="rowheader" scope="row" translate="no">{item.name}</th>
-                  <td {...cardCell("Address")}>{item.address}</td>
-                  <td {...cardCell("Result")}>
+                  <td {...cardCell("Address on file")}>{item.address}</td>
+                  <td {...cardCell("Proposed location")}>
                     {item.status === "MATCHED" ? (
                       <>
-                        <span className="status-chip green">Matched</span>
+                        <span className="status-chip green">Proposed match</span>
                         <span className="org-cell-sub">{item.matchedAddress}</span>
                         <span className="org-cell-sub">{item.latitude?.toFixed(4)}, {item.longitude?.toFixed(4)}</span>
+                        <span className="org-cell-sub">Not on the map until accepted.</span>
                       </>
                     ) : (
                       <span className="status-chip gold">No match</span>
                     )}
                   </td>
                   <td {...cardCell(null)} className="org-cell-actions">
-                    {item.status === "MATCHED" && (
-                      <button className="primary-button" disabled={busy !== null} onClick={() => void decide(item, "accept")} type="button">Accept</button>
-                    )}
-                    {/* A plain anchor: the map page needs its own Content-Security-Policy (#542). */}
-                    <a className="secondary-button" href={`/admin/organizations/${item.organizationId}/location`}>Set on map</a>
-                    <button className="secondary-button" disabled={busy !== null} onClick={() => void decide(item, "skip")} type="button">Skip</button>
+                    <div className={styles.reviewActions}>
+                      {item.status === "MATCHED" && (
+                        <HeldButton ariaLabel={`Accept match for ${item.name}`} held={busy !== null} onAction={() => void decide(item, "accept")}>Accept</HeldButton>
+                      )}
+                      {/* A plain anchor: the map page needs its own Content-Security-Policy (#542). */}
+                      <a className={styles.textLink} href={`/admin/organizations/${item.organizationId}/location`}>Set on map<span className="sr-only"> for {item.name}</span></a>
+                      <HeldButton ariaLabel={`Skip ${item.name}`} held={busy !== null} onAction={() => void decide(item, "skip")}>Skip</HeldButton>
+                    </div>
                   </td>
                 </tr>
               ))}
