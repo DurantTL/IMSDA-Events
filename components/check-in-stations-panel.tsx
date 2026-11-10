@@ -90,10 +90,10 @@ export function CheckInStationsPanel({
   return (
     <section className={`panel ${styles.cisPanel}`} aria-labelledby="cis-panel-title">
       {confirmDialog}
-      <h2 id="cis-panel-title">Check-in stations</h2>
+      <h2 id="cis-panel-title">Open as a station</h2>
       <p className={styles.cisPanelHelp}>
-        A station is a staff-run tablet that checks in a whole registration from one code. It works until the event
-        ends, and you can revoke it here at any time.
+        Full screen for the check-in table: a staff-run tablet that checks in a whole registration from one code. It
+        stays on until the event ends, and you can revoke it here at any time.
       </p>
       <form className={styles.cisPanelStart} onSubmit={start}>
         <label>
@@ -107,13 +107,15 @@ export function CheckInStationsPanel({
           />
         </label>
         <button type="submit" className="primary-button" disabled={busy !== ""}>
-          {busy === "start" ? "Starting..." : "Start a station on this device"}
+          {busy === "start" ? "Starting..." : "Open as a station on this device"}
         </button>
       </form>
       <div role="status" aria-live="polite">{error && <p className="form-error">{error}</p>}</div>
       {stations.length === 0 ? (
         <p className={styles.cisPanelHelp}>No stations are active for this event.</p>
       ) : (
+        <>
+        <h3 className={styles.cisPanelSub}>Active stations</h3>
         <ul className={styles.cisPanelList}>
           {stations.map((station) => (
             <li key={station.id}>
@@ -136,6 +138,7 @@ export function CheckInStationsPanel({
             </li>
           ))}
         </ul>
+        </>
       )}
     </section>
   );

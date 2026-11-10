@@ -354,6 +354,7 @@ const pages: PageSpec[] = [
   // Check-out for a person with keys out, a held cash deposit, a lost key and a charge (#214), and the closeout.
   staff("issued-assets-checkout", `/check-in/assets?attendee=${P}_reg_attendee_3_0`),
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
+  staff("merchandise", "/more/merchandise"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
   // Meal money closeout (#212): the money table, the exceptions and their review forms.
@@ -415,6 +416,7 @@ const pages: PageSpec[] = [
   },
   // The printable name badge sheets (#981): the sheet preview must not make the page scroll sideways.
   staff("check-in-badges", "/check-in/badges"),
+  staff("check-in-passes", "/check-in/passes"),
   staff("communications", "/communications"),
   // The template editor with attachments, a picture and a button (#824), and a draft announcement with attachments.
   staff("communications-editor", `/communications?event=${blocksEventId}&view=templates`, "system-admin"),
@@ -426,6 +428,8 @@ const pages: PageSpec[] = [
   staff("communications-scheduled", `/communications/scheduled?event=${blocksEventId}`, "system-admin"),
   staff("communications-scheduled-new", `/communications/scheduled?event=${blocksEventId}&new=1`, "system-admin"),
   staff("registration-builder", "/registration-builder"),
+  // The event's information forms list (#1572): the titled list page with its description and the form cards.
+  { ...staff("information-forms", "/information-forms"), expectText: /Information forms/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
@@ -448,6 +452,9 @@ const pages: PageSpec[] = [
   // Creating an event asks for start and end times next to the dates (#1406).
   { name: "staff-event-setup-blank", path: "/event-setup", role: "system-admin", expectText: /Start time/ },
   { name: "staff-event-setup-from-template", path: "/event-setup/from-template", role: "system-admin", expectText: /Start time/ },
+  { name: "staff-event-setup-copy", path: "/event-setup/copy", role: "system-admin", expectText: /Copy from a past event/ },
+  // All events (#1570): the system-wide event directory, a table that becomes cards on a phone.
+  { ...staff("staff-all-events", "/admin/events", "system-admin"), expectText: /All events/ },
   staff("calendar-admin", "/admin/calendar", "system-admin"),
   staff("churches-clubs", "/admin/organizations", "system-admin"),
   staff("churches-clubs-directory", "/admin/organizations/directory", "system-admin"),
@@ -485,6 +492,8 @@ const pages: PageSpec[] = [
   staff("system-report", "/admin/system-report", "system-admin"),
   staff("club-supplies", "/admin/club-supplies", "system-admin"),
   staff("club-forms", "/admin/club-forms", "system-admin"),
+  // Submitted club forms with no event (#1573): they sit in Admin -> Forms, not in an event's shell.
+  { name: "staff-club-forms-submissions-no-event", path: "/more/club-forms", role: "system-admin" },
   // The club form settings page, with the "Email these addresses when this form is submitted" box (#1017).
   staff("club-form-alerts", "/admin/club-forms/off_premises_permission_slip", "system-admin"),
   // The form template library and its editor (#1064).

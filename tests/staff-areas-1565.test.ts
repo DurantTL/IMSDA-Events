@@ -59,7 +59,7 @@ describe("staff areas (#1565)", () => {
     const system = viewers.system;
     // Home (#1568): Needs you and Coming up.
     expect(keys("home", system)).toEqual(["needs-you", "coming-up"]);
-    expect(keys("events", system)).toEqual(["calendar", "create", "copy", "templates", "archived"]);
+    expect(keys("events", system)).toEqual(["all-events", "calendar", "create", "copy", "templates", "archived"]);
     expect(keys("clubs", system)).toEqual(["club-administration", "club-summary", "clubs-and-churches", "applications", "leaders", "transfers", "monthly-records"]);
     expect(keys("people", system)).toEqual(["people-access", "break-glass"]);
     expect(keys("reports", system)).toEqual(["monthly-records", "year-end", "points", "analytics", "system-report"]);

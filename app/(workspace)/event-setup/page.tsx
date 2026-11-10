@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FormPage } from "@/components/page-templates/form-page";
 import { EventSettingsWorkspace } from "@/components/event-settings-workspace";
+import { EventStartChoices } from "@/components/event-start-choices";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { formatDateRange } from "@/modules/calendar/domain";
 import { getCalendarEntryPrefill } from "@/modules/calendar/event-links";
@@ -40,11 +41,7 @@ export default async function EventSetupPage({ searchParams }: { searchParams: P
               The event is linked to it, so the calendar shows the pair once.
             </p>
           )}
-          <div className="event-setup-entry-actions">
-            <Link className="secondary-button" href={`/event-setup/from-template${carry}`}>Start from a template</Link>
-            <Link className="secondary-button" href={`/event-setup${carry}#blank-event`}>Start blank</Link>
-            <Link className="secondary-button" href="/event-setup/copy">Copy from a past event</Link>
-          </div>
+          <EventStartChoices current="blank" carry={carry} />
         </>
       )}
     >
