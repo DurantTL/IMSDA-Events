@@ -85,6 +85,12 @@
   overflow-wrap: anywhere;
 }
 
+.relation > .textLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 .textButton {
   display: inline-flex;
   align-items: center;

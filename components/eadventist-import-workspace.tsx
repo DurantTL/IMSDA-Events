@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, FileUp } from "lucide-react";
-import { useRegisterOrganizationAction } from "@/components/organization-header-action";
+import { cardCell } from "@/components/table-card-labels";
+import { HEADER_ACTION_ID, useRegisterOrganizationAction } from "@/components/organization-header-action";
 import styles from "@/components/organization-pages.module.css";
 import { disbandedNotice, NEW_RECORD, organizationKindLabels } from "@/modules/organizations/eadventist-import";
 import type { ImportPreview } from "@/modules/organizations/eadventist-import-repository";
@@ -27,12 +28,14 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
   const [saved, setSaved] = useState(false);
   // "Possible match" choices: OrganizationID to a stored organization id, or "NEW".
   const [choices, setChoices] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
+  // Which call is running: "check" re-reads the preview (nothing is saved), "save" is the confirming call.
+  const [running, setRunning] = useState<"check" | "save" | null>(null);
+  const busy = running !== null;
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
   async function send(text: string, confirm: boolean, chosen: Record<string, string> = choices) {
-    setBusy(true);
+    setRunning(confirm ? "save" : "check");
     setError("");
     try {
       const response = await fetch("/api/admin/organizations/eadventist-import", {
@@ -47,7 +50,7 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That file couldn't be read.");
     } finally {
-      setBusy(false);
+      setRunning(null);
     }
   }
 
@@ -85,10 +88,11 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
   const registerAction = useRegisterOrganizationAction();
   const blocked = reviewing && (!csv || changes === 0 || waiting > 0);
   const label = reviewing ? saveLabel : "Choose CSV file";
+  const busyLabel = running === "save" ? "Saving…" : reviewing ? "Checking…" : "Reading…";
   useEffect(() => {
-    registerAction({ run, busy, blocked, label, busyLabel: reviewing ? "Saving…" : "Reading…" });
+    registerAction({ run, busy, blocked, label, busyLabel });
     return () => registerAction(null);
-  }, [registerAction, run, busy, blocked, label, reviewing]);
+  }, [registerAction, run, busy, blocked, label, busyLabel]);
 
   return (
     <section className="panel" aria-labelledby="eadventist-import-title">
@@ -126,15 +130,15 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
             </div>
           )}
           <div className="report-table-wrap">
-            <table className="report-table">
-              <thead><tr><th>Row</th><th>Name</th><th>Kind</th><th>{saved ? "What was saved" : "Proposed change"}</th></tr></thead>
-              <tbody>
+            <table className="report-table table-cards table-cards-wide" role="table">
+              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Row</th><th role="columnheader" scope="col">Name</th><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">{saved ? "What was saved" : "Proposed change"}</th></tr></thead>
+              <tbody role="rowgroup">
                 {preview.items.map((item) => (
-                  <tr key={item.line}>
-                    <td>{item.line}</td>
-                    <td translate="no">{item.name}</td>
-                    <td>{organizationKindLabels[item.kind]}</td>
-                    <td>
+                  <tr key={item.line} role="row">
+                    <td {...cardCell("Row")}>{item.line}</td>
+                    <th className="org-cell-name" role="rowheader" scope="row" translate="no">{item.name}</th>
+                    <td {...cardCell("Kind")}>{organizationKindLabels[item.kind]}</td>
+                    <td {...cardCell(saved ? "What was saved" : "Proposed change")}>
                       <span className={`status-chip ${actionTone[item.action]}`}>{actionLabels[item.action]}</span>
                       {(item.possibleMatches.length > 0 || item.needsChoice) && <span className="status-chip gold">{item.needsChoice ? "Possible match — choose" : "Possible match"}</span>}
                       <span className={styles.cellNotes}>
@@ -171,6 +175,12 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
             <button className="secondary-button" disabled={busy} onClick={() => { setPreview(null); setCsv(null); setSaved(false); setChoices({}); }} type="button">
               {saved ? "Upload another file" : "Cancel"}
             </button>
+            {!saved && (
+              <p className={styles.note}>
+                Save is at the top of the page.{" "}
+                <button className={styles.textButton} onClick={() => document.getElementById(HEADER_ACTION_ID)?.focus()} type="button">Go to Save</button>
+              </p>
+            )}
           </div>
         </>
       )}

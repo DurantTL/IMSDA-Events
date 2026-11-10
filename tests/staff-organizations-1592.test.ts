@@ -509,13 +509,25 @@ describe("pastor contact (#1592)", () => {
 describe("church location (#1592)", () => {
   const empty = { id: "church-1", name: longName, city: "", state: "", zip: "", latitude: null, longitude: null, source: null, updatedAt: null };
 
-  it("says plainly that a church has no location yet and links to the lookup", async () => {
+  it("tells a church with no location row to enter the town or pick the point, and offers no lookup", async () => {
     await render(createElement(ChurchLocationForm, { endpoint: "/api/admin/organizations/church-1/location", initialLocation: empty }));
     expect(document.body.textContent).toContain("No location on file yet.");
-    expect(document.querySelector('a[href="/admin/organizations/map-locations"]')?.textContent).toBe("Find map locations");
+    expect(document.body.textContent).toContain("switch to Pick on map");
+    expect(document.body.textContent).toContain("only looks up churches that have a street address");
+    expect(document.querySelector('a[href="/admin/organizations/map-locations"]')).toBeNull();
     expect(document.querySelectorAll("h1")).toHaveLength(0);
     // One column below 1024px: the field grid is the module's, not the two-column global.
     expect(read("components/church-location-form.tsx")).not.toContain("two-column");
+  });
+
+  it("offers the lookup, conditioned on a street address, to an imported location that has no map point", async () => {
+    await render(createElement(ChurchLocationForm, { endpoint: "/e", initialLocation: { ...empty, city: "Sampleton", source: "IMPORT", updatedAt: "2026-11-01T00:00:00.000Z" } }));
+    const link = document.querySelector('a[href="/admin/organizations/map-locations"]') as HTMLAnchorElement;
+    expect(link.textContent).toBe("Find map locations");
+    expect(link.parentElement!.textContent).toContain("If this church has a street address on file");
+    await render(createElement("div"));
+    await render(createElement(ChurchLocationForm, { endpoint: "/e", initialLocation: { ...empty, city: "Sampleton", latitude: 41.5, longitude: -93.6, source: "IMPORT", updatedAt: "2026-11-01T00:00:00.000Z" } }));
+    expect(document.querySelector('a[href="/admin/organizations/map-locations"]')).toBeNull();
   });
 
   it("names where the current location came from", async () => {
@@ -593,6 +605,41 @@ describe("organization import (#1592)", () => {
     expect(document.body.textContent).toContain("Nothing is saved yet. These are proposed changes.");
     expect(document.body.textContent).toContain(longName);
     expect(document.querySelectorAll(".primary-button")).toHaveLength(1);
+  });
+
+  it("shows Checking… while the preview is re-read and Saving… only for the confirming call, and Save is one link away from the bottom", async () => {
+    const calls: unknown[] = [];
+    vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => { calls.push(JSON.parse(init!.body as string)); return new Promise<Response>(() => {}); }));
+    const file = new File(["name\nx"], "orgs.csv", { type: "text/csv" });
+    await render(createElement(Import, { initialPreview: { ...conflicting, needsChoice: 0, items: conflicting.items.map((item) => ({ ...item, needsChoice: false })) } as typeof conflicting }));
+    // The page keeps a plain sentence and an underlined button below the table; it moves focus to the header's Save.
+    const goto = button("Go to Save")!;
+    expect(goto.className).toContain("textButton");
+    await click(goto);
+    expect(document.activeElement!.id).toBe("organization-header-action");
+    expect(document.querySelectorAll(".primary-button")).toHaveLength(1);
+    // A match choice re-checks the preview (confirm false): the header says Checking…, never Saving….
+    await render(createElement(Import, { initialPreview: conflicting }));
+    const select = document.querySelector("select") as HTMLSelectElement;
+    expect(file.name).toBe("orgs.csv");
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "church-7");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    // initialPreview has no file text, so no request is sent; the label logic is pinned in the source below.
+    expect(calls).toHaveLength(0);
+    const source = read("components/eadventist-import-workspace.tsx");
+    expect(source).toContain('setRunning(confirm ? "save" : "check")');
+    expect(source).toContain('running === "save" ? "Saving…" : reviewing ? "Checking…" : "Reading…"');
+  });
+
+  it("draws the preview as card rows on a phone, with the same labels", async () => {
+    await render(createElement(Import, { initialPreview: conflicting }));
+    const table = document.querySelector("table")!;
+    expect(table.className).toContain("table-cards");
+    const cells = Array.from(table.querySelectorAll("tbody tr:first-child td")).map((cell) => cell.getAttribute("data-label"));
+    expect(cells).toEqual(["Row", "Kind", "Proposed change"]);
+    expect(table.querySelector("tbody th[scope=row]")!.textContent).toBe(longName);
   });
 
   it("keeps the same request: file text, confirm flag and choices to the same route", () => {

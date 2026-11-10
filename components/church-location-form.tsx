@@ -104,19 +104,23 @@ export function ChurchLocationForm({
     }
   }
 
+  // The lookup only takes churches that have a street address from the import (ADR 0014). This page does not load the address,
+  // so a church with no location row at all (never imported) is told to enter the town or pick the point, and the lookup is
+  // offered only to an imported location that still has no map point.
+  const offerLookup = location.source === "IMPORT" && location.latitude === null;
   const sourceText = location.source === "IMPORT"
     ? "Comes from the eAdventist import."
     : location.source === "GEOCODED"
       ? "Comes from an accepted address lookup."
       : location.source === "MANUAL"
         ? "Set by hand."
-        : "No location on file yet. Enter the town below, or use Find map locations to look up a point from the church's address.";
+        : "No location on file yet. Enter the town below, or switch to Pick on map and place the point there. Find map locations only looks up churches that have a street address from the eAdventist import.";
 
   return (
     <form className={`panel form-stack ${styles.stack}`} key={location.updatedAt ?? "new"} onChange={() => setResult((current) => (current?.tone === "success" ? null : current))} onSubmit={save}>
       <p className={styles.statusLine}>
         <strong>Source</strong> {sourceText}
-        {location.source === null && <Link className={styles.textLink} href="/admin/organizations/map-locations">Find map locations</Link>}
+        {offerLookup && <>{" "}If this church has a street address on file, <Link className={styles.textLink} href="/admin/organizations/map-locations">Find map locations</Link> can look up its map point.</>}
       </p>
       <div className={styles.fieldGrid}>
         <label>

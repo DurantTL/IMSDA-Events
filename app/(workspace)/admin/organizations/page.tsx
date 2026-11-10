@@ -52,7 +52,7 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
         <ListPage
           header={{
             title: "Clubs and churches",
-            description: "Churches and the clubs each one sponsors, with their provider identifiers kept apart from their names.",
+            description: "Churches and the clubs each one sponsors, shared with events, club rosters and billing, with provider identifiers kept apart from names so later syncs do not guess.",
             primary: <OrganizationHeaderButton icon="add" label="Add church or club" />,
             tools: organizationTools(healthRecordsEnabled()),
           }}

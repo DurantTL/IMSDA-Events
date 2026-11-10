@@ -33,6 +33,8 @@
 /* Links read as links without colour: underlined, in the link colour token. */
 .textLink { color: var(--imsda-purple); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
 
+.textButton { display: inline-flex; align-items: center; min-height: 44px; border: 0; background: transparent; padding: 0 4px; color: var(--imsda-purple); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
 /* Import and map-location review: what the file or lookup proposes, and what is already accepted. */
 .statusLine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 0 12px; line-height: 1.55; }
 .statusLine strong { overflow-wrap: anywhere; }

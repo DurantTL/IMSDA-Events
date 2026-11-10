@@ -28,6 +28,9 @@ export function useRegisterOrganizationAction() {
   return useContext(ActionContext).setAction;
 }
 
+/** The header button's id, so a link lower on the page can move focus to it. */
+export const HEADER_ACTION_ID = "organization-header-action";
+
 const icons = { add: Plus, upload: FileUp, save: Upload, map: MapPin } as const;
 
 /** The header's filled button. `icon` picks the glyph; `label` is shown until the workspace registers its own. */
@@ -39,7 +42,7 @@ export function OrganizationHeaderButton({ label, icon }: { label: string; icon:
   const shown = busy ? action?.busyLabel ?? action?.label ?? label : action?.label ?? label;
   // aria-disabled, not disabled: a keyboard user's focus stays on the button while the workspace is working.
   return (
-    <button aria-disabled={held || undefined} className={`primary-button ${styles.held}`} onClick={() => { if (!held) action?.run(); }} type="button">
+    <button aria-disabled={held || undefined} id={HEADER_ACTION_ID} className={`primary-button ${styles.held}`} onClick={() => { if (!held) action?.run(); }} type="button">
       <Icon aria-hidden="true" size={16} /> {shown}
     </button>
   );
