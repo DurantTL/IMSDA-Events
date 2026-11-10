@@ -180,7 +180,7 @@ export function LodgingRequestsWorkspace({ initialView, canConfigure, canExport 
 
     <section className="panel" aria-labelledby="lodging-requests-table">
       <h3 id="lodging-requests-table">Requests ({view.requests.length})</h3>
-      {view.requests.length === 0 ? <p>No one has asked for lodging yet.</p> : <div className="table-wrap">{requestSort.note}<table className={`report-table report-table-auto table-cards table-cards-wide ${labels.requestsTable}`} role="table">
+      {view.requests.length === 0 ? <p>No one has asked for lodging yet.</p> : <div className="table-wrap">{requestSort.note}<table className={`report-table report-table-auto table-cards table-cards-max ${labels.requestsTable}`} role="table">
         <thead role="rowgroup"><tr role="row">
           {requestSort.header("registration", "Registration")}{requestSort.header("type", "Type")}{requestSort.header("nights", "Nights")}{requestSort.header("people", "People")}{requestSort.header("rooms", "Rooms")}
           {view.canSeeSensitive ? fullSort.header("ground", "Ground floor") : null}{view.canSeeSensitive ? fullSort.header("accessible", "Accessible room") : null}
@@ -261,7 +261,7 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
       <td {...cardCell("Household")}>{request.householdPreference === "TOGETHER" ? "Together" : "Flexible"}</td>
       <td {...cardCell("Roommates")}>{mutual} mutual, {waiting} waiting</td>
       <td {...cardCell("Version")}>{request.version}</td>
-      <td {...cardCell(null)}><button type="button" className="secondary-button" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Close" : "Details"}<span className="sr-only"> for {request.registration}</span></button></td>
+      <td {...cardCell(null)}><button type="button" className={`secondary-button ${labels.nowrap}`} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "Close" : "Details"}<span className="sr-only"> for {request.registration}</span></button></td>
     </tr>
     {open ? <tr role="row"><td colSpan={view.canSeeSensitive ? 12 : 10} role="cell">
       <h4>History ({request.history.length} version{request.history.length === 1 ? "" : "s"})</h4>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from "react";
 import { ExportLink } from "@/components/export-link";
 import labels from "@/components/lodging-labels.module.css";
 import assign from "@/components/lodging-assign.module.css";
@@ -84,6 +84,12 @@ export function LodgingAssignmentsWorkspace({ initialView, canConfigure, canExpo
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  // A success notice stays in view while scrolling, so it clears itself; an error stays until the next action.
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
   const [selected, setSelected] = useState<{ occupantKey: string; moveAssignmentId?: string } | null>(null);
   const [moveReason, setMoveReason] = useState(defaultMoveReason);
   // The special-use confirmation is the shared accessible dialog: focus moves in, Escape cancels, focus returns to the button.

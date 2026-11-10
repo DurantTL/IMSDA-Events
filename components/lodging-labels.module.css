@@ -35,7 +35,9 @@
 /* The live message stays in view in its column while scrolling. It is text only, so taps pass through it to what is beneath. */
 .live { align-self: start; position: sticky; top: 8px; z-index: 2; min-height: 1px; pointer-events: none; }
 
-/* The twelve-column requests table fits its box as a table: cells and sort headers wrap and take no fixed width. */
+/* The twelve-column requests table is cards until its box is wider than 1260px (table-cards-max); as a table its cells and sort headers wrap and take no fixed width. */
 .requestsTable { width: 100%; table-layout: auto; }
 .requestsTable :is(th, td) { white-space: normal; overflow-wrap: anywhere; width: auto; min-width: 0; padding-inline: 8px; }
 .requestsTable th button { white-space: normal; text-align: left; }
+
+.nowrap { white-space: nowrap; }
