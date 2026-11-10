@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
-import { ListPager } from "@/components/list-pager";
+import { ListPage } from "@/components/page-templates/list-page";
 import { SortOrderNote } from "@/components/list-sort";
 import { OrganizationSearchControls } from "@/components/organization-search-controls";
 import { cardCell } from "@/components/table-card-labels";
@@ -56,21 +56,14 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
   return (
     <>
       <AdminSectionHeaderFor path="/admin/organizations/directory" section="system" />
-      <div className="intro-actions club-admin-links">
-        <Link className="secondary-button" href="/admin/organizations/import">Import from eAdventist</Link>
-        <Link className="secondary-button" href="/admin/organizations/map-locations">Find map locations</Link>
-      </div>
-      <section className="page-stack org-directory-page" aria-labelledby="org-directory-title">
-        <div className="page-intro">
-          <div>
-            <p className="eyebrow">Clubs and churches</p>
-            <h2 id="org-directory-title">Organization directory</h2>
-            <p>
-              Churches, companies and groups that are active appear in registration form church lists; active schools appear in school lists.
-            </p>
-          </div>
-        </div>
-        <div className="panel org-directory-panel">
+      <ListPage
+        header={{
+          title: "Organization directory",
+          description: "Churches, companies and groups that are active appear in registration form church lists; active schools appear in school lists.",
+          primary: <Link className="primary-button" href="/admin/organizations/import">Import from eAdventist</Link>,
+          secondary: <Link className="secondary-button" href="/admin/organizations/map-locations">Find map locations</Link>,
+        }}
+        filters={(
           <OrganizationSearchControls
             basePath="/admin/organizations/directory"
             kindOptions={[{ value: "", label: "All kinds" }, ...kinds.map((value) => ({ value, label: organizationKindLabels[value] }))]}
@@ -79,6 +72,11 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
             state={state}
             statusOptions={statuses}
           />
+        )}
+        pager={{ hrefFor: pageHref, label: "Organization pages", noun: "organizations", nounOne: "organization", slice: sliceFromCount(organizations, page, total, pageSize) }}
+      >
+        <section className="org-directory-page" aria-label="Organizations">
+          <div className="panel org-directory-panel">
           <p className="org-result-summary" role="status">
             {total} {total === 1 ? "organization" : "organizations"}{searching ? " match" : ""}.
           </p>
@@ -166,9 +164,9 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
               </tbody>
             </table>
           </div>
-          <ListPager hrefFor={pageHref} label="Organization pages" noun="organizations" nounOne="organization" slice={sliceFromCount(organizations, page, total, pageSize)} />
-        </div>
-      </section>
+          </div>
+        </section>
+      </ListPage>
     </>
   );
 }

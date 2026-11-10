@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, FileUp, Upload } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { CheckCircle2, FileUp } from "lucide-react";
+import { cardCell } from "@/components/table-card-labels";
+import { HEADER_ACTION_ID, useRegisterOrganizationAction } from "@/components/organization-header-action";
+import styles from "@/components/organization-pages.module.css";
 import { disbandedNotice, NEW_RECORD, organizationKindLabels } from "@/modules/organizations/eadventist-import";
 import type { ImportPreview } from "@/modules/organizations/eadventist-import-repository";
 
@@ -15,7 +18,9 @@ type ApiError = { message?: string; issues?: Array<{ message?: string }> };
  * review what it would add, update, leave alone, or flag, then save. The file
  * stays in this page's memory and is sent again on save, so the server plans
  * the save from the database as it is then. `initialPreview` starts on an
- * already-read file (render tests).
+ * already-read file (render tests). The page header's one filled button chooses
+ * the file, and becomes Save once a preview is ready (#1592); it stays focusable
+ * and holds clicks back while reading, saving or waiting on a match choice.
  */
 export function EadventistImportWorkspace({ initialPreview }: { initialPreview?: ImportPreview }) {
   const [csv, setCsv] = useState<string | null>(null);
@@ -23,11 +28,14 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
   const [saved, setSaved] = useState(false);
   // "Possible match" choices: OrganizationID to a stored organization id, or "NEW".
   const [choices, setChoices] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
+  // Which call is running: "check" re-reads the preview (nothing is saved), "save" is the confirming call.
+  const [running, setRunning] = useState<"check" | "save" | null>(null);
+  const busy = running !== null;
   const [error, setError] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
 
   async function send(text: string, confirm: boolean, chosen: Record<string, string> = choices) {
-    setBusy(true);
+    setRunning(confirm ? "save" : "check");
     setError("");
     try {
       const response = await fetch("/api/admin/organizations/eadventist-import", {
@@ -42,7 +50,7 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That file couldn't be read.");
     } finally {
-      setBusy(false);
+      setRunning(null);
     }
   }
 
@@ -65,32 +73,51 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
   const changes = counts ? counts.new + counts.updated : 0;
   const waiting = preview?.needsChoice ?? 0;
 
+  // The header button's label and what it does follow the step: choose a file, then save what was reviewed.
+  const reviewing = Boolean(preview && counts && !saved);
+  const saveLabel = `Save ${changes} change${changes === 1 ? "" : "s"}`;
+  const latest = useRef<() => void>(() => {});
+  // The latest handler is kept in an effect, so the stable `run` the header button calls is never stale.
+  useEffect(() => {
+    latest.current = () => {
+      if (reviewing) { if (csv && changes > 0 && waiting === 0) void send(csv, true); }
+      else fileInput.current?.click();
+    };
+  });
+  const run = useCallback(() => latest.current(), []);
+  const registerAction = useRegisterOrganizationAction();
+  const blocked = reviewing && (!csv || changes === 0 || waiting > 0);
+  const label = reviewing ? saveLabel : "Choose CSV file";
+  const busyLabel = running === "save" ? "Saving…" : reviewing ? "Checking…" : "Reading…";
+  useEffect(() => {
+    registerAction({ run, busy, blocked, label, busyLabel });
+    return () => registerAction(null);
+  }, [registerAction, run, busy, blocked, label, busyLabel]);
+
   return (
     <section className="panel" aria-labelledby="eadventist-import-title">
-      <div className="section-head">
-        <div>
-          <p className="eyebrow">Clubs and churches</p>
-          <h2 id="eadventist-import-title">Import organizations from eAdventist</h2>
-          <p className="field-help">
-            Upload the organizations export (CSV). Nothing is saved until you review the list and choose Save. Records are matched by their
-            eAdventist OrganizationID, so uploading a newer file updates them instead of adding copies. Whether a record is active is never changed by an
-            upload; use the directory list for that.
-          </p>
-        </div>
-      </div>
+      <h2 className={styles.panelTitle} id="eadventist-import-title">{preview && counts ? (saved ? "What was saved" : "Review before saving") : "Choose the file"}</h2>
+      <p className={styles.note}>
+        Nothing is saved until you review the list and choose Save. Records are matched by their eAdventist OrganizationID, so uploading a newer
+        file updates them instead of adding copies. Whether a record is active is never changed by an upload; use the directory list for that.
+      </p>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
-      {!preview && (
-        <label className="club-import-upload">
-          <FileUp aria-hidden="true" size={24} />
-          <strong>{busy ? "Reading…" : "Choose the eAdventist organizations CSV"}</strong>
-          <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={readFile} type="file" />
-        </label>
-      )}
+      {/* Always mounted, so the header's Choose CSV file button can open the chooser; hidden once a file is being reviewed. */}
+      <label className="club-import-upload" hidden={Boolean(preview)}>
+        <FileUp aria-hidden="true" size={24} />
+        <strong>{busy ? "Reading…" : "Choose the eAdventist organizations CSV"}</strong>
+        <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={readFile} ref={fileInput} type="file" />
+      </label>
       {preview && counts && (
         <>
-          <p className="field-help" data-testid="eadventist-import-summary">
-            {saved ? <><CheckCircle2 aria-hidden="true" size={14} /> Saved. </> : "Nothing is saved yet. "}
+          <p className={styles.statusLine} data-testid="eadventist-import-summary">
+            {saved
+              ? <><CheckCircle2 aria-hidden="true" size={14} /> <strong>Saved.</strong> These changes are now in the directory.</>
+              : <strong>Nothing is saved yet. These are proposed changes.</strong>}
             {waiting > 0 && <strong>{waiting} possible {waiting === 1 ? "match needs" : "matches need"} a choice before you can save. </strong>}
+            {!saved && changes === 0 && waiting === 0 && <span>There is nothing new or changed to save.</span>}
+          </p>
+          <p className={styles.note}>
             {counts.new} new, {counts.updated} updated, {counts.unchanged} unchanged, {counts.skipped} skipped. {counts.flagged} with a disbanded date on file to review.
             {" "}Church map locations: {preview.locationCounts.created} to create, {preview.locationCounts.updated} to update (town, state and ZIP only; hand-set locations are never changed).
           </p>
@@ -103,21 +130,24 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
             </div>
           )}
           <div className="report-table-wrap">
-            <table className="report-table">
-              <thead><tr><th>Row</th><th>Name</th><th>Kind</th><th>What happens</th></tr></thead>
-              <tbody>
+            <table className="report-table table-cards table-cards-wide" role="table">
+              <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Row</th><th role="columnheader" scope="col">Name</th><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">{saved ? "What was saved" : "Proposed change"}</th></tr></thead>
+              <tbody role="rowgroup">
                 {preview.items.map((item) => (
-                  <tr key={item.line}>
-                    <td>{item.line}</td>
-                    <td translate="no">{item.name}</td>
-                    <td>{organizationKindLabels[item.kind]}</td>
-                    <td>
+                  <tr key={item.line} role="row">
+                    <td {...cardCell("Row")}>{item.line}</td>
+                    <th className="org-cell-name" role="rowheader" scope="row" translate="no">{item.name}</th>
+                    <td {...cardCell("Kind")}>{organizationKindLabels[item.kind]}</td>
+                    <td {...cardCell(saved ? "What was saved" : "Proposed change")}>
                       <span className={`status-chip ${actionTone[item.action]}`}>{actionLabels[item.action]}</span>
                       {(item.possibleMatches.length > 0 || item.needsChoice) && <span className="status-chip gold">{item.needsChoice ? "Possible match — choose" : "Possible match"}</span>}
-                      {item.notes.map((note) => <div className="field-help" key={note}>{note}</div>)}
+                      <span className={styles.cellNotes}>
+                        {item.notes.map((note) => <span key={note}>{note}</span>)}
+                      </span>
                       {(item.possibleMatches.length > 0 || item.needsChoice) && !saved && (
                         <select
                           aria-label={`Possible match for ${item.name}`}
+                          className={styles.matchSelect}
                           disabled={busy}
                           onChange={(event) => {
                             const next = { ...choices, [item.eadventistId]: event.target.value };
@@ -131,8 +161,10 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
                           <option value={NEW_RECORD}>Create new</option>
                         </select>
                       )}
-                      {item.locationAction && <div className="field-help">{item.locationAction === "CREATE" ? "Map location will be created." : "Map location will be updated."}</div>}
-                      {item.disbandedOn && <div className="field-help">{disbandedNotice(item.disbandedOn, true)}</div>}
+                      <span className={styles.cellNotes}>
+                        {item.locationAction && <span>{item.locationAction === "CREATE" ? (saved ? "Map location was created." : "Map location will be created.") : (saved ? "Map location was updated." : "Map location will be updated.")}</span>}
+                        {item.disbandedOn && <span>{disbandedNotice(item.disbandedOn, true)}</span>}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -144,9 +176,10 @@ export function EadventistImportWorkspace({ initialPreview }: { initialPreview?:
               {saved ? "Upload another file" : "Cancel"}
             </button>
             {!saved && (
-              <button className="primary-button" disabled={busy || !csv || changes === 0 || waiting > 0} onClick={() => csv && send(csv, true)} type="button">
-                <Upload aria-hidden="true" size={16} /> {busy ? "Saving…" : `Save ${changes} change${changes === 1 ? "" : "s"}`}
-              </button>
+              <p className={styles.note}>
+                Save is at the top of the page.{" "}
+                <button className={`text-button ${styles.textButton}`} onClick={() => document.getElementById(HEADER_ACTION_ID)?.focus()} type="button">Go to Save</button>
+              </p>
             )}
           </div>
         </>

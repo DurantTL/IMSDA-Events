@@ -1,7 +1,9 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { adminBackLink } from "@/components/admin-section-nav";
 import { OrganizationBillingContact } from "@/components/organization-billing-contact";
+import { DetailPage } from "@/components/page-templates/detail-page";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getOrganizationBillingContactAdminView } from "@/modules/billing-responsibility/repository";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
@@ -20,21 +22,28 @@ export default async function StaffOrganizationBillingContactPage({ params }: { 
   const { organizationId } = await params;
   const view = await getOrganizationBillingContactAdminView(organizationId, { id: user.id, globalRole: user.globalRole });
   if (!view) notFound();
+  const path = `/admin/organizations/${organizationId}/billing`;
   return (
-    <section className="page-stack">
-      <AdminSectionHeaderFor path={`/admin/organizations/${organizationId}/billing`} section="system" />
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Billing</p>
-          <h2>Billing contact for {view.organization.name}</h2>
-          <p>
-            Where invoices for this organization are sent after an event. Entered here by conference staff, never taken from a form
-            answer, an email address, the club director, or whoever submitted a registration. Event finance staff can see the current
-            contact&apos;s name, role and email, but only you can change it.
+    <>
+      {/* The back link is the header's: one link, named for where it goes. */}
+      <AdminSectionHeaderFor back={null} path={path} section="system" />
+      <DetailPage
+        header={{
+          title: view.organization.name,
+          exactName: true,
+          eyebrow: "Billing contact",
+          description: "Where invoices for this organization are sent after an event.",
+          back: adminBackLink("system", path) ?? undefined,
+        }}
+        notices={(
+          <p className="inline-notice" role="status">
+            Entered here by conference staff, never taken from a form answer, an email address, the club director, or whoever submitted a
+            registration. Event finance staff can see the current contact&apos;s name, role and email, but only you can change it.
           </p>
-        </div>
-      </div>
-      <OrganizationBillingContact active={view.active} history={view.history} organizationId={view.organization.id} />
-    </section>
+        )}
+      >
+        <OrganizationBillingContact active={view.active} history={view.history} organizationId={view.organization.id} />
+      </DetailPage>
+    </>
   );
 }

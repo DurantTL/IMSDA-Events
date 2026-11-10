@@ -92,7 +92,8 @@ describe("the review screen", () => {
 
   it("lists matches with Accept, Set on map and Skip, and no-matches without Accept", () => {
     const html = renderToStaticMarkup(createElement(ChurchMapLocationsWorkspace, { enabled: true, eligible: 3, items }));
-    expect(html).toContain("Find map locations");
+    // The lookup button is the page header's (#1592); the list names each match as a proposal until it is accepted.
+    expect(html).toContain("Proposed match");
     expect(html).toContain("2 results to review.");
     expect(html.match(/>Accept</g)).toHaveLength(1);
     expect(html.match(/>Skip</g)).toHaveLength(2);
@@ -100,9 +101,8 @@ describe("the review screen", () => {
     expect(html).toContain("No match");
   });
 
-  it("disables the button and explains when the flag is off", () => {
+  it("explains when the flag is off (the header's button is held; tests/staff-organizations-1592.test.ts)", () => {
     const html = renderToStaticMarkup(createElement(ChurchMapLocationsWorkspace, { enabled: false, eligible: 3, items: [] }));
     expect(html).toContain("GEOCODING_ENABLED=true");
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>(?:(?!<\/button>).)*Find map locations/);
   });
 });

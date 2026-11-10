@@ -1,15 +1,17 @@
 "use client";
 
-import { StaffPageHeader, type StaffPageTool } from "@/components/staff-page-header";
 import Link from "next/link";
 import { ActionsMenu } from "@/components/actions-menu";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { BadgeCheck, Building2, Church, Eye, IdCard, Link2, MapPin, Pencil, Plus, Save, ShieldCheck, Trash2, UserCog, UsersRound, X } from "lucide-react";
-import { OrganizationListPager, OrganizationSearchControls, type OrganizationListState } from "@/components/organization-search-controls";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BadgeCheck, Building2, Church, Eye, IdCard, Link2, MapPin, Pencil, Save, ShieldCheck, Trash2, UserCog, UsersRound, X } from "lucide-react";
+import { DialogError, HeldSaveButton } from "@/components/organization-form-parts";
+import { useRegisterOrganizationAction } from "@/components/organization-header-action";
+import { OrganizationListPager, OrganizationSearchControls, organizationListHref, type OrganizationListState } from "@/components/organization-search-controls";
 import { identityFormDirty, organizationFormDirty } from "@/components/organization-editor-dirty";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { useConfirm } from "@/components/use-confirm";
 import {
   externalSystemLabels,
   organizationTypeLabels,
@@ -62,11 +64,11 @@ const statusOptions = [
  * The Clubs and churches page. The list is one searched, filtered, server-paged
  * page (#723); the summary tiles and the sponsoring church or company picker come from the
  * whole directory, so a search never changes them. After a save the page asks
- * the server for the list again.
+ * the server for the list again. The page draws the header (title, description, Tools menu) and its one
+ * filled button, Add church or club, which opens the add dialog (#1592).
  */
 export function OrganizationDirectoryWorkspace({
   sponsorOptions,
-  tools,
   filters,
   organizations,
   page,
@@ -75,8 +77,6 @@ export function OrganizationDirectoryWorkspace({
   total,
 }: {
   sponsorOptions: SponsorOption[];
-  /** Sub-pages the system sidebar does not list (imports, the directory, invites). */
-  tools?: readonly StaffPageTool[];
   filters: OrganizationListState;
   organizations: OrganizationRecord[];
   page: number;
@@ -94,12 +94,32 @@ export function OrganizationDirectoryWorkspace({
   // record (or a blank form); closing or saving clears it. The delete confirmation is a typed name, not a draft (#1468).
   const [formDirty, setFormDirty] = useState(false);
   useUnsavedChangesGuard(formDirty && editor !== null && editor.kind !== "delete");
+  const { confirm: askConfirm, confirmDialog } = useConfirm();
   const dialogRef = useAccessibleDialog<HTMLElement>(Boolean(editor), closeEditor);
+  // The page header's one filled button opens the add dialog (rule D3); its handler is read fresh on every click.
+  const registerAction = useRegisterOrganizationAction();
+  const openCreate = useRef<() => void>(() => {});
+  const runCreate = useCallback(() => openCreate.current(), []);
+  useEffect(() => {
+    openCreate.current = beginCreate;
+  });
+  useEffect(() => {
+    registerAction({ run: runCreate, busy: false });
+    return () => registerAction(null);
+  }, [registerAction, runCreate]);
   const activeSponsors = sponsorOptions.filter((sponsor) => sponsor.isActive);
   const searching = filters.q.trim() !== "" || filters.kind !== "" || filters.status !== "ALL";
 
-  function closeEditor() {
+  /** Close, Cancel, Escape and the backdrop all come here: a form with typed work asks first, and a save in flight waits. */
+  async function closeEditor() {
     if (saving) return;
+    if (formDirty && editor !== null && editor.kind !== "delete" && !(await askConfirm({
+      title: editor.kind === "create" ? "Discard the new church or club" : `Discard changes to ${editor.organization.name}`,
+      body: <p>These changes haven&apos;t been saved. Discarding closes the editor and loses them.</p>,
+      confirmLabel: "Discard changes",
+      cancelLabel: "Keep editing",
+      destructive: true,
+    }))) return;
     setEditor(null);
     setError("");
     setFormDirty(false);
@@ -150,7 +170,7 @@ export function OrganizationDirectoryWorkspace({
 
   async function confirmDelete(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (editor?.kind !== "delete") return;
+    if (editor?.kind !== "delete" || saving) return;
     const form = new FormData(event.currentTarget);
     const name = editor.organization.name;
     setSaving(true);
@@ -185,7 +205,7 @@ export function OrganizationDirectoryWorkspace({
 
   async function saveOrganization(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!editor || editor.kind === "identity" || editor.kind === "delete") return;
+    if (!editor || editor.kind === "identity" || editor.kind === "delete" || saving) return;
     setSaving(true);
     setError("");
     const form = new FormData(event.currentTarget);
@@ -230,7 +250,7 @@ export function OrganizationDirectoryWorkspace({
 
   async function saveIdentity(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!editor || editor.kind !== "identity") return;
+    if (!editor || editor.kind !== "identity" || saving) return;
     setSaving(true);
     setError("");
     const form = new FormData(event.currentTarget);
@@ -273,17 +293,7 @@ export function OrganizationDirectoryWorkspace({
   }
 
   return (
-    <section className="page-stack">
-      <StaffPageHeader
-        description="One organization directory for events, club rosters, treasury billing, and provider reconciliation. External identifiers are stored separately from names so later syncs do not guess."
-        primary={(
-          <button className="primary-button" type="button" onClick={beginCreate}>
-            <Plus aria-hidden="true" size={17} /> Add church or club
-          </button>
-        )}
-        tools={tools}
-      />
-
+    <div className="page-stack">
       <section className="finance-summary" aria-label="Organization summary">
         <article className="finance-stat">
           <span><Church aria-hidden="true" size={18} /></span>
@@ -331,9 +341,9 @@ export function OrganizationDirectoryWorkspace({
         {total === 0 && searching ? (
           <NoMatchesState clear={{ href: "/admin/organizations" }} icon={<Building2 aria-hidden="true" size={27} />} noun="churches or clubs" query={filters.q} />
         ) : total === 0 ? (
-          <EmptyState action={{ label: "Add first organization", onClick: beginCreate }} canCreate icon={<Building2 aria-hidden="true" size={27} />} title="No churches or clubs yet">Add the first church, then place its clubs beneath it.</EmptyState>
+          <EmptyState action={{ label: "Add first organization", onClick: beginCreate }} actionClass="secondary-button" canCreate icon={<Building2 aria-hidden="true" size={27} />} title="No churches or clubs yet">Add the first church, then place its clubs beneath it.</EmptyState>
         ) : (
-          <div className={styles.directory}>
+          <div className={`${styles.directory} dense-rows`}>
             {organizations.map((organization) => (
               <article
                 className={`${styles.organizationCard} ${!organization.isActive ? styles.inactive : ""}`}
@@ -345,14 +355,25 @@ export function OrganizationDirectoryWorkspace({
                       ? <Church aria-hidden="true" size={18} />
                       : <UsersRound aria-hidden="true" size={18} />}
                   </span>
-                  <span>
-                    <strong>{organization.name}</strong>
-                    <small>
-                      {organizationTypeLabels[organization.type]}
-                      {organization.parentOrganization
-                        ? ` · ${sponsorOptionLabel(organization.parentOrganization)}`
-                        : ""}
-                    </small>
+                  <span className={styles.organizationText}>
+                    <strong translate="no">{organization.name}</strong>
+                    <small>{organizationTypeLabels[organization.type]}</small>
+                    {organization.parentOrganization && (
+                      <small className={styles.relation}>
+                        Sponsored by{" "}
+                        <Link className={styles.textLink} href={organizationListHref("/admin/organizations", { q: organization.parentOrganization.name, kind: "", status: "ALL" })}>
+                          {sponsorOptionLabel(organization.parentOrganization)}
+                        </Link>
+                        {!organization.parentOrganization.isActive && " (inactive)"}
+                      </small>
+                    )}
+                    {organization.type === "CHURCH" && (
+                      <small className={styles.relation}>
+                        <Link className={styles.textLink} href={organizationListHref("/admin/organizations", { q: organization.name, kind: "", status: "ALL" })}>
+                          Show this church with its clubs
+                        </Link>
+                      </small>
+                    )}
                   </span>
                   <em className={organization.isActive ? styles.active : styles.inactiveStatus}>
                     {organization.isActive ? "Active" : "Inactive"}
@@ -377,11 +398,14 @@ export function OrganizationDirectoryWorkspace({
                     </button>
                   ))}
                   {organization.externalIdentities.length === 0 && (
-                    <p>No provider identifier linked yet.</p>
+                    <p>
+                      No provider identifier linked yet.{" "}
+                      <button aria-label={`Link a provider identifier for ${organization.name}`} className={`text-button ${styles.textButton}`} onClick={() => beginIdentity(organization)} type="button">Link provider</button>
+                    </p>
                   )}
                 </div>
 
-                <div className={styles.actions}>
+                <div className={`${styles.actions} row-actions`}>
                   <button
                     className="secondary-button"
                     type="button"
@@ -550,16 +574,13 @@ export function OrganizationDirectoryWorkspace({
                     </label>
                   </>
                 )}
-                {error && <p className="form-error" role="alert">{error}</p>}
+                {error && <DialogError text={error} />}
                 <div className="form-actions">
                   <button className="secondary-button" disabled={saving} onClick={closeEditor} type="button">
                     {editor.check?.blockers.length ? "Close" : "Cancel"}
                   </button>
                   {editor.check && editor.check.blockers.length === 0 && (
-                    <button className="primary-button lifecycle-danger-button" disabled={saving} type="submit">
-                      <Trash2 aria-hidden="true" size={15} />
-                      {saving ? "Deleting…" : `Delete ${editor.check.name}`}
-                    </button>
+                    <HeldSaveButton danger held={saving} heldLabel="Deleting…" icon={<Trash2 aria-hidden="true" size={15} />} label={`Delete ${editor.check.name}`} />
                   )}
                 </div>
               </form>
@@ -617,19 +638,12 @@ export function OrganizationDirectoryWorkspace({
                   Provider identifiers are durable reconciliation keys. Names
                   and email addresses are never used as automatic sync keys.
                 </p>
-                {error && <p className="form-error" role="alert">{error}</p>}
+                {error && <DialogError text={error} />}
                 <div className="form-actions">
                   <button className="secondary-button" disabled={saving} onClick={closeEditor} type="button">
                     Cancel
                   </button>
-                  <button className="primary-button" disabled={saving} type="submit">
-                    <Link2 aria-hidden="true" size={15} />
-                    {saving
-                      ? "Saving…"
-                      : editor.identity
-                        ? "Save correction"
-                        : "Link identifier"}
-                  </button>
+                  <HeldSaveButton held={saving} icon={<Link2 aria-hidden="true" size={15} />} label={editor.identity ? "Save correction" : "Link identifier"} />
                 </div>
               </form>
             ) : (
@@ -713,21 +727,19 @@ export function OrganizationDirectoryWorkspace({
                   />
                   Active in the shared directory
                 </label>
-                {error && <p className="form-error" role="alert">{error}</p>}
+                {error && <DialogError text={error} />}
                 <div className="form-actions">
                   <button className="secondary-button" disabled={saving} onClick={closeEditor} type="button">
                     Cancel
                   </button>
-                  <button className="primary-button" disabled={saving} type="submit">
-                    <Save aria-hidden="true" size={15} />
-                    {saving ? "Saving…" : "Save organization"}
-                  </button>
+                  <HeldSaveButton held={saving} icon={<Save aria-hidden="true" size={15} />} label="Save organization" />
                 </div>
               </form>
             )}
           </section>
         </div>
       )}
-    </section>
+      {confirmDialog}
+    </div>
   );
 }

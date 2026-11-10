@@ -2,6 +2,8 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ChurchMapLocationsWorkspace } from "@/components/church-map-locations-workspace";
+import { OrganizationActionProvider, OrganizationHeaderButton } from "@/components/organization-header-action";
+import { ListPage } from "@/components/page-templates/list-page";
 import { geocodingEnabled } from "@/integrations/geocoding";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { countGeocodableChurches, listGeocodeReview } from "@/modules/organizations/church-geocoding";
@@ -18,16 +20,11 @@ export default async function ChurchMapLocationsPage() {
   return (
     <>
       <AdminSectionHeaderFor path="/admin/organizations/map-locations" section="system" />
-      <section className="page-stack" aria-labelledby="map-locations-title">
-        <div className="page-intro">
-          <div>
-            <p className="eyebrow">Clubs and churches</p>
-            <h2 id="map-locations-title">Find map locations</h2>
-            <p>Looks up map points for imported churches so their clubs appear on the public club map. Review each match before it is used.</p>
-          </div>
-        </div>
-        <ChurchMapLocationsWorkspace enabled={geocodingEnabled()} eligible={eligible} items={items} />
-      </section>
+      <OrganizationActionProvider>
+        <ListPage header={{ title: "Find map locations", description: "Looks up map points for imported churches so their clubs appear on the public club map. Review each match before it is used.", primary: <OrganizationHeaderButton icon="map" label="Find map locations" /> }}>
+          <ChurchMapLocationsWorkspace enabled={geocodingEnabled()} eligible={eligible} items={items} />
+        </ListPage>
+      </OrganizationActionProvider>
     </>
   );
 }
