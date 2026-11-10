@@ -22,7 +22,12 @@ case "$1" in
       *) case " $FAKE_EXISTING " in *" $2 "*) exit 0 ;; *) exit 1 ;; esac ;;
     esac ;;
   run)
-    case "$*" in *"--rm"*) exit "\${FAKE_PREFLIGHT_EXIT:-0}" ;; *) exit "\${FAKE_RUN_EXIT:-0}" ;; esac ;;
+    case "$*" in
+      *"--entrypoint grep"*) exit "\${FAKE_PROBE_EXIT:-0}" ;;
+      *IMSDA_PREFLIGHT_ONLY=1*) exit "\${FAKE_USER_CHECK_EXIT:-0}" ;;
+      *"--rm"*) exit "\${FAKE_PREFLIGHT_EXIT:-0}" ;;
+      *) exit "\${FAKE_RUN_EXIT:-0}" ;;
+    esac ;;
   start) exit "\${FAKE_START_EXIT:-0}" ;;
 esac
 exit 0
@@ -127,6 +132,44 @@ describe("manual-deploy.sh", () => {
     expect(result.calls).toMatch(/run -d --name xcloud-site-1-app-1 .*SECRET_ENCRYPTION_KEY_FILE=\/run\/secrets\/encryption-key/);
     expect(result.calls).toMatch(/run -d .*imsda_events_assets:\/app\/storage\/event-assets/);
     expect(result.calls).toContain(`network connect postgresql_9kgaw_239292_xcloud-network ${app}`);
+  });
+
+  it("checks the uploads volume and key file against the new image's user before stopping the live app (#1798)", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const { status, calls } = run([sha]);
+    expect(status).toBe(0);
+    const check = calls.split("\n").findIndex((line) => line.startsWith("run --rm") && line.includes("IMSDA_PREFLIGHT_ONLY=1"));
+    const stop = calls.split("\n").findIndex((line) => line.startsWith(`stop ${app}`));
+    expect(check).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(stop);
+    const line = calls.split("\n")[check];
+    expect(line).toContain("imsda_events_assets:/app/storage/event-assets");
+    expect(line).toContain("SECRET_ENCRYPTION_KEY_FILE=/run/secrets/encryption-key");
+  });
+
+  it("leaves the running app alone when the new image's user cannot use the uploads or key (#1798)", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const { status, stderr, calls } = run([sha], { FAKE_USER_CHECK_EXIT: "78" });
+    expect(status).not.toBe(0);
+    expect(stderr).toContain("Nothing was changed");
+    expect(calls).not.toContain(`stop ${app}`);
+    expect(calls).not.toContain("run -d");
+  });
+
+  it("skips that check for an image from before it existed, and still deploys (#1798)", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const { status, calls } = run([sha], { FAKE_PROBE_EXIT: "1" });
+    expect(status).toBe(0);
+    expect(calls).not.toContain("IMSDA_PREFLIGHT_ONLY=1");
+    expect(calls).toContain("run -d");
+  });
+
+  it("stops before any change when the new image cannot be inspected (#1798)", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const { status, stderr, calls } = run([sha], { FAKE_PROBE_EXIT: "125" });
+    expect(status).not.toBe(0);
+    expect(stderr).toContain("Nothing was changed");
+    expect(calls).not.toContain(`stop ${app}`);
   });
 
   // Key rotation (#1516): key files are named by version and never overwritten.
