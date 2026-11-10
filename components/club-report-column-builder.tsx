@@ -334,7 +334,7 @@ export function ClubReportColumnBuilder({ endpoint, eventName, options, defaultK
             <input aria-describedby={nameError ? `${ids}-name-error` : undefined} aria-invalid={nameError ? true : undefined} maxLength={80} onChange={(event) => { setLayoutName(event.target.value); setNameError(""); }} placeholder="e.g. Spring Camporee check-in" type="text" value={layoutName} />
             {nameError && <span className={`${styles.fieldError} ${styles.message}`} id={`${ids}-name-error`}>{nameError}</span>}
           </label>
-          <button className="secondary-button" disabled={busy || none || !layoutName.trim()} type="submit">{working === "save" ? "Saving…" : "Save layout"}</button>
+          <button className="secondary-button" aria-describedby={disabledHintId(clubHint, `${ids}-club-hint`)} disabled={busy || none || !layoutName.trim()} type="submit">{working === "save" ? "Saving…" : "Save layout"}</button>
         </form>
       )}
     </div>
