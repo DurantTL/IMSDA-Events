@@ -45,6 +45,12 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/admin/organizations/[organizationId]/billing" },
   { pattern: "/admin/organizations/[organizationId]/location" },
   { pattern: "/admin/organizations/[organizationId]/pastor" },
+  { pattern: "/admin/email" },
+  { pattern: "/admin/feature-requests" },
+  { pattern: "/admin/pauses" },
+  { pattern: "/admin/readiness" },
+  { pattern: "/admin/settings" },
+  { pattern: "/admin/system-report" },
 ];
 
 function segmentsOf(path: string) {

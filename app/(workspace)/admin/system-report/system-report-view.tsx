@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CircleHelp, RefreshCw, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ArrowRight, CircleHelp, ShieldAlert, ShieldCheck, TriangleAlert } from "lucide-react";
 import {
   reportReadLabel,
   reportTimeLabel,
@@ -16,7 +16,6 @@ import { systemSetupIdOf } from "@/modules/setup-help/system-setup-steps";
 import styles from "./page.module.css";
 import { SystemReportTesters } from "./system-report-testers";
 import { CloudflarePurgeRow } from "./cloudflare-purge-row";
-import { TestConnectionsButton } from "./test-connections-button";
 
 /** The shared status chip colors. "Count only" has no verdict, so it is drawn plain, never green. */
 const chipColor: Record<SignalState, string> = { ok: "green", watch: "gold", attention: "coral", unavailable: "neutral", info: "neutral" };
@@ -136,19 +135,7 @@ export function SystemReportView({ report, testerDefaultEmail = "", ownConnectio
   const Icon = verdictIcon[overall.state];
   const tally = overall.tally;
   return (
-    <section className={`page-stack ${styles.workspace}`}>
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">System administrators only</p>
-          <h2 className="duplicate-page-title">System report</h2>
-          <p>Every reading the system makes, in one place. Each row says what was checked, when, and what it found. A reading that could not be made shows as unavailable, never as OK.</p>
-        </div>
-        <div className="page-intro-actions">
-          <TestConnectionsButton />
-          <Link className="secondary-button" href="/admin/system-report"><RefreshCw aria-hidden="true" size={16} />Check again</Link>
-        </div>
-      </div>
-
+    <div className={`page-stack ${styles.workspace}`}>
       <section className={styles.glance} aria-labelledby="glance-heading" data-testid="report-glance" data-state={overall.state}>
         <div className={styles.verdict}>
           <span className={`${styles.verdictIcon} ${styles[`verdict_${overall.state}`] ?? ""}`} aria-hidden="true"><Icon size={24} /></span>
@@ -181,9 +168,9 @@ export function SystemReportView({ report, testerDefaultEmail = "", ownConnectio
       {report.sections.map((section) => <Section key={section.key} section={section} now={now} ownConnection={ownConnection} cloudflarePurgeConfigured={cloudflarePurgeConfigured} registry={registry} />)}
 
       <p className={styles.footerLine}>
-        Counts and states only: no settings values, names or attendee details. The one exception is your own connection card above, which shows only your own address.{" "}
+        System administrators only. Counts and states only: no settings values, names or attendee details. The one exception is your own connection card above, which shows only your own address.{" "}
         {report.releaseSha ? <>Release <code>{report.releaseSha.slice(0, 7)}</code>.</> : "Release not recorded."}
       </p>
-    </section>
+    </div>
   );
 }

@@ -176,7 +176,7 @@ describe("email page, with the staff alerts (#1016, #1043)", () => {
     const element = await EmailPage();
     const children = (element as { props: { children: Array<{ type: unknown; props: Record<string, unknown> }> } }).props.children
       .filter((child) => child && typeof child === "object" && "type" in child && typeof child.type === "function");
-    expect(children.map((child) => (child.type as { name: string }).name)).toEqual(["AdminSectionHeaderFor", "StaffPageHeader", "EmailDeliverySection", "NotificationsWorkspace", "EmailHealthSection", "MessageFileStorageSection"]);
+    expect(children.map((child) => (child.type as { name: string }).name)).toEqual(["AdminSectionHeaderFor", "PageHeader", "EmailDeliverySection", "NotificationsWorkspace", "EmailHealthSection", "MessageFileStorageSection"]);
     expect(children[3]!.props).toMatchObject({ addresses, switches: allOn, embedded: true });
     expect(children[2]!.props).toMatchObject({ sender: { name: "IMAdventist", email: "events@imsda-events.test", replyTo: "" }, platformConfigured: true });
   });

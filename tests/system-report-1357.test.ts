@@ -390,7 +390,7 @@ describe("the page markup", () => {
   it("shows the head, the at-a-glance card with a tile per section, and the footer with the release", () => {
     const markup = html();
     expect(markup).toContain("System administrators only");
-    expect(markup).toMatch(/<a class="secondary-button" href="\/admin\/system-report">[^]*Check again/);
+    // Check again and Test connections moved into the page header (#1595); tests/system-pages-1595.test.ts covers them.
     expect(markup).toContain("2 problems need attention");
     expect(markup).toContain("Read Friday, October 30, 2026 at 5:42 AM CDT. 4 readings tried, 1 could not be read.");
     for (const section of SECTION_DEFINITIONS) expect(markup).toContain(`href="#s-${section.key}"`);
