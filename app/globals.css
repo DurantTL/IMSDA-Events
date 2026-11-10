@@ -60,6 +60,8 @@
   --table-head: #f6f9fa;
   --table-row-line: #eaf0f2; /* the thin divider inside a table row and a table card (#1457); the value #eaf0f2 had before */
   --touch-target: 44px;
+  /* #1775: the shorter row-control size, used only in the one pointer: fine, 1024px-and-wider block below (the .dense-rows rule). */
+  --touch-target-dense: 36px;
   /* The cursor over a busy or disabled button ("Processing…", "Saving…"): one place to change it (#1506). */
   --cursor-busy: not-allowed;
   --radius-sm: 8px;
@@ -12068,6 +12070,18 @@ details.honor-seat-override > summary { cursor: pointer; font-weight: 700; displ
   .icon-button-row .icon-button, .icon-button-row .secondary-button.icon-only { width: 44px; height: 44px; min-height: 44px; }
 }
 :is(.report-table-wrap, .table-wrap, .table-scroll, .reminder-recipient-table-wrap):has(.actions-menu[open]) { overflow: visible; }
+
+/* Dense staff rows (#1775, site rule L13). Row actions, row links, compact selects and the row's select box are 44px by default:
+   touch, and any screen under 1024px. Only with a mouse or trackpad (pointer: fine) at 1024px and wider, inside a staff table or
+   list row marked .dense-rows, are they --touch-target-dense (36px). This is the only place that token is used; no page sets its own. */
+.app-shell .dense-rows :is(.arrival-row button, .row-actions > :is(a, button), .row-actions .secondary-button, .row-actions .actions-menu-trigger, .row-link, select) { min-height: var(--touch-target); }
+.app-shell .dense-rows .record-select { top: 0; right: 0; width: var(--touch-target); height: var(--touch-target); }
+.app-shell .dense-rows .record-card-shell:has(.record-select) > .record-card { padding-right: calc(var(--touch-target) + 4px); }
+@media (pointer: fine) and (min-width: 1024px) {
+  :root .app-shell .dense-rows :is(.arrival-row button, .row-actions > :is(a, button), .row-actions .secondary-button, .row-actions .actions-menu-trigger, .row-link, select) { min-height: var(--touch-target-dense); }
+  :root .app-shell .dense-rows .record-select { width: var(--touch-target-dense); height: var(--touch-target-dense); }
+  :root .app-shell .dense-rows .record-card-shell:has(.record-select) > .record-card { padding-right: calc(var(--touch-target-dense) + 4px); }
+}
 
 /* Staff tables at tablet and small desktop widths (#997): they fit the box beside the sidebar. Tighter cell padding,
    headers that wrap between words, and roster-style cells that wrap instead of holding one line. Words still never

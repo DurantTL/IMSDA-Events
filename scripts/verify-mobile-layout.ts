@@ -90,6 +90,7 @@ loadEnvConfig(process.cwd());
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Page = any;
 type Context = any;
+type Browser = any;
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 const baseUrl = (process.env.MOBILE_LAYOUT_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -4619,6 +4620,57 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
 }
 
 
+/**
+ * Dense staff rows (#1775, site rule L13): the registrations list and the arrivals list keep every row control 44px with touch
+ * (at any width, including 1024 and 1280) and, with a mouse at 1024px and wider, shrink them to the 36px dense size. Each page is
+ * opened twice per width: in a touch context (hasTouch makes Chromium report (pointer: coarse), which is confirmed here rather
+ * than assumed) and in a plain mouse context. Runs outside the width loop above because that loop only emulates touch up to 768px.
+ */
+const denseRowPages: Array<{ name: string; path: string; selector: string }> = [
+  { name: "dense-rows-registrations", path: "/people", selector: ".dense-rows .record-select" },
+  { name: "dense-rows-arrivals", path: "/check-in", selector: ".dense-rows .arrival-row button" },
+];
+const denseTargetPx = 36;
+const denseWidths = [1024, 1280];
+async function denseRowsAudit(browser: Browser, cookie: { name: string; value: string; expires: number }) {
+  for (const width of denseWidths) {
+    for (const pointer of ["touch", "mouse"] as const) {
+      const context: Context = await browser.newContext({ viewport: { width, height: heightFor(width) }, hasTouch: pointer === "touch", deviceScaleFactor: 1, reducedMotion: "reduce" });
+      await context.addInitScript("window.__name = (target) => target;");
+      await context.addCookies([{ name: cookie.name, value: cookie.value, url: baseUrl, httpOnly: true, expires: cookie.expires }]);
+      const page = await context.newPage();
+      for (const spec of denseRowPages) {
+        const label = `${spec.name} ${pointer}`;
+        try {
+          await page.goto(`${baseUrl}${spec.path}`, { waitUntil: "load", timeout: 60_000 });
+          await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => undefined);
+          await waitForShell(page);
+          await page.waitForTimeout(150);
+          const result: { coarse: boolean; fine: boolean; sizes: number[] } = await page.evaluate((selector: string) => ({
+            coarse: window.matchMedia("(pointer: coarse)").matches,
+            fine: window.matchMedia("(pointer: fine)").matches,
+            sizes: Array.from(document.querySelectorAll<HTMLElement>(selector)).map((el) => el.getBoundingClientRect()).filter((box) => box.width > 0 && box.height > 0).map((box) => Math.round(Math.min(box.width, box.height) * 100) / 100),
+          }), spec.selector);
+          pagesVisited.push(`${label} @${width}`);
+          if (pointer === "touch" && !result.coarse) record("dense-rows", label, width, "the touch context does not report (pointer: coarse), so the 44px check below would prove nothing");
+          if (pointer === "mouse" && !result.fine) record("dense-rows", label, width, "the mouse context does not report (pointer: fine)");
+          if (result.sizes.length === 0) { record("dense-rows", label, width, `no row control matched ${spec.selector}, so nothing was measured`); continue; }
+          const shortest = Math.min(...result.sizes);
+          const tallest = Math.max(...result.sizes);
+          if (pointer === "touch" && shortest < touchTarget - touchTolerance) record("dense-rows", label, width, `a row control is ${shortest}px with touch, under ${touchTarget}`);
+          if (pointer === "mouse") {
+            if (shortest < denseTargetPx - touchTolerance) record("dense-rows", label, width, `a row control is ${shortest}px with a mouse, under the dense ${denseTargetPx}px`);
+            if (tallest >= touchTarget - touchTolerance) record("dense-rows", label, width, `no row control is dense with a mouse (largest ${tallest}px): the dense rule did not apply`);
+          }
+        } catch (error) {
+          record("audit-failed", label, width, (error as Error).message.split("\n")[0]);
+        }
+      }
+      await context.close();
+    }
+  }
+}
+
 async function main() {
   // Hard guard first: nothing below may load Prisma or the session store
   // until this has passed.
@@ -4695,6 +4747,9 @@ async function main() {
         }
         await context.close();
       }
+    }
+    if (!only || denseRowPages.some((spec) => only.split(",").some((part) => spec.name.includes(part.trim())))) {
+      await denseRowsAudit(browser, cookies["event-admin"]);
     }
   } finally {
     await browser?.close().catch(() => undefined);
