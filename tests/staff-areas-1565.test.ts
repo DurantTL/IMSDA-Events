@@ -259,7 +259,7 @@ describe("event tabs (#1565)", () => {
     expect(place("/finance/cancellation-requests")).toEqual({ tab: "money", view: "refunds" });
     expect(place("/finance/tools")).toEqual({ tab: "money", view: "more-tools" });
     expect(place("/more/promo-codes")).toEqual({ tab: "money", view: "promo" });
-    expect(place(kitchenCountsPath)).toEqual({ tab: "reports", view: "kitchen-counts" });
+    expect(place(kitchenCountsPath)).toEqual({ tab: "reports", view: "kitchen" });
     expect(place("/more/reports/packets")).toEqual({ tab: "reports", view: "printouts" });
     expect(place("/more/reports/printouts")).toEqual({ tab: "reports", view: "printouts" });
     expect(place("/more/reports/clubs")).toEqual({ tab: "reports", view: "printouts" });

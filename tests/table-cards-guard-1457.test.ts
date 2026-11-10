@@ -92,7 +92,7 @@ const allowList: Record<string, { tables: number; reason: string }> = {
   "components/honors-setup-workspace.tsx": { tables: 1, reason: fits },
   "components/instructor-roster.tsx": { tables: 1, reason: fits },
   "components/lodging-assignments-panels.tsx": { tables: 5, reason: fits },
-  "components/meals-workspace.tsx": { tables: 4, reason: fits },
+  "components/meals-workspace.tsx": { tables: 1, reason: fits },
   "components/program-assignments-workspace.tsx": { tables: 2, reason: fits },
   "components/responsible-adult-review.tsx": { tables: 2, reason: fits },
   "components/roster-export-builder.tsx": { tables: 1, reason: fits },
