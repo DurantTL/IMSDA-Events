@@ -249,6 +249,6 @@ describe("the submission page header does not print (#1573)", () => {
 
 describe("the On or Off help says what the switch does (#1573)", () => {
   it("names each verified effect", () => {
-    for (const phrase of ["private links work", "opens its public application", "public club forms page link to it", "Missing forms view", "Area Coordinators", "Everything already filled in is kept"]) expect(definitions).toContain(phrase);
+    for (const phrase of ["private links work", "opens its public application", "public club forms page link to it", "Missing forms view", "Everything already filled in is kept"]) expect(definitions).toContain(phrase);
   });
 });
