@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { PackageOpen, Plus } from "lucide-react";
 import {
   assetAvailabilities,
@@ -17,6 +17,7 @@ import { formHasEdits } from "@/components/form-has-edits";
 import { issueDeskHref } from "@/components/issued-assets-views-model";
 import { NavigationLink } from "@/components/navigation-link";
 import { PageHeader } from "@/components/page-header";
+import { cardCell } from "@/components/table-card-labels";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -43,7 +44,7 @@ function useEditedForm(key?: string, report?: ReportEdited) {
   // Unsaved work: any field of this form changed from its starting value, until it is saved or reset (#1468).
   useUnsavedChangesGuard(edited);
   const set = (value: boolean) => { setEdited(value); if (key) report?.(key, value); };
-  return { track: (event: FormEvent<HTMLFormElement>) => set(formHasEdits(event.currentTarget)), clear: () => set(false) };
+  return { track: (event: FormEvent<HTMLFormElement>) => set(formHasEdits(event.currentTarget)), clear: () => set(false), recheck: (form: HTMLFormElement) => set(formHasEdits(form)) };
 }
 
 const label = (value: string) => value.charAt(0) + value.slice(1).toLowerCase();
@@ -64,12 +65,14 @@ export function IssuedAssetsWorkspace({ eventId, initialCatalog, canOpenDesk, st
   const [busy, setBusy] = useState(false);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
+  // True after an Edit save that stored some groups and then failed on a later one.
+  const [partlySaved, setPartlySaved] = useState(false);
   const base = `/api/events/${encodeURIComponent(eventId)}/assets`;
   // The forms of the open dialog that hold edits. A ref: it is only read when the dialog is asked to close.
   const editedForms = useRef(new Set<string>());
   const reportEdited: ReportEdited = (key, edited) => { if (edited) editedForms.current.add(key); else editedForms.current.delete(key); };
 
-  async function run(url: string, body: unknown, success: (result: Result) => string) {
+  async function run(url: string, body: unknown, success: (result: Result) => string, onError?: (message: string) => void) {
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await call(url, body);
@@ -77,7 +80,8 @@ export function IssuedAssetsWorkspace({ eventId, initialCatalog, canOpenDesk, st
       setNotice(success(response.result));
       return true;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "That could not be saved.");
+      const message = cause instanceof Error ? cause.message : "That could not be saved.";
+      if (onError) onError(message); else setError(message);
       return false;
     } finally { setBusy(false); }
   }
@@ -86,20 +90,28 @@ export function IssuedAssetsWorkspace({ eventId, initialCatalog, canOpenDesk, st
     // A leftover page message must not appear inside the new dialog.
     setError(""); setNotice("");
     editedForms.current.clear();
+    setPartlySaved(false);
     setDialog(next);
   }
 
+  /** The save worked: close and keep its success notice on the page. */
   function closeDialog() {
     editedForms.current.clear();
     setDiscardOpen(false);
     setDialog(null);
   }
 
+  /** Cancel or discard: close and drop any message the dialog showed, so a failed save does not reappear on the page. */
+  function abandonDialog() {
+    setError(""); setNotice("");
+    closeDialog();
+  }
+
   /** Close, Cancel and Escape all come through here: a clean dialog closes at once, a dirty one asks first, and nothing closes mid-save so a failure shows in the open dialog. */
   function requestClose() {
     if (busy) return;
     if (editedForms.current.size > 0) { setDiscardOpen(true); return; }
-    closeDialog();
+    abandonDialog();
   }
 
   const dialogType = dialog && dialog.kind !== "add-kind" ? catalog.types.find((type) => type.id === dialog.typeId) ?? null : null;
@@ -131,7 +143,7 @@ export function IssuedAssetsWorkspace({ eventId, initialCatalog, canOpenDesk, st
     </EditorDialog> : null}
     {dialog?.kind === "edit" && dialogType ? <EditorDialog className={styles.editor} closeLabel={`Close the edit form for ${dialogType.name}`} onRequestClose={requestClose} title={`Edit ${dialogType.name}`}>
       <DialogMessages error={error} notice={notice} />
-      <EditTypeForm type={dialogType} base={base} busy={busy} run={run} fail={setError} report={reportEdited} onCancel={requestClose} onDone={closeDialog} />
+      <EditTypeForm type={dialogType} base={base} busy={busy} run={run} fail={setError} onPartial={() => setPartlySaved(true)} report={reportEdited} onCancel={requestClose} onDone={closeDialog} />
     </EditorDialog> : null}
     {dialog?.kind === "add-items" && dialogType ? <EditorDialog className={styles.editor} closeLabel={`Close the add items form for ${dialogType.name}`} onRequestClose={requestClose} title={`Add items to ${dialogType.name}`}>
       <DialogMessages error={error} notice={notice} />
@@ -142,11 +154,11 @@ export function IssuedAssetsWorkspace({ eventId, initialCatalog, canOpenDesk, st
       confirmLabel="Discard changes"
       destructive
       onCancel={() => setDiscardOpen(false)}
-      onConfirm={closeDialog}
+      onConfirm={abandonDialog}
       open={discardOpen}
       title="Discard your changes?"
     >
-      <p>You have unsaved edits. If you close now they are lost. Keep editing to save them first.</p>
+      <p>{partlySaved ? "Part of this form was saved. The edits that were not saved are lost if you close now. Keep editing to save them first." : "You have unsaved edits. If you close now they are lost. Keep editing to save them first."}</p>
     </ConfirmDialog>
   </div>;
 }
@@ -159,7 +171,7 @@ function DialogMessages({ error, notice }: { error: string; notice: string }) {
   </>;
 }
 
-type Run = (url: string, body: unknown, success: (result: Result) => string) => Promise<boolean>;
+type Run = (url: string, body: unknown, success: (result: Result) => string, onError?: (message: string) => void) => Promise<boolean>;
 type DialogFormProps = { base: string; busy: boolean; run: Run; report: ReportEdited; onCancel: () => void; onDone: () => void };
 
 function AddKindForm({ base, busy, run, report, onCancel, onDone }: DialogFormProps) {
@@ -186,7 +198,7 @@ function AddKindForm({ base, busy, run, report, onCancel, onDone }: DialogFormPr
     <label>Deposit policy reference (optional) <input name="depositPolicyRef" maxLength={120} placeholder="CM26 key deposit" /></label>
     <label>Replacement policy reference (optional) <input name="replacementPolicyRef" maxLength={120} /></label>
     <MoneyFields />
-    <div className="form-actions"><button className="secondary-button" type="button" onClick={onCancel}>Cancel</button><button className="primary-button" type="submit" disabled={busy}>Add kind of item</button></div>
+    <div className="form-actions"><button className="secondary-button" type="button" onClick={onCancel}>Cancel</button><button className="primary-button" type="submit" disabled={busy}>{busy ? "Saving…" : "Add kind of item"}</button></div>
   </form>;
 }
 
@@ -194,8 +206,16 @@ function AddKindForm({ base, busy, run, report, onCancel, onDone }: DialogFormPr
  * One Save for what used to be separate controls. It sends the same requests as before (one for Active, one for Room-linked,
  * one for who it can be issued to, one for the policy and money) and only for what changed, one after another.
  */
-function EditTypeForm({ type, base, busy, run, fail, report, onCancel, onDone }: DialogFormProps & { type: CatalogType; fail: (message: string) => void }) {
+function EditTypeForm({ type, base, busy, run, fail, onPartial, report, onCancel, onDone }: DialogFormProps & { type: CatalogType; fail: (message: string) => void; onPartial: () => void }) {
   const edit = useEditedForm("edit-kind", report);
+  const formRef = useRef<HTMLFormElement>(null);
+  // What the form started from. After a partial save the saved groups move to their saved values, so only the groups still unsaved count as edits.
+  const [start, setStart] = useState({
+    active: type.active, roomLinked: type.roomLinked, kinds: type.assigneeKinds as readonly string[],
+    depositPolicyRef: type.depositPolicyRef ?? "", replacementPolicyRef: type.replacementPolicyRef ?? "", depositCents: type.depositCents, depositShortfall: type.depositShortfall as string, replacementFeeCents: type.replacementFeeCents,
+  });
+  const recheck = edit.recheck;
+  useEffect(() => { if (formRef.current) recheck(formRef.current); }, [start]); // eslint-disable-line react-hooks/exhaustive-deps
   async function save(form: HTMLFormElement) {
     const data = new FormData(form);
     const active = data.get("active") === "on";
@@ -203,34 +223,47 @@ function EditTypeForm({ type, base, busy, run, fail, report, onCancel, onDone }:
     const chosen = data.getAll("kinds");
     const kinds = assigneeKinds.filter((kind) => chosen.includes(kind));
     if (kinds.length === 0) { fail("Choose at least one kind of holder this item can be issued to."); return; }
-    const kindsChanged = kinds.length !== type.assigneeKinds.length || kinds.some((kind) => !type.assigneeKinds.includes(kind));
+    const kindsChanged = kinds.length !== start.kinds.length || kinds.some((kind) => !start.kinds.includes(kind));
     const policy = {
       depositPolicyRef: data.get("depositPolicyRef"), replacementPolicyRef: data.get("replacementPolicyRef"),
       depositCents: dollarsToCents(data.get("depositDollars")), depositShortfall: data.get("depositShortfall"), replacementFeeCents: dollarsToCents(data.get("replacementDollars")),
     };
-    const policyChanged = String(policy.depositPolicyRef ?? "") !== (type.depositPolicyRef ?? "") || String(policy.replacementPolicyRef ?? "") !== (type.replacementPolicyRef ?? "")
-      || policy.depositCents !== type.depositCents || policy.depositShortfall !== type.depositShortfall || policy.replacementFeeCents !== type.replacementFeeCents;
-    const requests: Array<{ body: Record<string, unknown>; done: string }> = [];
-    if (active !== type.active) requests.push({ body: { action: "update", typeId: type.id, active }, done: `${type.name} ${active ? "switched on" : "switched off"}.` });
-    if (roomLinked !== type.roomLinked) requests.push({ body: { action: "update", typeId: type.id, roomLinked }, done: `${type.name} updated.` });
-    if (kindsChanged) requests.push({ body: { action: "update", typeId: type.id, assigneeKinds: kinds }, done: `${type.name} updated.` });
-    if (policyChanged) requests.push({ body: { action: "update", typeId: type.id, ...policy }, done: `${type.name} updated.` });
+    const policyChanged = String(policy.depositPolicyRef ?? "") !== start.depositPolicyRef || String(policy.replacementPolicyRef ?? "") !== start.replacementPolicyRef
+      || policy.depositCents !== start.depositCents || policy.depositShortfall !== start.depositShortfall || policy.replacementFeeCents !== start.replacementFeeCents;
+    const requests: Array<{ body: Record<string, unknown>; done: string; failed: string; saved: Partial<typeof start> }> = [];
+    if (active !== start.active) requests.push({ body: { action: "update", typeId: type.id, active }, done: `${type.name} ${active ? "switched on" : "switched off"}.`, failed: "The Active change", saved: { active } });
+    if (roomLinked !== start.roomLinked) requests.push({ body: { action: "update", typeId: type.id, roomLinked }, done: `${type.name} updated.`, failed: "The Room-linked change", saved: { roomLinked } });
+    if (kindsChanged) requests.push({ body: { action: "update", typeId: type.id, assigneeKinds: kinds }, done: `${type.name} updated.`, failed: "The change to who it can be issued to", saved: { kinds } });
+    if (policyChanged) requests.push({ body: { action: "update", typeId: type.id, ...policy }, done: `${type.name} updated.`, failed: "The policy and money change", saved: { depositPolicyRef: String(policy.depositPolicyRef ?? ""), replacementPolicyRef: String(policy.replacementPolicyRef ?? ""), depositCents: policy.depositCents, depositShortfall: String(policy.depositShortfall), replacementFeeCents: policy.replacementFeeCents } });
+    const saved: string[] = [];
+    let moved = start;
     for (const request of requests) {
-      if (!(await run(`${base}/types`, request.body, () => request.done))) return;
+      let reason = "";
+      const ok = await run(`${base}/types`, request.body, () => request.done, (message) => { reason = message; });
+      if (!ok) {
+        if (saved.length === 0) { fail(reason); return; }
+        // Say what was stored and what was not.
+        fail(`${saved.join(" ")} ${request.failed} could not be saved: ${reason}`);
+        onPartial();
+        setStart(moved);
+        return;
+      }
+      saved.push(request.done);
+      moved = { ...moved, ...request.saved };
     }
     edit.clear();
     onDone();
   }
-  return <form className="form-stack" onSubmit={(event) => { event.preventDefault(); void save(event.currentTarget); }} onChange={edit.track}>
-    <label className="checkbox-label"><input type="checkbox" name="active" defaultChecked={type.active} /> Active</label>
-    <label className="checkbox-label"><input type="checkbox" name="roomLinked" defaultChecked={type.roomLinked} /> Room-linked</label>
+  return <form ref={formRef} className="form-stack" onSubmit={(event) => { event.preventDefault(); void save(event.currentTarget); }} onChange={edit.track}>
+    <label className="checkbox-label"><input type="checkbox" name="active" defaultChecked={start.active} /> Active</label>
+    <label className="checkbox-label"><input type="checkbox" name="roomLinked" defaultChecked={start.roomLinked} /> Room-linked</label>
     <fieldset><legend>Can be issued to</legend>
-      {assigneeKinds.map((kind) => <label className="checkbox-label" key={kind}><input type="checkbox" name="kinds" value={kind} defaultChecked={type.assigneeKinds.includes(kind)} /> {assigneeKindLabels[kind]}</label>)}
+      {assigneeKinds.map((kind) => <label className="checkbox-label" key={kind}><input type="checkbox" name="kinds" value={kind} defaultChecked={start.kinds.includes(kind)} /> {assigneeKindLabels[kind]}</label>)}
     </fieldset>
-    <label>Deposit policy reference <input name="depositPolicyRef" maxLength={120} defaultValue={type.depositPolicyRef ?? ""} /></label>
-    <label>Replacement policy reference <input name="replacementPolicyRef" maxLength={120} defaultValue={type.replacementPolicyRef ?? ""} /></label>
-    <MoneyFields type={type} />
-    <div className="form-actions"><button className="secondary-button" type="button" onClick={onCancel}>Cancel</button><button className="primary-button" type="submit" disabled={busy}>Save</button></div>
+    <label>Deposit policy reference <input name="depositPolicyRef" maxLength={120} defaultValue={start.depositPolicyRef} /></label>
+    <label>Replacement policy reference <input name="replacementPolicyRef" maxLength={120} defaultValue={start.replacementPolicyRef} /></label>
+    <MoneyFields type={{ ...type, depositCents: start.depositCents, replacementFeeCents: start.replacementFeeCents, depositShortfall: start.depositShortfall as CatalogType["depositShortfall"] }} />
+    <div className="form-actions"><button className="secondary-button" type="button" onClick={onCancel}>Cancel</button><button className="primary-button" type="submit" disabled={busy}>{busy ? "Saving…" : "Save"}</button></div>
   </form>;
 }
 
@@ -255,7 +288,7 @@ function AddItemsForms({ type, base, busy, run, report, onCancel, onDone }: Dial
       {serialized ? null : <label>Quantity <input name="quantityTotal" type="number" style={{ width: "100%" }} min={1} max={100000} defaultValue={100} required /></label>}
       <label>Condition <select name="condition" defaultValue="GOOD">{assetConditions.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></label>
       <label>Location <input name="location" maxLength={120} placeholder="Front desk" /></label>
-      <div className="form-actions"><button className="secondary-button" type="submit" disabled={busy}>Add</button></div>
+      <div className="form-actions"><button className="secondary-button" type="submit" disabled={busy}>{busy ? "Saving…" : "Add"}</button></div>
     </form>
 
     {serialized ? <form className={`form-stack ${styles.dialogSection}`} onSubmit={(event) => {
@@ -274,7 +307,7 @@ function AddItemsForms({ type, base, busy, run, report, onCancel, onDone }: Dial
       <label>Zero-pad to width (0 for none) <input name="width" type="number" style={{ width: "100%" }} min={0} max={8} defaultValue={0} /></label>
       <input name="condition" type="hidden" value="GOOD" />
       <input name="location" type="hidden" value="" />
-      <div className="form-actions"><button className="secondary-button" type="submit" disabled={busy}>Add range</button></div>
+      <div className="form-actions"><button className="secondary-button" type="submit" disabled={busy}>{busy ? "Saving…" : "Add range"}</button></div>
     </form> : null}
 
     <div className={`form-actions ${styles.dialogSection}`}><button className="secondary-button" type="button" onClick={onCancel}>Close</button></div>
@@ -319,7 +352,7 @@ function TypeCard({ type, assets, base, busy, run, onEdit, onAddItems }: { type:
     <div className={styles.cardHead}>
       <div className={styles.titleRow}>
         <h2 className={styles.name} id={headingId}>{type.name}</h2>
-        <span className={`status-chip ${type.active ? "green" : "neutral"}`}>{type.active ? "Active" : "Switched off"}</span>
+        <span className={`status-chip ${type.active ? "green" : "neutral"}`}>{type.active ? "Active" : "Inactive"}</span>
       </div>
       <div className={styles.actions}>
         <button className="secondary-button" type="button" aria-label={`Edit ${type.name}`} onClick={onEdit}>Edit</button>
@@ -327,23 +360,24 @@ function TypeCard({ type, assets, base, busy, run, onEdit, onAddItems }: { type:
       </div>
     </div>
     <p className={styles.kindLine}>{serialized ? "Numbered" : "Quantity"}</p>
-    <p className={styles.counts}>{type.assetCount} {serialized ? "items" : "lots"}; {type.availableQuantity} in stock, {type.outQuantity} out.</p>
+    <p className={styles.counts}>{type.assetCount} {serialized ? (type.assetCount === 1 ? "item" : "items") : (type.assetCount === 1 ? "lot" : "lots")}; {type.availableQuantity} in stock, {type.outQuantity} out.</p>
     {policyFacts ? <p className={styles.policy}>{policyFacts}</p> : null}
 
     {assets.length === 0 ? null : <details className={styles.items}>
-      <summary>{assets.length} {serialized ? "items" : "lots"}</summary>
+      <summary>{assets.length} {serialized ? (assets.length === 1 ? "item" : "items") : (assets.length === 1 ? "lot" : "lots")}</summary>
       {sorted.note}
-      <div className="table-wrap dense-rows"><table className="report-table report-table-auto">
-        <thead><tr>{sorted.header("identifier", "Identifier")}{sorted.header("scanCode", "Barcode value")}{serialized ? null : sorted.header("quantity", "Quantity")}{sorted.header("out", "Out")}{sorted.header("condition", "Condition")}{sorted.header("location", "Location")}{sorted.header("status", "Status")}</tr></thead>
-        <tbody>{sorted.rows.map((asset) => <tr key={asset.id}>
-          <th scope="row">{asset.identifier}</th>
-          <td>{asset.scanCode}</td>
-          {serialized ? null : <td>{asset.quantityTotal}</td>}
-          <td>{asset.outQuantity}</td>
-          <td><label className="sr-only" htmlFor={`cond-${asset.id}`}>Condition of {asset.identifier}</label>
+      <div className="table-wrap card-box dense-rows"><table role="table" className="report-table table-cards table-cards-compact">
+        <caption className="sr-only">{type.name} {serialized ? "items" : "lots"}</caption>
+        <thead role="rowgroup"><tr role="row">{sorted.header("identifier", "Identifier")}{sorted.header("scanCode", "Barcode value")}{serialized ? null : sorted.header("quantity", "Quantity")}{sorted.header("out", "Out")}{sorted.header("condition", "Condition")}{sorted.header("location", "Location")}{sorted.header("status", "Status")}</tr></thead>
+        <tbody role="rowgroup">{sorted.rows.map((asset) => <tr role="row" key={asset.id}>
+          <th role="rowheader" scope="row">{asset.identifier}</th>
+          <td {...cardCell("Barcode value")}>{asset.scanCode}</td>
+          {serialized ? null : <td {...cardCell("Quantity")}>{asset.quantityTotal}</td>}
+          <td {...cardCell("Out")}>{asset.outQuantity}</td>
+          <td {...cardCell("Condition")}><label className="sr-only" htmlFor={`cond-${asset.id}`}>Condition of {asset.identifier}</label>
             <select id={`cond-${asset.id}`} value={asset.condition} disabled={busy} onChange={(event) => void run(`${base}/items`, { action: "update", assetId: asset.id, condition: event.target.value as AssetCondition }, () => `${asset.identifier} updated.`)}>{assetConditions.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></td>
-          <td><LocationForm asset={asset} base={base} busy={busy} run={run} /></td>
-          <td><label className="sr-only" htmlFor={`avail-${asset.id}`}>Status of {asset.identifier}</label>
+          <td {...cardCell("Location")}><LocationForm asset={asset} base={base} busy={busy} run={run} /></td>
+          <td {...cardCell("Status")}><label className="sr-only" htmlFor={`avail-${asset.id}`}>Status of {asset.identifier}</label>
             <select id={`avail-${asset.id}`} value={asset.availability} disabled={busy} onChange={(event) => void run(`${base}/items`, { action: "update", assetId: asset.id, availability: event.target.value as AssetAvailability }, () => `${asset.identifier} updated.`)}>{assetAvailabilities.map((value) => <option key={value} value={value}>{label(value)}</option>)}</select></td>
         </tr>)}</tbody>
       </table></div>

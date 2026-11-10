@@ -20,13 +20,15 @@
 .previewCard h3 { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), .82rem); }
 .previewCard p { margin: 3px 0 6px; color: var(--muted); font-size: max(var(--type-body-floor, 0px), .64rem); }
 .previewCard ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.previewCard li span, .previewCard h3, .previewCard p { min-width: 0; overflow-wrap: anywhere; }
 .previewCard li, .variantSummary div { display: flex; justify-content: space-between; gap: 8px; font-size: max(var(--type-floor, 0px), .66rem); }
 .previewCard li strong { color: var(--imsda-purple); }
 .variantSummary { display: grid; gap: 6px; margin-top: 15px; border-top: 1px solid var(--line); padding-top: 13px; font-size: max(var(--type-body-floor, 0px), .68rem); }
 .variantSummary > strong { color: var(--imsda-navy); }
-.variantHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.variantHeading { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; }
+.variantHeading > strong { min-width: 0; overflow-wrap: anywhere; }
 .variantHeading .secondary-button { min-height: var(--touch-target); padding: 6px 10px; font-size: max(var(--type-staff-floor, 0px), .875rem); }
-.variantSummary .variantRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4px 10px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.variantSummary .variantRow { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4px 10px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
 .variantInfo { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .variantPrice { color: var(--imsda-purple); font-weight: 800; }
 .variantActions { grid-column: 1 / -1; justify-content: flex-start; }

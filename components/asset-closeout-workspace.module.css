@@ -2,3 +2,5 @@
 .note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .download { margin: 0; }
 .download > a { min-height: var(--touch-target); }
+.stack > * { min-width: 0; }
+.stack :is(th, td) { overflow-wrap: anywhere; }

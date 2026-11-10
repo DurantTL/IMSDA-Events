@@ -126,4 +126,55 @@ describe("the issued item dialogs (#1581)", () => {
     expect(dialog()!.querySelector('[role="alert"]')?.textContent).toContain("Choose at least one");
     expect(requests).toEqual([]);
   });
+
+  it("does not bring a failed save's error back onto the page after Cancel and Discard", async () => {
+    await open();
+    await openWith("Add items");
+    reply = () => json({ message: "The range must end at or after where it starts." }, 400);
+    await typeInto(field("from"), "60");
+    await typeInto(field("to"), "20");
+    await submitForm([...dialog()!.querySelectorAll("form")][1]!);
+    await flush();
+    expect(dialog()!.querySelector('[role="alert"]')).not.toBeNull();
+    await click(buttonByText(dialog()!, "Close"));
+    await click(buttonByText(topDialog(), "Discard changes"));
+    expect(dialog()).toBeNull();
+    expect(mounted.container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("says what was saved and what was not when a later group fails, and counts only the unsaved group as an edit", async () => {
+    await open();
+    await openWith("Edit");
+    await click(field("active"));
+    await typeInto(field("depositDollars"), "15");
+    let call = 0;
+    reply = () => (++call === 1 ? json({ result: {}, catalog }) : json({ message: "The deposit is not allowed." }, 400));
+    await submitForm(dialog()!.querySelector("form")!);
+    await flush();
+    expect(requests.map((request) => Object.keys(request.body).includes("active"))).toEqual([true, false]);
+    const alert = dialog()!.querySelector('[role="alert"]')!.textContent!;
+    expect(alert).toContain("Dorm room key switched off.");
+    expect(alert).toContain("The policy and money change could not be saved: The deposit is not allowed.");
+    expect(dialog()).not.toBeNull();
+    // The unsaved deposit still counts, so closing asks, and the question says part was saved.
+    await escape();
+    expect(topDialog().textContent).toContain("Part of this form was saved");
+    await click(buttonByText(topDialog(), "Cancel"));
+    // Undo the unsaved deposit: nothing unsaved is left, so closing no longer asks.
+    await typeInto(field("depositDollars"), "0.00");
+    await escape();
+    expect(document.body.textContent).not.toContain("Discard your changes?");
+    expect(dialog()).toBeNull();
+  });
+
+  it("shows Saving… on the button while a save is in flight", async () => {
+    await open();
+    await openWith("Add a kind of item");
+    await typeInto(field("name"), "Gym key");
+    let release: (response: Response) => void = () => undefined;
+    reply = () => new Promise<Response>((resolve) => { release = resolve; }) as unknown as Response;
+    await act(async () => { dialog()!.querySelector("form")!.requestSubmit(); });
+    expect(buttonByText(dialog()!, "Saving…").disabled).toBe(true);
+    await act(async () => { release(json({ result: {}, catalog })); });
+  });
 });

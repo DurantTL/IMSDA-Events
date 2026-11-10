@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -55,9 +57,9 @@ describe("issued-assets configuration screen", () => {
     expect(closed).not.toContain("Issue and return desk");
   });
 
-  it("marks a switched-off kind with a neutral chip in words", () => {
+  it("marks a switched-off kind with a neutral Inactive chip, the word rule B12 allows", () => {
     const off = renderToStaticMarkup(createElement(IssuedAssetsWorkspace, { eventId: "ev1", initialCatalog: { ...catalog, types: [{ ...catalog.types[0], active: false }] }, canOpenDesk: false }));
-    expect(off).toContain('<span class="status-chip neutral">Switched off</span>');
+    expect(off).toContain('<span class="status-chip neutral">Inactive</span>');
   });
 
   it("explains an empty inventory and offers the next step (#1581)", () => {
@@ -66,6 +68,19 @@ describe("issued-assets configuration screen", () => {
     expect(empty).toContain("Add a kind of item, such as a dorm room key");
     expect(empty.match(/Add a kind of item/g)!.length).toBeGreaterThanOrEqual(3);
     expect(empty.match(/class="primary-button"/g)).toHaveLength(1);
+  });
+
+  it("turns the items table into cards on a phone and never lets the card widen the page (#1581, rule B3)", () => {
+    expect(html).toContain("table-cards");
+    const css = readFileSync(join(process.cwd(), "components/issued-assets-workspace.module.css"), "utf8");
+    expect(css).toMatch(/\.card \{[^}]*min-width: 0;/);
+    expect(css).toMatch(/\.items \{[^}]*min-width: 0;/);
+  });
+
+  it("says 1 item or 1 lot in the singular", () => {
+    const one = renderToStaticMarkup(createElement(IssuedAssetsWorkspace, { eventId: "ev1", initialCatalog: { ...catalog, types: [{ ...catalog.types[0], assetCount: 1 }], assets: [catalog.assets[0]] }, canOpenDesk: false }));
+    expect(one).toContain("1 item;");
+    expect(one).toContain(">1 item</summary>");
   });
 
   it("keeps the sortable items table, with its screen-reader labels, under the card", () => {

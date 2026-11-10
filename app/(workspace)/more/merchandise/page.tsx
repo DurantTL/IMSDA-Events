@@ -18,7 +18,7 @@ export default async function MerchandisePage({
     return (
       <>
         <PageHeader title={staffPageTitles.merchandise} />
-        <AccessRestricted title="Merchandise catalog access is restricted" detail="Changing products, artwork, or availability needs configuration access." whoToAsk="your event administrator" />
+        <AccessRestricted title="Merchandise access is restricted" detail="Changing products, artwork, or availability needs configuration access." whoToAsk="your event administrator" />
       </>
     );
   }

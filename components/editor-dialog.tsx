@@ -20,5 +20,5 @@ export function EditorDialog({ children, className = "", closeLabel, eyebrow, on
 }) {
   const titleId = useId();
   const dialogRef = useAccessibleDialog<HTMLElement>(true, onRequestClose);
-  return <div className="modal-backdrop" role="presentation"><section className={`modal-card ${className}`.trim()} ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="modal-head"><div>{eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}<h2 id={titleId}>{title}</h2></div><button className="icon-button modal-close-button" type="button" aria-label={closeLabel} onClick={onRequestClose}><X size={18} aria-hidden="true" /></button></div>{children}</section></div>;
+  return <div className="modal-backdrop" role="presentation"><section className={`modal-card ${className}`.trim()} ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="modal-head"><div style={{ minWidth: 0, overflowWrap: "anywhere" }}>{eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}<h2 id={titleId}>{title}</h2></div><button className="icon-button modal-close-button" type="button" aria-label={closeLabel} onClick={onRequestClose}><X size={18} aria-hidden="true" /></button></div>{children}</section></div>;
 }

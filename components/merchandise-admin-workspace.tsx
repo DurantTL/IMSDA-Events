@@ -434,7 +434,7 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
       <div className={styles.layout}>
         <section className="panel" aria-labelledby="catalog-products-heading">
           <div className="section-heading"><div><h2 id="catalog-products-heading">Products</h2></div><span className="count-badge">{catalog.products.length} total</span></div>
-          {catalog.products.length === 0 ? <EmptyState action={{ label: "Create first product", onClick: () => openProductEditor("new") }} canCreate icon={<ShoppingBag size={26} aria-hidden="true" />} title="No products yet">Add a product with at least one variant to build the attendee offering.</EmptyState> : <div className={`dense-rows ${styles.productList}`}>
+          {catalog.products.length === 0 ? <EmptyState action={{ label: "Create first product", onClick: () => openProductEditor("new") }} actionClass="secondary-button" canCreate icon={<ShoppingBag size={26} aria-hidden="true" />} title="No products yet">Add a product with at least one variant to build the attendee offering.</EmptyState> : <div className={`dense-rows ${styles.productList}`}>
             {orderedProducts().map((product, index, ordered) => {
               const status = merchandiseAdminStatus(product);
               return <article className={`${styles.productCard} ${selectedId === product.id ? styles.selected : ""}`} key={product.id}>
