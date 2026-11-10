@@ -1,3 +1,5 @@
+import { OwnHeaderState } from "@/components/own-header-state";
+
 /**
  * The staff workspace's loading state (#1003). A `loading.tsx` puts a Suspense
  * boundary around the page inside the layout, so the sidebar and header (the
@@ -6,6 +8,9 @@
  */
 export default function WorkspaceLoading() {
   return (
+    <>
+    {/* A page that draws its own title has none on screen while it loads (#1772), so its one h1 is here. */}
+    <OwnHeaderState />
     <div aria-busy="true" className="content-skeleton" role="status" data-workspace-loading>
       <p className="workspace-loading-label">Loading the page…</p>
       <div aria-hidden="true" className="content-skeleton-bar content-skeleton-title" />
@@ -17,5 +22,6 @@ export default function WorkspaceLoading() {
       </div>
       <div aria-hidden="true" className="content-skeleton-bar content-skeleton-panel" />
     </div>
+    </>
   );
 }

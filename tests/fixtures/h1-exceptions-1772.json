@@ -1,0 +1,19 @@
+{
+  "note": "Files a staff page reaches that still draw an h1 outside PageHeader (#1772, rule D1), found by following every import (`@/` and relative) and matching `<h1` and run-time \"h1\". Reviewed list: it only shrinks. A file that no longer has an h1 must be removed from it, and a new file with one fails. Each entry has its reason.",
+  "files": {
+    "app/(workspace)/more/reports/packets/page.tsx": "The printed packet sheet draws its own h1 per sheet; it is a print layout, not the page header.",
+    "app/check-in-station/page.tsx": "The full-screen check-in kiosk page has no staff shell and draws its own title.",
+    "components/access-restricted.tsx": "The shared no-access card picks h1 or h2 at run time; h1 only where it is the whole page (/no-access).",
+    "components/account-page-banner.tsx": "A public attendee-account banner reached by the staff attendee preview page.",
+    "components/app-shell.tsx": "The staff shell's own h1 for every page that does not draw its own (reviewed exception).",
+    "components/check-in-station.tsx": "The full-screen check-in station draws its own title.",
+    "components/club-report-column-builder.tsx": "Builds the h1 of a standalone print window document, not a page of the app.",
+    "components/error-boundary-view.tsx": "The public and portal error views are a whole page and use h1; the workspace variant uses h2 and the header state above it.",
+    "components/event-content-blocks.tsx": "A public-site component the staff preview pages reuse.",
+    "components/message-body-editor.tsx": "The email editor's Heading 1 button writes h1 into the message body, not into the page.",
+    "components/public-club-forms-view.tsx": "A public-site component the staff preview pages reuse.",
+    "components/public-home-page.tsx": "A public-site component the staff preview pages reuse.",
+    "components/team-form-sheet.tsx": "The printed team form sheet draws its own h1; it is a print layout.",
+    "modules/communications/email-layout.ts": "Builds email HTML, which has its own h1 inside the message."
+  }
+}

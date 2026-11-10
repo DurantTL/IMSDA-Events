@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Eye } from "lucide-react";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
+import { DetailPage } from "@/components/page-templates/detail-page";
+import { PageHeader } from "@/components/page-header";
 import { BackgroundCheckList } from "@/components/background-check-flags";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { canSeeIssuesText } from "@/modules/background-checks/notes-access";
@@ -30,7 +31,15 @@ export default async function EventClubPage({
 }) {
   const [{ organizationId }, { event: requested }] = await Promise.all([params, searchParams]);
   const { event, allowed, permissions } = await resolveClubOversight(requested);
-  if (!allowed) return <AccessRestricted title="Club oversight is restricted" detail="Event administrators of this Pathfinder event can view its clubs." whoToAsk="your event administrator" />;
+  if (!allowed) {
+    // The page draws its own title (#1772), so the restricted state keeps the page's one h1 too.
+    return (
+      <>
+        <PageHeader title={staffPageTitles.club} />
+        <AccessRestricted title="Club oversight is restricted" detail="Event administrators of this Pathfinder event can view its clubs." whoToAsk="your event administrator" />
+      </>
+    );
+  }
   // Only clubs registered for this event: the role is for this event only.
   if (!(await isClubRegisteredForEvent(event.id, organizationId))) notFound();
   const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { name: true, parentOrganization: { select: { name: true } } } });
@@ -48,16 +57,15 @@ export default async function EventClubPage({
   // Guardian contacts (#510): only for staff who hold the sensitive-data permission on this event.
   const guardianViewer = await resolveStaffGuardianViewer(event.id);
   return (
-    <section className="page-stack">
-      <BackLink href={`/more/clubs${query}`} variant="staff">Back to clubs attending</BackLink>
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">{event.name} · view only</p>
-          <h2 translate="no">{club.name}</h2>
-          {club.parentOrganization && <p translate="no">{club.parentOrganization.name}</p>}
-        </div>
-      </div>
-      <p className="inline-notice" role="status"><Eye aria-hidden="true" size={14} /> View only, with ages instead of birth dates. The club makes changes.</p>
+    <DetailPage
+      header={{
+        title: club.name,
+        exactName: true,
+        description: club.parentOrganization ? <span translate="no">{club.parentOrganization.name}</span> : undefined,
+        back: { href: `/more/clubs${query}`, label: "Back to clubs attending" },
+      }}
+      notices={<p className="inline-notice" role="status"><Eye aria-hidden="true" size={14} /> View only, with ages instead of birth dates. The club makes changes.</p>}
+    >
       {backgroundFlags && (
         <section className="panel" id="background-checks">
           <div className="section-heading">
@@ -72,7 +80,7 @@ export default async function EventClubPage({
       )}
       {assignments.length > 0 && (
         <section className="panel">
-          <h3>Event assignments</h3>
+          <h2>Event assignments</h2>
           <p className="quiet-copy">Set by event staff for {event.name}.</p>
           {assignments.map((assignment) => (
             <div key={assignment.teamKey}>
@@ -88,12 +96,11 @@ export default async function EventClubPage({
         </section>
       )}
       <ClubOverview
-        headingLevel={3}
         organizationId={organizationId}
         reportHref={(month) => `/more/clubs/reports/${organizationId}/${month}${fromHere}`}
         reportsEditable={false}
       />
-      {guardianViewer && <ClubGuardiansPanel headingLevel={3} organizationId={organizationId} viewer={guardianViewer} />}
-    </section>
+      {guardianViewer && <ClubGuardiansPanel organizationId={organizationId} viewer={guardianViewer} />}
+    </DetailPage>
   );
 }

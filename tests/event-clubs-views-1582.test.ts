@@ -108,7 +108,7 @@ describe("page wiring (#1582)", () => {
   it("labels the club page's assignments as event-set and links Club assignments only for those who can manage them", () => {
     const source = read("app/(workspace)/more/clubs/[organizationId]/page.tsx");
     expect(source).toContain("Back to clubs attending");
-    expect(source).toContain("<h3>Event assignments</h3>");
+    expect(source).toContain("<h2>Event assignments</h2>");
     expect(source).toContain("Set by event staff for {event.name}.");
     expect(source).toMatch(/canManageClubAssignments\(permissions\) && <p><Link className="text-button" href=\{`\/more\/club-assignments\$\{query\}`\}>Change on Club assignments<\/Link><\/p>/);
   });

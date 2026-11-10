@@ -459,6 +459,25 @@ export function isEventFeaturesPath(pathname: string): boolean {
   return pathname === eventFeaturesRoute || pathname.startsWith(`${eventFeaturesRoute}/`);
 }
 
+/**
+ * The title the staff shell draws as a page's `h1` (#685, #1772): the profile page, a named sub-page, Event features, or
+ * the label of the navigation item the path falls under. A page that draws its own `PageHeader` title is listed in
+ * `components/page-header-routes.ts` and the shell skips this.
+ */
+export function staffShellPageTitle(pathname: string): string {
+  if (pathname === "/profile" || pathname.startsWith("/profile/")) return "Your account";
+  const subpage = staffSubpageTitle(pathname);
+  if (subpage) return subpage;
+  if (isEventFeaturesPath(pathname)) return "Event features";
+  const current = isSystemWorkspacePath(pathname)
+    ? systemNavigation
+    // The most specific match wins, so /people/attendees is "Attendee list", not "Registrations".
+    : navigation.reduce<NavigationItem | null>((best, item) => (
+      pathname.startsWith(item.href) && (!best || item.href.length > best.href.length) ? item : best
+    ), null) ?? navigation[0];
+  return current.label;
+}
+
 /** Sidebar-only items that are not in `navigation` (its hrefs are page lookups), placed after the item with this href. */
 const sidebarInserts: readonly { after: string; item: NavigationItem }[] = [
   { after: "/more/event-settings", item: eventFeaturesItem },

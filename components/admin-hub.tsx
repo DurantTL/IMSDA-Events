@@ -11,11 +11,11 @@ const chipClass = { ok: "green", warn: "coral", review: "purple", soon: "gold", 
  * status. The page title is the workspace topbar's heading. Everything here is a link: nothing approves, publishes, sends
  * or changes a record. A status says its words ("Unavailable", "1 to review"), never colour alone.
  */
-export function AdminHub({ view }: { view: HubBody }) {
+export function AdminHub({ view, intro = true }: { view: HubBody; /** False when a `PageHeader` above already draws the description and the main action (`HubPage`). */ intro?: boolean }) {
   const stats = view.stats ?? [];
   return (
     <div className={styles.hub} data-testid={`admin-hub-${view.key}`}>
-      <div className={styles.intro}>
+      {intro ? <div className={styles.intro}>
         <p className={styles.introText}>{view.description}</p>
         {view.action ? (
           <Link className={view.action.primary === false ? `${styles.action} ${styles.actionQuiet}` : styles.action} data-primary={view.action.primary === false ? "false" : "true"} href={view.action.href} data-testid="hub-action">
@@ -23,7 +23,7 @@ export function AdminHub({ view }: { view: HubBody }) {
             <ArrowRight aria-hidden="true" size={16} />
           </Link>
         ) : null}
-      </div>
+      </div> : null}
 
       {stats.length > 0 ? (
         <section aria-labelledby="hub-stats-heading">

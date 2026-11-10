@@ -1,19 +1,15 @@
-import { NavigationLink as Link } from "@/components/navigation-link";
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { ActionsMenu } from "@/components/actions-menu";
+import { PageHeader, type PageHeaderTool } from "@/components/page-header";
 
 /** One link in a page's "Tools" menu. */
-export type StaffPageTool = {
-  href: string;
-  label: string;
-  icon?: LucideIcon;
-};
+export type StaffPageTool = PageHeaderTool;
 
 /**
- * The one header every staff page uses under the workspace topbar (#981).
+ * The header most staff pages use under the workspace topbar (#981). Legacy since #1772: it renders through
+ * `PageHeader` in its title-less mode, so there is one place to change; new pages use `PageHeader` or a page template
+ * with a title instead.
  *
- * The topbar already names the page and holds the page's only `<h1>`
+ * The shell already names the page and holds the page's only `<h1>`
  * (`staffSubpageTitle`), so this draws no heading and no eyebrow: just an
  * optional one-line `description` on the left and, on the right, one `primary`
  * action, then secondary work in an "Actions" menu (`actions`, `<li>` items)
@@ -37,27 +33,14 @@ export function StaffPageHeader({
   /** Something small that sits beside the actions, such as a count badge. */
   extra?: ReactNode;
 }) {
-  const hasTools = Boolean(tools && tools.length > 0);
-  if (!description && !primary && !actions && !hasTools && !extra) return null;
   return (
-    <div className="staff-page-header">
-      {description ? <p className="staff-page-description">{description}</p> : null}
-      {primary || actions || hasTools || extra ? (
-        <div className="staff-page-actions">
-          {extra}
-          {primary}
-          {actions ? <ActionsMenu>{actions}</ActionsMenu> : null}
-          {hasTools ? (
-            <ActionsMenu label="Tools">
-              {tools!.map(({ href, label, icon: Icon }) => (
-                <li key={href}>
-                  <Link href={href}>{Icon ? <Icon aria-hidden="true" size={16} /> : null}{label}</Link>
-                </li>
-              ))}
-            </ActionsMenu>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
+    <PageHeader
+      actions={actions}
+      description={description}
+      extra={extra}
+      legacy={{ root: "staff-page-header", description: "staff-page-description", actions: "staff-page-actions" }}
+      primary={primary}
+      tools={tools}
+    />
   );
 }

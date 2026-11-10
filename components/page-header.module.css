@@ -1,0 +1,101 @@
+/* The one page header (#1772): title, one sentence, the page's main action. See docs/design-system/components/PageHeader/README.md. */
+.header {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0 0 16px;
+  padding-top: 14px;
+}
+
+/* On a page that is a card (the sign-in style pages), the card already pads its top. */
+:global(.auth-card) .header {
+  padding-top: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 24px;
+  min-width: 0;
+}
+
+.text {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+/* The one page title look. The staff shell's own title composes this class (`.pageTitle` in staff-shell.module.css), so a page titled by the shell and a page that draws its own match at every width (G1, G3). */
+.title {
+  margin: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), clamp(1.35rem, 2vw, 1.7rem));
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 800px) {
+  .title {
+    font-size: max(var(--type-staff-floor, 0px), 1.18rem);
+  }
+}
+
+.description {
+  max-width: 60ch;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.actions > :is(a, button) {
+  min-height: 44px;
+}
+
+.below {
+  min-width: 0;
+}
+
+/* Below 640px (639px and narrower) the actions drop under the title, full width, the main action first. */
+@media (max-width: 639px) {
+  .actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .actions > :is(a, button) {
+    justify-content: center;
+    width: 100%;
+  }
+
+  /* The menus open across the header, so they never run off a narrow screen. */
+  .actions :global(.actions-menu) {
+    position: static;
+    width: 100%;
+  }
+
+  .actions :global(.actions-menu-list) {
+    right: 0;
+    left: 0;
+    min-width: 0;
+  }
+}

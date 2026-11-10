@@ -28,6 +28,7 @@ import { StaffViewStrip } from "@/components/staff-view-strip";
 import { StaffPhoneBar } from "@/components/staff-phone-bar";
 import { StaffKeyboardWatch } from "@/components/staff-keyboard-watch";
 import { buildStaffNavigation } from "@/components/staff-navigation-model";
+import { pageOwnsHeader } from "@/components/page-header-routes";
 import { showsWorkContextChip } from "@/components/work-context-model";
 import { staffAreaMeta } from "@/components/staff-areas";
 import { eventPermissions, type EventPermission } from "@/modules/access/permissions";
@@ -36,12 +37,8 @@ import { adminRoleLanding, type AdminRole, type AdminRoleCounts } from "@/module
 import {
   eventsAdminHomeItem,
   helpPageTitle,
-  isEventFeaturesPath,
-  navigation,
-  staffSubpageTitle,
-  systemNavigation,
+  staffShellPageTitle,
   withCurrentEvent,
-  type NavigationItem,
 } from "@/components/staff-navigation";
 import styles from "@/components/staff-shell.module.css";
 
@@ -119,14 +116,10 @@ export function AppShell({
   // Help & learning (#1077) is open to every staff member and is no nav item: it lights its own link only.
   const isHelpRoute = pathname === "/help" || pathname.startsWith("/help/");
   const isSystemRoute = isSystemWorkspacePath(pathname);
-  const current = isSystemRoute
-    ? systemNavigation
-    // The most specific match wins, so /people/attendees is "Attendee list", not "Registrations".
-    : navigation.reduce<NavigationItem | null>((best, item) => (
-      pathname.startsWith(item.href) && (!best || item.href.length > best.href.length) ? item : best
-    ), null) ?? navigation[0];
   // The header names the page the staff member is on (#685): a `/more/*` page that isn't a nav item names itself instead of reading "More".
-  const pageTitle = isProfileRoute ? "Your account" : staffSubpageTitle(pathname) ?? (isEventFeaturesPath(pathname) ? "Event features" : current.label);
+  const pageTitle = staffShellPageTitle(pathname);
+  // A page that draws its own PageHeader title owns its h1 (#1772); the shell then draws none, so there is never a second one.
+  const pageDrawsOwnHeader = pageOwnsHeader(pathname);
   const requestedEventId = searchParams.get("event");
   const defaultEvent = defaultEventId
     ? events.find((event) => event.id === defaultEventId)
@@ -358,17 +351,19 @@ export function AppShell({
             trailing={place.area === "clubs" && !place.inEvent ? <ClubsYearSelector /> : openPicker}
           />
           {currentTab?.views && currentTab.views.length > 1 && <StaffViewStrip label={`${currentTab.label} views`} views={currentTab.views} />}
-          <header className={styles.pageHeader}>
-            <div>
-              <h1>{pageTitle}</h1>
-              {showContextChip && (
-                <p className="work-context" data-context={workContext.kind}>
-                  <span className="work-context-kind">{workContext.kindLabel}</span>
-                  <span className="work-context-name" title={workContext.label}>{workContext.label}</span>
-                </p>
-              )}
-            </div>
-          </header>
+          {!pageDrawsOwnHeader && (
+            <header className={styles.pageHeader}>
+              <div>
+                <h1 className={styles.pageTitle}>{pageTitle}</h1>
+                {showContextChip && (
+                  <p className="work-context" data-context={workContext.kind}>
+                    <span className="work-context-kind">{workContext.kindLabel}</span>
+                    <span className="work-context-name" title={workContext.label}>{workContext.label}</span>
+                  </p>
+                )}
+              </div>
+            </header>
+          )}
           <WorkspaceContent pageKey={workspacePageKey(pathname, searchParams)}>
             {!requestedEventId && !seenEventId && autoSelected && Boolean(defaultEvent) && place.inEvent && !pathname.startsWith("/people/matches") && !isProfileRoute && defaultEvent && (
               <EventAutoSelectNotice

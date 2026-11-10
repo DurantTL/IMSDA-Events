@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AccessRestricted } from "@/components/access-restricted";
-import { AdminHub } from "@/components/admin-hub";
+import { HubPage } from "@/components/page-templates/hub-page";
+import { PageHeader } from "@/components/page-header";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
 import { buildPrintoutsView } from "@/modules/reporting/printouts-model";
@@ -18,9 +19,15 @@ export default async function PrintoutsPage({ searchParams }: { searchParams: Pr
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Printouts are restricted" detail="This page needs report access." whoToAsk="your event administrator" />;
+    // The page draws its own title (#1772), so the restricted state keeps the page's one h1 too.
+    return (
+      <>
+        <PageHeader title={staffPageTitles.printouts} />
+        <AccessRestricted title="Printouts are restricted" detail="This page needs report access." whoToAsk="your event administrator" />
+      </>
+    );
   }
   const availability = await loadPrintoutAvailability(event.id);
   const viewer = { permissions, audience: event.audience, ...availability };
-  return <AdminHub view={buildPrintoutsView(viewer, event.id)} />;
+  return <HubPage title={staffPageTitles.printouts} view={buildPrintoutsView(viewer, event.id)} />;
 }
