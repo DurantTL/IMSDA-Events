@@ -1,0 +1,57 @@
+{
+  "note": "Staff pages whose shell title differs from the route-mapping label (the tab, menu item or hub card that opens them) on November 10, 2026 (#1772, rule D2). Reviewed list: it only shrinks. A page that now matches, or that draws its own title, must be removed from it; a new mismatch fails. Renaming these pages is the work of the redesign page groups.",
+  "routes": {
+    "/admin/clubs/reports": {
+      "title": "Review monthly records",
+      "label": "Monthly Records"
+    },
+    "/more/merchandise": {
+      "title": "Merchandise catalog",
+      "label": "Merchandise"
+    },
+    "/more/clubs": {
+      "title": "Clubs",
+      "label": "This event's clubs"
+    },
+    "/admin": {
+      "title": "System management",
+      "label": "System administration home"
+    },
+    "/admin/hubs/events": {
+      "title": "Events",
+      "label": "Events hub"
+    },
+    "/admin/hubs/clubs": {
+      "title": "Clubs",
+      "label": "Clubs hub"
+    },
+    "/admin/hubs/people": {
+      "title": "People",
+      "label": "People hub"
+    },
+    "/admin/hubs/forms": {
+      "title": "Forms",
+      "label": "Forms hub"
+    },
+    "/admin/hubs/catalogs": {
+      "title": "Catalogs and settings",
+      "label": "Catalogs and settings hub"
+    },
+    "/home": {
+      "title": "Home",
+      "label": "Home: Needs you"
+    },
+    "/home/coming-up": {
+      "title": "Home",
+      "label": "Home: Coming up"
+    },
+    "/events-admin": {
+      "title": "Event administration",
+      "label": "Events Administrator dashboard"
+    },
+    "/admin/clubs": {
+      "title": "Club administration",
+      "label": "Clubs Administrator dashboard"
+    }
+  }
+}

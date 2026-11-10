@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BrandLink } from "@/components/brand-link";
+import { ListPage } from "@/components/page-templates/list-page";
 import { SelectEventList } from "@/components/select-event-list";
 import { SignOutButton } from "@/components/sign-out-button";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -56,24 +57,30 @@ export default async function SelectEventPage({
     <main className="auth-page">
       <section className="auth-card select-event-card">
         <BrandLink className="auth-brand" wordmark />
-        <div className="auth-heading">
-          <p className="eyebrow">Staff workspace</p>
-          <h1>Choose an event</h1>
-          {unavailable
-            ? <p>You can&rsquo;t open that event with this account. Ask your event administrator if you need access, or choose one of your events below.</p>
-            : <p>{session.user.email} has access to more than one event. Pick one to continue.</p>}
-        </div>
-        <SelectEventList
-          events={events.map((event) => ({
-            id: event.id,
-            name: event.name,
-            dates: formatEventDates(event.startsAt, event.endsAt, event.timezone),
-          }))}
-        />
-        {archivedEvents.length > 0 && (
-          <Link className="secondary-button full-button" href="/archived-events">Archived events ({archivedEvents.length})</Link>
-        )}
-        <SignOutButton className="secondary-button full-button" />
+        <ListPage
+          header={{
+            title: "Choose an event",
+            description: unavailable
+              ? "You can\u2019t open that event with this account. Ask your event administrator if you need access, or choose one of your events below."
+              : `${session.user.email} has access to more than one event. Pick one to continue.`,
+          }}
+          footer={(
+            <>
+              {archivedEvents.length > 0 && (
+                <Link className="secondary-button full-button" href="/archived-events">Archived events ({archivedEvents.length})</Link>
+              )}
+              <SignOutButton className="secondary-button full-button" />
+            </>
+          )}
+        >
+          <SelectEventList
+            events={events.map((event) => ({
+              id: event.id,
+              name: event.name,
+              dates: formatEventDates(event.startsAt, event.endsAt, event.timezone),
+            }))}
+          />
+        </ListPage>
       </section>
     </main>
   );

@@ -149,6 +149,15 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | L11 | A staff tab row never scrolls sideways or is cut off, and holds at most eight tabs with at most five views each. Only when a row would not fit, at any width, it becomes a menu line (never just because the screen is narrow, #1734): the current tab plus an "<Area> menu" or "Event menu" button that opens the full list. | `tests/staff-workspace-1565.test.ts`, `tests/staff-areas-1565.test.ts`, `tests/mobile-directory-parity.test.ts`, `tests/staff-phone-tabs-search-1734.test.ts` | mobile layout audit (`staff-tab-row` check on every staff page at every width) | #1565; Caleb, Nov 6 (#1559) |
 | L12 | A club portal or Area Coordinator tab row never scrolls sideways or is cut off, and keeps the club portal's purple. With room it is the flat strip; below 1024px, or when the strip would not fit, it becomes a menu line (the current tab plus a "Club menu" or "Coordinator menu" button that opens the full list). On a phone the club's own pages show a bottom bar (Home, Roster, Events, Records and More; More only when the role has more than five tabs), and together the bar and More reach exactly the tabs the role has. Area Coordinator pages have no bar. | `tests/club-portal-nav-1641.test.ts`, `tests/portal-reference-look-1555.test.ts` | mobile layout audit (`scripts/verify-mobile-layout.ts` portal navigation flow, `portal-tab-row` check at 360, 390, 768, 861, 980, 1024, 1180 and 1280 px) | #1641; Caleb, Nov 6 |
 
+## Page headers (#1772)
+
+| ID | Rule | Guard test | Browser test | Issue |
+| --- | --- | --- | --- | --- |
+| D1 | Every staff page has one `h1`, drawn once in the one `PageHeader` (or a page template that uses it). A page that draws its own title is listed in `components/page-header-routes.ts`, and the staff shell then draws none, so a page never shows its title twice or has two `h1`. | `tests/page-header-1772.test.ts` (no staff page or component it uses draws an `h1` outside `PageHeader`; the reviewed list is `tests/fixtures/h1-exceptions-1772.json` and only shrinks), `tests/page-header-routes-1772.test.ts` (the route list and the pages that render a titled header agree both ways) | `npm run test:mobile-layout` (staff pages) | #1772 |
+| D2 | A page's title is the same words as the tab, menu item or hub card that opens it. | `tests/page-titles-match-1772.test.ts` (reviewed list of today's mismatches: `tests/fixtures/title-label-exceptions-1772.json`, only shrinks) | browser test only | #1772; Caleb, Nov 9 |
+| D3 | The header shows the page's one filled main action, and at most two buttons beside the title (one filled, one outlined); other actions go in the Actions menu. | `tests/page-header-1772.test.ts`, `tests/one-primary-action-1733.test.ts` | browser test only | #1772; Caleb, Nov 9 |
+| D4 | Below 640px the header's actions drop under the title, full width, with the main action first, and each is at least 44px tall. | `tests/page-header-1772.test.ts` | `npm run test:mobile-layout` (staff pages) | #1772; Caleb, Nov 9 |
+
 ## Page checks (AGENTS.md → Checks)
 
 | ID | Rule | Guard test | Browser test | Issue |

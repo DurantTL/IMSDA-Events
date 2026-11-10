@@ -1,4 +1,4 @@
-import { BackLink } from "@/components/back-link";
+import { PageHeader } from "@/components/page-header";
 import { DashboardTabs } from "@/components/dashboard-tabs";
 import { buildAdminSectionNav, type AdminBackLink, type AdminSection, type AdminSectionNav } from "@/components/admin-section-nav";
 import styles from "./admin-section-header.module.css";
@@ -12,11 +12,12 @@ import styles from "./admin-section-header.module.css";
  */
 export function AdminSectionHeader({ nav }: { nav: AdminSectionNav }) {
   return (
-    <div className={styles.header} data-testid="admin-section-header" data-section={nav.section}>
-      <p className={`eyebrow ${styles.name}`}>{nav.name}</p>
-      {(nav.localTabs?.length ?? 0) > 1 && <div className={styles.localNavigation}><DashboardTabs label={`${nav.name} page views`} tabs={nav.localTabs!} /></div>}
-      {nav.back ? <BackLink href={nav.back.href} variant="staff">{nav.back.label}</BackLink> : null}
-    </div>
+    <PageHeader
+      back={nav.back ? { href: nav.back.href, label: nav.back.label } : undefined}
+      below={(nav.localTabs?.length ?? 0) > 1 ? <div className={styles.localNavigation}><DashboardTabs label={`${nav.name} page views`} tabs={nav.localTabs!} /></div> : undefined}
+      eyebrow={nav.name}
+      legacy={{ root: styles.header, eyebrow: `eyebrow ${styles.name}`, testId: "admin-section-header", data: { section: nav.section } }}
+    />
   );
 }
 

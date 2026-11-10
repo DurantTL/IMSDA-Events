@@ -1,7 +1,7 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { StepPage } from "@/components/page-templates/step-page";
 import { CopyFromPastEvent } from "@/components/copy-from-past-event";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listEventsForUser } from "@/modules/events/repository";
@@ -25,9 +25,9 @@ export default async function CopyFromPastEventPage() {
   }));
 
   return (
-    <section className="page-stack">
-      <StaffPageHeader description="Start from a past event's settings and forms." />
+    // The copy flow keeps its own steps (choose, preview, created) in the client component, so no step number is shown here.
+    <StepPage header={{ title: "Copy from a past event", description: "Start from a past event's settings and forms." }}>
       <CopyFromPastEvent sources={sources} />
-    </section>
+    </StepPage>
   );
 }

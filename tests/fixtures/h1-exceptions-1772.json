@@ -1,0 +1,15 @@
+{
+  "note": "Files a staff page reaches that still draw an h1 outside PageHeader (#1772, rule D1). Reviewed list: it only shrinks. A file that no longer has an h1 must be removed from it, and a new file with one fails. Reasons: the shell's own h1 (reviewed exception); the print sheet and the full-screen check-in station draw their own; conference orders still draws its own h1; the rest are public-site components the staff preview pages reuse.",
+  "files": [
+    "app/(workspace)/admin/club-supplies/conference-orders/page.tsx",
+    "app/(workspace)/more/reports/packets/page.tsx",
+    "app/check-in-station/page.tsx",
+    "components/account-page-banner.tsx",
+    "components/app-shell.tsx",
+    "components/check-in-station.tsx",
+    "components/event-content-blocks.tsx",
+    "components/public-club-forms-view.tsx",
+    "components/public-home-page.tsx",
+    "components/team-form-sheet.tsx"
+  ]
+}
