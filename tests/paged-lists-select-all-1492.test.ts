@@ -27,9 +27,9 @@ afterEach(async () => { await mounted?.unmount(); vi.unstubAllGlobals(); });
 
 const invite = (index: number): InvitationListRow => ({
   id: `inv-${index}`, email: `person${index}@example.test`, firstName: "Pat", lastName: `Example${index}`, group: "STAFF", status: "SENT",
-  sentAt: "2026-10-01T00:00:00.000Z", sendCount: 1, registeredAt: null, confirmationCode: null, usable: true, reissuable: true, reinvitable: false, deliveryNote: null,
+  sentAt: "2026-10-01T00:00:00.000Z", sendCount: 1, registeredAt: null, confirmationCode: null, usable: true, expired: false, reissuable: true, reinvitable: false, deliveryNote: null,
 });
-const counts = { NOT_SENT: 0, SENT: 120, DELIVERY_FAILED: 0, REGISTERED: 0, APPROVED: 0, DECLINED: 0, REVOKED: 0 };
+const counts = { NOT_SENT: 0, SENT: 120, DELIVERY_FAILED: 0, EXPIRED: 0, REGISTERED: 0, APPROVED: 0, DECLINED: 0, REVOKED: 0 };
 
 describe("staff invitations: Select all N matching", () => {
   const list = (total: number) => createElement(StaffInvitationList, {

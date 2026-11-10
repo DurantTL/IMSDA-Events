@@ -918,7 +918,7 @@ export function PeopleWorkspace({
           </div>
         </div>
       )}
-      <div className="record-grid">
+      <div className="record-grid dense-rows">
         {visible.map((registration) => (
           <div className="record-card-shell" key={registration.id}>
           {canEmail && (

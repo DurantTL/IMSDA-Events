@@ -16,11 +16,16 @@ import { isSessionIdle } from "@/modules/access/session-store";
  * account. Club and Area Coordinator pages resolve access from that row.
  * Club-director acting has full director powers, attributed to the staff
  * user, never to an attendee account that didn't act. Area Coordinator
- * acting stays view-only. Only one act-as is active per staff session, and
+ * acting is view only, with two changes allowed (Caleb, 2026-11-09, #1788):
+ * emailing a club-form link, and changing the shared club report layouts.
+ * Both are recorded under the staff user and the act-as. Every other
+ * coordinator change (the optional tool switches, team permission decisions)
+ * needs the coordinator's own account. `tests/area-coordinator-act-as-writes-1788.test.ts`
+ * pins that list. Only one act-as is active per staff session, and
  * the window lasts two hours unless "Stop acting" or sign-out ends it first.
  *
  * Caleb, 2026-10-26 (#1232): an active Clubs Administrator may also act as a club's DIRECTOR, with the same powers and attribution.
- * Caleb, 2026-11-06: an active Clubs Administrator may also act as an Area Coordinator (view only, same two-hour limit). Such an act-as is valid only while the grant is active: every
+ * Caleb, 2026-11-06: an active Clubs Administrator may also act as an Area Coordinator (the same access as above, same two-hour limit). Such an act-as is valid only while the grant is active: every
  * read re-checks the grant in the database, so a revoke ends it on the next request.
  */
 

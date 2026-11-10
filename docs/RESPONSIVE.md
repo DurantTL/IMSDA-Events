@@ -208,6 +208,8 @@ invites, Sterling Volunteers, team, accounts, club forms, attendee listing.
 
 ### 44px tap targets
 
+Dense staff rows (#1775, L13): inside an element marked `dense-rows` (the registrations list and the arrivals list), row controls are 44px except with a mouse or trackpad (`pointer: fine`) at 1024px and wider, where they are `--touch-target-dense` (36px). Touch is 44px at every width; the audit's `dense-rows` check measures both at 1024 and 1280 px.
+
 `:root { --touch-target: 44px }` is set at 768 px and under; the rules this section lists apply at **600 px and under** (phones), the width the audit uses, so the registration form builder and other tablet layouts keep their sizes. At 600 px and under:
 
 - every text-like `input`, `select`, `textarea`, color input and `summary` is at

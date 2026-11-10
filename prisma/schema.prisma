@@ -6211,13 +6211,16 @@ model ClubRosterExportFormat {
 /// A saved column layout for a club event's attendee report (#1671). One per template-or-event scope, audience and
 /// name. `scopeKey` is `template:<id>` for an event made from an event template (so the layout follows the template) or
 /// `event:<id>` for any other event. `audience` keeps staff and Area Coordinator layouts apart. `columns` holds column
-/// keys in order and nothing else: never a name, an answer or any other data. The creator ids are plain references.
+/// keys in order. `filters` (#1762) is null or `{ roles?: string[], clubIds?: string[] }`: the role names and club ids the
+/// layout narrows to, never a name, an answer or any other data. Location is not saved, because locations belong to one
+/// event. The creator ids are plain references.
 model ClubReportColumnLayout {
   id                 String   @id @default(cuid())
   scopeKey           String
   audience           String
   name               String
   columns            Json
+  filters            Json?
   createdByUserId    String?
   createdByAccountId String?
   createdAt          DateTime @default(now())
@@ -10863,6 +10866,8 @@ model StaffInvitation {
   lastName        String                   @default("")
   group           StaffInvitationGroup
   linkVersion     Int                      @default(1)
+  /// When the link's 14-day window last started: at creation, on reissue, and on every send. The link stops opening 14 days after.
+  linkIssuedAt    DateTime                 @default(now())
   /// Which import created it (one id per confirmed CSV), so the office can find a file's rows together.
   importBatchId   String?
   createdByUserId String?

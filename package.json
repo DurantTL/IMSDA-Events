@@ -14,7 +14,9 @@
     "test:public-messaging": "tsx scripts/verify-public-registration-messaging.ts",
     "test:public-roster": "tsx scripts/verify-public-registration-roster.ts",
     "test:honor-capacity": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-honor-class-capacity.ts",
+    "audit:production": "node scripts/audit-production-dependencies.mjs",
     "test:staff-act-as": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-staff-act-as.ts",
+    "test:people-club-scope": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-people-club-scope.ts",
     "test:club-transfers": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-member-transfers.ts",
     "test:background-check-list": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-background-check-list.ts",
     "test:club-supplies": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-club-supply-catalog.ts",
@@ -174,7 +176,7 @@
   },
   "overrides": {
     "postcss": "^8.5.28",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "nanoid": "^3.3.18"
   },
   "dependencies": {
@@ -196,13 +198,13 @@
     "leaflet": "^1.9.4",
     "lexical": "0.49.0",
     "lucide-react": "^1.25.0",
-    "next": "16.3.6",
-    "nodemailer": "^10.0.16",
+    "next": "16.4.6",
+    "nodemailer": "^10.4.0",
     "pdf-lib": "1.17.1",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "sanitize-html": "^2.18.0",
+    "sanitize-html": "^2.18.1",
     "svix": "^1.99.0",
     "zod": "^4.4.3"
   },
@@ -217,13 +219,13 @@
     "@types/sanitize-html": "^2.16.2",
     "@types/smtp-server": "^3.5.13",
     "eslint": "^9",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.4.6",
     "jsdom": "^26.1.0",
     "prisma": "^6.19.3",
     "smtp-server": "^3.19.17",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
     "typescript": "^5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   }
 }

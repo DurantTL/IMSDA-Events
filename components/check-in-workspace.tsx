@@ -719,7 +719,7 @@ export function CheckInWorkspace({
         </section>
       )}
 
-      <section className="panel">
+      <section className="panel dense-rows">
         <div className="section-heading">
           <div>
             <p className="eyebrow">{locationName ? `Arrivals \u00b7 ${locationName}` : "Arrival roster"}</p>
