@@ -1,6 +1,8 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { CatalogActionProvider, CatalogHeaderButton } from "@/components/catalog-header-action";
+import { ListPage } from "@/components/page-templates/list-page";
 import { ClubSupplyCatalogWorkspace } from "@/components/club-supply-catalog-workspace";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -18,7 +20,11 @@ export default async function ClubSupplyCatalogPage() {
   return (
     <>
       <AdminPageHeader path="/admin/club-supplies" />
-      <ClubSupplyCatalogWorkspace initialItems={await listClubSupplyItems()} />
+      <CatalogActionProvider>
+      <ListPage header={{ title: "Club supply catalog", description: "The AdventSource items clubs order and keep in stock, plus the patches and pins the conference supplies itself.", primary: <CatalogHeaderButton busyLabel="Reading…" icon="upload" label="Upload CSV" /> }}>
+        <ClubSupplyCatalogWorkspace initialItems={await listClubSupplyItems()} />
+      </ListPage>
+      </CatalogActionProvider>
     </>
   );
 }
