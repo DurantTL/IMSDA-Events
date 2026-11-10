@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileUp, Pencil, Plus, Trash2, Trophy, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { AlertTriangle, CheckCircle2, Pencil, Plus, Trash2, Trophy, X } from "lucide-react";
+import { useRegisterCatalogAction } from "@/components/catalog-header-action";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { useConfirm } from "@/components/use-confirm";
@@ -47,6 +48,8 @@ function RuleEditor({
   choices,
   onSaved,
   onDirtyChange,
+  onBusyChange,
+  dirtyRef,
   onCancel,
 }: {
   rule: MasterAwardRuleRecord;
@@ -54,6 +57,10 @@ function RuleEditor({
   onSaved: (rules: MasterAwardRuleRecord[], message: string) => void;
   /** Whether the form holds work that is not saved, so the dialog can ask before it closes. */
   onDirtyChange: (dirty: boolean) => void;
+  /** Whether a save is in flight, so the dialog can refuse to close and lose its error. */
+  onBusyChange: (busy: boolean) => void;
+  /** Written on every render, so a close right after a change still sees it. */
+  dirtyRef: MutableRefObject<boolean>;
   onCancel: () => void;
 }) {
   const [groups, setGroups] = useState<DraftGroup[]>(() => draftGroups(rule));
@@ -61,7 +68,8 @@ function RuleEditor({
   const [note, setNote] = useState(rule.reviewNote);
   const [checked, setChecked] = useState(!rule.needsManualCheck);
   const [adding, setAdding] = useState<Record<number, string>>({});
-  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState<"save" | "ACTIVE" | "INACTIVE" | null>(null);
+  const busy = saving !== null;
   const [error, setError] = useState("");
   const listId = `master-award-honors-${rule.id}`;
   const snapshot = (value: { groups: DraftGroup[]; itemId: string; note: string; checked: boolean }) => JSON.stringify([
@@ -69,6 +77,8 @@ function RuleEditor({
   ]);
   const [saved] = useState(() => snapshot({ groups, itemId, note, checked }));
   const dirty = snapshot({ groups, itemId, note, checked }) !== saved;
+  // eslint-disable-next-line react-hooks/refs
+  dirtyRef.current = dirty;
   useEffect(() => {
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
@@ -89,7 +99,9 @@ function RuleEditor({
   }
 
   async function save(status?: "ACTIVE" | "INACTIVE") {
-    setBusy(true);
+    if (busy) return;
+    onBusyChange(true);
+    setSaving(status ?? "save");
     setError("");
     try {
       const response = await fetch(`/api/admin/master-award-rules/${encodeURIComponent(rule.id)}`, {
@@ -109,7 +121,8 @@ function RuleEditor({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The rule could not be saved.");
     } finally {
-      setBusy(false);
+      onBusyChange(false);
+      setSaving(null);
     }
   }
 
@@ -200,15 +213,15 @@ function RuleEditor({
         </label>
       )}
       {error && <p className="inline-notice error" role="alert">{error}</p>}
-      <div className="form-actions">
+      <div className={`form-actions ${catalogStyles.dialogActions}`}>
         <button className="secondary-button" disabled={busy} onClick={onCancel} type="button">Cancel</button>
-        <button className="secondary-button" disabled={busy} onClick={() => save()} type="button">Save changes</button>
+        <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => save()} type="button">{saving === "save" ? "Saving…" : "Save changes"}</button>
         {rule.status !== "ACTIVE" ? (
-          <button className="primary-button" disabled={busy || !checked} onClick={() => save("ACTIVE")} type="button">
-            <CheckCircle2 aria-hidden="true" size={16} /> Save and activate
+          <button aria-disabled={busy || !checked || undefined} className="primary-button" onClick={() => { if (checked) void save("ACTIVE"); }} type="button">
+            <CheckCircle2 aria-hidden="true" size={16} /> {saving === "ACTIVE" ? "Saving…" : "Save and activate"}
           </button>
         ) : (
-          <button className="secondary-button" disabled={busy} onClick={() => save("INACTIVE")} type="button">Deactivate</button>
+          <button aria-disabled={busy || undefined} className="secondary-button" onClick={() => save("INACTIVE")} type="button">{saving === "INACTIVE" ? "Saving…" : "Deactivate"}</button>
         )}
       </div>
     </div>
@@ -230,13 +243,27 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
   // The focused editor for one rule: closed until the rule's Review button opens it (#1590).
   const [openRuleId, setOpenRuleId] = useState<string | null>(null);
   const [ruleDirty, setRuleDirty] = useState(false);
+  const dirtyRef = useRef(false);
+  const busyRef = useRef(false);
+  const [ruleBusy, setRuleBusy] = useState(false);
+  const onRuleBusy = useCallback((next: boolean) => { busyRef.current = next; setRuleBusy(next); }, []);
   const openRule = rules.find((rule) => rule.id === openRuleId) ?? null;
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   useUnsavedChangesGuard(Boolean(openRule) && ruleDirty);
   const editorRef = useAccessibleDialog<HTMLElement>(Boolean(openRule), closeEditor);
 
+  // The page header's one filled button chooses the rules file (D3).
+  const fileRef = useRef<HTMLInputElement>(null);
+  const registerAction = useRegisterCatalogAction();
+  const reading = busy && !preview;
+  useEffect(() => {
+    registerAction({ run: () => fileRef.current?.click(), busy: reading });
+    return () => registerAction(null);
+  }, [registerAction, reading]);
+
   async function closeEditor() {
-    if (ruleDirty && !(await askConfirm({
+    if (busyRef.current) return;
+    if (dirtyRef.current && !(await askConfirm({
       title: `Discard changes to ${openRule?.name ?? "this rule"}`,
       body: <p>This rule has changes that haven&apos;t been saved. Discarding closes the editor and loses them.</p>,
       confirmLabel: "Discard changes",
@@ -303,13 +330,6 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
     ["Honors unmatched", preview.plan.summary.honorsUnmatched],
   ] : [];
 
-  const uploadAction = (
-    <label className={`primary-button ${styles.upload}`}>
-      <FileUp aria-hidden="true" size={16} /> {busy && !preview ? "Reading…" : "Upload rules file"}
-      <input accept=".json,application/json" className="sr-only" disabled={busy} onChange={chooseFile} type="file" />
-    </label>
-  );
-
   return (
     <>
       <section className="page-stack">
@@ -322,7 +342,7 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
         </ul>
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
         {error && <div className="inline-notice error" role="alert">{error}</div>}
-        <div className={catalogStyles.toolbar}>{uploadAction}</div>
+        <input accept=".json,application/json" aria-label="Upload rules file" className="sr-only" disabled={busy} onChange={chooseFile} ref={fileRef} tabIndex={-1} type="file" />
         <details className={catalogStyles.importHelp}>
           <summary>How the rules import works</summary>
           <p className="field-help">
@@ -419,7 +439,7 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
                 <p className="eyebrow">Review rule</p>
                 <h2 id="master-award-editor-title" translate="no">{openRule.name}</h2>
               </div>
-              <button aria-label="Close rule editor" className="icon-button modal-close-button" onClick={() => void closeEditor()} type="button">
+              <button aria-label="Close rule editor" className="icon-button modal-close-button" disabled={ruleBusy} onClick={() => void closeEditor()} type="button">
                 <X aria-hidden="true" size={18} />
               </button>
             </div>
@@ -427,6 +447,8 @@ export function MasterAwardRulesWorkspace({ initialRules, choices }: { initialRu
               choices={choices}
               key={openRule.id}
               onCancel={() => void closeEditor()}
+              dirtyRef={dirtyRef}
+              onBusyChange={onRuleBusy}
               onDirtyChange={setRuleDirty}
               onSaved={(next, message) => { setRules(next); setNotice(message); setError(""); setRuleDirty(false); setOpenRuleId(null); }}
               rule={openRule}

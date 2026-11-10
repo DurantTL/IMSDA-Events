@@ -2,13 +2,14 @@
 
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { ExportLink } from "@/components/export-link";
+import { useRegisterCatalogAction } from "@/components/catalog-header-action";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { useConfirm } from "@/components/use-confirm";
 import { staffPageTitles } from "@/components/staff-navigation";
 import catalogStyles from "@/components/catalog-workspace.module.css";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
-import { Check, Download, FileUp, Package, RefreshCw, Upload, X } from "lucide-react";
+import { Check, Download, Package, RefreshCw, Upload, X } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
 import type { ClubSupplyImportSummary, MergedNumberConflict, RepeatedCatalogNumber } from "@/modules/club-supplies/catalog-csv";
 import { type ClubSupplySection, clubSupplySectionLabels, clubSupplySections } from "@/modules/club-supplies/domain";
@@ -83,6 +84,14 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
   const editorDirty = Boolean(editedItem) && (draftSupplier !== editedItem!.supplier || (draftSupplier === "CONFERENCE" && draftPrice.trim() !== originalPrice));
   useUnsavedChangesGuard(editorDirty);
   const editorRef = useAccessibleDialog<HTMLElement>(Boolean(editedItem), closeEditor);
+  // The page header's one filled button chooses the CSV file (D3).
+  const fileRef = useRef<HTMLInputElement>(null);
+  const registerAction = useRegisterCatalogAction();
+  const reading = busy && !preview;
+  useEffect(() => {
+    registerAction({ run: () => fileRef.current?.click(), busy: reading });
+    return () => registerAction(null);
+  }, [registerAction, reading]);
 
   /** Close, Cancel, Escape and the backdrop: a save in flight waits, and typed work asks first. */
   async function closeEditor() {
@@ -190,6 +199,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
   }
 
   async function saveOrdering(item: ClubSupplyItemRecord) {
+    if (toggling) return;
     setToggling(item.id);
     setPriceError("");
     setEditorError("");
@@ -234,28 +244,22 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
     ["Merged rows with another number", preview.summary.mergedNumberConflicts],
   ] : [];
 
-  const uploadAction = (
-    <label className={`primary-button ${styles.upload}`}>
-      <FileUp aria-hidden="true" size={16} /> {busy && !preview ? "Reading…" : "Upload CSV"}
-      <input accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={chooseFile} type="file" />
-    </label>
-  );
-
   return (
     <>
       <section className="page-stack">
         <p className={catalogStyles.definition} data-catalog-definition="">
-          This list defines each item. Active items can be ordered by clubs; inactive items can&apos;t be newly ordered. Changing an item, its
-          supplier or its price here does not change the quantities or prices on orders already placed.
+          This list defines each item. Active items can be ordered by clubs; inactive items can&apos;t be newly ordered. Changing an item&apos;s
+          supplier or price does not change orders already placed: quantities and prices stay as placed, and conference orders keep the item name they were placed with.
+          AdventSource orders show an item&apos;s current name.
         </p>
         <ul aria-label="Related pages" className={catalogStyles.links}>
-          <li><span className={catalogStyles.linksLabel}>Orders clubs have placed:</span> <Link href="/admin/club-supplies/conference-orders">Conference club orders</Link></li>
+          <li><span className={catalogStyles.linksLabel}>Patch and pin orders from clubs:</span> <Link href="/admin/club-supplies/conference-orders">Conference club orders</Link></li>
           <li><span className={catalogStyles.linksLabel}>Items sold at an event are set up on</span> <Link href="/more/merchandise">{staffPageTitles.merchandise}</Link></li>
         </ul>
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
         {error && <div className="inline-notice error" role="alert">{error}</div>}
         <div className={catalogStyles.toolbar}>
-          {uploadAction}
+          <input accept=".csv,text/csv" aria-label="Upload CSV file" className="sr-only" disabled={busy} onChange={chooseFile} ref={fileRef} tabIndex={-1} type="file" />
           <span className={catalogStyles.toolbarTools}>
             <ExportLink className="text-button" href={TEMPLATE_HREF}><Download aria-hidden="true" size={14} /> CSV template</ExportLink>
           </span>
@@ -415,7 +419,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
               onSubmit={(event) => { event.preventDefault(); void saveOrdering(editedItem); }}
             >
               {editorError && <div className={`inline-notice error ${catalogStyles.editorError}`} role="alert">{editorError}</div>}
-              <p className={catalogStyles.editorNote}>Orders already placed keep their quantities and prices.</p>
+              <p className={catalogStyles.editorNote}>Orders already placed keep their quantities and prices; conference orders keep the item name too.</p>
               <label>
                 Supplied by
                 <select onChange={(event) => setDraftSupplier(event.target.value as "ADVENTSOURCE" | "CONFERENCE")} value={draftSupplier}>
@@ -430,9 +434,9 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
                   {priceError && <small className="field-error-message" id={`price-error-${editedItem.id}`}>{priceError}</small>}
                 </label>
               )}
-              <div className="form-actions">
+              <div className={`form-actions ${catalogStyles.dialogActions}`}>
                 <button className="secondary-button" disabled={toggling === editedItem.id} onClick={() => void closeEditor()} type="button">Cancel</button>
-                <button className="primary-button" disabled={toggling === editedItem.id} type="submit">{toggling === editedItem.id ? "Saving…" : "Save supplier"}</button>
+                <button aria-disabled={toggling === editedItem.id || undefined} className="primary-button" type="submit">{toggling === editedItem.id ? "Saving…" : "Save supplier"}</button>
               </div>
             </form>
           </section>

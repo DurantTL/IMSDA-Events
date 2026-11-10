@@ -1,16 +1,17 @@
 "use client";
 
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { useRegisterCatalogAction } from "@/components/catalog-header-action";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { useConfirm } from "@/components/use-confirm";
 import { staffPageTitles } from "@/components/staff-navigation";
 import styles from "@/components/catalog-workspace.module.css";
 import { cardCell } from "@/components/table-card-labels";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
-import { Award, Pencil, Plus, Save, X } from "lucide-react";
+import { Award, Pencil, Save, X } from "lucide-react";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import type { HonorRecord } from "@/modules/honors/repository";
 import { EmptyState } from "@/components/empty-state";
@@ -42,6 +43,12 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
   useUnsavedChangesGuard(edits.dirty);
   const { confirm: askConfirm, confirmDialog } = useConfirm();
   const editorRef = useAccessibleDialog<HTMLElement>(editor !== null, closeEditor);
+  // The page header's one filled button opens the new-honor editor (D3).
+  const registerAction = useRegisterCatalogAction();
+  useEffect(() => {
+    registerAction({ run: () => openEditor("new"), busy: false });
+    return () => registerAction(null);
+  }, [registerAction]);
 
   const query = search.term.trim().toLowerCase();
   const visible = query
@@ -72,6 +79,7 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     const form = new FormData(event.currentTarget);
     setSaving(true);
     setError("");
@@ -130,17 +138,14 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
     <>
       <section className="page-stack">
         <p className={styles.definition} data-catalog-definition="">
-          This list defines each honor. &quot;Used in classes&quot; counts the Honors Weekend classes that currently teach it. Changing or
-          deactivating an honor here does not change honors members have already earned.
+          This list defines each honor.{honors.length > 0 && <> &quot;Used in classes&quot; counts the classes across all Honors Weekends, past ones included, that teach it.</>}{" "}
+          Honors members have already earned stay on their records, which show the honor&apos;s current name and code.
         </p>
         <ul aria-label="Related pages" className={styles.links}>
           <li><span className={styles.linksLabel}>Each event chooses what it offers on</span> <Link href="/more/honors">{staffPageTitles.honors}</Link></li>
         </ul>
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
         <div className={styles.toolbar}>
-          <button className="primary-button" onClick={() => openEditor("new")} type="button">
-            <Plus aria-hidden="true" size={16} /> Add honor
-          </button>
           {honors.length > 0 && (
             <label className="form-stack">
               <span className="sr-only">Filter honors</span>
@@ -233,8 +238,8 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
               {error && <div className={`inline-notice error ${styles.editorError}`} role="alert">{error}</div>}
               {editing && (
                 <p className={styles.editorNote}>
-                  {editing.offeringCount === 0 ? "No class teaches this honor yet." : `${editing.offeringCount} ${editing.offeringCount === 1 ? "class teaches" : "classes teach"} this honor.`}{" "}
-                  Changes here do not change honors members have already earned.
+                  {editing.offeringCount === 0 ? "No class teaches this honor." : `${editing.offeringCount} ${editing.offeringCount === 1 ? "class teaches" : "classes teach"} this honor, across all Honors Weekends.`}{" "}
+                  Honors members have already earned stay on their records, under the honor&apos;s current name and code.
                 </p>
               )}
               <div className="form-grid two-column">
@@ -254,9 +259,9 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
               <label className="checkbox-label">
                 <input defaultChecked={editing?.isActive ?? true} name="isActive" type="checkbox" /> Active (can be offered at sites)
               </label>
-              <div className="form-actions">
+              <div className={`form-actions ${styles.dialogActions}`}>
                 <button className="secondary-button" disabled={saving} onClick={() => void closeEditor()} type="button">Cancel</button>
-                <button className="primary-button" disabled={saving} type="submit">
+                <button aria-disabled={saving || undefined} className="primary-button" type="submit">
                   <Save aria-hidden="true" size={16} />
                   {saving ? " Saving…" : " Save honor"}
                 </button>

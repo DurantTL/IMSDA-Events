@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { act, createElement } from "react";
+import { act, createElement, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +12,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("server-only", () => ({}));
 
+import { CatalogActionProvider, CatalogHeaderButton } from "@/components/catalog-header-action";
 import { ClubSupplyCatalogWorkspace } from "@/components/club-supply-catalog-workspace";
 import { HonorCatalogWorkspace } from "@/components/honor-catalog-workspace";
 import { MasterAwardRulesWorkspace } from "@/components/master-award-rules-workspace";
@@ -19,6 +20,11 @@ import { pageOwnsHeader } from "@/components/page-header-routes";
 import type { HonorRecord } from "@/modules/honors/repository";
 import type { ClubSupplyItemRecord } from "@/modules/club-supplies/repository";
 import type { MasterAwardRuleRecord } from "@/modules/earned-awards/rules-repository";
+
+// The header's one filled button is drawn by the page; these wrap each workspace the way the page does.
+const Honors = (props: ComponentProps<typeof HonorCatalogWorkspace>) => createElement(CatalogActionProvider, null, createElement(CatalogHeaderButton, { icon: "add", label: "Add honor" }), createElement(HonorCatalogWorkspace, props));
+const Rules = (props: ComponentProps<typeof MasterAwardRulesWorkspace>) => createElement(CatalogActionProvider, null, createElement(CatalogHeaderButton, { icon: "upload", label: "Upload rules file", busyLabel: "Reading…" }), createElement(MasterAwardRulesWorkspace, props));
+const Supplies = (props: ComponentProps<typeof ClubSupplyCatalogWorkspace>) => createElement(CatalogActionProvider, null, createElement(CatalogHeaderButton, { icon: "upload", label: "Upload CSV", busyLabel: "Reading…" }), createElement(ClubSupplyCatalogWorkspace, props));
 
 /** #1590: the honor, Master Award rule and club supply catalogs: header, list first, focused editor. Synthetic data only. */
 
@@ -82,14 +88,17 @@ describe("the catalog pages draw their own header (#1590)", () => {
 
 describe("honor catalog (#1590)", () => {
   it("shows one filled button (the page header draws the one h1), the list, and no editor until Add honor is pressed", async () => {
-    await render(createElement(HonorCatalogWorkspace, { initialHonors: [honor(), honor({ id: "h2", code: "AR-002", name: "Sample Birds", isActive: false, offeringCount: 0 })] }));
+    await render(createElement(Honors, { initialHonors: [honor(), honor({ id: "h2", code: "AR-002", name: "Sample Birds", isActive: false, offeringCount: 0 })] }));
     expect(document.querySelectorAll("h1")).toHaveLength(0);
     expect(filled()).toHaveLength(1);
     expect(filled()[0]!.textContent).toContain("Add honor");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.querySelector("form")).toBeNull();
     // Definition versus usage, and the earned-history sentence.
-    expect(document.body.textContent).toContain("does not change honors members have already earned");
+    expect(document.body.textContent).toContain("stay on their records, which show the honor's current name and code");
+    expect(document.body.textContent).toContain("across all Honors Weekends");
+    expect(document.body.textContent).not.toContain("does not change honors members have already earned");
+    expect(document.body.textContent).not.toContain("currently teach");
     expect(document.body.textContent).toContain("2 classes");
     expect(document.body.textContent).toContain("Not in any class");
     expect(document.body.textContent).toContain("Inactive");
@@ -100,7 +109,7 @@ describe("honor catalog (#1590)", () => {
   });
 
   it("opens the editor from Add honor and from a row's Edit, and Cancel closes a clean editor", async () => {
-    await render(createElement(HonorCatalogWorkspace, { initialHonors: [honor()] }));
+    await render(createElement(Honors, { initialHonors: [honor()] }));
     await click(button("Add honor"));
     expect(document.querySelector('[role="dialog"][aria-modal="true"]')).not.toBeNull();
     expect(document.body.textContent).toContain("New honor");
@@ -113,7 +122,7 @@ describe("honor catalog (#1590)", () => {
 
   it("keeps the typed values and shows a duplicate-code error inside the editor when the save fails", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ message: "Another honor already uses that code." }), { status: 409 })));
-    await render(createElement(HonorCatalogWorkspace, { initialHonors: [honor()] }));
+    await render(createElement(Honors, { initialHonors: [honor()] }));
     await click(button("Add honor"));
     const set = (name: string, value: string) => {
       const input = document.querySelector(`input[name="${name}"]`) as HTMLInputElement;
@@ -129,7 +138,7 @@ describe("honor catalog (#1590)", () => {
   });
 
   it("asks before it discards typed work, and Keep editing leaves the editor open", async () => {
-    await render(createElement(HonorCatalogWorkspace, { initialHonors: [honor()] }));
+    await render(createElement(Honors, { initialHonors: [honor()] }));
     await click(button("Add honor"));
     const input = document.querySelector('input[name="name"]') as HTMLInputElement;
     await act(async () => {
@@ -143,7 +152,7 @@ describe("honor catalog (#1590)", () => {
   });
 
   it("explains an empty catalog and still offers Add honor and the CSV import", async () => {
-    await render(createElement(HonorCatalogWorkspace, { initialHonors: [] }));
+    await render(createElement(Honors, { initialHonors: [] }));
     expect(document.body.textContent).toContain("No honors yet");
     expect(filled()).toHaveLength(1);
     expect(document.body.textContent).toContain("Upload CSV");
@@ -162,7 +171,7 @@ describe("Master Award rules (#1590)", () => {
   const choices = { honors: [{ id: "h1", name: "Sample Knots" }], items: [] };
 
   it("shows one filled button (the page header draws the one h1), status and availability, and no editor until Review is pressed", async () => {
-    await render(createElement(MasterAwardRulesWorkspace, {
+    await render(createElement(Rules, {
       choices,
       initialRules: [rule(), rule({ id: "r2", name: "Active Sample Award", status: "ACTIVE", needsManualCheck: true, reviewNote: "Long synthetic review note that must wrap and stay readable on a phone." })],
     }));
@@ -177,7 +186,7 @@ describe("Master Award rules (#1590)", () => {
   });
 
   it("opens the rule editor on Review, and Cancel closes it when nothing changed", async () => {
-    await render(createElement(MasterAwardRulesWorkspace, { choices, initialRules: [rule()] }));
+    await render(createElement(Rules, { choices, initialRules: [rule()] }));
     await click(button("Review Sample Master Award"));
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     expect(document.body.textContent).toContain("Save and activate");
@@ -187,21 +196,21 @@ describe("Master Award rules (#1590)", () => {
 
   it("shows a failed save inside the editor and keeps the dialog open", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ message: "The rule could not be saved." }), { status: 400 })));
-    await render(createElement(MasterAwardRulesWorkspace, { choices, initialRules: [rule()] }));
+    await render(createElement(Rules, { choices, initialRules: [rule()] }));
     await click(button("Review Sample Master Award"));
     await click(button("Save changes"));
     expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toBe("The rule could not be saved.");
   });
 
   it("explains an empty rule list", async () => {
-    await render(createElement(MasterAwardRulesWorkspace, { choices, initialRules: [] }));
+    await render(createElement(Rules, { choices, initialRules: [] }));
     expect(document.body.textContent).toContain("No rules yet");
   });
 });
 
 describe("club supply catalog (#1590)", () => {
   it("shows one filled button (the page header draws the one h1), the list, availability and supplier, and no editor until Supplier and price is pressed", async () => {
-    await render(createElement(ClubSupplyCatalogWorkspace, {
+    await render(createElement(Supplies, {
       initialItems: [supply(), supply({ id: "s2", name: "Sample Conference Pin", isActive: false, supplier: "CONFERENCE", unitPriceCents: 125 })],
     }));
     expect(document.querySelectorAll("h1")).toHaveLength(0);
@@ -210,14 +219,16 @@ describe("club supply catalog (#1590)", () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.body.textContent).toContain("Inactive");
     expect(document.body.textContent).toContain("Conference-supplied");
-    expect(document.body.textContent).toContain("does not change the quantities or prices on orders already placed");
+    expect(document.body.textContent).toContain("does not change orders already placed")
+    expect(document.body.textContent).toContain("AdventSource orders show an item's current name")
+    expect(document.body.textContent).toContain("Patch and pin orders from clubs:");
     expect(document.querySelector('a[href="/admin/club-supplies/conference-orders"]')?.textContent).toBe("Conference club orders");
     expect(document.querySelector('a[href="/more/merchandise"]')?.textContent).toBe("Merchandise catalog");
   });
 
   it("opens the supplier editor from the row, with Save and Cancel, and shows a failed save in it", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ message: "The supplier could not be saved." }), { status: 500 })));
-    await render(createElement(ClubSupplyCatalogWorkspace, { initialItems: [supply()] }));
+    await render(createElement(Supplies, { initialItems: [supply()] }));
     await click(button("Supplier and price: Sample Patch"));
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     expect(button("Save supplier")).not.toBeNull();
@@ -228,7 +239,7 @@ describe("club supply catalog (#1590)", () => {
   });
 
   it("explains an empty catalog", async () => {
-    await render(createElement(ClubSupplyCatalogWorkspace, { initialItems: [] }));
+    await render(createElement(Supplies, { initialItems: [] }));
     expect(document.body.textContent).toContain("No items yet");
   });
 
@@ -240,12 +251,70 @@ describe("club supply catalog (#1590)", () => {
   });
 });
 
+const typeInto = (input: HTMLInputElement, value: string) => act(async () => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
+const pressEscape = () => act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); });
+const pending = () => vi.fn(() => new Promise<Response>(() => {}));
+const submit = () => act(async () => { document.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+
+describe("editors refuse to close during a save and ask before discarding (#1590)", () => {
+  it("honor editor: Escape and X do nothing while saving, and focus stays on Save", async () => {
+    vi.stubGlobal("fetch", pending());
+    await render(createElement(Honors, { initialHonors: [honor()] }));
+    await click(button("Edit Sample Knots"));
+    await submit();
+    await pressEscape();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect((button("Close honor editor") as HTMLButtonElement).disabled).toBe(true);
+    const save = button("Saving…")!;
+    expect(save.getAttribute("aria-disabled")).toBe("true");
+    expect(save.disabled).toBe(false);
+  });
+
+  it("supplier editor: Escape and X do nothing while saving; a changed supplier asks before it closes", async () => {
+    vi.stubGlobal("fetch", pending());
+    await render(createElement(Supplies, { initialItems: [supply()] }));
+    await click(button("Supplier and price: Sample Patch"));
+    const select = document.querySelector('[role="dialog"] select') as HTMLSelectElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "CONFERENCE");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await click(button("Close supplier editor"));
+    expect(document.body.textContent).toContain("Discard changes to Sample Patch");
+    await click(button("Keep editing"));
+    await typeInto(document.querySelector('[role="dialog"] input[type="text"]') as HTMLInputElement, "1.25");
+    await submit();
+    await pressEscape();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect((button("Close supplier editor") as HTMLButtonElement).disabled).toBe(true);
+    expect(button("Saving…")!.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("rule editor: a change followed at once by X asks first, and Escape and X do nothing while saving", async () => {
+    vi.stubGlobal("fetch", pending());
+    await render(createElement(Rules, { choices: { honors: [{ id: "h1", name: "Sample Knots" }], items: [] }, initialRules: [rule()] }));
+    await click(button("Review Sample Master Award"));
+    await typeInto(document.querySelector('[role="dialog"] input[type="number"]') as HTMLInputElement, "2");
+    await click(button("Close rule editor"));
+    expect(document.body.textContent).toContain("Discard changes to Sample Master Award");
+    await click(button("Keep editing"));
+    await click(button("Save changes"));
+    await pressEscape();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect((button("Close rule editor") as HTMLButtonElement).disabled).toBe(true);
+    expect(button("Saving…")).not.toBeNull();
+  });
+});
+
 describe("styles (#1590)", () => {
   it("keeps the new module on tokens with 44px links and no raw colors, sizes or radii", () => {
     const css = read("components/catalog-workspace.module.css").replace(/\/\*[\s\S]*?\*\//g, "");
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(css).not.toMatch(/font-size:\s*\d/);
     expect(css).not.toMatch(/border-radius:\s*\d/);
-    expect(css).toContain(".links a { display: inline-flex; align-items: center; min-height: 44px; }");
+    expect(css).toMatch(/\.links a \{[^}]*min-height: 44px;[^}]*color: var\(--imsda-purple\);[^}]*text-decoration: underline/);
   });
 });
