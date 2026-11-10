@@ -1,0 +1,140 @@
+/* The header of a restricted-purpose staff page (#1584). One column on a phone, nothing scrolls sideways. */
+.header {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0 0 16px;
+}
+
+.header > :global(.more-back-link) {
+  min-height: var(--touch-target);
+  margin-bottom: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 24px;
+  min-width: 0;
+}
+
+.text {
+  display: grid;
+  flex: 1 1 18rem;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* The purpose label: a tinted band so the page never reads as a routine report. */
+.purpose {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  border: 1px solid var(--imsda-gold);
+  border-radius: var(--radius-sm);
+  background: var(--imsda-gold-soft);
+  padding: 6px 10px;
+  color: var(--gold-text);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.purpose svg {
+  flex: 0 0 auto;
+}
+
+.description {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.action > :is(a, button) {
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
+}
+
+/* The record a page is about: label above value, long text wraps. */
+.subject {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 12px 14px;
+}
+
+.subject h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 1.15rem);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.subject p {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+/* Paper only: the shell's header is hidden when printing, so the sheet keeps the title it always had. */
+.printTitle {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .action {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .action > :is(a, button) {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+@media print {
+  .header {
+    gap: 0;
+    margin: 0;
+  }
+
+  .header > :not(.printTitle) {
+    display: none !important;
+  }
+
+  .printTitle {
+    display: block;
+  }
+
+  .printTitle h2 {
+    margin: 2px 0;
+  }
+
+  .printTitle p {
+    margin: 4px 0 0;
+  }
+}

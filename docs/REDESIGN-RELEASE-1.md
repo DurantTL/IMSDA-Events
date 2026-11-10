@@ -213,3 +213,14 @@ Browser checks ran on a seeded local database with synthetic data, at 1280 and 3
 | `/more/clubs/reports` | Event club pages strip | Strip replaces the back link | Pass | - |
 | `/more/clubs/reports/[organizationId]/[month]` | Monthly Records | Event and club named in the header context; return-to unchanged | Pass | - |
 | `/more/club-assignments` | Event club pages strip | Header says what is editable and that email goes out only after preview and send | Pass; registration manager without oversight sees no strip (one view) | Nothing was saved or sent |
+
+## Coverage after release 1: health information and emergency plan (#1584, #1596 ledger)
+
+Presentation and navigation only. Access checks, the privacy acknowledgment, break-glass, audit writes and what each person may see are unchanged, and no page loads anything new. The page titles stay generic; a member's name appears only on the record page itself.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/more/event-health` | Event setup → Event health information | Header leads with the "Confidential · read only" label and the availability and recording sentence, with the printable-sheet action as the one header action; attendee tables become cards on a phone; the printed sheet keeps its title block | Pending review | - |
+| `/more/health-records/[organizationId]/[memberId]` | Opened from a member's record link | Shell title "Health record"; header with the view-only and recorded label, a back link to event health information only when opened from an event, and the member, club and status block; the same header frame on the privacy notice, break-glass and restricted states | Pending review | - |
+| `/more/emergency-plan` | Event setup → Emergency plan | Header with the event named; the draft editor and the published versions with their print and download actions are two separate zones; the current version is marked | Pending review | - |
+| `/more/emergency-plan/print` | Print and Preview draft links on the emergency plan | Header with "Back to the emergency plan", the version or draft marking, Print as the main action and CSV download beside it; the printed sheet is unchanged | Pending review | - |

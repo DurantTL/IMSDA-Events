@@ -12,4 +12,19 @@
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .hint { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .versions { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.version { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.version { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); padding: 10px 12px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+/* The draft editor and the published, printable versions are two separate zones (#1584). */
+.zone { display: grid; gap: 12px; min-width: 0; border-radius: var(--radius-card); padding: 14px; }
+.zone h2 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.05rem); font-weight: 800; color: var(--ink); overflow-wrap: anywhere; }
+.zoneHead { display: grid; gap: 4px; }
+.zoneHead .hint { margin: 0; }
+.draftZone { border: 1px dashed var(--field-border); background: var(--secondary-bg); }
+.publishedZone { border: 1px solid var(--green); background: var(--green-soft); }
+.zone .item, .zone .version, .zone .block { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 639px) {
+  .zone { padding: 10px; }
+  .version > .actions { width: 100%; }
+  .version > .actions > :global(.secondary-button) { flex: 1 1 100%; justify-content: center; }
+}
