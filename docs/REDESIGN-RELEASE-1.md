@@ -202,6 +202,20 @@ There are no migrations on the branch (verified: no file under `prisma/` differs
 2. Merge the revert PR and deploy as usual. No database step is needed, and data entered while release 1 was live stays valid, because the redesign changes only pages and navigation.
 3. To ship the redesign again later, revert the revert (GitHub's "Revert" on the revert PR) rather than re-merging the branch.
 
+## Coverage after release 1: form pages (#1572, #1596 ledger)
+
+Browser checks ran on a seeded local database with synthetic data, at 1280 and 390 px. The viewers were a system admin, an event admin, a registration manager and read-only staff.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/information-forms` (list) | Event setup → Information forms card | Shared page header (title drawn once by the page) | Pass; restricted state passes | Empty list: the seed has one form |
+| `/information-forms?form=` (builder) | Information forms list | Title drawn by the page; arriving from the form's other pages opens Form settings or the preview | Pass at 1280; at 390 the existing "use a computer or tablet" notice shows | - |
+| `/information-forms/responses` | Form pages strip (Editor, Preview, Responses, Form settings) | Strip under the title; "Back to information forms" (it had no way back); Download CSV is the one main action | Pass; restricted, wrong-event form and missing form pass | A response on an event form: the seeded event form has no questions to answer |
+| `/admin/information-forms` | Admin → Forms | Shared page header | Pass; non-system staff are sent to no-access | Empty list |
+| `/admin/information-forms/[formId]` | General information forms list | Arriving from the form's other pages opens Form settings or the preview | Pass at 1280; phone notice at 390 | - |
+| `/admin/information-forms/[formId]/responses` | Form pages strip | Strip under the title; the back link now goes to the list, because Editor in the strip opens the form | Pass, with no responses, one response and a selected response (cards at 390) | - |
+| `/registration-builder` | Event setup → Registration forms card | "Registrations" link in the builder's top bar for people who can see registration records; on a phone the top-bar links wrap instead of scrolling sideways | Pass; unsaved edits ask before leaving; `?form=&field=` unchanged | A viewer with form access but no access to registration records (no seeded role has that): unit test only. Phone keyboard open: not tried on a real phone |
+
 ## Coverage after release 1: event club pages (#1582, #1596 ledger)
 
 Browser checks ran on a seeded local database with synthetic data, at 1280 and 390 px. The viewers were a system admin, an event admin, read-only staff, a registration manager, and an event admin on a non-club event.
@@ -225,3 +239,15 @@ One in-page strip, "Meals and kitchen pages" (Meals, Kitchen report, Kitchen cou
 | `/more/kitchen-report/counts` | Strip; kitchen-only staff open it directly | Shared page header replaces the old intro; "Back to the kitchen report" replaced by the strip; each count has its definition beside it, with Ordered and Served defined on each service card | Pass: strip for report holders, none for kitchen-only staff (their only links are this page and its CSV); empty state explains itself; mobile audit passes with entered counts, a long note and a correction, also as kitchen staff | Count entry, saved and error states were not typed through by hand: the seed has no meal tickets. The audit fixture and the route tests cover them |
 | `/more/kitchen-report/scanner-import` | Strip; per-service ticket links on the served table | Shared page header titled "Scanner results"; back link replaced by the strip; served table definitions added | Pass: strip, one h1, title matches the strip label; Preview stays off until a file is chosen | An import with exceptions: no scanner file was uploaded. Code and tests only |
 | `/more/kitchen-report/closeout` | Strip (finance only) | Shared page header replaces the old intro; back link replaced by the strip; the Kitchen counts definition now lists each count's own definition | Pass: strip (finance only), one h1, export links unchanged | Exceptions and their review forms by hand: the seed has none. The mobile audit fixture covers them |
+
+## Coverage after release 1: check-in desk and station (#1577, #1596 ledger)
+
+Presentation and navigation only. URLs, permissions, server checks, the Sterling Volunteers gate and override, payment recording, the offline queue and the station's device checks are unchanged.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/check-in` | Event → Check-in | Search and scan lead; the checked-in tally is a compact strip; the Saved on this device queue and its states keep their own look; "Open as a station" panel; long names wrap | Pass (SA1 to SA10, S1, S2, S4, B10, B12) | Offline, queued and storage-unavailable states and camera scanning: desk queue code and styles are unchanged |
+| `/check-in/badges` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pass | - |
+| `/check-in/passes` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pass | - |
+| `/check-in/assets` | Check-in → Tools | Already on the shared header pattern; no change | Pass (viewed; no change) | - |
+| `/check-in-station` | Check-in → Open as a station | Header bar with the station name and the event beneath; Money, then Who is here?, then Check in and Next person; "Go to Check-in" link on the not-active screen; safe-area padding | Pass at 1280, 820 and 390 (SA1 to SA10, L5, B10, B12) | A person held by the screening gate, and safe-area insets on a real iPhone or iPad |

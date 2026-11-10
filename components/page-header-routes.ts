@@ -11,12 +11,17 @@
 export type PageOwnsHeaderRoute = { pattern: string; notSegments?: readonly string[] };
 
 export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
+  { pattern: "/admin/events" },
   { pattern: "/event-setup" },
   { pattern: "/event-setup/from-template" },
   { pattern: "/event-setup/copy" },
   { pattern: "/more/reports/printouts" },
   { pattern: "/admin/club-supplies/conference-orders" },
   { pattern: "/more/clubs/[organizationId]", notSegments: ["reports"] },
+  { pattern: "/information-forms" },
+  { pattern: "/information-forms/responses" },
+  { pattern: "/admin/information-forms" },
+  { pattern: "/admin/information-forms/[formId]/responses" },
 ];
 
 function segmentsOf(path: string) {

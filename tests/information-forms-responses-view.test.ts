@@ -3,9 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/components/staff-page-header", () => ({
-  StaffPageHeader: ({ description, primary }: { description?: string; primary?: unknown }) => createElement("header", null, description, primary as never),
-}));
+vi.mock("next/navigation", () => ({ usePathname: () => "/information-forms/responses", useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }));
 
 import { answerText, InformationFormResponsesView, responseColumns, type ResponseRowView } from "@/components/information-form-responses-view";
 
@@ -16,8 +14,8 @@ const rows: ResponseRowView[] = [
 
 function render(overrides: Partial<Parameters<typeof InformationFormResponsesView>[0]> = {}) {
   return renderToStaticMarkup(createElement(InformationFormResponsesView, {
-    formName: "Camp survey", total: 2, rows, selected: null, exportHref: "/api/x/responses/export", rowHref: (id) => `/r?response=${id}`, closeHref: "/r", nextHref: null, ...overrides,
-  }));
+    views: [{ key: "editor", label: "Editor", href: "/b" }, { key: "responses", label: "Responses", href: "/r", current: true }], formName: "Camp survey", total: 2, rows, selected: null, exportHref: "/api/x/responses/export", rowHref: (id) => `/r?response=${id}`, closeHref: "/r", nextHref: null, ...overrides,
+  } as Parameters<typeof InformationFormResponsesView>[0]));
 }
 
 describe("information form responses view (#1150)", () => {
