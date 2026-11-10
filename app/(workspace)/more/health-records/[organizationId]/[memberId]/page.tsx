@@ -41,7 +41,7 @@ export default async function StaffHealthRecordPage({
   if (!viewer) {
     return (
       <>
-        <HealthRecordPageHeader eventId={event} />
+        <HealthRecordPageHeader />
         <AccessRestricted detail="Health records need the health information permission." title="Health records are restricted" whoToAsk="a system administrator" />
       </>
     );

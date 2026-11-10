@@ -103,6 +103,9 @@ describe("health record header (#1584)", () => {
     const html = await recordPage({ event: "event-1" });
     expect(html).toContain(RECORD_PURPOSE);
     expect(html).toContain("Casey Sample");
+    // The name is drawn once, in the subject block, and the header keeps that block on paper.
+    expect(html.match(/Casey Sample/g)).toHaveLength(1);
+    expect(html).toMatch(/<header class="[^"]*printSubject[^"]*"[^>]*>[\s\S]*class="[^"]*subject[^"]*"[^>]*><h2>[\s\S]*Casey Sample/);
     expect(html).toContain('translate="no">Synthetic Pathfinders');
     expect(html).toContain("Current for this club year");
     expect(html).toContain('href="/more/event-health?event=event-1"');
@@ -116,7 +119,10 @@ describe("health record header (#1584)", () => {
 
   it("keeps the label on the restricted, acknowledgment and break-glass states and loads no record for them", async () => {
     mocks.requireStaffHealthViewer.mockRejectedValue(new HealthRecordError("FORBIDDEN", "No."));
-    expect(await recordPage({ event: "event-1" })).toContain(RECORD_PURPOSE);
+    const restricted = await recordPage({ event: "event-1" });
+    expect(restricted).toContain(RECORD_PURPOSE);
+    expect(restricted).not.toContain("Back to event health information");
+    expect(restricted).not.toMatch(/printSubject|class="[^"]*subject/);
     expect(mocks.viewHealthRecord).not.toHaveBeenCalled();
     mocks.requireStaffHealthViewer.mockResolvedValue({ kind: "SYSTEM_ADMIN", userId: "u1" });
     mocks.viewHealthRecord.mockRejectedValue(new HealthRecordError("ACKNOWLEDGMENT_REQUIRED", "Read the notice."));
@@ -126,5 +132,6 @@ describe("health record header (#1584)", () => {
     expect(html).toContain(RECORD_PURPOSE);
     expect(html).toContain("Break-glass access is required");
     expect(html).not.toContain("Casey");
+    expect(html).not.toMatch(/printSubject|class="[^"]*subject/);
   });
 });

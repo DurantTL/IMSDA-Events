@@ -14,6 +14,7 @@ export function HealthRecordPageHeader({ eventId, subject }: { eventId?: string;
     <RestrictedPageHeader
       back={eventId ? { href: `/more/event-health?event=${encodeURIComponent(eventId)}`, label: "Back to event health information" } : undefined}
       purpose={HEALTH_RECORD_PURPOSE}
+      printSubject={Boolean(subject)}
       subject={subject}
     />
   );

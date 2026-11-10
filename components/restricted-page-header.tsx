@@ -12,7 +12,7 @@ import styles from "@/components/restricted-page-header.module.css";
  * `printTitle` is a title block that appears on paper only: the shell's header is hidden when printing, so a printed
  * sheet keeps the event name and the confidential label it had before.
  */
-export function RestrictedPageHeader({ purpose, locked = true, back, description, subject, action, printTitle }: {
+export function RestrictedPageHeader({ purpose, locked = true, back, description, subject, action, printTitle, printSubject = false }: {
   /** What this page is for, in a few words, such as "Confidential · read only". */
   purpose: ReactNode;
   /** The lock mark beside the purpose label; off for a page that holds no medical information. */
@@ -25,9 +25,11 @@ export function RestrictedPageHeader({ purpose, locked = true, back, description
   /** The page's one action. */
   action?: ReactNode;
   printTitle?: ReactNode;
+  /** On paper, keep the purpose label and the subject block (and hide the rest): for a record whose printout must say whose it is. */
+  printSubject?: boolean;
 }) {
   return (
-    <header className={styles.header} data-restricted-header="">
+    <header className={`${styles.header} ${printSubject ? styles.printSubject : ""}`} data-restricted-header="">
       {back ? <BackLink href={back.href} variant="staff">{back.label}</BackLink> : null}
       <div className={styles.row}>
         <div className={styles.text}>

@@ -138,3 +138,37 @@
     margin: 4px 0 0;
   }
 }
+
+/* A record's printout keeps the purpose label and the subject block, so the page says whose record it is (#1584). */
+@media print {
+  .printSubject {
+    gap: 6px;
+    margin: 0 0 8px;
+  }
+
+  .printSubject > .row {
+    display: block !important;
+  }
+
+  .printSubject .text > :not(.purpose) {
+    display: none !important;
+  }
+
+  .printSubject .action {
+    display: none !important;
+  }
+
+  .printSubject .purpose {
+    display: inline-flex !important;
+  }
+
+  .printSubject > .subject {
+    display: grid !important;
+    border: 0;
+    padding: 0;
+  }
+
+  .printSubject .subject h2::before {
+    content: "Health record: ";
+  }
+}
