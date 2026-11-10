@@ -11,6 +11,7 @@
 export type PageOwnsHeaderRoute = { pattern: string; notSegments?: readonly string[] };
 
 export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
+  { pattern: "/admin/events" },
   { pattern: "/event-setup" },
   { pattern: "/event-setup/from-template" },
   { pattern: "/event-setup/copy" },
@@ -21,6 +22,10 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/admin/club-forms/[templateKey]", notSegments: ["public-page"] },
   { pattern: "/more/club-forms" },
   { pattern: "/more/club-forms/[submissionId]" },
+  { pattern: "/information-forms" },
+  { pattern: "/information-forms/responses" },
+  { pattern: "/admin/information-forms" },
+  { pattern: "/admin/information-forms/[formId]/responses" },
 ];
 
 function segmentsOf(path: string) {

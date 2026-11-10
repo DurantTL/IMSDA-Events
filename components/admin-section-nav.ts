@@ -199,7 +199,7 @@ export function adminBackLink(
   if (/^\/admin\/club-forms\/[^/]+(\/|$)/.test(pathname)) return { href: "/admin/club-forms", label: "Back to club forms" };
   if (/^\/admin\/form-templates\/[^/]+(\/|$)/.test(pathname)) return { href: "/admin/form-templates", label: "Back to form templates" };
   match = /^\/admin\/information-forms\/([^/]+)\/responses(\/|$)/.exec(pathname);
-  if (match) return { href: `/admin/information-forms/${match[1]}`, label: `Back to ${options.parentName ?? "the form"}` };
+  if (match) return { href: "/admin/information-forms", label: "Back to information forms" };
   if (/^\/admin\/information-forms\/[^/]+(\/|$)/.test(pathname)) return { href: "/admin/information-forms", label: "Back to information forms" };
   if (/^\/admin\/event-templates\/[^/]+(\/|$)/.test(pathname)) return { href: "/admin/event-templates", label: "Back to Event templates" };
   return null;

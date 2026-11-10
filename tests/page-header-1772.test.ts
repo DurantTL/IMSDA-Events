@@ -22,7 +22,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: { id: "user_1", email: "staff@example.test", globalRole: "SYSTEM_ADMIN" } }) }));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
 vi.mock("@/modules/events/archive-repository", () => ({
-  listArchivedEventsForUser: async () => [{ id: "evt_1", name: "Sample archived event", startsAt: new Date("2025-06-01T15:00:00Z"), endsAt: new Date("2025-06-02T15:00:00Z"), timezone: "America/Chicago" }],
+  listArchivedEventsForUser: async () => [{ id: "evt_1", name: "Sample archived event", startsAt: new Date("2025-06-01T15:00:00Z"), endsAt: new Date("2025-06-02T15:00:00Z"), timezone: "America/Chicago", archivedAt: new Date("2025-07-01T15:00:00Z") }],
 }));
 
 // A loosely typed createElement: the templates take their sections as children, which the strict overloads reject here.
@@ -79,7 +79,7 @@ describe("the states that replace a page keep its one h1 (#1772)", () => {
 
 describe("migrated pages carry a real header action (#1772)", () => {
   it("puts /archived-events' Back to events link in the header, once, as the outlined button", async () => {
-    const markup = html(await ArchivedEventsPage());
+    const markup = html(await ArchivedEventsPage({ searchParams: Promise.resolve({}) }));
     expect(count(markup, /Back to events/g)).toBe(1);
     expect(markup.indexOf("Back to events")).toBeGreaterThan(markup.indexOf("<h1"));
     expect(markup.indexOf("Back to events")).toBeLessThan(markup.indexOf("Sample archived event"));

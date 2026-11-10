@@ -88,6 +88,7 @@ const pathOf = (href: string) => href.split("?")[0].split("#")[0];
 
 /** Task words by destination path (no query string). Words people use that the label does not. */
 const destinationKeywords: Record<string, readonly string[]> = {
+  "/admin/events": ["all events", "every event", "event list", "events directory", "find an event", "current events"],
   "/event-setup": ["new event", "add event", "start event", "build event"],
   "/admin/calendar": ["calendar", "conference calendar", "public calendar", "calendar item", "visitors"],
   "/event-setup/copy": ["copy event", "duplicate event", "clone event", "last year", "previous event", "rollover"],

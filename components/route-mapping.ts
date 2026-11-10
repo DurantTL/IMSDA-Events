@@ -58,6 +58,7 @@ type Menu = readonly [route: string, scope: DestinationScope, oldPlace: RouteMap
 
 const menuRoutes: readonly Menu[] = [
   // System management groups (systemNavGroups)
+  ["/admin/events", "System", "System management", "Events", "All events"],
   ["/event-setup", "System", "System management", "Events", "Create an event"],
   ["/admin/calendar", "System", "System management", "Events", "Conference calendar"],
   ["/event-setup/copy", "System", "System management", "Events", "Copy from a past event"],
@@ -159,7 +160,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/check-in/passes", "/check-in", "components/check-in-workspace.tsx"],
   ["/communications/scheduled", "/communications", "components/communications-workspace.tsx"],
   ["/admin/event-templates/from-event", "/admin/event-templates", "components/event-template-list.tsx"],
-  ["/event-setup/from-template", "/event-setup", "app/(workspace)/event-setup/page.tsx"],
+  ["/event-setup/from-template", "/event-setup", "components/event-start-choices.tsx"],
   ["/finance/attendance-reconciliation", "/finance", "components/finance-workspace.tsx"],
   ["/finance/billing-responsibility", "/finance", "components/finance-workspace.tsx"],
   ["/finance/cancellation-policy", "/finance", "components/finance-workspace.tsx"],

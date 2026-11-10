@@ -213,6 +213,19 @@ Browser checks ran on a seeded local database with synthetic data, at 1280 and 3
 | `/admin/club-forms/[templateKey]` | Definitions list | Form name as the title; read-only Form status (on or off, version, draft, filled in) with a link to where requirements are set | Pass, for a form that is on and one that is off with a past submission | Stale and unreadable drafts: not produced in the browser; text checked against the code |
 | `/more/club-forms` | Admin → Forms when opened without an event; the event's More card keeps the event | Strip (hidden for people who can open only Submissions); privacy notice kept word for word; cards on a phone | Pass; filters, sort, paging and CSV unchanged; restricted state passes | The "No submitted forms match" state: source only |
 | `/more/club-forms/[submissionId]` | Submissions list | Own title, "Back to submissions", Print; no unrelated event named; prints as before | Pass; restricted state passes; opening is still recorded and birth dates still hidden from people without access (checked through the module) | A submission with a protected birth date on screen: the local app has no encryption key |
+## Coverage after release 1: form pages (#1572, #1596 ledger)
+
+Browser checks ran on a seeded local database with synthetic data, at 1280 and 390 px. The viewers were a system admin, an event admin, a registration manager and read-only staff.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/information-forms` (list) | Event setup → Information forms card | Shared page header (title drawn once by the page) | Pass; restricted state passes | Empty list: the seed has one form |
+| `/information-forms?form=` (builder) | Information forms list | Title drawn by the page; arriving from the form's other pages opens Form settings or the preview | Pass at 1280; at 390 the existing "use a computer or tablet" notice shows | - |
+| `/information-forms/responses` | Form pages strip (Editor, Preview, Responses, Form settings) | Strip under the title; "Back to information forms" (it had no way back); Download CSV is the one main action | Pass; restricted, wrong-event form and missing form pass | A response on an event form: the seeded event form has no questions to answer |
+| `/admin/information-forms` | Admin → Forms | Shared page header | Pass; non-system staff are sent to no-access | Empty list |
+| `/admin/information-forms/[formId]` | General information forms list | Arriving from the form's other pages opens Form settings or the preview | Pass at 1280; phone notice at 390 | - |
+| `/admin/information-forms/[formId]/responses` | Form pages strip | Strip under the title; the back link now goes to the list, because Editor in the strip opens the form | Pass, with no responses, one response and a selected response (cards at 390) | - |
+| `/registration-builder` | Event setup → Registration forms card | "Registrations" link in the builder's top bar for people who can see registration records; on a phone the top-bar links wrap instead of scrolling sideways | Pass; unsaved edits ask before leaving; `?form=&field=` unchanged | A viewer with form access but no access to registration records (no seeded role has that): unit test only. Phone keyboard open: not tried on a real phone |
 
 ## Coverage after release 1: event club pages (#1582, #1596 ledger)
 
@@ -225,3 +238,15 @@ Browser checks ran on a seeded local database with synthetic data, at 1280 and 3
 | `/more/clubs/reports` | Event club pages strip | Strip replaces the back link | Pass | - |
 | `/more/clubs/reports/[organizationId]/[month]` | Monthly Records | Event and club named in the header context; return-to unchanged | Pass | - |
 | `/more/club-assignments` | Event club pages strip | Header says what is editable and that email goes out only after preview and send | Pass; registration manager without oversight sees no strip (one view) | Nothing was saved or sent |
+
+## Coverage after release 1: check-in desk and station (#1577, #1596 ledger)
+
+Presentation and navigation only. URLs, permissions, server checks, the Sterling Volunteers gate and override, payment recording, the offline queue and the station's device checks are unchanged.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/check-in` | Event → Check-in | Search and scan lead; the checked-in tally is a compact strip; the Saved on this device queue and its states keep their own look; "Open as a station" panel; long names wrap | Pass (SA1 to SA10, S1, S2, S4, B10, B12) | Offline, queued and storage-unavailable states and camera scanning: desk queue code and styles are unchanged |
+| `/check-in/badges` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pass | - |
+| `/check-in/passes` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pass | - |
+| `/check-in/assets` | Check-in → Tools | Already on the shared header pattern; no change | Pass (viewed; no change) | - |
+| `/check-in-station` | Check-in → Open as a station | Header bar with the station name and the event beneath; Money, then Who is here?, then Check in and Next person; "Go to Check-in" link on the not-active screen; safe-area padding | Pass at 1280, 820 and 390 (SA1 to SA10, L5, B10, B12) | A person held by the screening gate, and safe-area insets on a real iPhone or iPad |

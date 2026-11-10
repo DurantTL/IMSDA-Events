@@ -674,8 +674,6 @@
 ".section-actions button, .field-actions button, .drag-handle | 0.54rem",
 ".section-heading h2, .panel h2 | 1.12rem",
 ".section-number | 0.65rem",
-".select-event-option small | 0.875rem",
-".select-event-option strong | 0.875rem",
 ".select-shell select | 0.78rem",
 ".selected-audience-recipients small | 0.61rem",
 ".selected-audience-recipients strong | 0.7rem",
