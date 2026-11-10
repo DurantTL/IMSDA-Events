@@ -7,6 +7,7 @@ import { MerchandiseAdminWorkspace } from "@/components/merchandise-admin-worksp
 
 const root = process.cwd();
 const workspaceSource = readFileSync(path.join(root, "components/merchandise-admin-workspace.tsx"), "utf8");
+const dialogSource = readFileSync(path.join(root, "components/editor-dialog.tsx"), "utf8");
 const workspaceCss = readFileSync(path.join(root, "components/merchandise-admin-workspace.module.css"), "utf8");
 
 describe("merchandise admin workspace accessibility", () => {
@@ -29,6 +30,16 @@ describe("merchandise admin workspace accessibility", () => {
     expect(workspaceSource).toContain("aria-label={`Archive ${product.name}`}");
   });
 
+  it("gives every product and variant a visible Edit button and one Actions menu named for it (#1581)", () => {
+    expect(workspaceSource).toContain("aria-label={`Edit ${product.name}`} onClick={() => openProductEditor(product)}>Edit</button>");
+    expect(workspaceSource).toContain("aria-label={`Edit ${variant.label}`} onClick={() => openVariantEditor(variant)}>Edit</button>");
+    expect(workspaceSource).toContain("<ActionsMenu ariaLabel={`Actions for ${product.name}`}>");
+    expect(workspaceSource).toContain("<ActionsMenu ariaLabel={`Actions for ${variant.label}`}>");
+    for (const word of [">Move up</button>", ">Move down</button>", ">Archive</button>"]) expect(workspaceSource.split(word).length - 1, word).toBe(2);
+    // No icon-only row controls remain.
+    expect(workspaceSource).not.toContain('className="icon-button" type="button" aria-label');
+  });
+
   it("disables reorder controls at the visible edges instead of only hiding them, so keyboard/switch focus never lands on a dead move button", () => {
     expect(workspaceSource).toMatch(/aria-label=\{`Move \$\{product\.name\} up`\}[^>]*disabled=\{saving \|\| index === 0\}/);
     expect(workspaceSource).toMatch(/aria-label=\{`Move \$\{product\.name\} down`\}[^>]*disabled=\{saving \|\| index === ordered\.length - 1\}/);
@@ -41,12 +52,14 @@ describe("merchandise admin workspace accessibility", () => {
   });
 
   it("gives every modal dialog a role, an aria-modal flag, and an aria-labelledby that resolves to a heading in the same dialog", () => {
-    expect(workspaceSource).toContain('role="dialog"');
-    expect(workspaceSource).toContain('aria-modal="true"');
-
-    // Both editors share EditorDialog, which wires aria-labelledby to its own heading id.
-    expect(workspaceSource).toContain("aria-labelledby={titleId}");
-    expect(workspaceSource).toContain("<h2 id={titleId}>");
+    // Both editors share EditorDialog (components/editor-dialog.tsx, also used by the issued items page, #1581),
+    // which wires aria-labelledby to its own heading id.
+    expect(workspaceSource).toContain('import { EditorDialog } from "@/components/editor-dialog"');
+    expect(workspaceSource).not.toContain("function EditorDialog");
+    expect(dialogSource).toContain('role="dialog"');
+    expect(dialogSource).toContain('aria-modal="true"');
+    expect(dialogSource).toContain("aria-labelledby={titleId}");
+    expect(dialogSource).toContain("<h2 id={titleId}>");
 
     expect(workspaceSource).toContain('closeLabel="Close variant editor"');
     expect(workspaceSource).toContain('closeLabel="Close product editor"');
@@ -86,13 +99,22 @@ describe("merchandise admin workspace responsive layout", () => {
     expect(workspaceCss).toMatch(/@media \(max-width: 850px\)\s*\{\s*\.layout \{ grid-template-columns: 1fr; \}\s*\}/);
   });
 
-  it("stacks per-item reorder/edit/archive controls vertically and lets header actions fill the width on phone-sized viewports", () => {
+  it("drops each product's Edit and Actions under its name on phone-sized viewports, and lets long names wrap (#1581)", () => {
     const smallBreakpoint = workspaceCss.match(/@media \(max-width: 520px\)\s*\{([\s\S]*?)\n\}/);
     expect(smallBreakpoint).not.toBeNull();
     const body = smallBreakpoint![1];
-    expect(body).toContain(".actions { justify-content: stretch; }");
-    expect(body).toContain(".actions > button { flex: 1; }");
-    expect(body).toContain(".cardActions { flex-direction: column; }");
+    expect(body).toContain(".cardActions { flex: 1 1 100%; justify-content: flex-start; }");
+    expect(workspaceCss).toMatch(/\.productSelect strong \{[^}]*overflow-wrap: anywhere;/);
+    expect(workspaceCss).not.toMatch(/\.productSelect strong \{[^}]*white-space: nowrap/);
+    expect(workspaceCss).toMatch(/\.variantInfo \{[^}]*overflow-wrap: anywhere;/);
+    expect(workspaceCss).toMatch(/\.productCard \{[^}]*flex-wrap: wrap;/);
+  });
+
+  it("keeps the shared 44px row controls: the dense rows rule and 44px targets for the small buttons (#1581)", () => {
+    expect(workspaceSource).toContain("dense-rows");
+    expect(workspaceCss).toMatch(/\.variantHeading \.secondary-button \{[^}]*min-height: var\(--touch-target\);/);
+    expect(workspaceCss).toMatch(/\.audienceToggle button \{[^}]*min-height: var\(--touch-target\);/);
+    expect(workspaceCss).toMatch(/\.productSelect \{[^}]*min-height: var\(--touch-target\);/);
   });
 
   it("shrinks preview artwork thumbnails on phone-sized viewports so the card still fits without horizontal scrolling", () => {
@@ -113,7 +135,7 @@ describe("merchandise admin workspace responsive layout", () => {
   });
 
   it("gives both editors the shared accessible dialog and a discard confirmation (#1108)", () => {
-    expect(workspaceSource).toContain("useAccessibleDialog<HTMLElement>(true, onRequestClose)");
+    expect(dialogSource).toContain("useAccessibleDialog<HTMLElement>(true, onRequestClose)");
     expect(workspaceSource).toContain('requestCloseEditor("variant")');
     expect(workspaceSource).toContain('requestCloseEditor("product")');
     expect(workspaceSource).toContain("Discard your changes?");

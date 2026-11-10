@@ -4,18 +4,13 @@
 /* eslint-disable @next/next/no-img-element */
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { staffPageTitles } from "@/components/staff-navigation";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Archive,
-  ChevronDown,
-  ChevronUp,
   ImagePlus,
   PackageOpen,
-  Pencil,
   Plus,
   Save,
   ShoppingBag,
-  X,
 } from "lucide-react";
 import {
   artworkPreviewUrl,
@@ -27,8 +22,10 @@ import {
   toIsoOrNull,
   toLocalInputValue,
 } from "@/components/merchandise-admin-ui";
+import { ActionsMenu } from "@/components/actions-menu";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { EditorDialog } from "@/components/editor-dialog";
+import { PageHeader } from "@/components/page-header";
 import styles from "./merchandise-admin-workspace.module.css";
 import { EmptyState } from "@/components/empty-state";
 
@@ -126,21 +123,6 @@ function variantPayload(variant: Variant, position: number) {
       reason: availability?.reason ?? null,
     },
   };
-}
-
-/** Shared shell for the product and variant editors: initial focus, Tab
- * containment, Escape and focus return come from useAccessibleDialog; the
- * caller decides what closing means (including the dirty-edit confirmation). */
-function EditorDialog({ children, closeLabel, eyebrow, onRequestClose, title }: {
-  children: React.ReactNode;
-  closeLabel: string;
-  eyebrow: string;
-  onRequestClose: () => void;
-  title: string;
-}) {
-  const titleId = useId();
-  const dialogRef = useAccessibleDialog<HTMLElement>(true, onRequestClose);
-  return <div className="modal-backdrop" role="presentation"><section className={`modal-card ${styles.editor}`} ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="modal-head"><div><p className="eyebrow">{eyebrow}</p><h2 id={titleId}>{title}</h2></div><button className="icon-button modal-close-button" type="button" aria-label={closeLabel} onClick={onRequestClose}><X size={18} aria-hidden="true" /></button></div>{children}</section></div>;
 }
 
 export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
@@ -433,15 +415,17 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
   const previewProducts = useMemo(() => (previewShown ? preview.products : []), [preview, previewShown]);
   const previewLabel = previewAudiences.find((audience) => audience.value === previewAudience)?.label ?? "";
 
-  if (loading) return <section className="page-stack"><div className="panel" role="status">Loading merchandise catalog…</div></section>;
-  if (!catalog) return <section className="page-stack"><div className="panel"><p className="form-error" role="alert">{error || "The merchandise catalog is unavailable."}</p><button className="secondary-button" type="button" onClick={() => void load()}>Try again</button></div></section>;
+  if (loading) return <section className="page-stack"><PageHeader title={staffPageTitles.merchandise} /><div className="panel" role="status">Loading merchandise catalog…</div></section>;
+  if (!catalog) return <section className="page-stack"><PageHeader title={staffPageTitles.merchandise} /><div className="panel"><p className="form-error" role="alert">{error || "The merchandise catalog is unavailable."}</p><button className="secondary-button" type="button" onClick={() => void load()}>Try again</button></div></section>;
 
   return (
     <section className={`page-stack ${styles.workspace}`}>
-      <div className="page-intro">
-        <div><p className="eyebrow">Event commerce</p><h2 className="duplicate-page-title">{staffPageTitles.merchandise}</h2><p>Configure reusable products for this event. Archived products stay in history and cannot be deleted.</p></div>
-        <div className={styles.actions}><button className="secondary-button" type="button" onClick={() => void mutate(merchandiseEndpoint(eventId), "PATCH", { isEnabled: !catalog.isEnabled }, catalog.isEnabled ? "Merchandise disabled for this event." : "Merchandise enabled for this event.")} disabled={saving} aria-pressed={catalog.isEnabled}>{catalog.isEnabled ? "Disable catalog" : "Enable catalog"}</button><button className="primary-button" type="button" onClick={() => openProductEditor("new")}><Plus size={16} aria-hidden="true" /> Add product</button></div>
-      </div>
+      <PageHeader
+        title={staffPageTitles.merchandise}
+        description="Add the products and variants this event offers, and check what each group of attendees sees."
+        primary={<button className="primary-button" type="button" onClick={() => openProductEditor("new")}><Plus size={16} aria-hidden="true" /> Add product</button>}
+        secondary={<button className="secondary-button" type="button" onClick={() => void mutate(merchandiseEndpoint(eventId), "PATCH", { isEnabled: !catalog.isEnabled }, catalog.isEnabled ? "Merchandise disabled for this event." : "Merchandise enabled for this event.")} disabled={saving} aria-pressed={catalog.isEnabled}>{catalog.isEnabled ? "Disable catalog" : "Enable catalog"}</button>}
+      />
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {/* While the archive dialog is open, its own alert shows the error; one announcement, not two. */}
       {error && !archiveTarget && !editing && !variantEditing && <div className="inline-notice error" role="alert">{error}</div>}
@@ -449,8 +433,8 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
 
       <div className={styles.layout}>
         <section className="panel" aria-labelledby="catalog-products-heading">
-          <div className="section-heading"><div><p className="eyebrow">Staff configuration</p><h2 id="catalog-products-heading">Products</h2></div><span className="count-badge">{catalog.products.length} total</span></div>
-          {catalog.products.length === 0 ? <EmptyState action={{ label: "Create first product", onClick: () => openProductEditor("new") }} canCreate icon={<ShoppingBag size={26} aria-hidden="true" />} title="No products yet">Add a product with at least one variant to build the attendee offering.</EmptyState> : <div className={styles.productList}>
+          <div className="section-heading"><div><h2 id="catalog-products-heading">Products</h2></div><span className="count-badge">{catalog.products.length} total</span></div>
+          {catalog.products.length === 0 ? <EmptyState action={{ label: "Create first product", onClick: () => openProductEditor("new") }} canCreate icon={<ShoppingBag size={26} aria-hidden="true" />} title="No products yet">Add a product with at least one variant to build the attendee offering.</EmptyState> : <div className={`dense-rows ${styles.productList}`}>
             {orderedProducts().map((product, index, ordered) => {
               const status = merchandiseAdminStatus(product);
               return <article className={`${styles.productCard} ${selectedId === product.id ? styles.selected : ""}`} key={product.id}>
@@ -458,11 +442,13 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
                   {product.artwork?.url ? <img src={product.artwork.url} alt={product.artwork.altText || `${product.name} artwork`} /> : <span className={styles.artPlaceholder}><ImagePlus size={20} aria-hidden="true" /></span>}
                   <span><strong>{product.name}</strong><small>{product.variants.length} variant{product.variants.length === 1 ? "" : "s"} · {status}</small></span>
                 </button>
-                <div className={styles.cardActions}>
-                  <button className="icon-button" type="button" aria-label={`Move ${product.name} up`} disabled={saving || index === 0} onClick={() => void moveProduct(product, -1)}><ChevronUp size={16} aria-hidden="true" /></button>
-                  <button className="icon-button" type="button" aria-label={`Move ${product.name} down`} disabled={saving || index === ordered.length - 1} onClick={() => void moveProduct(product, 1)}><ChevronDown size={16} aria-hidden="true" /></button>
-                  <button className="icon-button" type="button" aria-label={`Edit ${product.name}`} onClick={() => openProductEditor(product)}><Pencil size={16} aria-hidden="true" /></button>
-                  {!product.isArchived && <button className="icon-button" type="button" aria-label={`Archive ${product.name}`} onClick={() => openArchive({ kind: "product", product })}><Archive size={16} aria-hidden="true" /></button>}
+                <div className={`row-actions ${styles.cardActions}`}>
+                  <button className="secondary-button" type="button" aria-label={`Edit ${product.name}`} onClick={() => openProductEditor(product)}>Edit</button>
+                  <ActionsMenu ariaLabel={`Actions for ${product.name}`}>
+                    <li><button type="button" aria-label={`Move ${product.name} up`} disabled={saving || index === 0} onClick={() => void moveProduct(product, -1)}>Move up</button></li>
+                    <li><button type="button" aria-label={`Move ${product.name} down`} disabled={saving || index === ordered.length - 1} onClick={() => void moveProduct(product, 1)}>Move down</button></li>
+                    {!product.isArchived && <li className="actions-menu-divider"><button className="actions-menu-danger" type="button" aria-label={`Archive ${product.name}`} onClick={() => openArchive({ kind: "product", product })}>Archive</button></li>}
+                  </ActionsMenu>
                 </div>
               </article>;
             })}
@@ -470,7 +456,7 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
         </section>
 
         <aside className="panel" aria-labelledby="preview-heading">
-          <div className="section-heading"><div><p className="eyebrow">What attendees see</p><h2 id="preview-heading">Attendee preview</h2></div>{previewShown && previewStatus !== "failed" && <span className="status-chip green">{previewProducts.length} visible</span>}</div>
+          <div className="section-heading"><div><h2 id="preview-heading">Attendee preview</h2></div>{previewShown && previewStatus !== "failed" && <span className="status-chip green">{previewProducts.length} visible</span>}</div>
           <p className={styles.previewHelp}>This preview shows exactly what attendees are offered. Sales windows, who each variant is available to, and enabled or archived state are applied by the system, not worked out here. Storage paths and payment settings are never displayed. Draft, unapproved configuration is visible here to staff only; it is never exposed publicly until you enable and approve the catalog.</p>
           <p className={styles.previewAs}>Preview as…</p><div className={styles.audienceToggle} role="group" aria-label="Preview as attendee context">{previewAudiences.map((audience) => <button key={audience.value} type="button" className="secondary-button" aria-pressed={previewAudience === audience.value} onClick={() => void changePreviewAudience(audience.value)}>{audience.label}</button>)}</div>
           <div className={styles.previewList} aria-busy={previewStatus === "loading"}>
@@ -479,20 +465,22 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
               : !previewShown ? null
               : previewProducts.length === 0 ? <EmptyState headingLevel={4} hint="Put a variant on sale for this group in the product editor." icon={<ShoppingBag size={24} aria-hidden="true" />} title="Nothing is visible to this group">Nothing is currently visible to {previewLabel}. No enabled variants are on sale for this group.</EmptyState>
               : previewProducts.map((product) => <article className={styles.previewCard} key={product.id}>{product.artwork && <img src={artworkPreviewUrl(eventId, product.artwork.assetId)} alt={product.artwork.altText} />}<div><h3>{product.name}</h3>{product.description && <p>{product.description}</p>}<ul>{product.variants.map((variant) => <li key={variant.id}><span>{variant.label}</span><strong>{formatMerchandiseMoney(variant.availability.priceCents)}</strong></li>)}</ul></div></article>)}</div>
-          {selected && <div className={styles.variantSummary}><div className={styles.variantHeading}><strong>{selected.name} variants</strong><button className="secondary-button" type="button" onClick={() => openVariantEditor("new")}><Plus size={14} aria-hidden="true" /> Add variant</button></div>{orderedVariants(selected).map((variant, index, ordered) => <div className={styles.variantRow} key={variant.id}>
-            <span><strong>{variant.label}</strong><small>{variant.sku ? `${variant.sku} · ` : ""}{variant.availability?.inventoryPolicy === "TRACKED" ? `${variant.availability.inventoryQuantity ?? 0} in stock` : "Unlimited inventory"} · {variant.isArchived ? "archived" : variant.isEnabled ? "enabled" : "disabled"} · {variant.availability?.attendeeAvailability === "STAFF_ONLY" ? "staff only" : variant.availability?.attendeeAvailability === "REGISTERED" ? "registered attendees" : "all attendees"}</small></span>
-            <span>
-              {formatMerchandiseMoney(variant.availability?.priceCents ?? 0)}
-              <button className="icon-button" type="button" aria-label={`Move ${variant.label} up`} disabled={saving || index === 0} onClick={() => void moveVariant(variant, -1)}><ChevronUp size={14} aria-hidden="true" /></button>
-              <button className="icon-button" type="button" aria-label={`Move ${variant.label} down`} disabled={saving || index === ordered.length - 1} onClick={() => void moveVariant(variant, 1)}><ChevronDown size={14} aria-hidden="true" /></button>
-              <button className="text-button" type="button" onClick={() => openVariantEditor(variant)}>Edit</button>
-              {!variant.isArchived && <button className="text-button" type="button" onClick={() => openArchive({ kind: "variant", variant })}>Archive</button>}
+          {selected && <div className={`dense-rows ${styles.variantSummary}`}><div className={styles.variantHeading}><strong>{selected.name} variants</strong><button className="secondary-button" type="button" onClick={() => openVariantEditor("new")}><Plus size={14} aria-hidden="true" /> Add variant</button></div>{orderedVariants(selected).map((variant, index, ordered) => <div className={styles.variantRow} key={variant.id}>
+            <span className={styles.variantInfo}><strong>{variant.label}</strong><small>{variant.sku ? `${variant.sku} · ` : ""}{variant.availability?.inventoryPolicy === "TRACKED" ? `${variant.availability.inventoryQuantity ?? 0} in stock` : "Unlimited inventory"} · {variant.isArchived ? "archived" : variant.isEnabled ? "enabled" : "disabled"} · {variant.availability?.attendeeAvailability === "STAFF_ONLY" ? "staff only" : variant.availability?.attendeeAvailability === "REGISTERED" ? "registered attendees" : "all attendees"}</small></span>
+            <span className={styles.variantPrice}>{formatMerchandiseMoney(variant.availability?.priceCents ?? 0)}</span>
+            <span className={`row-actions ${styles.variantActions}`}>
+              <button className="secondary-button" type="button" aria-label={`Edit ${variant.label}`} onClick={() => openVariantEditor(variant)}>Edit</button>
+              <ActionsMenu ariaLabel={`Actions for ${variant.label}`}>
+                <li><button type="button" aria-label={`Move ${variant.label} up`} disabled={saving || index === 0} onClick={() => void moveVariant(variant, -1)}>Move up</button></li>
+                <li><button type="button" aria-label={`Move ${variant.label} down`} disabled={saving || index === ordered.length - 1} onClick={() => void moveVariant(variant, 1)}>Move down</button></li>
+                {!variant.isArchived && <li className="actions-menu-divider"><button className="actions-menu-danger" type="button" aria-label={`Archive ${variant.label}`} onClick={() => openArchive({ kind: "variant", variant })}>Archive</button></li>}
+              </ActionsMenu>
             </span>
           </div>)}</div>}
         </aside>
       </div>
 
-      {variantEditing && selected && <EditorDialog closeLabel="Close variant editor" eyebrow="Variant configuration" onRequestClose={() => requestCloseEditor("variant")} title={variantEditing === "new" ? `Add ${selected.name} variant` : variantEditing.label}><form className="form-stack" onSubmit={saveVariant} onChange={() => setEditorDirty(true)}>{error && <p className="form-error" role="alert">{error}</p>}
+      {variantEditing && selected && <EditorDialog className={styles.editor} closeLabel="Close variant editor" eyebrow="Variant configuration" onRequestClose={() => requestCloseEditor("variant")} title={variantEditing === "new" ? `Add ${selected.name} variant` : variantEditing.label}><form className="form-stack" onSubmit={saveVariant} onChange={() => setEditorDirty(true)}>{error && <p className="form-error" role="alert">{error}</p>}
         <div className="form-grid two-column"><label>Variant label<input name="label" required maxLength={100} defaultValue={variantEditing === "new" ? "" : variantEditing.label} placeholder="Adult · Navy" /></label><label>SKU <small>Optional</small><input name="sku" maxLength={100} defaultValue={variantEditing === "new" ? "" : variantEditing.sku ?? ""} /></label></div>
         <div className="form-grid two-column"><label>Price <small>USD</small><input name="price" required type="number" min="0" step="0.01" defaultValue={variantEditing === "new" ? "" : ((variantEditing.availability?.priceCents ?? 0) / 100).toFixed(2)} /></label><label>Maximum per attendee <small>Optional</small><input name="maximumQuantity" type="number" min="1" step="1" defaultValue={variantEditing === "new" ? "" : variantEditing.availability?.maxQuantity ?? ""} /></label></div>
         <div className="form-grid two-column"><label>Minimum per order<input name="minQuantity" type="number" min="1" step="1" defaultValue={variantEditing === "new" ? 1 : variantEditing.availability?.minQuantity ?? 1} /></label><label>Attendee availability<select name="attendeeAvailability" defaultValue={variantEditing === "new" ? "ALL" : variantEditing.availability?.attendeeAvailability ?? "ALL"}><option value="ALL">All attendees</option><option value="REGISTERED">Registered attendees</option><option value="STAFF_ONLY">Staff only</option></select></label></div>
@@ -505,7 +493,7 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
         <label className="public-registration-check"><input name="isActive" type="checkbox" defaultChecked={variantEditing === "new" ? true : variantEditing.availability?.isActive ?? false} /><span><strong>Available for purchase</strong><small>Pause sales without removing configuration.</small></span></label>
         <div className="form-actions"><button className="secondary-button" type="button" onClick={() => requestCloseEditor("variant")}>Cancel</button><button className="primary-button" type="submit" disabled={saving}><Save size={16} aria-hidden="true" />{saving ? "Saving…" : "Save variant"}</button></div>
       </form></EditorDialog>}
-      {editing && <EditorDialog closeLabel="Close product editor" eyebrow={editing === "new" ? "New catalog item" : "Edit catalog item"} onRequestClose={() => requestCloseEditor("product")} title={editing === "new" ? "Add product" : editing.name}><form className="form-stack" onSubmit={saveProduct} onChange={() => setEditorDirty(true)}>{error && <p className="form-error" role="alert">{error}</p>}<label>Product name<input name="name" required maxLength={120} defaultValue={editing === "new" ? "" : editing.name} /></label><label>Description <small>Shown to attendees</small><textarea name="description" rows={3} maxLength={500} defaultValue={editing === "new" ? "" : editing.description ?? ""} /></label><div className={styles.artworkControls}><label>Artwork<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadArtwork} disabled={saving} /></label><label>Use uploaded artwork<select name="artworkAssetId" defaultValue={editing === "new" ? "" : editing.artwork?.id ?? ""}><option value="">No artwork</option>{assets.map((asset) => <option value={asset.id} key={asset.id}>{asset.filename ?? asset.id}{asset.altText ? " · alt text set" : " · alt text needed"}</option>)}</select></label><label>Meaningful alt text <small>Required when artwork is selected</small><input name="artworkAltText" maxLength={240} defaultValue={editing === "new" ? "" : editing.artwork?.altText ?? ""} /></label></div><label className="public-registration-check"><input name="isEnabled" type="checkbox" defaultChecked={editing === "new" ? true : editing.isEnabled} /><span><strong>Enabled</strong><small>Disable instead of deleting a product referenced by order history.</small></span></label><p className={styles.variantNote}><strong>Variants and availability</strong><br />Save the product first, then use the variant controls in the product detail panel. Enter prices in US dollars.</p><div className="form-actions"><button className="secondary-button" type="button" onClick={() => requestCloseEditor("product")}>Cancel</button><button className="primary-button" type="submit" disabled={saving}><Save size={16} aria-hidden="true" />{saving ? "Saving…" : "Save product"}</button></div></form></EditorDialog>}
+      {editing && <EditorDialog className={styles.editor} closeLabel="Close product editor" eyebrow={editing === "new" ? "New catalog item" : "Edit catalog item"} onRequestClose={() => requestCloseEditor("product")} title={editing === "new" ? "Add product" : editing.name}><form className="form-stack" onSubmit={saveProduct} onChange={() => setEditorDirty(true)}>{error && <p className="form-error" role="alert">{error}</p>}<label>Product name<input name="name" required maxLength={120} defaultValue={editing === "new" ? "" : editing.name} /></label><label>Description <small>Shown to attendees</small><textarea name="description" rows={3} maxLength={500} defaultValue={editing === "new" ? "" : editing.description ?? ""} /></label><div className={styles.artworkControls}><label>Artwork<input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadArtwork} disabled={saving} /></label><label>Use uploaded artwork<select name="artworkAssetId" defaultValue={editing === "new" ? "" : editing.artwork?.id ?? ""}><option value="">No artwork</option>{assets.map((asset) => <option value={asset.id} key={asset.id}>{asset.filename ?? asset.id}{asset.altText ? " · alt text set" : " · alt text needed"}</option>)}</select></label><label>Meaningful alt text <small>Required when artwork is selected</small><input name="artworkAltText" maxLength={240} defaultValue={editing === "new" ? "" : editing.artwork?.altText ?? ""} /></label></div><label className="public-registration-check"><input name="isEnabled" type="checkbox" defaultChecked={editing === "new" ? true : editing.isEnabled} /><span><strong>Enabled</strong><small>Disable instead of deleting a product referenced by order history.</small></span></label><p className={styles.variantNote}><strong>Variants and availability</strong><br />Save the product first, then use the variant controls in the product detail panel. Enter prices in US dollars.</p><div className="form-actions"><button className="secondary-button" type="button" onClick={() => requestCloseEditor("product")}>Cancel</button><button className="primary-button" type="submit" disabled={saving}><Save size={16} aria-hidden="true" />{saving ? "Saving…" : "Save product"}</button></div></form></EditorDialog>}
 
       <ConfirmDialog
         confirmLabel="Discard changes"

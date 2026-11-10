@@ -65,7 +65,7 @@ describe("staff page names (#685)", () => {
     expect(staffSubpageTitle("/more/clubs/reports/org_1/2028-08")).toBe("Club Monthly Record");
     expect(staffSubpageTitle("/more/club-forms")).toBe("Club forms");
     expect(staffSubpageTitle("/more/club-forms/sub_1")).toBe("Club form");
-    expect(staffSubpageTitle("/more/merchandise")).toBe("Merchandise catalog");
+    expect(staffSubpageTitle("/more/merchandise")).toBe("Merchandise");
     expect(staffSubpageTitle("/more/lodging")).toBe("Lodging");
     expect(staffSubpageTitle("/more/meals")).toBe("Meals");
     expect(staffSubpageTitle("/more/lodging/requests")).toBe("Lodging requests");
