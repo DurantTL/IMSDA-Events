@@ -129,6 +129,19 @@ describe("manual-deploy.sh", () => {
     expect(result.calls).toContain(`network connect postgresql_9kgaw_239292_xcloud-network ${app}`);
   });
 
+  it("checks the uploads volume and key file against the new image's user before stopping the live app (#1798)", () => {
+    const { run } = setup(envWithoutKey, "k");
+    const { status, calls } = run([sha]);
+    expect(status).toBe(0);
+    const check = calls.split("\n").findIndex((line) => line.startsWith("run --rm") && line.includes("IMSDA_PREFLIGHT_ONLY=1"));
+    const stop = calls.split("\n").findIndex((line) => line.startsWith(`stop ${app}`));
+    expect(check).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(stop);
+    const line = calls.split("\n")[check];
+    expect(line).toContain("imsda_events_assets:/app/storage/event-assets");
+    expect(line).toContain("SECRET_ENCRYPTION_KEY_FILE=/run/secrets/encryption-key");
+  });
+
   // Key rotation (#1516): key files are named by version and never overwritten.
   function keyDir(files: Record<string, string>) {
     const dir = mkdtempSync(path.join(tmpdir(), "imsda-keys-"));

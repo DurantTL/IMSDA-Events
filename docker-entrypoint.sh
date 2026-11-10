@@ -22,12 +22,15 @@ preflight_fail() {
   exit 78
 }
 if [ "$(id -u)" != "0" ]; then
-  if [ -n "${ASSET_STORAGE_DIR:-}" ] && [ -d "${ASSET_STORAGE_DIR}" ]; then
+  # The app uses this folder when ASSET_STORAGE_DIR is unset or empty (modules/events/asset-storage.ts).
+  uploads_dir="${ASSET_STORAGE_DIR:-/app/storage/event-assets}"
+  if [ -d "$uploads_dir" ]; then
     # Every folder must be writable and every file readable, not only the top one:
-    # files a root container wrote are 0640 root:root and would not open.
-    blocked="$(find "${ASSET_STORAGE_DIR}" \( -type d ! -writable \) -o \( ! -readable \) 2>/dev/null | head -n 1)"
+    # files a root container wrote are 0640 root:root and would not open. Links
+    # are skipped; the app stores none.
+    blocked="$(find "$uploads_dir" ! -type l \( \( -type d ! -writable \) -o \( ! -readable \) \) 2>/dev/null | head -n 1)"
     if [ -n "$blocked" ]; then
-      preflight_fail "The uploads folder ${ASSET_STORAGE_DIR} holds files this container's user (uid $(id -u)) cannot use, for example ${blocked}. Hand the uploads volume to uid $(id -u)."
+      preflight_fail "The uploads folder ${uploads_dir} holds files this container's user (uid $(id -u)) cannot use, for example ${blocked}. Hand the uploads volume to uid $(id -u)."
     fi
   fi
   for key_variable in SECRET_ENCRYPTION_KEY_FILE SECRET_ENCRYPTION_PREVIOUS_KEY_FILE; do
@@ -36,6 +39,13 @@ if [ "$(id -u)" != "0" ]; then
       preflight_fail "The key file named by ${key_variable} is not readable by this container's user (uid $(id -u)). Change the file's owner on the server to uid $(id -u); keep its mode 0400."
     fi
   done
+fi
+
+# scripts/manual-deploy.sh runs only the check above in a one-off container,
+# with the uploads volume and key files mounted, before it stops the live app.
+if [ "${IMSDA_PREFLIGHT_ONLY:-}" = "1" ]; then
+  echo "[entrypoint] The uploads folder and key files are usable by uid $(id -u)."
+  exit 0
 fi
 
 # deploy/xcloud/deploy.sh runs the preparation below in a one-off container

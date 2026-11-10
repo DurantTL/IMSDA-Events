@@ -1563,8 +1563,13 @@ replaced, so leave as little time as you can between step 2 and step 4.
 docker volume inspect imsda_events_assets --format '{{ .Mountpoint }}'
 ASSETS="$(docker volume inspect imsda_events_assets --format '{{ .Mountpoint }}')"
 find "$ASSETS" ! -uid 1000 | wc -l          # how many files and folders are not uid 1000 yet
-ls -ln /etc/imsda/secret-encryption-key      # only if the key file is in use
+ls -ln /etc/imsda/                           # only if a key file is in use
+getent passwd 1000                           # which server login, if any, is uid 1000
 ```
+
+   If uid 1000 is a real login on the server, that login still cannot reach the
+   key file or the uploads: `/etc/imsda` stays `root:root` `0700` and Docker's
+   volume folder is root-only. Keep both that way.
 
 2. Hand the uploads volume to uid 1000. Modes are not changed, only the owner:
 
@@ -1622,6 +1627,21 @@ and writes files owned by uid 1000. Use the normal rollback
 (`docker tag imsda-events:previous imsda-events:live` and restart the app, see
 "Deploys without downtime"). Leave the uploads volume and key file owned by uid
 1000; changing them back is not needed and would only have to be redone.
+
+While a root image runs it writes root-owned files again. Before the next deploy
+of an image that runs as `node`, repeat step 2 (and remove
+`/var/lib/imsda/failed-sha` if a deploy already stopped on it).
+
+### The manual deploy path and local stacks
+
+- `scripts/manual-deploy.sh` runs the same check in a one-off container before
+  it stops the live app, so an unprepared server is refused with nothing
+  changed. A hand-typed `docker run` has no such step: the new container would
+  exit with the `[entrypoint]` message after the old one was stopped. Do steps 2
+  and 3 first.
+- A local `docker compose up` whose `imsda_events_assets` volume was written by
+  an earlier root image stops with the same message. Hand the volume to uid 1000
+  the same way, or remove the local volume if its files don't matter.
 
 ### Other containers
 
@@ -1835,6 +1855,7 @@ install -d -m 0700 /root/keytest
 umask 077
 vi /root/keytest/backup-key      # paste the key from the password manager; save
 chmod 0400 /root/keytest/backup-key
+chown 1000:1000 /root/keytest/backup-key   # the image runs as uid 1000 (#1798); the folder stays root-only
 ```
 
 2. Restore last night's dump into a scratch database and keep it. In the backup

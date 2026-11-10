@@ -74,7 +74,10 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # A volume or key file that an earlier root container owns must be handed to
 # uid 1000 once on the server: see docs/DEPLOY-DOCKER.md, "Running as the node
 # user". The entrypoint refuses to start, before any migration, when it is not.
-RUN mkdir -p /app/storage/event-assets /app/.next/cache \
+# The build's own cache is not needed to serve; starting the folder empty also
+# keeps the ownership change from copying it into another layer.
+RUN rm -rf /app/.next/cache \
+  && mkdir -p /app/storage/event-assets /app/.next/cache \
   && chown -R node:node /app/storage /app/.next/cache
 USER node
 

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -108,6 +108,36 @@ describe("docker-entrypoint.sh checks what the node user needs (#1798)", () => {
     expect(stderr).toContain(variable);
     expect(`${stderr}${stdout}`).not.toContain("synthetic-key-value");
     expect(calls).toBe("");
+  });
+
+  it("checks the folder the app falls back to when ASSET_STORAGE_DIR is unset or empty", () => {
+    const script = readFileSync(entrypoint, "utf8");
+    const storage = readFileSync(path.join(root, "modules/events/asset-storage.ts"), "utf8");
+    expect(script).toContain('uploads_dir="${ASSET_STORAGE_DIR:-/app/storage/event-assets}"');
+    expect(storage).toContain('"storage", "event-assets"');
+  });
+
+  it("ignores links in uploads, which a change of owner could not fix", () => {
+    const data = scratch();
+    mkdirSync(path.join(data, "uploads"), { recursive: true });
+    symlinkSync(path.join(data, "missing"), path.join(data, "uploads", "dangling"));
+    const { status } = run({ ASSET_STORAGE_DIR: path.join(data, "uploads"), IMSDA_SKIP_DB_PREP: "1" });
+    expect(status).toBe(0);
+  });
+
+  it("runs only the check in preflight-only mode: no migration, no app", () => {
+    const { status, stdout, calls } = run({ IMSDA_PREFLIGHT_ONLY: "1" });
+    expect(status).toBe(0);
+    expect(stdout).not.toContain("app-started");
+    expect(calls).toBe("");
+  });
+
+  it.skipIf(asRoot)("fails preflight-only mode on an unusable uploads folder", () => {
+    const data = scratch();
+    const folder = path.join(data, "uploads", "event-1");
+    mkdirSync(folder, { recursive: true });
+    chmodSync(folder, 0o555);
+    expect(run({ ASSET_STORAGE_DIR: path.join(data, "uploads"), IMSDA_PREFLIGHT_ONLY: "1" }).status).toBe(78);
   });
 
   it("names the same key file variables the app reads", () => {
