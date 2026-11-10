@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { postJson } from "@/lib/post-json";
 import type { ClonePlan } from "@/modules/event-clones/domain";
 import { CreationFeaturesStep } from "@/components/creation-features-step";
@@ -10,7 +10,14 @@ export type CloneSourceOption = { id: string; name: string; startsOn: string; en
 
 type CopyFromPastEventProps = {
   sources: CloneSourceOption[];
+  /** Shown above the first two steps (the page's three starting choices, #1570); not shown once the draft exists. */
+  intro?: ReactNode;
 };
+
+/** The step line (#1570), in the words the other step flows use. Shown only; the steps themselves are unchanged. */
+function copyStepLine(number: 1 | 2 | 3, label: string) {
+  return <p className="eyebrow" data-testid="copy-step-line">{`Step ${number} of 3 \u00b7 ${label}`}</p>;
+}
 
 function slugFromName(value: string) {
   return value
@@ -96,7 +103,7 @@ function ReviewedInput({ label, type, entry, noneLabel, hint, onChange }: Review
  * in between is refused. No value is pre-filled from the source: the old one
  * is shown as a hint only.
  */
-export function CopyFromPastEvent({ sources }: CopyFromPastEventProps) {
+export function CopyFromPastEvent({ sources, intro }: CopyFromPastEventProps) {
   const [sourceId, setSourceId] = useState(sources[0]?.id ?? "");
   const [plan, setPlan] = useState<ClonePlan | null>(null);
   const [include, setInclude] = useState<Record<string, boolean>>({});
@@ -208,12 +215,13 @@ export function CopyFromPastEvent({ sources }: CopyFromPastEventProps) {
     }
   }
 
-  if (sources.length === 0) return <p>There are no events to copy from yet.</p>;
+  if (sources.length === 0) return <div className="page-stack">{intro}<p>There are no events to copy from yet.</p></div>;
 
   if (result && plan) {
     const summary = result.summary;
     return (
       <div className="page-stack event-settings-workspace event-clone">
+        {copyStepLine(3, "Draft created")}
         <section className="panel form-stack event-settings-panel" aria-live="polite">
           <h2>{result.alreadyCloned ? "This draft was already created" : "Draft event created"}</h2>
           <p className="clone-hint">{result.event.name} is an unpublished draft copied from {plan.source.name}.</p>
@@ -248,6 +256,8 @@ export function CopyFromPastEvent({ sources }: CopyFromPastEventProps) {
 
   return (
     <div className="page-stack event-settings-workspace event-clone">
+      {intro}
+      {copyStepLine(plan ? 2 : 1, plan ? "Review and create" : "Choose the event")}
       {failure ? (
         <div className="inline-notice error" role="alert">
           <p>{failure.message}</p>

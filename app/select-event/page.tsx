@@ -4,7 +4,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BrandLink } from "@/components/brand-link";
 import { ListPage } from "@/components/page-templates/list-page";
-import { SelectEventList } from "@/components/select-event-list";
+import { EventDirectory } from "@/components/event-directory";
+import { buildDirectoryRows } from "@/components/event-directory-model";
 import { SignOutButton } from "@/components/sign-out-button";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listArchivedEventsForUser } from "@/modules/events/archive-repository";
@@ -14,11 +15,6 @@ export const metadata: Metadata = {
   title: "Choose an event",
   robots: { index: false, follow: false, nocache: true },
 };
-
-function formatEventDates(start: Date, end: Date, timeZone: string) {
-  const formatter = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone });
-  return formatter.formatRange(start, end);
-}
 
 /**
  * A minimal event picker for a staff account with several active event
@@ -32,14 +28,17 @@ function formatEventDates(start: Date, end: Date, timeZone: string) {
  * shows a "that event isn't available" notice instead of the ordinary
  * greeting, and, unlike the ordinary picker, does not auto-continue into an
  * account's one remaining event without saying why it's here.
+ *
+ * The list is the shared event directory (#1570) over the events this account is assigned to; a System Administrator
+ * never reaches it (they go to /admin, and see every event on All events).
  */
 export default async function SelectEventPage({
   searchParams,
 }: {
-  searchParams: Promise<{ unavailable?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { unavailable: unavailableParam } = await searchParams;
-  const unavailable = unavailableParam === "1";
+  const params = await searchParams;
+  const unavailable = params.unavailable === "1";
 
   const session = await getCurrentSession();
   if (!session.user) redirect(await staffLoginRedirectPath());
@@ -62,19 +61,22 @@ export default async function SelectEventPage({
             title: "Choose an event",
             description: unavailable
               ? "You can\u2019t open that event with this account. Ask your event administrator if you need access, or choose one of your events below."
-              : `${session.user.email} has access to more than one event. Pick one to continue.`,
+              : `These are the events ${session.user.email} is assigned to. Pick one to continue.`,
             secondary: archivedEvents.length > 0
               ? <Link className="secondary-button" href="/archived-events">Archived events ({archivedEvents.length})</Link>
               : undefined,
           }}
           footer={<SignOutButton className="secondary-button full-button" />}
         >
-          <SelectEventList
-            events={events.map((event) => ({
-              id: event.id,
-              name: event.name,
-              dates: formatEventDates(event.startsAt, event.endsAt, event.timezone),
-            }))}
+          <EventDirectory
+            pathname="/select-event"
+            searchParams={params}
+            rows={buildDirectoryRows(events)}
+            hrefFor={(id) => `/overview?event=${encodeURIComponent(id)}`}
+            rememberOnOpen
+            defaultSort={{ key: "dates", dir: "asc" }}
+            keepParams={unavailable ? { unavailable: "1" } : undefined}
+            noEvents={{ title: "No events", text: "No events are assigned to this account." }}
           />
         </ListPage>
       </section>

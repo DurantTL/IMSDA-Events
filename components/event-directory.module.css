@@ -1,0 +1,56 @@
+/* The event directory (#1570): search and filter above a table that becomes cards on a phone. */
+.directory {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.status {
+  flex: 0 1 200px;
+  min-width: 0;
+}
+
+.filters button {
+  min-height: var(--touch-target, 44px);
+}
+
+.clear {
+  margin: 0;
+}
+
+/* A long event name wraps inside its cell and never widens the page. */
+.table {
+  width: 100%;
+}
+
+.name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target, 44px);
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
