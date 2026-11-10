@@ -67,7 +67,6 @@ const allowList: Record<string, { tables: number; reason: string }> = {
   "components/check-in-book.tsx": { tables: 1, reason: printed },
   "components/emergency-reference-sheet.tsx": { tables: 1, reason: printed },
   "components/honors-print-report.tsx": { tables: 2, reason: printed },
-  "components/event-health-sheet.tsx": { tables: 1, reason: printed },
   "components/staff-approval-queue.tsx": { tables: 1, reason: ownCards },
   "components/staff-invitation-list.tsx": { tables: 1, reason: ownCards },
   "components/staff-monthly-records.tsx": { tables: 1, reason: "Has its own two-line row layout (#1298), switched by the card's width; move it onto table-cards in a follow-up." },

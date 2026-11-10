@@ -508,6 +508,7 @@ const pages: PageSpec[] = [
   staff("form-template-editor", "/admin/form-templates/simple_rsvp", "system-admin"),
   staff("map-locations", "/admin/organizations/map-locations", "system-admin"),
   staff("honor-catalog", "/admin/honors", "system-admin"),
+  staff("master-award-rules", "/admin/master-award-rules", "system-admin"),
   staff("year-end-reports", "/admin/clubs/reports/year-end", "system-admin"),
   staff("church-import", "/admin/organizations/import", "system-admin"),
   staff("club-import", "/admin/clubs/import", "system-admin"),
