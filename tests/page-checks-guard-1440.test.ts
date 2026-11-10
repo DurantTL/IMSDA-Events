@@ -92,7 +92,7 @@ describe("C2: tap targets are at least 44px", () => {
   const inDenseBlock = (rule: CssRule) => rule.at.some((at) => /pointer:\s*fine/.test(at) && /min-width:\s*1024px/.test(at));
   const denseUses = (file: string, rules: CssRule[]) => rules
     .filter((rule) => /var\(--touch-target-dense/.test(rule.body))
-    .map((rule) => ({ file, rule, ok: inDenseBlock(rule) }));
+    .map((rule) => ({ file, rule, ok: inDenseBlock(rule) && /\.dense-rows\b/.test(rule.selector) }));
 
   it("keeps the 44px token", () => {
     expect(globalsCss).toMatch(/:root \{[^}]*--touch-target: 44px;/);
@@ -113,7 +113,7 @@ describe("C2: tap targets are at least 44px", () => {
     expect(globalsCss.match(/--touch-target-dense:/g)).toHaveLength(1);
   });
 
-  it("uses the dense token only inside the pointer: fine, min-width: 1024px block", () => {
+  it("uses the dense token only on .dense-rows rules inside the pointer: fine, min-width: 1024px block", () => {
     const uses = [...denseUses("app/globals.css", globalsRules), ...modules.flatMap((module) => denseUses(module.file, module.rules))];
     expect(uses.length).toBeGreaterThan(0);
     expect(uses.filter((use) => !use.ok).map((use) => `${use.file}:${use.rule.line} ${use.rule.selector}`)).toEqual([]);
