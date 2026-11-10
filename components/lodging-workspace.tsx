@@ -2,7 +2,7 @@
 
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { StaffPageHeader } from "@/components/staff-page-header";
-import chips from "@/components/lodging-chips.module.css";
+import labels from "@/components/lodging-labels.module.css";
 import { cardCell } from "@/components/table-card-labels";
 import { lodgingNightsLine } from "@/modules/lodging/lodging-views-model";
 import { useState } from "react";
@@ -64,7 +64,7 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates, canSeeRe
 
   return <div className="settings-stack">
     <StaffPageHeader description={`Rooms, beds and sites for ${eventName}, night by night. This is inventory only: nobody is assigned here, and a guest's request is not a placement.`} />
-    {view.property ? <p className={chips.context}><span><strong>{view.property.name}</strong></span><span>{lodgingNightsLine(view.nights)}</span></p> : null}
+    {view.property ? <p className={labels.context}><span><strong>{view.property.name}</strong></span><span>{lodgingNightsLine(view.nights)}</span></p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
 
@@ -163,9 +163,9 @@ function UnitRow({ unit, nights, base, busy, run }: {
   return <>
     <tr role="row">
       <th role="rowheader" scope="row">{unit.name}{unit.retired ? " (Retired)" : ""}
-        {unit.unavailable || activeHolds.length > 0 ? <ul className={chips.row} aria-label={`State of ${unit.name}`}>
-          {unit.unavailable ? <li className="status-chip gold">Unavailable</li> : null}
-          {activeHolds.length > 0 ? <li className="status-chip gold">{activeHolds.length === 1 ? "On hold" : `${activeHolds.length} holds`}</li> : null}
+        {unit.unavailable || activeHolds.length > 0 ? <ul className={labels.row} aria-label={`State of ${unit.name}`}>
+          {unit.unavailable ? <li className={labels.state}>Unavailable</li> : null}
+          {activeHolds.length > 0 ? <li className={labels.state}>{activeHolds.length === 1 ? "On hold" : `${activeHolds.length} holds`}</li> : null}
         </ul> : null}</th>
       <td {...cardCell("Details")}>{describeUnit(unit)}{unit.notes ? ` (${unit.notes})` : ""}</td>
       <td {...cardCell("Sleeps up to")}>
@@ -190,7 +190,7 @@ function UnitRow({ unit, nights, base, busy, run }: {
         <strong>{({ STAFF: "Staff hold", MAINTENANCE: "Maintenance", SAFETY: "Safety", DAMAGE: "Damage" } as Record<string, string>)[hold.kind] ?? hold.kind}</strong>: {hold.reason}, {hold.firstNight} to {hold.lastNight}{hold.active ? "" : ` (released: ${hold.releaseReason})`}
         {hold.staleDefault ? <span role="alert"> This default hold no longer covers every night of the event. <button type="button" className="secondary-button" disabled={busy || nights.length === 0} onClick={() => void run(() => call(`${base}/holds/${hold.id}`, "PATCH", { action: "change_window", firstNight: nights[0], lastNight: nights[nights.length - 1] }), "Hold extended to cover the event.")}>Extend to cover the event</button></span> : null}
         <ul>{hold.history.map((entry, index) => <li key={index}>{entry.type.toLowerCase().replace("_", " ")} on {entry.at.slice(0, 10)}{entry.reason ? `: ${entry.reason}` : ""}{entry.firstNight ? ` (${entry.firstNight} to ${entry.lastNight})` : ""}</li>)}</ul>
-        {hold.active ? <form onChange={edits.track(`release:${hold.id}`)} onSubmit={(event) => {
+        {hold.active ? <form className={labels.stack} onChange={edits.track(`release:${hold.id}`)} onSubmit={(event) => {
           event.preventDefault();
           const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
           void run(() => call(`${base}/holds/${hold.id}`, "PATCH", { action: "release", reason }), "Hold released.").then((ok) => { if (ok) edits.clear(`release:${hold.id}`); });
@@ -199,7 +199,7 @@ function UnitRow({ unit, nights, base, busy, run }: {
           <button type="submit" className="secondary-button" disabled={busy}>Release hold</button>
         </form> : null}
       </li>)}</ul>}
-      <form onChange={edits.track("newHold")} onSubmit={(event) => {
+      <form className={labels.stack} onChange={edits.track("newHold")} onSubmit={(event) => {
         event.preventDefault();
         const formElement = event.currentTarget;
         const form = new FormData(formElement);

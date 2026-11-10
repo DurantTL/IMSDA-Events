@@ -40,7 +40,6 @@ export default async function LodgingRequestsPage({ searchParams }: { searchPara
     <>
       {strip}
       <LodgingRequestsWorkspace
-        eventName={event.name}
         initialView={view}
         canConfigure={permissions.includes("CONFIGURE_EVENT")}
         canExport={permissions.includes("VIEW_REPORTS")}

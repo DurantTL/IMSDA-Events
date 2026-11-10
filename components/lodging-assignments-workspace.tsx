@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type DragEvent, type FormEvent } from "react";
 import { ExportLink } from "@/components/export-link";
-import chips from "@/components/lodging-chips.module.css";
+import labels from "@/components/lodging-labels.module.css";
 import assign from "@/components/lodging-assign.module.css";
 import { useConfirm } from "@/components/use-confirm";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
@@ -75,7 +75,6 @@ function wantedRange(person: PersonCard, nights: readonly string[]) {
 }
 
 export function LodgingAssignmentsWorkspace({ initialView, canConfigure, canExport }: {
-  eventName: string;
   initialView: AssignmentWorkspaceView;
   canConfigure: boolean;
   canExport: boolean;
@@ -273,7 +272,7 @@ export function LodgingAssignmentsWorkspace({ initialView, canConfigure, canExpo
       {unit.specialUse ? <p className="lodging-assign-warning" role="note">Special-use room: you will be asked to confirm.</p> : null}
       {unit.holdReasons.length > 0 ? <p className="lodging-assign-warning" role="note">Held: {unit.holdReasons.join("; ")}</p> : null}
       {unit.unavailableReason ? <p className="lodging-assign-warning" role="note">Unavailable: {unit.unavailableReason}</p> : null}
-      <p className={chips.assignedLabel}>{unit.occupants.length > 0 ? "Assigned here" : "Nobody assigned here yet"}</p>
+      <p className={labels.assignedLabel}>{unit.occupants.length > 0 ? "Assigned here" : "Nobody assigned here yet"}</p>
       <ul className="lodging-assign-occupants" aria-label={`Who is in ${unit.name}`}>
         {unit.occupants.map((occupant) => renderChip(occupant, unit.name))}
       </ul>
@@ -391,25 +390,23 @@ export function LodgingAssignmentsWorkspace({ initialView, canConfigure, canExpo
     ["attention", `Needs a look (${view.counts.exceptions})`], ["reports", "Reports"], ["display", "What attendees see"],
   ];
 
+  const liveRegion = <div role="status" aria-live="polite" className={`lodging-assign-live ${labels.live}`}>
+    {error ? <p className="form-error" role="alert">{error}</p> : null}
+    {notice ? <p className="usage-note">{notice}</p> : null}
+  </div>;
+
   return <div className="settings-stack lodging-assign">
     {confirmDialog}
     <StaffPageHeader
       actions={canExport ? <>{lodgingExports.map(({ report, label }) => <li key={report}><ExportLink href={lodgingExportHref(view.eventId, report)}>{label}</ExportLink></li>)}</> : undefined}
       description="Place guests in rooms and sites. The server checks every night, so two people cannot be given the last bed. Every move keeps who did it and why, and nothing here changes a registration's charge."
     />
-    <div className={chips.context}>
+    <div className={labels.context}>
       <span><strong>{view.propertyName}</strong></span><span>{lodgingNightsLine(nights)}</span>
     </div>
-    <ul className={chips.row} aria-label="Assignment counts">
-      <li className="status-chip green">{view.counts.placed} assigned</li>
-      <li className="status-chip neutral">{view.counts.unplaced} not assigned yet</li>
-      <li className="status-chip neutral">{view.counts.waitingOnList} on the waitlist</li>
-      <li className="status-chip purple">{view.counts.exceptions} to look at</li>
-    </ul>
-    <div role="status" aria-live="polite" className={`lodging-assign-live ${chips.live}`}>
-      {error ? <p className="form-error" role="alert">{error}</p> : null}
-      {notice ? <p className="usage-note">{notice}</p> : null}
-    </div>
+    <p className={labels.summary}><strong>{view.counts.placed}</strong> assigned, <strong>{view.counts.unplaced}</strong> not assigned yet, {view.counts.waitingOnList} on the waitlist, {view.counts.exceptions} to look at.</p>
+    {tab !== "rooms" ? liveRegion : null}
+
     <nav aria-label="Lodging sections" className="lodging-assign-tabs">
       {tabs.map(([key, label]) => <button key={key} type="button" className={tab === key ? "primary-button" : "secondary-button"} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{label}</button>)}
     </nav>
@@ -434,8 +431,8 @@ export function LodgingAssignmentsWorkspace({ initialView, canConfigure, canExpo
             <button type="button" aria-pressed={selected?.occupantKey === person.occupantKey && !selected?.moveAssignmentId} disabled={!person.active} onClick={() => setSelected(selected?.occupantKey === person.occupantKey && !selected?.moveAssignmentId ? null : { occupantKey: person.occupantKey })}>
               <span className="lodging-assign-chip-name">{person.name}{person.kind === "PLACEHOLDER" ? " (expected)" : ""}{person.people > 1 ? ` x${person.people}` : ""}</span>
               {person.placements.length > 0
-                ? <span className={`status-chip green ${chips.wrap}`}>Assigned: {person.placements.map((placement) => `${placement.label} (${range(placement.firstNight, placement.lastNight)})`).join(", ")}</span>
-                : <span className="status-chip neutral">Not assigned yet</span>}
+                ? <span className={labels.assigned}><strong>Assigned:</strong> {person.placements.map((placement) => `${placement.label} (${range(placement.firstNight, placement.lastNight)})`).join(", ")}</span>
+                : <span className={labels.notAssigned}>Not assigned yet</span>}
               <span className="lodging-assign-chip-meta">
                 {person.registrationCode ?? "not registered yet"}
                 {person.category ? `, asked for ${lodgingCategoryLabels[person.category]}` : ""}
@@ -469,6 +466,7 @@ export function LodgingAssignmentsWorkspace({ initialView, canConfigure, canExpo
       </section>
 
       <div className="lodging-assign-main">
+        {liveRegion}
         <section className="panel" aria-labelledby="la-elsewhere">
           <h3 id="la-elsewhere">Housing arranged elsewhere</h3>
           <p className="field-hint">These count as placed but use no rooms or sites here.</p>

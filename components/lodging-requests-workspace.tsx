@@ -2,7 +2,7 @@
 
 import { ExportLink } from "@/components/export-link";
 import { StaffPageHeader } from "@/components/staff-page-header";
-import chips from "@/components/lodging-chips.module.css";
+import labels from "@/components/lodging-labels.module.css";
 import { cardCell } from "@/components/table-card-labels";
 import { lodgingNightsLine } from "@/modules/lodging/lodging-views-model";
 import { SubmitButton } from "@/components/submit-button";
@@ -63,7 +63,6 @@ export const REQUEST_SORT_SENSITIVE: Record<RequestColumn, ColumnSpec<LodgingReq
  * appear only when the server sent them, which it does for staff holding VIEW_SENSITIVE_DATA.
  */
 export function LodgingRequestsWorkspace({ initialView, canConfigure, canExport }: {
-  eventName: string;
   initialView: StaffLodgingRequestsView;
   canConfigure: boolean;
   canExport: boolean;
@@ -108,7 +107,7 @@ export function LodgingRequestsWorkspace({ initialView, canConfigure, canExport 
       actions={canExport ? <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-requests`}>Download requests (CSV)</ExportLink></li> : undefined}
       description="What guests asked for. A request is a preference, never an assignment: nobody is placed here. Roommate requests count as mutual only when both sides ask or staff approve, and no contact details are shown."
     />
-    <p className={chips.context}><span>{lodgingNightsLine(view.nights)}</span><span className={`status-chip neutral ${chips.dashed}`}>Requests only, nobody is assigned here</span></p>
+    <p className={labels.context}><span>{lodgingNightsLine(view.nights)}</span><span>Requests only: nobody is assigned here.</span></p>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
     {chargeChange !== null ? <p className="form-error" role="status" data-testid="charge-change">
@@ -132,7 +131,7 @@ export function LodgingRequestsWorkspace({ initialView, canConfigure, canExport 
         <label><input type="checkbox" name="collects" defaultChecked={view.settings.collectsPreferences} /> Registrants choose a lodging type (turn off for club events, where staff assign)</label>
         <label>Last day to change <input type="date" name="deadline" defaultValue={view.settings.preferencesDeadline ?? ""} /></label>
         <p className="field-hint">Blank follows the registration close date. Right now registrants can change their choice through {view.settings.effectiveDeadline}{view.settings.deadlinePassed ? " (passed)" : ""}.</p>
-        <label className={chips.fit}>When a type is full <select name="fullBehavior" defaultValue={view.settings.fullBehavior}>
+        <label className={labels.fit}>When a type is full <select name="fullBehavior" defaultValue={view.settings.fullBehavior}>
           {fullBehaviors.map((value) => <option key={value} value={value}>{value === "SHOW_FULL" ? "Show \"Full\"" : "Show \"Full\" and let guests join a lodging waitlist"}</option>)}
         </select></label>
         <SubmitButton label="Save settings" submitting={busy} submittingLabel="Saving…" />
@@ -148,7 +147,7 @@ export function LodgingRequestsWorkspace({ initialView, canConfigure, canExport 
       <h3 id="lodging-queue">Needs a look ({view.queue.filter((item) => !item.acknowledged).length})</h3>
       <label><input type="checkbox" checked={showAcknowledged} onChange={(event) => setShowAcknowledged(event.target.checked)} /> Show items already acknowledged</label>
       {queue.length === 0 ? <p>Nothing needs review.</p> : <ul>{queue.map((item) => <li key={`${item.key}:${item.fingerprint}`}>
-        <span className="status-chip purple">{item.acknowledged ? "Acknowledged" : "Needs review"}</span> <strong>{reviewKindLabels[item.kind]}</strong>{item.sensitive ? " (restricted)" : ""}
+        {item.acknowledged ? <strong>Acknowledged:</strong> : <span className="status-chip purple">To review</span>} <strong>{reviewKindLabels[item.kind]}</strong>{item.sensitive ? " (restricted)" : ""}
         <p>{item.title}. {item.detail}</p>
         {item.roommateRequestId && !item.acknowledged ? <form ref={edits.gone(`roommate:${item.key}`)} onChange={edits.track(`roommate:${item.key}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
@@ -181,7 +180,7 @@ export function LodgingRequestsWorkspace({ initialView, canConfigure, canExport 
 
     <section className="panel" aria-labelledby="lodging-requests-table">
       <h3 id="lodging-requests-table">Requests ({view.requests.length})</h3>
-      {view.requests.length === 0 ? <p>No one has asked for lodging yet.</p> : <div className="table-wrap">{requestSort.note}<table className="report-table report-table-auto table-cards table-cards-xwide" role="table">
+      {view.requests.length === 0 ? <p>No one has asked for lodging yet.</p> : <div className="table-wrap">{requestSort.note}<table className={`report-table report-table-auto table-cards table-cards-wide ${labels.requestsTable}`} role="table">
         <thead role="rowgroup"><tr role="row">
           {requestSort.header("registration", "Registration")}{requestSort.header("type", "Type")}{requestSort.header("nights", "Nights")}{requestSort.header("people", "People")}{requestSort.header("rooms", "Rooms")}
           {view.canSeeSensitive ? fullSort.header("ground", "Ground floor") : null}{view.canSeeSensitive ? fullSort.header("accessible", "Accessible room") : null}
@@ -228,9 +227,9 @@ export function LodgingRequestsWorkspace({ initialView, canConfigure, canExport 
           if (ok) { formElement.reset(); edits.clear("addRule"); }
         });
       }}>
-        <label className={chips.fit}>Rule <select name="kind">{lodgingRuleKinds.map((kind) => <option key={kind} value={kind}>{lodgingRuleKindLabels[kind]}</option>)}</select></label>
-        <label className={chips.fit}>Person <select name="personAId" required>{view.people.map((person) => <option key={person.personId} value={person.personId}>{person.name} ({person.registration})</option>)}</select></label>
-        <label className={chips.fit}>Other person (not for a split) <select name="personBId"><option value="">None</option>{view.people.map((person) => <option key={person.personId} value={person.personId}>{person.name} ({person.registration})</option>)}</select></label>
+        <label className={labels.fit}>Rule <select name="kind">{lodgingRuleKinds.map((kind) => <option key={kind} value={kind}>{lodgingRuleKindLabels[kind]}</option>)}</select></label>
+        <label className={labels.fit}>Person <select name="personAId" required>{view.people.map((person) => <option key={person.personId} value={person.personId}>{person.name} ({person.registration})</option>)}</select></label>
+        <label className={labels.fit}>Other person (not for a split) <select name="personBId"><option value="">None</option>{view.people.map((person) => <option key={person.personId} value={person.personId}>{person.name} ({person.registration})</option>)}</select></label>
         <label>First night <input type="date" name="effectiveFrom" /></label>
         <label>Last night <input type="date" name="effectiveUntil" /></label>
         <label>Reason <input name="reason" required maxLength={300} /></label>
@@ -286,7 +285,7 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
       </> : null}
       {request.churchSponsored ? <p role="note" className="usage-note"><strong>Church-sponsored registration.</strong> {CHURCH_SHARE_AUTOMATIC} Record only the registrant&apos;s share in Payments.</p> : null}
       <h4>Change this request (staff)</h4>
-      <form ref={edits.gone("change")} onChange={edits.track("change")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
+      <form className={labels.stack} ref={edits.gone("change")} onChange={edits.track("change")} onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const formElement = event.currentTarget;
         const form = new FormData(formElement);
@@ -310,7 +309,7 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
           }
         });
       }}>
-        <label className={chips.fit}>Type <select name="category" defaultValue={request.category ?? ""}><option value="">No preference</option>{lodgingCategories.map((category) => <option key={category} value={category}>{lodgingCategoryLabels[category]}</option>)}</select></label>
+        <label className={labels.fit}>Type <select name="category" defaultValue={request.category ?? ""}><option value="">No preference</option>{lodgingCategories.map((category) => <option key={category} value={category}>{lodgingCategoryLabels[category]}</option>)}</select></label>
         <label>First night <input type="date" name="firstNight" defaultValue={request.firstNight ?? ""} /></label>
         <label>Last night <input type="date" name="lastNight" defaultValue={request.lastNight ?? ""} /></label>
         <label>People <input type="number" name="partySize" min={1} max={100} defaultValue={request.partySize} required /></label>
