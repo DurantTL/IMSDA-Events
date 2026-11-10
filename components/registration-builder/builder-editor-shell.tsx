@@ -29,7 +29,8 @@ import { locateField } from "./canvas-rows";
 import { inspectorAfterClose, inspectorAfterSelection } from "./phone-inspector";
 import { MIN_SIDEBAR_WIDTH, SIDEBAR_WIDTH_STEP, displayedSidebarWidth, maxSidebarWidthFor } from "./editor-layout";
 import { canRedo, canUndo } from "./edit-history";
-import { focusTargetAction, isSearchShortcut, undoRedoShortcut } from "./shell-keys";
+import { BUILDER_SETTINGS_HASH } from "@/components/form-page-views";
+import { focusTargetAction, hashAction, isSearchShortcut, undoRedoShortcut } from "./shell-keys";
 import { useBuilderPhoneViewport, useEditorLayout, useHydrated } from "./use-editor-layout";
 import { BuilderPhoneCanvas } from "./builder-phone-canvas";
 import { PhoneMoveSheet } from "./builder-phone-move";
@@ -101,7 +102,7 @@ function dialogIsOpen() {
  */
 export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarget?: { formId: string; fieldId: string } | null; registry?: PaletteRegistry }) {
   const {
-    eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, editsCreateDraft, canEditNotifications: canEditRegistrationNotifications, information,
+    eventId, forms, selectedFormId, selectedForm, selectedVersion, definition, dirty, canEdit, editsCreateDraft, canEditNotifications: canEditRegistrationNotifications, canViewRegistrations, information,
     busy, history, undoEdit, redoEdit, libraryRefresh, expandedFieldId, setExpandedFieldId, addPaletteEntry, moveField, duplicateField, openRemoveField, showPreview, chooseForm,
   } = useLoadedBuilder();
   // Information mode (#1149): no registration notifications, and the palette lists only what the information-form check allows.
@@ -132,6 +133,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const lastSelection = useRef<{ fieldId: string; sectionId: string } | null>(null);
   const handledFocusTarget = useRef(false);
+  const handledHash = useRef(false);
   const lastVersionKey = useRef<string | null>(null);
   const topbarRef = useRef<HTMLElement>(null);
   const topbarSize = useMeasuredSize(topbarRef);
@@ -219,6 +221,18 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
     input.scrollIntoView({ block: "center" });
     input.focus();
   }, [focusTarget, selectedFormId, expandedFieldId, tab, layout.sidebarVisible, showSidebar, hydrated, phone, inspectorOpen]);
+
+  // A link from another page of the form (#1572) arrives with a hash: Form settings opens the settings tab, the preview hash
+  // does what Preview does. Once, after hydration, so the layout stored in this browser is in place; never over a setup
+  // warning's question, and nothing for a page with no hash.
+  useEffect(() => {
+    if (handledHash.current || !hydrated) return;
+    handledHash.current = true;
+    const action = hashAction({ hash: window.location.hash, hasFocusTarget: Boolean(focusTarget), formOpen: Boolean(selectedForm) });
+    if (action === "settings") openFormSettings();
+    else if (action === "preview") showPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the page has hydrated
+  }, [hydrated]);
 
   // Remember where the selection was; if the question is then removed, focus goes to its step's add button instead of being lost.
   // Opening another form or version forgets it. The removal confirmation puts focus back itself when it closes, so this waits a
@@ -400,9 +414,10 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
           : <span className="fb-form-name">{selectedForm.name}</span>}
         <nav className="fb-nav" aria-label="Form sections">
           <a href="#builder-editor" aria-current={activeSection === "editor" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("editor"); }}>Editor</a>
-          {information && <a href="#builder-settings" data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Form settings</a>}
-          {!information && <a href="#builder-settings" data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Settings &amp; payment</a>}
+          {information && <a href={BUILDER_SETTINGS_HASH} data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Form settings</a>}
+          {!information && <a href={BUILDER_SETTINGS_HASH} data-fb-nav="settings" aria-current={tab === "form-settings" ? "page" : undefined} aria-controls={sidebarPanelId("form-settings")} onClick={(event) => { event.preventDefault(); openFormSettings(); }}>Settings &amp; payment</a>}
           {information && <Link href={informationResponsesHref(information, selectedForm.id)}>Responses</Link>}
+          {canViewRegistrations && !information && <Link href={`/people?event=${encodeURIComponent(eventId)}`}>Registrations</Link>}
           {canEditNotifications && <a href="#builder-notifications" aria-current={activeSection === "notifications" && tab !== "form-settings" ? "page" : undefined} onClick={(event) => { event.preventDefault(); scrollToSection("notifications"); }}>Notifications</a>}
         </nav>
         <BuilderVersionChips />

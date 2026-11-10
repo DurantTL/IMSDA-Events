@@ -2,6 +2,10 @@ import { staffPageTitles } from "@/components/staff-navigation";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
+import { informationFormPageViews } from "@/components/form-page-views";
+import { PageHeader } from "@/components/page-header";
+import { eventInformationConfig, informationListHref } from "@/components/registration-builder/information-mode";
+import { getCurrentSession } from "@/modules/access/current-session";
 import { InformationFormResponsesView } from "@/components/information-form-responses-view";
 import { resolveEventContext } from "@/modules/events/selection";
 import { loadInformationFormResponsesPage } from "@/modules/information-forms/responses-page";
@@ -16,14 +20,24 @@ export default async function EventInformationFormResponsesPage({ searchParams }
   const { event: requested, form: formId, response, cursor } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FORMS")) {
-    return <AccessRestricted title="Form responses are restricted" detail="Event administrators and registration managers can see the answers sent through an event's information forms." whoToAsk="your event administrator" />;
+    // The page draws its own title (#1572), so the restricted state keeps the page's one h1 too.
+    return (
+      <>
+        <PageHeader title={staffPageTitles.formResponses} />
+        <AccessRestricted title="Form responses are restricted" detail="Event administrators and registration managers can see the answers sent through an event's information forms." whoToAsk="your event administrator" />
+      </>
+    );
   }
   if (!formId) notFound();
   const data = await loadInformationFormResponsesPage({ scope: "EVENT", eventId: event.id }, formId, { responseId: response, cursor });
   if (!data) notFound();
+  const { user } = await getCurrentSession();
+  const config = eventInformationConfig(event, user?.globalRole === "SYSTEM_ADMIN");
   const base = `/information-forms/responses?event=${encodeURIComponent(event.id)}&form=${encodeURIComponent(formId)}`;
   return (
     <InformationFormResponsesView
+      views={informationFormPageViews(config, formId, "responses")}
+      back={{ href: informationListHref(config), label: "Back to information forms" }}
       closeHref={base}
       exportHref={`/api/events/${encodeURIComponent(event.id)}/information-forms/${encodeURIComponent(formId)}/responses/export`}
       membersExportHref={data.hasMemberList ? `/api/events/${encodeURIComponent(event.id)}/information-forms/${encodeURIComponent(formId)}/responses/export?format=members` : undefined}
