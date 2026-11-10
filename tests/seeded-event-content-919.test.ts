@@ -109,7 +109,7 @@ describe("seeded event content (#919)", () => {
   it("shows the seeded words on the Meals and cancellation rules screens, and only to someone who may add the meals", async () => {
     const emptyView = { services: [], plans: [], totals: [], recentOrders: [], attendeeTypes: [], formWarnings: [] } as unknown as MealView;
     const presets = await listMealPresetOptions({ seededEventContent: { findUnique: vi.fn().mockResolvedValue(null) } } as never);
-    const render = (canManageFinance: boolean) => renderToStaticMarkup(createElement(MealsWorkspace, { eventId: "evt_synthetic", eventName: "Synthetic Camp", initialView: emptyView, presets, canConfigure: true, canManageFinance, canExport: false }));
+    const render = (canManageFinance: boolean) => renderToStaticMarkup(createElement(MealsWorkspace, { eventId: "evt_synthetic", initialView: emptyView, presets, canConfigure: true, canManageFinance, canExport: false }));
     const finance = render(true);
     expect(finance).toContain("Start from Camp Meeting");
     expect(finance).toContain(escaped(fixture.copy.mealsDescription));
@@ -122,7 +122,7 @@ describe("seeded event content (#919)", () => {
     expect(noFinance).not.toContain("Add the Camp Meeting meals");
     expect(finance).not.toContain("Only staff who manage finance can add the preset.");
     // No preset, nothing shown.
-    const none = renderToStaticMarkup(createElement(MealsWorkspace, { eventId: "evt_synthetic", eventName: "Synthetic Camp", initialView: emptyView, presets: [], canConfigure: true, canManageFinance: false, canExport: false }));
+    const none = renderToStaticMarkup(createElement(MealsWorkspace, { eventId: "evt_synthetic", initialView: emptyView, presets: [], canConfigure: true, canManageFinance: false, canExport: false }));
     expect(none).not.toContain("Start from");
     expect(none).not.toContain("add the preset");
 

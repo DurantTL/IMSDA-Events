@@ -363,6 +363,8 @@ const pages: PageSpec[] = [
   staff("kitchen-counts", "/more/kitchen-report/counts"),
   // The same page as a Kitchen staff user (#1029): no event view, so the sidebar and phone tabs show only Kitchen counts.
   staff("kitchen-counts-as-kitchen-staff", "/more/kitchen-report/counts", "kitchen"),
+  // Meals setup (#1579): the views strip, the services and orders as phone cards, and the price grid.
+  staff("meals-setup", "/more/meals"),
   staff("more-menu", "/more"),
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).

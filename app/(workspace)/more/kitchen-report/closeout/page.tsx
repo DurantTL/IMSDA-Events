@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
 import { MealCloseout } from "@/components/meal-closeout";
+import { MealsViewsStrip } from "@/components/meals-views-strip";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
 import { loadMealCloseout } from "@/modules/meals/closeout-repository";
@@ -18,24 +19,20 @@ export default async function MealCloseoutPage({ searchParams }: { searchParams:
   const params = await searchParams;
   const requested = firstParam(params.event);
   const { event, permissions } = await resolveEventContext(requested, { allowWithoutEventView: true });
+  // The strip lists only the pages this viewer passes the same check for (#1579).
+  const strip = <MealsViewsStrip current="closeout" eventId={event.id} permissions={permissions} />;
   if (!permissions.includes("MANAGE_FINANCE")) {
-    return <AccessRestricted title="The meal closeout is restricted" detail="Your event role does not include finance access." whoToAsk="your event administrator" />;
+    return <>{strip}<AccessRestricted title="The meal closeout is restricted" detail="Your event role does not include finance access." whoToAsk="your event administrator" /></>;
   }
   const closeout = await loadMealCloseout(event.id);
   const base = `/api/events/${encodeURIComponent(event.id)}/exports/meals-closeout`;
   return (
-    <section className="page-stack meal-closeout-page">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow" translate="no">{event.name}</p>
-          <h2>Meal closeout</h2>
-          <p>
-            Meal charges, credits, conference billing and walk-up orders beside what was ordered, served and prepared, with every difference listed.
-            {permissions.includes("VIEW_REPORTS") && <> <Link href={`/more/kitchen-report?event=${encodeURIComponent(event.id)}`}>Back to the kitchen report</Link></>}
-          </p>
-        </div>
-      </div>
+    <>
+      {strip}
+      <section className="page-stack meal-closeout-page">
+      <StaffPageHeader description="Meal charges, credits, conference billing and walk-up orders beside what was ordered, served and prepared, with every difference listed." />
       <MealCloseout eventId={event.id} closeout={closeout} csvHref={base} exceptionsCsvHref={`${base}?part=exceptions`} />
-    </section>
+      </section>
+    </>
   );
 }
