@@ -33,6 +33,8 @@ const normalHex = (hex: string) => {
 };
 for (const match of rootBlock.matchAll(/(--[\w-]+):\s*(#[0-9a-fA-F]{3,8})\s*;/g)) if (!colorTokens.has(normalHex(match[2]!))) colorTokens.set(normalHex(match[2]!), match[1]!);
 for (const match of rootBlock.matchAll(/(--radius-[\w-]+):\s*(\d+)px\s*;/g)) radiusTokens.set(`${match[2]}px`, match[1]!);
+// #1771: the hint names the job-named token. The tokens are aliases, so the scan above does not see them.
+for (const [px, token] of [["10px", "--radius-element"], ["12px", "--radius-container"], ["20px", "--radius-overlay"], ["999px", "--radius-pill"]] as const) radiusTokens.set(px, token);
 
 /** Blanks every var(...) so a token's own fallback (`var(--card, #fff)`) is not a raw value. */
 function withoutVars(value: string) {
@@ -179,7 +181,7 @@ describe("G3: no new raw color, font-size or border-radius (#1770)", () => {
 
   it("reads the tokens from :root", () => {
     expect(colorTokens.get("#582c83")).toBe("--imsda-purple");
-    expect(radiusTokens.get("12px")).toBe("--radius-card");
+    expect(radiusTokens.get("12px")).toBe("--radius-container");
   });
 
   it("proves itself: one injected example of each kind fails, with the file, line and token to use", () => {
@@ -199,7 +201,7 @@ describe("G3: no new raw color, font-size or border-radius (#1770)", () => {
     expect(problems.join("\n")).toContain("sample.css:6 border-radius: 7px");
     expect(problems.join("\n")).toContain("use");
     // A raw value that equals a token names that token.
-    expect(compareToBaseline({ color: {}, fontSize: {}, radius: {} }, scanStyles("t.css", ".a { border-radius: 12px; background: #582C83; }")).join("\n")).toMatch(/--imsda-purple[\s\S]*--radius-card/);
+    expect(compareToBaseline({ color: {}, fontSize: {}, radius: {} }, scanStyles("t.css", ".a { border-radius: 12px; background: #582C83; }")).join("\n")).toMatch(/--imsda-purple[\s\S]*--radius-container/);
   });
 
   it("proves the ratchet both ways: a rise fails and a drop without a lowered fixture fails", () => {

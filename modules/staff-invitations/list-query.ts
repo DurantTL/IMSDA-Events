@@ -4,6 +4,7 @@ import { parseSortParams, type SortState } from "@/lib/list-sort";
 import {
   INVITATION_FAILED_MESSAGE_STATUSES,
   INVITATION_FAILED_PROVIDER_STATUSES,
+  INVITATION_LINK_MS,
   INVITATION_STATUSES,
   INVITATION_STATUS_LABEL,
   STAFF_INVITATION_GROUPS,
@@ -61,15 +62,18 @@ export function parseInvitationQuery(params: RawParams): InvitationListQuery {
 }
 
 /** The status the person sees, as a database condition: the same rules as `invitationStatus`. */
-export function invitationStatusWhere(status: InvitationStatus) {
+export function invitationStatusWhere(status: InvitationStatus, now: Date = new Date()) {
   const failedMessage = { status: { in: [...INVITATION_FAILED_MESSAGE_STATUSES] } };
   const failedProvider = { providerDeliveryStatus: { in: [...INVITATION_FAILED_PROVIDER_STATUSES] } };
-  const open = { revokedAt: null, registeredAt: null };
+  // An open link past its 14 days is "Expired", whether or not it was sent, so the other open statuses need a live window.
+  const windowStart = new Date(now.getTime() - INVITATION_LINK_MS);
+  const open = { revokedAt: null, registeredAt: null, linkIssuedAt: { gt: windowStart } };
   switch (status) {
     case "REVOKED": return { revokedAt: { not: null } };
     case "APPROVED": return { revokedAt: null, registeredAt: { not: null }, approval: "APPROVED" };
     case "DECLINED": return { revokedAt: null, registeredAt: { not: null }, approval: "DECLINED" };
     case "REGISTERED": return { revokedAt: null, registeredAt: { not: null }, OR: [{ approval: null }, { approval: "WAITING" }] };
+    case "EXPIRED": return { revokedAt: null, registeredAt: null, linkIssuedAt: { lte: windowStart } };
     case "NOT_SENT": return { ...open, sentAt: null };
     case "DELIVERY_FAILED": return { ...open, sentAt: { not: null }, lastMessage: { is: { OR: [failedMessage, failedProvider] } } };
     case "SENT": return {
@@ -103,12 +107,12 @@ function searchWhere(search: string) {
  * and the search; `status` is added too unless the caller asks for the status left out (the counts and the status sort).
  * The event is always part of the clause.
  */
-export function buildInvitationWhere(eventId: string, filters: InvitationListFilters, options: { withStatus?: boolean } = {}) {
+export function buildInvitationWhere(eventId: string, filters: InvitationListFilters, options: { withStatus?: boolean; now?: Date } = {}) {
   const and: Array<Record<string, unknown>> = [];
   if (filters.group !== "ALL") and.push({ group: filters.group });
   const search = searchWhere(filters.search);
   if (search) and.push(search);
-  if ((options.withStatus ?? true) && filters.status !== "ALL") and.push(invitationStatusWhere(filters.status));
+  if ((options.withStatus ?? true) && filters.status !== "ALL") and.push(invitationStatusWhere(filters.status, options.now));
   return { eventId, supersededAt: null, ...(and.length > 0 ? { AND: and } : {}) };
 }
 

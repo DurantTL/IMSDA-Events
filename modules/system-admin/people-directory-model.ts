@@ -465,6 +465,35 @@ export function buildRoleWhere(filters: PeopleFilters, scope: PeopleScope, now =
   return where.staff || where.account ? where : null;
 }
 
+/**
+ * Who a Clubs Administrator's list holds (Caleb, 2026-11-09): club people only. That is anyone with a club role (director
+ * or club staff) in a CLUB-type organization that is current or scheduled to start, a current Area Coordinator, and a
+ * current Clubs Administrator. A role that was revoked or has ended does not count. A staff login whose linked website
+ * account is a club person is the same person, so it is listed too.
+ * A role in a club that has been made inactive still counts, on purpose: the person still holds a club role, and the
+ * Clubs Administrator needs to find them to end it.
+ */
+export function clubPeopleWhere(now = new Date()): Required<PeopleRoleWhere> {
+  const account = {
+    OR: [
+      { areaCoordinatorGrant: { is: { revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } } },
+      {
+        clubDirectorGrants: {
+          some: {
+            revokedAt: null,
+            OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+            organization: { type: "CLUB" },
+          },
+        },
+      },
+    ],
+  };
+  return {
+    account,
+    staff: { OR: [{ clubsAdministratorGrant: { is: { revokedAt: null } } }, { attendeeAccount: { is: account } }] },
+  };
+}
+
 /** True when the chosen roles are all event roles and no event (or club) is picked, so nothing can be listed yet. */
 export function needsEventPick(filters: PeopleFilters): boolean {
   const hasEventRole = filters.roles.some((role) => role.kind === "event");

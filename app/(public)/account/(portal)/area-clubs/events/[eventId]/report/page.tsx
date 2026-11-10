@@ -4,9 +4,10 @@ import { BackLink } from "@/components/back-link";
 import { ClubReportColumnBuilder } from "@/components/club-report-column-builder";
 import { CoordinatorUnavailable } from "@/components/coordinator-overview";
 import { logError } from "@/lib/logger";
+import { resolveLocationFilter } from "@/modules/event-locations/filter";
 import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
 import { CLUB_REPORT_COLUMNS, DEFAULT_CLUB_REPORT_COLUMNS, clubReportColumnKeysFor, type ClubReportViewer } from "@/modules/reporting/club-report-columns";
-import { ClubReportError, listClubReportLayouts, requireCoordinatorClubEvent } from "@/modules/reporting/club-report-export";
+import { ClubReportError, listClubReportLayouts, listRegisteredClubs, requireCoordinatorClubEvent } from "@/modules/reporting/club-report-export";
 
 export const metadata: Metadata = { title: "Attendee report", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -22,7 +23,11 @@ export default async function AreaClubEventReportPage({ params }: { params: Prom
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
   if (!(await currentAreaCoordinatorViewerActive())) notFound();
   const { eventId } = await params;
-  const loaded = await Promise.all([requireCoordinatorClubEvent(eventId), listClubReportLayouts(eventId, viewer)]).catch((error: unknown) => {
+  const loaded = await Promise.all([
+    requireCoordinatorClubEvent(eventId),
+    listRegisteredClubs(eventId),
+    resolveLocationFilter(eventId, null),
+  ]).then(async ([event, clubs, { locations }]) => [event, await listClubReportLayouts(eventId, viewer, new Set(clubs.map((club) => club.id))), clubs, locations] as const).catch((error: unknown) => {
     if (error instanceof ClubReportError && error.code === "EVENT_NOT_FOUND") return "missing" as const;
     logError("Coordinator attendee report read failed", error, { eventId });
     return null;
@@ -42,13 +47,15 @@ export default async function AreaClubEventReportPage({ params }: { params: Prom
           <p className="field-help">
             Who is registered, one row per person. You can include names, age, role, class and the event answers (ribbons,
             baptism interest, medical volunteer, Master Guide, first-time camper). Birth dates, dietary needs, medical
-            information and parent or guardian contacts are never included. Every print and download is logged.
+            information and parent or guardian contacts are never included. You can narrow the list by club, role and location. Every print and download is logged.
           </p>
           <ClubReportColumnBuilder
             defaultKeys={[...DEFAULT_CLUB_REPORT_COLUMNS]}
             endpoint={`/api/attendee/area-clubs/events/${encodeURIComponent(eventId)}/report-columns`}
             eventName={loaded[0].name}
             initialLayouts={loaded[1]}
+            clubs={loaded[2]}
+            locations={loaded[3].map((location) => ({ id: location.id, name: location.name }))}
             options={clubReportColumnKeysFor(viewer).map((key) => ({ key, header: CLUB_REPORT_COLUMNS[key].header }))}
           />
         </>

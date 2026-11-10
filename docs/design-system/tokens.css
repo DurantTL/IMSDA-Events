@@ -129,6 +129,9 @@
   --radius-modal: 20px;
   --radius-hero: 24px;
   --radius-pill: 999px;
+  --radius-element: 10px;
+  --radius-container: 12px;
+  --radius-overlay: 20px;
   --bp-phone: 600px;
   --bp-club-nav: 640px;
   --bp-tablet: 768px;

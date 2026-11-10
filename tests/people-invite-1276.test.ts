@@ -138,6 +138,9 @@ const person = { name: "Pat Example", email: "Pat@Example.test" };
 const invite = (access: Record<string, unknown>, extra: Record<string, unknown> = {}) => inviteRoute(post("/api/admin/people/invite", { ...person, access, ...extra }));
 
 beforeEach(() => {
+  // Routes read the real clock, and the fixtures hold fixed dates: pin it so they never go stale.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(now);
   vi.clearAllMocks();
   users = [];
   accounts = [];

@@ -96,7 +96,7 @@
     "app/(workspace)/events-admin/events-admin.module.css": 3,
     "app/(workspace)/help/help.module.css": 1,
     "app/(workspace)/more/health/operational-health.module.css": 6,
-    "app/globals.css": 680,
+    "app/globals.css": 674,
     "components/area-club-switcher.module.css": 2,
     "components/check-in-station.module.css": 4,
     "components/church-location-map-picker.module.css": 3,

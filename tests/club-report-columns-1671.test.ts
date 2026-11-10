@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   layoutFindFirst: vi.fn(),
   layoutCreate: vi.fn(),
   layoutDeleteMany: vi.fn(),
+  locationFindFirst: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -34,6 +35,7 @@ vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     event: { findFirst: mocks.eventFindFirst, findUnique: mocks.eventFindUnique },
     eventTemplateApplication: { findUnique: mocks.applicationFindUnique },
+    eventLocation: { findFirst: mocks.locationFindFirst },
     clubReportColumnLayout: {
       findMany: mocks.layoutFindMany,
       findFirst: mocks.layoutFindFirst,
@@ -103,7 +105,8 @@ beforeEach(() => {
   mocks.layoutFindMany.mockResolvedValue([]);
   mocks.layoutFindFirst.mockResolvedValue(null);
   mocks.layoutDeleteMany.mockResolvedValue({ count: 1 });
-  mocks.layoutCreate.mockImplementation(async ({ data }: { data: { name: string; columns: unknown } }) => ({ id: "layout-1", name: data.name, columns: data.columns, updatedAt: new Date("2026-11-08T00:00:00Z") }));
+  mocks.locationFindFirst.mockResolvedValue(null);
+  mocks.layoutCreate.mockImplementation(async ({ data }: { data: { name: string; columns: unknown; filters?: unknown } }) => ({ id: "layout-1", name: data.name, columns: data.columns, filters: data.filters ?? null, updatedAt: new Date("2026-11-08T00:00:00Z") }));
 });
 
 describe("column catalog", () => {

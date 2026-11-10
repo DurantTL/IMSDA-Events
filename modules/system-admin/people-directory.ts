@@ -13,6 +13,7 @@ import {
   summarizePeopleAccess,
   type MergedPerson,
   type PeopleCandidate,
+  clubPeopleWhere,
 } from "@/modules/system-admin/people-directory-model";
 import { containsAnyOf } from "@/lib/server-search";
 
@@ -20,7 +21,8 @@ import { containsAnyOf } from "@/lib/server-search";
  * People & access (#1275): one directory over staff logins (`User`) and website accounts
  * (`AttendeeAccount`). A staff login and the account linked to it (`User.attendeeAccountId`) are one
  * person and one row. Read only; the callers gate on a system administrator or an active Clubs
- * Administrator.
+ * Administrator. A system administrator lists everyone; a Clubs Administrator lists club people only
+ * (Caleb, 2026-11-09).
  */
 
 export type SignInChip = { side: "Staff login" | "Website account"; label: string; tone: "green" | "gold" | "coral" };
@@ -57,17 +59,24 @@ export function isGrantCurrent(grant: { revokedAt: Date | null; effectiveTo?: Da
  * is one row and the page count is exact. That is fine at the conference's size (thousands of rows, a few bytes
  * each). Move to database paging (a SQL union ordered by name) if the two tables grow to hundreds of thousands of
  * rows or a search without a query becomes slow.
+ *
+ * A Clubs Administrator (`clubs`) gets club people only (`clubPeopleWhere`), with or without a search. The scope is
+ * required so no caller lists everyone by leaving it out.
  */
-export async function findPeople(query: string): Promise<MergedPerson[]> {
+export async function findPeople(query: string, scope: PeopleScope, now = new Date()): Promise<MergedPerson[]> {
   const prisma = getPrisma();
   const text = query.trim().slice(0, 120);
+  const textWhere = text ? containsAnyOf(["email", "displayName"], text) : undefined;
+  const club = scope === "full" ? null : clubPeopleWhere(now);
+  const within = (clubWhere: Record<string, unknown> | undefined) =>
+    clubWhere && textWhere ? { AND: [clubWhere, textWhere] } : clubWhere ?? textWhere;
   const [users, accounts] = await Promise.all([
     prisma.user.findMany({
-      where: text ? containsAnyOf(["email", "displayName"], text) : undefined,
+      where: within(club?.staff),
       select: { id: true, email: true, displayName: true, attendeeAccountId: true },
     }),
     prisma.attendeeAccount.findMany({
-      where: text ? containsAnyOf(["email", "displayName"], text) : undefined,
+      where: within(club?.account),
       select: { id: true, email: true, displayName: true, linkedUser: { select: { id: true } } },
     }),
   ]);
@@ -176,7 +185,7 @@ export async function findPeopleByRole(
 }
 
 export async function searchPeople(query: string, requestedPage: number, scope: PeopleScope = "full", filters?: PeopleFilters) {
-  const matches = filters && peopleFilterCount(filters) > 0 ? await findPeopleByRole(filters, query, scope) : await findPeople(query);
+  const matches = filters && peopleFilterCount(filters) > 0 ? await findPeopleByRole(filters, query, scope) : await findPeople(query, scope);
   const page = pagePeople(matches, requestedPage);
   return { ...page, rows: await loadPeopleRows(page.items, scope) };
 }

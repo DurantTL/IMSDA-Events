@@ -121,18 +121,28 @@ export type ExistingEmails = {
 // ---------------------------------------------------------------------------------------------
 
 /** What the invite list shows for a person. `declined` and `approved` follow a registration; the rest describe the link. */
-export const INVITATION_STATUSES = ["NOT_SENT", "SENT", "DELIVERY_FAILED", "REGISTERED", "APPROVED", "DECLINED", "REVOKED"] as const;
+export const INVITATION_STATUSES = ["NOT_SENT", "SENT", "DELIVERY_FAILED", "EXPIRED", "REGISTERED", "APPROVED", "DECLINED", "REVOKED"] as const;
 export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
 
 export const INVITATION_STATUS_LABEL: Record<InvitationStatus, string> = {
   NOT_SENT: "Not sent",
   SENT: "Sent",
   DELIVERY_FAILED: "Delivery failed",
+  EXPIRED: "Link expired",
   REGISTERED: "Registered, waiting for approval",
   APPROVED: "Registered and approved",
   DECLINED: "Registered, declined",
   REVOKED: "Revoked",
 };
+
+/** How long a personal link opens after it was issued (created or reissued) or last sent (#1787). */
+export const INVITATION_LINK_DAYS = 14;
+export const INVITATION_LINK_MS = INVITATION_LINK_DAYS * 24 * 60 * 60 * 1000;
+
+/** Whether the link's window has run out: at the 14-day mark exactly, it has. Says nothing about whether the person registered. */
+export function invitationLinkExpired(input: { linkIssuedAt: Date | string }, now: Date) {
+  return now.getTime() >= new Date(input.linkIssuedAt).getTime() + INVITATION_LINK_MS;
+}
 
 /** Message states and provider reports that mean the email did not reach the person. */
 /** The outbox and provider statuses that mean the invitation email did not reach the person; the list's "Delivery failed" is these. */
@@ -154,16 +164,19 @@ export type InvitationStatusInput = {
   registeredAt: Date | string | null;
   approval: "WAITING" | "APPROVED" | "DECLINED" | null;
   sentAt: Date | string | null;
+  /** When the link's 14-day window started. Left out, the link is not treated as expired. */
+  linkIssuedAt?: Date | string;
   message: { status: string; providerDeliveryStatus: string | null } | null;
 };
 
-export function invitationStatus(input: InvitationStatusInput): InvitationStatus {
+export function invitationStatus(input: InvitationStatusInput, now: Date = new Date()): InvitationStatus {
   if (input.revokedAt) return "REVOKED";
   if (input.registeredAt) {
     if (input.approval === "APPROVED") return "APPROVED";
     if (input.approval === "DECLINED") return "DECLINED";
     return "REGISTERED";
   }
+  if (input.linkIssuedAt && invitationLinkExpired({ linkIssuedAt: input.linkIssuedAt }, now)) return "EXPIRED";
   if (!input.sentAt) return "NOT_SENT";
   if (input.message && (FAILED_MESSAGE_STATUSES.has(input.message.status) || (input.message.providerDeliveryStatus !== null && FAILED_PROVIDER_STATUSES.has(input.message.providerDeliveryStatus)))) {
     return "DELIVERY_FAILED";
@@ -256,6 +269,9 @@ export const COVERED_MEAL_ANSWER = "Covered (staff)";
 
 export const INVITATION_RECEIVED_MESSAGE =
   "We have your registration. The event office reviews staff, pastor and volunteer registrations and will confirm yours. There is no charge.";
+
+export const INVITATION_EXPIRED_MESSAGE =
+  "This link has expired. Ask the event office for a new invitation.";
 
 export const INVITATION_UNAVAILABLE_MESSAGE =
   "This link isn't available. It may have been replaced or turned off. Contact the event office if you think that is a mistake.";

@@ -12,7 +12,7 @@ import { resolveClubReportsAccess } from "@/modules/reporting/club-reports-acces
 import { ClubReportColumnBuilder } from "@/components/club-report-column-builder";
 import { canViewDietaryDetails } from "@/modules/registrations/attendee-listing";
 import { CLUB_REPORT_COLUMNS, DEFAULT_CLUB_REPORT_COLUMNS, clubReportColumnKeysFor, type ClubReportViewer } from "@/modules/reporting/club-report-columns";
-import { listClubReportLayouts } from "@/modules/reporting/club-report-export";
+import { listClubReportLayouts, listRegisteredClubs } from "@/modules/reporting/club-report-export";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { cardCell } from "@/components/table-card-labels";
 import { ColumnHeader } from "@/components/column-header";
@@ -47,7 +47,8 @@ export default async function ClubEventReportsPage({
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   // The column chooser offers only what this person may see; the server checks every request again (#1671).
   const reportViewer: ClubReportViewer = { kind: "staff", canViewDietaryDetails: canViewDietaryDetails({ permissions, clubEvent: true }) };
-  const columnLayouts = await listClubReportLayouts(event.id, reportViewer);
+  const registeredClubs = await listRegisteredClubs(event.id);
+  const columnLayouts = await listClubReportLayouts(event.id, reportViewer, new Set(registeredClubs.map((club) => club.id)));
   // Each location on its own, or all of them combined with the location named (#413).
   const { locations, locationId } = await resolveLocationFilter(event.id, requestedLocation);
   const reports = await getClubEventReports(event.id, { locationId });
@@ -127,6 +128,8 @@ export default async function ClubEventReportsPage({
         <ClubReportColumnBuilder
           defaultKeys={[...DEFAULT_CLUB_REPORT_COLUMNS]}
           canSaveLayouts={!readOnly}
+          clubs={registeredClubs}
+          locations={locations.map((location) => ({ id: location.id, name: location.name }))}
           endpoint={`/api/events/${encodeURIComponent(event.id)}/club-reports/columns`}
           eventName={event.name}
           initialLayouts={columnLayouts}
