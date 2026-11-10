@@ -2,7 +2,10 @@ import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { DetailPage } from "@/components/page-templates/detail-page";
+import { staffPageTitles } from "@/components/staff-navigation";
+import { StaffViewStrip } from "@/components/staff-view-strip";
+import type { RowView } from "@/components/staff-tab-row-model";
 import type { LabelledAnswer } from "@/modules/information-forms/responses";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
@@ -40,7 +43,11 @@ export function responseColumns(rows: ResponseRowView[]) {
  * event page (MANAGE_FORMS). The caller has already authorized the viewer and loaded the data through the module's
  * target-scoped queries; nothing here reads data itself.
  */
-export function InformationFormResponsesView({ formName, total, rows, selected, exportHref, membersExportHref, rowHref, closeHref, nextHref }: {
+export function InformationFormResponsesView({ views, back, formName, total, rows, selected, exportHref, membersExportHref, rowHref, closeHref, nextHref }: {
+  /** The form's pages (#1572), with Responses current; the page builds them from its scope. */
+  views: readonly RowView[];
+  /** The one back link. The admin page passes none: its section header draws it. */
+  back?: { href: string; label: string } | undefined;
   formName: string;
   total: number;
   rows: ResponseRowView[];
@@ -54,16 +61,16 @@ export function InformationFormResponsesView({ formName, total, rows, selected, 
 }) {
   const columns = responseColumns(rows);
   return (
-    <section className="page-stack information-form-responses">
-      <StaffPageHeader
-        description={`${formName}: answers sent through the form's public link.`}
-        primary={total > 0 ? (
-          <>
-            <ExportLink className="secondary-button information-form-download" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink>
-            {membersExportHref && <ExportLink className="secondary-button information-form-download" href={membersExportHref}><Download aria-hidden="true" size={16} /> Download members CSV</ExportLink>}
-          </>
-        ) : undefined}
-      />
+    <DetailPage
+      header={{
+        title: staffPageTitles.formResponses,
+        description: `${formName}: answers sent through the form's public link.`,
+        ...(back ? { back } : {}),
+        ...(total > 0 ? { primary: <ExportLink className="secondary-button information-form-download" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink> } : {}),
+        ...(total > 0 && membersExportHref ? { secondary: <ExportLink className="secondary-button information-form-download" href={membersExportHref}><Download aria-hidden="true" size={16} /> Download members CSV</ExportLink> } : {}),
+        below: <StaffViewStrip label="Form pages" views={views} />,
+      }}
+    >
       <section className="panel">
         <h2 className="information-form-count">{total.toLocaleString("en-US")} {total === 1 ? "response" : "responses"}</h2>
         {selected && (
@@ -115,6 +122,6 @@ export function InformationFormResponsesView({ formName, total, rows, selected, 
           )}
         {nextHref && <p><Link className="secondary-button" href={nextHref}>Older responses</Link></p>}
       </section>
-    </section>
+    </DetailPage>
   );
 }

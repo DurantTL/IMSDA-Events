@@ -202,6 +202,20 @@ There are no migrations on the branch (verified: no file under `prisma/` differs
 2. Merge the revert PR and deploy as usual. No database step is needed, and data entered while release 1 was live stays valid, because the redesign changes only pages and navigation.
 3. To ship the redesign again later, revert the revert (GitHub's "Revert" on the revert PR) rather than re-merging the branch.
 
+## Coverage after release 1: form pages (#1572, #1596 ledger)
+
+Browser checks ran on a seeded local database with synthetic data, at 1280 and 390 px. The viewers were a system admin, an event admin, a registration manager and read-only staff.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/information-forms` (list) | Event setup → Information forms card | Shared page header (title drawn once by the page) | Pass; restricted state passes | Empty list: the seed has one form |
+| `/information-forms?form=` (builder) | Information forms list | Title drawn by the page; arriving from the form's other pages opens Form settings or the preview | Pass at 1280; at 390 the existing "use a computer or tablet" notice shows | - |
+| `/information-forms/responses` | Form pages strip (Editor, Preview, Responses, Form settings) | Strip under the title; "Back to information forms" (it had no way back); Download CSV is the one main action | Pass; restricted, wrong-event form and missing form pass | A response on an event form: the seeded event form has no questions to answer |
+| `/admin/information-forms` | Admin → Forms | Shared page header | Pass; non-system staff are sent to no-access | Empty list |
+| `/admin/information-forms/[formId]` | General information forms list | Arriving from the form's other pages opens Form settings or the preview | Pass at 1280; phone notice at 390 | - |
+| `/admin/information-forms/[formId]/responses` | Form pages strip | Strip under the title; the back link now goes to the list, because Editor in the strip opens the form | Pass, with no responses, one response and a selected response (cards at 390) | - |
+| `/registration-builder` | Event setup → Registration forms card | "Registrations" link in the builder's top bar for people who can see registration records; on a phone the top-bar links wrap instead of scrolling sideways | Pass; unsaved edits ask before leaving; `?form=&field=` unchanged | A viewer with form access but no access to registration records (no seeded role has that): unit test only. Phone keyboard open: not tried on a real phone |
+
 ## Coverage after release 1: event club pages (#1582, #1596 ledger)
 
 Browser checks ran on a seeded local database with synthetic data, at 1280 and 390 px. The viewers were a system admin, an event admin, read-only staff, a registration manager, and an event admin on a non-club event.
@@ -224,3 +238,15 @@ Presentation and navigation only. Access checks, the privacy acknowledgment, bre
 | `/more/health-records/[organizationId]/[memberId]` | Opened from a member's record link | Shell title "Health record"; header with the view-only and recorded label, a back link to event health information only when opened from an event, and the member, club and status block; the same header frame on the privacy notice, break-glass and restricted states | Pass: generic title on every state; record shown, restricted, break-glass and not-found states; the name appears once and only when the record is shown; a crafted event value stays a plain query value; print shows the label, name, club and status and no back link | The privacy-notice state in a browser (unit test only); a record holding stored values and a completed break-glass (not started, by design); an event-scoped health viewer (the seed has none) |
 | `/more/emergency-plan` | Event setup → Emergency plan | Header with the event named; the draft editor and the published versions with their print and download actions are two separate zones; the current version is marked | Pass as editor and as read-only staff (no draft content sent to read-only staff); module-off state says who to ask; version actions 44 px | Saving and publishing were not run. Leaving an edited draft by a link gives no warning; this was so before the change (follow-up) |
 | `/more/emergency-plan/print` | Print and Preview draft links on the emergency plan | Header with "Back to the emergency plan", the version or draft marking, Print as the main action and CSV download beside it; the printed sheet is unchanged | Pass: published version, draft preview as editor, draft refused for read-only staff, bad version; tab order back, print, CSV; the printed sheet is unchanged | - |
+
+## Coverage after release 1: check-in desk and station (#1577, #1596 ledger)
+
+Presentation and navigation only. URLs, permissions, server checks, the Sterling Volunteers gate and override, payment recording, the offline queue and the station's device checks are unchanged.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/check-in` | Event → Check-in | Search and scan lead; the checked-in tally is a compact strip; the Saved on this device queue and its states keep their own look; "Open as a station" panel; long names wrap | Pass (SA1 to SA10, S1, S2, S4, B10, B12) | Offline, queued and storage-unavailable states and camera scanning: desk queue code and styles are unchanged |
+| `/check-in/badges` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pass | - |
+| `/check-in/passes` | Check-in → Tools | Eyebrow reads "Check-in", like the other check-in tools | Pass | - |
+| `/check-in/assets` | Check-in → Tools | Already on the shared header pattern; no change | Pass (viewed; no change) | - |
+| `/check-in-station` | Check-in → Open as a station | Header bar with the station name and the event beneath; Money, then Who is here?, then Check in and Next person; "Go to Check-in" link on the not-active screen; safe-area padding | Pass at 1280, 820 and 390 (SA1 to SA10, L5, B10, B12) | A person held by the screening gate, and safe-area insets on a real iPhone or iPad |

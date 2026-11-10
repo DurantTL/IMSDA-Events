@@ -75,7 +75,7 @@ export default async function PrintableAttendeePassesPage({
     <section className="page-stack printable-passes-workspace">
       <div className="page-intro printable-passes-intro">
         <div>
-          <p className="eyebrow">Event-day preparation</p>
+          <p className="eyebrow">Check-in</p>
           <h2>Printable attendee passes</h2>
           <p>
             One signed check-in pass for every active attendee at {event.name}.

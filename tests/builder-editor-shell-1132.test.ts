@@ -470,7 +470,7 @@ describe("the movable sidebar layout (#1132)", () => {
 });
 
 describe("the editor shell, rendered (#1132)", () => {
-  async function renderShell(options: { selectFirstField?: boolean; status?: string; readOnly?: boolean } = {}) {
+  async function renderShell(options: { selectFirstField?: boolean; status?: string; readOnly?: boolean; canViewRegistrations?: boolean } = {}) {
     const { BuilderContext } = await import("@/components/registration-builder/builder-context");
     const { BuilderEditorShell } = await import("@/components/registration-builder/builder-editor-shell");
     const { useBuilderModel } = await import("@/components/registration-builder/use-builder-model");
@@ -486,11 +486,17 @@ describe("the editor shell, rendered (#1132)", () => {
     };
     const focusTarget = options.selectFirstField ? { formId: "form-1", fieldId: definition.sections[0]!.fields[0]!.id } : null;
     function Harness() {
-      const model = useBuilderModel({ eventId: "event-1", eventSlug: "synthetic", eventName: "Synthetic Event", initialForms: [form], templates: [], focusTarget, canEditNotifications: false }, (async () => true) as never);
+      const model = useBuilderModel({ eventId: "event-1", eventSlug: "synthetic", eventName: "Synthetic Event", initialForms: [form], templates: [], focusTarget, canEditNotifications: false, ...(options.canViewRegistrations ? { canViewRegistrations: true } : {}) }, (async () => true) as never);
       return createElement(BuilderContext.Provider, { value: options.readOnly ? { ...model, canEdit: false } : model }, createElement(BuilderEditorShell, { focusTarget }));
     }
     return { markup: renderToStaticMarkup(createElement(Harness)), definition };
   }
+
+  it("shows a Registrations link to the event's people only when the page says the viewer may open them (#1572)", async () => {
+    expect((await renderShell()).markup).not.toContain(">Registrations<");
+    const { markup } = await renderShell({ canViewRegistrations: true });
+    expect(markup).toContain('href="/people?event=event-1">Registrations</a>');
+  });
 
   it("shows the top bar, the form as steps with real labels, and the five sidebar tabs", async () => {
     const { markup, definition } = await renderShell();

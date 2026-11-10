@@ -1,0 +1,97 @@
+/* The event directory (#1570): search and filter above a table that becomes cards on a phone. */
+.directory {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* The directory is a staff list wherever it is drawn. "Choose an event" and "Archived events" sit outside the staff
+   shell, so they take the staff text floors here (chips, the sort line and help text at 14px, as inside the shell). */
+@media screen {
+  .directory {
+    --type-floor: 0.875rem;
+    --type-label-floor: 0.875rem;
+    --type-staff-floor: 0.875rem;
+  }
+}
+
+/* The empty state's heading is an h2 here (it follows the page's h1); the shared look styles an h3. */
+.directory :global(.empty-state) h2 {
+  margin: 10px 0 3px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 700;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+/* The select draws its own field look so it measures the same on every page that uses the directory (the sign-in-style card
+   pages have no workspace field styles). The search box uses the shared .search-field look. */
+.select {
+  display: block;
+  width: 100%;
+  min-height: var(--touch-target, 44px);
+  margin-top: 4px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-sm);
+  background: var(--field-bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  padding: 0 12px;
+}
+
+.select:hover {
+  border-color: var(--field-border-hover);
+}
+
+.status {
+  flex: 0 1 200px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.filters button {
+  min-height: var(--touch-target, 44px);
+}
+
+.clear {
+  margin: 0;
+}
+
+/* A long event name wraps inside its cell and never widens the page. */
+.table {
+  width: 100%;
+}
+
+.name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target, 44px);
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
