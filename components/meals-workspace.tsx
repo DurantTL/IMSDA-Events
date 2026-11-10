@@ -132,7 +132,7 @@ export function MealsWorkspace({ eventId, initialView, presets = [], canConfigur
 
     {canManageFinance ? <section className="panel">
       <h3>Add a meal plan</h3>
-      <form onSubmit={(event) => {
+      <form className={styles.fieldGrid} onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
         const payer = String(form.get("payer"));
@@ -147,8 +147,8 @@ export function MealsWorkspace({ eventId, initialView, presets = [], canConfigur
         <label>Name <input name="name" required maxLength={80} /></label>
         <label>Description <input name="description" maxLength={500} /></label>
         <label>Who pays <select name="payer" defaultValue="ATTENDEE"><option value="ATTENDEE">{mealPayerLabels.ATTENDEE}</option><option value="CONFERENCE">{mealPayerLabels.CONFERENCE}</option></select></label>
-        <label><input name="includesAllServices" type="checkbox" defaultChecked /> Covers every ticketed service</label>
-        <label><input name="isDefaultTicketPlan" type="checkbox" /> Sells the registration form&apos;s tickets (attendee-paid only)</label>
+        <label className={styles.check}><input name="includesAllServices" type="checkbox" defaultChecked /> Covers every ticketed service</label>
+        <label className={styles.check}><input name="isDefaultTicketPlan" type="checkbox" /> Sells the registration form&apos;s tickets (attendee-paid only)</label>
         <button className="primary-button" type="submit" disabled={busy}>Add plan</button>
       </form>
     </section> : <p>Only staff who manage finance can add plans or set prices.</p>}
@@ -164,7 +164,7 @@ export function MealsWorkspace({ eventId, initialView, presets = [], canConfigur
           <th className={styles.wrap} role="rowheader" scope="row">{mealTypeLabels[order.mealType as MealTypeValue]} ({mealAgeGroupLabels[order.ageGroup as MealAgeGroupValue]}){order.serviceName ? `, ${order.serviceName}` : ""}</th>
           <td {...cardCell("For")} className={styles.wrap}>{order.confirmationCode ?? order.orderLabel ?? "Walk-up"}</td><td {...cardCell("Qty")}>{order.quantity}</td>
           <td {...cardCell("Each")}>{order.payer === "CONFERENCE" ? "Conference" : formatCents(order.unitPriceCents)}</td><td {...cardCell("Source")}>{order.source.toLowerCase().replace("_", " ")}</td><td {...cardCell("Status")}>{order.status.toLowerCase()}</td>
-          <td {...cardCell(null)}>{canManageFinance && order.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={async () => {
+          <td {...cardCell(null)} className={styles.rowActions}>{canManageFinance && order.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={async () => {
             const reason = await ask({
               title: "Cancel this order?",
               body: <p>The order is cancelled and credited.</p>,
@@ -193,7 +193,7 @@ function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }
       <td {...cardCell("When")}>{serviceLabel(service)}</td><td {...cardCell("Where")} className={styles.wrap}>{service.location ?? ""}</td>
       <td {...cardCell("Capacity")}>{service.capacity === null ? "No limit" : `${service.pinnedQuantity} of ${service.capacity}`}</td>
       <td {...cardCell("Status")} className={styles.wrap}>{cancelled ? `Cancelled${service.cancelReason ? `: ${service.cancelReason}` : ""}` : "Active"}</td>
-      <td {...cardCell(null)}>
+      <td {...cardCell(null)} className={styles.rowActions}>
         {confirmDialog}
         {!cancelled && canConfigure ? <button type="button" disabled={busy} onClick={() => setEditing((value) => !value)}>{editing ? "Close" : "Edit"}</button> : null}
         {!cancelled && canConfigure && canManageFinance ? <button type="button" disabled={busy} onClick={async () => {
@@ -228,7 +228,7 @@ function ServiceForm({ title, submitLabel, busy, initial, onSubmit }: {
   title: string; submitLabel: string; busy: boolean; initial?: Service; onSubmit: (input: unknown) => Promise<boolean>;
 }) {
   const edit = useEditedForm();
-  return <form onChange={edit.track} onSubmit={(event) => {
+  return <form className={styles.fieldGrid} onChange={edit.track} onSubmit={(event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const text = (key: string) => String(form.get(key) ?? "").trim();
@@ -262,7 +262,7 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
   return <section className="panel">
     <h3>{plan.name} <small>({mealPayerLabels[plan.payer]}{plan.isDefaultTicketPlan ? ", sells form tickets" : ""}{plan.isActive ? "" : ", off"})</small></h3>
     {plan.description ? <p>{plan.description}</p> : null}
-    {canManageFinance ? <form onSubmit={(event) => {
+    {canManageFinance ? <form className={styles.fieldGrid} onSubmit={(event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const isActive = form.get("isActive") === "on";
@@ -275,8 +275,8 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
       <h4>Edit this plan</h4>
       <label>Name <input name="name" required maxLength={80} defaultValue={plan.name} /></label>
       <label>Description <input name="description" maxLength={500} defaultValue={plan.description} /></label>
-      <label><input name="isActive" type="checkbox" defaultChecked={plan.isActive} /> Plan is on</label>
-      {plan.payer === "ATTENDEE" ? <label><input name="isDefaultTicketPlan" type="checkbox" defaultChecked={plan.isDefaultTicketPlan} /> Sells the registration form&apos;s tickets (only one plan can)</label> : null}
+      <label className={styles.check}><input name="isActive" type="checkbox" defaultChecked={plan.isActive} /> Plan is on</label>
+      {plan.payer === "ATTENDEE" ? <label className={styles.check}><input name="isDefaultTicketPlan" type="checkbox" defaultChecked={plan.isDefaultTicketPlan} /> Sells the registration form&apos;s tickets (only one plan can)</label> : null}
       <button type="submit" disabled={busy}>Save plan</button>
     </form> : null}
     <p>{plan.includesAllServices ? `Covers every ticketed service (${plan.defaultEntitlement === "INCLUDED" ? "included, never charged to the attendee" : "paid tickets"}).` : "Covers only the services listed below."}</p>
@@ -297,7 +297,7 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
       const type = view.attendeeTypes.find((candidate) => candidate.id === price.attendeeTypeId);
       return `${type?.label ?? "Type"} ${mealTypeLabels[price.mealType as MealTypeValue].toLowerCase()} ${formatCents(price.amountCents)}`;
     }).join("; ")}.</p> : null}
-    {canManageFinance && view.attendeeTypes.length > 0 ? <form onSubmit={(event) => {
+    {canManageFinance && view.attendeeTypes.length > 0 ? <form className={styles.fieldGrid} onSubmit={(event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const cents = Math.round(Number(form.get("amount")) * 100);
@@ -308,7 +308,7 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
       <label>Price in dollars <input name="amount" inputMode="decimal" required /></label>
       <button type="submit" disabled={busy}>Set price for this type</button>
     </form> : null}
-    {canManageFinance && !plan.includesAllServices ? <form onSubmit={(event) => {
+    {canManageFinance && !plan.includesAllServices ? <form className={styles.fieldGrid} onSubmit={(event) => {
       event.preventDefault();
       const form = new FormData(event.currentTarget);
       const listed = services.filter((service) => form.get(`service-${service.id}`) === "on").map((service) => ({ serviceId: service.id, entitlement: plan.payer === "CONFERENCE" ? "INCLUDED" : String(form.get(`entitlement-${service.id}`)) }));
@@ -318,7 +318,7 @@ function PlanPanel({ plan, view, base, busy, run, canManageFinance, services }: 
         {services.map((service) => {
           const row = plan.services.find((candidate) => candidate.serviceId === service.id);
           return <div key={service.id}>
-            <label><input type="checkbox" name={`service-${service.id}`} defaultChecked={Boolean(row)} /> {service.name} ({serviceLabel(service)})</label>
+            <label className={styles.check}><input type="checkbox" name={`service-${service.id}`} defaultChecked={Boolean(row)} /> {service.name} ({serviceLabel(service)})</label>
             {plan.payer === "ATTENDEE" ? <select name={`entitlement-${service.id}`} aria-label={`${service.name} is paid or included`} defaultValue={row?.entitlement ?? "PAID"}><option value="PAID">Paid</option><option value="INCLUDED">Included</option></select> : null}
           </div>;
         })}
@@ -334,7 +334,7 @@ function WalkUpForm({ services, plans, base, busy, run }: {
 }) {
   const order = useEditedForm();
   if (services.length === 0 || plans.length === 0) return <p>Add a ticketed meal service and an attendee-paid plan to take walk-up orders.</p>;
-  return <form onSubmit={(event) => {
+  return <form className={styles.fieldGrid} onSubmit={(event) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const service = services.find((candidate) => candidate.id === String(form.get("serviceId")));
