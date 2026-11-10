@@ -25,12 +25,13 @@ export function focusTargetAction(state: { handled: boolean; hydrated: boolean; 
 
 /**
  * What a hash on arrival does (#1572): the links of a form's other pages end in the Form settings or preview hash. A setup
- * warning's question (`hasFocusTarget`) wins, and with no form open or any other hash nothing happens.
+ * warning's question (`hasFocusTarget`) wins, and with no form open or any other hash nothing happens. At phone width the
+ * preview hash does nothing: the phone layout scrolls to its step chips, so focus would land on a preview that is off screen.
  */
-export function hashAction(state: { hash: string; hasFocusTarget: boolean; formOpen: boolean }): "settings" | "preview" | null {
+export function hashAction(state: { hash: string; hasFocusTarget: boolean; formOpen: boolean; phone?: boolean }): "settings" | "preview" | null {
   if (state.hasFocusTarget || !state.formOpen) return null;
   if (state.hash === BUILDER_SETTINGS_HASH) return "settings";
-  if (state.hash === LIVE_PREVIEW_HASH) return "preview";
+  if (state.hash === LIVE_PREVIEW_HASH) return state.phone ? null : "preview";
   return null;
 }
 

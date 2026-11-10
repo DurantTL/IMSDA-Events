@@ -228,7 +228,7 @@ export function BuilderEditorShell({ focusTarget = null, registry }: { focusTarg
   useEffect(() => {
     if (handledHash.current || !hydrated) return;
     handledHash.current = true;
-    const action = hashAction({ hash: window.location.hash, hasFocusTarget: Boolean(focusTarget), formOpen: Boolean(selectedForm) });
+    const action = hashAction({ hash: window.location.hash, hasFocusTarget: Boolean(focusTarget), formOpen: Boolean(selectedForm), phone });
     if (action === "settings") openFormSettings();
     else if (action === "preview") showPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the page has hydrated

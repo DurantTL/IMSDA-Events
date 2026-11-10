@@ -57,6 +57,9 @@ describe("hashAction (#1572)", () => {
     expect(hashAction({ ...base, hash: "#builder-notifications" })).toBeNull();
     expect(hashAction({ hash: "#builder-settings", hasFocusTarget: false, formOpen: false })).toBeNull();
     expect(hashAction({ hash: "#builder-settings", hasFocusTarget: true, formOpen: true })).toBeNull();
+    // At phone width the preview hash does nothing (focus would land off screen); Form settings still opens.
+    expect(hashAction({ ...base, hash: "#live-form-preview", phone: true })).toBeNull();
+    expect(hashAction({ ...base, hash: "#builder-settings", phone: true })).toBe("settings");
   });
 });
 
