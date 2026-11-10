@@ -44,9 +44,9 @@ export function FormTemplateCopy({ templates }: { templates: Array<{ key: string
   }
 
   return (
-    <form className="panel form-stack" onSubmit={copy}>
-      <h3>New template</h3>
-      <p className="field-help">Start a new template as a copy of an existing one. The original and every form already made from it stay as they are. Event staff can pick the new template when they create a form.</p>
+    <form className="panel form-stack" id="new-template" onSubmit={copy}>
+      <div className="section-heading"><div><h2>New template</h2></div></div>
+      <p className="field-help">Start a new template as a copy of an existing one: its questions and settings are copied, nothing else. The original and every form already made from it stay as they are. Event staff can pick the new template when they create a form.</p>
       <div className="form-grid two-column">
         <label>Name
           <input maxLength={120} onChange={(event) => setName(event.target.value)} required value={name} />
@@ -59,7 +59,7 @@ export function FormTemplateCopy({ templates }: { templates: Array<{ key: string
       </div>
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       <div>
-        <SubmitButton className="primary-button" disabled={name.trim().length < 2 || !sourceKey} label="Create template" submitting={saving} submittingLabel="Creating…" />
+        <SubmitButton className="secondary-button" disabled={name.trim().length < 2 || !sourceKey} label="Create template" submitting={saving} submittingLabel="Creating…" />
       </div>
     </form>
   );

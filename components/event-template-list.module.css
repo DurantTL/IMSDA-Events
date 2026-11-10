@@ -1,0 +1,83 @@
+/* The event template list (#1593): dense rows, with the same status chips as everywhere else. */
+.rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--card);
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.titleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.name {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.meta,
+.purpose {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.purpose {
+  color: var(--ink);
+}
+
+.actions {
+  justify-content: flex-end;
+}
+
+.details {
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.details summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.starterList {
+  margin: 8px 0;
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+}

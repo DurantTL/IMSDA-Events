@@ -74,8 +74,8 @@ const destinationSearchInputId = "destination-search-input";
 /**
  * The staff shell (#1565): a branded header (logo, "Find a page or task", Help, Create, notifications, the account menu
  * with the workspace switcher), an icon rail of the areas this person can reach, and below it the page column with that
- * area's one row of tabs, or inside an event the event's tabs. There is no sidebar. Below 1024px, and whenever a row would
- * not fit, a row becomes a menu line. On a phone the bottom bar is Home, Events, Check-in, Clubs and More. Everything here
+ * area's one row of tabs, or inside an event the event's tabs. There is no sidebar. Only when a row would
+ * not fit, at any width, it becomes a menu line (#1734). On a phone the bottom bar is Home, Events, Check-in, Clubs and More. Everything here
  * only decides which links to draw; every page and route keeps its own server-side authorization.
  */
 export function AppShell({

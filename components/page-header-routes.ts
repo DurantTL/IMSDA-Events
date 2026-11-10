@@ -38,6 +38,13 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/admin/calendar" },
   { pattern: "/admin/site-content" },
   { pattern: "/admin/analytics" },
+  { pattern: "/admin/organizations" },
+  { pattern: "/admin/organizations/directory" },
+  { pattern: "/admin/organizations/import" },
+  { pattern: "/admin/organizations/map-locations" },
+  { pattern: "/admin/organizations/[organizationId]/billing" },
+  { pattern: "/admin/organizations/[organizationId]/location" },
+  { pattern: "/admin/organizations/[organizationId]/pastor" },
 ];
 
 function segmentsOf(path: string) {

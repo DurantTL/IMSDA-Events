@@ -1,0 +1,43 @@
+/* Lodging view pieces (#1578). Inventory state, a guest's request and an actual assignment are told apart in plain words and
+   placement, not chips (site rule B12): the only chip on these pages is the shared "To review" flag. */
+
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
+
+/* A unit's inventory state ("Unavailable", "On hold"): a bold word, the same on every unit. */
+.state { font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; color: var(--ink); }
+
+/* The property and night window a view is showing, kept under the header on every Lodging page. */
+.context { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.context strong { color: var(--ink); }
+
+/* The counts line on the assignments page. */
+.summary { margin: 0; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+/* A person who has a place ("Assigned: 101 (Jun 15 to Jun 17)") against one who has none yet, which reads quieter. */
+.assigned { display: block; max-width: 100%; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.notAssigned { display: block; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-style: italic; }
+
+/* The small label above who is assigned to a room or site. */
+.assignedLabel { margin: 0; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+
+/* A labelled select never grows past its box, so a long option cannot widen the page. */
+.fit { display: block; min-width: 0; max-width: 100%; }
+.fit select { box-sizing: border-box; min-width: 0; max-width: 100%; }
+
+/* A detail-row form: each label sits directly above its own field, one column, at every width. */
+.stack { display: grid; gap: 12px; width: 100%; max-width: 32rem; min-width: 0; }
+.stack label { display: grid; gap: 4px; min-width: 0; }
+.stack label:has(> input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
+.stack input:not([type="checkbox"]), .stack select, .stack textarea { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; }
+.stack > :is(button, .primary-button, .secondary-button) { justify-self: start; }
+.stack .field-hint { margin: 0; }
+
+/* The live message stays in view in its column while scrolling. It is text only, so taps pass through it to what is beneath. */
+.live { align-self: start; position: sticky; top: 8px; z-index: 2; min-height: 1px; pointer-events: none; }
+
+/* The twelve-column requests table is cards until its box is wider than 1260px (table-cards-max); as a table its cells and sort headers wrap and take no fixed width. */
+.requestsTable { width: 100%; table-layout: auto; }
+.requestsTable :is(th, td) { white-space: normal; overflow-wrap: anywhere; width: auto; min-width: 0; padding-inline: 8px; }
+.requestsTable th button { white-space: normal; text-align: left; }
+
+.nowrap { white-space: nowrap; }

@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { EmailInput } from "@/components/email-input";
+import { notSavedMessage, savedMessage } from "@/components/form-message";
+import { HeldButton, HeldSaveButton, SaveResult, type SaveResultState } from "@/components/organization-form-parts";
+import styles from "@/components/organization-pages.module.css";
 import { PhoneInput } from "@/components/phone-input";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { inlineFieldProblem, inlinePhoneProblem } from "@/lib/field-validation";
@@ -16,7 +19,7 @@ function date(value: string) {
 export function ChurchPastorContact({ organizationId, active, history }: { organizationId: string; active: PastorContactEntry | null; history: PastorContactEntry[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [result, setResult] = useState<SaveResultState | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -29,21 +32,23 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
   const [emailTouched, setEmailTouched] = useState(false);
   const emailProblem = inlineFieldProblem("Email", "email", email, undefined, emailTouched);
 
-  async function send(body: Record<string, unknown>) {
+  /** `slot` is where the result shows: beside the form for a save, beside the current pastor for End contact. */
+  async function send(body: Record<string, unknown>, slot: "form" | "current", doneText: string) {
     setBusy(true);
-    setError("");
+    setResult(null);
     try {
       const response = await fetch(`/api/admin/organizations/${encodeURIComponent(organizationId)}/pastor-contact`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof result.message === "string" ? result.message : "The change could not be saved.");
+      const parsed = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof parsed.message === "string" ? parsed.message : "The change could not be saved.");
       router.refresh();
+      setResult({ tone: "success", text: doneText, slot });
       return true;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The change could not be saved.");
+      setResult({ tone: "error", text: notSavedMessage(caught instanceof Error ? caught.message : "The change could not be saved."), slot });
       return false;
     } finally {
       setBusy(false);
@@ -51,49 +56,59 @@ export function ChurchPastorContact({ organizationId, active, history }: { organ
   }
 
   return (
-    <div className="panel pastor-contact-admin">
-      <h3>Current pastor contact</h3>
-      {active ? (
-        <p>
-          <strong>{active.name}</strong>{active.email ? ` · ${active.email}` : ""}{active.phone ? ` · ${active.phone}` : ""}
-          <br /><small>since {date(active.effectiveFrom)}</small>
-        </p>
-      ) : (
-        <p>No pastor contact on file.</p>
-      )}
-      {active && (
-        <button className="secondary-button" disabled={busy} onClick={() => void send({ action: "end", contactId: active.id })} type="button">End contact</button>
-      )}
-      <form
-        className="billing-contact-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setPhoneTouched(true);
-          setEmailTouched(true);
-          if (phoneProblem.blocking || emailProblem.blocking) return;
-          void send({ action: "set", contact: { name, email: email || undefined, phone: phone || undefined } }).then((ok) => {
-            if (ok) { setName(""); setEmail(""); setPhone(""); }
-          });
-        }}
-      >
-        <h4>{active ? "Replace the pastor" : "Add a pastor"}</h4>
-        <label htmlFor={`${base}-name`}>Name</label>
-        <input autoComplete="off" id={`${base}-name`} maxLength={120} onChange={(event) => setName(event.target.value)} required value={name} />
-        <label htmlFor={`${base}-email`}>Email (optional)</label>
-        <EmailInput autoComplete="off" id={`${base}-email`} label="Email" maxLength={254} onBlur={() => setEmailTouched(true)} onValueChange={setEmail} showNow={emailTouched} value={email} />
-        <label htmlFor={`${base}-phone`}>Phone (optional)</label>
-        <PhoneInput autoComplete="off" id={`${base}-phone`} label="Phone" onBlur={() => setPhoneTouched(true)} onValueChange={setPhone} showNow={phoneTouched} value={phone} />
-        {active && <small>The current pastor is ended and kept in the history.</small>}
-        <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Save pastor"}</button>
-      </form>
-      {error && <p className="form-error" role="alert">{error}</p>}
+    <div className={styles.stack}>
+      <section aria-labelledby={`${base}-current`} className="panel pastor-contact-admin">
+        <h2 className={styles.panelTitle} id={`${base}-current`}>Current pastor contact</h2>
+        {active ? (
+          <>
+            <p className={styles.record}>
+              <strong translate="no">{active.name}</strong>{active.email ? ` · ${active.email}` : ""}{active.phone ? ` · ${active.phone}` : ""}
+            </p>
+            <p className={styles.meta}>since {date(active.effectiveFrom)}</p>
+            <div className={styles.actionRow}>
+              <HeldButton held={busy} onAction={() => void send({ action: "end", contactId: active.id }, "current", savedMessage("Contact ended and kept in the history."))}>End contact</HeldButton>
+            </div>
+          </>
+        ) : (
+          <p className={styles.empty}>No pastor contact on file. Add the pastor below.</p>
+        )}
+        <SaveResult result={result} slot="current" />
+      </section>
+      <section aria-labelledby={`${base}-form`} className="panel">
+        <h2 className={styles.panelTitle} id={`${base}-form`}>{active ? "Replace the pastor" : "Add a pastor"}</h2>
+        <form
+          className={`billing-contact-form ${styles.form}`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (busy) return;
+            setPhoneTouched(true);
+            setEmailTouched(true);
+            if (phoneProblem.blocking || emailProblem.blocking) return;
+            void send({ action: "set", contact: { name, email: email || undefined, phone: phone || undefined } }, "form", savedMessage()).then((ok) => {
+              if (ok) { setName(""); setEmail(""); setPhone(""); }
+            });
+          }}
+        >
+          <label htmlFor={`${base}-name`}>Name</label>
+          <input autoComplete="off" id={`${base}-name`} maxLength={120} onChange={(event) => setName(event.target.value)} required value={name} />
+          <label htmlFor={`${base}-email`}>Email (optional)</label>
+          <EmailInput autoComplete="off" id={`${base}-email`} label="Email" maxLength={254} onBlur={() => setEmailTouched(true)} onValueChange={setEmail} showNow={emailTouched} value={email} />
+          <label htmlFor={`${base}-phone`}>Phone (optional)</label>
+          <PhoneInput autoComplete="off" id={`${base}-phone`} label="Phone" onBlur={() => setPhoneTouched(true)} onValueChange={setPhone} showNow={phoneTouched} value={phone} />
+          {active && <p className={styles.note}>The current pastor is ended and kept in the history.</p>}
+          <div className={styles.saveRow}>
+            <HeldSaveButton held={busy} label="Save pastor" />
+            <SaveResult result={result} slot="form" />
+          </div>
+        </form>
+      </section>
       {history.length > 0 && (
-        <details open>
+        <details className={`panel ${styles.history}`} open>
           <summary>History ({history.length})</summary>
           <ul>
             {history.map((entry) => (
               <li key={entry.id}>
-                {entry.name} · {date(entry.effectiveFrom)} to {entry.effectiveTo ? date(entry.effectiveTo) : "now"}
+                <span translate="no">{entry.name}</span> · {date(entry.effectiveFrom)} to {entry.effectiveTo ? date(entry.effectiveTo) : "now"}
                 {entry.createdByName ? ` · entered by ${entry.createdByName}` : ""}
                 {entry.endReason ? ` · ${entry.endReason}` : ""}
               </li>

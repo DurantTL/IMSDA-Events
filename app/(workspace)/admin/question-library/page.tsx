@@ -6,6 +6,7 @@ import { QuestionLibraryManager } from "@/components/question-library-manager";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listLibraryItemsForAdmin } from "@/modules/question-library/repository";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { TemplateLibrariesGuide } from "@/components/template-libraries-guide";
 
 export const metadata: Metadata = { title: "Question library" };
 export const dynamic = "force-dynamic";
@@ -25,8 +26,9 @@ export default async function AdminQuestionLibraryPage() {
     <section className="page-stack">
       <AdminSectionHeaderFor path="/admin/question-library" section="system" />
       <StaffPageHeader
-        description="Saved questions that anyone building a form can add from the form builder. Adding one puts an independent copy on the form, so renaming or deleting one here never changes a form that already uses it or a published form."
+        description="Saved questions anyone building a form can add from the form builder. Adding one puts an independent copy on the form, so renaming or deleting one here never changes a form that already uses it."
       />
+      <TemplateLibrariesGuide current="question" />
       <section className="panel"><QuestionLibraryManager items={items} /></section>
     </section>
   );

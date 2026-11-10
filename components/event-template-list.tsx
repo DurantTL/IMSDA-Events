@@ -5,16 +5,12 @@ import { useState } from "react";
 import { ArchiveTemplateDialog } from "@/components/archive-template-dialog";
 import type { EventTemplateRecord } from "@/modules/event-templates/repository";
 import type { StarterTemplatesResult } from "@/modules/event-templates/starter-repository";
+import { eventTemplateRowModel } from "@/components/event-template-list-model";
+import styles from "./event-template-list.module.css";
 import { pendingStarterEvents, starterEventTemplates } from "@/modules/event-templates/starters";
 
 type EventTemplateListProps = {
   initialTemplates: EventTemplateRecord[];
-};
-
-const statusLabel: Record<string, string> = {
-  DRAFT: "Draft",
-  PUBLISHED: "Published",
-  ARCHIVED: "Archived",
 };
 
 export function EventTemplateList({ initialTemplates }: EventTemplateListProps) {
@@ -102,39 +98,85 @@ export function EventTemplateList({ initialTemplates }: EventTemplateListProps) 
     }
   }
 
+  const active = templates.filter((template) => template.status !== "ARCHIVED");
+  const archived = templates.filter((template) => template.status === "ARCHIVED");
+
+  function renderRow(template: EventTemplateRecord, Heading: "h3" | "h4" = "h3") {
+    const row = eventTemplateRowModel(template);
+    return (
+      <li className={styles.row} key={template.id}>
+        <div className={styles.body}>
+          <div className={styles.titleLine}>
+            <Heading className={styles.name}>{template.name}</Heading>
+            <span className={`status-chip ${row.statusChip.tone}`}>{row.statusChip.label}</span>
+            <span className="status-chip neutral">{row.audienceLabel}</span>
+          </div>
+          <p className={styles.purpose}>{template.description || "No description."}</p>
+          <p className={styles.meta}>{row.versionLine}. {row.provenanceLine}.</p>
+          <p className={styles.meta}>{row.availabilityLine}</p>
+        </div>
+        <div className={`row-actions ${styles.actions}`}>
+          <Link className="secondary-button" href={`/admin/event-templates/${template.id}`} aria-label={`Edit ${template.name}`}>Edit</Link>
+          {template.status !== "ARCHIVED" ? (
+            <button type="button" className="secondary-button" aria-label={`Archive ${template.name}`} onClick={() => { setArchiveError(""); setArchiving(template); }}>Archive</button>
+          ) : (
+            <button type="button" className="secondary-button" aria-label={`Unarchive ${template.name}`} disabled={unarchivingId !== null} onClick={() => unarchiveTemplate(template.id)}>{unarchivingId === template.id ? "Unarchiving…" : "Unarchive"}</button>
+          )}
+        </div>
+      </li>
+    );
+  }
+
   return (
     <div className="page-stack template-list">
       {error ? <div className="inline-notice error" role="alert">{error}</div> : null}
 
-      <section className="panel form-stack event-settings-panel">
-        <div className="section-heading"><div><h2>Save an event as a template</h2></div></div>
-        <p>Turn a reviewed event&apos;s settings and forms into a new template, or the next draft version of one you have. You see exactly what is copied and what is not before anything is saved.</p>
-        <Link className="secondary-button" href="/admin/event-templates/from-event">Save an event as a template</Link>
+      <section className="panel form-stack event-settings-panel dense-rows">
+        <div className="section-heading"><div><h2>Templates</h2></div><span className="count-badge">{templates.length} {templates.length === 1 ? "template" : "templates"}</span></div>
+        {templates.length === 0 ? (
+          <div className="inline-notice" role="status">
+            <p>No event templates yet. Add the starter templates below, or <Link href="/admin/event-templates/from-event">save an event as a template</Link>.</p>
+          </div>
+        ) : (
+          <>
+            <ul className={styles.rows}>{active.map((template) => renderRow(template))}</ul>
+            {archived.length > 0 ? (
+              <>
+                <h3 className={styles.name}>Archived</h3>
+                <ul className={styles.rows}>{archived.map((template) => renderRow(template, "h4"))}</ul>
+              </>
+            ) : null}
+          </>
+        )}
       </section>
 
       <section className="panel form-stack event-settings-panel">
         <div className="section-heading"><div><h2>Starter templates</h2></div></div>
-        <p>
-          Adds a published template for each real event that has a built-in form, ready to start an event from. Starter
-          drafts added earlier are published too, unless someone has edited them. Templates set no
-          capacity. Some forms (Women&apos;s Retreat, Man Camp, Spring Camporee, Camp Meeting) keep last year&apos;s
-          prices, late-price dates and choice limits; Leadership Weekend keeps its 2026 lodging prices and late-price
-          date; Hispanic Institute keeps its 2026 semester price; TLT Retreat is free; Honors Weekend, Fall Camporee and
-          Outdoor School have a fee with no amount (it is flagged until you set it); the blank starters have no prices.
-          Review each draft event before publishing it. Templates that already exist (even renamed, edited, or archived) are left alone.
-          Your own templates still need publishing by hand.
-        </p>
-        <ul>
-          {starterEventTemplates.map((starter) => (
-            <li key={starter.starterKey}>{starter.name}</li>
-          ))}
-          {pendingStarterEvents.map((pending) => (
-            <li key={pending.starterKey}>{pending.name} ({pending.note})</li>
-          ))}
-        </ul>
-        <button type="button" className="primary-button" disabled={addingStarters} onClick={addStarterTemplates}>
-          {addingStarters ? "Adding…" : "Add starter templates"}
-        </button>
+        <p>Adds a published template for each real event that has a built-in form, ready to start an event from. Templates that already exist (even renamed, edited, or archived) are left alone.</p>
+        <details className={styles.details}>
+          <summary>What the starters include</summary>
+          <p>
+            Starter drafts added earlier are published too, unless someone has edited them. Templates set no
+            capacity. Some forms (Women&apos;s Retreat, Man Camp, Spring Camporee, Camp Meeting) keep last year&apos;s
+            prices, late-price dates and choice limits; Leadership Weekend keeps its 2026 lodging prices and late-price
+            date; Hispanic Institute keeps its 2026 semester price; TLT Retreat is free; Honors Weekend, Fall Camporee and
+            Outdoor School have a fee with no amount (it is flagged until you set it); the blank starters have no prices.
+            Review each draft event before publishing it. Your own templates still need publishing by hand.
+          </p>
+          <ul className={styles.starterList}>
+            {starterEventTemplates.map((starter) => (
+              <li key={starter.starterKey}>{starter.name}</li>
+            ))}
+            {pendingStarterEvents.map((pending) => (
+              <li key={pending.starterKey}>{pending.name} ({pending.note})</li>
+            ))}
+          </ul>
+        </details>
+        <div>
+          <button type="button" className="secondary-button" disabled={addingStarters} onClick={addStarterTemplates}>
+            {addingStarters ? "Adding…" : "Add starter templates"}
+          </button>
+        </div>
         {starterResult ? (
           <div className="inline-notice" role="status">
             {(starterResult.published ?? []).length > 0 ? <p>Published {starterResult.published.length} earlier draft{starterResult.published.length === 1 ? "" : "s"}: {starterResult.published.map((entry) => entry.name).join(", ")}.</p> : null}
@@ -147,6 +189,7 @@ export function EventTemplateList({ initialTemplates }: EventTemplateListProps) 
 
       <section className="panel form-stack event-settings-panel">
         <div className="section-heading"><div><h2>New template</h2></div></div>
+        <p className="field-help">Starts an empty draft, version 1. Edit it, then publish it so Create event offers it.</p>
         <div className="form-grid two-column">
           <label>Name
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Weekend retreat" />
@@ -161,32 +204,11 @@ export function EventTemplateList({ initialTemplates }: EventTemplateListProps) 
         <label>Description
           <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} />
         </label>
-        <button type="button" className="primary-button" disabled={creating || name.trim().length < 2} onClick={createTemplate}>
-          {creating ? "Creating…" : "Create template"}
-        </button>
-      </section>
-
-      <section className="panel form-stack event-settings-panel">
-        <div className="section-heading"><div><h2>Templates</h2></div></div>
-        {templates.length === 0 ? <p>No event templates yet.</p> : (
-          <ul>
-            {templates.map((template) => (
-              <li key={template.id}>
-                <div>
-                  <strong>{template.name}</strong>{" "}
-                  ({statusLabel[template.status] ?? template.status}, {template.audience === "CLUB" ? "Club" : "General"})
-                </div>
-                <p>{template.description || "No description."}</p>
-                <Link className="secondary-button" href={`/admin/event-templates/${template.id}`}>Edit</Link>{" "}
-                {template.status !== "ARCHIVED" ? (
-                  <button type="button" className="secondary-button" onClick={() => { setArchiveError(""); setArchiving(template); }}>Archive</button>
-                ) : (
-                  <button type="button" className="secondary-button" disabled={unarchivingId !== null} onClick={() => unarchiveTemplate(template.id)}>{unarchivingId === template.id ? "Unarchiving…" : "Unarchive"}</button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+        <div>
+          <button type="button" className="secondary-button" disabled={creating || name.trim().length < 2} onClick={createTemplate}>
+            {creating ? "Creating…" : "Create template"}
+          </button>
+        </div>
       </section>
 
       <ArchiveTemplateDialog
