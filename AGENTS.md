@@ -73,6 +73,14 @@ Then `npm run dev`.
   rule IDs it checked with a result for each (pass, fail, or not applicable
   with a reason). A build is not done without that list. A newly approved rule
   goes into `docs/SITE-RULES.md` in the same PR that builds it.
+  - **Layout, styling or copy only** (no change to what a page does, saves,
+    loads or allows; Caleb, November 9, 2026): the browser review uses the ten
+    checks in `docs/SCREEN-AUDIT.md` (SA1 to SA10) in place of the full
+    site-rules list, at the same two widths, and lists each with a result. It
+    also tries the site rules for any part the change restyles (for example
+    S1 to S5 when a search box is restyled). The guard tests and the mobile
+    layout audit still run. If the review finds the change touches behavior,
+    data or permissions, it uses the full list.
 
 ### Rules that tests and the audit enforce
 
@@ -104,17 +112,11 @@ Then `npm run dev`.
 
 ## Build workflow
 
-### Staff redesign development exception (#1559)
+### Staff redesign (#1559)
 
-For #1565–#1596, create each issue branch from
-`origin/codex/neon-preview-setup` and target its PR at
-`codex/neon-preview-setup`, not `main`. Compare implementation/review diffs
-against that same development base. Keep one issue per worktree/PR, the full
-required checks and independent review. The owner merges reviewed work into
-the development branch for preview testing. Production promotion is a separate
-owner-approved release PR to `main`; never merge to `main` merely to preview.
-All other work retains its existing base/target policy. This exception does
-not change #98 priorities or grant permission for any human-only action.
+Staff redesign release 1 merged into `main` on November 9, 2026 (#1755). The
+remaining redesign issues (#1565–#1596) branch from and target `main` like all
+other work. `codex/neon-preview-setup` is no longer a development base.
 
 1. Query the installed Graphify project before broad repository searches
    (`graphify query "<question>"`). Verify every finding against current source;
@@ -148,6 +150,12 @@ Use synthetic development data only. Never put production database contents,
 attendee exports, medical records, insurance documents, secrets, or payment
 credentials in prompts, Graphify, Obsidian, issues, tests, fixtures, screenshots,
 logs, or commits.
+
+This repository is public (Caleb, November 9, 2026). Never write a security
+weakness, or the steps to use one, into an issue, pull request, commit message,
+code comment or document here. Stop and tell the owner in the conversation;
+the fix is then built from a private note or a private security advisory
+(see `SECURITY.md`), with a neutral description in the public PR.
 
 Only a human may approve or perform merging, deployment, production migrations
 or imports, refunds, bulk communications, pricing or capacity changes, identity

@@ -11,7 +11,7 @@ import { listEventBackgroundFlags } from "@/modules/background-checks/repository
 import { ClubGuardiansPanel } from "@/components/club-guardians-panel";
 import { ClubOverview } from "@/components/club-overview";
 import { getPrisma } from "@/lib/prisma";
-import { getClubAssignmentForClub } from "@/modules/club-registrations/assignments-repository";
+import { listClubAssignmentsForClub } from "@/modules/club-registrations/assignments-repository";
 import { resolveStaffGuardianViewer } from "@/modules/club-rosters/guardians-access";
 import { isClubRegisteredForEvent, resolveClubOversight } from "@/modules/club-rosters/event-oversight";
 import { canManageClubAssignments } from "@/modules/club-registrations/assignments-access";
@@ -41,7 +41,10 @@ export default async function EventClubPage({
   // The issues text is for system administrators only (#427, #544).
   const { user } = await getCurrentSession();
   const backgroundFlags = await listEventBackgroundFlags(event.id, { organizationId, includeNotes: canSeeIssuesText(user), includeContact: true });
-  const assignment = await getClubAssignmentForClub(event.id, organizationId);
+  // One per team (#1782): a club registered as a named team keeps its assignment on that team's registration.
+  const assignments = await listClubAssignmentsForClub(event.id, organizationId);
+  // A team's name is shown only when there is more than one team or the one team is named.
+  const showTeamNames = assignments.length > 1 || assignments.some((entry) => entry.teamName);
   // Guardian contacts (#510): only for staff who hold the sensitive-data permission on this event.
   const guardianViewer = await resolveStaffGuardianViewer(event.id);
   return (
@@ -67,15 +70,20 @@ export default async function EventClubPage({
           <BackgroundCheckList people={backgroundFlags.people} registrationHref={{ base: "/people", query: `event=${encodeURIComponent(event.id)}` }} showClub={false} />
         </section>
       )}
-      {assignment && (
+      {assignments.length > 0 && (
         <section className="panel">
           <h3>Event assignments</h3>
           <p className="quiet-copy">Set by event staff for {event.name}.</p>
-          <ul className="quiet-copy compact-list">
-            {assignment.fields.campsiteLocation && <li>Campsite: {assignment.fields.campsiteLocation}</li>}
-            {assignment.fields.dutyLabel && <li>Duty: {assignment.fields.dutyLabel}{assignment.fields.dutyDay ? ` — ${assignment.fields.dutyDay}` : ""}{assignment.fields.dutyTime ? ` ${assignment.fields.dutyTime}` : ""}</li>}
-            {assignment.fields.activityLabel && <li>Activity: {assignment.fields.activityLabel}</li>}
-          </ul>
+          {assignments.map((assignment) => (
+            <div key={assignment.teamKey}>
+              {showTeamNames && <p className="quiet-copy"><strong translate="no">{assignment.teamName ?? club.name}</strong></p>}
+              <ul className="quiet-copy compact-list">
+                {assignment.fields.campsiteLocation && <li>Campsite: {assignment.fields.campsiteLocation}</li>}
+                {assignment.fields.dutyLabel && <li>Duty: {assignment.fields.dutyLabel}{assignment.fields.dutyDay ? ` — ${assignment.fields.dutyDay}` : ""}{assignment.fields.dutyTime ? ` ${assignment.fields.dutyTime}` : ""}</li>}
+                {assignment.fields.activityLabel && <li>Activity: {assignment.fields.activityLabel}</li>}
+              </ul>
+            </div>
+          ))}
           {canManageClubAssignments(permissions) && <p><Link className="text-button" href={`/more/club-assignments${query}`}>Change on Club assignments</Link></p>}
         </section>
       )}

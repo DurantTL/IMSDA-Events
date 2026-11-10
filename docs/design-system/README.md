@@ -20,7 +20,7 @@ IMAdventist (Events & Club Ministry) is the Iowa-Missouri Conference's event and
 
 - Brand: `imsda-navy` for primary actions, headers and links; `imsda-purple` for focus on fields, eyebrows and the club portal's current-tab underline (staff tabs no longer use it); `imsda-gold` for the public home call to action (navy text on gold) and for "where you are" in the staff screens: the rail's current edge, the 4px tab underline, the menu line, the current item in a list and the phone bar's 4px top bar. `home-green` belongs to the public home page only: the descriptor under the wordmark, section kickers and place-card edges. The `-soft` tints are backgrounds only.
 - Text: `ink` for body, `muted` for secondary (4.5:1 or better on `card` and `paper`). Lines use `line`; fields use `field-border` (3:1 on white).
-- Status: `green` / `green-soft` done, `imsda-gold-soft` with `gold-text` in progress, `coral` / `coral-soft` needs attention, `danger` for destructive actions.
+- Status: `green` / `green-soft` done, `imsda-gold-soft` with `gold-text` in progress, `coral` / `coral-soft` needs attention, `danger` for destructive actions. One status word has one color on every page; the full table of words is in `StatusChip`. Status and money are two chips, and chips keep their filled tone on navy.
 - Calendar chips use `cal-tone-1`…`6` and `cal-closure-*`; event info cards use `info-card-*`.
 - Dark theme exists only for public content blocks (`block-*`) and event info cards (`info-card-*`). The core palette has no dark values; don't invent them.
 
@@ -39,6 +39,27 @@ IMAdventist (Events & Club Ministry) is the Iowa-Missouri Conference's event and
 - Shadows are soft and navy-tinted: `shadow-metric` on cards, `shadow` on menus and heroes, `shadow-modal` on dialogs, `shadow-tabbar` on the phone tab bar.
 - Staff shell (#1565): a branded header (the image symbol, "Find a page or task", Help & learning, Create, notifications, the account menu with the workspace switcher), an 88px navy icon rail of at most six areas (Events, Clubs, People, Reports, Admin, filtered by role; Home joins when its pages exist), and below it the page column with that area's one row of tabs, or inside an event the event's tabs. No sidebar, no second list. A tab row holds at most eight tabs and never scrolls sideways: below 1024px, or when it would not fit, it becomes a menu line (the current tab with its 4px gold underline and an "<Area> menu" or "Event menu" button that opens the full list as a sheet or dialog). Views inside a tab are a bordered button strip of at most five, the current one filled navy. The phone bar is Home, Events, Check-in, Clubs and More.
 - Club portal: masthead (symbol, "Club portal", the signed-in name and role, Your account, Forms help, Sign out), a navy banner with the club, church, role and club-year box, and one tab row of up to ten tools that never scrolls sideways: the flat strip with room; below 1024px or when it would not fit, a menu line (current tab with the purple underline and a "Club menu" button, "Coordinator menu" for the coordinator); and on a phone a bottom bar of Home, Roster, Events, Records and More. The coordinator and attendee account pages use the same masthead and banner. Staff: 88px navy icon rail and one row of tabs on desktop (a menu line below 1024px), five-slot bottom bar on phones.
+
+## Page header and phone rules (approved Nov 9, 2026)
+
+- **One page header** (`PageHeader`) on staff, club portal, Area Coordinator and account pages: the title once, the same words as the tab or card that opened it; at most one sentence; one filled main action on the right. No eyebrow, chip or card title repeats the title or the event name.
+- **One primary per view** counts the rows too: repeated row actions (Open, Review, Save) are outlined or text buttons.
+- **Phones put the task first** (`PhoneHeader`): the page title starts within 160px of the top in the portals and 200px inside a staff event; the first control a person came for is on the first screen; a note that applies to a whole registration shows once, not on each person.
+- These came from a whole-system review on Nov 9, 2026 and Caleb approved them the same day. The app does not match them yet, so each is a defect to fix, not a new design to review.
+- The ten-line check for any screen is in `screen-audit.md` (also `docs/SCREEN-AUDIT.md`).
+
+## What is not in this system yet
+
+Caleb, Nov 9, 2026: everything about how the product looks belongs here. These shared parts exist in the app but have no page in this system yet (#1773 adds them from the code):
+
+- **Lists:** the pager, sortable column headers, tables that turn into cards on phones, the select-all bar, filters and active-filter chips.
+- **Search:** the search-as-you-type field and its clear button (rules S1 to S5).
+- **Forms:** select, checkbox, radio, date and file fields; inline errors and the error summary; the saving and "Saved" message slot; the unsaved-changes guard.
+- **Feedback:** banners (acting as, view only, site notices), the notification bell, loading states.
+- **Layout:** panel and card, card grids, the hero, the views strip, sheets and menus, the avatar with initials or photo.
+- **Money and dates:** how amounts, balances and date ranges are written.
+- **Public pages:** event page blocks, event cards, the calendar, the registration summary card.
+- **Outside the screen:** emails, printed sheets and badges, the Help & learning pages.
 
 ## Focus and motion
 

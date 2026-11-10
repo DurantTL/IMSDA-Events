@@ -167,6 +167,9 @@ export function CoordinatorClubsAtAGlance({
           <ExportLink className="secondary-button" href={`${EXPORT_PATH}?report=points&year=${encodeURIComponent(overview.clubYear)}`}>
             <Download aria-hidden="true" size={15} /> {fullYearExportLabel(overview.clubYear, "points")}
           </ExportLink>
+          <Link className="secondary-button" href={`/account/area-clubs/roster-export?year=${encodeURIComponent(overview.clubYear)}`}>
+            <Download aria-hidden="true" size={15} /> Export rosters
+          </Link>
         </div>
         <p className="field-help">The CSV files cover the full club year for every available club. They do not change with the search below.</p>
       </div>

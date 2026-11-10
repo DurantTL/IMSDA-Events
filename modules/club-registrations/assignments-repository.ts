@@ -209,6 +209,30 @@ function assignmentPublicFields(row: {
 }
 
 /**
+ * Every assignment for one club at one event, one per live team registration (submitted or confirmed, the same rule as
+ * `isClubRegisteredForEvent`), for the staff club page (#1782). A club registered as a named team (#809) has its
+ * assignment on that team's registration, so a lookup by the empty team key alone never finds it. Unassigned rows are
+ * left out; `teamName` is null for the club's unnamed registration.
+ */
+export async function listClubAssignmentsForClub(eventId: string, organizationId: string) {
+  const rows = await getPrisma().clubEventAssignment.findMany({
+    where: {
+      eventId,
+      organizationId,
+      clubEventRegistration: { registration: { status: { in: ["SUBMITTED", "CONFIRMED"] } } },
+    },
+    include: { clubEventRegistration: { select: { teamKey: true, teamName: true } } },
+    orderBy: [{ clubEventRegistration: { teamKey: "asc" } }],
+  });
+  return rows.flatMap((row) => {
+    const fields = assignmentPublicFields(row);
+    const status = clubAssignmentStatus(fields);
+    if (status === "UNASSIGNED") return [];
+    return [{ teamKey: row.clubEventRegistration.teamKey, teamName: row.clubEventRegistration.teamName ?? null, fields, status }];
+  });
+}
+
+/**
  * The read-only view for a club director on their own event page, and for
  * the club packet (#411) print helper. Returns null when staff haven't set
  * anything yet, so an empty section is never shown.

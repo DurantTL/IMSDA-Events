@@ -28,7 +28,7 @@ import { toCsv } from "@/modules/reporting/csv";
 
 type Actor = ReturnType<typeof actorAttribution>;
 
-export type RosterExportErrorCode = "CONFIRMATION_REQUIRED" | "SENSITIVE_ACCESS_DENIED" | "FORMAT_NAME_TAKEN" | "FORMAT_NOT_FOUND";
+export type RosterExportErrorCode = "CONFIRMATION_REQUIRED" | "SENSITIVE_ACCESS_DENIED" | "FORMAT_NAME_TAKEN" | "FORMAT_NOT_FOUND" | "CLUBS_NOT_ELIGIBLE";
 
 export class RosterExportError extends Error {
   constructor(public readonly code: RosterExportErrorCode, message: string) {

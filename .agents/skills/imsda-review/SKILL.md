@@ -9,10 +9,8 @@ Accept exactly one positive PR number, or review the current branch against
 `origin/main` when called from a build before its PR exists. Read root
 `AGENTS.md` before acting.
 
-For staff redesign #1565–#1596, use `origin/codex/neon-preview-setup` instead
-of `origin/main` in the pre-PR comparisons below, as directed by AGENTS.md.
-The reviewed PR targets the development branch; production promotion remains
-a separate owner-approved release PR.
+Staff redesign issues (#1565–#1596) compare against `origin/main` like all
+other work (the redesign merged into `main` on November 9, #1755).
 
 ## Workflow
 
@@ -42,7 +40,17 @@ a separate owner-approved release PR.
      tab to fields, and so on.
    - A broken rule is a finding, with the rule ID, page, width and what
      happened.
+   - When the change is only layout, styling or copy (no change to what a
+     page does, saves, loads or allows), use the ten checks in
+     `docs/SCREEN-AUDIT.md` (SA1 to SA10) in place of the full
+     `docs/SITE-RULES.md` list, at the same two widths, and list each with a
+     result in the Rules checked list. Also try the site rules for any part
+     the change restyles (for example S1 to S5 when a search box is
+     restyled). If anything in the diff touches behavior, data or
+     permissions, use the full list.
    If no page changed, say so and skip this step.
+   A security weakness is never written into the PR, an issue or a comment:
+   this repository is public. Stop and tell the owner in the conversation (`SECURITY.md`).
 6. Report only actionable findings, ordered by severity, with exact file and
    line references. Then list verification gaps and decisions separately. Say
    explicitly when no findings remain. End every report with a **Rules

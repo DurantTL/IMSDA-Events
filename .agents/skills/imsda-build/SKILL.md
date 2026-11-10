@@ -7,10 +7,8 @@ description: Build exactly one codex-ready or explicitly owner-approved IMSDA Ev
 
 Accept exactly one positive issue number. Read root `AGENTS.md` before acting.
 
-For staff redesign #1565–#1596, AGENTS.md's development exception replaces
-`origin/main` with `origin/codex/neon-preview-setup` in the base and diff steps
-below, and the draft PR targets `codex/neon-preview-setup`. It does not change
-required checks, review or human merge/release gates.
+Staff redesign issues (#1565–#1596) now use `origin/main` like all other work
+(the redesign merged into `main` on November 9, #1755).
 
 ## Workflow
 

@@ -12,16 +12,17 @@ subagents. The agents live in `.claude/agents/`.
   Caleb needs to do.
 - **Human-only steps:** Caleb merges PRs and runs production migrations
   himself. Never merge or deploy.
-- **PRs:** target `main` by default. For staff redesign #1565–#1596, branch
-  from and target `codex/neon-preview-setup` under AGENTS.md's development
-  exception; compare/review against that base. Production promotion is a
-  separate owner-approved release PR. Open ready for review (not draft), use the repository
-  template. Add the `mobile-check` label only for shared layout changes (app
+- **PRs:** target `main`, including the remaining staff redesign issues
+  (#1565–#1596); the redesign branch merged into `main` on November 9 (#1755).
+  Open ready for review (not draft), use the repository template. Add the `mobile-check` label only for shared layout changes (app
   shell, navigation, shared CSS in `app/globals.css`); a page-level change
   relies on the local mobile audit the build already runs, plus the weekly
   run (Caleb, October 29). Never delete branches.
-- **Two builds at most:** never run more than two builds at once. Keep moving
-  through approved issues without re-asking.
+- **Three builds at most:** never run more than three builds at once (Caleb,
+  November 9). Keep moving through approved issues without re-asking.
+- **Fable for build sessions:** new build sessions started from the
+  project-manager session run on Fable (`claude-fable-5-2`, Caleb, November 9).
+  The agent model rules below still apply inside each session.
 - **Base branch:** don't merge `main` into an open PR unless there is a real
   conflict.
 - **No scheduled check-ins:** don't schedule check-ins on PRs. PR event
@@ -53,8 +54,6 @@ subagents. The agents live in `.claude/agents/`.
 
 1. **Worktree:** create it yourself. `isolation: "worktree"` fails in cloud
    sessions.
-   - For staff redesign #1565–#1596, replace `origin/main` below with
-     `origin/codex/neon-preview-setup` and fetch that branch first.
    - `git fetch origin main && git worktree add -b claude/issue-<n>-<slug> .claude/worktrees/issue-<n> origin/main`
    - then, inside it, `npm ci --ignore-scripts && npx prisma generate`.
 2. **Implementer:** give it the issue number, the worktree path, what you
