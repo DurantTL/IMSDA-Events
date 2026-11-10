@@ -180,7 +180,7 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
       views: [
         { href: clubsAdminRecordsHref, label: "Monthly Records", visible: clubs },
         { href: reviewMonthlyRecordsHref, label: "Review monthly records", visible: clubs },
-        { href: clubYearEndHref, label: "Year-end", visible: clubs },
+        { href: clubYearEndHref, visible: clubs },
         { href: clubPointsHref, label: "Points", visible: clubs },
       ],
     },

@@ -21,7 +21,7 @@ describe("Monthly records tab views (#1588)", () => {
 
   it("lists Monthly Records, Review monthly records, Year-end and Points, within the five-view cap", () => {
     const views = tab(clubsAdmin)!.views!;
-    expect(views.map((view) => view.label)).toEqual(["Monthly Records", "Review monthly records", "Year-end", "Points"]);
+    expect(views.map((view) => view.label)).toEqual(["Monthly Records", "Review monthly records", "Club Year-End Reports", "Points"]);
     expect(views.length).toBeLessThanOrEqual(maxViewsPerTab);
     expect(views.map((view) => view.href)).toEqual(["/admin/clubs/summary?view=records#monthly-records", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary?view=points#points"]);
   });

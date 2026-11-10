@@ -179,7 +179,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/clubs/summary?view=events` | Clubs | Club summary | Club events |
 | `/admin/clubs/summary?view=records` | Clubs | Monthly Records | - |
 | `/admin/clubs/summary?view=points` | Clubs | Monthly records | Points |
-| `/admin/clubs/reports/year-end` | Clubs | Monthly records | Year-end |
+| `/admin/clubs/reports/year-end` | Clubs | Monthly records | Club Year-End Reports |
 | `/finance` | Events (inside an event) | Money | Payments |
 | `/finance?filter=BALANCE` | Events (inside an event) | Money | Balances due |
 
