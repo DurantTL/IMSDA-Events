@@ -1,0 +1,29 @@
+/* Shared by the meals and kitchen pages (#1579): long meal names wrap instead of widening a card, and new help lines in
+   these layouts sit directly under what they describe (the global .field-help has a negative top margin). */
+.wrap {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.help {
+  margin: 4px 0 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.definitions {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.definitions dd {
+  margin: 0;
+}
+
+/* The page header is screen chrome: a printed kitchen report is the tables only (#787). */
+@media print {
+  .printHide {
+    display: none !important;
+  }
+}

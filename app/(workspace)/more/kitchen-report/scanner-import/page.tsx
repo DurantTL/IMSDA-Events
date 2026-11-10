@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
 import { KitchenMealsServed } from "@/components/kitchen-meals-served";
 import { ScannerImportWorkspace } from "@/components/scanner-import-workspace";
+import { MealsViewsStrip } from "@/components/meals-views-strip";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
 import { loadServedDrillDown, loadServedReport } from "@/modules/meals/scanner-import-repository";
 import { firstParam } from "@/lib/search-params";
 
-export const metadata: Metadata = { title: staffPageTitles.kitchenReport };
+export const metadata: Metadata = { title: staffPageTitles.scannerResults };
 
 const serviceKeyPattern = /^(\d{4}-\d{2}-\d{2}|any):(BREAKFAST|LUNCH|SUPPER)$/;
 
@@ -19,8 +20,10 @@ const serviceKeyPattern = /^(\d{4}-\d{2}-\d{2}|any):(BREAKFAST|LUNCH|SUPPER)$/;
 export default async function ScannerImportPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const { event, permissions } = await resolveEventContext(firstParam(params.event), { allowWithoutEventView: true });
+  // The strip lists only the pages this viewer passes the same check for (#1579).
+  const strip = <MealsViewsStrip current="scanner" eventId={event.id} permissions={permissions} />;
   if (!permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Scanner results are restricted" detail="Your event role does not include access to reports." whoToAsk="your event administrator" />;
+    return <>{strip}<AccessRestricted title="Scanner results are restricted" detail="Your event role does not include access to reports." whoToAsk="your event administrator" /></>;
   }
   const eventQuery = `event=${encodeURIComponent(event.id)}`;
   const service = firstParam(params.service);
@@ -33,13 +36,8 @@ export default async function ScannerImportPage({ searchParams }: { searchParams
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow" translate="no">{event.name}</p>
-          <h2>Café scanner results</h2>
-          <p>Bring the scanner&rsquo;s results back to see how many meals were served. <Link href={`/more/kitchen-report?${eventQuery}`}>Back to the kitchen report</Link></p>
-        </div>
-      </div>
+      {strip}
+      <StaffPageHeader description="Bring the café scanner’s results back to see how many meals were served." />
 
       <KitchenMealsServed
         report={report}

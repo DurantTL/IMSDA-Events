@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
 import { KitchenCountsEntry, type KitchenEntryService } from "@/components/kitchen-counts-entry";
 import { KitchenCountsTable } from "@/components/kitchen-counts-table";
+import { MealsViewsStrip } from "@/components/meals-views-strip";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
 import { kitchenCountKinds } from "@/modules/meals/kitchen-counts";
@@ -21,11 +22,12 @@ export default async function KitchenCountsPage({ searchParams }: { searchParams
   const requested = firstParam(params.event);
   const { event, permissions } = await resolveEventContext(requested, { allowWithoutEventView: true });
   const canEnter = permissions.includes("MANAGE_KITCHEN_COUNTS");
+  // The strip lists only the pages this viewer passes the same check for (#1579); kitchen-only staff get one view, so no strip.
+  const strip = <MealsViewsStrip current="counts" eventId={event.id} permissions={permissions} />;
   if (!canEnter && !permissions.includes("VIEW_REPORTS")) {
-    return <AccessRestricted title="Kitchen counts are restricted" detail="Your event role does not include kitchen counts." whoToAsk="your event administrator" />;
+    return <>{strip}<AccessRestricted title="Kitchen counts are restricted" detail="Your event role does not include kitchen counts." whoToAsk="your event administrator" /></>;
   }
   const report = await loadKitchenCountsReport(event.id);
-  const eventQuery = `event=${encodeURIComponent(event.id)}`;
   const services: KitchenEntryService[] = report.rows.map((row) => ({
     key: row.key, label: row.label, ordered: row.ordered, served: row.served,
     cells: Object.fromEntries(kitchenCountKinds.flatMap((kind) => {
@@ -38,16 +40,8 @@ export default async function KitchenCountsPage({ searchParams }: { searchParams
   }));
   return (
     <section className="page-stack kitchen-counts-page">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow" translate="no">{event.name}</p>
-          <h2>Kitchen counts</h2>
-          <p>
-            Enter what the kitchen prepared, wasted, donated and transferred for each meal service.
-            {permissions.includes("VIEW_REPORTS") && <> <Link href={`/more/kitchen-report?${eventQuery}`}>Back to the kitchen report</Link></>}
-          </p>
-        </div>
-      </div>
+      {strip}
+      <StaffPageHeader description={canEnter ? "Enter what the kitchen prepared, wasted, donated and transferred for each meal service." : "What the kitchen prepared, wasted, donated and transferred for each meal service."} />
       {firstParam(params.restricted) === "1" && (
         <div className="inline-notice" role="status">
           The page you opened is not part of the Kitchen staff role, so Kitchen counts opened instead. Ask your event administrator if you need access to more of this event.

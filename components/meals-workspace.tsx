@@ -7,7 +7,9 @@ import { formHasEdits } from "@/components/form-has-edits";
 import { useConfirm } from "@/components/use-confirm";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
-import { staffPageTitles } from "@/components/staff-navigation";
+import { StaffPageHeader } from "@/components/staff-page-header";
+import { cardCell } from "@/components/table-card-labels";
+import styles from "./meals-kitchen.module.css";
 import { formatCents } from "@/modules/payments/format-cents";
 import {
   mealAgeGroupLabels,
@@ -55,8 +57,8 @@ function useEditedForm() {
 
 const reasonHint = "Do not enter allergy, medical or other personal details.";
 
-export function MealsWorkspace({ eventId, eventName, initialView, presets = [], canConfigure, canManageFinance, canExport }: {
-  eventId: string; eventName: string; initialView: MealView; presets?: MealPresetOption[]; canConfigure: boolean; canManageFinance: boolean; canExport: boolean;
+export function MealsWorkspace({ eventId, initialView, presets = [], canConfigure, canManageFinance, canExport }: {
+  eventId: string; initialView: MealView; presets?: MealPresetOption[]; canConfigure: boolean; canManageFinance: boolean; canExport: boolean;
 }) {
   const [view, setView] = useState(initialView);
   const [error, setError] = useState("");
@@ -84,12 +86,13 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
   const { ask, confirmDialog } = useConfirm();
   return <div className="settings-stack">
     {confirmDialog}
-    <div className="page-intro"><div>
-      <p className="eyebrow">Event configuration</p>
-      <h2 className="duplicate-page-title">{staffPageTitles.meals}</h2>
-      <p>Meal services, plans and prices for {eventName}. What people ordered is kept here separately from anything used or served at the café. Registration form tickets are priced from the ticket plan below.{" "}
-        {canExport ? <><ExportLink href={`/api/events/${eventId}/exports/meal-tickets`}>Download meal tickets CSV</ExportLink> (café scanner format) or the <ExportLink href={`/api/events/${eventId}/exports/meal-ticket-summary`}>meal ticket summary</ExportLink>.</> : null}</p>
-    </div></div>
+    <StaffPageHeader
+      description="Meal services, plans and prices, and walk-up orders. What people ordered is kept apart from what the café scanner served."
+      actions={canExport ? <>
+        <li><ExportLink href={`/api/events/${eventId}/exports/meal-tickets`}>Download meal tickets CSV (café scanner format)</ExportLink></li>
+        <li><ExportLink href={`/api/events/${eventId}/exports/meal-ticket-summary`}>Download meal ticket summary</ExportLink></li>
+      </> : undefined}
+    />
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
     {view.formWarnings.map((warning) => <p className="form-error" role="alert" key={`${warning.formName}-${warning.status}`}>
@@ -105,21 +108,22 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
 
     <section className="panel">
       <h3>Meals ordered</h3>
-      {view.totals.length === 0 ? <p>No meals have been ordered yet.</p> : <div className="table-wrap">{totalSort.note}<table className="report-table report-table-auto">
+      <p className={`field-help ${styles.help}`}>Registration form tickets are priced from the ticket plan below.</p>
+      {view.totals.length === 0 ? <p>No meals have been ordered yet.</p> : <div className="table-wrap">{totalSort.note}<table role="table" className="report-table report-table-auto table-cards">
         <caption>Active selections of submitted and confirmed registrations, and walk-up orders</caption>
-        <thead><tr>{totalSort.header("meal", "Meal")}{totalSort.header("age", "Age group")}{totalSort.header("payer", "Payer")}{totalSort.header("quantity", "Quantity")}</tr></thead>
-        <tbody>{totalSort.rows.map((row) => <tr key={`${row.mealType}${row.ageGroup}${row.payer}`}>
-          <th scope="row">{mealTypeLabels[row.mealType as MealTypeValue]}</th><td>{mealAgeGroupLabels[row.ageGroup as MealAgeGroupValue]}</td>
-          <td>{row.payer === "CONFERENCE" ? "Conference" : "Attendee"}</td><td>{row.quantity}</td>
+        <thead role="rowgroup"><tr role="row">{totalSort.header("meal", "Meal")}{totalSort.header("age", "Age group")}{totalSort.header("payer", "Payer")}{totalSort.header("quantity", "Quantity")}</tr></thead>
+        <tbody role="rowgroup">{totalSort.rows.map((row) => <tr role="row" key={`${row.mealType}${row.ageGroup}${row.payer}`}>
+          <th role="rowheader" scope="row">{mealTypeLabels[row.mealType as MealTypeValue]}</th><td {...cardCell("Age group")}>{mealAgeGroupLabels[row.ageGroup as MealAgeGroupValue]}</td>
+          <td {...cardCell("Payer")}>{row.payer === "CONFERENCE" ? "Conference" : "Attendee"}</td><td {...cardCell("Quantity")}>{row.quantity}</td>
         </tr>)}</tbody>
       </table></div>}
     </section>
 
     <section className="panel">
       <h3>Meal services</h3>
-      {view.services.length === 0 ? <><p>No meal services yet. Add one below.</p><EventSetupHelp context="meal services" id="meals-no-services" /></> : <div className="table-wrap"><table className="report-table report-table-auto">
-        <thead><tr><th scope="col">Service</th><th scope="col">When</th><th scope="col">Where</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
-        <tbody>{view.services.map((service) => <ServiceRow key={service.id} service={service} base={base} busy={busy} run={run} canManageFinance={canManageFinance} canConfigure={canConfigure} />)}</tbody>
+      {view.services.length === 0 ? <><p>No meal services yet. Add one below.</p><EventSetupHelp context="meal services" id="meals-no-services" /></> : <div className="table-wrap"><table role="table" className="report-table report-table-auto table-cards">
+        <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Service</th><th role="columnheader" scope="col">When</th><th role="columnheader" scope="col">Where</th><th role="columnheader" scope="col">Capacity</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody role="rowgroup">{view.services.map((service) => <ServiceRow key={service.id} service={service} base={base} busy={busy} run={run} canManageFinance={canManageFinance} canConfigure={canConfigure} />)}</tbody>
       </table></div>}
       {canConfigure ? <ServiceForm title="Add a meal service" submitLabel="Add service" busy={busy} onSubmit={(input) => run(() => call(`${base}/services`, "POST", input), "Meal service added.")} /> : <p>Only event administrators can add or edit meal services.</p>}
     </section>
@@ -153,14 +157,14 @@ export function MealsWorkspace({ eventId, eventName, initialView, presets = [], 
       <h3>Walk-up orders</h3>
       <p>A walk-up order is for one service and is settled at the counter by staff. Nothing is charged to a card here.</p>
       {canManageFinance ? <WalkUpForm services={activeServices} plans={view.plans.filter((plan) => plan.payer === "ATTENDEE" && plan.isActive)} base={base} busy={busy} run={run} /> : <p>Only staff who manage finance can take orders.</p>}
-      {view.recentOrders.length > 0 ? <div className="table-wrap"><table className="report-table report-table-auto">
+      {view.recentOrders.length > 0 ? <div className="table-wrap"><table role="table" className="report-table report-table-auto table-cards">
         <caption>Recent staff, walk-up and entitlement selections</caption>
-        <thead><tr><th scope="col">Meal</th><th scope="col">For</th><th scope="col">Qty</th><th scope="col">Each</th><th scope="col">Source</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
-        <tbody>{view.recentOrders.map((order) => <tr key={order.id}>
-          <th scope="row">{mealTypeLabels[order.mealType as MealTypeValue]} ({mealAgeGroupLabels[order.ageGroup as MealAgeGroupValue]}){order.serviceName ? `, ${order.serviceName}` : ""}</th>
-          <td>{order.confirmationCode ?? order.orderLabel ?? "Walk-up"}</td><td>{order.quantity}</td>
-          <td>{order.payer === "CONFERENCE" ? "Conference" : formatCents(order.unitPriceCents)}</td><td>{order.source.toLowerCase().replace("_", " ")}</td><td>{order.status.toLowerCase()}</td>
-          <td>{canManageFinance && order.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={async () => {
+        <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Meal</th><th role="columnheader" scope="col">For</th><th role="columnheader" scope="col">Qty</th><th role="columnheader" scope="col">Each</th><th role="columnheader" scope="col">Source</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody role="rowgroup">{view.recentOrders.map((order) => <tr role="row" key={order.id}>
+          <th className={styles.wrap} role="rowheader" scope="row">{mealTypeLabels[order.mealType as MealTypeValue]} ({mealAgeGroupLabels[order.ageGroup as MealAgeGroupValue]}){order.serviceName ? `, ${order.serviceName}` : ""}</th>
+          <td {...cardCell("For")} className={styles.wrap}>{order.confirmationCode ?? order.orderLabel ?? "Walk-up"}</td><td {...cardCell("Qty")}>{order.quantity}</td>
+          <td {...cardCell("Each")}>{order.payer === "CONFERENCE" ? "Conference" : formatCents(order.unitPriceCents)}</td><td {...cardCell("Source")}>{order.source.toLowerCase().replace("_", " ")}</td><td {...cardCell("Status")}>{order.status.toLowerCase()}</td>
+          <td {...cardCell(null)}>{canManageFinance && order.status === "ACTIVE" ? <button type="button" disabled={busy} onClick={async () => {
             const reason = await ask({
               title: "Cancel this order?",
               body: <p>The order is cancelled and credited.</p>,
@@ -184,12 +188,12 @@ function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }
   const { ask, confirmDialog } = useConfirm();
   const cancelled = service.status === "CANCELLED";
   return <>
-    <tr>
-      <th scope="row">{service.name} ({mealTypeLabels[service.mealType]}{service.ticketing === "DONATION_ONLY" ? ", donation-only" : ""})</th>
-      <td>{serviceLabel(service)}</td><td>{service.location ?? ""}</td>
-      <td>{service.capacity === null ? "No limit" : `${service.pinnedQuantity} of ${service.capacity}`}</td>
-      <td>{cancelled ? `Cancelled${service.cancelReason ? `: ${service.cancelReason}` : ""}` : "Active"}</td>
-      <td>
+    <tr role="row">
+      <th className={styles.wrap} role="rowheader" scope="row">{service.name} ({mealTypeLabels[service.mealType]}{service.ticketing === "DONATION_ONLY" ? ", donation-only" : ""})</th>
+      <td {...cardCell("When")}>{serviceLabel(service)}</td><td {...cardCell("Where")} className={styles.wrap}>{service.location ?? ""}</td>
+      <td {...cardCell("Capacity")}>{service.capacity === null ? "No limit" : `${service.pinnedQuantity} of ${service.capacity}`}</td>
+      <td {...cardCell("Status")} className={styles.wrap}>{cancelled ? `Cancelled${service.cancelReason ? `: ${service.cancelReason}` : ""}` : "Active"}</td>
+      <td {...cardCell(null)}>
         {confirmDialog}
         {!cancelled && canConfigure ? <button type="button" disabled={busy} onClick={() => setEditing((value) => !value)}>{editing ? "Close" : "Edit"}</button> : null}
         {!cancelled && canConfigure && canManageFinance ? <button type="button" disabled={busy} onClick={async () => {
@@ -213,7 +217,7 @@ function ServiceRow({ service, base, busy, run, canManageFinance, canConfigure }
         }}>Reinstate</button> : null}
       </td>
     </tr>
-    {editing ? <tr><td colSpan={6}>
+    {editing ? <tr role="row"><td role="cell" colSpan={6}>
       <ServiceForm title={`Edit ${service.name}`} submitLabel="Save service" busy={busy} initial={service}
         onSubmit={(input) => run(() => call(`${base}/services/${service.id}`, "PUT", input), "Meal service saved.")} />
     </td></tr> : null}

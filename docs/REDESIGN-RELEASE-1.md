@@ -213,3 +213,15 @@ Browser checks ran on a seeded local database with synthetic data, at 1280 and 3
 | `/more/clubs/reports` | Event club pages strip | Strip replaces the back link | Pass | - |
 | `/more/clubs/reports/[organizationId]/[month]` | Monthly Records | Event and club named in the header context; return-to unchanged | Pass | - |
 | `/more/club-assignments` | Event club pages strip | Header says what is editable and that email goes out only after preview and send | Pass; registration manager without oversight sees no strip (one view) | Nothing was saved or sent |
+
+## Coverage after release 1: meals and kitchen pages (#1579, #1596 ledger)
+
+One in-page strip, "Meals and kitchen pages" (Meals, Kitchen report, Kitchen counts, Scanner results, Meal closeout), sits on all five pages, including their restricted states. A view shows only when the viewer passes that page's own server check, so the strip never links to a page that would refuse them. Kitchen-only staff hold one view, so they see no strip and keep their focused entry. The Reports tab shows one kitchen view per viewer: Kitchen report for report holders (it also lights for counts, scanner results and closeout), Kitchen counts for kitchen-only staff. `/more/meals` stays under Event setup. Presentation and navigation only: no URL, permission, API, validation or export changed.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/more/meals` | Event setup → Program card; Meals and kitchen pages strip | Shared page header with the two meal ticket downloads in its Actions menu; meals ordered, meal services and recent orders become cards on a phone with long names wrapping | Pending review | - |
+| `/more/kitchen-report` | Reports tab → Kitchen report; strip | Shared page header (sentence and Print in the header, CSV in Actions); "Meal money closeout" button replaced by the strip; Sold, Served and Not used defined above the served table | Pending review | - |
+| `/more/kitchen-report/counts` | Strip; kitchen-only staff open it directly | Shared page header replaces the old intro; "Back to the kitchen report" replaced by the strip; each count has its definition beside it, with Ordered and Served defined on each service card | Pending review | - |
+| `/more/kitchen-report/scanner-import` | Strip; per-service ticket links on the served table | Shared page header titled "Scanner results"; back link replaced by the strip; served table definitions added | Pending review | - |
+| `/more/kitchen-report/closeout` | Strip (finance only) | Shared page header replaces the old intro; back link replaced by the strip; the Kitchen counts definition now lists each count's own definition | Pending review | - |
