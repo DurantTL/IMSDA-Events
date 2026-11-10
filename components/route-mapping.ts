@@ -176,7 +176,7 @@ const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn
   ["/more/honors/instructors", "/more/honors", "modules/honors/honors-views-model.ts"],
   ["/more/honors/rosters", "/more/honors", "modules/honors/honors-views-model.ts"],
   ["/more/honors/schedule", "/more/honors", "modules/honors/honors-views-model.ts"],
-  ["/more/issued-assets/closeout", "/more/issued-assets", "components/issued-assets-workspace.tsx"],
+  ["/more/issued-assets/closeout", "/more/issued-assets", "components/issued-assets-views-model.ts"],
   ["/more/kitchen-report", "/more/reports", "components/staff-event-tabs.ts"],
   ["/more/kitchen-report/closeout", "/more/kitchen-report", "app/(workspace)/more/kitchen-report/page.tsx"],
   ["/more/kitchen-report/scanner-import", "/more/kitchen-report", "app/(workspace)/more/kitchen-report/page.tsx"],
