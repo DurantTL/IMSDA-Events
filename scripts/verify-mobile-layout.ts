@@ -418,6 +418,7 @@ const pages: PageSpec[] = [
   staff("check-in-badges", "/check-in/badges"),
   staff("check-in-passes", "/check-in/passes"),
   staff("communications", "/communications"),
+  staff("community", "/community"),
   // The template editor with attachments, a picture and a button (#824), and a draft announcement with attachments.
   staff("communications-editor", `/communications?event=${blocksEventId}&view=templates`, "system-admin"),
   staff("communications-announcement-attachments", `/communications?event=${blocksEventId}`, "system-admin"),
