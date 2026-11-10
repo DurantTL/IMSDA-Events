@@ -1,10 +1,12 @@
 "use client";
 
 import { EventSetupHelp } from "@/components/event-setup-help";
+import { StaffPageHeader } from "@/components/staff-page-header";
+import chips from "@/components/lodging-chips.module.css";
+import { lodgingNightsLine } from "@/modules/lodging/lodging-views-model";
 import { useState } from "react";
 import { useEditedForms } from "@/components/use-edited-forms";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
-import { staffPageTitles } from "@/components/staff-navigation";
 import {
   lodgingCategories,
   lodgingCategoryLabels,
@@ -60,11 +62,8 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
   }
 
   return <div className="settings-stack">
-    <div className="page-intro"><div>
-      <p className="eyebrow">Event configuration</p>
-      <h2 className="duplicate-page-title">{staffPageTitles.lodging}</h2>
-      <p>Rooms, beds and sites for {eventName}, night by night. This is inventory only: nobody is assigned here (guests are placed on the <a href={`/more/lodging/assignments?event=${encodeURIComponent(view.eventId)}`}>Lodging assignments</a> page). Hotel details on the event settings page are separate and never counted as on-site lodging. What guests asked for is on the <a href={`/more/lodging/requests?event=${encodeURIComponent(view.eventId)}`}>Lodging requests</a> page.</p>
-    </div></div>
+    <StaffPageHeader description={`Rooms, beds and sites for ${eventName}, night by night. This is inventory only: nobody is assigned here, and a guest's request is not a placement.`} />
+    {view.property ? <p className={chips.context} aria-label="Lodging context"><span><strong>{view.property.name}</strong></span><span>{lodgingNightsLine(view.nights)}</span></p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
 
@@ -85,6 +84,7 @@ export function LodgingWorkspace({ eventName, initialView, canSetRates }: { even
     </section> : <>
       <section className="panel">
         <h3>{view.property.name}</h3>
+        <p className="field-hint">Hotel details on the event settings page are separate and never counted as on-site lodging. What guests asked for is under Requests; who is placed where is under Assignments.</p>
         <p>Property layout version {view.property.templateVersion}.{" "}
           {view.property.currentTemplateVersion !== view.property.templateVersion ? <>
             <span role="status">Version {view.property.currentTemplateVersion} is available. Capacities for this event stay as they are until you update.</span>{" "}
@@ -161,7 +161,11 @@ function UnitRow({ unit, nights, base, busy, run }: {
   const holdKeys = ["newHold", ...unit.holds.map((hold) => `release:${hold.id}`)];
   return <>
     <tr>
-      <th scope="row">{unit.name}{unit.retired ? " (Retired)" : ""}</th>
+      <th scope="row">{unit.name}{unit.retired ? " (Retired)" : ""}
+        {unit.unavailable || activeHolds.length > 0 ? <ul className={chips.row} aria-label={`State of ${unit.name}`}>
+          {unit.unavailable ? <li className={`${chips.chip} ${chips.inventory}`}>Unavailable</li> : null}
+          {activeHolds.length > 0 ? <li className={`${chips.chip} ${chips.inventory}`}>{activeHolds.length === 1 ? "On hold" : `${activeHolds.length} holds`}</li> : null}
+        </ul> : null}</th>
       <td>{describeUnit(unit)}{unit.notes ? ` (${unit.notes})` : ""}</td>
       <td>
         <form onChange={edits.track("capacity")} onSubmit={(event) => {

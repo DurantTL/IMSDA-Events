@@ -232,6 +232,21 @@ export function WaitlistPanel({ view, base, run, busy, canConfigure }: { view: A
 // Proposal and CSV import: preview first, then a confirmed apply
 // ---------------------------------------------------------------------------
 
+/**
+ * The rooming, occupancy and exception files (#200): one list, shared by the Export panel and the page header's menu, so both
+ * offer the same links from the same generation. Callers show them only to staff with VIEW_REPORTS (`canExport`).
+ */
+export const lodgingExports: ReadonlyArray<{ report: string; label: string }> = [
+  { report: "assignments", label: "Rooming list (CSV, the file the import reads)" },
+  { report: "occupancy", label: "Occupancy by night (CSV)" },
+  { report: "unassigned", label: "Not placed (CSV)" },
+  { report: "conflicts", label: "Conflicts (CSV)" },
+  { report: "keys", label: "Key hand-off inputs (CSV)" },
+  { report: "closeout", label: "Closeout exceptions (CSV)" },
+];
+
+export const lodgingExportHref = (eventId: string, report: string) => `/api/events/${eventId}/exports/lodging-assignments?report=${report}`;
+
 export function PlanPanel({ view, base, run, busy, canExport }: { view: AssignmentWorkspaceView; base: string; run: Run; busy: boolean; canExport: boolean }) {
   const [preview, setPreview] = useState<PlanPreview | null>(null);
   const [csv, setCsv] = useState("");
@@ -278,12 +293,7 @@ export function PlanPanel({ view, base, run, busy, canExport }: { view: Assignme
     <section className="panel" aria-labelledby="la-export">
       <h3 id="la-export">Export</h3>
       {canExport ? <ul>
-        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=assignments`}>Rooming list (CSV, the file the import reads)</ExportLink></li>
-        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=occupancy`}>Occupancy by night (CSV)</ExportLink></li>
-        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=unassigned`}>Not placed (CSV)</ExportLink></li>
-        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=conflicts`}>Conflicts (CSV)</ExportLink></li>
-        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=keys`}>Key hand-off inputs (CSV)</ExportLink></li>
-        <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-assignments?report=closeout`}>Closeout exceptions (CSV)</ExportLink></li>
+        {lodgingExports.map(({ report, label }) => <li key={report}><ExportLink href={lodgingExportHref(view.eventId, report)}>{label}</ExportLink></li>)}
       </ul> : <p>Exports need the reports permission.</p>}
       <p className="field-hint">Names appear, as on any rooming list; contact details never do. {view.canSeeSensitive ? "The two accessibility columns are included for you." : "Accessibility columns are not included."}</p>
     </section>

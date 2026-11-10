@@ -1,6 +1,9 @@
 "use client";
 
 import { ExportLink } from "@/components/export-link";
+import { StaffPageHeader } from "@/components/staff-page-header";
+import chips from "@/components/lodging-chips.module.css";
+import { lodgingNightsLine } from "@/modules/lodging/lodging-views-model";
 import { SubmitButton } from "@/components/submit-button";
 import { useState, type FormEvent } from "react";
 import { useEditedForms } from "@/components/use-edited-forms";
@@ -100,12 +103,11 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
   const activeRules = view.rules.filter((rule) => !rule.ended);
 
   return <div className="settings-stack">
-    <div className="page-intro"><div>
-      <p className="eyebrow">Registration</p>
-      <h2 className="duplicate-page-title">Lodging requests</h2>
-      <p>What guests asked for at {eventName}. A request is a preference, never an assignment: nobody is placed in a room here (use Lodging assignments for that). Roommate requests count as mutual only when both sides ask or staff approve, and no contact details are shown.</p>
-      {canExport ? <p><ExportLink className="secondary-button" href={`/api/events/${view.eventId}/exports/lodging-requests`}>Download requests (CSV)</ExportLink></p> : null}
-    </div></div>
+    <StaffPageHeader
+      actions={canExport ? <li><ExportLink href={`/api/events/${view.eventId}/exports/lodging-requests`}>Download requests (CSV)</ExportLink></li> : undefined}
+      description="What guests asked for. A request is a preference, never an assignment: nobody is placed here. Roommate requests count as mutual only when both sides ask or staff approve, and no contact details are shown."
+    />
+    <p className={chips.context} aria-label="Lodging context"><span><strong>{eventName}</strong></span><span>{lodgingNightsLine(view.nights)}</span><span className={`${chips.chip} ${chips.request}`}>Requests only, nobody is assigned here</span></p>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
     {chargeChange !== null ? <p className="form-error" role="status" data-testid="charge-change">
@@ -145,7 +147,7 @@ export function LodgingRequestsWorkspace({ eventName, initialView, canConfigure,
       <h3 id="lodging-queue">Needs a look ({view.queue.filter((item) => !item.acknowledged).length})</h3>
       <label><input type="checkbox" checked={showAcknowledged} onChange={(event) => setShowAcknowledged(event.target.checked)} /> Show items already acknowledged</label>
       {queue.length === 0 ? <p>Nothing needs review.</p> : <ul>{queue.map((item) => <li key={`${item.key}:${item.fingerprint}`}>
-        <strong>{reviewKindLabels[item.kind]}</strong>{item.sensitive ? " (restricted)" : ""}{item.acknowledged ? " (acknowledged)" : ""}
+        <span className={`${chips.chip} ${chips.review}`}>{item.acknowledged ? "Reviewed" : "Needs review"}</span> <strong>{reviewKindLabels[item.kind]}</strong>{item.sensitive ? " (restricted)" : ""}{item.acknowledged ? " (acknowledged)" : ""}
         <p>{item.title}. {item.detail}</p>
         {item.roommateRequestId && !item.acknowledged ? <form ref={edits.gone(`roommate:${item.key}`)} onChange={edits.track(`roommate:${item.key}`)} onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
@@ -248,7 +250,7 @@ function RequestRow({ request, view, base, busy, run }: { request: StaffLodgingR
   const waiting = request.roommates.filter((row) => row.direction === "OUT" && row.status === "ONE_SIDED").length;
   return <>
     <tr>
-      <th scope="row">{request.registration}{request.afterDeadline ? " (changed after the deadline)" : ""}</th>
+      <th scope="row">{request.registration}{request.afterDeadline ? " (changed after the deadline)" : ""} <span className={`${chips.chip} ${chips.request}`}>Request</span></th>
       <td>{request.category ? lodgingCategoryLabels[request.category] : "No preference"}</td>
       <td>{request.firstNight ? `${request.firstNight} to ${request.lastNight}` : "Whole event"}</td>
       <td>{request.partySize}</td>

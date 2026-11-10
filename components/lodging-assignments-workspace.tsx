@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState, type DragEvent, type FormEvent } from "react";
+import { ExportLink } from "@/components/export-link";
+import chips from "@/components/lodging-chips.module.css";
+import assign from "@/components/lodging-assign.module.css";
 import { SearchResultStatus, useClientSearch } from "@/components/search-as-you-type";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import {
   ExceptionsPanel,
   DisplayPanel,
@@ -9,11 +13,14 @@ import {
   ReportsPanel,
   WaitlistPanel,
   callLodging,
+  lodgingExportHref,
+  lodgingExports,
   type Run,
 } from "@/components/lodging-assignments-panels";
 import { useEditedForms } from "@/components/use-edited-forms";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { lodgingCategoryLabels } from "@/modules/lodging/domain";
+import { lodgingNightsLine } from "@/modules/lodging/lodging-views-model";
 import type { AssignmentWorkspaceView, OccupantCard, PersonCard, UnitCard, UnitStatusWord } from "@/modules/lodging/assignment-view";
 
 /**
@@ -251,6 +258,7 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
       {unit.specialUse ? <p className="lodging-assign-warning" role="note">Special-use room: you will be asked to confirm.</p> : null}
       {unit.holdReasons.length > 0 ? <p className="lodging-assign-warning" role="note">Held: {unit.holdReasons.join("; ")}</p> : null}
       {unit.unavailableReason ? <p className="lodging-assign-warning" role="note">Unavailable: {unit.unavailableReason}</p> : null}
+      <p className={chips.assignedLabel}>{unit.occupants.length > 0 ? "Assigned here" : "Nobody assigned here yet"}</p>
       <ul className="lodging-assign-occupants" aria-label={`Who is in ${unit.name}`}>
         {unit.occupants.map((occupant) => renderChip(occupant, unit.name))}
       </ul>
@@ -369,17 +377,24 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
   ];
 
   return <div className="settings-stack lodging-assign">
-    <div className="page-intro"><div>
-      <p className="eyebrow">Lodging</p>
-      <h2 className="duplicate-page-title">Lodging assignments</h2>
-      <p>Place guests in rooms and sites at {eventName} ({view.propertyName}). The server checks every night, so two people cannot be given the last bed. Every move keeps who did it and why. Nothing here changes a registration&apos;s charge.</p>
-      <p><strong>{view.counts.placed}</strong> placed, <strong>{view.counts.unplaced}</strong> not placed, <strong>{view.counts.waitingOnList}</strong> on the waitlist, <strong>{view.counts.exceptions}</strong> to look at.</p>
-    </div></div>
+    <StaffPageHeader
+      actions={canExport ? <>{lodgingExports.map(({ report, label }) => <li key={report}><ExportLink href={lodgingExportHref(view.eventId, report)}>{label}</ExportLink></li>)}</> : undefined}
+      description="Place guests in rooms and sites. The server checks every night, so two people cannot be given the last bed. Every move keeps who did it and why, and nothing here changes a registration's charge."
+    />
+    <div className={chips.context} aria-label="Lodging context">
+      <span><strong>{eventName}</strong></span><span>{view.propertyName}</span><span>{lodgingNightsLine(nights)}</span>
+    </div>
+    <ul className={chips.row} aria-label="Assignment counts">
+      <li className={`${chips.chip} ${chips.assignment}`}>{view.counts.placed} assigned</li>
+      <li className={`${chips.chip} ${chips.request}`}>{view.counts.unplaced} not assigned yet</li>
+      <li className={`${chips.chip} ${chips.review}`}>{view.counts.waitingOnList} on the waitlist</li>
+      <li className={`${chips.chip} ${chips.review}`}>{view.counts.exceptions} to look at</li>
+    </ul>
     <div role="status" aria-live="polite" className="lodging-assign-live">
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {notice ? <p className="usage-note">{notice}</p> : null}
     </div>
-    {pendingSpecial ? <div className="panel lodging-assign-confirm" role="alertdialog" aria-labelledby="la-special-title">
+    {pendingSpecial ? <div className={`panel lodging-assign-confirm ${assign.review}`} role="alertdialog" aria-labelledby="la-special-title">
       <h3 id="la-special-title">{pendingSpecial.unit.name} is a special-use room</h3>
       <p>It is set aside for a particular group. Place {pendingSpecial.personKeys.map((key) => peopleByKey.get(key)?.name).filter(Boolean).join(", ")} there anyway?</p>
       <button type="button" className="primary-button" disabled={busy} onClick={() => {
@@ -402,7 +417,7 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
           {(["unassigned", "assigned", "all"] as const).map((value) => <label key={value}><input type="radio" name="la-filter" checked={filter === value} onChange={() => setFilter(value)} /> {value === "unassigned" ? "Not placed" : value === "assigned" ? "Placed" : "Everyone"}</label>)}
         </div>
         <p><button type="button" className="secondary-button" disabled={unplacedActive.length === 0} onClick={() => { const next = unplacedActive[0]; if (next) setSelected({ occupantKey: next.occupantKey }); }}>Assign the next unplaced person</button></p>
-        {selectedPerson ? <div className="usage-note" role="status">
+        {selectedPerson ? <div className={`usage-note ${assign.review}`} role="status">
           <span>{selected?.moveAssignmentId ? "Moving" : "Assigning"} <strong>{selectedPerson.name}</strong>. Choose a room, a housing choice below, or</span>
           {selected?.moveAssignmentId ? <label>Reason <input value={moveReason} onChange={(event) => setMoveReason(event.target.value)} maxLength={300} /></label> : null}
           <button type="button" className="secondary-button" onClick={() => { setSelected(null); setMoveReason(defaultMoveReason); }}>Clear my selection</button>
@@ -412,9 +427,12 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
             draggable={person.active} onDragStart={(event) => onDragStart(event, person.occupantKey)}>
             <button type="button" aria-pressed={selected?.occupantKey === person.occupantKey && !selected?.moveAssignmentId} disabled={!person.active} onClick={() => setSelected(selected?.occupantKey === person.occupantKey && !selected?.moveAssignmentId ? null : { occupantKey: person.occupantKey })}>
               <span className="lodging-assign-chip-name">{person.name}{person.kind === "PLACEHOLDER" ? " (expected)" : ""}{person.people > 1 ? ` x${person.people}` : ""}</span>
+              {person.placements.length > 0
+                ? <span className={`${chips.chip} ${chips.assignment}`}>Assigned: {person.placements.map((placement) => `${placement.label} (${range(placement.firstNight, placement.lastNight)})`).join(", ")}</span>
+                : <span className={`${chips.chip} ${chips.request}`}>Not assigned yet</span>}
               <span className="lodging-assign-chip-meta">
                 {person.registrationCode ?? "not registered yet"}
-                {person.category ? `, wants ${lodgingCategoryLabels[person.category]}` : ""}
+                {person.category ? `, asked for ${lodgingCategoryLabels[person.category]}` : ""}
                 {person.category && person.roomCount > 0 && person.kind === "ATTENDEE" ? `, ${person.roomCount} ${person.roomCount === 1 ? "room" : "rooms"}` : ""}
                 {person.bringsExtraBedding ? ", bringing extra bedding" : ""}
                 {person.asksForLodging ? "" : ", not asking for lodging"}
@@ -422,7 +440,6 @@ export function LodgingAssignmentsWorkspace({ eventName, initialView, canConfigu
                 {!person.active ? ", registration not active" : ""}
                 {person.waitlistStatus ? ", on the lodging waitlist" : ""}
                 {person.groundFloorNeeded || person.accessibleRoomNeeded ? ", needs ground floor" : ""}
-                {person.placements.length > 0 ? `; in ${person.placements.map((placement) => `${placement.label} (${range(placement.firstNight, placement.lastNight)})`).join(", ")}` : ""}
                 {person.uncoveredNights > 0 && person.placements.length > 0 ? `; ${person.uncoveredNights} night(s) not placed` : ""}
                 {householdIsSplit(person) ? "; warning: household split across rooms" : ""}
               </span>

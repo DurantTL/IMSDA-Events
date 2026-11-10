@@ -1,0 +1,11 @@
+/* The assign and move review on a phone (#1578): the selection banner and the special-use confirmation use the full width, with
+   44px controls, and the page never scrolls sideways. */
+.review { display: grid; gap: 8px; min-width: 0; }
+.review label { display: grid; gap: 4px; min-width: 0; }
+.review input { box-sizing: border-box; max-width: 100%; }
+
+@media (max-width: 640px) {
+  .review { width: 100%; box-sizing: border-box; }
+  .review button { width: 100%; min-height: 44px; }
+  .review input { width: 100%; min-height: 44px; }
+}

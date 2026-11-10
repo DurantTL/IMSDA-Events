@@ -213,3 +213,13 @@ Browser checks ran on a seeded local database with synthetic data, at 1280 and 3
 | `/more/clubs/reports` | Event club pages strip | Strip replaces the back link | Pass | - |
 | `/more/clubs/reports/[organizationId]/[month]` | Monthly Records | Event and club named in the header context; return-to unchanged | Pass | - |
 | `/more/club-assignments` | Event club pages strip | Header says what is editable and that email goes out only after preview and send | Pass; registration manager without oversight sees no strip (one view) | Nothing was saved or sent |
+
+## Coverage after release 1: lodging pages (#1578, #1596 ledger)
+
+One Lodging area on Event setup: the Lodging pages strip (Inventory, Requests, Assignments) on all three pages and their restricted and "no lodging property yet" states. A page the viewer cannot open is left out of the strip. Inventory, a guest's request, a review item and an actual assignment each carry their own labelled chip, in words as well as colour. No URL, permission, API route, saved field or domain rule changed.
+
+| Page | Where it lives | What changed | Browser check (1280 / 390) | Not checked, and why |
+|---|---|---|---|---|
+| `/more/lodging` | Event setup → Lodging card; Lodging pages strip | Strip; header on the shared pattern, saying it is inventory only; property and night window under the header; Unavailable and hold chips on each unit | Pending review | - |
+| `/more/lodging/requests` | Event setup → Lodging requests card; Lodging pages strip | Strip replaces the back link; "Download requests (CSV)" moved into the header's Actions menu (same `canExport` condition); "Request" and "Needs review" chips so a request never reads as an assignment | Pending review | - |
+| `/more/lodging/assignments` | Event setup → Lodging assignments card; Lodging pages strip | Strip replaces the back link; rooming, occupancy and exception files in the header's Actions menu (same `canExport` condition, same links as the Export panel); "Assigned" and "Not assigned yet" chips and counts; "Assigned here" label on each room; full-width assign and move review on a phone | Pending review | - |
