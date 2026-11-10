@@ -11,6 +11,33 @@
 #   docker compose exec app npm run admin:create -- --email you@imsda.org --name "Your Name"
 set -e
 
+# The app runs as the unprivileged `node` user (#1798). Before anything touches
+# the database, make sure this user can use what an earlier root container may
+# still own: the uploads folder and the encryption key file. Stopping here, with
+# the fix named, lets a deploy fail while the current version keeps serving.
+# Exit 78 is the conventional "configuration error".
+preflight_fail() {
+  echo "[entrypoint] $1" >&2
+  echo "[entrypoint] See docs/DEPLOY-DOCKER.md, \"Running as the node user\". Nothing was changed." >&2
+  exit 78
+}
+if [ "$(id -u)" != "0" ]; then
+  if [ -n "${ASSET_STORAGE_DIR:-}" ] && [ -d "${ASSET_STORAGE_DIR}" ]; then
+    # Every folder must be writable and every file readable, not only the top one:
+    # files a root container wrote are 0640 root:root and would not open.
+    blocked="$(find "${ASSET_STORAGE_DIR}" \( -type d ! -writable \) -o \( ! -readable \) 2>/dev/null | head -n 1)"
+    if [ -n "$blocked" ]; then
+      preflight_fail "The uploads folder ${ASSET_STORAGE_DIR} holds files this container's user (uid $(id -u)) cannot use, for example ${blocked}. Hand the uploads volume to uid $(id -u)."
+    fi
+  fi
+  for key_variable in SECRET_ENCRYPTION_KEY_FILE SECRET_ENCRYPTION_PREVIOUS_KEY_FILE; do
+    eval "key_file=\${${key_variable}:-}"
+    if [ -n "$key_file" ] && [ -e "$key_file" ] && [ ! -r "$key_file" ]; then
+      preflight_fail "The key file named by ${key_variable} is not readable by this container's user (uid $(id -u)). Change the file's owner on the server to uid $(id -u); keep its mode 0400."
+    fi
+  done
+fi
+
 # deploy/xcloud/deploy.sh runs the preparation below in a one-off container
 # (IMSDA_PREP_ONLY=1) while the old version keeps serving, then starts the new
 # version with IMSDA_SKIP_DB_PREP=1 so it answers within seconds (#1263).

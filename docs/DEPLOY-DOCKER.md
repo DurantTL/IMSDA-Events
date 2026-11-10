@@ -98,7 +98,7 @@ unset in production (`fake` is an offline stand-in for local work only). See
 [ADR 0014](decisions/0014-church-geocoding.md).
 
 On the production server `SECRET_ENCRYPTION_KEY` does **not** go in this env
-file: it is loaded from a root-only file with `SECRET_ENCRYPTION_KEY_FILE`
+file: it is loaded from a protected file with `SECRET_ENCRYPTION_KEY_FILE`
 instead (see "Loading the encryption key from a protected file" below). The plain
 variable stays supported for development and for a server that has not moved yet,
 but setting both is a startup error.
@@ -1531,6 +1531,105 @@ the cause.
 from the environment. This is the same fault as above, caught earlier and stated
 plainly. Add the named variable and deploy again.
 
+## Running as the node user (#1798)
+
+The app container runs as the image's unprivileged `node` user (uid 1000, gid
+1000), not root. That covers the app, the start-up preparation (migrations and
+syncs) and anything run with `docker exec`. The app's code in the image is owned
+by root and is read-only to the app. Two folders are writable: uploaded files
+(`/app/storage/event-assets`, the `imsda_events_assets` volume) and Next's cache.
+
+A new, empty uploads volume needs nothing: it takes the folder's owner from the
+image. A server that ran an earlier image as root has an uploads volume, and
+perhaps a key file, owned by root. Those need the one-time steps below.
+
+**What happens if the steps are skipped.** The entrypoint checks, before any
+migration, that uid 1000 can write every folder and read every file in the
+uploads volume and can read the key file. If not, it exits with code 78 and a
+line starting `[entrypoint]` that names what to fix. `imsda-deploy` then stops
+at "Migrations or syncs ... failed", the current version keeps serving, and the
+commit is written to `/var/lib/imsda/failed-sha`, which pauses the nightly
+deploys until it is removed.
+
+### One-time steps on a server that ran as root (a system administrator does these)
+
+Run as `root` over SSH, **right before** deploying the first image that runs as
+`node`. The running root container keeps creating root-owned files until it is
+replaced, so leave as little time as you can between step 2 and step 4.
+
+1. See what is there now (changes nothing):
+
+```bash
+docker volume inspect imsda_events_assets --format '{{ .Mountpoint }}'
+ASSETS="$(docker volume inspect imsda_events_assets --format '{{ .Mountpoint }}')"
+find "$ASSETS" ! -uid 1000 | wc -l          # how many files and folders are not uid 1000 yet
+ls -ln /etc/imsda/secret-encryption-key      # only if the key file is in use
+```
+
+2. Hand the uploads volume to uid 1000. Modes are not changed, only the owner:
+
+```bash
+chown -R 1000:1000 "$ASSETS"
+find "$ASSETS" ! -uid 1000 | wc -l          # expect: 0
+```
+
+3. If the key file is in use (`SECRET_ENCRYPTION_KEY_FILE`, and
+   `SECRET_ENCRYPTION_PREVIOUS_KEY_FILE` during a key rotation), hand it to uid
+   1000. The mode stays `0400`, so only that uid and root can read it:
+
+```bash
+ls -ln /etc/imsda/                           # every key file mounted into the app (after a rotation: secret-encryption-key-vN too)
+chown 1000:1000 /etc/imsda/secret-encryption-key*
+ls -ln /etc/imsda/                           # expect each: -r-------- 1 1000 1000
+```
+
+   The folder `/etc/imsda` stays `root:root` `0700`; the bind mount passes the
+   file itself.
+
+4. Deploy (`imsda-deploy`, or let the nightly window do it).
+
+The running root container is not disturbed by steps 2 and 3: root can still
+read and write everything.
+
+### Verify
+
+```bash
+docker exec xcloud-site-<id>-app-1 id                       # expect: uid=1000(node) gid=1000(node)
+docker exec xcloud-site-<id>-app-1 sh -c 'touch /app/storage/event-assets/.write-check && rm /app/storage/event-assets/.write-check && echo uploads-ok'
+docker exec xcloud-site-<id>-app-1 sh -c 'touch /app/package.json 2>/dev/null && echo CODE-WRITABLE || echo code-read-only'   # expect: code-read-only
+docker logs --tail 200 xcloud-site-<id>-app-1 2>&1 | grep -ci 'EACCES\|permission denied'   # expect: 0
+```
+
+Then, signed in: open an event with a banner photo (the picture shows), upload a
+new event photo, and open `/api/health` with the monitor token
+(`"encryptionKey": {"configured": true, ...}`).
+
+### If the deploy stopped with the `[entrypoint]` message
+
+Nothing was changed and the old version is still serving. Run steps 2 and 3
+again (a file written between your `chown` and the deploy is the usual cause),
+then:
+
+```bash
+rm -f /var/lib/imsda/failed-sha
+imsda-deploy
+```
+
+### Rolling back
+
+Going back to an image that runs as root needs no ownership change: root reads
+and writes files owned by uid 1000. Use the normal rollback
+(`docker tag imsda-events:previous imsda-events:live` and restart the app, see
+"Deploys without downtime"). Leave the uploads volume and key file owned by uid
+1000; changing them back is not needed and would only have to be redone.
+
+### Other containers
+
+- The **backup** container reads the uploads volume as root and is not affected.
+- The **outbox sweeper** does not use the volume or the key.
+- A one-off `docker run` of the image also runs as `node`. Add `--user 0` only
+  for a maintenance command that truly needs root; never for the app.
+
 ## Loading the encryption key from a protected file (#876)
 
 `SECRET_ENCRYPTION_KEY` protects birth dates, health records, Sterling Volunteers
@@ -1561,13 +1660,12 @@ How the app behaves (`lib/env.ts`):
   (or `"env"`; the version fields come from "Rotating the encryption key" below). `configured: false` with `source: "file"` means the file variable
   is set but the file could not be used. The value is never shown.
 
-**File ownership and mode.** The `Dockerfile` has no `USER` line, so the app
-container runs as root (uid 0) and can read a root-owned `0400` file. Keep the
-file `root:root` and `0400` on the host. If a `USER` line is ever added to the
-`Dockerfile`, a root-owned `0400` file will not be readable inside and startup
-will fail with "not readable by this process"; change the host file to that
-user's uid (`chown <uid>:<uid> /etc/imsda/secret-encryption-key`, mode stays
-`0400`), because a bind mount keeps the host's numeric owner. Check with
+**File ownership and mode.** The app container runs as the image's `node` user
+(uid 1000), not root (#1798), and a bind mount keeps the host's numeric owner.
+So on the host the file is owned by uid 1000 with mode `0400`
+(`chown 1000:1000 /etc/imsda/secret-encryption-key`). A `root:root` `0400` file
+is not readable inside the container: the entrypoint stops before any migration
+and names the variable. See "Running as the node user" above. Check with
 `docker exec <app> id`.
 
 ### One-time steps on the production server (a system administrator does these)
@@ -1582,9 +1680,9 @@ history that is shared.
 ```bash
 install -d -m 0700 -o root -g root /etc/imsda
 ( umask 077; docker exec xcloud-site-<id>-app-1 printenv SECRET_ENCRYPTION_KEY | tr -d '\n' > /etc/imsda/secret-encryption-key )
-chown root:root /etc/imsda/secret-encryption-key
+chown 1000:1000 /etc/imsda/secret-encryption-key   # uid 1000 is the container's node user (#1798)
 chmod 0400 /etc/imsda/secret-encryption-key
-ls -l /etc/imsda/secret-encryption-key      # expect: -r-------- 1 root root, size not 0
+ls -ln /etc/imsda/secret-encryption-key     # expect: -r-------- 1 1000 1000, size not 0
 ```
 
    Compare checksums (a hash, not the key). The two lines must be identical:
@@ -1870,7 +1968,7 @@ Steps:
    new one 2; use your own numbers):
    1. Write the new key (from the password manager, never typed on a command
       line) to its **own new file**, `/etc/imsda/secret-encryption-key-v2`, with
-      `install -m 0400 -o root -g root <tmp file> /etc/imsda/secret-encryption-key-v2`,
+      `install -m 0400 -o 1000 -g 1000 <tmp file> /etc/imsda/secret-encryption-key-v2` (uid 1000 is the container's `node` user, #1798),
       then delete the temporary file. **Leave `/etc/imsda/secret-encryption-key`
       exactly as it is.**
    2. Set the versions. Manual path: add `SECRET_ENCRYPTION_KEY_VERSION=2` and
