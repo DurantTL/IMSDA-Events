@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CheckInStationScreen } from "@/components/check-in-station";
 import { STATION_INACTIVE_MESSAGE } from "@/modules/checkin-stations/domain";
 import { resolveStation } from "@/modules/checkin-stations/repository";
@@ -23,6 +24,9 @@ export default async function CheckInStationPage() {
         <section className={styles.cisCard}>
           <h1>Check-in station</h1>
           <p>{STATION_INACTIVE_MESSAGE}</p>
+          <p className={styles.cisActions}>
+            <Link href="/check-in" className={`secondary-button ${styles.large}`}>Go to Check-in</Link>
+          </p>
         </section>
       </main>
     );
