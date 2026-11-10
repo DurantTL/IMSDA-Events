@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /** #1246: the Club forms page's missing view behind "Clubs with forms missing": its gate, and that it shows exactly the clubs the card counts. Synthetic data only. */
 const mocks = vi.hoisted(() => ({ getCurrentSession: vi.fn(), hasClubsAdministration: vi.fn(), getRequiredFormsStatus: vi.fn() }));
 vi.mock("server-only", () => ({}));
-vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`redirect:${path}`); } }));
+vi.mock("next/navigation", () => ({ redirect: (path: string) => { throw new Error(`redirect:${path}`); }, usePathname: () => "/admin/club-forms", useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }) }));
+// The section header (#1274) is async and has its own tests; this page is tested without it.
+vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/admin-roles", () => ({ hasClubsAdministration: mocks.hasClubsAdministration }));
@@ -49,6 +51,18 @@ describe("the forms-missing list page", () => {
     expect(html).toContain("1 of 4 members");
     expect(html).not.toContain("Amy Youth");
     expect(html).toContain("2 clubs are missing a required form");
+  });
+
+  it("draws the page's titled header and the view strip with Missing forms current, and no back link (#1573)", async () => {
+    const html = await render("2026-27");
+    expect(html.match(/<h1\b/g)).toHaveLength(1);
+    expect(html).toContain(">Club forms</h1>");
+    expect(html).toContain('aria-label="Club form pages"');
+    expect(html).toContain('href="/admin/club-forms?view=missing&amp;year=2026-27"');
+    expect(html).toMatch(/aria-current="page"[^>]*>Missing forms</);
+    expect(html).not.toContain("Back to club administration");
+    expect(html).not.toMatch(/<h3\b/);
+    expect(html).toContain("Public club forms page");
   });
 
   it("shows the same number of clubs as the dashboard card", async () => {

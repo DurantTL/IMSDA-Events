@@ -2,9 +2,9 @@ import { z } from "zod";
 import { scannerMealTypes, type MealTypeValue } from "@/modules/meals/domain";
 import { serviceKey, serviceLabel, type ServedReport, type ServedRow } from "@/modules/meals/served-report";
 import { toCsv } from "@/modules/reporting/csv";
-import { KITCHEN_COUNT_MAX, KITCHEN_NOTE_MAX, kitchenCountKindLabels, kitchenCountKinds, type KitchenCountKind } from "@/modules/meals/kitchen-count-kinds";
+import { KITCHEN_COUNT_MAX, KITCHEN_NOTE_MAX, kitchenColumnDefinitions, kitchenCountKindLabels, kitchenCountKinds, type KitchenCountKind } from "@/modules/meals/kitchen-count-kinds";
 
-export { KITCHEN_COUNT_MAX, KITCHEN_NOTE_MAX, kitchenCountKindLabels, kitchenCountKinds, type KitchenCountKind };
+export { KITCHEN_COUNT_MAX, KITCHEN_NOTE_MAX, kitchenColumnDefinitions, kitchenCountKindLabels, kitchenCountKinds, type KitchenCountKind };
 
 /**
  * Kitchen-entered counts per meal service (#1029): prepared, wasted, donated and transferred. Pure rules, no database.
@@ -14,17 +14,6 @@ export { KITCHEN_COUNT_MAX, KITCHEN_NOTE_MAX, kitchenCountKindLabels, kitchenCou
  * history. These counts are never added to, subtracted from or written over the served count, which comes only from the
  * scanner redemptions (#1028): the report keeps every column apart and shows prepared minus served as the variance.
  */
-
-/** The short definitions shown with the report's columns (screen and the counts page). */
-export const kitchenColumnDefinitions = {
-  ordered: "Ordered: café meal tickets sold for the service, on live registrations. Not a count of food.",
-  served: "Served: meals the café scanner recorded as eaten. Comes only from the imported scanner results.",
-  PREPARED: "Prepared: portions the kitchen made, as the kitchen entered them.",
-  WASTED: "Wasted: prepared portions thrown away, as the kitchen entered them.",
-  DONATED: "Donated: prepared portions given away outside the event, as the kitchen entered them.",
-  TRANSFERRED: "Transferred: prepared portions sent to another service or group, as the kitchen entered them.",
-  variance: "Variance: prepared minus served. Positive means more was made than eaten. Blank until prepared is entered.",
-} as const;
 
 const serviceKeyPattern = /^(\d{4}-\d{2}-\d{2}|any):(BREAKFAST|LUNCH|SUPPER)$/;
 

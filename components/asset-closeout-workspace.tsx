@@ -2,7 +2,10 @@
 
 import { ExportLink } from "@/components/export-link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { issueDeskHref } from "@/components/issued-assets-views-model";
+import { NavigationLink } from "@/components/navigation-link";
+import { PageHeader } from "@/components/page-header";
 import { cardCell } from "@/components/table-card-labels";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { assigneeKindLabels } from "@/modules/issued-assets/domain";
@@ -14,6 +17,7 @@ import { lodgingHoldKinds } from "@/modules/lodging/domain";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import styles from "./asset-closeout-workspace.module.css";
 
 /**
  * The issued-asset closeout (#214): what is still out, lost, damaged, charged, waived and held, the facility issues that
@@ -26,9 +30,8 @@ const newKey = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? 
 const when = (iso: string | null) => (iso ? formatInConferenceTime(iso, { dateStyle: "medium", timeStyle: "short" }) : "");
 
 
-export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canManageMoney, canConfigure, canUpdateFacility, canOpenDesk }: {
+export function AssetCloseoutWorkspace({ eventId, report, staff, canManageMoney, canConfigure, canUpdateFacility, canOpenDesk, strip }: {
   eventId: string;
-  eventName: string;
   report: CloseoutReport;
   staff: Array<{ userId: string; name: string }>;
   canManageMoney: boolean;
@@ -36,6 +39,8 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
   canUpdateFacility: boolean;
   /** The issue desk (/check-in/assets) needs MANAGE_CHECK_IN; without it a holder is plain text (#1735). */
   canOpenDesk: boolean;
+  /** The "Issued item pages" strip, drawn under the header. */
+  strip?: ReactNode;
 }) {
   const router = useRouter();
   const base = `/api/events/${encodeURIComponent(eventId)}/assets`;
@@ -64,26 +69,28 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
 
   const deskHref = (attendeeId: string | null) => (canOpenDesk && attendeeId ? `/check-in/assets?event=${encodeURIComponent(eventId)}&attendee=${encodeURIComponent(attendeeId)}` : null);
   const holder = (row: { holderLabel: string; deskAttendeeId: string | null }) => { const href = deskHref(row.deskAttendeeId); return href ? <a href={href}>{row.holderLabel}</a> : <>{row.holderLabel}</>; };
-  const download = (section: string) => <p><ExportLink className="secondary-button report-download" href={csv(section)}>Download CSV</ExportLink></p>;
+  const download = (section: string) => <p className={styles.download}><ExportLink className="secondary-button report-download" href={csv(section)}>Download CSV</ExportLink></p>;
   const ctx: TableContext = { holder, download, canManageMoney, busy, post };
-  return <div className="settings-stack">
-    <div className="page-intro"><div>
-      <p className="eyebrow">Event configuration</p>
-      <h2 className="duplicate-page-title">Issued asset closeout</h2>
-      <p>{eventName}: keys and items still out, lost, damaged, charged, waived or held as cash deposits, and facility problems still open. This page reads only; it does not charge, waive, refund or release anything by itself. Generated {when(report.generatedAt)}.</p>
-    </div></div>
+  return <div className={`settings-stack ${styles.stack}`}>
+    <PageHeader
+      title="Issued asset closeout"
+      description={`Keys and items still out, lost, damaged, charged, waived or held as cash deposits, and facility problems still open, as of ${when(report.generatedAt)}.`}
+      secondary={canOpenDesk ? <NavigationLink className="secondary-button" href={issueDeskHref(eventId)}>Issue and return desk</NavigationLink> : undefined}
+      below={strip}
+    />
+    <p className={styles.note}>This page reads only; it does not charge, waive, refund or release anything by itself.</p>
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     {notice ? <p className="usage-note" role="status">{notice}</p> : null}
     {report.truncated ? <p role="status">A list was cut short at its limit. Download the CSV and narrow the event before closing out.</p> : null}
 
     <section className="panel form-stack">
-      <h3>{report.unresolvedCount === 0 ? "Nothing is unresolved" : `${report.unresolvedCount} unresolved`}</h3>
+      <h2>{report.unresolvedCount === 0 ? "Nothing is unresolved" : `${report.unresolvedCount} unresolved`}</h2>
       {download("exceptions")}
       {report.exceptions.length === 0 ? <p>Every key and item is accounted for, every deposit is settled and no facility issue is open.</p> : <ExceptionsTable ctx={ctx} rows={report.exceptions} />}
     </section>
 
     <section className="panel form-stack">
-      <h3>Issued, returned and outstanding</h3>
+      <h2>Issued, returned and outstanding</h2>
       {download("summary")}
       <TypesTable rows={report.types} />
       <p>Cash deposits: {formatCentsPlain(report.money.depositsReceivedCents)} received, {formatCentsPlain(report.money.depositsHandedBackCents)} handed back, {formatCentsPlain(report.money.depositsKeptCents)} kept, {formatCentsPlain(report.money.depositsHeldCents)} still held. Charges: {formatCentsPlain(report.money.chargedCents)}, waived {formatCentsPlain(report.money.waivedCents)}, net {formatCentsPlain(report.money.netChargedCents)}.</p>
@@ -94,20 +101,20 @@ export function AssetCloseoutWorkspace({ eventId, eventName, report, staff, canM
     <IssueTable ctx={ctx} empty="Nothing came back damaged." rows={report.damaged} section="damaged" title="Returned damaged" />
 
     <section className="panel form-stack">
-      <h3>Charges and waivers ({report.charges.length})</h3>
+      <h2>Charges and waivers ({report.charges.length})</h2>
       {download("charges")}
       {report.charges.length === 0 ? <p>No charge has been recorded.</p> : <ChargesTable ctx={ctx} rows={report.charges} />}
       {canManageMoney ? null : <p>Waiving a charge needs finance or an event administrator.</p>}
     </section>
 
     <section className="panel form-stack">
-      <h3>Cash key deposits ({report.deposits.length})</h3>
+      <h2>Cash key deposits ({report.deposits.length})</h2>
       {download("deposits")}
       {report.deposits.length === 0 ? <p>No deposit has been recorded.</p> : <DepositsTable ctx={ctx} rows={report.deposits} />}
     </section>
 
     <section className="panel form-stack">
-      <h3>Facility issues still open ({report.facility.length})</h3>
+      <h2>Facility issues still open ({report.facility.length})</h2>
       {download("facility")}
       {report.facility.length === 0 ? <p>No facility issue is open.</p> : report.facility.map((issue) => <FacilityCard key={issue.id} issue={issue} staff={staff} canUpdate={canUpdateFacility} canConfigure={canConfigure} busy={busy} post={post} />)}
     </section>
@@ -157,9 +164,9 @@ function IssueTable({ ctx, title, rows, section, empty }: { ctx: TableContext; t
   const { holder, download, canManageMoney, busy, post } = ctx;
   const sorted = useTableSort(rows, ISSUE_SORT, section);
   return <section className="panel form-stack">
-    <h3>{title} ({rows.length})</h3>
+    <h2>{title} ({rows.length})</h2>
     {download(section)}
-    {rows.length === 0 ? <p>{empty}</p> : <div className="table-wrap card-box">{sorted.note}<table role="table" className="report-table table-cards table-cards-compact">
+    {rows.length === 0 ? <p>{empty}</p> : <div className="table-wrap card-box dense-rows">{sorted.note}<table role="table" className="report-table table-cards table-cards-compact">
       <caption className="sr-only">{title}</caption>
       <thead role="rowgroup"><tr role="row">{sorted.header("item", "Item")}{sorted.header("qty", "Qty")}{sorted.header("holder", "Holder")}{sorted.header("room", "Room")}{sorted.header("issued", "Issued")}{sorted.header("ended", section === "outstanding" ? "Expected back" : "Ended")}{canManageMoney && section !== "outstanding" ? <th role="columnheader" scope="col">Correct</th> : null}</tr></thead>
       <tbody role="rowgroup">{sorted.rows.map((row) => <tr role="row" key={row.id}>
@@ -176,7 +183,7 @@ function IssueTable({ ctx, title, rows, section, empty }: { ctx: TableContext; t
 function ExceptionsTable({ ctx, rows }: { ctx: TableContext; rows: ExceptionRow[] }) {
   const { holder, canManageMoney, busy, post } = ctx;
   const sorted = useTableSort(rows, EXCEPTION_SORT, "exceptions");
-  return <div className="table-wrap card-box">{sorted.note}<table role="table" className="report-table table-cards table-cards-compact">
+  return <div className="table-wrap card-box dense-rows">{sorted.note}<table role="table" className="report-table table-cards table-cards-compact">
     <caption className="sr-only">Unresolved items</caption>
     <thead role="rowgroup"><tr role="row">{sorted.header("exception", "Exception")}{sorted.header("item", "Item")}{sorted.header("holder", "Holder")}{sorted.header("detail", "Detail")}{canManageMoney ? <th role="columnheader" scope="col">Resolve</th> : null}</tr></thead>
     <tbody role="rowgroup">{sorted.rows.map((row) => <tr role="row" key={`${row.code}:${row.refId}:${row.triggerId ?? ""}`}>
@@ -193,7 +200,7 @@ function ExceptionsTable({ ctx, rows }: { ctx: TableContext; rows: ExceptionRow[
 
 /** A short fixed list (one row per asset kind, a reconciliation tally), so not sortable (#1458). */
 function TypesTable({ rows }: { rows: TypeReconciliation[] }) {
-  return <div className="table-wrap card-box"><table role="table" className="report-table table-cards table-cards-wide">
+  return <div className="table-wrap card-box dense-rows"><table role="table" className="report-table table-cards table-cards-wide">
     <caption className="sr-only">Units issued, returned, lost, damaged and still out, by kind</caption>
     <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Kind</th><th role="columnheader" scope="col">Went out</th><th role="columnheader" scope="col">Returned</th><th role="columnheader" scope="col">Lost</th><th role="columnheader" scope="col">Damaged</th><th role="columnheader" scope="col">Withdrawn in error</th><th role="columnheader" scope="col">Replaced, unaccounted</th><th role="columnheader" scope="col">Still out</th><th role="columnheader" scope="col">Reconciles</th></tr></thead>
     <tbody role="rowgroup">{rows.map((row) => <tr role="row" key={row.typeId}>
@@ -207,7 +214,7 @@ function TypesTable({ rows }: { rows: TypeReconciliation[] }) {
 function ChargesTable({ ctx, rows }: { ctx: TableContext; rows: ChargeRow[] }) {
   const { holder, canManageMoney, busy, post } = ctx;
   const sorted = useTableSort(rows, CHARGE_SORT, "charges");
-  return <div className="table-wrap card-box">{sorted.note}<table role="table" className="report-table table-cards table-cards-compact">
+  return <div className="table-wrap card-box dense-rows">{sorted.note}<table role="table" className="report-table table-cards table-cards-compact">
     <caption className="sr-only">Charges and waivers</caption>
     <thead role="rowgroup"><tr role="row">{sorted.header("item", "Item")}{sorted.header("holder", "Holder")}{sorted.header("charge", "Charge")}{sorted.header("state", "State")}{sorted.header("why", "Why")}{canManageMoney ? <th role="columnheader" scope="col">Waive</th> : null}</tr></thead>
     <tbody role="rowgroup">{sorted.rows.map((row) => <tr role="row" key={row.entryId}>
@@ -224,7 +231,7 @@ function ChargesTable({ ctx, rows }: { ctx: TableContext; rows: ChargeRow[] }) {
 function DepositsTable({ ctx, rows }: { ctx: TableContext; rows: DepositRow[] }) {
   const { holder } = ctx;
   const sorted = useTableSort(rows, DEPOSIT_SORT, "deposits");
-  return <div className="table-wrap card-box">{sorted.note}<table role="table" className="report-table table-cards table-cards-compact">
+  return <div className="table-wrap card-box dense-rows">{sorted.note}<table role="table" className="report-table table-cards table-cards-compact">
     <caption className="sr-only">Cash key deposits</caption>
     <thead role="rowgroup"><tr role="row">{sorted.header("holder", "Holder")}{sorted.header("kind", "Kind")}{sorted.header("deposit", "Deposit")}{sorted.header("state", "State")}{sorted.header("items", "Items")}</tr></thead>
     <tbody role="rowgroup">{sorted.rows.map((row) => <tr role="row" key={row.entryId}>
@@ -313,7 +320,7 @@ function FacilityCard({ issue, staff, canUpdate, canConfigure, busy, post }: {
     || note.trim() !== "" || resolution.trim() !== "" || firstNight !== "" || lastNight !== "",
   );
   return <article className="panel form-stack">
-    <h4>{issue.targetLabel}: {issue.title}</h4>
+    <h3>{issue.targetLabel}: {issue.title}</h3>
     <p>{issue.severity.toLowerCase()} severity, {issue.status === "OPEN" ? "open" : "in progress"}; reported {when(issue.reportedAt)}{issue.reportedByName ? ` by ${issue.reportedByName}` : ""}{issue.source === "CHECKOUT_INSPECTION" ? " at check-out" : ""}. {issue.assigneeName ? `Assigned to ${issue.assigneeName}.` : "Not assigned."}{issue.description ? ` ${issue.description}` : ""}</p>
     {issue.block ? <p role="status">{issue.block.active ? `Blocked (${holdKindLabels[issue.block.kind as keyof typeof holdKindLabels] ?? issue.block.kind}) ${issue.block.firstNight} to ${issue.block.lastNight}. People already placed were not moved.` : "Its block was released."}</p> : null}
     <details><summary>History ({issue.history.length})</summary><ul>{issue.history.map((entry, index) => <li key={index}>{when(entry.at)}: {entry.type.toLowerCase().replace("_", " ")}{entry.actorName ? ` by ${entry.actorName}` : ""}, {entry.status.toLowerCase().replace("_", " ")}, {entry.severity.toLowerCase()}{entry.note ? `: ${entry.note}` : ""}</li>)}</ul></details>
