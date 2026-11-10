@@ -1848,7 +1848,7 @@ one sealed value using the *backup copy* of the key, not the server's file. Neve
 run it against the live database.
 
 1. Fetch the key from the password manager onto the server into a temporary file
-   readable only by root, outside the backup volume:
+   in a folder only root can enter, outside the backup volume:
 
 ```bash
 install -d -m 0700 /root/keytest

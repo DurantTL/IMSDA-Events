@@ -117,7 +117,7 @@ describe("docker-entrypoint.sh checks what the node user needs (#1798)", () => {
     expect(storage).toContain('"storage", "event-assets"');
   });
 
-  it("ignores links in uploads, which a change of owner could not fix", () => {
+  it.skipIf(asRoot)("ignores links in uploads, which a change of owner could not fix", () => {
     const data = scratch();
     mkdirSync(path.join(data, "uploads"), { recursive: true });
     symlinkSync(path.join(data, "missing"), path.join(data, "uploads", "dangling"));
