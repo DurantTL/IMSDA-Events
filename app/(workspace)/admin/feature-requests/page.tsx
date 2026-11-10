@@ -38,7 +38,7 @@ export default async function FeatureRequestsPage() {
       >
         <section className="panel module-requests" id="module-requests" aria-labelledby="module-requests-heading">
           <div className={styles.sectionHeading}>
-            <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Waiting for a decision</h2></div>
+            <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Requests to review</h2></div>
             <span>{requests ? `${requests.length >= FEATURE_REQUEST_READ_LIMIT ? `${FEATURE_REQUEST_READ_LIMIT}+` : requests.length} waiting` : "Unavailable"}</span>
           </div>
           {requests === null
