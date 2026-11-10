@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { PageHeader } from "@/components/page-header";
 import { ColumnHeader } from "@/components/column-header";
 import { cardCell } from "@/components/table-card-labels";
 import { SortOrderNote } from "@/components/list-sort";
 import { serverSort, sortOrderText, sortRows, type ServerSort, type SortValue } from "@/lib/list-sort";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
+import { formatDateRange } from "@/modules/calendar/domain";
 import { conferenceToday } from "@/modules/calendar/repository";
 import { getAnalyticsSummary, type MetricRow } from "@/modules/public-metrics/repository";
 import styles from "./analytics.module.css";
@@ -66,10 +68,14 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
     <>
       <AdminSectionHeaderFor path="/admin/analytics" section="system" />
       <div className={styles.page}>
+        <PageHeader
+          description="Daily counts of public site activity for the last 30 days. Nothing here identifies a person."
+          title="Public analytics"
+        />
         <section aria-labelledby="analytics-intro" className="panel">
-          <div className="section-heading"><div><p className="eyebrow">Last 30 days</p><h2 id="analytics-intro">Public analytics</h2></div></div>
-          <p className="field-help" style={{ margin: "4px 0 0" }}>
-            {summary.from} to {summary.to}. Daily counts only. Nothing here identifies a person, a device, a search or a private event.
+          <div className="section-heading"><div><p className="eyebrow">{formatDateRange(summary.from, summary.to)}</p><h2 id="analytics-intro">What is counted</h2></div></div>
+          <p className={`field-help ${styles.help}`}>
+            Daily counts only. Nothing here identifies a person, a device, a search or a private event.
             Visitors who send a Global Privacy Control or Do Not Track signal are not counted, and the staff workspace is never measured. Rows older than 400 days are deleted.
           </p>
         </section>
@@ -108,10 +114,11 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
 
         <section aria-labelledby="analytics-signin" className="panel">
           <div className="section-heading"><div><h2 id="analytics-signin">Sign-ins</h2></div></div>
-          <p className="field-help" style={{ margin: "4px 0 0" }}>Overall success rate: {pct(totals.LOGIN_SUCCESS, attempts)}. Counted by sign-in method only.</p>
+          <p className={`field-help ${styles.help}`}>Overall success rate: {pct(totals.LOGIN_SUCCESS, attempts)}. Counted by sign-in method only.</p>
           <Table
             caption="Sign-ins by method"
             head={["Method", "Worked", "Failed", "Success rate"]}
+            empty="Nothing counted yet. Sign-ins appear here once someone signs in."
             rows={summary.logins.map((row) => ({ cells: [row.surface, String(row.success), String(row.failure), pct(row.success, row.success + row.failure)], values: [row.surface, row.success, row.failure, rate(row.success, row.success + row.failure)] }))}
             search={search}
             sortBy="method"

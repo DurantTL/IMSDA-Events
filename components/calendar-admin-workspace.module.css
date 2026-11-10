@@ -1,0 +1,19 @@
+/* Conference calendar admin (#1594). Text is 0.875rem or larger; every row control is at least 44px on touch and under 1024px. */
+.scope { display: grid; gap: 6px; }
+.scopeTitle { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.95rem); }
+.scopeList { display: grid; gap: 4px; margin: 0; padding-left: 20px; list-style: disc; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
+.scopeList li { overflow-wrap: anywhere; }
+
+/* A long title, place or link wraps inside its row instead of widening the page. */
+.entryText { overflow-wrap: anywhere; }
+.entryText small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.4; }
+.rows { min-width: 0; }
+.rows small { font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+/* Row buttons are 44px wherever a finger may be the pointer. */
+@media (max-width: 1023px) {
+  .rowActions.rowActions :is(.secondary-button, summary) { min-height: 44px; }
+}
+@media (max-width: 639px) {
+  .rowActions.rowActions { width: 100%; }
+}

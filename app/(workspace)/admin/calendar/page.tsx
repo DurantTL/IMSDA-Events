@@ -11,6 +11,8 @@ import { loadCalendarCategoryChoices } from "@/modules/calendar/public-filters";
 import { siteBaseUrl } from "@/modules/calendar/subscribe";
 import { buildCalendarWidgetEmbedCode } from "@/modules/calendar/widget";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { PageHeader } from "@/components/page-header";
+import { CalendarDays } from "lucide-react";
 
 export const metadata: Metadata = { title: "Conference calendar" };
 export const dynamic = "force-dynamic";
@@ -28,6 +30,15 @@ export default async function CalendarAdminPage({ searchParams }: { searchParams
   return (
     <>
       <AdminSectionHeaderFor path="/admin/calendar" section="system" />
+      <PageHeader
+        description="Choose which events and dates appear on the public calendar, and add dates for things registered elsewhere."
+        secondary={(
+          <a className="secondary-button" href="/calendar" rel="noreferrer" target="_blank">
+            <CalendarDays aria-hidden="true" size={15} /> View public calendar<span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        )}
+        title="Conference calendar"
+      />
       <CalendarAdminWorkspace initialEntries={entries} initialEntryList={entryList} initialQueryKey={entryQueryParams(entryQuery).toString()} initialEvents={events} initialFeeds={feeds} initialReminders={reminders} publicFilters={publicFilters} widgetEmbedCode={buildCalendarWidgetEmbedCode({ origin: siteBaseUrl() })} />
     </>
   );

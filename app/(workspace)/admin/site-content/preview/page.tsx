@@ -22,7 +22,8 @@ export default async function SiteContentPreviewPage() {
   return (
     <>
       <p className={styles.previewBar} role="status">
-        Preview: not published. Visitors do not see this yet. <Link href="/admin/site-content">Back to editing</Link>
+        <span>Preview: not published. Visitors do not see this yet.</span>
+        <Link href="/admin/site-content">Back to the editor</Link>
       </p>
       <PublicHomePage content={draft} preview />
     </>

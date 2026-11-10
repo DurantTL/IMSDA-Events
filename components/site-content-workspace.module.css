@@ -21,6 +21,17 @@
 .history li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 14px; font-size: max(var(--type-staff-floor, 0px), 0.9rem); }
 .historyText { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
 .status { min-height: 24px; }
-.error { color: #b3261e; font-weight: 700; }
-.previewBar { position: sticky; top: 0; z-index: 5; margin: 0; background: var(--imsda-gold); color: #3a2a00; padding: 10px 16px; font-size: max(var(--type-staff-floor, 0px), 0.95rem); font-weight: 700; text-align: center; }
+.error { color: var(--coral); font-weight: 700; }
+.previewBar { position: sticky; top: 0; z-index: 5; margin: 0; background: var(--imsda-gold); color: var(--ink); padding: 10px 16px; font-size: max(var(--type-staff-floor, 0px), 0.95rem); font-weight: 700; text-align: center; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 16px; }
 .previewBar a { color: inherit; display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; }
+.help { margin: 4px 0 0; }
+.scope { margin: 0; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
+.empty { margin: 0; }
+/* A long announcement or notice wraps inside its card, and the order buttons stay a full-size row on a phone. */
+.item textarea, .item input { overflow-wrap: anywhere; }
+@media (max-width: 639px) {
+  .actions > button, .actions > a { flex: 1 1 100%; justify-content: center; }
+  .rowButtons { width: 100%; }
+  .rowButtons button { flex: 1 1 0; justify-content: center; }
+  .history li > button { width: 100%; justify-content: center; }
+}
