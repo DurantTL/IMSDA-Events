@@ -7,9 +7,9 @@ import styles from "./month-heading-link.module.css";
  */
 export function MonthHeadingLink({ href, label }: { href: string; label: string }) {
   return (
-    <Link className={styles.link} href={href} prefetch={false}>
-      <span aria-hidden="true">›</span>
-      <span className="sr-only">{label} records</span>
+    <Link className={styles.link} href={href} prefetch={false} title={`${label} records`}>
+      <span aria-hidden="true">Open</span>
+      <span className="sr-only">Open {label} records</span>
     </Link>
   );
 }

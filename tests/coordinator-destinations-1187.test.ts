@@ -109,7 +109,7 @@ describe("Monthly Records (#1187)", () => {
     expect(html).not.toContain("/reports/2026-10");
     // Month headings open that month's view.
     expect(html).toContain('href="/account/area-clubs/reports?year=2026-27&amp;month=2026-09"');
-    expect(html).toContain("September 2026 records");
+    expect(html).toContain("Open September 2026 records");
     expect(html).toContain("Not submitted");
     expect(html).toContain("(draft saved)");
     expect(html).toContain("Not due yet");
