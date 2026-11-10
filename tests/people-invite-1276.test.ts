@@ -533,7 +533,9 @@ describe("accepting an Area Coordinator invite", () => {
     // The route reads the real clock; pin it before the fixture's expiry (2026-11-10).
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-05T12:00:00Z"));
-    onTestFinished(() => vi.useRealTimers());
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null });
     expect((await areaInviteAccept(post("/api/attendee/area-coordinator-invites/aci-1/accept", {}), ctx({ inviteId: "aci-1" }))).status).toBe(401);
     mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-acc", verifiedEmail: "pat@example.test" }, via: "staff" });
