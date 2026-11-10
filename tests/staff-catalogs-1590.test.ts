@@ -223,7 +223,7 @@ describe("club supply catalog (#1590)", () => {
     expect(document.body.textContent).toContain("AdventSource orders show an item's current name")
     expect(document.body.textContent).toContain("Patch and pin orders from clubs:");
     expect(document.querySelector('a[href="/admin/club-supplies/conference-orders"]')?.textContent).toBe("Conference club orders");
-    expect(document.querySelector('a[href="/more/merchandise"]')?.textContent).toBe("Merchandise catalog");
+    expect(document.querySelector('a[href="/more/merchandise"]')?.textContent).toBe("Merchandise");
   });
 
   it("opens the supplier editor from the row, with Save and Cancel, and shows a failed save in it", async () => {
