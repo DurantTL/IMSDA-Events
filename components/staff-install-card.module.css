@@ -1,0 +1,57 @@
+.card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 14px 16px;
+  overflow-wrap: anywhere;
+}
+
+.heading {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 1.075rem);
+}
+
+.text {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 62ch;
+  list-style: decimal;
+}
+
+.steps > li {
+  display: list-item;
+}
+
+.icon {
+  display: inline-block;
+  vertical-align: text-bottom;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions > button {
+  min-height: 44px;
+}
+
+.restore {
+  margin: 4px 0 0;
+}
+
+.restore > button {
+  min-height: 44px;
+}
