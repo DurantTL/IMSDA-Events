@@ -14,11 +14,11 @@ export const metadata: Metadata = { title: "Club Year-End Reports" };
 export const dynamic = "force-dynamic";
 
 /** Conference staff: every club's Year-End Report for a Pathfinder year (#607). */
-export default async function ClubYearEndReportsAdminPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
+export default async function ClubYearEndReportsAdminPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
-  const { year } = await searchParams;
+  const { year, q } = await searchParams;
   const current = latestStartedReportYear(new Date());
   const reportYear = year && isReportYear(year) ? year : current;
   const start = reportYearStart(reportYear);
@@ -35,11 +35,12 @@ export default async function ClubYearEndReportsAdminPage({ searchParams }: { se
           id: club.id,
           name: club.name,
           church: club.church,
+          directors: club.directors,
           status: club.status,
-          submittedAt: club.submittedAt,
           late: club.late,
           totalMembership: club.report?.totals.totalMembership ?? null,
         }))}
+        initialQuery={typeof q === "string" ? q.slice(0, 80) : ""}
         key={reportYear}
         reportYear={reportYear}
       />

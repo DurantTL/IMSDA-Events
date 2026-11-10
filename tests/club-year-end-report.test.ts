@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   rosterFindMany: vi.fn(),
   completionFindMany: vi.fn(),
   entryFindMany: vi.fn(),
+  grantFindMany: vi.fn(),
   getCurrentAttendee: vi.fn(),
   listDirectedClubs: vi.fn(),
   rejectCrossOriginRequest: vi.fn(),
@@ -34,6 +35,7 @@ const client = {
   clubRosterMember: { findMany: mocks.rosterFindMany },
   memberClassCompletion: { findMany: mocks.completionFindMany },
   memberHonorEntry: { findMany: mocks.entryFindMany },
+  clubDirectorGrant: { findMany: mocks.grantFindMany },
   $transaction: (work: (tx: unknown) => unknown) => work(client),
 };
 
@@ -134,6 +136,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.orgFindUnique.mockResolvedValue({ type: "CLUB", name: "Test Pathfinders" });
   mocks.orgFindMany.mockResolvedValue([]);
+  mocks.grantFindMany.mockResolvedValue([]);
   mocks.reportFindUnique.mockResolvedValue(null);
   mocks.reportFindMany.mockResolvedValue([]);
   mocks.reportCreate.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve(stored(data)));
@@ -639,7 +642,16 @@ describe("staff list and CSV", () => {
       stored({ organizationId: "club-1", status: "SUBMITTED", prefill: { memberMale57: 2 }, firstSubmittedAt: new Date("2027-04-09T15:00:00Z"), submittedAt: new Date("2027-04-09T15:00:00Z") }),
       stored({ id: "report-2", organizationId: "club-2", status: "DRAFT", prefill: { memberMale57: 9 } }),
     ]);
-    const clubs = await listYearEndReportsForYear("2026-27");
+    const grant = (organizationId: string, displayName: string, over: Record<string, unknown> = {}) => ({
+      organizationId, effectiveFrom: new Date("2026-01-01T00:00:00Z"), effectiveTo: null, revokedAt: null, attendeeAccount: { displayName }, ...over,
+    });
+    mocks.grantFindMany.mockResolvedValue([
+      grant("club-1", "Dana Example"),
+      grant("club-1", "Sam Example"),
+      grant("club-2", "Ended Example", { effectiveTo: new Date("2026-02-01T00:00:00Z") }),
+    ]);
+    const clubs = await listYearEndReportsForYear("2026-27", new Date("2027-04-10T12:00:00Z"));
+    expect(clubs.map((club) => club.directors)).toEqual([["Dana Example", "Sam Example"], [], []]);
     expect(clubs.map((club) => [club.name, club.status, club.late])).toEqual([["Alpha", "SUBMITTED", true], ["Bravo", "DRAFT", false], ["Charlie", "NONE", false]]);
     expect(clubs[1].report).toBeNull();
     expect(yearEndProgress(clubs)).toEqual({ submitted: 1, missing: 2, drafts: 1 });

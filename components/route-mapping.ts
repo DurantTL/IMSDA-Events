@@ -233,6 +233,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
 export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/admin/club-forms/[templateKey]": "Club form builder, opened from Club forms.",
   "/admin/clubs/reports/[organizationId]/[month]": "One club's Monthly Record, opened from Review monthly records.",
+  "/admin/clubs/reports/year-end/[organizationId]/[year]": "One club's Year-End Report, read only, opened from the Year-End Reports list.",
   "/admin/event-templates/[templateId]": "Edit one event template, opened from Event templates.",
   "/admin/form-templates/[templateKey]": "One form template, opened from Form templates.",
   "/admin/information-forms/[formId]": "One information form, opened from Information forms.",
