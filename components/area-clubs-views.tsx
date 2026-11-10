@@ -2,6 +2,7 @@ import navStyles from "@/components/staff-records-nav.module.css";
 import Link from "next/link";
 import { areaHealthHref } from "@/modules/coordinator-health/domain";
 import { RecordCellLink } from "@/components/month-heading-link";
+import monthGridStyles from "@/components/month-heading-link.module.css";
 import { ColumnHeader } from "@/components/column-header";
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { Download } from "lucide-react";
@@ -131,7 +132,7 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query, sorting
   return (
     <div className="report-table-wrap club-reports-grid" id="monthly-grid">
       {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : "number")}</SortOrderNote>}
-      <table role="table" className="report-table table-cards table-cards-xwide">
+      <table role="table" className={`report-table table-cards table-cards-xwide ${monthGridStyles.monthGrid}`}>
         <caption className="sr-only">Monthly Record status and points by club for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">

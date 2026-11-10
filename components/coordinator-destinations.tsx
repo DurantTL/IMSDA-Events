@@ -3,6 +3,7 @@ import { NavigationLink as Link } from "@/components/navigation-link";
 import { areaHealthHref } from "@/modules/coordinator-health/domain";
 import { ColumnHeader } from "@/components/column-header";
 import { RecordCellLink } from "@/components/month-heading-link";
+import monthGridStyles from "@/components/month-heading-link.module.css";
 import { reportMonthLabel } from "@/modules/club-reports/domain";
 import { yearLabel } from "@/modules/club-rosters/home-view";
 import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
@@ -126,7 +127,7 @@ export function CoordinatorMonthlyRecords({
   return (
     <CoordinatorScrollRegion className="club-reports-grid" label={`Monthly Records by club and month, ${clubYear}`}>
       {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : key?.startsWith("month-") ? "state" : "number")}</SortOrderNote>}
-      <table className="report-table table-cards table-cards-xwide" role="table">
+      <table className={`report-table table-cards table-cards-xwide ${monthGridStyles.monthGrid}`} role="table">
         <caption className="sr-only">Monthly Record status by club for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">

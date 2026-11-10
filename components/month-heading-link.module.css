@@ -26,3 +26,11 @@
   font-weight: inherit;
   text-decoration: underline;
 }
+
+/* The month-by-month grids (#1842): month columns wrap and use tight side padding so 12 months plus the totals fit the
+   box at 1280px with the 44px links inside them. Doubled class beats the grid's nowrap rule in globals.css. */
+table.monthGrid.monthGrid :is(td, th):not(:first-child) {
+  padding-inline: 5px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
