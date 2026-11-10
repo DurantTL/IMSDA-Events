@@ -179,8 +179,10 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
       // Each view is a page that checks Clubs administration itself, so each is gated the same way (#1588).
       views: [
         { href: clubsAdminRecordsHref, label: "Monthly Records", visible: clubs },
-        { href: reviewMonthlyRecordsHref, label: "Review monthly records", visible: clubs },
+        // Year-end second (#1841): at 390px the four views then sit in two rows before and after the web font swaps in, so
+        // the page does not jump on load.
         { href: clubYearEndHref, visible: clubs },
+        { href: reviewMonthlyRecordsHref, label: "Review monthly records", visible: clubs },
         { href: clubPointsHref, label: "Points", visible: clubs },
       ],
     },

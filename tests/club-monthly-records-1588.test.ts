@@ -19,11 +19,11 @@ const read = (path: string) => readFileSync(path, "utf8");
 describe("Monthly records tab views (#1588)", () => {
   const tab = (viewer: StaffAreaViewer) => areaTabs("clubs", viewer).find((item) => item.key === "monthly-records");
 
-  it("lists Monthly Records, Review monthly records, Year-end and Points, within the five-view cap", () => {
+  it("lists Monthly Records, Year-end, Review monthly records and Points, within the five-view cap", () => {
     const views = tab(clubsAdmin)!.views!;
-    expect(views.map((view) => view.label)).toEqual(["Monthly Records", "Review monthly records", "Club Year-End Reports", "Points"]);
+    expect(views.map((view) => view.label)).toEqual(["Monthly Records", "Club Year-End Reports", "Review monthly records", "Points"]);
     expect(views.length).toBeLessThanOrEqual(maxViewsPerTab);
-    expect(views.map((view) => view.href)).toEqual(["/admin/clubs/summary?view=records#monthly-records", "/admin/clubs/reports", "/admin/clubs/reports/year-end", "/admin/clubs/summary?view=points#points"]);
+    expect(views.map((view) => view.href)).toEqual(["/admin/clubs/summary?view=records#monthly-records", "/admin/clubs/reports/year-end", "/admin/clubs/reports", "/admin/clubs/summary?view=points#points"]);
   });
 
   it("shows nothing to someone without Clubs administration", () => {
