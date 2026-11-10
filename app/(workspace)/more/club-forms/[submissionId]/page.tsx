@@ -34,7 +34,7 @@ export default async function StaffClubFormPage({
   return (
     <section className="page-stack club-form-page">
       <div className="club-form-page-actions intro-actions">
-        <BackLink href={`/more/club-forms${event ? `?event=${encodeURIComponent(event)}` : ""}`} variant="staff">Back to club forms</BackLink>
+        <BackLink href={`/more/club-forms${event ? `?event=${encodeURIComponent(event)}` : ""}`} variant="staff">Back to submissions</BackLink>
         <PrintFormButton />
       </div>
       <ClubFormSubmissionView submission={submission} />

@@ -12,6 +12,7 @@ import { getClubFormBuilderView } from "@/modules/club-forms/builder";
 import { STALE_DRAFT_MESSAGE } from "@/modules/club-forms/builder-messages";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { DetailPage } from "@/components/page-templates/detail-page";
 
 export const metadata: Metadata = { title: "Club form builder" };
 export const dynamic = "force-dynamic";
@@ -32,20 +33,37 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
   });
   if (!view) notFound();
 
+  const draftLine = view.draftUnreadable
+    ? "A saved draft cannot be read; discard it."
+    : view.draftStale
+      ? `Draft is stale (started on version ${view.draftBaseVersion ?? "?"}); discard it.`
+      : view.draft !== null
+        ? `Draft saved, started on version ${view.draftBaseVersion ?? view.version}, not published yet.`
+        : "No draft.";
+
   return (
-    <section className="page-stack">
-      <AdminPageHeader path={`/admin/club-forms/${templateKey}`} />
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">System administration</p>
-          <h2>{view.published.name}</h2>
-          <p>
-            Changes are saved as a draft. Publishing creates a new version for new fills. Forms already filled in keep the
-            version they were filled in on. A field that was ever sensitive or a birth date keeps that setting for good; hide it
-            from new forms instead of deleting it.
-          </p>
-        </div>
-      </div>
+    <>
+    <AdminPageHeader path={`/admin/club-forms/${templateKey}`} />
+    <DetailPage
+      header={{ title: view.published.name }}
+      notices={(
+        <p className="inline-notice" role="status">
+          Changes are saved as a draft. Publishing creates a new version for new fills. Forms already filled in keep the
+          version they were filled in on. A field that was ever sensitive or a birth date keeps that setting for good; hide it
+          from new forms instead of deleting it.
+        </p>
+      )}
+    >
+      <section aria-labelledby="club-form-status-heading" className="panel">
+        <h2 id="club-form-status-heading">Form status</h2>
+        <ul>
+          <li>Status: {view.enabled ? "On" : "Off"}</li>
+          <li>Published version: {view.version}</li>
+          <li>{draftLine}</li>
+          <li>Forms filled in: {view.submissionCount}</li>
+        </ul>
+        <p className="quiet-copy">Who fills it in and whether it is required are set on the <Link href="/admin/club-forms">Club forms list</Link>.</p>
+      </section>
       {view.customized && <p className="field-help">Edited in the app; code updates no longer apply to this form.</p>}
       {view.draftStale ? (
         <ClubFormDraftDiscard
@@ -86,6 +104,7 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
           />
         )}
       </div>
-    </section>
+    </DetailPage>
+    </>
   );
 }

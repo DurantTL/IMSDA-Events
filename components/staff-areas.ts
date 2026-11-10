@@ -298,9 +298,12 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   if (pathname === homeDestinations.comingUp.href) return place("home", "coming-up");
   if (pathname === homeDestinations.needsYou.href) return place("home", "needs-you");
   if (under(pathname, "/help") || under(pathname, "/profile")) return place("home", null);
+  // Submitted club forms belong to the clubs, not to an event (#1573): with no `event` parameter they sit in Admin -> Forms beside
+  // the definitions. With one (the person came from that event's More card) they stay in the event shell.
+  if (under(pathname, "/more/club-forms") && !params.get("event")) return place("admin", "hub-forms", "/admin/club-forms");
   if (isEventScopedPath(pathname)) return { area: "events", tab: null, view: null, inEvent: true };
 
-  if (pathname === "/admin") return place("admin", "system-administration");
+  if (pathname === "/admin")return place("admin", "system-administration");
   if (under(pathname, adminHubs.events.href)) return place("admin", "hub-events");
   if (under(pathname, adminHubs.clubs.href)) return place("admin", "hub-clubs");
   if (under(pathname, adminHubs.people.href)) return place("admin", "hub-people");

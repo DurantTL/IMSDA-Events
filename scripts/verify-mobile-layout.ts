@@ -485,6 +485,8 @@ const pages: PageSpec[] = [
   staff("system-report", "/admin/system-report", "system-admin"),
   staff("club-supplies", "/admin/club-supplies", "system-admin"),
   staff("club-forms", "/admin/club-forms", "system-admin"),
+  // Submitted club forms with no event (#1573): they sit in Admin -> Forms, not in an event's shell.
+  { name: "staff-club-forms-submissions-no-event", path: "/more/club-forms", role: "system-admin" },
   // The club form settings page, with the "Email these addresses when this form is submitted" box (#1017).
   staff("club-form-alerts", "/admin/club-forms/off_premises_permission_slip", "system-admin"),
   // The form template library and its editor (#1064).
