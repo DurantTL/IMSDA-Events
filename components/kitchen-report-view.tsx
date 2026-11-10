@@ -2,12 +2,24 @@ import { ExportLink } from "@/components/export-link";
 import { Download } from "lucide-react";
 import { cardCell } from "@/components/table-card-labels";
 import { PrintReportButton } from "@/components/print-report-button";
+import styles from "./meals-kitchen.module.css";
 import type { KitchenReport } from "@/modules/registrations/kitchen-report";
 
 /** The kitchen report (#787): counts and answers as typed, no names. Shared by the staff and Area Coordinator pages. */
 export function KitchenReportView({ eventName, report, csvHref, showHeader = true }: { eventName: string; report: KitchenReport; csvHref: string; /** False on the staff page, which draws the shared page header (#1579) with this sentence and the two actions. The Area Coordinator page keeps its own. */ showHeader?: boolean }) {
   return (
     <section className="page-stack kitchen-report">
+      {/* The staff page draws the shared header on screen; on paper that header is hidden, so the printout keeps its own title block (#787). */}
+      {!showHeader && (
+        <div className={styles.printOnly} data-testid="kitchen-print-intro">
+          <p className="eyebrow" translate="no">{eventName}</p>
+          <h2>Kitchen report</h2>
+          <p>
+            Confirmed registrations only. {report.totalPeople} {report.totalPeople === 1 ? "person" : "people"} counted, {report.peopleWithNeeds} with a dietary need.
+            Answers are shown as typed and are not linked to anyone.
+          </p>
+        </div>
+      )}
       {showHeader && (
         <div className="page-intro">
           <div>

@@ -39,8 +39,9 @@ export default async function KitchenCountsPage({ searchParams }: { searchParams
     })),
   }));
   return (
-    <section className="page-stack kitchen-counts-page">
+    <>
       {strip}
+      <section className="page-stack kitchen-counts-page">
       <StaffPageHeader description={canEnter ? "Enter what the kitchen prepared, wasted, donated and transferred for each meal service." : "What the kitchen prepared, wasted, donated and transferred for each meal service."} />
       {firstParam(params.restricted) === "1" && (
         <div className="inline-notice" role="status">
@@ -49,6 +50,7 @@ export default async function KitchenCountsPage({ searchParams }: { searchParams
       )}
       {canEnter && <KitchenCountsEntry eventId={event.id} services={services} />}
       <KitchenCountsTable report={report} timeZone={report.timeZone} csvHref={`/api/events/${encodeURIComponent(event.id)}/exports/kitchen-counts`} />
-    </section>
+      </section>
+    </>
   );
 }

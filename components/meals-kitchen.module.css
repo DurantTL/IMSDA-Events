@@ -21,6 +21,16 @@
   margin: 0;
 }
 
+.printOnly {
+  display: none;
+}
+
+@media print {
+  .printOnly {
+    display: block;
+  }
+}
+
 /* The page header is screen chrome: a printed kitchen report is the tables only (#787). */
 @media print {
   .printHide {

@@ -27,10 +27,12 @@ export default async function MealCloseoutPage({ searchParams }: { searchParams:
   const closeout = await loadMealCloseout(event.id);
   const base = `/api/events/${encodeURIComponent(event.id)}/exports/meals-closeout`;
   return (
-    <section className="page-stack meal-closeout-page">
+    <>
       {strip}
+      <section className="page-stack meal-closeout-page">
       <StaffPageHeader description="Meal charges, credits, conference billing and walk-up orders beside what was ordered, served and prepared, with every difference listed." />
       <MealCloseout eventId={event.id} closeout={closeout} csvHref={base} exceptionsCsvHref={`${base}?part=exceptions`} />
-    </section>
+      </section>
+    </>
   );
 }

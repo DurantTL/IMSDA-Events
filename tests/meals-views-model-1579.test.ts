@@ -8,7 +8,7 @@ const keys = (permissions: string[]) => mealsViews("e", permissions).map((view) 
 
 describe("mealsViews (#1579)", () => {
   it("gives a viewer with every permission all five pages, in order, with ?event", () => {
-    const views = mealsViews("ev 1", ["CONFIGURE_EVENT", "MANAGE_FINANCE", "VIEW_REPORTS", "MANAGE_KITCHEN_COUNTS"], "counts");
+    const views = mealsViews("ev 1", ["CONFIGURE_EVENT", "MANAGE_FINANCE", "VIEW_REPORTS", "MANAGE_KITCHEN_COUNTS", "VIEW_EVENT"], "counts");
     expect(labels(views)).toEqual(["Meals", "Kitchen report", "Kitchen counts", "Scanner results", "Meal closeout"]);
     expect(views.map((view) => view.href)).toEqual([
       "/more/meals?event=ev%201",
@@ -34,6 +34,11 @@ describe("mealsViews (#1579)", () => {
 
   it("gives kitchen-only staff just the counts page, so their focused entry has no strip", () => {
     expect(keys(["MANAGE_KITCHEN_COUNTS"])).toEqual(["counts"]);
+  });
+
+  it("leaves Meals out for a kitchen viewer without the event view, whose /more/meals redirects to counts", () => {
+    expect(keys(["MANAGE_KITCHEN_COUNTS", "VIEW_REPORTS"])).toEqual(["kitchen-report", "counts", "scanner"]);
+    expect(keys(["MANAGE_KITCHEN_COUNTS", "VIEW_REPORTS", "VIEW_EVENT"])).toEqual(["meals", "kitchen-report", "counts", "scanner"]);
   });
 
   it("gives other permissions nothing and marks no page current without one", () => {

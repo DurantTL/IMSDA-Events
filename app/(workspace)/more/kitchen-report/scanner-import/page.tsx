@@ -35,8 +35,9 @@ export default async function ScannerImportPage({ searchParams }: { searchParams
   const drillLabel = serviceKey ? report.rows.find((row) => row.key === serviceKey)?.label ?? serviceKey : "";
 
   return (
-    <section className="page-stack">
+    <>
       {strip}
+      <section className="page-stack">
       <StaffPageHeader description="Bring the café scanner’s results back to see how many meals were served." />
 
       <KitchenMealsServed
@@ -70,6 +71,7 @@ export default async function ScannerImportPage({ searchParams }: { searchParams
       )}
 
       <ScannerImportWorkspace eventId={event.id} />
-    </section>
+      </section>
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { isKitchenWithoutEventView, type EventPermission } from "@/modules/access/permissions";
 import type { RowView } from "@/components/staff-tab-row-model";
 
 export type MealsViewKey = "meals" | "kitchen-report" | "counts" | "scanner" | "closeout";
@@ -23,7 +24,10 @@ const specs: readonly Spec[] = [
  * strip renders as nothing.
  */
 export function mealsViews(eventId: string, permissions: readonly string[], current?: MealsViewKey): RowView[] {
+  // /more/meals sends a kitchen viewer without the event view back to the counts page, so it is not offered to them.
+  const kitchenOnly = isKitchenWithoutEventView(permissions as readonly EventPermission[]);
   return specs
+    .filter((spec) => !(kitchenOnly && spec.key === "meals"))
     .filter((spec) => spec.anyOf.some((permission) => permissions.includes(permission)))
     .map((spec) => ({
       key: spec.key,
