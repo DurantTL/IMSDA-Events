@@ -645,6 +645,10 @@ jobs:
         env:
           JOURNEY_SHARD: phone
         run: npm run test:club-journeys
+      # The staff shell on a phone and an iPad (#1566): about 40 seconds on the app this job already built and the browser it
+      # already installed (playwright-core comes with playwright). Last, so the journeys see the database before its rows.
+      - name: Staff phone and iPad tasks
+        run: npm run test:staff-phone-tasks
       - name: Show the app log when a check failed
         if: failure()
         run: cat app.log || true
