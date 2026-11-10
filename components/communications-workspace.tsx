@@ -1542,6 +1542,7 @@ export function CommunicationsWorkspace({
 
       {view === "announcements" && (
         <ViewPanel managed={canManage} view="announcements">
+        <h2 className="sr-only">Announcements</h2>
         <div className="communications-grid">
           <section className="announcement-list">
             {announcements.map((announcement) => (
@@ -2007,6 +2008,7 @@ export function CommunicationsWorkspace({
                 {templateDirty && <span className="unsaved-dot" role="status">Unpublished changes</span>}
                 <button className="primary-button" type="submit" disabled={saving || !templateDirty || templateCheck.hasErrors}><Save size={16} aria-hidden="true" /> {saving ? "Publishing…" : "Publish new version"}</button>
               </div>
+              <h3>Version history</h3>
               <div className="message-version-history">
                 {selectedTemplate.versions.map((version) => (
                   <div key={version.id}>
@@ -2302,6 +2304,7 @@ export function CommunicationsWorkspace({
                       <summary>Plain-text fallback</summary>
                       <pre className="message-body-snapshot">{withPreviewLinks(selectedMessage.bodyText)}</pre>
                     </details>
+                    <h3>Attempts</h3>
                     <div className="message-attempts">
                       {selectedMessage.attempts.map((attempt) => (
                         <div key={attempt.id}>

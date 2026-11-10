@@ -58,7 +58,7 @@ describe("each page has one titled header and is registered (#1585)", () => {
     for (const route of ["/communications", "/communications/scheduled", "/community"]) expect(pageOwnsHeader(route), route).toBe(true);
   });
 
-  it("draws one h1 in the strip's words on /communications, with the filled New announcement beside it", async () => {
+  it("draws one h1 with the page's title on /communications, with the filled New announcement beside it", async () => {
     const markup = await render(CommunicationsPage as never);
     expect(count(markup, /<h1\b/g)).toBe(1);
     expect(markup).toContain(`${staffPageTitles.emails}</h1>`);
