@@ -6,11 +6,6 @@
       "label": "Monthly Records",
       "reason": "The page is titled by what it does (review monthly records); the tab says Monthly Records."
     },
-    "/more/merchandise": {
-      "title": "Merchandise catalog",
-      "label": "Merchandise",
-      "reason": "The page says Merchandise catalog; the menu says Merchandise."
-    },
     "/more/clubs": {
       "title": "Clubs",
       "label": "This event's clubs",

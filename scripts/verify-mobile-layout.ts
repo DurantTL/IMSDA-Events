@@ -354,6 +354,7 @@ const pages: PageSpec[] = [
   // Check-out for a person with keys out, a held cash deposit, a lost key and a charge (#214), and the closeout.
   staff("issued-assets-checkout", `/check-in/assets?attendee=${P}_reg_attendee_3_0`),
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
+  staff("merchandise", "/more/merchandise"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
   // Meal money closeout (#212): the money table, the exceptions and their review forms.
