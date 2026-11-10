@@ -3,8 +3,31 @@
 .rosterTableWrap:global(.report-table-wrap):has(> :global(table.table-cards)) { overflow-x: auto; overflow-y: hidden; padding: 4px 3px; margin: -4px -3px; }
 .rosterTableWrap:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
 
-/* Table layout only (the wrap is wider than 1100px); a narrower wrap shows cards, which keep their own rules. */
+/* Table layout only (the wrap is wider than 1100px; a desktop window gets the same rules below). A narrower wrap on a phone or
+   tablet shows cards, which keep their own rules. */
 @container table-box (min-width: 1101px) {
+  :global(.roster-card-table) :global(th) { padding-inline: 8px; }
+  :global(.roster-card-table) :global(td) { padding-inline: 8px; }
+  :global(.roster-card-table) :global(th.roster-card-name) { min-width: 12.5rem; }
+  :global(.roster-card-table) :global(td.roster-card-flags) { min-width: 7rem; }
+  :global(.roster-card-table) :global(td.roster-row-actions) { min-width: 6.5rem; }
+  /* Edit sits over Actions, so the last column is one narrow stack; both keep 44px targets. */
+  :global(.roster-card-table) :global(.roster-row-action-set) { flex-direction: column; align-items: stretch; gap: 6px; }
+  :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) { display: block; }
+  :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) > summary:global(.actions-menu-trigger) { justify-content: center; }
+  :global(.roster-card-table) :global(.roster-row-action-set) > button { justify-content: center; }
+  :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) > summary:global(.actions-menu-trigger) { width: 100%; box-sizing: border-box; }
+}
+
+/* A desktop window with a mouse, 1024px or wider, always shows the table (#1838). The shared cards switch at a 1100px box
+   (table-cards-xwide), and the club portal's roster box is about 1130px only in a window 1250px or wider (1310px on the
+   staff club page, beside the side rail), so a laptop window that was not full width, in any browser, showed phone cards.
+   Here the wrap of a table marked data-cards="touch" stops being the `table-box` container, so the card rules never match (the
+   mobile layout audit knows the marker). The nine columns fit an 810px box (the staff page at 1024px), and the wrap still
+   scrolls sideways if extra columns (Show gender, Show school details) or a long name make the table wider. Phones and tablets
+   (a touch screen, or a window under 1024px) keep the cards. */
+@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+  .rosterTableWrap:global(.report-table-wrap):has(> :global(table.table-cards[data-cards="touch"])) { container: none; }
   :global(.roster-card-table) :global(th) { padding-inline: 8px; }
   :global(.roster-card-table) :global(td) { padding-inline: 8px; }
   :global(.roster-card-table) :global(th.roster-card-name) { min-width: 12.5rem; }

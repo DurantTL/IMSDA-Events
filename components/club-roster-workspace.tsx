@@ -995,7 +995,7 @@ function ClubRosterWorkspaceInner({
                   <p className={styles.empty}>{section.empty}</p>
                 ) : (
                   <RosterTableScroll label={`${section.title}, scrolls sideways`}>
-                    <table aria-labelledby={`roster-section-${section.key.toLowerCase()}-title`} className="report-table table-cards table-cards-xwide roster-card-table" role="table">
+                    <table aria-labelledby={`roster-section-${section.key.toLowerCase()}-title`} className="report-table table-cards table-cards-xwide roster-card-table" data-cards="touch" role="table">
                       <thead role="rowgroup">
                         <tr role="row">
                           {columns.map((column) => {

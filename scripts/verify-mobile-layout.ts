@@ -30,7 +30,8 @@
  *  - squeezed text (#996): no visible text in a box narrower than about four characters, no text that wraps one
  *    character per line, and no ordinary word (6 to 15 letters) broken in the middle; only emails, codes and
  *    unbroken strings that cannot fit may break anywhere;
- *  - a `table-cards` table sits in a `table-box` container (`table-cards-no-box`), so it can become cards;
+ *  - a `table-cards` table sits in a `table-box` container (`table-cards-no-box`), so it can become cards (a `data-cards="touch"`
+ *    table, the club roster, is exempt on a desktop window with a mouse at 1024px or wider, where it stays a table, #1838);
  *  - tables never scroll sideways (#1457), at every width: a table whose scrolling box is wider than the box is `table-scrolls-sideways`
  *    (no scroll-cue exemption; a table that does not fit is the shared `table-cards` cards, switched by its container's width),
  *    and a table clipped by its box or sticking out of it is `table-wider-than-box` (#997);
@@ -2221,6 +2222,9 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
   for (const table of Array.from(document.querySelectorAll("table.table-cards"))) {
     if (!visible(table) || inHiddenTree(table)) continue;
     const parent = table.parentElement;
+    // A table marked data-cards="touch" (the club roster, #1838) is cards on phones and tablets only: a desktop window with a mouse,
+    // 1024px or wider, drops its container on purpose so it stays a table there. Anywhere else it still needs the container.
+    if (table.getAttribute("data-cards") === "touch" && matchMedia("(hover: hover) and (pointer: fine) and (min-width: 1024px)").matches) continue;
     if (parent && !/(^|\s)table-box(\s|$)/.test(getComputedStyle(parent).containerName)) cardsWithoutBox.push(`${describe(table)} sits in ${describe(parent)}, which is not a table-box container: it never becomes cards`);
   }
 
