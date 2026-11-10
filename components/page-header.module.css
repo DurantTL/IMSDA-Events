@@ -31,12 +31,21 @@
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
 }
 
+/* The one page title look. The staff shell's own title composes this class (`.pageTitle` in staff-shell.module.css), so a page titled by the shell and a page that draws its own match at every width (G1, G3). */
 .title {
   margin: 0;
   color: var(--ink);
-  font-size: max(var(--type-staff-floor, 0px), 1.6rem);
+  font-size: max(var(--type-staff-floor, 0px), clamp(1.35rem, 2vw, 1.7rem));
+  font-weight: 800;
+  letter-spacing: -0.02em;
   line-height: 1.2;
   overflow-wrap: anywhere;
+}
+
+@media (max-width: 800px) {
+  .title {
+    font-size: max(var(--type-staff-floor, 0px), 1.18rem);
+  }
 }
 
 .description {
@@ -64,8 +73,8 @@
   min-width: 0;
 }
 
-/* Below 640px the actions drop under the title, full width, the main action first. */
-@media (max-width: 640px) {
+/* Below 640px (639px and narrower) the actions drop under the title, full width, the main action first. */
+@media (max-width: 639px) {
   .actions {
     width: 100%;
     flex-direction: column;

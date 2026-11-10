@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import ArchivedEventsPage from "@/app/archived-events/page";
 import { AdminHub } from "@/components/admin-hub";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { PageHeader } from "@/components/page-header";
@@ -11,10 +12,18 @@ import { FormPage } from "@/components/page-templates/form-page";
 import { HubPage } from "@/components/page-templates/hub-page";
 import { ListPage } from "@/components/page-templates/list-page";
 import { StepPage, stepLine } from "@/components/page-templates/step-page";
+import { OwnHeaderState } from "@/components/own-header-state";
 import { StaffPageHeader } from "@/components/staff-page-header";
-import { root, source, staffReach } from "./helpers/page-sources-1772";
+import { drawsH1, root, source, staffReach } from "./helpers/page-sources-1772";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/x", useRouter: () => ({ push: vi.fn() }) }));
+const navigation = vi.hoisted(() => ({ path: "/x" }));
+vi.mock("next/navigation", () => ({ usePathname: () => navigation.path, useRouter: () => ({ push: vi.fn() }), redirect: vi.fn() }));
+vi.mock("server-only", () => ({}));
+vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: { id: "user_1", email: "staff@example.test", globalRole: "SYSTEM_ADMIN" } }) }));
+vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
+vi.mock("@/modules/events/archive-repository", () => ({
+  listArchivedEventsForUser: async () => [{ id: "evt_1", name: "Sample archived event", startsAt: new Date("2025-06-01T15:00:00Z"), endsAt: new Date("2025-06-02T15:00:00Z"), timezone: "America/Chicago" }],
+}));
 
 // A loosely typed createElement: the templates take their sections as children, which the strict overloads reject here.
 const createElement = createTypedElement as unknown as (type: unknown, props?: unknown, ...children: unknown[]) => ReactElement;
@@ -24,6 +33,65 @@ const html = (element: ReactElement) => renderToStaticMarkup(element);
 const count = (text: string, pattern: RegExp) => (text.match(pattern) ?? []).length;
 const primary = createElement("a", { className: "primary-button", href: "/go" }, "Go");
 const secondary = createElement("a", { className: "secondary-button", href: "/other" }, "Other");
+
+describe("the title look is one source (#1772)", () => {
+  const read = (file: string) => readFileSync(join(root, file), "utf8");
+  const block = (css: string, selector: string) => new RegExp(`${selector.replace(".", "\\.")} \\{([^}]*)\\}`).exec(css)?.[1] ?? "";
+
+  it("gives the title the staff title's weight, spacing, size steps and colour", () => {
+    const css = read("components/page-header.module.css");
+    const title = block(css, ".title");
+    expect(title).toContain("font-weight: 800");
+    expect(title).toContain("letter-spacing: -0.02em");
+    expect(title).toContain("clamp(1.35rem, 2vw, 1.7rem)");
+    expect(title).toContain("color: var(--ink)");
+    expect(title).toContain("line-height: 1.2");
+    expect(css).toMatch(/@media \(max-width: 800px\) \{\s*\.title \{[^}]*1\.18rem/);
+  });
+
+  it("makes the shell's own title compose it, with no second set of title rules", () => {
+    const shell = read("components/staff-shell.module.css");
+    expect(shell).toContain('.pageTitle { composes: title from "./page-header.module.css"; }');
+    expect(shell).not.toMatch(/\.pageHeader h1/);
+    expect(source("components/app-shell.tsx")).toContain("<h1 className={styles.pageTitle}>");
+  });
+});
+
+describe("the states that replace a page keep its one h1 (#1772)", () => {
+  it("draws the title for a page that owns its header, and nothing for any other", () => {
+    navigation.path = "/more/clubs/org_1";
+    const owned = html(createElement(OwnHeaderState));
+    expect(count(owned, /<h1\b/g)).toBe(1);
+    expect(owned).toContain(">Club</h1>");
+    navigation.path = "/more/clubs/reports";
+    expect(html(createElement(OwnHeaderState))).toBe("");
+    navigation.path = "/overview";
+    expect(html(createElement(OwnHeaderState))).toBe("");
+    navigation.path = "/x";
+  });
+
+  it("is drawn by the not-found, error and loading views of the workspace", () => {
+    for (const file of ["app/(workspace)/not-found.tsx", "app/(workspace)/error.tsx", "app/(workspace)/loading.tsx"]) {
+      expect(source(file), file).toContain("<OwnHeaderState />");
+    }
+  });
+});
+
+describe("migrated pages carry a real header action (#1772)", () => {
+  it("puts /archived-events' Back to events link in the header, once, as the outlined button", async () => {
+    const markup = html(await ArchivedEventsPage());
+    expect(count(markup, /Back to events/g)).toBe(1);
+    expect(markup.indexOf("Back to events")).toBeGreaterThan(markup.indexOf("<h1"));
+    expect(markup.indexOf("Back to events")).toBeLessThan(markup.indexOf("Sample archived event"));
+    expect(markup).toMatch(/page-header-actions[^>]*>\s*<a class="secondary-button" href="\/admin">Back to events/);
+    expect(count(markup, /primary-button/g)).toBe(0);
+  });
+
+  it("keeps /select-event's Archived events link in the header under the same condition", () => {
+    const page = source("app/select-event/page.tsx");
+    expect(page).toContain("secondary: archivedEvents.length > 0");
+  });
+});
 
 describe("PageHeader (#1772)", () => {
   it("draws one h1, the one-sentence description, an eyebrow and the actions in the approved order", () => {
@@ -55,7 +123,7 @@ describe("PageHeader (#1772)", () => {
 
   it("drops the actions under the title below 640px, full width", () => {
     const css = readFileSync(join(root, "components/page-header.module.css"), "utf8");
-    expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.actions \{[^}]*width: 100%/);
+    expect(css).toMatch(/@media \(max-width: 639px\)[\s\S]*\.actions \{[^}]*width: 100%/);
     expect(css).toMatch(/\.actions > :is\(a, button\) \{[^}]*min-height: 44px/);
   });
 });
@@ -145,20 +213,21 @@ describe("the five page templates (#1772)", () => {
 });
 
 describe("no staff page draws an h1 outside PageHeader (#1772, rule D1)", () => {
-  const exceptions: { files: string[] } = JSON.parse(readFileSync(join(root, "tests/fixtures/h1-exceptions-1772.json"), "utf8"));
-  const drawsH1 = (file: string) => /<h1\b/.test(source(file));
+  const exceptions: { files: Record<string, string> } = JSON.parse(readFileSync(join(root, "tests/fixtures/h1-exceptions-1772.json"), "utf8"));
+  const listed = Object.keys(exceptions.files);
   const found = [...staffReach()].filter((file) => file !== "components/page-header.tsx" && drawsH1(file)).sort();
 
   it("fails for any new file with an h1", () => {
-    expect(found.filter((file) => !exceptions.files.includes(file))).toEqual([]);
+    expect(found.filter((file) => !listed.includes(file))).toEqual([]);
   });
 
   it("fails when a reviewed exception no longer has an h1, so the list only shrinks", () => {
-    expect(exceptions.files.filter((file) => !found.includes(file))).toEqual([]);
+    expect(listed.filter((file) => !found.includes(file))).toEqual([]);
   });
 
   it("keeps the shell's own h1 as one reviewed exception", () => {
-    expect(exceptions.files).toContain("components/app-shell.tsx");
+    expect(listed).toContain("components/app-shell.tsx");
+    expect(Object.values(exceptions.files).every((reason) => reason.length > 10)).toBe(true);
   });
 
   it("draws the h1 in PageHeader", () => {

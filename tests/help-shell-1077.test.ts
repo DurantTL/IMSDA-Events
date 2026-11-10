@@ -62,9 +62,9 @@ describe("Help & learning in the shell", () => {
 
   it("titles the topbar and keeps Help & learning for staff with no event, without event controls", () => {
     const markup = render("/help", [], false);
-    expect(markup).toContain("<h1>Help &amp; learning</h1>");
+    expect(markup).toMatch(/<h1[^>]*>Help &amp; learning<\/h1>/);
     expect(helpLit(markup)).toBe(true);
     expect(markup).not.toContain('id="event-picker"');
-    expect(render("/help/glossary", ["VIEW_EVENT"])).toContain("<h1>Glossary</h1>");
+    expect(render("/help/glossary", ["VIEW_EVENT"])).toMatch(/<h1[^>]*>Glossary<\/h1>/);
   });
 });

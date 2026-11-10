@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, SearchX } from "lucide-react";
+import { OwnHeaderState } from "@/components/own-header-state";
 
 export const metadata: Metadata = { title: "Not found" };
 
@@ -17,6 +18,7 @@ export const metadata: Metadata = { title: "Not found" };
 export default function WorkspaceNotFound() {
   return (
     <section className="page-stack">
+      <OwnHeaderState />
       <div className="forbidden-state panel">
         <span><SearchX size={26} aria-hidden="true" /></span>
         <p className="eyebrow">Not found</p>

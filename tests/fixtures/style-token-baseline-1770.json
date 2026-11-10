@@ -83,7 +83,7 @@
     "components/staff-account-menu.module.css": 1,
     "components/staff-create-menu.module.css": 1,
     "components/staff-monthly-records.module.css": 1,
-    "components/staff-shell.module.css": 6,
+    "components/staff-shell.module.css": 4,
     "components/two-step-recovery-link.module.css": 1,
     "components/two-step-setup.module.css": 7
   },

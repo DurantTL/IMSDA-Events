@@ -38,13 +38,12 @@ export default async function ArchivedEventsPage() {
       <section className="auth-card select-event-card">
         <BrandLink className="auth-brand" wordmark />
         <ListPage
-          header={{ title: "Archived events", description: "Archived events are hidden from pickers and the public site, and registration is closed. Their records, reports and exports are still here." }}
-          footer={(
-            <>
-              <Link className="secondary-button full-button" href={backHref}>Back to events</Link>
-              <SignOutButton className="secondary-button full-button" />
-            </>
-          )}
+          header={{
+            title: "Archived events",
+            description: "Archived events are hidden from pickers and the public site, and registration is closed. Their records, reports and exports are still here.",
+            secondary: <Link className="secondary-button" href={backHref}>Back to events</Link>,
+          }}
+          footer={<SignOutButton className="secondary-button full-button" />}
         >
           {events.length === 0 ? (
             <p role="status">There are no archived events.</p>

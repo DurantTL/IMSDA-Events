@@ -354,7 +354,7 @@ export function AppShell({
           {!pageDrawsOwnHeader && (
             <header className={styles.pageHeader}>
               <div>
-                <h1>{pageTitle}</h1>
+                <h1 className={styles.pageTitle}>{pageTitle}</h1>
                 {showContextChip && (
                   <p className="work-context" data-context={workContext.kind}>
                     <span className="work-context-kind">{workContext.kindLabel}</span>

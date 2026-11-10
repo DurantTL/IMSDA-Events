@@ -63,15 +63,11 @@ export default async function SelectEventPage({
             description: unavailable
               ? "You can\u2019t open that event with this account. Ask your event administrator if you need access, or choose one of your events below."
               : `${session.user.email} has access to more than one event. Pick one to continue.`,
+            secondary: archivedEvents.length > 0
+              ? <Link className="secondary-button" href="/archived-events">Archived events ({archivedEvents.length})</Link>
+              : undefined,
           }}
-          footer={(
-            <>
-              {archivedEvents.length > 0 && (
-                <Link className="secondary-button full-button" href="/archived-events">Archived events ({archivedEvents.length})</Link>
-              )}
-              <SignOutButton className="secondary-button full-button" />
-            </>
-          )}
+          footer={<SignOutButton className="secondary-button full-button" />}
         >
           <SelectEventList
             events={events.map((event) => ({

@@ -21,23 +21,45 @@ export function walk(dir: string, out: string[] = []): string[] {
 export const standaloneStaffPages = ["app/select-event/page.tsx", "app/archived-events/page.tsx", "app/check-in-station/page.tsx"];
 export const workspacePages = () => walk("app/(workspace)").filter((file) => file.endsWith("/page.tsx"));
 
-/** Every file a staff page reaches through `@/components/...` imports, the pages themselves included. */
-export function staffReach(): Set<string> {
+/** The repo files a source file imports: `@/` paths and relative paths, to a .tsx or .ts file or a folder's index. */
+function importsOf(file: string): string[] {
+  const found: string[] = [];
+  for (const match of source(file).matchAll(/(?:from|import)\s*\(?\s*"([^"]+)"/g)) {
+    const spec = match[1]!;
+    const base = spec.startsWith("@/") ? spec.slice(2) : spec.startsWith(".") ? join(file, "..", spec) : null;
+    if (!base) continue;
+    for (const candidate of [`${base}.tsx`, `${base}.ts`, `${base}/index.tsx`, `${base}/index.ts`]) {
+      const clean = candidate.replace(/\\/g, "/");
+      if (existsSync(join(root, clean))) {
+        found.push(clean);
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+/** Every file reached from the given files through imports (`@/...` and relative), the starting files included. */
+export function reachFrom(starts: readonly string[]): Set<string> {
   const seen = new Set<string>();
-  const queue = [...walk("app/(workspace)"), ...standaloneStaffPages];
+  const queue = [...starts];
   while (queue.length > 0) {
     const file = queue.pop()!;
     if (seen.has(file)) continue;
     seen.add(file);
-    for (const match of source(file).matchAll(/from\s+"@\/(components\/[^"]+)"/g)) {
-      for (const extension of [".tsx", ".ts"]) {
-        const candidate = `${match[1]}${extension}`;
-        if (existsSync(join(root, candidate))) queue.push(candidate);
-      }
-    }
+    queue.push(...importsOf(file));
   }
   return seen;
 }
+
+/** Every file a staff page reaches, the pages themselves included. */
+export const staffReach = () => reachFrom([...walk("app/(workspace)"), ...standaloneStaffPages]);
+
+/** A heading level 1 in markup (`<h1`) or chosen at run time (`"h1"`, as in `headingLevel === 1 ? "h1" : "h2"`). */
+export const drawsH1 = (file: string) => /<h1\b|["'`]h1["'`]/.test(source(file));
+
+/** The files that define the header and the states that stand in for a page's title; they are not pages' own uses of it. */
+export const headerDefinitionFiles = (file: string) => file === "components/page-header.tsx" || file === "components/own-header-state.tsx" || file.startsWith("components/page-templates/");
 
 /** The route a workspace page file serves: `app/(workspace)/more/clubs/[id]/page.tsx` is `/more/clubs/[id]`. */
 export const routeOf = (file: string) => `/${relative("app/(workspace)", file).replace(/\/?page\.tsx$/, "")}`.replace(/^\/$/, "/").replace(/\/+/g, "/");

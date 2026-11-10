@@ -8,7 +8,7 @@ import { pageTitleExpressions, root, source } from "./helpers/page-sources-1772"
 
 // #1772 (site rule D2): a page's title is the same words as the tab or hub card that opens it. Synthetic data only.
 const rows = buildRouteMapping().filter((row) => (row.kind === "menu" || row.kind === "shell") && !row.route.includes("["));
-const exceptions: Record<string, { title: string; label: string }> = JSON.parse(readFileSync(join(root, "tests/fixtures/title-label-exceptions-1772.json"), "utf8")).routes;
+const exceptions: Record<string, { title: string; label: string; reason: string }> = JSON.parse(readFileSync(join(root, "tests/fixtures/title-label-exceptions-1772.json"), "utf8")).routes;
 const pageFile = (route: string) => `app/(workspace)${route === "/" ? "" : route}/page.tsx`;
 
 /** The words a title expression gives, or null for a dynamic one (a record's own name). */
@@ -59,6 +59,9 @@ describe("a page's title is the label that opens it (#1772)", () => {
     // A new mismatch fails; an old one that now matches (or moved to a page that draws its own title) must leave the list.
     expect(Object.keys(mismatches).filter((route) => !(route in exceptions)), "new mismatches").toEqual([]);
     expect(Object.keys(exceptions).filter((route) => !(route in mismatches)), "exceptions that no longer mismatch").toEqual([]);
-    for (const [route, entry] of Object.entries(exceptions)) expect(mismatches[route], route).toEqual(entry);
+    for (const [route, { reason, ...entry }] of Object.entries(exceptions)) {
+      expect(reason.length, `${route} has a reason`).toBeGreaterThan(10);
+      expect(mismatches[route], route).toEqual(entry);
+    }
   });
 });
