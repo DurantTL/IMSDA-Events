@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { installCardVariant, isIosDevice, type InstallCardInput } from "@/lib/staff-install-card";
 
@@ -57,5 +59,13 @@ describe("staff install card variant (#1836)", () => {
         expect(variant({ ...device, installPromptAvailable: true, [flag]: true })).toBe("none");
       }
     }
+  });
+
+  it("loads the install-prompt listener from the staff layout, so a prompt fired on another staff page is kept", () => {
+    const layout = readFileSync(path.join(process.cwd(), "app/(workspace)/layout.tsx"), "utf8");
+    expect(layout).toContain('import { StaffInstallPromptCapture } from "@/components/staff-install-card";');
+    expect(layout).toContain("<StaffInstallPromptCapture />");
+    const card = readFileSync(path.join(process.cwd(), "components/staff-install-card.tsx"), "utf8");
+    expect(card).toMatch(/if \(typeof window !== "undefined"\) \{\n  window\.addEventListener\("beforeinstallprompt"/);
   });
 });

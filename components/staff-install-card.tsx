@@ -14,9 +14,10 @@ type InstallPromptEvent = Event & {
 };
 
 /*
- * Capture state lives at module level, not in a component effect. Chromium can fire `beforeinstallprompt` before React
- * finishes hydrating; this module loads with the page's client bundle, so the listener is attached as early as we can
- * without a script in the document head. A page that fired the event before this chunk ran would miss it, which only
+ * Capture state lives at module level, not in a component effect. Chromium fires `beforeinstallprompt` once per page load,
+ * possibly before React finishes hydrating and on whichever staff page opened first. The staff layout renders
+ * StaffInstallPromptCapture, so this module loads with every staff page and a prompt kept on, say, Events is still there
+ * after a client-side move to Home. That is as early as we can attach without a script in the document head. A page that fired the event before this chunk ran would miss it, which only
  * means no card on that load (the Help guide still explains it). Nothing is stored: the event lives in memory.
  */
 let deferredPrompt: InstallPromptEvent | null = null;
@@ -71,6 +72,11 @@ const getPrompt = () => deferredPrompt;
 const getInstalled = () => appInstalled;
 const serverFalse = () => false;
 const serverNull = () => null;
+
+/** Renders nothing: importing it from the staff layout loads the listeners above on every staff page (#1836). */
+export function StaffInstallPromptCapture() {
+  return null;
+}
 
 /** Staff Home: a small, dismissible card that helps save the app to a phone or tablet (#1836). */
 export function StaffInstallCard() {
