@@ -1,0 +1,65 @@
+/* The three template libraries side by side (#1593): what each one holds, with plain links to the other two. */
+.guide {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--card);
+  padding: 12px 14px;
+}
+
+.current {
+  border-left: 4px solid var(--imsda-gold);
+  background: var(--imsda-gold-soft);
+}
+
+.name {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.here {
+  margin-left: 6px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.what {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.copyNote {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+@media (max-width: 860px) {
+  .list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

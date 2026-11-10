@@ -11,6 +11,8 @@ import { serverSort, sortOrderText, sortRows, type SortKind, type SortValue } fr
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listFormTemplateLibrary } from "@/modules/forms/form-template-library";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { TemplateLibrariesGuide } from "@/components/template-libraries-guide";
+import styles from "./form-templates.module.css";
 
 export const metadata: Metadata = { title: "Form templates" };
 export const dynamic = "force-dynamic";
@@ -46,9 +48,14 @@ export default async function AdminFormTemplatesPage({ searchParams }: { searchP
     <section className="page-stack">
       <AdminSectionHeaderFor path="/admin/form-templates" section="system" />
       <StaffPageHeader
-        description="The registration form templates event staff start a form from. Open one to edit it in the form builder. Every save makes a new version; forms already created from a template keep the version they were created with. A template you have edited here is never overwritten by a code update."
+        description="The registration forms event staff start from. Each save makes a new version; forms already created keep the version they were created with."
+        primary={<a className="primary-button" href="#new-template">New template</a>}
       />
-      <section className="panel">
+      <TemplateLibrariesGuide current="form" />
+      <section className="panel dense-rows">
+        {templates.length === 0 ? (
+          <p className={`quiet-copy ${styles.empty}`}>There are no form templates yet. A new template is made as a copy of an existing one, so the library needs one to start from.</p>
+        ) : (
         <div className="report-table-wrap">
           {sorting.order.key && <SortOrderNote>{sortOrderText(templateSortLabels[sorting.order.key].label, sorting.order.dir, templateSortLabels[sorting.order.key].kind)}</SortOrderNote>}
           <table role="table" className="report-table table-cards">
@@ -62,20 +69,24 @@ export default async function AdminFormTemplatesPage({ searchParams }: { searchP
                   <th role="rowheader" scope="row">{template.name}{template.appCreated && <small className="quiet-copy"> · Created in the app</small>}</th>
                   <td {...cardCell("For")}>{template.audience}</td>
                   <td {...cardCell("Version")}>
-                    {template.version ?? "Unreadable"}
-                    <small className="quiet-copy"> · {template.source === "APP" ? "Edited in the app" : "From the code"}</small>
-                    {template.updatedBy && <small className="quiet-copy"> · by {template.updatedBy}</small>}
-                    {template.unreadable && <small className="club-report-problem"> · The stored definition cannot be read. {template.appCreated ? "Event staff cannot pick it." : "Event staff get the code's copy until you save it."}</small>}
+                    <span className={styles.stack}>
+                      {template.unreadable
+                        ? <span className="status-chip coral">Needs repair</span>
+                        : <span className={`status-chip neutral`}>Version {template.version}</span>}
+                      <span className={styles.note}>{template.source === "APP" ? "Edited in the app" : "From the code"}{template.updatedBy ? ` · by ${template.updatedBy}` : ""}</span>
+                      {template.unreadable && <span className={styles.problem}>The stored definition cannot be read. {template.appCreated ? "Event staff cannot pick it." : "Event staff get the code's copy until you save it."}</span>}
+                    </span>
                   </td>
                   <td {...cardCell("Forms created from it")}>{template.usedByForms}</td>
                   <td {...cardCell(null)}>
-                    {!(template.unreadable && template.appCreated) && <Link className="secondary-button" href={`/admin/form-templates/${encodeURIComponent(template.key)}`}>Edit</Link>}
+                    {!(template.unreadable && template.appCreated) && <div className={`row-actions ${styles.actions}`}><Link className="secondary-button" href={`/admin/form-templates/${encodeURIComponent(template.key)}`} aria-label={`Edit ${template.name}`}>Edit</Link></div>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        )}
       </section>
       <FormTemplateCopy templates={templates.filter((template) => !(template.unreadable && template.appCreated)).map((template) => ({ key: template.key, name: template.name }))} />
     </section>

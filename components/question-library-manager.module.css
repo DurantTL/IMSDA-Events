@@ -1,0 +1,103 @@
+/* The saved-question list (#1593): dense rows on a desktop, cards on a phone. */
+.heading {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 1.125rem);
+}
+
+.rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--card);
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.editing {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.titleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.name {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.meta,
+.problem,
+.confirm {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  color: var(--muted);
+}
+
+.problem {
+  color: var(--coral);
+}
+
+.confirm {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+
+.actions {
+  justify-content: flex-end;
+}
+
+.editForm {
+  display: grid;
+  gap: 12px;
+}
+
+.editActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.empty {
+  display: grid;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions,
+  .editActions {
+    justify-content: flex-start;
+  }
+}

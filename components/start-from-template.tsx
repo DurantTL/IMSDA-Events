@@ -164,6 +164,7 @@ export function StartFromTemplate({ templates, featureDefaults = {}, calendarPre
           </p>
         ) : null}
         {selectedTemplate?.description ? <p>{selectedTemplate.description}</p> : null}
+        <p className="field-help">The new event starts with a copy of the published version, so later template edits do not change it. Manage templates in <Link href="/admin/event-templates">Event templates</Link>.</p>
 
         <div className="form-grid two-column">
           <div>
