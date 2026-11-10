@@ -11,6 +11,7 @@
 export type PageOwnsHeaderRoute = { pattern: string; notSegments?: readonly string[] };
 
 export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
+  { pattern: "/admin/events" },
   { pattern: "/event-setup" },
   { pattern: "/event-setup/from-template" },
   { pattern: "/event-setup/copy" },

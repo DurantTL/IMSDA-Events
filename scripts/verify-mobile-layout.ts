@@ -448,6 +448,9 @@ const pages: PageSpec[] = [
   // Creating an event asks for start and end times next to the dates (#1406).
   { name: "staff-event-setup-blank", path: "/event-setup", role: "system-admin", expectText: /Start time/ },
   { name: "staff-event-setup-from-template", path: "/event-setup/from-template", role: "system-admin", expectText: /Start time/ },
+  { name: "staff-event-setup-copy", path: "/event-setup/copy", role: "system-admin", expectText: /Copy from a past event/ },
+  // All events (#1570): the system-wide event directory, a table that becomes cards on a phone.
+  { ...staff("staff-all-events", "/admin/events", "system-admin"), expectText: /All events/ },
   staff("calendar-admin", "/admin/calendar", "system-admin"),
   staff("churches-clubs", "/admin/organizations", "system-admin"),
   staff("churches-clubs-directory", "/admin/organizations/directory", "system-admin"),
