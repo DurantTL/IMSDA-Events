@@ -9,6 +9,7 @@ import {
   ClubReportError,
   deleteClubReportLayout,
   listClubReportLayouts,
+  resolveClubReportFilters,
   runClubReport,
   saveClubReportLayout,
   type ClubReportActor,
@@ -25,9 +26,17 @@ const noStore = { "Cache-Control": "private, no-store" };
  * server, not this schema, decides which a viewer may have, so an unknown key and a refused key are different answers.
  */
 const columnKeys = z.array(z.string().max(40)).max(40);
+/**
+ * Filters (#1762) are plain strings too: the server checks each role, club and location against the event, so a bad one
+ * is a 400 and never silently ignored. A saved layout keeps roles and clubs only (never a location).
+ */
+const roleValues = z.array(z.string().max(60)).max(10);
+const clubIdValues = z.array(z.string().max(64)).max(500);
+const reportFilters = z.object({ roles: roleValues.optional(), clubIds: clubIdValues.optional(), locationId: z.string().max(64).nullish() }).strict();
+const layoutFilters = z.object({ roles: roleValues.optional(), clubIds: clubIdValues.optional() }).strict();
 export const clubReportRequestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.enum(["preview", "csv", "print"]), columns: columnKeys, locationId: z.string().max(64).nullish() }).strict(),
-  z.object({ action: z.literal("save-layout"), name: z.string().trim().min(1, "Name the layout.").max(80), columns: columnKeys }).strict(),
+  z.object({ action: z.enum(["preview", "csv", "print"]), columns: columnKeys, filters: reportFilters.optional() }).strict(),
+  z.object({ action: z.literal("save-layout"), name: z.string().trim().min(1, "Name the layout.").max(80), columns: columnKeys, filters: layoutFilters.optional() }).strict(),
   z.object({ action: z.literal("delete-layout"), layoutId: z.string().min(1).max(64) }).strict(),
 ]);
 
@@ -39,7 +48,10 @@ export async function handleClubReportRequest(input: {
   body: unknown;
   /** False for view-only access (Pathfinder event-manager oversight): it may run a report but never change shared layouts. */
   canManageLayouts?: boolean;
-  /** Staff may narrow a report to one location the way the staff reports do; the route resolves it. */
+  /**
+   * The one location this person is limited to, or null when they may see every location. A requested location may
+   * only narrow inside it: a different one is refused (403) and none means this one. Never widens.
+   */
   resolveLocation?: (requested: string | null | undefined) => Promise<string | null>;
 }) {
   const request = clubReportRequestSchema.parse(input.body);
@@ -54,8 +66,10 @@ export async function handleClubReportRequest(input: {
     await deleteClubReportLayout(input.eventId, input.viewer, input.actor, request.layoutId);
     return Response.json({ layouts: await listClubReportLayouts(input.eventId, input.viewer) }, { headers: noStore });
   }
-  const locationId = input.resolveLocation ? await input.resolveLocation(request.locationId) : null;
-  const result = await runClubReport({ eventId: input.eventId, viewer: input.viewer, actor: input.actor, columns: request.columns, mode: request.action, locationId });
+  const allowedLocationId = input.resolveLocation ? await input.resolveLocation(request.filters?.locationId) : null;
+  // Refused before any attendee is read: an unknown role, an unregistered club or a foreign location is a 400.
+  const filters = await resolveClubReportFilters(input.eventId, request.filters, allowedLocationId);
+  const result = await runClubReport({ eventId: input.eventId, viewer: input.viewer, actor: input.actor, columns: request.columns, mode: request.action, filters });
   if (request.action === "csv" && "csv" in result && typeof result.csv === "string") {
     return csvDownloadResponse(result.csv, exportFileName({ scope: await eventFileScope(input.eventId), kind: "club-attendee-report" }));
   }
@@ -70,7 +84,7 @@ export function clubReportApiError(error: unknown, action: string) {
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status, headers: noStore });
   if (error instanceof ClubReportColumnError) return Response.json({ error: error.code, message: error.message }, { status: error.status, headers: noStore });
   if (error instanceof ClubReportError) {
-    const status = error.code === "LAYOUT_NAME_TAKEN" ? 409 : 404;
+    const status = error.code === "LAYOUT_NAME_TAKEN" ? 409 : error.code === "INVALID_FILTER" ? 400 : 404;
     return Response.json({ error: error.code, message: error.message }, { status, headers: noStore });
   }
   logError(`${action} failed`, error);

@@ -299,6 +299,8 @@ const pages: PageSpec[] = [
   { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
   area("clubs", "/account/area-clubs/clubs"),
   area("events", "/account/area-clubs/events"),
+  // The coordinator attendee report with its club, role and location filters (#1762).
+  area("event-report", `/account/area-clubs/events/${clubEventId}/report`),
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
   area("points", "/account/area-clubs/points"),
