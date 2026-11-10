@@ -30,6 +30,9 @@ import styles from "./coordinator-monthly-records.module.css";
 
 const formatNumber = (value: number) => value.toLocaleString("en-US");
 
+/** The view-only record page for one club and month (#1842). */
+export const areaRecordHref = (organizationId: string, month: string) => `/account/area/${encodeURIComponent(organizationId)}/reports/${month}`;
+
 const stateWords: Record<RecordState, { icon: string; word: string }> = {
   SUBMITTED: { icon: "✓", word: "Submitted" },
   NOT_SUBMITTED: { icon: "✕", word: "Not submitted" },
@@ -142,7 +145,7 @@ export function CoordinatorMonthTable({ clubs, clubYear, month, query, now, show
                   </span>
                 </td>
                 <td {...cardCell("Year so far")} className={styles.year}>
-                  <YearStrip clubName={row.name} selectedMonth={month} states={row.year} variant="coordinator" />
+                  <YearStrip clubName={row.name} recordHref={(month) => areaRecordHref(row.id, month)} selectedMonth={month} states={row.year} variant="coordinator" />
                 </td>
                 <td {...cardCell(null)} className={styles.action}>
                   {row.status.state === "SUBMITTED" ? (
@@ -180,7 +183,7 @@ export function CoordinatorMonthView({ clubs, clubYear, month, query, now, showA
     <div className={styles.view}>
       <CoordinatorMonthPicker clubYear={clubYear} clubs={clubs} month={month} now={now} query={query} />
       <CoordinatorMonthBand clubs={clubs} month={month} now={now} />
-      <RecordsByMonthChart clubYear={clubYear} selectedMonth={month} totals={coordinatorMonthlyTotals(clubs, clubYear, now)} variant="coordinator" />
+      <RecordsByMonthChart clubYear={clubYear} monthHref={(target) => coordinatorRecordsHref({ clubYear, month: target, query })} selectedMonth={month} totals={coordinatorMonthlyTotals(clubs, clubYear, now)} variant="coordinator" />
       <CoordinatorMonthTable clubs={clubs} clubYear={clubYear} month={month} now={now} query={query} showAll={showAll} sorting={sorting} />
     </div>
   );

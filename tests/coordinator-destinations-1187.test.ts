@@ -97,12 +97,19 @@ describe("Monthly Records (#1187)", () => {
     expect(monthlyRecordCounts(clubs[3]!, now)).toEqual({ submitted: 0, notSubmitted: 1 });
   });
 
-  it("opens a Submitted month read only and shows Not submitted and Not due yet as plain text", () => {
+  it("opens a Submitted and a Not submitted month, and shows Not due yet as plain text (#1842)", () => {
     const html = monthly(clubs);
     expect(html).toContain('href="/account/area/c1/reports/2026-09"');
     expect(html).toContain('href="/account/area/c3/reports/2026-09"');
-    // Only the two submitted records are links; Bravo (draft) and Delta are text.
-    expect(html.match(/\/reports\/2026-/g)).toHaveLength(2);
+    // Bravo (draft) and Delta (nothing filed) link to the record page, which says nothing is submitted yet; later months are text.
+    expect(html).toContain('href="/account/area/c2/reports/2026-09"');
+    expect(html).toContain('href="/account/area/c4/reports/2026-09"');
+    expect(html).toContain('aria-label="Delta Club, September 2026: not submitted"');
+    expect(html.match(/\/reports\/2026-/g)).toHaveLength(4);
+    expect(html).not.toContain("/reports/2026-10");
+    // Month headings open that month's view.
+    expect(html).toContain('href="/account/area-clubs/reports?year=2026-27&amp;month=2026-09"');
+    expect(html).toContain("September 2026 records");
     expect(html).toContain("Not submitted");
     expect(html).toContain("(draft saved)");
     expect(html).toContain("Not due yet");

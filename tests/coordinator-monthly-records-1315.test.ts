@@ -165,7 +165,9 @@ describe("Monthly Records by month (#1315)", () => {
     expect(table).toContain("Opens the record, view only.");
     expect(table).toContain('href="/account/area/c04"');
     expect(table).toContain("Open club");
-    expect(table.match(/\/reports\/2026-10/g)).toHaveLength(3);
+    // The action column opens a record only for Submitted rows; the year-so-far squares link every started month (#1842).
+    expect(table.match(/Open record</g)).toHaveLength(3);
+    expect(table).toContain('aria-label="Delta Club, October 2026: not submitted"');
     expect(coordinatorRecordsHref({ clubYear, month: "2026-10" })).toBe("/account/area-clubs/reports?year=2026-27&month=2026-10");
   });
 

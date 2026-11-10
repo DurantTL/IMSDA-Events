@@ -1,6 +1,7 @@
 import navStyles from "@/components/staff-records-nav.module.css";
 import Link from "next/link";
 import { areaHealthHref } from "@/modules/coordinator-health/domain";
+import { RecordCellLink } from "@/components/month-heading-link";
 import { ColumnHeader } from "@/components/column-header";
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { Download } from "lucide-react";
@@ -44,7 +45,15 @@ const formatNumber = (value: number) => value.toLocaleString("en-US");
 export type AreaLinks = {
   clubHref: (organizationId: string) => string;
   reportHref: (organizationId: string, month: string) => string;
+  /** The Monthly Records view of one month (#1842): a month heading in the full-year grid links to it. Left out, headings stay plain. */
+  monthHref?: (month: string) => string;
 };
+
+/** "Club, March 2027: missing" (#1842): the name of a club-month link, with points when the record has them. */
+export function clubMonthLinkName(clubName: string, month: string, cell: { status: keyof typeof monthStatusLabels; points?: number | null }) {
+  const points = (cell.status === "SUBMITTED" || cell.status === "LATE") && cell.points !== null && cell.points !== undefined ? `, ${formatNumber(cell.points)} ${cell.points === 1 ? "point" : "points"}` : "";
+  return `${clubName}, ${reportMonthLabel(month)}: ${monthStatusLabels[cell.status].toLowerCase()}${points}`;
+}
 
 /** What an empty club list says: nothing matched the search, or there are no clubs at all. */
 const noClubsText = (query?: string) => (query ? `No club name matches “${query}”.` : "No active clubs yet.");
@@ -127,7 +136,7 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query, sorting
         <thead role="rowgroup">
           <tr role="row">
             <ColumnHeader column="club" label="Club" sorting={sorting} />
-            {months.map((month) => <ColumnHeader column={`month-${month}`} key={month} label={shortMonth(month)} hiddenLabel="points" sorting={sorting} />)}
+            {months.map((month) => <ColumnHeader column={`month-${month}`} key={month} label={shortMonth(month)} hiddenLabel="points" monthLink={links.monthHref ? { href: links.monthHref(month), label: reportMonthLabel(month) } : undefined} sorting={sorting} />)}
             <ColumnHeader column="submitted" label="Submitted" sorting={sorting} />
             <ColumnHeader column="drafts" label="Draft" sorting={sorting} />
             <ColumnHeader column="missing" label="Missing" sorting={sorting} />
@@ -139,18 +148,15 @@ export function AreaMonthlyReportsTable({ clubs, clubYear, links, query, sorting
             <tr role="row" key={club.id}>
               <th role="rowheader" scope="row" translate="no">{club.name}{club.church && <small>{club.church}</small>}</th>
               {club.months.map((cell) => {
-                if (cell.status === "SUBMITTED" || cell.status === "LATE") {
-                  return (
-                    <td key={cell.month} {...cardCell(shortMonth(cell.month))}>
-                      <Link href={links.reportHref(club.id, cell.month)}>{cell.points}</Link>
-                      {cell.status === "LATE" && <small> late</small>}
-                    </td>
-                  );
-                }
                 if (cell.status === "FUTURE") return <td key={cell.month} {...cardCell(shortMonth(cell.month))} className="club-reports-future"><span aria-hidden="true">—</span><span className="sr-only">{monthStatusLabels.FUTURE}</span></td>;
+                // Every month that has started opens that club's record, whatever its status (#1842); the record page says when nothing is filed.
+                const filed = cell.status === "SUBMITTED" || cell.status === "LATE";
                 return (
-                  <td key={cell.month} {...cardCell(shortMonth(cell.month))} className={cell.status === "MISSING" ? "club-reports-missing" : "club-reports-due"}>
-                    {monthStatusLabels[cell.status]}
+                  <td key={cell.month} {...cardCell(shortMonth(cell.month))} className={filed ? undefined : cell.status === "MISSING" ? "club-reports-missing" : "club-reports-due"}>
+                    <RecordCellLink href={links.reportHref(club.id, cell.month)} name={clubMonthLinkName(club.name, cell.month, cell)}>
+                      {filed ? cell.points : monthStatusLabels[cell.status]}
+                    </RecordCellLink>
+                    {cell.status === "LATE" && <small> late</small>}
                   </td>
                 );
               })}

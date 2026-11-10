@@ -1,0 +1,32 @@
+/* Links added to the month grids (#1842). Tokens only; 44px tap targets on touch screens. */
+.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  margin-inline-start: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.link:hover { text-decoration: underline; }
+
+.cell {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: underline;
+}
+
+@media (pointer: coarse) {
+  .link { min-width: 44px; min-height: 44px; }
+  .cell { min-height: 44px; min-width: 44px; }
+}

@@ -67,7 +67,7 @@ export function StaffMonthlyRecords({ clubYear, view, links, fromClub = null }: 
       </nav>
 
       <ReportSummaryBand label={`${view.monthLabel} at a glance`} tiles={view.tiles} />
-      <RecordsByMonthChart clubYear={clubYear} selectedMonth={view.month} totals={view.totals} variant="staff" />
+      <RecordsByMonthChart clubYear={clubYear} monthHref={(month) => here({ month })} selectedMonth={view.month} totals={view.totals} variant="staff" />
 
       <section aria-labelledby="records-table-heading" className={styles.card}>
         <div className={styles.head}>
@@ -122,7 +122,7 @@ export function StaffMonthlyRecords({ clubYear, view, links, fromClub = null }: 
                       </span>
                     </td>
                     <td className={styles.points} role="cell"><span className="sr-only">Points: </span>{row.points === null ? "—" : row.points.toLocaleString("en-US")}</td>
-                    <td className={styles.stripCell} role="cell"><YearStrip cells={row.cells} clubName={row.name} selectedMonth={view.month} variant="staff" /></td>
+                    <td className={styles.stripCell} role="cell"><YearStrip cells={row.cells} clubName={row.name} recordHref={(month) => links.reportHref(row.id, month)} selectedMonth={view.month} variant="staff" /></td>
                     <td className={styles.action} role="cell">
                       <Link className={styles.rowLink} href={href} prefetch={false}>{row.action}<span className="sr-only"> {row.name}, {staffRecordStatusLabel(row)}</span> <span aria-hidden="true">›</span></Link>
                     </td>
