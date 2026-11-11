@@ -753,6 +753,16 @@ describe("club roster storage", () => {
       expect(db.members[0]).toMatchObject({ baptized: null });
     });
 
+    it("saves a baptized-only edit and audits the field name, not the value", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+      mocks.writeAuditLog.mockClear();
+      await updateRosterMember("club-1", memberId, { baptized: "YES" }, actor, now);
+      expect(db.members[0]).toMatchObject({ baptized: "YES" });
+      const entry = mocks.writeAuditLog.mock.calls.map((call) => call[0]).find((call) => call.action === "CLUB_ROSTER_MEMBER_UPDATED");
+      expect(entry.metadata).toMatchObject({ fields: ["baptized"] });
+      expect(JSON.stringify(entry)).not.toContain("YES");
+    });
+
     it("is erased on removal and never written into the audit log as a value", async () => {
       const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, baptized: "NOT_SURE" }, actor, { now });
       await updateRosterMember("club-1", memberId, { baptized: "YES" }, actor, now);

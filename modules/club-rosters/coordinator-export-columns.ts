@@ -30,7 +30,7 @@ export const COORDINATOR_ROSTER_EXPORT_COLUMNS = {
   schoolGrade: { header: "Grade" },
   schoolType: { header: "School type" },
   churchMember: { header: "Church member" },
-  /** Visible to Area Coordinators, unlike the two school-detail columns above (#1852). */
+  /** Baptized (#1852): offered in this export and in every roster view. */
   baptized: { header: "Baptized" },
   sterling: { header: "Sterling Volunteers status" },
 } as const satisfies Record<string, { header: string }>;

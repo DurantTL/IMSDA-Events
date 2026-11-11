@@ -231,9 +231,9 @@ export function planRosterImport(rows: readonly RosterCsvRow[], existing: Readon
     const matches = byName.get(key) ?? [];
     if (matches.length > 1) return skip("More than one person on the roster has this name. Edit them by hand.");
     if (matches.length === 1) {
-      // A TLT column alone (#1851) is a change too; it is never listed as blank, since it is optional.
+      // A TLT or Baptized column alone (#1851, #1852) is a change too; neither is ever listed as blank, since both are optional.
       const changes = csvFieldOrder.filter((field) => row[field] !== undefined);
-      if (changes.length === 0 && row.isTlt === undefined) return { line: row.line, name, action: "SKIP", memberId: matches[0], message: "Already on the roster; nothing to change.", row };
+      if (changes.length === 0 && row.isTlt === undefined && row.baptized === undefined) return { line: row.line, name, action: "SKIP", memberId: matches[0], message: "Already on the roster; nothing to change.", row };
       // Blank cells on an update keep what's on file (#424), so they're only noted, not called missing.
       const blank = missingRosterCsvFields(row);
       const message = blank.length > 0

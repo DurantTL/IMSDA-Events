@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseRosterCsv, missingRosterCsvFields, rosterCsvTemplate } from "@/modules/club-rosters/csv-import";
+import { parseRosterCsv, planRosterImport, missingRosterCsvFields, rosterCsvTemplate } from "@/modules/club-rosters/csv-import";
 import { BAPTIZED_LABEL, clubBaptizedLabels, missingRosterFields } from "@/modules/club-rosters/domain";
 import { buildRosterExportTable } from "@/modules/club-rosters/export";
 import { ROSTER_EXPORT_COLUMNS, rosterExportColumnKeysFor } from "@/modules/club-rosters/export-columns";
@@ -52,6 +52,15 @@ describe("roster CSV", () => {
     const [row] = parseRosterCsv(`${header}A,S,2010-04-17,Youth,Maybe\n`, 2026);
     expect(row!.problems.join(" ")).toMatch(/Baptized "Maybe" should be Yes, No or Not sure/);
     expect(missingRosterCsvFields({ line: 2, firstName: "A", lastName: "S", problems: [] })).not.toContain("Baptized");
+  });
+
+  it("plans a Baptized-only row for an existing member as an update, and a blank one as nothing to change", () => {
+    const existing = [{ id: "member-1", firstName: "Ana", lastName: "Sample" }];
+    const [filled] = planRosterImport(parseRosterCsv(`${header}Ana,Sample,,,Yes\n`, 2026), existing);
+    expect(filled).toMatchObject({ action: "UPDATE", memberId: "member-1" });
+    expect(filled!.message).not.toMatch(/Baptized/);
+    const [blank] = planRosterImport(parseRosterCsv(`${header}Ana,Sample,,,\n`, 2026), existing);
+    expect(blank).toMatchObject({ action: "SKIP", message: "Already on the roster; nothing to change." });
   });
 
   it("is in the template", () => {
