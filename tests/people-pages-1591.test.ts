@@ -232,7 +232,9 @@ describe("/admin/people/[kind]/[id] (#1591)", () => {
   it("shows the grant panel and the invites for this person above the access sections, as separate boxes", async () => {
     mocks.listPendingInvites.mockResolvedValue({ invites: [invite({ kind: "area", name: "Sample Person", email: "sample@example.test", what: "Area Coordinator" })], emailConfigured: true });
     const html = await renderPerson("staff", "u-target", { grant: "ac" });
-    const grant = html.indexOf('data-testid="person-grant-panel"') >= 0 ? html.indexOf('data-testid="person-grant-panel"') : html.search(/grant/i);
+    const grant = html.indexOf('aria-labelledby="people-chosen"');
+    expect(grant).toBeGreaterThan(-1);
+    expect(html.indexOf('id="people-system-wide"')).toBeGreaterThan(-1);
     expect(html).toContain("Pending invites for this person");
     expect(html.indexOf("Pending invites for this person")).toBeLessThan(html.indexOf('id="people-system-wide"'));
     expect(grant).toBeLessThan(html.indexOf('id="people-system-wide"'));
@@ -320,9 +322,11 @@ describe("/people/matches (#1591)", () => {
     expect(html).toContain("Nothing open for review");
   });
 
-  it("sits in System and links to the registration duplicates as a separate task", async () => {
+  it("links to the registration duplicates as a separate task", async () => {
     const html = renderToStaticMarkup(await DuplicateMatchQueuePage());
-    expect(html).toContain('data-section="system"');
+    // The shell still places /people/* in the event shell, so the page draws no section header of its own.
+    expect(html).not.toContain('data-testid="admin-section-header"');
+    expect(read("app/(workspace)/people/matches/page.tsx")).not.toContain("AdminSectionHeader");
     expect(html).toContain("Identity review across the whole system");
     expect(html).toContain("separate from an event&#x27;s registration duplicates");
     expect(html).toContain('href="/people/duplicates"');

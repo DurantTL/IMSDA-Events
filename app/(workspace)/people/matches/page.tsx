@@ -1,7 +1,6 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { DuplicateMatchReviewWorkspace } from "@/components/duplicate-match-review-workspace";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { isDisclosureAllowed, staffIdentityAudience } from "@/modules/people/disclosure-matrix";
@@ -23,11 +22,5 @@ export default async function DuplicateMatchQueuePage() {
   if (!isDisclosureAllowed("MATCH_CANDIDATE_EVIDENCE", staffIdentityAudience(user), "READ")) redirect("/no-access");
 
   const [candidates, merges] = await Promise.all([listOpenMatchCandidates(user.id), listActivePersonMerges(user.id)]);
-  return (
-    <>
-      {/* Identity review is System work: only a system administrator passes the gate above. */}
-      <AdminSectionHeaderFor path="/people/matches" section="system" />
-      <DuplicateMatchReviewWorkspace initialCandidates={candidates} initialMerges={merges} />
-    </>
-  );
+  return <DuplicateMatchReviewWorkspace initialCandidates={candidates} initialMerges={merges} />;
 }
