@@ -2,13 +2,12 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { ClubLeadersList } from "@/components/club-leaders-list";
-import { StaffPageHeader } from "@/components/staff-page-header";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
-import { clubRoleText } from "@/modules/access/role-descriptions";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { parsePageParam, sliceFromCount } from "@/lib/pagination";
-import { listClubLeaders } from "@/modules/system-admin/club-leaders";
+import { isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { countDraftClubInvites, listClubLeaderInvites, listClubLeaders } from "@/modules/system-admin/club-leaders";
 import { clubLeadersHref, parseLeaderFilters } from "@/modules/system-admin/club-leaders-model";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
 import { listClubOptions } from "@/modules/system-admin/people-directory";
@@ -16,23 +15,42 @@ import { listClubOptions } from "@/modules/system-admin/people-directory";
 export const metadata: Metadata = { title: "Club leaders" };
 export const dynamic = "force-dynamic";
 
-/** Every current Director, Deputy, Registrar and Reporter across clubs (#1277). Read only; gated like the Clubs dashboard. */
+/** Club leaders (#1277, #1589): current Directors, Deputies, Registrars and Reporters, or the invites still waiting (Invited) or not sent (Draft). Gated like the Clubs dashboard; the invite actions keep their own route checks. */
 export default async function ClubLeadersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ club?: string | string[]; role?: string | string[]; page?: string }>;
+  searchParams: Promise<{ club?: string | string[]; role?: string | string[]; status?: string | string[]; page?: string }>;
 }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const query = await searchParams;
   const filters = parseLeaderFilters(query);
-  const [{ leaders, total, page, pageSize }, clubs, viewer] = await Promise.all([listClubLeaders(filters, parsePageParam(query.page)), listClubOptions(), resolvePeopleViewer()]);
+  const page = parsePageParam(query.page);
+  const invitesView = filters.status !== "current";
+  const [current, invited, drafts, clubs, viewer] = await Promise.all([
+    invitesView ? null : listClubLeaders(filters, page),
+    invitesView ? listClubLeaderInvites(filters, page) : null,
+    filters.status === "draft" ? countDraftClubInvites(filters.clubId) : null,
+    listClubOptions(),
+    resolvePeopleViewer(),
+  ]);
+  const shown = invited ?? current!;
+  const hrefFor = (next: number) => clubLeadersHref(filters, next);
   return (
     <>
       <AdminPageHeader path="/admin/clubs/leaders" />
-      <StaffPageHeader description={`Everyone who currently leads a club as ${clubRoleText.DIRECTOR.name}, ${clubRoleText.DEPUTY.name}, ${clubRoleText.REGISTRAR.name} or ${clubRoleText.REPORTER.name}.`} />
-      <ClubLeadersList canOpenPeople={viewer.scope !== null} clubs={clubs} filters={filters} hrefFor={(next) => clubLeadersHref(filters, next)} leaders={leaders} slice={sliceFromCount([...leaders], page, total, pageSize)} />
+      <ClubLeadersList
+        canOpenPeople={viewer.scope !== null}
+        clubs={clubs}
+        drafts={drafts ?? undefined}
+        emailConfigured={isAccountEmailConfigured()}
+        filters={filters}
+        hrefFor={hrefFor}
+        invites={invited?.invites ?? []}
+        leaders={current?.leaders ?? []}
+        slice={sliceFromCount([...(invited?.invites ?? current?.leaders ?? [])], shown.page, shown.total, shown.pageSize)}
+      />
     </>
   );
 }

@@ -22,8 +22,8 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/clubs/applications` | System management | Clubs | New club applications | Applications | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/applications/page.tsx` |
 | `/admin/clubs/health-import` | Page link | Clubs | Club administration | Import health records | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/health-import/page.tsx` |
 | `/admin/clubs/import` | Page link | Clubs | Club administration | Import clubs | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/import/page.tsx` |
-| `/admin/clubs/invites` | System management | Clubs | New club applications | Club invites | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/invites/page.tsx` |
-| `/admin/clubs/leaders` | System management | Clubs | Club leaders | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/leaders/page.tsx` |
+| `/admin/clubs/invites` | System management | Clubs | Club leaders | Invited (redirect, #1589) | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/invites/page.tsx` |
+| `/admin/clubs/leaders` | System management | Clubs | Club leaders | Current, Invited, Draft (`?status=`) | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/leaders/page.tsx` |
 | `/admin/clubs/reports` | System management | Clubs | Monthly Records | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/page.tsx` |
 | `/admin/clubs/reports/[organizationId]/[month]` | System management | Clubs | Monthly Records | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/[organizationId]/[month]/page.tsx` |
 | `/admin/clubs/reports/year-end` | System management | Clubs | Club Year-End Reports | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/year-end/page.tsx` |

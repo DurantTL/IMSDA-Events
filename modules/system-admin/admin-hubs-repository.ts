@@ -15,7 +15,7 @@ import { loadFormsHub } from "@/modules/forms-hub/load";
 import { listFormTemplateLibrary } from "@/modules/forms/form-template-library";
 import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repository";
 import { listAreaPauses } from "@/modules/system-admin/area-pause";
-import { listClubLeaders } from "@/modules/system-admin/club-leaders";
+import { countWaitingClubInvites, listClubLeaders } from "@/modules/system-admin/club-leaders";
 import { listPendingInvitesPage } from "@/modules/system-admin/pending-invites";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { neededMetrics, type HubKey, type HubViewer, type MetricKey, type MetricValues } from "@/modules/system-admin/admin-hubs-model";
@@ -77,6 +77,7 @@ const readers: Record<MetricKey, (context: Context) => Promise<number>> = {
   applicationsWaiting: ({ viewer }) => countWaitingNewClubApplications(viewer.isSystemAdmin ? "SYSTEM_ADMIN" : "CLUBS_ADMIN"),
   openTransfers: ({ now }) => countStaffTransferQueue("open", now),
   clubLeaders: async ({ now }) => (await listClubLeaders({ clubId: null, role: null }, 1, now)).total,
+  clubInvitesWaiting: ({ now }) => countWaitingClubInvites(now),
   staffLogins: () => getPrisma().user.count({ where: { accountStatus: "ACTIVE" } }),
   invitesWaiting: async () => (await listPendingInvitesPage({ query: "", scope: "full" }, 1)).total,
   formsTotal: async (context) => (await formsHub(context)).length,

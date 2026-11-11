@@ -136,7 +136,7 @@ const menuRoutes: readonly Menu[] = [
 
 /** Other addresses for a menu destination: [route, destination it opens]. All System scope. */
 const aliasRoutes: readonly (readonly [route: string, destinationPath: string])[] = [
-  ["/admin/clubs/invites", "/admin/clubs/applications"],
+  ["/admin/clubs/invites", "/admin/clubs/leaders"],
   ["/admin/notifications", "/admin/email"],
   ["/admin/background-checks", "/admin/organizations/background-checks"],
   // Team and Accounts became People & access (#1275); both old addresses redirect to it.

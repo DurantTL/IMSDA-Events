@@ -24,9 +24,8 @@ const titles = (viewer: HubViewer) => view(viewer).groups.map((group) => [group.
 describe("Club administration uses the hub pattern (#1568)", () => {
   it("groups every destination as the approved mockup does, with the registries' titles", () => {
     expect(titles(system)).toEqual([
-      ["Clubs", ["Club summary", "Clubs and churches", "Club member transfers", "Sterling Volunteers"]],
+      ["Clubs", ["Club summary", "Clubs and churches", "New club applications", "Club member transfers", "Sterling Volunteers"]],
       ["Records and points", ["Monthly Records", "Club Year-End Reports", "Points"]],
-      ["Applications", ["New club applications", "Club invites"]],
       ["Club events and forms", ["Club events", "Club forms", "Public club forms page"]],
       ["People", ["Club leaders", "People & access"]],
       ["Catalogs and imports", ["Honor catalog", "Club supply catalog", "Conference club orders", "Import clubs", "Import health records"]],
@@ -53,7 +52,7 @@ describe("Club administration uses the hub pattern (#1568)", () => {
   });
 
   it("drops what a Clubs Administrator cannot open, and Import health records while the feature is off", () => {
-    expect(titles(clubsAdmin)[0]).toEqual(["Clubs", ["Club summary", "Club member transfers", "Sterling Volunteers"]]);
+    expect(titles(clubsAdmin)[0]).toEqual(["Clubs", ["Club summary", "New club applications", "Club member transfers", "Sterling Volunteers"]]);
     const hrefs = (viewer: HubViewer) => view(viewer).groups.flatMap((group) => group.cards.map((card) => card.href));
     expect(hrefs(clubsAdmin)).not.toContain("/admin/organizations");
     expect(hrefs(clubsAdmin)).toContain("/admin/clubs/health-import");
@@ -73,7 +72,7 @@ describe("Club administration uses the hub pattern (#1568)", () => {
 
   it("shows each card's status in words, and Unavailable for a number that could not be read", () => {
     const statuses = (value: number | null) => Object.fromEntries(view(system, value).groups.flatMap((group) => group.cards).map((card) => [card.title, card.status?.text ?? null]));
-    expect(statuses(2)).toMatchObject({ "Club summary": "2 late", "Monthly Records": "2 late", "New club applications": "2 waiting", "Club member transfers": "2 open", "Club leaders": "2 current leaders", "Honor catalog": "2 honors" });
+    expect(statuses(2)).toMatchObject({ "Club summary": "2 late", "Monthly Records": "2 late", "New club applications": "2 waiting", "Club member transfers": "2 open", "Club leaders": "2 current leaders · 2 invites waiting", "Honor catalog": "2 honors" });
     const unreadable = statuses(null);
     for (const title of ["Club summary", "Clubs and churches", "Monthly Records", "New club applications", "Club member transfers", "Club leaders", "Club forms", "Honor catalog"]) {
       expect(unreadable[title], title).toBe("Unavailable");
@@ -83,7 +82,7 @@ describe("Club administration uses the hub pattern (#1568)", () => {
   });
 
   it("reads only the numbers its shown cards need", () => {
-    expect(neededMetrics("club-administration", clubsAdmin).sort()).toEqual(["applicationsWaiting", "clubFormsOn", "clubLeaders", "honors", "lateRecords", "openTransfers"]);
+    expect(neededMetrics("club-administration", clubsAdmin).sort()).toEqual(["applicationsWaiting", "clubFormsOn", "clubInvitesWaiting", "clubLeaders", "honors", "lateRecords", "openTransfers"]);
     expect(neededMetrics("club-administration", system)).toContain("clubs");
     expect(neededMetrics("club-administration", nobody)).toEqual([]);
   });

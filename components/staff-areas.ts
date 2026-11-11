@@ -167,7 +167,6 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
       count: waitingClubApplications,
       views: [
         { href: "/admin/clubs/applications", label: "Applications", visible: clubs },
-        { href: "/admin/clubs/invites", visible: clubs },
       ],
     },
     { key: "leaders", destination: "/admin/clubs/leaders", visible: clubs },
@@ -339,8 +338,8 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
     return place("clubs", "club-summary", view === "events" ? "/admin/clubs/summary?view=events#club-events" : "/admin/clubs/summary");
   }
   if (under(pathname, "/admin/clubs/applications")) return place("clubs", "applications", "/admin/clubs/applications");
-  if (under(pathname, "/admin/clubs/invites")) return place("clubs", "applications", "/admin/clubs/invites");
-  if (under(pathname, "/admin/clubs/leaders")) return place("clubs", "leaders");
+  // Club invites is the Invited view of Club leaders (#1589).
+  if (under(pathname, "/admin/clubs/leaders") || under(pathname, "/admin/clubs/invites")) return place("clubs", "leaders");
   if (under(pathname, "/admin/clubs/transfers")) return place("clubs", "transfers");
   if (under(pathname, "/admin/clubs/import")) return place("clubs", "club-administration", "/admin/clubs/import");
   if (under(pathname, "/admin/clubs/health-import")) return place("clubs", "club-administration", clubsAdminHealthImportHref);

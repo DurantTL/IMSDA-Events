@@ -200,7 +200,7 @@ describe("links to working pages", () => {
     expect(links.map((link) => link.href)).toEqual([
       "/staff?event=evt_synthetic",
       "/admin/people?event=evt_synthetic",
-      "/admin/clubs/invites?event=evt_synthetic",
+      "/admin/clubs/leaders?event=evt_synthetic",
     ]);
   });
 
