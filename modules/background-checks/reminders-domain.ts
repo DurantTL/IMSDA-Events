@@ -1,4 +1,5 @@
 import type { ClubComplianceState } from "@/modules/background-checks/display";
+import { formatCalendarDate } from "@/modules/club-registrations/domain";
 import { compareByName, sortRows, type SortDirection, type SortValue } from "@/lib/list-sort";
 
 /**
@@ -89,7 +90,7 @@ export function reminderStatusText(state: ClubComplianceState) {
 
 /** The expiry date when one is known, else what is missing. */
 export function expiryOrMissingText(row: Pick<SterlingActionRow, "state" | "expiresOn">) {
-  if (row.expiresOn) return row.expiresOn;
+  if (row.expiresOn) return formatCalendarDate(row.expiresOn);
   switch (row.state) {
     case "CLEAR": return "—";
     case "FLAGGED": return "Marked expiring on the roster export";

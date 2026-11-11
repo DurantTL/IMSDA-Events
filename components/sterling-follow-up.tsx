@@ -78,7 +78,6 @@ export function SterlingFollowUp({ rows, filter, reminderTotal, columns, sortNot
   const overCap = reminderTotal > REMINDER_MAX_PEOPLE;
   const canSelectAllInFilter = hasMoreThanPage && !overCap && !allInFilter;
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const busyOpening = loading;
 
   useEffect(() => {
     if (done) resultRef.current?.focus();
@@ -178,8 +177,8 @@ export function SterlingFollowUp({ rows, filter, reminderTotal, columns, sortNot
       {error && !preview && <div className="inline-notice error" role="alert">{error}</div>}
 
       <div className={styles.toolbar}>
-        <button aria-busy={loading || undefined} aria-disabled={selectedCount === 0 || loading || undefined} className="primary-button" onClick={() => void openPreview()} ref={triggerRef} type="button">
-          <Mail aria-hidden="true" size={16} /> {busyOpening ? "Preparing the preview…" : "Send reminder"}
+        <button aria-busy={loading || undefined} aria-disabled={selectedCount === 0 || loading || undefined} className={`primary-button ${styles.sendTrigger}`} onClick={() => void openPreview()} ref={triggerRef} type="button">
+          <Mail aria-hidden="true" size={16} /> {loading ? "Preparing the preview…" : "Send reminder"}
         </button>
         {selectable.length > 0 && (
           <label className={styles.selectPage}>

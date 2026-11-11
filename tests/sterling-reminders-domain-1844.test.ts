@@ -63,7 +63,7 @@ describe("reminder filters and counts (#1844)", () => {
     expect(reminderStatusText("FLAGGED")).toBe("Expiring soon");
     expect(reminderStatusText("NOT_COMPLIANT")).toBe("Expired or not in compliance");
     expect(reminderStatusText("NO_RECORD")).toBe("No check on file");
-    expect(expiryOrMissingText({ state: "FLAGGED", expiresOn: "2026-12-20" })).toBe("2026-12-20");
+    expect(expiryOrMissingText({ state: "FLAGGED", expiresOn: "2026-12-20" })).toBe("December 20, 2026");
     expect(expiryOrMissingText({ state: "NO_RECORD", expiresOn: null })).toBe("No check on file");
   });
 });
