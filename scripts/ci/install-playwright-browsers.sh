@@ -13,6 +13,7 @@
 #      plain "package mirror unreachable" message naming the browser.
 #
 # PLAYWRIGHT_SETUP_SIMULATE_MIRROR_OUTAGE=1 points apt at an unresolvable mirror first, to rehearse an outage.
+# CI ONLY: that rehearsal rewrites every apt source on the machine. Never run it on your own computer.
 set -uo pipefail
 
 if [ "$#" -eq 0 ]; then
@@ -27,14 +28,17 @@ DOWNLOAD_TIMEOUT="${PLAYWRIGHT_SETUP_DOWNLOAD_TIMEOUT:-600}"
 SUDO=""
 if [ "$(id -u)" -ne 0 ]; then SUDO="sudo"; fi
 
-# Run "$@" up to ATTEMPTS times, each limited to $1 seconds, waiting 10s, 20s, ... between tries.
+# Run "$@" up to ATTEMPTS times, each limited to $2 seconds, waiting 10s, 20s, ... between tries. With $1 = root the
+# time limit itself runs under sudo, so a hung apt-get (a root process) is stopped too and frees the apt lock.
 retry_with_timeout() {
-  local limit="$1" label="$2"
-  shift 2
+  local as="$1" limit="$2" label="$3"
+  shift 3
+  local prefix=()
+  if [ "$as" = "root" ] && [ -n "$SUDO" ]; then prefix=("$SUDO" env "PATH=$PATH"); fi
   local attempt
   for attempt in $(seq 1 "$ATTEMPTS"); do
     echo "::group::${label} (attempt ${attempt} of ${ATTEMPTS})"
-    timeout --kill-after=30 "$limit" "$@"
+    "${prefix[@]}" timeout --kill-after=30 "$limit" "$@"
     local status=$?
     echo "::endgroup::"
     if [ "$status" -eq 0 ]; then return 0; fi
@@ -48,9 +52,11 @@ retry_with_timeout() {
   return 1
 }
 
-# apt: retry each download and give up on an unreachable mirror quickly rather than waiting on it.
-printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' \
-  | $SUDO tee /etc/apt/apt.conf.d/80-imsda-ci-retries > /dev/null
+# apt: retry each download, give up on an unreachable mirror quickly rather than waiting on it, and wait for a lock
+# left by an earlier stopped try instead of failing on it.
+APT_CONF="${PLAYWRIGHT_SETUP_APT_CONF:-/etc/apt/apt.conf.d/80-imsda-ci-retries}"
+printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::https::Timeout "30";' 'DPkg::Lock::Timeout "120";' \
+  | $SUDO tee "$APT_CONF" > /dev/null
 
 if [ "${PLAYWRIGHT_SETUP_SIMULATE_MIRROR_OUTAGE:-}" = "1" ]; then
   echo "Simulating a package-mirror outage: apt now points at an unresolvable host."
@@ -62,13 +68,13 @@ if [ "${PLAYWRIGHT_SETUP_SIMULATE_MIRROR_OUTAGE:-}" = "1" ]; then
 fi
 
 deps_ok=1
-if ! retry_with_timeout "$DEPS_TIMEOUT" "System libraries for ${browsers[*]}" \
+if ! retry_with_timeout root "$DEPS_TIMEOUT" "System libraries for ${browsers[*]}" \
   npx playwright install-deps "${browsers[@]}"; then
   deps_ok=0
-  echo "::warning title=Ubuntu package mirror unreachable::Could not install the system libraries for ${browsers[*]} after ${ATTEMPTS} tries. Carrying on with the libraries already on the runner image; each browser is test-launched next."
+  echo "::warning title=Ubuntu package mirror unreachable::Could not install the system libraries for ${browsers[*]} after ${ATTEMPTS} tries. Carrying on with the libraries and fonts already on the runner image; each browser is test-launched next. Fonts the mirror would have added may be missing, so text widths can differ from a normal run."
 fi
 
-if ! retry_with_timeout "$DOWNLOAD_TIMEOUT" "Download ${browsers[*]}" npx playwright install "${browsers[@]}"; then
+if ! retry_with_timeout user "$DOWNLOAD_TIMEOUT" "Download ${browsers[*]}" npx playwright install "${browsers[@]}"; then
   echo "::error title=Browser download failed::Could not download ${browsers[*]} from Playwright's download server after ${ATTEMPTS} tries. This is a network problem, not a test failure; re-run the job."
   exit 1
 fi
@@ -81,7 +87,7 @@ fi
 # The libraries were not installed: prove each browser starts before any test runs.
 missing=()
 for browser in "${browsers[@]}"; do
-  if timeout 120 node -e '
+  if timeout --kill-after=10 120 node -e '
     const name = process.argv[1];
     require("playwright")[name].launch().then((b) => b.close()).then(
       () => process.exit(0),
