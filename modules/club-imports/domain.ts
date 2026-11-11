@@ -25,7 +25,9 @@ export type ImportPerson = {
   lastName: string;
   attendeeType: "STAFF" | "YOUTH";
   role: string;
-  classLevel: ClubClassLevel | null;
+  classLevel: Exclude<ClubClassLevel, "TLT"> | null;
+  /** Teen Leadership Training (#1851): youth only. */
+  isTlt: boolean;
   /** What the form said, when it isn't a known class level. */
   classText: string;
   reportedAge: number | null;
@@ -135,12 +137,24 @@ const classAliases: Record<string, ClubClassLevel> = {
   guide: "GUIDE",
   tlt: "TLT",
   teenleadershiptraining: "TLT",
+  basicstafftraining: "BASIC_STAFF_TRAINING",
+  bst: "BASIC_STAFF_TRAINING",
   masterguide: "MASTER_GUIDE",
   mg: "MASTER_GUIDE",
 };
 
 export function classLevelFrom(value: string): ClubClassLevel | null {
   return classAliases[value.toLowerCase().replace(/[^a-z]/g, "")] ?? null;
+}
+
+/**
+ * An imported class text as the roster stores it (#1851): "TLT" or "Teen Leadership Training" sets the TLT flag and
+ * leaves the class blank, any other known class is the class. Null when the text isn't a known class.
+ */
+export function rosterClassFrom(value: string): { classLevel: Exclude<ClubClassLevel, "TLT"> | null; isTlt: boolean } | null {
+  const level = classLevelFrom(value);
+  if (level === null) return null;
+  return level === "TLT" ? { classLevel: null, isTlt: true } : { classLevel: level, isTlt: false };
 }
 
 export function ageFrom(value: string) {
@@ -182,6 +196,7 @@ function person(key: string, name: string, fields: Partial<ImportPerson>): Impor
     attendeeType: "YOUTH",
     role: "",
     classLevel: null,
+    isTlt: false,
     classText: "",
     reportedAge: null,
     keepBoth: false,
@@ -220,12 +235,14 @@ function draftFrom(entry: z.infer<typeof entrySchema>, now: Date): ClubImportDra
   rows(response.repeater_container).forEach((row, index) => {
     if (!row[0]) return;
     const classText = row[2] ?? "";
+    const rosterClass = rosterClassFrom(classText);
     people.push(person(`pathfinder-${index}`, row[0], {
       attendeeType: "YOUTH",
       role: "Pathfinder",
       reportedAge: ageFrom(row[1] ?? ""),
-      classLevel: classLevelFrom(classText),
-      classText: classLevelFrom(classText) ? "" : classText.slice(0, 40),
+      classLevel: rosterClass?.classLevel ?? null,
+      isTlt: rosterClass?.isTlt ?? false,
+      classText: rosterClass ? "" : classText.slice(0, 40),
     }));
   });
 

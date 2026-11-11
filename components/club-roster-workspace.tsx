@@ -26,6 +26,8 @@ import { formEntries, rosterCloseDecision, rosterDialogIsDirty, rosterDiscardPro
 import { complianceFilterLabels, complianceFilterState, type ComplianceFilterValue } from "@/modules/background-checks/display";
 import {
   clubClassLevelLabels,
+  rosterClassLevelLabels,
+  rosterTltLabel,
   attendeeTypeAgeHint,
   clubRosterAttendeeTypeLabels,
   clubRosterGenderLabels,
@@ -690,6 +692,8 @@ function ClubRosterWorkspaceInner({
       attendeeType,
       role: String(form.get("role") ?? ""),
       classLevel: String(form.get("classLevel") ?? "") || null,
+      // The TLT yes/no (#1851) is a Pathfinder's own; the server also clears it for any other type.
+      isTlt: attendeeType === "YOUTH" && form.get("isTlt") === "on",
       // Grade, school type and church membership (#1664, #1668) are a Pathfinder's own; the fields are only shown for Youth.
       ...(attendeeType === "YOUTH" ? { schoolGrade: String(form.get("schoolGrade") ?? "") || null } : {}),
       ...(attendeeType === "YOUTH" && schoolDetails
@@ -1078,7 +1082,7 @@ function ClubRosterWorkspaceInner({
                                 );
                                 case "birthDate": return <td {...cardCell("Birth date")} className={tableStyles.cardFact} key={column} translate="no">{birthDates?.[member.id] ?? "—"}</td>;
                                 case "type": return <td {...cardCell("Type")} className={tableStyles.cardPrimary} key={column}>{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>;
-                                case "class": return <td {...cardCell("Current class")} className={tableStyles.cardPrimary} key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : "—"}</td>;
+                                case "class": return <td {...cardCell("Current class")} className={tableStyles.cardPrimary} key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : member.isTlt ? null : "—"}{member.isTlt && <span className="status-chip" title={rosterTltLabel}>TLT</span>}</td>;
                                 case "grade": return <td {...cardCell("Grade")} className={tableStyles.cardFact} key={column}>{member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "—"}</td>;
                                 case "school": return <td {...cardCell("School")} className={tableStyles.cardFact} key={column}>{member.schoolType ? clubSchoolTypeLabels[member.schoolType] : "—"}</td>;
                                 case "churchMember": return <td {...cardCell(CHURCH_MEMBER_LABEL)} className={tableStyles.cardFact} key={column}>{member.churchMember ? clubChurchMemberLabels[member.churchMember] : "—"}</td>;
@@ -1250,11 +1254,17 @@ function ClubRosterWorkspaceInner({
             Current class
             <select defaultValue={editing?.classLevel ?? ""} name="classLevel">
               <option value="">None</option>
-              {Object.entries(clubClassLevelLabels).map(([value, label]) => (
+              {Object.entries(rosterClassLevelLabels).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
           </label>
+          {formType === "YOUTH" && (
+            <label className="checkbox-label">
+              <input defaultChecked={editing?.isTlt ?? false} name="isTlt" type="checkbox" />
+              {rosterTltLabel}
+            </label>
+          )}
           {formType === "YOUTH" && (
             <label>
               Grade

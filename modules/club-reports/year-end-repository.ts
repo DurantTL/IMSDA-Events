@@ -48,7 +48,7 @@ export async function yearEndPrefill(organizationId: string, reportYear: string,
     prisma.clubRosterMember.findMany({
       where: { organizationId, clubYear: reportYear },
       select: {
-        attendeeType: true, classLevel: true, gender: true, reportedAge: true, sealedBirthDate: true,
+        attendeeType: true, isTlt: true, gender: true, reportedAge: true, sealedBirthDate: true,
         personId: true, status: true, removedAt: true, updatedAt: true,
       },
     }),
@@ -71,7 +71,7 @@ export async function yearEndPrefill(organizationId: string, reportYear: string,
     }
     return {
       attendeeType: row.attendeeType,
-      classLevel: row.classLevel,
+      isTlt: row.isTlt,
       gender: row.gender,
       age: age ?? row.reportedAge,
     };

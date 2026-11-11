@@ -57,18 +57,19 @@ import {
 } from "@/modules/club-meeting-notes/attendance";
 import { attendanceMonthExportHref, clubYearDateBounds, defaultMeetingDate, meetingAttendanceTotal, monthDateBounds, notesMonthlySummary, recordsMonth } from "@/modules/club-meeting-notes/domain";
 import { eraseRosterRow } from "@/modules/club-rosters/repository";
+import { rosterIsTltFor } from "@/modules/club-rosters/domain";
 import { createClubMeetingNote, updateClubMeetingNote } from "@/modules/club-meeting-notes/repository";
 import { meetingNoteInputSchema } from "@/modules/club-meeting-notes/schemas";
 
-const member = (id: string, attendeeType: string, classLevel: string | null, firstName: string, lastName: string) =>
-  ({ id, attendeeType, classLevel, firstName, lastName });
+const member = (id: string, attendeeType: string, isTlt: boolean, firstName: string, lastName: string) =>
+  ({ id, attendeeType, isTlt, firstName, lastName });
 
 const roster = [
-  member("m-1", "YOUTH", "FRIEND", "Ana", "Zed"),
-  member("m-2", "YOUTH", "TLT", "Ben", "Yarrow"),
-  member("m-3", "STAFF", null, "Cy", "Xu"),
-  member("m-4", "UNDERAGE", null, "Di", "Ames"),
-  member("m-5", "ADULT", null, "Ed", "Bell"),
+  member("m-1", "YOUTH", false, "Ana", "Zed"),
+  member("m-2", "YOUTH", true, "Ben", "Yarrow"),
+  member("m-3", "STAFF", false, "Cy", "Xu"),
+  member("m-4", "UNDERAGE", false, "Di", "Ames"),
+  member("m-5", "ADULT", false, "Ed", "Bell"),
 ];
 
 describe("attendance groups and derived counts", () => {
@@ -113,7 +114,7 @@ describe("saving a meeting note with attendance", () => {
     mocks.noteCreate.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve(stored(data)));
     mocks.noteUpdate.mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve(stored(data)));
     mocks.rosterFindMany.mockImplementation(({ where }: { where: { id: { in: string[] } } }) =>
-      Promise.resolve(roster.filter((entry) => where.id.in.includes(entry.id)).map(({ id, attendeeType, classLevel }) => ({ id, attendeeType, classLevel }))));
+      Promise.resolve(roster.filter((entry) => where.id.in.includes(entry.id)).map(({ id, attendeeType, isTlt }) => ({ id, attendeeType, isTlt }))));
   });
 
   it("stores the check-off and fills blank head counts from it", async () => {
@@ -210,7 +211,7 @@ describe("saving a meeting note with attendance", () => {
   });
 
   it("refuses members who are not on this club's roster for the meeting's year, or repeated", async () => {
-    mocks.rosterFindMany.mockResolvedValue([{ id: "m-1", attendeeType: "YOUTH", classLevel: null }]);
+    mocks.rosterFindMany.mockResolvedValue([{ id: "m-1", attendeeType: "YOUTH", isTlt: false }]);
     await expect(createClubMeetingNote("club-1", input({
       attendance: [{ rosterMemberId: "m-1", present: true }, { rosterMemberId: "other-club-member", present: true }],
     }), actor)).rejects.toMatchObject({ code: "INVALID_ATTENDANCE" });
@@ -304,8 +305,8 @@ describe("attendance needs roster access (ADR 0005)", () => {
     ]);
     mocks.rosterFindMany.mockImplementation((args: { where: { id?: { in: string[] } } }) =>
       Promise.resolve(args.where.id
-        ? args.where.id.in.map((id) => ({ id, attendeeType: "YOUTH", classLevel: null, person: { firstName: "Ana", lastName: "Zed" } }))
-        : [{ id: "m-1", attendeeType: "YOUTH", classLevel: null, person: { firstName: "Ana", lastName: "Zed" } }]));
+        ? args.where.id.in.map((id) => ({ id, attendeeType: "YOUTH", isTlt: false, person: { firstName: "Ana", lastName: "Zed" } }))
+        : [{ id: "m-1", attendeeType: "YOUTH", isTlt: false, person: { firstName: "Ana", lastName: "Zed" } }]));
   });
 
   it("rejects a reporter's attendance on save (403) but still saves their head counts", async () => {
@@ -462,11 +463,11 @@ describe("month export bounds and file names (#1320)", () => {
 });
 
 describe("TLTs are inside Pathfinders (director decision)", () => {
-  const youth = (id: string, classLevel: string | null) => ({ id, attendeeType: "YOUTH", classLevel, present: true });
+  const youth = (id: string, isTlt: boolean) => ({ id, attendeeType: "YOUTH", isTlt, present: true });
   const tenPlusTwo = [
-    ...Array.from({ length: 10 }, (_, i) => youth(`y-${i}`, "FRIEND")),
-    youth("t-1", "TLT"),
-    youth("t-2", "TLT"),
+    ...Array.from({ length: 10 }, (_, i) => youth(`y-${i}`, false)),
+    youth("t-1", true),
+    youth("t-2", true),
   ];
 
   it("10 youth + 2 youth TLTs all present: Pathfinders 12, TLT 2, and an average total of 12", () => {
@@ -486,12 +487,12 @@ describe("TLTs are inside Pathfinders (director decision)", () => {
 
   it("a report prefilled from check-offs matches the roster prefill for the same people", () => {
     // reportPrefill's rule, applied to the same roster (modules/club-reports/repository.ts).
-    const rosterPrefill = (members: Array<{ attendeeType: string; classLevel: string | null }>) => ({
+    const rosterPrefill = (members: Array<{ attendeeType: string; isTlt: boolean }>) => ({
       pathfinderCount: members.filter((m) => m.attendeeType === "YOUTH" || m.attendeeType === "UNDERAGE").length,
-      tltCount: members.filter((m) => m.classLevel === "TLT").length,
+      tltCount: members.filter((m) => rosterIsTltFor(m.attendeeType, m.isTlt)).length,
       staffCount: members.filter((m) => m.attendeeType === "STAFF" || m.attendeeType === "ADULT").length,
     });
-    const everyone = [...tenPlusTwo, { id: "s-1", attendeeType: "STAFF", classLevel: null, present: true }, { id: "a-1", attendeeType: "ADULT", classLevel: "TLT", present: true }, { id: "u-1", attendeeType: "UNDERAGE", classLevel: null, present: true }];
+    const everyone = [...tenPlusTwo, { id: "s-1", attendeeType: "STAFF", isTlt: false, present: true }, { id: "a-1", attendeeType: "ADULT", isTlt: true, present: true }, { id: "u-1", attendeeType: "UNDERAGE", isTlt: false, present: true }];
     const counts = countsFromAttendance(everyone);
     expect(counts).toEqual(rosterPrefill(everyone));
     const summary = notesMonthlySummary([{ ...counts, presentPeople: presentTotal(everyone), honors: [] }]);

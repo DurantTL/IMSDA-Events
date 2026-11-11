@@ -1,4 +1,5 @@
 import { calendarDateIn } from "@/modules/calendar/domain";
+import { rosterIsTltFor } from "@/modules/club-rosters/domain";
 
 /**
  * The Pathfinder Year-End Report (#607), replacing the paper/Word form. One
@@ -281,7 +282,8 @@ export function gradeBandForAge(age: number): GradeBand | null {
 
 export type RosterCountMember = {
   attendeeType: "YOUTH" | "STAFF" | "ADULT" | "UNDERAGE";
-  classLevel: string | null;
+  /** The roster's TLT flag (#1851). */
+  isTlt: boolean;
   gender: "MALE" | "FEMALE" | null;
   /** Age on the report date, or null when there is no birth date or reported age. */
   age: number | null;
@@ -297,14 +299,13 @@ export type RosterPrefill = {
     membersAgeOutsideBands: number;
     staffWithoutGender: number;
   };
-  /** TLTs on the roster (youth, or staff with the TLT class); their level (1 to 4) isn't stored, so the level cells stay manual. */
+  /** TLTs on the roster (youth with the TLT flag); their level (1 to 4) isn't stored, so the level cells stay manual. */
   tltsOnRoster: number;
 };
 
 /**
- * Sections 1 and 2 from the roster. Membership is youth members plus anyone
- * with the TLT class level, staff included (the form says membership includes
- * TLTs), by age band and gender. Underage children aren't club members. Staff
+ * Sections 1 and 2 from the roster. Membership is youth members, TLTs included
+ * (a TLT is a youth with the roster's TLT flag, #1851), by age band and gender. Underage children aren't club members. Staff
  * is registered STAFF who aren't TLTs, by gender. A member without a gender or
  * a usable age, or with an age outside 10 to 18, can't be placed and is counted
  * separately so the director knows to fill the gap.
@@ -316,9 +317,9 @@ export function prefillFromRoster(members: readonly RosterCountMember[]): Roster
   let tltsOnRoster = 0;
   for (const member of members) {
     const gender = member.gender === "MALE" ? "Male" : member.gender === "FEMALE" ? "Female" : null;
-    const isTlt = member.classLevel === "TLT" && (member.attendeeType === "YOUTH" || member.attendeeType === "STAFF");
+    const isTlt = rosterIsTltFor(member.attendeeType, member.isTlt);
     if (isTlt) tltsOnRoster += 1;
-    if (member.attendeeType === "YOUTH" || isTlt) {
+    if (member.attendeeType === "YOUTH") {
       if (!gender) {
         unplaced.membersWithoutGender += 1;
         continue;

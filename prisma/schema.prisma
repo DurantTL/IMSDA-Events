@@ -93,6 +93,9 @@ enum ClubDirectorRole {
 }
 
 /// Pathfinder class level on a club roster (#375). No level is stored as null.
+/// Since #1851 a roster member's current class is never TLT (that is the
+/// `ClubRosterMember.isTlt` flag); TLT stays here for class history, monthly
+/// report class lists and honor minimum levels.
 enum ClubClassLevel {
   FRIEND
   COMPANION
@@ -101,6 +104,8 @@ enum ClubClassLevel {
   VOYAGER
   GUIDE
   TLT
+  /// Basic Staff Training (#1851), a Master Guide prerequisite.
+  BASIC_STAFF_TRAINING
   MASTER_GUIDE
 }
 
@@ -6099,6 +6104,8 @@ model ClubRosterMember {
   attendeeType         ClubRosterAttendeeType
   role                 String                 @default("")
   classLevel           ClubClassLevel?
+  /// Teen Leadership Training (#1851): a yes/no on youth members, separate from type and class. Only ever true for YOUTH.
+  isTlt                Boolean                @default(false)
   /// School grade (#1664), youth only. Optional; a missing one is listed under "Details needed".
   schoolGrade          ClubRosterSchoolGrade?
   /// School type (#1668). Optional, never flagged as missing. Not shown to Area Coordinators.

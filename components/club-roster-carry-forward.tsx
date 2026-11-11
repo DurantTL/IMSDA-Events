@@ -10,7 +10,7 @@ import { SortOrderNote, SortableHeader } from "@/components/list-sort";
 import { useTableSort, type SortSpec } from "@/components/use-table-sort";
 import { seniorsToReview } from "@/modules/club-rosters/carry-forward-domain";
 import styles from "@/components/club-roster-carry-forward.module.css";
-import { clubClassLevelLabels, clubClassLevels, clubRosterAttendeeTypeLabels, clubSchoolGradeLabels, clubSchoolGrades, nextSchoolGrade, schoolGradeOrder, type ClubSchoolGrade } from "@/modules/club-rosters/domain";
+import { clubClassLevelLabels, rosterClassLevels, clubRosterAttendeeTypeLabels, clubSchoolGradeLabels, clubSchoolGrades, nextSchoolGrade, schoolGradeOrder, type ClubSchoolGrade } from "@/modules/club-rosters/domain";
 
 /**
  * The checklist for starting next year's roster (#414). Everyone from last
@@ -222,7 +222,7 @@ export function ClubRosterCarryForward({
                       value={choice.attendeeType === "YOUTH" ? choice.classLevel : ""}
                     >
                       <option value="">None</option>
-                      {clubClassLevels.map((level) => <option key={level} value={level}>{clubClassLevelLabels[level]}</option>)}
+                      {rosterClassLevels.map((level) => <option key={level} value={level}>{clubClassLevelLabels[level]}</option>)}
                     </select>
                   </td>
                   <td data-label={`${toClubYear} grade`} role="cell">

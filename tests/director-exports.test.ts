@@ -78,12 +78,12 @@ describe("honors export CSV", () => {
 describe("class tracking export CSV", () => {
   it("lists each member with joined items and handles an empty roster", () => {
     const csv = classTrackingExportCsv(context, [{
-      personId: "p1", lastName: "Sample", firstName: "Alex", className: "Friend",
+      personId: "p1", lastName: "Sample", firstName: "Alex", className: "Friend", tlt: "Yes",
       insignia: ["Friend Pin (awarded)"], eventPatches: ["Fall Camporee Patch (earned)"], conductAndTlt: ["Good Conduct Bar (earned)", "TLT Pin (ordered)"],
       masterAwards: ["Health Master Award: 5 of 7"],
     }]);
     expect(csv).toContain('"Club","Sample Pathfinders"');
-    expect(csv).toContain('"Sample","Alex","Friend","Friend Pin (awarded)","Fall Camporee Patch (earned)","Good Conduct Bar (earned); TLT Pin (ordered)","Health Master Award: 5 of 7"');
+    expect(csv).toContain('"Sample","Alex","Friend","Yes","Friend Pin (awarded)","Fall Camporee Patch (earned)","Good Conduct Bar (earned); TLT Pin (ordered)","Health Master Award: 5 of 7"');
     expect(classTrackingExportCsv(context, [])).toContain("No active roster members for this club year.");
   });
 });

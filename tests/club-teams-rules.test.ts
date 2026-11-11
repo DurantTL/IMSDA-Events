@@ -119,7 +119,7 @@ describe("who is a coach", () => {
 
   it("lets an 18 or 19 year old Pathfinder or TLT be a team member, even when staff on the roster", () => {
     expect(teamRoleFor({ responses: { attendee_type: "TLT" }, rosterAttendeeType: "STAFF", maxMemberAge: 19, age: 18 })).toBe("MEMBER");
-    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "STAFF", rosterClassLevel: "TLT", maxMemberAge: 19, age: 19 })).toBe("MEMBER");
+    expect(teamRoleFor({ responses: {}, rosterAttendeeType: "STAFF", rosterIsTlt: true, maxMemberAge: 19, age: 19 })).toBe("MEMBER");
     expect(teamRoleFor({ responses: { attendee_type: "Pathfinder" }, age: 19 })).toBe("MEMBER");
     expect(teamRoleFor({ responses: { attendee_type: "Pathfinder" }, rosterAttendeeType: "YOUTH", maxMemberAge: 19, age: 19 })).toBe("MEMBER");
   });

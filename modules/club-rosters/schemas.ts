@@ -2,7 +2,7 @@ import { z } from "zod";
 import { rosterRoleOrDefault } from "@/modules/club-rosters/domain";
 import { guardiansInputSchema, guardiansUpdateSchema } from "@/modules/club-rosters/guardians-domain";
 
-const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "MASTER_GUIDE"]).nullable();
+const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "BASIC_STAFF_TRAINING", "MASTER_GUIDE"]).nullable();
 
 const schoolGrade = z.enum(["GRADE_K", "GRADE_1", "GRADE_2", "GRADE_3", "GRADE_4", "GRADE_5", "GRADE_6", "GRADE_7", "GRADE_8", "GRADE_9", "GRADE_10", "GRADE_11", "GRADE_12", "NOT_IN_SCHOOL"]).nullable();
 const schoolType = z.enum(["ADVENTIST_SCHOOL", "PUBLIC_SCHOOL", "HOMESCHOOL", "OTHER"]).nullable();
@@ -50,6 +50,8 @@ export const rosterMemberInputSchema = z.object({
   attendeeType: z.enum(["YOUTH", "STAFF", "ADULT", "UNDERAGE"]),
   role: role.default(""),
   classLevel: classLevel.default(null),
+  /** Teen Leadership Training (#1851): a yes/no on youth members; the write drops it for any other type. */
+  isTlt: z.boolean().optional(),
   /** School grade, school type and church membership (#1664, #1668): optional, youth only. */
   schoolGrade: schoolGrade.optional(),
   schoolType: schoolType.optional(),
@@ -69,6 +71,7 @@ export const rosterMemberUpdateSchema = z.object({
   attendeeType: z.enum(["YOUTH", "STAFF", "ADULT", "UNDERAGE"]),
   role,
   classLevel,
+  isTlt: z.boolean(),
   schoolGrade,
   schoolType,
   churchMember,

@@ -5,7 +5,7 @@ import { CheckCircle2, CircleAlert, FileUp, Upload } from "lucide-react";
 import { confirmPayload } from "@/modules/club-imports/confirm-payload";
 import { churchStem, earlierImportNotice, inFileDuplicateKeys, skipReasonLabel, submissionYearNote } from "@/modules/club-imports/domain";
 import type { AnnotatedImportDraft, ClubImportResult } from "@/modules/club-imports/repository";
-import { clubClassLevelLabels } from "@/modules/club-rosters/domain";
+import { rosterClassLevelLabels, rosterTltLabel } from "@/modules/club-rosters/domain";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import { sponsorOptionLabel } from "@/modules/organizations/domain";
 
@@ -443,8 +443,14 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                                 value={person.classLevel ?? ""}
                               >
                                 <option value="">{person.classText ? `None (form: ${person.classText})` : "None"}</option>
-                                {Object.entries(clubClassLevelLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                {Object.entries(rosterClassLevelLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                               </select>
+                              {person.attendeeType === "YOUTH" && (
+                                <label className="checkbox-label">
+                                  <input checked={person.isTlt} onChange={(event) => set({ isTlt: event.target.checked })} type="checkbox" />
+                                  {rosterTltLabel}
+                                </label>
+                              )}
                             </td>
                             <td>
                               <input

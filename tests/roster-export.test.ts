@@ -3,6 +3,7 @@ import { buildRosterExportTable } from "@/modules/club-rosters/export";
 import {
   DEFAULT_ROSTER_EXPORT_COLUMNS,
   ROSTER_EXPORT_COLUMN_KEYS,
+  ROSTER_EXPORT_COLUMNS,
   guardianColumnParts,
   isGuardianRosterExportColumn,
   isSensitiveRosterExportColumn,
@@ -35,7 +36,7 @@ describe("roster export columns (#490)", () => {
   it("defaults to names only, and offers no emergency contact or medical field", () => {
     expect(DEFAULT_ROSTER_EXPORT_COLUMNS.map((column) => column.key)).toEqual(["firstName", "lastName"]);
     expect(ROSTER_EXPORT_COLUMN_KEYS).toEqual([
-      "firstName", "lastName", "birthDate", "age", "gender", "classLevel", "schoolGrade", "role",
+      "firstName", "lastName", "birthDate", "age", "gender", "classLevel", "isTlt", "schoolGrade", "role",
       "guardian1Name", "guardian1Relationship", "guardian1Email", "guardian1Phone",
       "guardian2Name", "guardian2Relationship", "guardian2Email", "guardian2Phone",
     ]);
@@ -114,8 +115,8 @@ describe("guardian export columns (#510)", () => {
   it("offers guardian columns only to someone who may see guardians", () => {
     const withAccess = rosterExportColumnKeysFor(true);
     const without = rosterExportColumnKeysFor(false);
-    expect(without).toEqual(["firstName", "lastName", "birthDate", "age", "gender", "classLevel", "schoolGrade", "role"]);
-    expect(withAccess).toHaveLength(16);
+    expect(without).toEqual(["firstName", "lastName", "birthDate", "age", "gender", "classLevel", "isTlt", "schoolGrade", "role"]);
+    expect(withAccess).toHaveLength(17);
     expect(without.some(isGuardianRosterExportColumn)).toBe(false);
   });
 
@@ -138,5 +139,18 @@ describe("guardian export columns (#510)", () => {
     ]);
     // Without guardians (the viewer may not see them), nothing leaks into the cells.
     expect(buildRosterExportTable([member()], columns).rows).toEqual([["Ana", "", "", "", ""]]);
+  });
+});
+
+describe("TLT column (#1851)", () => {
+  it("is an optional, non-sensitive column that writes Yes or No for youth and nothing for staff", () => {
+    expect(ROSTER_EXPORT_COLUMNS.isTlt).toEqual({ header: "TLT", sensitive: false });
+    const base = { role: "", classLevel: null, gender: null, status: "ACTIVE", source: "DIRECTOR", age: 12, reportedAge: null, birthDateNeeded: false, updatedAt: "2026-09-01T00:00:00.000Z" };
+    const members = [
+      { ...base, id: "m1", firstName: "Ana", lastName: "Reyes", attendeeType: "YOUTH", isTlt: true },
+      { ...base, id: "m2", firstName: "Ben", lastName: "Lund", attendeeType: "YOUTH", isTlt: false },
+      { ...base, id: "m3", firstName: "Cy", lastName: "Okafor", attendeeType: "STAFF", isTlt: false },
+    ] as never;
+    expect(buildRosterExportTable(members, [{ key: "isTlt", header: "TLT" }]).rows).toEqual([["Yes"], ["No"], [""]]);
   });
 });

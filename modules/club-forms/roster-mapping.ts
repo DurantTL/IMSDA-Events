@@ -10,6 +10,7 @@ import {
   schoolGradeFromText,
   type ClubChurchMember,
   type ClubClassLevel,
+  type RosterClassLevel,
   type ClubSchoolGrade,
   type ClubSchoolType,
 } from "@/modules/club-rosters/domain";
@@ -290,7 +291,9 @@ export type RosterPrefill = {
   birthDate: string;
   attendeeType: "YOUTH" | "STAFF";
   role: string;
-  classLevel: ClubClassLevel | null;
+  classLevel: RosterClassLevel | null;
+  /** Teen Leadership Training (#1851): a "TLT" class answer sets it, youth only. */
+  isTlt: boolean;
   schoolGrade: ClubSchoolGrade | null;
   schoolType: ClubSchoolType | null;
   churchMember: ClubChurchMember | null;
@@ -319,6 +322,12 @@ function text(answers: Record<string, unknown>, key: string | undefined, max: nu
   if (!key) return "";
   const value = answers[key];
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+/** A class answer as the roster stores it (#1851): "TLT" sets the TLT flag and leaves the class blank. */
+function rosterClassFrom(value: string): { classLevel: RosterClassLevel | null; isTlt: boolean } {
+  const level = classLevelFrom(value);
+  return level === "TLT" ? { classLevel: null, isTlt: true } : { classLevel: level, isTlt: false };
 }
 
 function classLevelFrom(value: string): ClubClassLevel | null {
@@ -389,7 +398,7 @@ export function rosterPrefillFromAnswers(
   const birthRaw = text(answers, birthKey, 20);
   const birthDate = birthRaw ? parseRosterBirthDateInput(birthRaw) ?? "" : "";
   const gender = genderFrom(text(answers, plain(fields.gender), 20));
-  const classLevel = mapping.rosterType === "YOUTH" ? classLevelFrom(text(answers, plain(fields.classLevel), 40)) : null;
+  const { classLevel, isTlt } = mapping.rosterType === "YOUTH" ? rosterClassFrom(text(answers, plain(fields.classLevel), 40)) : { classLevel: null, isTlt: false };
   const youth = mapping.rosterType === "YOUTH";
   const schoolGrade = youth ? schoolGradeFromText(text(answers, plain(fields.schoolGrade), 40)) : null;
   const schoolType = youth ? schoolTypeFrom(text(answers, plain(fields.schoolType), 40)) : null;
@@ -418,6 +427,7 @@ export function rosterPrefillFromAnswers(
     attendeeType: mapping.rosterType,
     role: text(answers, plain(fields.role), 60),
     classLevel,
+    isTlt,
     schoolGrade,
     schoolType,
     churchMember,

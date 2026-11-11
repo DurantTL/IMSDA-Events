@@ -15,7 +15,8 @@ import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { rosterFormFieldOrder, validateRosterForm, type RosterFormErrors, type RosterFormField } from "@/modules/club-rosters/form-validation";
 import {
   attendeeTypeAgeHint,
-  clubClassLevelLabels,
+  rosterClassLevelLabels,
+  rosterTltLabel,
   clubRosterAttendeeTypeLabels,
   clubRosterGenderLabels,
   defaultRosterRole,
@@ -131,6 +132,8 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
         attendeeType: String(form.get("attendeeType") ?? "YOUTH"),
         role: String(form.get("role") ?? ""),
         classLevel: String(form.get("classLevel") ?? "") || null,
+        // The TLT yes/no (#1851) is a Pathfinder's own; the server drops it for any other type.
+        isTlt: String(form.get("attendeeType") ?? "YOUTH") === "YOUTH" && form.get("isTlt") === "on",
         // Grade, school type and church membership (#1664, #1668): a Pathfinder's own, copied from the form for the director to check.
         ...(String(form.get("attendeeType") ?? "YOUTH") === "YOUTH"
           ? {
@@ -218,11 +221,15 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
             Current class
             <select defaultValue={prefill.classLevel ?? ""} name="classLevel">
               <option value="">None</option>
-              {Object.entries(clubClassLevelLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              {Object.entries(rosterClassLevelLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
           {formType === "YOUTH" && (
             <>
+              <label className="checkbox-label">
+                <input defaultChecked={prefill.isTlt} name="isTlt" type="checkbox" />
+                {rosterTltLabel}
+              </label>
               <label>
                 Grade
                 <select defaultValue={prefill.schoolGrade ?? ""} name="schoolGrade">

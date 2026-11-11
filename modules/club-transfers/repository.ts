@@ -122,6 +122,7 @@ const rosterMemberSelect = {
   attendeeType: true,
   role: true,
   classLevel: true,
+  isTlt: true,
   schoolGrade: true,
   schoolType: true,
   churchMember: true,
@@ -600,6 +601,8 @@ async function completeTransfer(
       attendeeType: sending.attendeeType,
       role: sending.role,
       classLevel: sending.classLevel,
+      // The TLT flag (#1851) moves with the member, like the class.
+      isTlt: sending.isTlt,
       // Grade, school type and church membership (#1664, #1668) move with the member, like the class.
       schoolGrade: sending.schoolGrade,
       schoolType: sending.schoolType,

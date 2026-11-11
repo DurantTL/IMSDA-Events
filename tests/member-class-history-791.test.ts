@@ -142,7 +142,7 @@ describe("class history page edit and read-only modes (#1011)", () => {
     expect(out).toContain("Remove");
     // Friend is completed, so it is not offered; the in-progress Companion row has no actions of its own.
     const options = [...out.matchAll(/<option value="([A-Z_]*)"/g)].map((match) => match[1]);
-    expect(options).toEqual(["", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "MASTER_GUIDE"]);
+    expect(options).toEqual(["", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "BASIC_STAFF_TRAINING", "MASTER_GUIDE"]);
     expect(out.match(/Change date/g)).toHaveLength(1);
     expect(out).not.toContain("View only");
   });

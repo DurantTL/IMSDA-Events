@@ -1,5 +1,5 @@
-import { classLevelFrom } from "@/modules/club-imports/domain";
-import type { ClubClassLevel, ClubSchoolGrade } from "@/modules/club-rosters/domain";
+import { rosterClassFrom } from "@/modules/club-imports/domain";
+import type { RosterClassLevel, ClubSchoolGrade } from "@/modules/club-rosters/domain";
 import {
   clubRosterAttendeeTypeLabels,
   missingRosterFields,
@@ -39,7 +39,9 @@ export type RosterCsvRow = {
   /** Undefined means the cell was blank: keep what's on file. */
   birthDate?: string;
   attendeeType?: AttendeeType;
-  classLevel?: ClubClassLevel | null;
+  classLevel?: RosterClassLevel | null;
+  /** Teen Leadership Training (#1851), youth only. Undefined means the cell was blank: keep what's on file. */
+  isTlt?: boolean;
   /** School grade (#1664). Undefined means the cell was blank: keep what's on file. */
   schoolGrade?: ClubSchoolGrade;
   role?: string;
@@ -59,6 +61,8 @@ const headerKeys: Record<string, keyof Omit<RosterCsvRow, "line" | "problems">> 
   class: "classLevel",
   classlevel: "classLevel",
   currentclass: "classLevel",
+  tlt: "isTlt",
+  teenleadershiptraining: "isTlt",
   grade: "schoolGrade",
   schoolgrade: "schoolGrade",
   role: "role",
@@ -109,9 +113,16 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
         if (type) row.attendeeType = type;
         else row.problems.push(`Type "${value}" isn't one of Youth, Staff, Adult, or Underage.`);
       } else if (key === "classLevel") {
-        const level = value.toLowerCase() === "none" ? null : classLevelFrom(value);
-        if (level !== null || value.toLowerCase() === "none") row.classLevel = level;
-        else row.problems.push(`Class "${value}" isn't a Pathfinder class level.`);
+        const parsed = value.toLowerCase() === "none" ? { classLevel: null, isTlt: false } : rosterClassFrom(value);
+        if (parsed === null) row.problems.push(`Class "${value}" isn't a Pathfinder class level.`);
+        // "TLT" in the class column sets the TLT flag and leaves the class alone (#1851).
+        else if (parsed.isTlt) row.isTlt = true;
+        else row.classLevel = parsed.classLevel;
+      } else if (key === "isTlt") {
+        const answer = value.toLowerCase();
+        if (["yes", "y", "true", "1", "x"].includes(answer)) row.isTlt = true;
+        else if (["no", "n", "false", "0"].includes(answer)) row.isTlt = false;
+        else row.problems.push(`TLT "${value}" should be Yes or No, or left blank.`);
       } else if (key === "schoolGrade") {
         const grade = schoolGradeFromText(value);
         if (grade) row.schoolGrade = grade;

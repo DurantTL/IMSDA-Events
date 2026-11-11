@@ -31,7 +31,9 @@ export const clubImportItemSchema = z.object({
     lastName: name.min(1, "Every person needs a last name. Fix it in the preview or skip them."),
     attendeeType: z.enum(["STAFF", "YOUTH", "ADULT"]),
     role: z.string().trim().max(60).default(""),
-    classLevel: z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "MASTER_GUIDE"]).nullable(),
+    classLevel: z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "BASIC_STAFF_TRAINING", "MASTER_GUIDE"]).nullable(),
+    /** Teen Leadership Training (#1851): kept only for a youth. */
+    isTlt: z.boolean().default(false),
     reportedAge: z.number().int().min(0).max(99).nullable(),
     /** "Keep both" (#541): add this person even though an earlier person in the file has the same name and section. */
     keepBoth: z.boolean().default(false),
