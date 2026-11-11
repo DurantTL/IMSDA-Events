@@ -70,7 +70,7 @@ export function AreaCoordinatorImport({ pendingCount }: { pendingCount: number }
         variant="staff"
       />
       {pendingCount > 0 ? (
-        <button className="primary-button" disabled={busy} onClick={() => void send()} type="button">
+        <button className="secondary-button" disabled={busy} onClick={() => void send()} type="button">
           <Send aria-hidden="true" size={16} /> {busy ? "Sending…" : `Send ${pendingCount} Area Coordinator invite${pendingCount === 1 ? "" : "s"}`}
         </button>
       ) : null}

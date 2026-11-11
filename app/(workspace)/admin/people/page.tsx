@@ -1,5 +1,5 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { ListPage } from "@/components/page-templates/list-page";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AreaCoordinatorImport } from "@/components/area-coordinator-import";
@@ -7,6 +7,7 @@ import { ActAsButton } from "@/components/act-as-button";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { InvitePerson } from "@/components/invite-person";
 import { sliceFromCount } from "@/lib/pagination";
+import styles from "@/components/people-directory.module.css";
 import { PeopleDirectory } from "@/components/people-directory";
 import { PendingInvites } from "@/components/pending-invites";
 import { countPendingAreaCoordinatorInvites } from "@/modules/organizations/area-coordinator-invites";
@@ -57,15 +58,16 @@ export default async function PeopleAccessPage({
   return (
     <>
       <AdminPageHeader path="/admin/people" />
-      <StaffPageHeader
-        description={full
-          ? "Everyone with a staff login or a website account, and what each person can reach."
-          : "Club people: club directors and club staff, Area Coordinators and Clubs Administrators, and the club roles each one holds."}
-        primary={(
-          <>
-            <InvitePerson clubOptions={clubOptions} eventOptions={eventOptions} scope={viewer.scope} />
-            {full ? <AreaCoordinatorImport pendingCount={waitingAreaInvites} /> : null}
-            {/* Both scopes (system administrator "full", Clubs Administrator "clubs") match the start route's `requireClubsAdministration` (Caleb, 2026-11-06). */}
+      <ListPage
+        header={{
+          title: "People & access",
+          description: full
+            ? "Everyone with a staff login or a website account, and what each person can reach."
+            : "Club people: club directors and club staff, Area Coordinators and Clubs Administrators, and the club roles each one holds.",
+          primary: <InvitePerson clubOptions={clubOptions} eventOptions={eventOptions} scope={viewer.scope} />,
+          // One filled action (Invite a person) and one outlined button. The Area Coordinator import stays a quiet row under the title.
+          secondary: (
+            /* Both scopes (system administrator "full", Clubs Administrator "clubs") match the start route's `requireClubsAdministration` (Caleb, 2026-11-06). */
             <ActAsButton
               access="View only"
               endpoint="/api/admin/act-as/area-coordinator"
@@ -74,20 +76,22 @@ export default async function PeopleAccessPage({
               resultAction="Open the Area Coordinator portal"
               role="Area Coordinator"
             />
-          </>
-        )}
-      />
-      <PeopleDirectory
-        scope={viewer.scope}
-        filters={filters}
-        eventOptions={eventOptions}
-        clubOptions={clubOptions}
-        pending={<PendingInvites emailConfigured={pending.emailConfigured} invites={pending.invites} />}
-        pendingCount={pending.total}
-        pendingPage={pending.page}
-        pendingSlice={pending.total > 0 ? sliceFromCount(pending.invites, pending.page, pending.total, pending.pageSize) : undefined}
-        page={result.page} pageCount={result.pageCount} query={query} rows={result.rows} total={result.total}
-      />
+          ),
+          below: full ? <div className={styles.headerTools}><AreaCoordinatorImport pendingCount={waitingAreaInvites} /></div> : undefined,
+        }}
+      >
+        <PeopleDirectory
+          scope={viewer.scope}
+          filters={filters}
+          eventOptions={eventOptions}
+          clubOptions={clubOptions}
+          pending={<PendingInvites emailConfigured={pending.emailConfigured} invites={pending.invites} />}
+          pendingCount={pending.total}
+          pendingPage={pending.page}
+          pendingSlice={pending.total > 0 ? sliceFromCount(pending.invites, pending.page, pending.total, pending.pageSize) : undefined}
+          page={result.page} pageCount={result.pageCount} query={query} rows={result.rows} total={result.total}
+        />
+      </ListPage>
     </>
   );
 }
