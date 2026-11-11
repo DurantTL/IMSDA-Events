@@ -152,6 +152,11 @@ let fieldsChecked = 0;
  */
 const touchMaxWidth = 600;
 /**
+ * Controls that stay 44px at every width, with a mouse too (#1863): the denser desktop sizes above never apply to them.
+ * Each visible match is measured on every page at every width.
+ */
+const alwaysTouchTargets = [".roster-honors-button"];
+/**
  * Staff text floor (#981): text on a staff page is never smaller than 14px (the body floor,
  * max(var(--type-body-floor), 0.875rem)). Deliberate exceptions, each with its reason. A selector
  * matches the text's element or any ancestor of it.
@@ -4185,6 +4190,9 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   for (const table of result.scrollingTables) record("table-scrolls-sideways", spec.name, width, table);
   for (const problem of result.cardsWithoutBox) record("table-cards-no-box", spec.name, width, problem);
   for (const target of result.smallTargets) record("small-tap-target", spec.name, width, target);
+  for (const target of await page.evaluate(alwaysTargetsInPage, { selectors: alwaysTouchTargets, minTarget: touchTarget, tolerance: touchTolerance })) {
+    record("small-tap-target", spec.name, width, target);
+  }
   for (const note of result.barNotes) record("sticky-bar-size", spec.name, width, note);
   for (const problem of result.cellProblems) record("table-cell", spec.name, width, problem);
   for (const problem of result.pillProblems) record("honor-pill", spec.name, width, problem);
@@ -4685,6 +4693,24 @@ const denseRowPages: Array<{ name: string; path: string; selector: string }> = [
 ];
 const denseTargetPx = 36;
 const denseWidths = [1024, 1280];
+/**
+ * The always-44px controls (#1863) that are visible and smaller than the minimum in either direction, at any width and
+ * pointer. Runs in the page.
+ */
+function alwaysTargetsInPage({ selectors, minTarget, tolerance }: { selectors: string[]; minTarget: number; tolerance: number }) {
+  const small: string[] = [];
+  for (const selector of selectors) {
+    for (const element of Array.from(document.querySelectorAll<HTMLElement>(selector))) {
+      const box = element.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      if (box.height < minTarget - tolerance || box.width < minTarget - tolerance) {
+        small.push(`${selector} "${(element.getAttribute("aria-label") ?? element.textContent ?? "").trim().slice(0, 60)}" is ${Math.round(box.width)}x${Math.round(box.height)}px; it must be ${minTarget}px at every width`);
+      }
+    }
+  }
+  return small;
+}
+
 async function denseRowsAudit(browser: Browser, cookie: { name: string; value: string; expires: number }) {
   for (const width of denseWidths) {
     for (const pointer of ["touch", "mouse"] as const) {

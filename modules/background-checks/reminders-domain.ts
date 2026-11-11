@@ -11,8 +11,8 @@ import { compareByName, sortRows, type SortDirection, type SortValue } from "@/l
  * issue reason or anything from a Sterling report.
  */
 
-/** The link a volunteer follows to complete or renew a check and training. Confirmed in review (#1844). */
-export const STERLING_VOLUNTEERS_URL = "https://app.sterlingvolunteers.com/";
+/** The conference's Sterling Volunteers (NCSRisk) sign-in page, where a volunteer completes or renews a check and training (Caleb, Nov 11, 2026). */
+export const STERLING_VOLUNTEERS_URL = "https://www.ncsrisk.org/adventist/index.cfm";
 
 /** The anchor on the review panel that the page's "Needs a look" quick filter jumps to. */
 export const NEEDS_A_LOOK_ID = "needs-a-look";

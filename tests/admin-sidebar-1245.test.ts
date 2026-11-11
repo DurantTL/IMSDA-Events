@@ -273,6 +273,8 @@ describe("Find a page or task in the Clubs view", () => {
     const inView = clubDestinations({ ...base, clubsAdmin: { healthImport: true } });
     expect(inView.map((destination) => destination.label)).toEqual([
       "Review monthly records", "Club administration", ...clubsAdminGroups.flatMap((group) => group.items.map((item) => item.label)),
+      // A page with no menu entry that a Clubs Administrator may open (#1661).
+      "Conference club orders",
     ]);
     const points = searchDestinations(buildSearchDestinations({ ...base, clubsAdmin: { healthImport: true } }), "points")[0];
     expect(points).toMatchObject({ scope: "Clubs", label: "Points", href: "/admin/clubs/summary?view=points#points" });
