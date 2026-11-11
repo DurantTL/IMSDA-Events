@@ -475,6 +475,31 @@ describe("People & access club invites (#1276)", () => {
     expect(mocks.grantCreate).toHaveBeenCalledTimes(1);
   });
 
+  it("accepts a club-sent invite only while its sender still leads that club", async () => {
+    const clubInvite = { ...sentInvite, role: "REGISTRAR", source: "CLUB", createdByUserId: null, createdByAccountId: "account-9", expiresAt: new Date("2026-10-01T00:00:00Z") };
+    mocks.inviteFindUnique.mockResolvedValue(clubInvite);
+    // The sender's role was removed after the invite went out.
+    mocks.grantFindFirst.mockResolvedValue(null);
+    await expect(acceptClubInvite("invite-1", account, now)).rejects.toMatchObject({ code: "INVITE_NOT_OPEN" });
+    expect(mocks.grantCreate).not.toHaveBeenCalled();
+    expect(mocks.grantFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ organizationId: "club-1", attendeeAccountId: "account-9", revokedAt: null, role: { in: ["DIRECTOR", "DEPUTY"] } }),
+    }));
+    // The sender still holds a director role: the first lookup finds it, the second finds no existing grant for the invitee.
+    mocks.grantFindFirst.mockReset();
+    mocks.grantFindFirst.mockResolvedValueOnce({ id: "sender-grant" }).mockResolvedValueOnce(null);
+    await expect(acceptClubInvite("invite-1", account, now)).resolves.toEqual({ organizationId: "club-1" });
+    expect(mocks.grantCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-checks a staff member who sent a club invite while acting as director", async () => {
+    mocks.inviteFindUnique.mockResolvedValue({ ...sentInvite, role: "REGISTRAR", source: "CLUB", createdByUserId: "admin-1", createdByAccountId: null });
+    mocks.userFindUnique.mockResolvedValue({ globalRole: null });
+    mocks.clubsGrantFindFirst.mockResolvedValue(null);
+    await expect(acceptClubInvite("invite-1", account, now)).rejects.toMatchObject({ code: "INVITE_NOT_OPEN" });
+    expect(mocks.grantCreate).not.toHaveBeenCalled();
+  });
+
   it("treats an expired PEOPLE invite as expired", async () => {
     mocks.inviteFindUnique.mockResolvedValue({ ...sentInvite, source: "PEOPLE", expiresAt: new Date("2026-09-01T00:00:00Z") });
     await expect(acceptClubInvite("invite-1", account, now)).rejects.toMatchObject({ code: "INVITE_EXPIRED" });
