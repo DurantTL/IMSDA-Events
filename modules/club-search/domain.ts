@@ -1,3 +1,4 @@
+import { formatPersonName } from "@/lib/person-name";
 import { STAFF_SEARCH_GROUP_LIMIT, STAFF_SEARCH_MAX_QUERY_LENGTH, cleanStaffSearchQuery, staffSearchTerms, type StaffSearchGroup } from "@/modules/staff-search/domain";
 
 /**
@@ -55,5 +56,5 @@ export function everyTermInAnyField(terms: readonly string[], fields: readonly (
 }
 
 export function memberDisplayName(person: { firstName: string; lastName: string }): string {
-  return `${person.firstName} ${person.lastName}`.trim().replace(/\s+/g, " ");
+  return formatPersonName(person).replace(/\s+/g, " ");
 }
