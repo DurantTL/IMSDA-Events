@@ -25,7 +25,7 @@ describe("club roster phone cards (#1838)", () => {
   const cards = block(css, cardQuery);
 
   it("lays each card out as a grid that fits two columns on a phone and more on a tablet", () => {
-    expect(cards).toMatch(/> tbody > tr \{\s*display: grid; grid-template-columns: repeat\(auto-fill, minmax\(8\.5rem, 1fr\)\);/);
+    expect(cards).toMatch(/> tbody > tr \{\s*display: grid; grid-template-columns: repeat\(auto-fill, minmax\(7\.5rem, 1fr\)\);/);
   });
 
   it("orders the card: Type and class, then status, then the other facts, then the actions", () => {

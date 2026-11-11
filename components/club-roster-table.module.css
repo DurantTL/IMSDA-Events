@@ -42,7 +42,7 @@
 }
 
 /* Phone and tablet roster cards (#1838). The shared table-cards rules make each row a card of "Label: value" lines; the roster
-   card is easier to scan. The card is a grid that fits as many 8.5rem columns as its width allows (two on a phone):
+   card is easier to scan. The card is a grid that fits as many 7.5rem columns as its width allows (two on a phone):
      1. the name, role and Class history link (the row header, as before);
      2. Type and Current class, the most-read facts, in bold;
      3. what needs attention: the Details chips (no line at all when nothing is needed) and Sterling Volunteers;
@@ -54,7 +54,7 @@
    of this reaches a desktop table. */
 @container table-box (max-width: 1100px) {
   .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); column-gap: 0; row-gap: 0; align-items: start;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); column-gap: 0; row-gap: 0; align-items: start;
     padding: 12px 14px 12px;
   }
   .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > th[scope="row"] { grid-column: 1 / -1; margin-bottom: 2px; }
