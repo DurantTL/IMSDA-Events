@@ -89,14 +89,18 @@ describe("Home layout resolving (#1705)", () => {
   });
 });
 
-// Actions: a fake store keyed by user id, and a session that tests set.
+// Route handlers: a fake store keyed by user id, and a session that tests set.
 const store = new Map<string, unknown>();
 const writes: string[] = [];
-let sessionUser: { id: string; globalRole: string | null } | null = null;
+let sessionUser: { id: string; email: string; displayName: string; globalRole: string | null } | null = null;
 let roles: AdminRoles = none;
+let crossOrigin = false;
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: sessionUser }) }));
 vi.mock("@/modules/access/admin-roles", () => ({ resolveAdminRoles: async () => roles }));
-vi.mock("@/lib/logger", () => ({ logError: vi.fn() }));
+vi.mock("@/modules/access/request-security", () => ({
+  rejectCrossOriginRequest: () => (crossOrigin ? Response.json({ error: "INVALID_REQUEST_ORIGIN" }, { status: 403 }) : null),
+}));
+vi.mock("@/lib/logger", async (original) => ({ ...(await original<typeof import("@/lib/logger")>()), logError: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     staffHomeLayout: {
@@ -107,54 +111,69 @@ vi.mock("@/lib/prisma", () => ({
   }),
 }));
 
-const { saveHomeLayoutAction, resetHomeLayoutAction } = await import("@/app/(workspace)/home/actions");
+const { PUT, DELETE } = await import("@/app/api/home/layout/route");
 const { loadHomeLayout } = await import("@/modules/system-admin/home-layout-repository");
 
 const swap = [{ key: "coming-up", shown: true }, { key: "needs-you", shown: true }];
+const url = "https://events.imsda.test/api/home/layout";
+const put = (modules: unknown, extra: Record<string, unknown> = {}) => PUT(new Request(url, { method: "PUT", headers: { origin: "https://events.imsda.test", "content-type": "application/json" }, body: JSON.stringify({ modules, ...extra }) }));
+const del = () => DELETE(new Request(url, { method: "DELETE", headers: { origin: "https://events.imsda.test" } }));
+const as = (id: string) => { sessionUser = { id, email: `${id}@imsda.test`, displayName: id, globalRole: null }; };
 
-beforeEach(() => { store.clear(); writes.length = 0; sessionUser = null; roles = none; });
+beforeEach(() => { store.clear(); writes.length = 0; sessionUser = null; roles = none; crossOrigin = false; });
 
 describe("Home layout saving (#1705)", () => {
   it.each([["System admin", system], ["Clubs admin", clubs], ["Events admin for one event", events], ["Events and Clubs admin", eventsAndClubs]] as const)("saves and returns the layout for a %s", async (_name, held) => {
-    sessionUser = { id: "user_a", globalRole: null };
+    as("user_a");
     roles = held;
-    const result = await saveHomeLayoutAction(swap);
-    expect(result).toMatchObject({ ok: true });
+    const response = await put(swap);
+    expect(response.status).toBe(200);
+    expect(keys((await response.json()).layout)).toEqual(["coming-up:on", "needs-you:on"]);
     expect(writes).toEqual(["user_a"]);
     expect(keys(await loadHomeLayout("user_a", held))).toEqual(["coming-up:on", "needs-you:on"]);
-    const reset = await resetHomeLayoutAction();
-    expect(reset).toMatchObject({ ok: true, layout: { customized: false } });
+    const reset = await del();
+    expect(reset.status).toBe(200);
+    expect((await reset.json()).layout.customized).toBe(false);
     expect(store.has("user_a")).toBe(false);
   });
 
   it("refuses a person with no admin role and writes nothing", async () => {
-    sessionUser = { id: "user_b", globalRole: null };
-    expect(await saveHomeLayoutAction(swap)).toMatchObject({ ok: false });
-    expect(await resetHomeLayoutAction()).toMatchObject({ ok: false });
+    as("user_b");
+    expect((await put(swap)).status).toBe(403);
+    expect((await del()).status).toBe(403);
     expect(writes).toEqual([]);
   });
 
   it("refuses a signed-out request and writes nothing", async () => {
     roles = system;
-    expect(await saveHomeLayoutAction(swap)).toMatchObject({ ok: false });
-    expect(await resetHomeLayoutAction()).toMatchObject({ ok: false });
+    expect((await put(swap)).status).toBe(401);
+    expect((await del()).status).toBe(401);
     expect(writes).toEqual([]);
   });
 
-  it("writes only the session user even when the input names another id", async () => {
-    sessionUser = { id: "user_a", globalRole: null };
+  it("refuses a cross-origin request and writes nothing", async () => {
+    as("user_a");
+    roles = system;
+    crossOrigin = true;
+    expect((await put(swap)).status).toBe(403);
+    expect((await del()).status).toBe(403);
+    expect(writes).toEqual([]);
+  });
+
+  it("writes only the session user even when the request names another id", async () => {
+    as("user_a");
     roles = events;
-    await saveHomeLayoutAction(Object.assign([...swap], { userId: "user_x" }).map((entry) => ({ ...entry, userId: "user_x" })));
+    await put(swap.map((entry) => ({ ...entry, userId: "user_x" })), { userId: "user_x" });
     expect(writes).toEqual(["user_a"]);
     expect(store.has("user_x")).toBe(false);
   });
 
-  it("refuses unusable input and never returns one person's layout for another", async () => {
-    sessionUser = { id: "user_a", globalRole: null };
+  it("answers 400 for unusable input and never returns one person's layout for another", async () => {
+    as("user_a");
     roles = events;
-    expect(await saveHomeLayoutAction("nope")).toMatchObject({ ok: false });
+    expect((await put("nope")).status).toBe(400);
     expect(writes).toEqual([]);
-    await saveHomeLayoutAction(swap);
+    await put(swap);
     expect(keys(await loadHomeLayout("user_b", events))).toEqual(["needs-you:on", "coming-up:on"]);
   });
 });

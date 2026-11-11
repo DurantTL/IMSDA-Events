@@ -5,10 +5,32 @@ import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import styles from "@/components/staff-home-board.module.css";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
-import { resetHomeLayoutAction, saveHomeLayoutAction, type HomeLayoutResult } from "@/app/(workspace)/home/actions";
-import { moveAnnouncement, moveItem, type HomeLayoutModule, type HomeModuleKey } from "@/modules/system-admin/home-layout-domain";
+import { moveAnnouncement, moveItem, type HomeLayout, type HomeLayoutModule, type HomeModuleKey } from "@/modules/system-admin/home-layout-domain";
 
 type Scope = "arrange" | "customize";
+
+export type HomeLayoutResult = { ok: true; layout: HomeLayout } | { ok: false; message: string };
+
+const failed: HomeLayoutResult = { ok: false, message: "Your layout could not be saved." };
+
+async function callLayoutApi(method: "PUT" | "DELETE", body?: unknown): Promise<HomeLayoutResult> {
+  try {
+    const response = await fetch("/api/home/layout", {
+      method,
+      credentials: "same-origin",
+      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!response.ok) return failed;
+    const data = (await response.json()) as { layout?: HomeLayout };
+    return data.layout ? { ok: true, layout: data.layout } : failed;
+  } catch {
+    return failed;
+  }
+}
+
+const saveLayout = (input: unknown) => callLayoutApi("PUT", { modules: input });
+const resetLayout = () => callLayoutApi("DELETE");
 
 /** Puts the shown modules into the slots the shown ones held, so hidden modules keep their place (#1705). */
 export function reorderShown(modules: readonly HomeLayoutModule[], shownKeys: readonly HomeModuleKey[]): HomeLayoutModule[] {
@@ -17,7 +39,7 @@ export function reorderShown(modules: readonly HomeLayoutModule[], shownKeys: re
   return modules.map((item) => (item.shown ? byKey.get(shownKeys[next++])! : item));
 }
 
-export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = false, action = saveHomeLayoutAction, resetAction = resetHomeLayoutAction }: {
+export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = false, action = saveLayout, resetAction = resetLayout }: {
   modules: HomeLayoutModule[];
   /** Server-rendered module bodies by key; a shown module without one is still loading. */
   bodies: Partial<Record<HomeModuleKey, ReactNode>>;
