@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AccessDeniedError, requirePermission } from "@/modules/access/authorization";
+import { AccessDeniedError, effectivePermissions, requirePermission } from "@/modules/access/authorization";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { findActiveMembership } from "@/modules/events/repository";
@@ -17,9 +17,12 @@ async function patchHandler(request: Request, context: { params: Promise<{ event
   const originError = rejectCrossOriginRequest(request);
   if (originError) return originError;
   try {
-    const { eventId, noteId } = await context.params;
+    const { eventId, noteId, attendeeId } = await context.params;
     const access = await requirePermission(await getCurrentSession(), eventId, "MANAGE_REGISTRATION", findActiveMembership);
-    const note = await addNoteRevision(eventId, noteId, access.user.id, await request.json());
+    const note = await addNoteRevision(eventId, noteId, access.user.id, await request.json(), {
+      subject: { attendeeId },
+      actorPermissions: new Set(effectivePermissions(access.user, access.membership)),
+    });
     return Response.json({ note });
   } catch (error) { return apiError(error); }
 }

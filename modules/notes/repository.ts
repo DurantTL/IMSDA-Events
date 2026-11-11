@@ -106,18 +106,34 @@ export async function createNote(
   });
 }
 
+function noteBelongsToSubject(
+  note: { registrationId: string | null; attendeeId: string | null; personId: string | null },
+  subject: NoteSubject,
+) {
+  if (subject.registrationId) return note.registrationId === subject.registrationId;
+  if (subject.attendeeId) return note.attendeeId === subject.attendeeId;
+  return note.personId === subject.personId;
+}
+
 export async function addNoteRevision(
   eventId: string,
   noteId: string,
   actorUserId: string,
   rawInput: unknown,
+  access: { subject: NoteSubject; actorPermissions: ReadonlySet<string> },
 ) {
   const input = noteRevisionInputSchema.parse(rawInput);
   const existing = await getPrisma().staffNote.findFirst({
     where: { id: noteId, eventId },
     include: { revisions: { orderBy: { sequence: "desc" }, take: 1 } },
   });
-  if (!existing) throw new NoteError("NOT_FOUND", "That note was not found for this event.");
+  if (!existing || !noteBelongsToSubject(existing, access.subject)) {
+    throw new NoteError("NOT_FOUND", "That note was not found for this event.");
+  }
+  // The same visibility rule as reading: a note the editor cannot read is not theirs to revise.
+  if (!canReadNote(existing, access.actorPermissions)) {
+    throw new NoteError("FORBIDDEN", "This note is restricted to a permission you do not hold.");
+  }
   const nextSequence = (existing.revisions[0]?.sequence ?? 0) + 1;
 
   return getPrisma().$transaction(async (tx) => {
