@@ -90,6 +90,10 @@ page, and a staff viewer never gets a portal guide in staff search.
 - Guide ids must not collide with a route already below `/account/help` (today `authenticator`, in
   `reservedPortalGuideIds`). Static routes win over `[guideId]`, and the check reports a collision.
 - Add a guide the same way as a staff guide (see above), using `portalDestinations` and the audience.
+- The attendee guides are Find your registration and its next step, and the family guides (#1883) Pay a balance, Change a
+  registration and Cancel a registration. They follow My registrations: each says what a card shows, the exact buttons, and
+  what happens to payments. They never state a refund amount, deadline or fee: the cancellation guide sends the reader to the
+  policy as the page shows it (Proposed outcome).
 
 ### Searching portal Help
 
@@ -129,8 +133,9 @@ change, and after you re-check a guide, update its `lastReviewed`.
 
 Step-by-step guides with a picture of the real screen for every step (#1482, site rule H6). Each walkthrough is its own portal
 guide (ids start `walkthrough-`, titles start "Step by step: "), so the hub, Help search and the Getting started links reach it
-like any other guide. Today: the 10 club director walkthroughs and the 6 area coordinator walkthroughs (sign-in; their clubs
-and Who's missing what; Monthly Records; Points; following up with a club that is behind; a club with no director). A written guide that has a step-by-step version shows
+like any other guide. Today: the 10 club director walkthroughs, the 6 area coordinator walkthroughs (sign-in; their clubs
+and Who's missing what; Monthly Records; Points; following up with a club that is behind; a club with no director) and the 3
+family walkthroughs (#1883: pay a balance, change a registration, ask to cancel one; audience `attendee`). A written guide that has a step-by-step version shows
 "See it step by step" links near its Steps (`walkthroughsForGuide` in `modules/help/walkthroughs.ts`), and the Getting started
 checklists and the setup-help "Help guide" links point at the walkthrough where it is the same task.
 
@@ -153,11 +158,11 @@ checklists and the setup-help "Help guide" links point at the walkthrough where 
 
 **Adding or changing a walkthrough**
 
-1. Add the entry to `directorWalkthroughs` or `coordinatorWalkthroughs` in `modules/help/walkthroughs.ts`, and list its
-   `sourceFiles`. Add a fixture to `help-walkthrough-fixtures.ts` if the screen needs sample data. A walkthrough starts
-   `signed-out`, `signed-in` (the sample club director, two-step sign-in done) or `signed-in-coordinator` (the sample area
-   coordinator).
-2. Add one action per step id in `tests/browser/walkthroughs/`. Use roles and the exact labels.
+1. Add the entry to `directorWalkthroughs`, `coordinatorWalkthroughs` or `familyWalkthroughs` in `modules/help/walkthroughs.ts`,
+   and list its `sourceFiles`. Add a fixture to `help-walkthrough-fixtures.ts` if the screen needs sample data. A walkthrough starts
+   `signed-out`, `signed-in` (the sample club director, two-step sign-in done), `signed-in-coordinator` (the sample area
+   coordinator) or `signed-in-family` (the sample family account, two-step sign-in done).
+2. Add one action per step id in `tests/browser/walkthroughs/` (`club-director.ts`, `coordinator.ts` or `family.ts`). Use roles and the exact labels.
 3. `HELP_SHOTS_ONLY=<walkthrough id> npm run help:screenshots`, then open the pictures and check that nothing looks like a real
    person and that each mark sits on the right control.
 4. `npx vitest run tests/walkthroughs-1482.test.ts`.
@@ -169,6 +174,19 @@ playwright-core@1.56.1` unless Playwright is already installed; `HELP_SHOTS_BROW
   contains the text. `HELP_SHOTS_BASE_URL` defaults to `http://localhost:3000`.
 - `npm run test:walkthroughs` runs every step at phone and desktop width and fails when an action or the control it marks is
   missing. It saves nothing. CI runs it in `.github/workflows/help-walkthroughs.yml`.
+
+**The family walkthroughs (#1883)** start as a sample family account (`walkthrough_account_family`, "Taylor Sample",
+`walkthrough.family@example.test`) with one registration for "Sample Family Retreat" (a general event with a synthetic
+cancellation policy: a full refund until a sample date). The registration costs $120.00 with $40.00 paid, so the card shows
+"$80.00 remaining", and two sample people with a shirt-size choice. It is made straight in the database (the fixtures'
+`createFamilyFixtures`), and the whole event, its registration, payment, policy and any cancellation request the "ask to cancel"
+walkthrough sends are removed with the other fixtures (`removeEventOwnedRows`) before every run. The "change a registration"
+walkthrough saves a new phone number with the emailed edit code (the local app returns the code, like the sign-in code).
+
+Square is not set up locally or in CI, and its card form cannot load there, so My registrations shows no Continue payment
+button: the card shows the balance, how much was paid, and "Contact the event team to arrange payment" instead. The pay
+walkthrough therefore pictures only that (the page, the card, the amount remaining and the line under it). Nothing in it pretends
+Square is on; the written guide Pay a balance describes Continue payment and the payment panel in the component's own words.
 
 The area coordinator walkthroughs use a sample area: a coordinator account with an authenticator app (its secret is made fresh each
 run and only the script knows it, so the coordinator sign-in walkthrough types a real six-digit code), and four sample clubs:
@@ -209,7 +227,7 @@ control gets the numbered outline, the rest of the screen a light shade, and the
 shadow. The number sits beside the outline where it hides nothing, otherwise on a corner of it. A step can return
 `{ target, area, alsoMark }` from its browser action to keep other context in the phone crop or outline two controls
 together; the mark always stays in view. Target at most 60 KB (phone) and 90 KB (desktop); over 150 KB fails the test, and all
-walkthroughs together should stay under about 6 MB (now about 5.8 MB).
+walkthroughs together should stay under about 8 MB (now about 6.7 MB; the family walkthroughs raised the limit from 6 MB).
 
 ## Contextual help
 

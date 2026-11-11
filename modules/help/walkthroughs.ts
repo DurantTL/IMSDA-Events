@@ -407,8 +407,86 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
   },
 ];
 
-/** Every walkthrough, in the order the capture script and the browser check run them. Coordinator walkthroughs are added here. */
-export const walkthroughs: readonly WalkthroughDefinition[] = [...directorWalkthroughs, ...coordinatorWalkthroughs];
+
+const REGISTRATIONS = "app/(public)/account/(portal)/registrations/page.tsx";
+/** The files every My registrations picture depends on: the page, its card and the action that opens each panel. */
+const FAMILY_SHELL = [REGISTRATIONS, "components/account-registration-card.tsx", "components/registration-action-disclosure.tsx", "components/account-section-nav.tsx", "components/account-portal-nav.ts", "modules/attendee-accounts/registration-card.ts", "modules/attendee-accounts/registration-history.ts"] as const;
+
+/**
+ * The family walkthroughs (#1883): pay a balance, change a registration, cancel a registration, from My registrations. They start
+ * signed in as a sample family account with one registration, part paid. Square is not set up where the pictures are taken, so the
+ * pay walkthrough shows only what My registrations shows then: the balance, and the line that says to contact the event team.
+ */
+export const familyWalkthroughs: readonly WalkthroughDefinition[] = [
+  {
+    id: "walkthrough-family-pay",
+    audience: "attendee",
+    title: "Step by step: Pay a balance",
+    summary: "Find the amount still owing on your registration and see how to pay it.",
+    needs: ["Your account, signed in.", "A registration made with your account's email address."],
+    changes: ["Nothing. Reading the card does not take any payment."],
+    verify: ["You can read how much is remaining.", "You know whether to choose Continue payment or contact the event team."],
+    next: "When the card shows Continue payment, choose it to pay. When it says to contact the event team, ask them how to pay.",
+    destinationIds: ["portal-registrations"],
+    keywords: ["pay", "payment", "balance", "owe", "owing", "remaining", "continue payment", "pay a balance", "family", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [...FAMILY_SHELL, "modules/public-access/domain.ts"],
+    steps: [
+      { id: "open-registrations", text: "Open My registrations in the account tabs.", alt: "The account page with My registrations marked in the account tabs. On a phone, the Account menu button is marked." },
+      { id: "find-card", text: "Find the card for the event you want to pay for.", alt: "The My registrations page with the event's name on its card marked." },
+      { id: "read-balance", text: "Read the amount under the event name. It says how much is remaining.", alt: "The registration card with the line that says how much is remaining marked." },
+      { id: "read-next", text: "Read the line under it. It says how much you paid, and what to do next.", alt: "The registration card with the line under the amount marked. It says how much was paid and to contact the event team to arrange payment." },
+    ],
+  },
+  {
+    id: "walkthrough-family-change",
+    audience: "attendee",
+    title: "Step by step: Change a registration",
+    summary: "Update the contact details on your registration with a code we email you.",
+    needs: ["Your account, signed in.", "Access to the email inbox on your account, to read the six-digit code.", "An upcoming registration made with your account's email address."],
+    changes: ["The contact details on that one registration change. Your payments and the other people on it do not."],
+    verify: ["The page says Saved.", "The summary under Update registration contact shows the new details."],
+    next: "To change anything else, such as who is attending, rooms or activities, ask the event team.",
+    destinationIds: ["portal-registrations"],
+    keywords: ["change", "update", "edit", "contact details", "phone", "email a code", "edit code", "change a registration", "family", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [...FAMILY_SHELL, "components/attendee-registration-contact-form.tsx", "components/phone-input.tsx", "components/form-message.tsx"],
+    steps: [
+      { id: "open-registrations", text: "Open My registrations in the account tabs.", alt: "The account page with My registrations marked in the account tabs. On a phone, the Account menu button is marked." },
+      { id: "open-contact", text: "On the registration's card, choose Update contact details.", alt: "The registration card with the Update contact details button marked." },
+      { id: "open-form", text: "Choose Update registration contact.", alt: "The Update contact details panel with Update registration contact marked." },
+      { id: "edit-phone", text: "Type the new number in the Phone box.", alt: "The contact form with a new number typed in the Phone box, which is marked." },
+      { id: "email-code", text: "Choose Email a code. We email a six-digit code to your account's email address.", alt: "The contact form with the Email a code button marked." },
+      { id: "enter-code", text: "Type the six digits in the Six-digit edit code box.", alt: "The contact form with the six digits typed in the Six-digit edit code box, which is marked." },
+      { id: "save", text: "Choose Save with code.", alt: "The contact form with the Save with code button marked." },
+      { id: "saved", text: "The page says Saved, and the summary shows the new details.", alt: "The contact form with the Saved message marked." },
+    ],
+  },
+  {
+    id: "walkthrough-family-cancel",
+    audience: "attendee",
+    title: "Step by step: Ask to cancel a registration",
+    summary: "Read what the cancellation policy would mean for your payments, then send a request for the event team to review.",
+    needs: ["Your account, signed in.", "An upcoming registration made with your account's email address.", "An event that takes online cancellation requests."],
+    changes: ["A request goes to the event team. Sending it does not cancel your registration, refund anything or change anything you paid."],
+    verify: ["The panel says your request was sent and that nothing has been cancelled or refunded yet.", "Your request shows under Your cancellation requests."],
+    next: "Watch the status under Your cancellation requests, and the email the event team sends you.",
+    destinationIds: ["portal-registrations"],
+    keywords: ["cancel", "cancellation", "request cancellation", "refund", "policy", "withdraw", "cancel a registration", "family", "step by step", "walkthrough", "screenshots"],
+    sourceFiles: [...FAMILY_SHELL, "components/cancellation-request-panel.tsx", "components/cancellation-unavailable-note.tsx", "modules/cancellation-requests/views.ts"],
+    steps: [
+      { id: "open-registrations", text: "Open My registrations in the account tabs.", alt: "The account page with My registrations marked in the account tabs. On a phone, the Account menu button is marked." },
+      { id: "open-cancel", text: "On the registration's card, choose Request cancellation. A panel called Ask to cancel opens.", alt: "The registration card with the Request cancellation button marked." },
+      { id: "show-outcome", text: "Choose Show the proposed outcome.", alt: "The Ask to cancel panel with the Show the proposed outcome button marked." },
+      { id: "read-outcome", text: "Read the Proposed outcome. Its first line is the cancellation policy as it applies today.", alt: "The Ask to cancel panel with the first line of the Proposed outcome marked. It names the policy period and its terms." },
+      { id: "read-money", text: "Read what it means for your payments: what was charged, what you paid, the proposed refund and what is kept. It is not a decision.", alt: "The Proposed outcome with its list of amounts marked: charged on this registration, paid so far, proposed refund and kept under the policy." },
+      { id: "reason", text: "Type why you are asking in the Why are you asking? box.", alt: "The Ask to cancel panel with a reason typed in the Why are you asking? box, which is marked." },
+      { id: "send", text: "Choose Send request for review.", alt: "The Ask to cancel panel with the Send request for review button marked." },
+      { id: "sent", text: "The panel says nothing has been cancelled or refunded yet. The event team will review your request.", alt: "The Ask to cancel panel with the message that the request was sent, and that nothing is cancelled or refunded yet, marked." },
+    ],
+  },
+];
+
+/** Every walkthrough, in the order the capture script and the browser check run them. */
+export const walkthroughs: readonly WalkthroughDefinition[] = [...directorWalkthroughs, ...coordinatorWalkthroughs, ...familyWalkthroughs];
 
 export function findWalkthrough(id: string): WalkthroughDefinition | undefined {
   return walkthroughs.find((walkthrough) => walkthrough.id === id);
@@ -456,4 +534,7 @@ export const walkthroughsForGuide: Record<string, readonly string[]> = {
   "coordinator-follow-records": ["walkthrough-coordinator-records"],
   "coordinator-follow-up-clubs": ["walkthrough-coordinator-follow-up", "walkthrough-coordinator-no-director"],
   "coordinator-points": ["walkthrough-coordinator-points"],
+  "family-pay-balance": ["walkthrough-family-pay"],
+  "family-change-registration": ["walkthrough-family-change"],
+  "family-cancel-registration": ["walkthrough-family-cancel"],
 };

@@ -221,8 +221,9 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
         };
         const begin = async (start: WalkthroughStart) => {
           if (start === "signed-out") return;
-          const accountId = start === "signed-in" ? fixtures.walkthroughIds.director : fixtures.walkthroughCoordinator.id;
+          const accountId = start === "signed-in" ? fixtures.walkthroughIds.director : start === "signed-in-family" ? fixtures.walkthroughFamily.id : fixtures.walkthroughCoordinator.id;
           if (start === "signed-in") await fixtures.enrolPlaceholderTwoStep(prisma);
+          if (start === "signed-in-family") await fixtures.enrolPlaceholderTwoStep(prisma, fixtures.walkthroughFamily.id);
           const session = await sessionStore.createAttendeeSession(accountId, null, { secondFactorVerifiedAt: new Date() });
           tokens.push(session.token);
           await context.addCookies([{ name: attendeeSessionCookie.legacyName, value: session.token, url: baseUrl, httpOnly: true, expires: Math.floor(session.expiresAt.getTime() / 1000) }]);
@@ -232,6 +233,7 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
           baseUrl,
           clubPath: `/account/clubs/${fixtures.walkthroughIds.club}`,
           director: { email: fixtures.walkthroughDirector.email, password: fixtures.walkthroughDirector.password, displayName: fixtures.walkthroughDirector.displayName },
+          family: { email: fixtures.walkthroughFamily.email, password: fixtures.walkthroughFamily.password, displayName: fixtures.walkthroughFamily.displayName, phone: fixtures.walkthroughFamily.phone, newPhone: fixtures.walkthroughFamily.newPhone },
           coordinator: { email: fixtures.walkthroughCoordinator.email, password: fixtures.walkthroughCoordinator.password, displayName: fixtures.walkthroughCoordinator.displayName },
           authenticatorCode: () => totpCode(authenticatorSecret, new Date()),
           rosterPerson: fixtures.walkthroughRosterPerson,

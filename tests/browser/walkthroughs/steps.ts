@@ -1,16 +1,17 @@
 import { findWalkthrough } from "@/modules/help/walkthroughs";
 import { clubDirectorWalkthroughActions } from "./club-director";
 import { coordinatorWalkthroughActions } from "./coordinator";
+import { familyWalkthroughActions } from "./family";
 import type { WalkthroughActions, WalkthroughContext, WalkthroughLocator, WalkthroughStepTarget } from "./types";
 
 /**
  * Every walkthrough's browser actions, by walkthrough id (#1482). The data (ids, text, alt text) is in
  * `modules/help/walkthroughs.ts`; `tests/walkthroughs-1482.test.ts` checks the two agree step for step.
- * Coordinator walkthroughs are added here.
  */
 export const walkthroughActions: Record<string, WalkthroughActions> = {
   ...clubDirectorWalkthroughActions,
   ...coordinatorWalkthroughActions,
+  ...familyWalkthroughActions,
 };
 
 export type StepEvent = {
