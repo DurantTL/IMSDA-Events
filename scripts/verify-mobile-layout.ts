@@ -4043,16 +4043,16 @@ function staffTabRowInPage(): string[] {
 }
 
 /**
- * The phone header's search (#1734), at 800px and narrower: a search icon button of at least 44px with the name "Find a page or
- * task" opens the same search, and on Check-in at 390px the page's own search box is in the first screen (its top above the
+ * The phone header's search (#1734), at 800px and narrower: a search icon button of at least 44px with the name "Search pages, clubs,
+ * events and churches" opens the same search, and on Check-in at 390px the page's own search box is in the first screen (its top above the
  * 844px viewport's bottom, and above the phone bar). Runs in the page.
  */
 function phoneHeaderSearchInPage(): string[] {
   const problems: string[] = [];
   if (window.innerWidth > 800) return problems;
-  const toggle = Array.from(document.querySelectorAll<HTMLElement>("header button[aria-label='Find a page or task']")).find((el) => el.getBoundingClientRect().width > 0);
+  const toggle = Array.from(document.querySelectorAll<HTMLElement>("header button[aria-label='Search pages, clubs, events and churches']")).find((el) => el.getBoundingClientRect().width > 0);
   if (document.getElementById("destination-search-input")) {
-    if (!toggle) problems.push("the phone header has no search icon button named \"Find a page or task\"");
+    if (!toggle) problems.push("the phone header has no search icon button named \"Search pages, clubs, events and churches\"");
     else {
       const box = toggle.getBoundingClientRect();
       if (box.width < 43.5 || box.height < 43.5) problems.push(`the phone header search button is ${Math.round(box.width)}x${Math.round(box.height)}px`);

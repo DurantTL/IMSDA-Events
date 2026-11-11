@@ -68,11 +68,11 @@ describe("the tab row component", () => {
 });
 
 describe("the phone header search", () => {
-  it("is a 44px icon button named Find a page or task that opens the same search", () => {
+  it("is a 44px icon button named Search pages, clubs, events and churches that opens the same search", () => {
     const markup = renderToStaticMarkup(createElement(StaffHeaderSearch, { destinations: [], inputId: "destination-search-input" }));
     expect(markup).toMatch(/aria-controls="destination-search-input-wrap"/);
     expect(markup).toContain(`id="destination-search-input-wrap"`);
-    expect(markup).toMatch(/<button[^>]*aria-label="Find a page or task"[^>]*aria-expanded="false"/);
+    expect(markup).toMatch(/<button[^>]*aria-label="Search pages, clubs, events and churches"[^>]*aria-expanded="false"/);
     expect(markup).toContain('id="destination-search-input"');
     const css = read("components/staff-shell.module.css");
     expect(css).toMatch(/\.searchToggle \{[^}]*min-width: 44px; min-height: 44px/);

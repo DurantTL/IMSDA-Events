@@ -346,7 +346,7 @@ export async function checkSearchBoxes(page: Page, rec: Recorder, name: string) 
     const box = boxes.nth(index);
     const id = (await box.getAttribute("id")) ?? (await box.getAttribute("placeholder")) ?? `box ${index + 1}`;
     const what = `search box "${id}"`;
-    // A combobox (the header's "Find a page or task") opens a list of choices when it is focused: that list is the full list, so it
+    // A combobox (the header's "Search pages, clubs, events and churches") opens a list of choices when it is focused: that list is the full list, so it
     // is read as options, not as a change to the page.
     if ((await box.getAttribute("role")) === "combobox") {
       await checkComboboxSearch(page, rec, name, what, box);
