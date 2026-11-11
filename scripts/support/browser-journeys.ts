@@ -213,7 +213,8 @@ export async function assertHealthy(page: Page, label: string, failures: Failure
  * real failure is the one reported. Screenshots show synthetic journey data only.
  */
 export async function saveFailureEvidence(page: Page | null, label: string) {
-  if (!page) return;
+  // A page whose context already closed was saved by its own wrapper (or cannot be saved): nothing to add.
+  if (!page || page.isClosed?.()) return;
   try {
     console.error(`    page address when it failed: ${page.url()}`);
     const dir = path.resolve(process.env.JOURNEY_FAILURE_DIR || "test-results/journey-failures");

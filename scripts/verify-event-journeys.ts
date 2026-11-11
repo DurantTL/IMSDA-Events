@@ -769,6 +769,8 @@ async function asStaff(ctx: Ctx, role: StaffRole, run: (page: J.Page) => Promise
   try {
     await run(page);
   } catch (error) {
+    // The context closes below, so the failed step's screenshot and address are saved here (#1873).
+    await J.saveFailureEvidence(page, `event-${ctx.viewport.name}-${role}-${(error as Error).message.split("\n")[0]!.slice(0, 40)}`);
     if (process.env.JOURNEY_DEBUG) console.error(`    page ${page.url()}:\n${(await J.bodyText(page).catch(() => "")).split("\n").filter(Boolean).slice(0, 90).join("\n")}`);
     throw error;
   } finally {
@@ -991,13 +993,19 @@ const attendeeNames = (page: J.Page) => page.locator('tbody [data-col="name"]').
 async function sortAttendees(page: J.Page, column: string, label: string, direction: "asc" | "desc") {
   const header = page.locator(`th[data-col="${column}"] a`).first();
   if (await header.isVisible().catch(() => false)) {
-    // A first press sorts ascending, a second flips it.
-    await header.click();
-    await page.waitForURL((url: URL) => url.searchParams.get("sort") === column, { timeout: 15_000 });
-    if (direction === "desc") {
-      await page.locator(`th[data-col="${column}"] a`).first().click();
-      await page.waitForURL((url: URL) => url.searchParams.get("dir") === "desc", { timeout: 15_000 });
+    // A press on the header goes to the order its link names (ascending first, then a flip). Press it until the list is in the
+    // wanted order, and after each press wait for the header itself to re-render: the address changes first, and a second
+    // press on the new header too early flipped the list back to ascending (#1873).
+    const wanted = (url: URL) => url.searchParams.get("sort") === column && (url.searchParams.get("dir") ?? "asc") === direction;
+    for (let press = 0; press < 3 && !wanted(new URL(page.url())); press += 1) {
+      const link = page.locator(`th[data-col="${column}"] a`).first();
+      const href = (await link.getAttribute("href"))!;
+      const target = new URL(href, page.url());
+      await link.click();
+      await page.waitForURL((url: URL) => url.searchParams.get("sort") === target.searchParams.get("sort") && (url.searchParams.get("dir") ?? "asc") === (target.searchParams.get("dir") ?? "asc"), { timeout: 15_000 });
+      await page.waitForFunction(({ column, href }: { column: string; href: string }) => document.querySelector(`th[data-col="${column}"] a`)?.getAttribute("href") !== href, { column, href }, { timeout: 15_000 });
     }
+    assert(wanted(new URL(page.url())), `the ${label} header did not sort ${direction}: ${page.url()}`);
   } else {
     // The phone Sort by choice submits through the client filter form, so it does nothing until React has hydrated that
     // select: on a slow runner `settle` (which samples the top of the page) can return first and the change is lost.
