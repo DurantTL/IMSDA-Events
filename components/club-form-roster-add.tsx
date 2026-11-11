@@ -20,7 +20,9 @@ import {
   clubRosterAttendeeTypeLabels,
   clubRosterGenderLabels,
   defaultRosterRole,
+  BAPTIZED_LABEL,
   CHURCH_MEMBER_LABEL,
+  clubBaptizedLabels,
   clubChurchMemberLabels,
   clubSchoolGradeLabels,
   clubSchoolGrades,
@@ -142,6 +144,8 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
             churchMember: String(form.get("churchMember") ?? "") || null,
           }
           : {}),
+        // Baptized (#1852) is asked of every member type.
+        baptized: String(form.get("baptized") ?? "") || null,
         gender: String(form.get("gender") ?? "") || null,
         guardians,
       },
@@ -253,6 +257,13 @@ export function ClubFormRosterAdd({ review, formHref }: { review: RosterAddRevie
               </label>
             </>
           )}
+          <label>
+            {BAPTIZED_LABEL}
+            <select defaultValue={prefill.baptized ?? ""} name="baptized">
+              <option value="">Not given</option>
+              {Object.entries(clubBaptizedLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
           <label>
             Role (optional)
             <input defaultValue={prefill.role} maxLength={60} name="role" placeholder={defaultRosterRole(formType)} />

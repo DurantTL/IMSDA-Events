@@ -1,5 +1,5 @@
 import { rosterClassFrom } from "@/modules/club-imports/domain";
-import type { RosterClassLevel, ClubSchoolGrade } from "@/modules/club-rosters/domain";
+import type { ClubBaptized, RosterClassLevel, ClubSchoolGrade } from "@/modules/club-rosters/domain";
 import {
   clubRosterAttendeeTypeLabels,
   missingRosterFields,
@@ -7,6 +7,8 @@ import {
   rosterFieldLabels,
   rosterRoleOrDefault,
   schoolGradeFromText,
+  clubBaptizedAnswers,
+  clubBaptizedLabels,
 } from "@/modules/club-rosters/domain";
 import { parseCsvMatrix } from "@/modules/imports/csv-parser";
 import { toCsv } from "@/modules/reporting/csv";
@@ -22,7 +24,7 @@ import { formatPersonName } from "@/lib/person-name";
  * file (no birth dates), only what the file says and what will happen.
  */
 
-export const ROSTER_CSV_HEADERS = ["First name", "Last name", "Birth date", "Type", "Current class", "Grade", "Role", "Gender"] as const;
+export const ROSTER_CSV_HEADERS = ["First name", "Last name", "Birth date", "Type", "Current class", "Grade", "Role", "Gender", "Baptized"] as const;
 export const MAX_ROSTER_CSV_ROWS = 500;
 export const MAX_ROSTER_CSV_BYTES = 200_000;
 
@@ -44,6 +46,8 @@ export type RosterCsvRow = {
   isTlt?: boolean;
   /** School grade (#1664). Undefined means the cell was blank: keep what's on file. */
   schoolGrade?: ClubSchoolGrade;
+  /** Baptized (#1852), any type. Undefined means the cell was blank: keep what's on file. Never listed as missing. */
+  baptized?: ClubBaptized;
   role?: string;
   gender?: "FEMALE" | "MALE" | null;
   problems: string[];
@@ -65,6 +69,7 @@ const headerKeys: Record<string, keyof Omit<RosterCsvRow, "line" | "problems">> 
   teenleadershiptraining: "isTlt",
   grade: "schoolGrade",
   schoolgrade: "schoolGrade",
+  baptized: "baptized",
   role: "role",
   gender: "gender",
 };
@@ -129,6 +134,11 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
         const grade = schoolGradeFromText(value);
         if (grade) row.schoolGrade = grade;
         else row.problems.push(`Grade "${value}" isn't K, 1 to 12, or Not in school.`);
+      } else if (key === "baptized") {
+        const answer = value.toLowerCase().replace(/[^a-z]/g, "");
+        const match = answer === "y" ? "YES" : answer === "n" ? "NO" : clubBaptizedAnswers.find((item) => item.toLowerCase().replace(/_/g, "") === answer || clubBaptizedLabels[item].toLowerCase().replace(/[^a-z]/g, "") === answer);
+        if (match) row.baptized = match;
+        else row.problems.push(`Baptized "${value}" should be Yes, No or Not sure, or left blank.`);
       } else if (key === "role") {
         row.role = value.slice(0, 60);
       } else if (key === "gender") {

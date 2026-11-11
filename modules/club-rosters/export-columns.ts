@@ -23,6 +23,8 @@ export const ROSTER_EXPORT_COLUMNS = {
   isTlt: { header: "TLT", sensitive: false },
   // School grade (#1664), like the class. School type and church membership (#1668) are deliberately not offered here.
   schoolGrade: { header: "Grade", sensitive: false },
+  /** Baptized (#1852), any type; offered to everyone who may export the roster. */
+  baptized: { header: "Baptized", sensitive: false },
   role: { header: "Role", sensitive: false },
   guardian1Name: { header: "Emergency contact 1 name", sensitive: true, guardian: true },
   guardian1Relationship: { header: "Emergency contact 1 relationship", sensitive: true, guardian: true },

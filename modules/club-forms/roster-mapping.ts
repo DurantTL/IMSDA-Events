@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  clubBaptizedAnswers,
+  clubBaptizedLabels,
   clubChurchMemberLabels,
   clubChurchMembers,
   clubClassLevelLabels,
@@ -8,6 +10,7 @@ import {
   clubSchoolTypes,
   parseRosterBirthDateInput,
   schoolGradeFromText,
+  type ClubBaptized,
   type ClubChurchMember,
   type ClubClassLevel,
   type RosterClassLevel,
@@ -52,6 +55,8 @@ export const rosterMappingSchema = z.object({
     schoolGrade: fieldKey.optional(),
     schoolType: fieldKey.optional(),
     churchMember: fieldKey.optional(),
+    /** Baptized (#1852): any roster type. */
+    baptized: fieldKey.optional(),
     role: fieldKey.optional(),
   }).strict(),
   /** Up to two emergency contacts, for any roster type. A slot may name a fixed relationship instead of a form field. */
@@ -78,11 +83,12 @@ export const rosterTargetLabels: Record<RosterMappingFieldTarget, string> = {
   schoolGrade: "Grade",
   schoolType: "School",
   churchMember: "Seventh-day Adventist church member",
+  baptized: "Baptized",
   role: "Role",
 };
 
 /** Targets in the order the builder shows them. */
-export const rosterFieldTargets: readonly RosterMappingFieldTarget[] = ["fullName", "firstName", "lastName", "birthDate", "gender", "classLevel", "schoolGrade", "schoolType", "churchMember", "role"];
+export const rosterFieldTargets: readonly RosterMappingFieldTarget[] = ["fullName", "firstName", "lastName", "birthDate", "gender", "classLevel", "schoolGrade", "schoolType", "churchMember", "baptized", "role"];
 
 export const guardianMappingParts = ["name", "relationship", "email", "phone"] as const;
 export type GuardianMappingPart = (typeof guardianMappingParts)[number];
@@ -101,6 +107,7 @@ const allowedTypes: Record<RosterMappingFieldTarget, readonly FieldType[]> = {
   schoolGrade: choiceOrText,
   schoolType: choiceOrText,
   churchMember: choiceOrText,
+  baptized: choiceOrText,
   role: textTypes,
 };
 const guardianTypes: Record<GuardianMappingPart, readonly FieldType[]> = {
@@ -297,6 +304,7 @@ export type RosterPrefill = {
   schoolGrade: ClubSchoolGrade | null;
   schoolType: ClubSchoolType | null;
   churchMember: ClubChurchMember | null;
+  baptized: ClubBaptized | null;
   gender: "FEMALE" | "MALE" | null;
   guardians: GuardianValues[];
 };
@@ -352,6 +360,13 @@ function churchMemberFrom(value: string): ClubChurchMember | null {
     || clubChurchMemberLabels[answer].toLowerCase().replace(/[^a-z]/g, "") === wanted) ?? null;
 }
 
+function baptizedFrom(value: string): ClubBaptized | null {
+  const wanted = value.toLowerCase().replace(/[^a-z]/g, "");
+  if (!wanted) return null;
+  return clubBaptizedAnswers.find((answer) => answer.toLowerCase().replace(/_/g, "") === wanted
+    || clubBaptizedLabels[answer].toLowerCase().replace(/[^a-z]/g, "") === wanted) ?? null;
+}
+
 function genderFrom(value: string): "FEMALE" | "MALE" | null {
   const wanted = value.trim().toLowerCase();
   if (wanted === "female" || wanted === "f" || wanted === "girl") return "FEMALE";
@@ -403,6 +418,8 @@ export function rosterPrefillFromAnswers(
   const schoolGrade = youth ? schoolGradeFromText(text(answers, plain(fields.schoolGrade), 40)) : null;
   const schoolType = youth ? schoolTypeFrom(text(answers, plain(fields.schoolType), 40)) : null;
   const churchMember = youth ? churchMemberFrom(text(answers, plain(fields.churchMember), 40)) : null;
+  // Baptized (#1852) is asked of every roster type, staff included.
+  const baptized = baptizedFrom(text(answers, plain(fields.baptized), 40));
   const guardians: GuardianValues[] = Array.from({ length: GUARDIAN_SLOTS }, (_, index) => {
     const slot = mapping.guardians[index];
     if (!slot) return { name: "", relationship: "", email: "", phone: "" };
@@ -431,6 +448,7 @@ export function rosterPrefillFromAnswers(
     schoolGrade,
     schoolType,
     churchMember,
+    baptized,
     gender,
     guardians,
   };

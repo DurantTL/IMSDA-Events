@@ -142,10 +142,10 @@ describe("who may export (#1760)", () => {
 describe("the column allow-list (#1760)", () => {
   it("is exactly the approved columns, in offer order, with the minimal default", () => {
     expect(COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS).toEqual([
-      "firstName", "lastName", "club", "type", "role", "classLevel", "isTlt", "age", "gender", "schoolGrade", "schoolType", "churchMember", "sterling",
+      "firstName", "lastName", "club", "type", "role", "classLevel", "isTlt", "age", "gender", "schoolGrade", "schoolType", "churchMember", "baptized", "sterling",
     ]);
     expect(Object.values(COORDINATOR_ROSTER_EXPORT_COLUMNS).map((column) => column.header)).toEqual([
-      "First name", "Last name", "Club", "Type", "Role", "Current class", "TLT", "Age", "Gender", "Grade", "School type", "Church member", "Sterling Volunteers status",
+      "First name", "Last name", "Club", "Type", "Role", "Current class", "TLT", "Age", "Gender", "Grade", "School type", "Church member", "Baptized", "Sterling Volunteers status",
     ]);
     expect(DEFAULT_COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS).toEqual(["club", "firstName", "lastName", "role"]);
   });
@@ -251,6 +251,18 @@ describe("preview and CSV (#1760)", () => {
     );
     expect(table.rows[0]).toEqual(["Public school", "Yes", expect.any(String), expect.any(String), "11", expect.any(String), "Director"]);
     expect(table.rows[0]!.every((value) => value !== "")).toBe(true);
+  });
+
+  it("includes Baptized for an Area Coordinator, for any member type (#1852)", () => {
+    const rows = [
+      { clubName: "C", member: member("m1", "L", "F", { baptized: "YES" }) as never, sterling: "" },
+      { clubName: "C", member: member("m2", "L", "G", { attendeeType: "STAFF", baptized: "NOT_SURE" }) as never, sterling: "" },
+      { clubName: "C", member: member("m3", "L", "H") as never, sterling: "" },
+    ];
+    expect(buildCoordinatorRosterTable(rows, ["firstName", "baptized"])).toEqual({
+      headers: ["First name", "Baptized"],
+      rows: [["F", "Yes"], ["G", "Not sure"], ["H", ""]],
+    });
   });
 
   it("sorts by club, then last name, then first name", () => {

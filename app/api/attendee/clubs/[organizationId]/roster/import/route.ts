@@ -65,6 +65,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
             schoolGrade: row.schoolGrade ?? null,
             schoolType: null,
             churchMember: null,
+            baptized: row.baptized ?? null,
             gender: row.gender ?? null,
           }, actor);
           touchedPersonIds.add(personId);
@@ -77,6 +78,7 @@ async function postHandler(request: Request, context: { params: Promise<{ organi
             ...(row.classLevel === undefined ? {} : { classLevel: row.classLevel }),
             ...(row.isTlt === undefined ? {} : { isTlt: row.isTlt }),
             ...(row.schoolGrade === undefined ? {} : { schoolGrade: row.schoolGrade }),
+            ...(row.baptized === undefined ? {} : { baptized: row.baptized }),
             ...(row.role === undefined ? {} : { role: row.role }),
             ...(row.gender === undefined ? {} : { gender: row.gender }),
           }, actor);

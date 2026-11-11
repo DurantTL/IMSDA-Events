@@ -58,17 +58,17 @@ export function rosterDetailsSummary(items: readonly string[]): string {
   return items.length === 0 ? "" : `Needs ${items.map((item) => item.toLowerCase()).join(", ")}`;
 }
 
-export type RosterColumnId = "name" | "age" | "birthDate" | "type" | "class" | "grade" | "details" | "gender" | "school" | "churchMember" | "screening" | "actions";
+export type RosterColumnId = "name" | "age" | "birthDate" | "type" | "class" | "grade" | "details" | "gender" | "school" | "churchMember" | "baptized" | "screening" | "actions";
 
 /** The `?grade=` value that lists people with no grade given (#1664). Any other value is a grade key such as `GRADE_7`. */
 export const ROSTER_NO_GRADE_FILTER = "none";
 
 /**
  * The columns a viewer's table has, in order. Name, Age, Type, Current class and Details lead; Gender joins
- * with "Show gender"; School and church membership (#1668) join with "Show school details", only for a viewer who may see them; the birth date appears only after its separate authorized reveal; screening only where
+ * with "Show gender"; School and church membership (#1668) join with "Show school details", only for a viewer who may see them; Baptized (#1852) joins with "Show baptized", for every viewer; the birth date appears only after its separate authorized reveal; screening only where
  * the role gets it today; the actions column only where the row has something to do.
  */
-export function rosterColumns(options: { birthDatesShown: boolean; showGender: boolean; hasScreening: boolean; hasRowActions: boolean; showSchool?: boolean }): RosterColumnId[] {
+export function rosterColumns(options: { birthDatesShown: boolean; showGender: boolean; hasScreening: boolean; hasRowActions: boolean; showSchool?: boolean; showBaptized?: boolean }): RosterColumnId[] {
   return [
     "name",
     "age",
@@ -79,6 +79,7 @@ export function rosterColumns(options: { birthDatesShown: boolean; showGender: b
     "details",
     ...(options.showGender ? (["gender"] as const) : []),
     ...(options.showSchool ? (["school", "churchMember"] as const) : []),
+    ...(options.showBaptized ? (["baptized"] as const) : []),
     ...(options.hasScreening ? (["screening"] as const) : []),
     ...(options.hasRowActions ? (["actions"] as const) : []),
   ];

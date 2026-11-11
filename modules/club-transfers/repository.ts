@@ -126,6 +126,7 @@ const rosterMemberSelect = {
   schoolGrade: true,
   schoolType: true,
   churchMember: true,
+  baptized: true,
   reportedAge: true,
   gender: true,
   sealedBirthDate: true,
@@ -607,6 +608,8 @@ async function completeTransfer(
       schoolGrade: sending.schoolGrade,
       schoolType: sending.schoolType,
       churchMember: sending.churchMember,
+      // Baptized (#1852) moves with the member too.
+      baptized: sending.baptized,
       reportedAge: sending.reportedAge,
       gender: sending.gender,
       sealedBirthDate: sending.sealedBirthDate,

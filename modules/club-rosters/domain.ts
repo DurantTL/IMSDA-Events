@@ -160,6 +160,20 @@ export type ClubChurchMember = keyof typeof clubChurchMemberLabels;
 
 export const clubChurchMembers = Object.keys(clubChurchMemberLabels) as ClubChurchMember[];
 
+/** Baptized (#1852): any member type, shown to everyone who can see the roster, Area Coordinators included. */
+export const clubBaptizedLabels = {
+  YES: "Yes",
+  NO: "No",
+  NOT_SURE: "Not sure",
+} as const;
+
+export type ClubBaptized = keyof typeof clubBaptizedLabels;
+
+export const clubBaptizedAnswers = Object.keys(clubBaptizedLabels) as ClubBaptized[];
+
+/** The plain label of the baptized question, wherever it is asked or shown. */
+export const BAPTIZED_LABEL = "Baptized";
+
 /** The plain label of the church membership question, wherever it is asked or shown. */
 export const CHURCH_MEMBER_LABEL = "Seventh-day Adventist church member";
 

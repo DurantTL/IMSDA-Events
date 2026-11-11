@@ -7,6 +7,7 @@ const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER
 const schoolGrade = z.enum(["GRADE_K", "GRADE_1", "GRADE_2", "GRADE_3", "GRADE_4", "GRADE_5", "GRADE_6", "GRADE_7", "GRADE_8", "GRADE_9", "GRADE_10", "GRADE_11", "GRADE_12", "NOT_IN_SCHOOL"]).nullable();
 const schoolType = z.enum(["ADVENTIST_SCHOOL", "PUBLIC_SCHOOL", "HOMESCHOOL", "OTHER"]).nullable();
 const churchMember = z.enum(["YES", "NO", "NOT_SURE"]).nullable();
+const baptized = z.enum(["YES", "NO", "NOT_SURE"]).nullable();
 
 const name = (label: string) => z.string().trim().min(1, `Enter the ${label}.`).max(80);
 
@@ -56,6 +57,8 @@ export const rosterMemberInputSchema = z.object({
   schoolGrade: schoolGrade.optional(),
   schoolType: schoolType.optional(),
   churchMember: churchMember.optional(),
+  /** Baptized (#1852): optional, any member type. */
+  baptized: baptized.optional(),
   gender: gender.default(null),
   /** Guardian contacts (#510): replaces the set when sent; only a club director or deputy may send it (the route checks). */
   guardians: guardiansInputSchema.optional(),
@@ -75,6 +78,7 @@ export const rosterMemberUpdateSchema = z.object({
   schoolGrade,
   schoolType,
   churchMember,
+  baptized,
   gender,
   status: z.enum(["ACTIVE", "INACTIVE"]),
   guardians: guardiansUpdateSchema,

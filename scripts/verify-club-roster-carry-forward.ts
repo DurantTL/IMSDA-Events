@@ -73,7 +73,7 @@ async function addPerson(organizationId: string, index: number, type: "YOUTH" | 
   return addRosterMember(organizationId, from, {
     firstName: names[index]!, lastName: "Carryfwd", birthDate: birthDates[index]!, attendeeType: type,
     role: type === "YOUTH" ? "Pathfinder" : "Counselor", classLevel: type === "YOUTH" ? "RANGER" : null, gender: "FEMALE",
-    schoolGrade: type === "YOUTH" ? "GRADE_7" : null, schoolType: type === "YOUTH" ? "HOMESCHOOL" : null, churchMember: type === "YOUTH" ? "NOT_SURE" : null,
+    schoolGrade: type === "YOUTH" ? "GRADE_7" : null, schoolType: type === "YOUTH" ? "HOMESCHOOL" : null, churchMember: type === "YOUTH" ? "NOT_SURE" : null, baptized: "YES",
   }, actor);
 }
 
@@ -144,6 +144,7 @@ async function main() {
   const stayed = carried.find((row) => row.attendeeType === "YOUTH")!;
   assert(stayed.schoolGrade === "GRADE_8", "the reviewed new grade is saved on the new year's row");
   assert(stayed.schoolType === "HOMESCHOOL" && stayed.churchMember === "NOT_SURE", "school type and church membership carry over unchanged");
+  assert(toStaff.baptized === "YES" && stayed.baptized === "YES", "baptized (#1852) carries over for every type, including a Pathfinder who becomes staff");
   assert((await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: a[1]!.memberId } })).schoolGrade === "GRADE_7", "last year's grade is untouched (nothing moves up on its own)");
   assert(result.gradesChanged === 1, "one grade changed in the review");
   assert(stayed.role === "Pathfinder" && stayed.classLevel === "VOYAGER" && stayed.status === "ACTIVE", "a youth keeps their role and takes the new class");

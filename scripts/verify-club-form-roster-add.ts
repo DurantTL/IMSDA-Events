@@ -75,6 +75,7 @@ const input = (firstName: string, birthDate = "2014-05-06"): RosterMemberInput =
   schoolGrade: "GRADE_7",
   schoolType: "PUBLIC_SCHOOL",
   churchMember: "YES",
+  baptized: "NOT_SURE",
   gender: "FEMALE",
   guardians: [{ name: SECRET_GUARDIAN, relationship: "Mother", email: "", phone: "" }],
 });
@@ -112,6 +113,7 @@ async function main() {
   assert(row.sealedBirthDate && !row.sealedBirthDate.includes("2014"), "the birth date is sealed on the roster row");
   assert((await prisma.clubRosterGuardian.count({ where: { rosterMemberId: added.rosterMemberId } })) === 1, "the guardian contact is stored");
   assert(row.schoolGrade === "GRADE_7" && row.schoolType === "PUBLIC_SCHOOL" && row.churchMember === "YES", "grade, school type and church membership are stored on the roster row (#1664, #1668)");
+  assert(row.baptized === "NOT_SURE", "baptized is stored on the roster row (#1852)");
 
   // 2. Already added: nothing more can be added or linked.
   assert((await code(confirmAddToRoster(director, { action: "ADD", organizationId: clubs.a, submissionId: `${P}_s1`, member: input("Verifyb") }, now))) === "ALREADY_ON_ROSTER", "a second add is refused");
@@ -147,7 +149,7 @@ async function main() {
   await removeRosterMember(clubs.a, added.rosterMemberId, { accountId }, now);
   const erased = await prisma.clubRosterMember.findUniqueOrThrow({ where: { id: added.rosterMemberId } });
   assert(erased.status === "REMOVED", "the member is removed");
-  assert(erased.schoolGrade === null && erased.schoolType === null && erased.churchMember === null, "removing the member erases grade, school type and church membership");
+  assert(erased.schoolGrade === null && erased.schoolType === null && erased.churchMember === null && erased.baptized === null, "removing the member erases grade, school type and church membership");
   const readded = await confirmAddToRoster(director, { action: "ADD", organizationId: clubs.a, submissionId: `${P}_s1`, member: input("Verifyc", "2012-02-03") }, now);
   assert(readded.action === "ADDED" && (await state(`${P}_s1`)).rosterActionMemberId === readded.rosterMemberId, "a form whose member was removed can be added again");
 

@@ -199,7 +199,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
     await tx.$queryRaw`SELECT "id" FROM "ClubRosterMember" WHERE "id" = ANY(${ids}::text[]) AND "organizationId" = ${organizationId} FOR UPDATE`;
     const sources = await tx.clubRosterMember.findMany({
       where: { id: { in: ids }, organizationId, clubYear: fromClubYear, status: "ACTIVE", personId: { not: null } },
-      select: { id: true, personId: true, attendeeType: true, role: true, classLevel: true, isTlt: true, schoolGrade: true, schoolType: true, churchMember: true, gender: true, reportedAge: true, sealedBirthDate: true },
+      select: { id: true, personId: true, attendeeType: true, role: true, classLevel: true, isTlt: true, schoolGrade: true, schoolType: true, churchMember: true, baptized: true, gender: true, reportedAge: true, sealedBirthDate: true },
     });
     if (sources.length !== ids.length) {
       throw new RosterOperationError("MEMBER_NOT_FOUND", "One of those people isn't on last year's roster.");
@@ -228,6 +228,8 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
         schoolGrade: carriedSchoolValue(source.schoolGrade, choice, choice.schoolGrade),
         schoolType: carriedSchoolValue(source.schoolType, choice, undefined),
         churchMember: carriedSchoolValue(source.churchMember, choice, undefined),
+        // Baptized (#1852) is asked of every member type, so it carries whatever the new type.
+        baptized: source.baptized,
         gender: source.gender,
         reportedAge: source.reportedAge,
         // The ciphertext moves as it is: a carried birth date is never opened here, so it never exists in plain text.
