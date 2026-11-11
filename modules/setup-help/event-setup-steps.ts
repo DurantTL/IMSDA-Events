@@ -66,7 +66,7 @@ export function eventSetupFor(id: EventSetupId, ctx: EventSetupContext = {}): Ro
     case "readiness-support":
       return { setup: howTo(["Open the Registration support contact field in event settings.", "Type who attendees should contact with questions.", "Choose Save event settings."], "The row shows done."), guideId: "finish-event-setup", guideScope: staff };
     case "readiness-club-billing":
-      return { setup: howTo(["Open the Billing mode field in event settings.", "Choose church invoice.", "Choose Save event settings."], "The row shows done."), guideId: "finish-event-setup", guideScope: staff };
+      return { setup: howTo(["Open the Billing mode field in event settings.", "Choose Bill the responsible organization later.", "Choose Save event settings."], "The row shows done."), guideId: "finish-event-setup", guideScope: staff };
     case "readiness-public-info":
       return {
         setup: howTo(["Open the IMSDA.org information page field in event settings.", "Type a full web address that starts with http:// or https://, or clear the field.", "Choose Save event settings."], "The row shows done. This never blocks publishing."),
@@ -84,7 +84,7 @@ export function eventSetupFor(id: EventSetupId, ctx: EventSetupContext = {}): Ro
       return {
         setup: ctx.systemAdmin
           ? { href: "/admin/email", label: "Open email settings" }
-          : howTo(["Real email is off until the email provider is set up for the whole platform.", "Ask a system administrator to open the System report and set up the email provider.", "Until then, messages are captured for preview and nothing is sent."], "Delivery readiness says the provider is configured."),
+          : howTo(["Real email is off until the email provider is set up for the whole platform.", "Ask a system administrator to open the System report and set up Email provider (Resend).", "Until then, messages are captured for preview and nothing is sent."], "The Settings tab on Communications says Email provider is configured."),
         whoToAsk: ctx.systemAdmin ? undefined : askSystemAdmin("set up the email provider"),
         guideId: "schedule-event-emails",
         guideScope: staff,
@@ -99,9 +99,9 @@ export function eventSetupFor(id: EventSetupId, ctx: EventSetupContext = {}): Ro
         guideScope: staff,
       };
     case "announcements-none":
-      return work("MANAGE_COMMUNICATIONS", ["Choose to create a draft announcement.", "Write the title and message, and save the draft.", "Publish it when it is ready. It then shows in the attendee event feed."], "The announcement is listed.", "create announcements", "schedule-event-emails");
+      return work("MANAGE_COMMUNICATIONS", ["Choose New announcement.", "Write the title and message, and save the draft.", "Publish it when it is ready. It then shows in the attendee event feed."], "The announcement is listed.", "create announcements", "schedule-event-emails");
     case "scheduled-emails-none":
-      return work("MANAGE_COMMUNICATIONS", ["Choose to add a schedule.", "Pick the message and the time, and save.", "Approve it. An email that is not approved does not send."], "The schedule is listed as approved.", "schedule emails", "schedule-event-emails");
+      return work("MANAGE_COMMUNICATIONS", ["Choose New schedule.", "Pick the message and the time, then choose Review schedule and Save schedule.", "Choose Review and approve, then Approve and schedule. An email that is not approved does not send."], "The schedule says Approved and scheduled.", "schedule emails", "schedule-event-emails");
     case "cancellation-policy-none":
       return work("MANAGE_FINANCE", ["Fill in the first rule in the form below: how much is refunded and by when.", "Choose Save to keep the first version.", "Attendees can then ask to cancel online."], "Cancellation policy set shows done on Event settings.", "save the cancellation policy", "finish-event-setup");
     case "meals-no-services":
