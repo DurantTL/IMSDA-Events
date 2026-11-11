@@ -28,7 +28,7 @@ export function validateRosterForm(input: {
   if (!input.lastName.trim()) errors.lastName = "Last name is required.";
   const typed = input.birthDateText.trim();
   if (typed && !input.birthDate) {
-    errors.birthDate = "Enter a date like 4/17/2014, or 4/17/14.";
+    errors.birthDate = "Enter a date like 4/17/2014 or 04172014.";
   } else if (!typed && !input.editing) {
     errors.birthDate = "Birth date is required.";
   }
