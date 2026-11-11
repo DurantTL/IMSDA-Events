@@ -11,6 +11,7 @@
  * image); install it first with
  *   npm i --no-save playwright@1.63.0 && npx playwright install chromium firefox webkit
  */
+import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { PrismaClient, ClubRosterSchoolGrade } from "@prisma/client";
@@ -204,6 +205,27 @@ export async function assertHealthy(page: Page, label: string, failures: Failure
   if (state.length < 40) failures.push(`${label}: blank page (${state.length} characters)`);
   if (state.errorScreen) failures.push(`${label}: an error screen is showing`);
   if (state.overlay) failures.push(`${label}: the framework error overlay is showing`);
+}
+
+/**
+ * When a journey step fails (#1873): print the page's current address and save a full-page screenshot to
+ * JOURNEY_FAILURE_DIR (default test-results/journey-failures), which CI uploads as an artifact. Never throws, so the
+ * real failure is the one reported. Screenshots show synthetic journey data only.
+ */
+export async function saveFailureEvidence(page: Page | null, label: string) {
+  // A page whose context already closed was saved by its own wrapper (or cannot be saved): nothing to add.
+  if (!page || page.isClosed?.()) return;
+  try {
+    console.error(`    page address when it failed: ${page.url()}`);
+    const dir = path.resolve(process.env.JOURNEY_FAILURE_DIR || "test-results/journey-failures");
+    mkdirSync(dir, { recursive: true });
+    const name = `${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 90)}.png`;
+    const file = path.join(dir, name);
+    await page.screenshot({ path: file, fullPage: true, timeout: 15_000 });
+    console.error(`    screenshot: ${path.relative(process.cwd(), file)}`);
+  } catch (error) {
+    console.error(`    (no screenshot: ${String((error as Error)?.message ?? error).split("\n")[0]})`);
+  }
 }
 
 /** Text a person would read in the page body. */

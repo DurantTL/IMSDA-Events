@@ -37,6 +37,20 @@ export function isPlainLeftClick(click: ClickLike): boolean {
   return click.button === 0 && !click.metaKey && !click.ctrlKey && !click.shiftKey && !click.altKey;
 }
 
+/**
+ * The link a click follows away from this page, or null (#1873): a plain left click on an `a[href]` that is not a new
+ * tab or window, a download, a sheet or menu trigger (aria-haspopup) or an in-page `#` link.
+ */
+export function linkLeavingPage(event: ClickLike & { target: unknown }): Element | null {
+  if (!isPlainLeftClick(event)) return null;
+  const target = event.target as { closest?: (selector: string) => Element | null } | null;
+  if (!target || typeof target.closest !== "function") return null;
+  const link = target.closest("a[href]") as (Element & { target?: string }) | null;
+  if (!link || link.target === "_blank" || link.hasAttribute("download") || link.hasAttribute("aria-haspopup")) return null;
+  const href = link.getAttribute("href");
+  return !href || href.startsWith("#") ? null : link;
+}
+
 type AnchorLike = {
   target: string;
   href: string;

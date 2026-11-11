@@ -88,13 +88,14 @@ function failStep(ctx: Ctx, journey: string, error: unknown) {
 let lastPage: J.Page | null = null;
 let blockedRequests = 0;
 
-async function journey(ctx: Ctx, name: string, run: () => Promise<void>) {
+async function journey(ctx: Ctx, name: string, run: () => Promise<void>, page?: J.Page) {
   const started = Date.now();
   console.log(`  - ${name}`);
   try {
     await run();
   } catch (error) {
     failStep(ctx, name, error);
+    await J.saveFailureEvidence(page ?? lastPage, `club-${ctx.viewport.name}-${name}`);
     // JOURNEY_DEBUG=1 shows what the person would have been looking at when a step failed.
     if (process.env.JOURNEY_DEBUG && lastPage) console.error(`    page ${lastPage.url()}:\n${(await J.bodyText(lastPage).catch(() => "")).split("\n").filter(Boolean).slice(0, 80).join("\n")}`);
   }
@@ -644,11 +645,17 @@ async function coordinatorRecordsJourney(ctx: Ctx, page: J.Page) {
   // The club's row appears in more than one table on the page (the month table and the full-year grid); any may say it.
   const rowsOf = (name: string) => () => page.locator("tr").filter({ hasText: name }).allInnerTexts().then((rows: string[]) => rows.map(clean));
   // With many clubs the month view lists only some, so find each club the way a coordinator would: search by name.
-  const search = page.locator("#area-club-search");
-  await search.fill(clubs.missing.clubName);
+  // Each search must land (its words in the address, the list filtered by the server) before its rows are read or a
+  // link is clicked (#1873): rows already on screen belong to the unfiltered list.
+  const searchFor = async (name: string) => {
+    await settle(page);
+    await page.locator("#area-club-search").fill(name);
+    await page.waitForURL((url: URL) => url.searchParams.get("q") === name, { timeout: 20_000, waitUntil: "commit" });
+  };
+  await searchFor(clubs.missing.clubName);
   const missing = await pollPage<string[]>(page, rowsOf(clubs.missing.clubName), (rows) => rows.some((row) => /Not submitted/.test(row)), 8_000);
   assert(missing.ok, `the club with no record is not shown as Not submitted (rows: ${JSON.stringify(missing.value)})`);
-  await search.fill(clubs.complete.clubName);
+  await searchFor(clubs.complete.clubName);
   const complete = await pollPage<string[]>(page, rowsOf(clubs.complete.clubName), (rows) => rows.some((row) => /Submitted/.test(row)), 8_000);
   assert(complete.ok, `the club with a record is not shown as Submitted (rows: ${JSON.stringify(complete.value)})`);
   await page.locator(`a[href*="/account/area/${clubs.complete.clubId}/reports/${month}"]`).first().click();
@@ -751,16 +758,16 @@ async function runShard(ctx: Ctx) {
   // Signed in as the main director through the real sign-in (journey 1), then used for everything else.
   const main = await newDirectorContext(ctx);
   try {
-    await journey(ctx, "1. Sign in with the emailed code and set up two-step", () => signInJourney(ctx, main.page, world.main, { rules: true }));
-    if (wanted("2")) await journey(ctx, "2. Team: add a leader, the invite email arrives", () => teamJourney(ctx, main.page));
-    if (wanted("3")) await journey(ctx, "3. Roster: add a member, see it at once, a second browser sees it", () => rosterJourney(ctx, main.page));
-    if (wanted("4")) await journey(ctx, "4. Yearly forms: open, fill one in", () => formsJourney(ctx, main.page));
-    if (wanted("5")) await journey(ctx, "5. Register the club for an event", () => eventsJourney(ctx, main.page));
-    if (wanted("6")) await journey(ctx, "6. Orders: add a line to the order list", () => ordersJourney(ctx, main.page));
-    if (wanted("7")) await journey(ctx, "7. Monthly record: fill and save", () => monthlyRecordJourney(ctx, main.page));
-    if (wanted("8")) await journey(ctx, "8. Year-end report: fill and save", () => yearEndJourney(ctx, main.page));
-    if (wanted("9")) await journey(ctx, "9. Getting started checklist and Help", () => helpJourney(ctx, main.page));
-    if (wanted("10")) await journey(ctx, "10. Forms help popup", () => formsHelpJourney(ctx, main.page));
+    await journey(ctx, "1. Sign in with the emailed code and set up two-step", () => signInJourney(ctx, main.page, world.main, { rules: true }), main.page);
+    if (wanted("2")) await journey(ctx, "2. Team: add a leader, the invite email arrives", () => teamJourney(ctx, main.page), main.page);
+    if (wanted("3")) await journey(ctx, "3. Roster: add a member, see it at once, a second browser sees it", () => rosterJourney(ctx, main.page), main.page);
+    if (wanted("4")) await journey(ctx, "4. Yearly forms: open, fill one in", () => formsJourney(ctx, main.page), main.page);
+    if (wanted("5")) await journey(ctx, "5. Register the club for an event", () => eventsJourney(ctx, main.page), main.page);
+    if (wanted("6")) await journey(ctx, "6. Orders: add a line to the order list", () => ordersJourney(ctx, main.page), main.page);
+    if (wanted("7")) await journey(ctx, "7. Monthly record: fill and save", () => monthlyRecordJourney(ctx, main.page), main.page);
+    if (wanted("8")) await journey(ctx, "8. Year-end report: fill and save", () => yearEndJourney(ctx, main.page), main.page);
+    if (wanted("9")) await journey(ctx, "9. Getting started checklist and Help", () => helpJourney(ctx, main.page), main.page);
+    if (wanted("10")) await journey(ctx, "10. Forms help popup", () => formsHelpJourney(ctx, main.page), main.page);
     // Last of the main director's journeys: recovery signs the other browsers of the account out.
     if (wanted("11")) await journey(ctx, "11. Lost-device recovery, then sign out everywhere else", () => recoveryJourney(ctx));
   } finally {
@@ -770,11 +777,11 @@ async function runShard(ctx: Ctx) {
     await seedCoordinatorWorld(ctx.prisma, world);
     const coordinator = await coordinatorContext(ctx);
     try {
-      if (wanted("C1")) await journey(ctx, "C1. Coordinator: the club list", () => coordinatorClubsJourney(ctx, coordinator.page));
-      if (wanted("C2")) await journey(ctx, "C2. Coordinator: who's missing what", () => coordinatorMissingJourney(ctx, coordinator.page));
-      if (wanted("C3")) await journey(ctx, "C3. Coordinator: open a submitted monthly record", () => coordinatorRecordsJourney(ctx, coordinator.page));
-      if (wanted("C4")) await journey(ctx, "C4. Coordinator: points", () => coordinatorPointsJourney(ctx, coordinator.page));
-      if (wanted("C5")) await journey(ctx, "C5. Coordinator: Getting started and Help", () => coordinatorHelpJourney(ctx, coordinator.page));
+      if (wanted("C1")) await journey(ctx, "C1. Coordinator: the club list", () => coordinatorClubsJourney(ctx, coordinator.page), coordinator.page);
+      if (wanted("C2")) await journey(ctx, "C2. Coordinator: who's missing what", () => coordinatorMissingJourney(ctx, coordinator.page), coordinator.page);
+      if (wanted("C3")) await journey(ctx, "C3. Coordinator: open a submitted monthly record", () => coordinatorRecordsJourney(ctx, coordinator.page), coordinator.page);
+      if (wanted("C4")) await journey(ctx, "C4. Coordinator: points", () => coordinatorPointsJourney(ctx, coordinator.page), coordinator.page);
+      if (wanted("C5")) await journey(ctx, "C5. Coordinator: Getting started and Help", () => coordinatorHelpJourney(ctx, coordinator.page), coordinator.page);
     } finally {
       await coordinator.context.close();
     }

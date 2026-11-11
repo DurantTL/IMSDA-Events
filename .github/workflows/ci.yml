@@ -653,6 +653,15 @@ jobs:
       - name: Show the app log when a check failed
         if: failure()
         run: cat app.log || true
+      # A failed journey step saves a screenshot and prints the page address (#1873); keep the screenshots for a week.
+      - name: Keep the failed-step screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: club-journey-failures
+          path: test-results/journey-failures/
+          if-no-files-found: ignore
+          retention-days: 7
 
   # The attendee and event staff journeys (#1439 round 2) in a real browser (Chromium). Attendee: create an account with the
   # Security check blocked, register with a promo code and pay by card, manage the registration, ask to cancel and have staff
@@ -756,6 +765,15 @@ jobs:
         run: |
           cat app.log || true
           cat app-turnstile.log || true
+      # A failed journey step saves a screenshot and prints the page address (#1873); keep the screenshots for a week.
+      - name: Keep the failed-step screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: event-journey-failures-${{ matrix.shard }}
+          path: test-results/journey-failures/
+          if-no-files-found: ignore
+          retention-days: 7
 
   # The required check (branch protection and the Claude tooling look for this
   # name): green only when `npm run verify` and every shard passed. The shards
