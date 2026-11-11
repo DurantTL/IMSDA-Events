@@ -97,8 +97,9 @@ export function MfaManager({
   }
 
   async function regenerate(code?: string) {
+    // Staff always prove it is them first (as when changing a passkey); an attendee is asked only when the server wants it.
     const result = await call(code
-      ? { action: "regenerate-recovery-codes", code }
+      ? { action: "regenerate-recovery-codes", ...(attendee ? { code } : { proof: { code } }) }
       : { action: "regenerate-recovery-codes" });
     if (result) {
       setNeedsCodeToRegenerate(false);
@@ -195,7 +196,7 @@ export function MfaManager({
 
       {!offer && status.status === "ACTIVE" && (
         <>
-          {needsCodeToRegenerate ? (
+          {needsCodeToRegenerate || !attendee ? (
             <form
               className="form-stack"
               onSubmit={(event) => {
@@ -204,7 +205,7 @@ export function MfaManager({
                 void regenerate(typeof code === "string" ? code : undefined);
               }}
             >
-              <OneTimeCodeInput label="Code from your authenticator" />
+              <OneTimeCodeInput label={attendee ? "Code from your authenticator" : "Code from your authenticator, or a recovery code"} />
               {error && <p className="form-error" role="alert">{error}</p>}
               <button className="secondary-button" type="submit" disabled={busy}>
                 <KeyRound size={16} /> Issue new recovery codes

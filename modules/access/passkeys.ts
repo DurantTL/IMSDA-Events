@@ -232,7 +232,7 @@ async function verifyExistingPasskey(
 }
 
 /**
- * The re-authentication gate on adding or removing a passkey (#429). The
+ * The re-authentication gate on adding or removing a passkey (#429), and on issuing new recovery codes. The
  * request must carry one fresh proof the account supports:
  *
  * - with an ACTIVE authenticator: an authenticator code or a recovery code,
@@ -245,12 +245,12 @@ async function verifyExistingPasskey(
  * Every failure — nothing sent, a wrong or reused code, a wrong password, a
  * proof this account can't give — is the same answer.
  */
-async function requireRecentVerification(
+export async function requireRecentVerification(
   account: StaffAccount,
   sessionId: string,
   requestOrigin: string | null,
   proof: ChangeProof | undefined,
-  now: Date,
+  now = new Date(),
 ) {
   const methods = await changeVerificationMethods(account.id);
   let verified = false;
