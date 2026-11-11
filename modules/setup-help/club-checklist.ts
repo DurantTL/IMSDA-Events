@@ -44,12 +44,12 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
   add({
     id: "two-step",
     label: "Two-step sign-in",
-    detail: "Add a passkey (the easiest) or an authenticator app. It protects youth and medical records.",
+    detail: "Add a passkey (the easiest) or an authenticator app on your Profile. It protects youth and medical records.",
     done: facts.twoStepVerified,
     reference: !facts.twoStepVerified,
     href: "/account/security",
     linkable: true,
-    actionLabel: "Open Security",
+    actionLabel: "Set up two-step sign-in",
     helpHref: portalGuideHref("walkthrough-director-two-step"),
   });
   add({
@@ -67,7 +67,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
   add({
     id: "roster",
     label: "Roster",
-    detail: "Add your club's people for this year.",
+    detail: "Add your club's people for this year with Add to roster.",
     done: facts.rosterCount !== null && facts.rosterCount > 0,
     reference: facts.rosterCount === null,
     href: `${base}/roster`,
@@ -92,7 +92,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
   add({
     id: "events",
     label: "Register for events",
-    detail: facts.hasOpenEvents ? "Register your club for an open event." : "No event is open for your club yet. Watch Upcoming deadlines.",
+    detail: facts.hasOpenEvents ? "Choose Register beside an open event." : "No event is open for your club yet. Watch Upcoming deadlines on Home.",
     done: eventsKnown && facts.registeredEventCount! > 0,
     reference: !eventsKnown || (facts.registeredEventCount === 0 && !facts.hasOpenEvents),
     href: `${base}/events`,
@@ -130,7 +130,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
   add({
     id: "sterling",
     label: "Honors and Sterling Volunteers",
-    detail: facts.sterlingReminders ? "Someone on your roster needs a current Sterling Volunteers check." : "Record honors, and keep Sterling Volunteers current for adults and staff.",
+    detail: facts.sterlingReminders ? "Someone on your roster needs a current Sterling Volunteers check." : "Record honors for members, and keep Sterling Volunteers (the screening for adults) current for adults and staff.",
     // Honors cannot be read as "done", and zero reminders also means an empty roster, so this is always a guide row.
     done: false,
     reference: true,
