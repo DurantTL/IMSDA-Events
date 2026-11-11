@@ -43,7 +43,7 @@ export function PortalHelpSearch({ guides }: { guides: readonly PortalHubGuide[]
           id={inputId}
           ref={inputRef}
           {...search.inputProps}
-          placeholder="For example: passkey, roster, step by step"
+          placeholder="For example: registration, passkey, step by step"
           type="search"
         />
         <p className={styles.count} id={countId} role="status">{count}</p>
