@@ -98,10 +98,11 @@ export function withRequestContext<Arguments extends unknown[]>(
 
 /**
  * The path a log line carries. The segment after `/club-forms/`, `/manage/`, `/staff-invite/` (a personal invitation link, #804)
- * or `/api/public/staff-invitations/` is a private bearer token, so it is replaced before it can reach a log.
+ * or `/api/public/staff-invitations/` is a private bearer token, and so is the segment after `/health-records/` or
+ * `/api/public/health-records/` (a health record link). Each is replaced before it can reach a log.
  */
 export function redactTokenPath(pathname: string) {
-  return pathname.replace(/^(\/(?:api\/public\/)?(?:club-forms|manage|unsubscribe|staff-invite|staff-invitations)\/)[^/]+/, "$1[redacted]");
+  return pathname.replace(/^(\/(?:api\/public\/)?(?:club-forms|manage|unsubscribe|staff-invite|staff-invitations|health-records)\/)[^/]+/, "$1[redacted]");
 }
 
 /** The unredacted path, only to decide which area a request belongs to. Never logged. */
