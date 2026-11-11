@@ -28,14 +28,14 @@ export default async function PortalHelpPage({ searchParams }: { searchParams: P
   return (
     <>
       <AccountPageBanner title="Help">
-        <p>Short guides for the things you can do with your account.</p>
+        <p>Short, step-by-step guides for what you can do with your account.</p>
       </AccountPageBanner>
       <div className="account-page-body">
         <div className={styles.page}>
           <HelpBackLink fallbackHref="/account/clubs" fallbackLabel="" from={from} hideWithoutTarget useRemembered />
           <div className={styles.note} role="note">
-            <strong>Reading a guide is not a task completion</strong>
-            <p>Reading a guide does not file a report, finish a registration, approve anything or give anyone access. Those happen on the working pages, by the people allowed to do them.</p>
+            <strong>A guide only explains</strong>
+            <p>Reading a guide does not change anything. You do the work on the pages themselves, such as My registrations, and only if your account is allowed to.</p>
           </div>
           {guides.length === 0 ? (
             <p className={styles.empty}>There are no guides for this account yet.</p>

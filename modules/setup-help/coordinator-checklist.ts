@@ -27,7 +27,7 @@ export function buildCoordinatorChecklist(facts: CoordinatorChecklistFacts): Che
     {
       id: "clubs",
       label: "Your clubs",
-      detail: "See every active club and open one. Your view is read only.",
+      detail: "Choose Find a club to search, then open a club. Your view is read only.",
       done: false,
       reference: true,
       href: "/account/area-clubs/overview#clubs-at-a-glance",

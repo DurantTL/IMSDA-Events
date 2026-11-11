@@ -6,7 +6,6 @@ import type { PortalGuide } from "@/modules/help/types";
  */
 
 const REVIEWED = "2026-11-11";
-const COORDINATOR_REVIEWED = "2026-11-01";
 const OWNER = "Communication office";
 
 export const newDirectorGuides: readonly PortalGuide[] = [
@@ -209,12 +208,12 @@ export const newCoordinatorGuides: readonly PortalGuide[] = [
     needs: ["An Area Coordinator account, signed in with two-step sign-in."],
     changes: ["Nothing. Your role is view only. Directors keep their own club's records."],
     steps: [
-      "Open Overview. It shows the clubs, how many filed this month's Monthly Record, and Who's missing what.",
-      "On Overview, use Clubs at a glance to find a club. Search by club, church or city, then choose the club name or Open club. See the Find a club guide.",
-      "Open Monthly Records to see which clubs filed each month. See the Follow Monthly Records guide.",
-      "Open Points to see the club ranking for the year.",
+      "Open Overview. It shows how many clubs are active, how many filed the latest Monthly Record, and Who's missing what. On a phone, the other tabs are in the Coordinator menu.",
+      "On Overview, choose Find a club. Type a club, church, city or director in Search clubs, then choose the club name. See the Find a club guide.",
+      "Choose Monthly Records to see which clubs filed each month. See the Follow Monthly Records guide.",
+      "Choose Points to see the club ranking for the year.",
       "Use Who's missing what on Overview to follow up with clubs that are behind. See the Follow up with clubs that are behind guide.",
-      "Open Team approvals when a club asks you to approve a team member of 18 or older.",
+      "Choose Team approvals when a club asks you to approve a team member of 18 or older.",
       "If a club has no director, ask the conference office to add one. Only they can.",
     ],
     verify: ["You can say which clubs still need a record this month.", "You know who to ask when a club has no director."],
@@ -223,7 +222,7 @@ export const newCoordinatorGuides: readonly PortalGuide[] = [
     relatedDocs: [],
     keywords: ["getting started", "start", "new coordinator", "first time", "checklist", "area", "coordinator", "overview", "what can i see", "help"],
     owner: OWNER,
-    lastReviewed: COORDINATOR_REVIEWED,
+    lastReviewed: "2026-11-11",
   },
   {
     id: "coordinator-follow-up-clubs",
@@ -233,11 +232,12 @@ export const newCoordinatorGuides: readonly PortalGuide[] = [
     needs: ["An Area Coordinator account, signed in."],
     changes: ["Nothing. This view only reads, sends no messages and sets no deadline."],
     steps: [
-      "Open Overview and find Who's missing what. Each club in your list shows what it is missing.",
+      "Open Overview and find Who's missing what. Each club in the list shows what it is missing, with one Next step.",
       "No director means the club has no one who can file its records. Ask the conference office to add one.",
-      "Missing or Late next to a month means the club has not filed that Monthly Record, or filed it after the 10th.",
+      "Missing means the latest Monthly Record is not filed. Missing 1 earlier month means an older record is not filed either.",
+      "Late 1 record means a record was filed after the 10th. No roster yet means the club has no people on its roster.",
       "Choose Open club on a row to read what the club has filed, view only.",
-      "Contact the club's director yourself about a missing record. The app sends nothing for you.",
+      "On the club's page, Who runs this club shows the director's name and email. Contact them yourself. The app sends nothing for you.",
     ],
     verify: ["Each club in the list has one next step you can act on."],
     next: "Check Monthly Records for the whole year.",
@@ -245,7 +245,7 @@ export const newCoordinatorGuides: readonly PortalGuide[] = [
     relatedDocs: [],
     keywords: ["missing", "behind", "late", "follow up", "no director", "who's missing", "whos missing", "records", "overdue", "clubs", "next step"],
     owner: OWNER,
-    lastReviewed: COORDINATOR_REVIEWED,
+    lastReviewed: "2026-11-11",
   },
   {
     id: "coordinator-points",
@@ -255,9 +255,10 @@ export const newCoordinatorGuides: readonly PortalGuide[] = [
     needs: ["An Area Coordinator account, signed in."],
     changes: ["Nothing. This page is reading only."],
     steps: [
-      "Open Points in Club coordination.",
-      "The chart ranks clubs by total points. Choose Show as a table for the full list.",
-      "Total points are report points from submitted Monthly Records plus points for registering on time.",
+      "Choose Points in Club coordination. On a phone, open the Coordinator menu first.",
+      "The Points leader card names the club with the most points. The chart ranks clubs by total points.",
+      "Choose Show as a table (ranking and supporting records) for the full list, with Rank, Report points, Yearly registration and Total points.",
+      "Total points are report points from submitted Monthly Records, plus points for registering on time, plus any event points.",
       "Choose Records beside a club to read what it filed, view only.",
       "A club with No submitted records has not filed yet. Use the Follow up with clubs that are behind guide.",
     ],
@@ -267,7 +268,7 @@ export const newCoordinatorGuides: readonly PortalGuide[] = [
     relatedDocs: [],
     keywords: ["points", "ranking", "leaderboard", "score", "total", "chart"],
     owner: OWNER,
-    lastReviewed: COORDINATOR_REVIEWED,
+    lastReviewed: "2026-11-11",
   },
 ];
 

@@ -42,10 +42,20 @@ export type WalkthroughContext = {
 };
 
 /**
- * Drives the page to the state a step's picture shows (doing whatever tap or typing leads there from the step before) and
- * returns the control to mark, or null when the picture needs no mark.
+ * What a step returns to say what its picture shows: the control to mark, or an object when the picture needs more:
+ * - `alsoMark`: a second control that belongs to the same action (for example the Last name box beside First name). One
+ *   outline then covers both.
+ * - `area`: other context to keep in view (for example the person's whole card around the menu that is marked). It is not
+ *   outlined.
+ * The capture crops around the mark and the area together, at the usual picture size; when both do not fit, the mark stays in view.
  */
-export type WalkthroughStepAction = (context: WalkthroughContext) => Promise<WalkthroughLocator | null>;
+export type WalkthroughStepTarget = WalkthroughLocator | { target: WalkthroughLocator; alsoMark?: WalkthroughLocator; area?: WalkthroughLocator };
+
+/**
+ * Drives the page to the state a step's picture shows (doing whatever tap or typing leads there from the step before) and
+ * returns the control to mark (see `WalkthroughStepTarget`), or null when the picture needs no mark.
+ */
+export type WalkthroughStepAction = (context: WalkthroughContext) => Promise<WalkthroughStepTarget | null>;
 
 export type WalkthroughActions = {
   start: WalkthroughStart;

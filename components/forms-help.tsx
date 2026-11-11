@@ -69,12 +69,13 @@ export function FormsHelpSections({ contact }: { contact: FormsHelpContact }) {
       <details className={styles.section}>
         <summary>Having form issues?</summary>
         <div className={styles.body}>
-          <p>If something won&apos;t submit, turn off ad blockers, VPNs or privacy extensions for this site, then reload.</p>
+          <p>If something won&apos;t submit, pause ad blockers, VPNs or privacy extensions for this site, then reload the page.</p>
           <ul>
             <li><strong>Brave:</strong> select the lion icon in the address bar, then turn Shields off for this site.</li>
+            <li><strong>Other ad blockers:</strong> select the blocker&apos;s icon next to the address bar, then choose to pause it on this site.</li>
             <li><strong>Avast:</strong> open the Avast shield or extension icon and allow this site.</li>
           </ul>
-          <p>Still not working? Clear your browser cache, restart your browser, or restart your device.</p>
+          <p>Still not working? Clear your browser cache, restart your browser, or restart your device. You can also try a private or incognito window.</p>
           <p>Recommended browsers: Chrome, Edge, Firefox, Safari.</p>
         </div>
       </details>
@@ -84,10 +85,12 @@ export function FormsHelpSections({ contact }: { contact: FormsHelpContact }) {
           <ul className={styles.steps}>
             <li className={styles.desktopStep}><strong>Chrome or Edge:</strong> right-click the page and choose Translate, or select the translate icon in the address bar.</li>
             <li className={styles.phoneStep}><strong>Safari on iPhone:</strong> tap aA, then Translate.</li>
+            <li className={styles.phoneStep}><strong>Chrome on Android:</strong> tap the three dots, then Translate.</li>
           </ul>
           <ul className={styles.steps} lang="es">
-            <li className={styles.desktopStep}><strong>Chrome o Edge:</strong> haga clic derecho en la página y elija Traducir, o toque el ícono de traducir en la barra de direcciones.</li>
+            <li className={styles.desktopStep}><strong>Chrome o Edge:</strong> haga clic derecho en la página y elija Traducir, o haga clic en el ícono de traducir en la barra de direcciones.</li>
             <li className={styles.phoneStep}><strong>Safari en iPhone:</strong> toque aA y luego Traducir.</li>
+            <li className={styles.phoneStep}><strong>Chrome en Android:</strong> toque los tres puntos y luego Traducir.</li>
           </ul>
         </div>
       </details>
