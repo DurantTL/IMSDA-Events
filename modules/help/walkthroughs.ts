@@ -129,7 +129,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
       { id: "add-open", text: "Choose Add to roster.", alt: "The Roster page, with the Add to roster button marked." },
       { id: "add-name", text: "Type the first name and the last name.", alt: "The Add to the roster window with the First name and Last name boxes filled in and marked." },
       { id: "add-birth", text: "Type the birth date, like 4/17/2014.", alt: "The Add to the roster window with the Birth date box marked and filled in. Under it the page says how it reads the date." },
-      { id: "add-gender", text: "Pick the Gender. Here you can also pick the Type and the Current class.", alt: "The Add to the roster window with the Gender box marked, filled in under the Role box." },
+      { id: "add-gender", text: "Pick the Gender. Here you can also pick the Type and the Current class.", alt: "The Add to the roster window with the Gender box marked, below the Role (optional) box." },
       { id: "add-save", text: "Choose Add to roster.", alt: "The Add to the roster window filled in, with its Add to roster button marked." },
       { id: "edit-open", text: "The person is on your roster. To change them, choose Edit in their row.", alt: "The roster list with the Edit button in the new person's row marked." },
       { id: "edit-fields", text: "Change what you need, such as the Role.", alt: "The Edit window for the person with the Role box marked." },
@@ -263,7 +263,7 @@ export const directorWalkthroughs: readonly WalkthroughDefinition[] = [
     sourceFiles: ["components/forms-help.tsx", "components/club-portal-masthead-view.tsx", "components/forms-help.module.css", "modules/system-admin/forms-help-contact.ts", "app/(public)/account/(portal)/clubs/[organizationId]/page.tsx", "components/club-overview.tsx", "components/club-portal-masthead-view.module.css", "components/club-portal-masthead.tsx"],
     steps: [
       { id: "open-help", text: "On any club page, choose Forms help at the top.", alt: "A club page with the Forms help button at the top marked." },
-      { id: "help-choices", text: "Pick the choice that fits, such as Having form issues? or Need translation?.", alt: "The Forms help window listing Having form issues, Need translation and Need more help, with those three choices marked." },
+      { id: "help-choices", text: "Pick the choice that fits, such as Having form issues? or Need translation?.", alt: "The Forms help window listing Having form issues, Need translation and Need more help, with those three choices marked together." },
       { id: "support-contact", text: "Choose Need more help? to see the support email and phone number.", alt: "The Forms help window showing the support email and phone number, with Need more help marked." },
     ],
   },

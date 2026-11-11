@@ -30,44 +30,45 @@ export function drawMarkInPage(args: { number: number; id: string }) {
   const top = Math.max(2, rect.top - pad);
   const width = Math.min(window.innerWidth - 2, rect.right + pad) - left;
   const height = Math.min(window.innerHeight - 2, rect.bottom + pad) - top;
-  box.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;border-radius:10px;outline:3px solid ${purple};box-shadow:0 0 0 6px ${gold},0 0 0 9999px rgba(24,16,40,0.18);box-sizing:border-box;`;
+  box.style.cssText = `position:absolute;left:${left}px;top:${top}px;width:${width}px;height:${height}px;border-radius:10px;outline:3px solid ${purple};box-shadow:0 0 0 6px ${gold},0 0 0 9999px rgba(24,16,40,0.12);box-sizing:border-box;`;
+  const size = 30;
   const badge = document.createElement("div");
   badge.textContent = String(args.number);
-  const size = 30;
-  const gap = 10;
-  // The badge goes where it covers no visible text: left of the box, right of it, above it, below it, and only then on
-  // its top-left corner (the old place, which could hide a label next to the control).
-  const textRects: DOMRect[] = [];
-  const ownRects: DOMRect[] = [];
+  // The badge always touches its own outline. It goes left of the outline, then right of it, centred on it, when that covers no
+  // visible text and no other control; otherwise it sits on a corner of the outline (top-left first), with its centre on the corner, where it hides no text.
+  const blocked: DOMRect[] = [];
+  const ownText: DOMRect[] = [];
   const visible = (r: DOMRect) => r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (!node.textContent?.trim()) continue;
-    const own = inTarget(node);
     const range = document.createRange();
     range.selectNodeContents(node);
-    for (const r of Array.from(range.getClientRects())) if (visible(r)) (own ? ownRects : textRects).push(r);
+    for (const r of Array.from(range.getClientRects())) if (visible(r)) (inTarget(node) ? ownText : blocked).push(r);
   }
-  // What people typed or picked is not a text node, so a filled box counts as text too.
-  for (const field of Array.from(document.querySelectorAll("input, textarea, select")) as HTMLInputElement[]) {
-    if (field.type === "hidden" || field.type === "checkbox" || field.type === "radio" || !(field.value || field.placeholder)) continue;
-    const r = field.getBoundingClientRect();
-    if (visible(r)) (inTarget(field) ? ownRects : textRects).push(r);
+  const controls = "button, a[href], input, select, textarea, label, summary, [role=button], [role=option], [role=checkbox]";
+  for (const element of Array.from(document.querySelectorAll(controls))) {
+    if (inTarget(element) || targets.some((t) => element.contains(t))) continue;
+    const r = element.getBoundingClientRect();
+    if (visible(r)) blocked.push(r);
   }
   const middle = top + height / 2 - size / 2;
+  const touch = 6;
   const candidates = [
-    { x: left - size - gap, y: middle },
-    { x: left + width + gap, y: middle },
-    { x: left, y: top - size - gap },
-    { x: left, y: top + height + gap },
-    // Inside the box at either end, when nothing in it is there (an empty field, the empty end of a wide button).
-    { x: left + width - size - 8, y: middle },
-    { x: left + 8, y: middle },
+    { x: left - size - touch, y: middle },
+    { x: left + width + touch, y: middle },
   ];
-  const fits = (c: { x: number; y: number }, inside: boolean) =>
+  const fits = (c: { x: number; y: number }, rects: DOMRect[] = blocked) =>
     c.x >= 2 && c.y >= 2 && c.x + size <= window.innerWidth - 2 && c.y + size <= window.innerHeight - 2 &&
-    !(inside ? [...textRects, ...ownRects] : textRects).some((r) => c.x < r.right + 2 && c.x + size > r.left - 2 && c.y < r.bottom + 2 && c.y + size > r.top - 2);
-  const chosen = candidates.find((c, i) => fits(c, i >= 4)) ?? { x: left - size / 2, y: top - size / 2 };
+    !rects.some((r) => c.x < r.right + 2 && c.x + size > r.left - 2 && c.y < r.bottom + 2 && c.y + size > r.top - 2);
+  // On a corner, with its centre on the corner: the top-left one, or another when the control's own label sits there.
+  const corners = [
+    { x: left - size / 2, y: top - size / 2 },
+    { x: left + width - size / 2, y: top - size / 2 },
+    { x: left + width - size / 2, y: top + height - size / 2 },
+    { x: left - size / 2, y: top + height - size / 2 },
+  ];
+  const chosen = candidates.find((c) => fits(c)) ?? corners.find((c) => fits(c, [...blocked, ...ownText])) ?? corners[0]!;
   const badgeLeft = Math.min(Math.max(2, chosen.x), window.innerWidth - size - 2);
   const badgeTop = Math.min(Math.max(2, chosen.y), window.innerHeight - size - 2);
   badge.style.cssText = `position:absolute;left:${badgeLeft}px;top:${badgeTop}px;width:${size}px;height:${size}px;border-radius:50%;background:${purple};color:#fff;border:3px solid ${gold};display:flex;align-items:center;justify-content:center;font:700 15px/1 system-ui,sans-serif;box-sizing:border-box;`;

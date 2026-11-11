@@ -4,7 +4,8 @@
  * For each walkthrough in `modules/help/walkthroughs.ts` it resets the synthetic fixtures, signs in (for real, through the
  * page, for the sign-in walkthroughs), runs the shared steps from `tests/browser/walkthroughs/`, marks the control with a
  * numbered outline, screenshots the screen at 390 x 844 (phone) and 1280 x 800 (desktop) at twice the pixel density, crops
- * it to the shown picture size around the mark (390 x 640 and 960 x 600, see `walkthroughImageSizes`), and saves WebP files to
+ * a phone picture to 390 x 640 around the mark (and the step's optional area; a desktop picture keeps the whole screen, see
+ * `walkthroughCropSizes`), scales it to the file size, and saves WebP files to
  * `public/help/walkthroughs/<guideId>/`. It also writes `public/help/walkthroughs/manifest.json` (capture date and a hash of
  * the walkthrough's source files), which `npm run help:check` compares to warn about stale pictures.
  *

@@ -5,13 +5,22 @@
 export type WalkthroughImageKind = "phone" | "desktop";
 
 /**
- * The size each picture is shown at, in CSS pixels (#1840). The capture crops the screen to this area around the marked
- * control, so the step's own part of the page fills the picture, and the phone picture fits on one phone screen with its
- * instruction. The file itself is `walkthroughImageScale` times larger, so text stays sharp on high-density screens.
+ * The size each picture is shown at, in CSS pixels (#1840). The phone picture fits on one phone screen with its instruction.
+ * The file itself is `walkthroughImageScale` times larger, so text stays sharp on high-density screens.
  */
 export const walkthroughImageSizes: Record<WalkthroughImageKind, { width: number; height: number }> = {
   phone: { width: 390, height: 640 },
   desktop: { width: 960, height: 600 },
+};
+
+/**
+ * The part of the screen each picture keeps, in CSS pixels. A phone picture is cropped to this size around the marked control,
+ * so the step's own part of the page fills it. A desktop picture is not cropped: it shows the whole 1280 x 800 screen, so no
+ * name or heading is cut off at the sides, and the browser scales it down to the shown size.
+ */
+export const walkthroughCropSizes: Record<WalkthroughImageKind, { width: number; height: number }> = {
+  phone: { width: 390, height: 640 },
+  desktop: { width: 1280, height: 800 },
 };
 
 /** File pixels per shown pixel: a phone picture file is 780 x 1280, a desktop one 1440 x 900. */
@@ -66,13 +75,13 @@ function windowStart(markStart: number, markEnd: number, areaStart: number, area
 }
 
 /**
- * The part of the screen a picture shows, in CSS pixels: the shown picture size, centred on the mark (and on the optional
+ * The part of the screen a picture shows, in CSS pixels: the crop size, centred on the mark (and on the optional
  * extra `area` a step wants in view, such as a person's whole card) and kept inside the screen. When the mark and the area are
- * together larger than the picture, the mark stays in view. A mark taller than the picture keeps its top edge in view. With
- * no mark, the top of the screen.
+ * together larger than the crop, the mark stays in view. A mark taller (or wider) than the crop keeps its top (or left) edge in
+ * view. With no mark, the top of the screen. A crop as big as the screen (desktop) is always the whole screen.
  */
 export function walkthroughCrop(kind: WalkthroughImageKind, mark: MarkArea | null, area: MarkArea | null = null) {
-  const { width, height } = walkthroughImageSizes[kind];
+  const { width, height } = walkthroughCropSizes[kind];
   const viewport = walkthroughViewports[kind];
   if (!mark) return { left: 0, top: 0, width, height };
   const extra = area ?? mark;
