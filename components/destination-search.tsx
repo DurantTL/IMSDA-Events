@@ -299,7 +299,16 @@ export function DestinationOption({
       onMouseMove={onHover}
       role="option"
     >
-      <span className="destination-search-label">{destination.label}</span>
+      <span className="destination-search-label">
+        {destination.parent ? (
+          <span className={styles.parent}>
+            {destination.parent}
+            <span aria-hidden="true"> › </span>
+            <span className="sr-only">: </span>
+          </span>
+        ) : null}
+        {destination.label}
+      </span>
       <span className="destination-search-scope" data-scope={destination.scope.toLowerCase()}>
         <span className="sr-only">Scope: {destinationScopeDescription(destination.scope)}. </span>
         <span aria-hidden="true">{destinationScopeLabels[destination.scope]}</span>
