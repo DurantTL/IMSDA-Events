@@ -6,6 +6,11 @@ import { KeyRound, LayoutDashboard, LogIn, UserRound } from "lucide-react";
 // no events to /no-access, one event to its workspace, several to the picker. The `staff=1` intent is
 // needed so /sign-in shows the form to an attendee session instead of sending it on to /account.
 export const STAFF_SIGN_IN_HREF = "/sign-in?staff=1";
+/**
+ * Where "Staff workspace" opens (#1839): staff Home, which every staff account can open. `/overview` sent staff with
+ * no event (a Site content editor, say) to "No event access" from a link they were shown.
+ */
+export const STAFF_HOME_HREF = "/home";
 export const PUBLIC_SIGN_IN_UNIFIED_HREF = "/sign-in";
 export const PUBLIC_SIGN_IN_ATTENDEE_HREF = "/account/sign-in";
 
@@ -15,7 +20,7 @@ export const PUBLIC_SIGN_IN_ATTENDEE_HREF = "/account/sign-in";
  * Nobody signed in: "Sign in" (to `/sign-in` with single sign-in on, else
  * `/account/sign-in`; staff keep `/login`, which is not linked here). A staff
  * session: "Staff workspace". An attendee session: "My account". These are
- * links only; `/overview` and `/account` check access themselves.
+ * links only; `/home` and `/account` check access themselves.
  */
 export function PublicHeaderLinks({
   staffSignedIn,
@@ -39,7 +44,7 @@ export function PublicHeaderLinks({
   return (
     <>
       {staffSignedIn && (
-        <Link className="text-button" href="/overview">
+        <Link className="text-button" href={STAFF_HOME_HREF}>
           <LayoutDashboard size={16} aria-hidden="true" /> <span>Staff workspace</span>
         </Link>
       )}
