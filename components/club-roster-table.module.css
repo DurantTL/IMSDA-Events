@@ -40,3 +40,62 @@
   :global(.roster-card-table) :global(.roster-row-action-set) > button { justify-content: center; }
   :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) > summary:global(.actions-menu-trigger) { width: 100%; box-sizing: border-box; }
 }
+
+/* Phone and tablet roster cards (#1838). The shared table-cards rules make each row a card of "Label: value" lines; the roster
+   card is easier to scan. The card is a grid that fits as many 7.5rem columns as its width allows (two on a phone):
+     1. the name, role and Class history link (the row header, as before);
+     2. Type and Current class, the most-read facts, in bold;
+     3. what needs attention: the Details chips (no line at all when nothing is needed) and Sterling Volunteers;
+     4. the less-used facts (age, grade, and gender, school, church member and birth date when they are shown) in a compact
+        grid of small labelled cells with thin lines between rows;
+     5. Edit and Actions side by side at the foot, 44px tall.
+   Only the visual order changes: the cells, their column headers and what each viewer can see are the same as the table.
+   The wrap's class raises these rules above the shared card rules; the desktop window rules above drop the container, so none
+   of this reaches a desktop table. */
+@container table-box (max-width: 1100px) {
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); column-gap: 0; row-gap: 0; align-items: start;
+    padding: 12px 14px 12px;
+  }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > th[scope="row"] { grid-column: 1 / -1; margin-bottom: 2px; }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > th[scope="row"] :global(.roster-class-history-link) {
+    display: inline-flex; align-items: center; min-height: 44px; margin: 0; padding-inline: 0;
+  }
+
+  /* Every grid cell: the label sits above its value. */
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td:is(.cardPrimary, .cardFact, .cardStatus) {
+    padding: 6px 12px 6px 0; overflow-wrap: anywhere;
+  }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td:is(.cardPrimary, .cardFact, .cardStatus)[data-label]::before {
+    float: none; display: block; width: auto; margin: 0 0 1px;
+    color: var(--muted); font-weight: 700; font-size: max(var(--type-staff-floor, 0px), var(--type-floor, 0px), 0.75rem); line-height: 1.3;
+  }
+
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td.cardPrimary {
+    order: 1; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.9375rem); font-weight: 700;
+  }
+
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td.cardStatus { order: 2; grid-column: 1 / -1; }
+  /* The chips say what they are ("Needs gender", "Inactive"), so the Details cell needs no label. */
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td.cardStatus:global(.roster-card-flags)::before { content: none; }
+  /* Nothing to show (no Details chip, no Sterling Volunteers record): the cell takes no room on the card, and a screen reader
+     still reads it as in the table ("Nothing needed", "—"). */
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td.cardStatus.cardNothing { block-size: 0; padding: 0; overflow: hidden; }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td.cardStatus.cardNothing::before { content: none; }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td.cardNothing [aria-hidden="true"] { display: none; }
+
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td.cardFact {
+    order: 3; margin-top: -1px; border-top: 1px solid var(--table-row-line);
+    color: var(--ink); font-size: var(--text-helper-min); font-weight: 500;
+  }
+
+  /* Edit and Actions share the card's foot, each at least 44px tall; an open Actions menu takes the full width below them. */
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) > tbody > tr > td:not([data-label]) { order: 4; grid-column: 1 / -1; margin-top: 8px; }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) :global(.roster-row-action-set) { flex: 1 1 100%; }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) :global(.roster-row-action-set) > :is(button, a) { flex: 1 1 0; justify-content: center; }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) :global(.roster-row-action-set) > :global(.actions-menu) { flex: 1 1 0; }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) :global(.roster-row-action-set) > :global(.actions-menu[open]) { flex: 1 1 100%; }
+  .rosterTableWrap :global(table.table-cards-xwide.roster-card-table) :global(.roster-row-action-set) > :global(.actions-menu) > summary:global(.actions-menu-trigger) {
+    width: 100%; box-sizing: border-box; justify-content: center;
+  }
+}
