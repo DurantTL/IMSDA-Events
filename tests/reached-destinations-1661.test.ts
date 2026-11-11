@@ -261,7 +261,8 @@ describe("search finds each page for a viewer who may open it", () => {
     const clubsAdmin: DestinationSearchContext = { ...base, selectedEventId: "", clubsAdmin: { healthImport: true } };
     const results = buildSearchDestinations(clubsAdmin).filter((destination) => reachedRoutes.has(routeOf(destination)));
     expect(results.map(routeOf)).toEqual(["/admin/club-supplies/conference-orders"]);
-    expect(results[0]).toMatchObject({ scope: "System", parent: "Club supply catalog", label: "Conference club orders" });
+    // They hold no System role, so it is listed in their Clubs scope.
+    expect(results[0]).toMatchObject({ scope: "Clubs", parent: "Club supply catalog", label: "Conference club orders" });
   });
 
   it("keeps the club pages excluded as already in the Clubs menu", () => {

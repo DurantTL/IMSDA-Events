@@ -255,9 +255,11 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
   // System pages need no event. A page a System menu item already lists stays one result.
   for (const entry of reached.filter((candidate) => candidate.scope === "System")) {
     if (systemPaths.has(entry.route)) continue;
+    // A Clubs Administrator who is not a system administrator opens it as club administration, not System.
+    const scope = context.isSystemAdmin ? "System" : "Clubs";
     add({
-      key: `System:${entry.route}`,
-      scope: "System",
+      key: `${scope}:${entry.route}`,
+      scope,
       label: entry.label,
       parent: entry.parent,
       description: entry.description,
