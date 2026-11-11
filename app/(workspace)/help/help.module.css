@@ -317,6 +317,13 @@
   }
 }
 
+/* A phone-shaped guide example picture (#1885): the walkthrough frame, shown at the phone picture's own width on every screen. */
+.figureImage.figureImagePhone {
+  max-width: min(100%, 390px);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+}
+
 .stepLinks {
   display: flex;
   flex-wrap: wrap;

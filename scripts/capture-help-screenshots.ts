@@ -6,7 +6,8 @@
  * numbered outline, screenshots the screen at 390 x 844 (phone) and 1280 x 800 (desktop) at twice the pixel density, crops
  * a phone picture to 390 x 640 around the mark (and the step's optional area; a desktop picture keeps the whole screen, see
  * `walkthroughCropSizes`), scales it to the file size, and saves WebP files to
- * `public/help/walkthroughs/<guideId>/`. It also writes `public/help/walkthroughs/manifest.json` (capture date and a hash of
+ * `public/help/walkthroughs/<guideId>/`. The guide example pictures in `modules/help/guide-example-pictures.ts` (#1885) are retaken
+ * in the same run from one walkthrough step's phone screen, with the ring numbered to match the guide's own step. It also writes `public/help/walkthroughs/manifest.json` (capture date and a hash of
  * the walkthrough's source files), which `npm run help:check` compares to warn about stale pictures.
  *
  * LOCAL USE ONLY: see `scripts/support/walkthrough-harness.ts` for the guards. The app must already be running (default
@@ -23,6 +24,7 @@ import sharp from "sharp";
 import { walkthroughCrop, walkthroughImage, walkthroughImageFileSize, walkthroughImageRoot, type MarkArea, type WalkthroughImageKind } from "../modules/help/walkthrough-images";
 import type { WalkthroughManifest } from "../modules/help/walkthrough-check";
 import { readWalkthroughManifest, walkthroughManifestFile, walkthroughSourceHash } from "../modules/help/walkthrough-files";
+import { guideExamplePictures } from "../modules/help/guide-example-pictures";
 import { findWalkthrough } from "../modules/help/walkthroughs";
 import { drawMarkInPage, overlayId, removeMarkInPage } from "./support/walkthrough-overlay";
 import { runWalkthroughHarness } from "./support/walkthrough-harness";
@@ -86,6 +88,22 @@ async function main() {
       written.add(file);
       sizes.push(webp.length);
       console.log(`  ${path.basename(file)} ${(webp.length / 1024).toFixed(1)} KB`);
+      // A guide's single example picture (#1885) is the phone picture of one step, with the ring numbered as in the guide.
+      for (const example of guideExamplePictures) {
+        if (kind !== "phone" || !target || example.walkthroughId !== walkthroughId || example.stepId !== stepId) continue;
+        // The first mark took its targets away when it was removed: set the same control (and its partner) again.
+        const second = alsoMark ? await alsoMark.first().elementHandle() : null;
+        await target.first().evaluate((element: Element, other: Element | null) => {
+          (window as unknown as { __walkthroughTargets?: Element[] }).__walkthroughTargets = other ? [element, other] : [element];
+        }, second);
+        const exampleMark = (await page.evaluate(drawMarkInPage, { number: example.guideStepNumber, id: overlayId })) as MarkArea | null;
+        const examplePng: Buffer = await page.screenshot({ type: "png" });
+        await page.evaluate(removeMarkInPage, overlayId);
+        const exampleFile = path.join(publicDir, example.src);
+        const exampleWebp = await encodeWalkthroughImage(examplePng, "phone", exampleMark, extra);
+        writeFileSync(exampleFile, exampleWebp);
+        console.log(`  ${path.basename(exampleFile)} (example for ${example.guideId}) ${(exampleWebp.length / 1024).toFixed(1)} KB`);
+      }
     },
   });
 

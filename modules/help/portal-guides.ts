@@ -136,7 +136,7 @@ const writtenPortalGuides: readonly PortalGuide[] = [
     keywords: ["monthly record", "monthly records", "report", "reports", "meeting notes", "attendance", "points", "submit", "draft", "due", "10th"],
     owner: "Communication office",
     lastReviewed: "2026-11-11",
-    screenshot: { src: "/help/monthly-records-example.webp", width: 800, height: 298, alt: "The Monthly Records page with the monthly points summary and the list of months, using sample data.", capturedFor: "2026-10-27" },
+    screenshot: { src: "/help/monthly-records-example.webp", width: 780, height: 1280, alt: "The Monthly Records list on a phone, using sample data, with the Open button beside the month that has no record marked 3, the same as step 3.", capturedFor: "2026-11-11" },
   },
   {
     id: "director-year-end-report",

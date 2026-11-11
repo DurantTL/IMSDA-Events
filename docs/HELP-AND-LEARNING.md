@@ -233,4 +233,7 @@ steps above are current." Keep the steps accurate even when the picture is not.
 - Files live in `public/help/`, under about 150 KB, WebP or PNG. Take them of the app running on the synthetic seed only
   (`npm run db:seed`), and look at each one for anything that looks like a real person or record before committing it.
 - A guide that is re-checked should either get a fresh picture and a new `capturedFor`, or keep the old date so the note shows.
+- A guide's example picture listed in `modules/help/guide-example-pictures.ts` (#1885) is retaken by `npm run help:screenshots`
+  from one walkthrough step's phone screen, in the walkthrough style, with the ring numbered as in the guide. Add a line there
+  to bring another guide's picture into the same style.
 - `npm run help:check` reports a screenshot whose file is missing.
