@@ -47,3 +47,37 @@ export function walkthroughImage(guideId: string, stepIndex: number, stepId: str
   const number = String(stepIndex + 1).padStart(2, "0");
   return { src: `${walkthroughImageRoot}/${guideId}/${number}-${stepId}-${kind}.webp`, ...walkthroughImageSizes[kind] };
 }
+
+/** A rectangle on the screen in CSS pixels: the marked control, or an area a step wants in view. */
+export type MarkArea = { left: number; top: number; right: number; bottom: number };
+
+/**
+ * Where a picture's window starts along one axis: centred on the mark and the extra area together, but always with the mark
+ * in view. A mark taller than the window keeps its start edge in view (with a little space before it).
+ */
+function windowStart(markStart: number, markEnd: number, areaStart: number, areaEnd: number, size: number, screen: number) {
+  const clamp = (value: number, min: number, max: number) => Math.round(Math.min(Math.max(min, value), max));
+  const first = Math.min(markStart, areaStart);
+  const last = Math.max(markEnd, areaEnd);
+  if (markEnd - markStart > size - 24) return clamp(markStart - 12, 0, screen - size);
+  // Keep the whole mark inside the window, then fit as much of the area as the window can hold.
+  const wanted = (first + last) / 2 - size / 2;
+  return clamp(Math.min(Math.max(wanted, markEnd - size), markStart), 0, screen - size);
+}
+
+/**
+ * The part of the screen a picture shows, in CSS pixels: the shown picture size, centred on the mark (and on the optional
+ * extra `area` a step wants in view, such as a person's whole card) and kept inside the screen. When the mark and the area are
+ * together larger than the picture, the mark stays in view. A mark taller than the picture keeps its top edge in view. With
+ * no mark, the top of the screen.
+ */
+export function walkthroughCrop(kind: WalkthroughImageKind, mark: MarkArea | null, area: MarkArea | null = null) {
+  const { width, height } = walkthroughImageSizes[kind];
+  const viewport = walkthroughViewports[kind];
+  if (!mark) return { left: 0, top: 0, width, height };
+  const extra = area ?? mark;
+  const left = windowStart(mark.left, mark.right, extra.left, extra.right, width, viewport.width);
+  const top = windowStart(mark.top, mark.bottom, extra.top, extra.bottom, height, viewport.height);
+  return { left, top, width, height };
+}
+

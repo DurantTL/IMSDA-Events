@@ -202,8 +202,12 @@ modules. A change to something not listed (a shared hook, a helper, global CSS, 
 warning, so when you change shared look or behavior, re-run `npm run test:walkthroughs` (it fails on a missing control) and
 refresh the pictures by hand. Add a file to `sourceFiles` when a walkthrough's pictures start to depend on it.
 
-**Size budget.** Pictures are WebP (quality 70): phone 390 x 844, desktop 1280 x 800 resized to 960 wide. Target at most 60 KB
-(phone) and 90 KB (desktop); over 150 KB fails the test, and all walkthroughs together should stay under about 6 MB.
+**Size budget and look (#1840).** The capture takes each screen at twice the pixel density, crops it to the shown size around
+the marked control (phone 390 x 640 shown, file 780 x 1280; desktop 960 x 600 shown, file 1440 x 900) and saves WebP quality 62.
+The marked control gets the numbered outline, the rest of the screen a light shade, and the picture a rounded frame with the
+shared shadow. A step can also return `{ target, area }` from its browser action to keep other context in the crop (for example a
+person's whole card); the mark always stays in view. Target at most 60 KB (phone) and 90 KB (desktop); over 150 KB fails the
+test, and all walkthroughs together should stay under about 6 MB.
 
 ## Contextual help
 

@@ -19,7 +19,7 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
-import { walkthroughImage, walkthroughImageFileSize, walkthroughImageSizes, walkthroughImageRoot, walkthroughViewports, type WalkthroughImageKind } from "../modules/help/walkthrough-images";
+import { walkthroughCrop, walkthroughImage, walkthroughImageFileSize, walkthroughImageRoot, type MarkArea, type WalkthroughImageKind } from "../modules/help/walkthrough-images";
 import type { WalkthroughManifest } from "../modules/help/walkthrough-check";
 import { readWalkthroughManifest, walkthroughManifestFile, walkthroughSourceHash } from "../modules/help/walkthrough-files";
 import { findWalkthrough } from "../modules/help/walkthroughs";
@@ -34,27 +34,9 @@ const publicDir = path.join(root, "public");
 /** The capture's pixel density: the screenshot is taken at 2x and then scaled to the file size. */
 const captureScale = 2;
 
-export type MarkArea = { left: number; top: number; right: number; bottom: number };
-
-/**
- * The part of the screen a picture shows, in CSS pixels: the shown picture size, centred on the mark and kept inside the
- * screen. A mark taller than the picture keeps its top edge in view. With no mark, the top of the screen.
- */
-export function walkthroughCrop(kind: WalkthroughImageKind, mark: MarkArea | null) {
-  const { width, height } = walkthroughImageSizes[kind];
-  const viewport = walkthroughViewports[kind];
-  if (!mark) return { left: 0, top: 0, width, height };
-  const clamp = (value: number, max: number) => Math.round(Math.min(Math.max(0, value), max));
-  const centreX = (mark.left + mark.right) / 2;
-  const centreY = (mark.top + mark.bottom) / 2;
-  const left = clamp(centreX - width / 2, viewport.width - width);
-  const top = mark.bottom - mark.top > height - 24 ? clamp(mark.top - 12, viewport.height - height) : clamp(centreY - height / 2, viewport.height - height);
-  return { left, top, width, height };
-}
-
 /** Encodes one screenshot: crops it around the mark, scales it to the file size and saves WebP quality 62, effort 6. */
-export async function encodeWalkthroughImage(png: Buffer, kind: WalkthroughImageKind, mark: MarkArea | null) {
-  const crop = walkthroughCrop(kind, mark);
+export async function encodeWalkthroughImage(png: Buffer, kind: WalkthroughImageKind, mark: MarkArea | null, area: MarkArea | null = null) {
+  const crop = walkthroughCrop(kind, mark, area);
   const file = walkthroughImageFileSize(kind);
   return sharp(png)
     .extract({ left: crop.left * captureScale, top: crop.top * captureScale, width: crop.width * captureScale, height: crop.height * captureScale })
@@ -71,8 +53,9 @@ async function main() {
     only,
     kinds: ["phone", "desktop"],
     deviceScaleFactor: captureScale,
-    onStep: async ({ walkthroughId, stepId, index, kind, page, target }) => {
+    onStep: async ({ walkthroughId, stepId, index, kind, page, target, area }) => {
       let mark: MarkArea | null = null;
+      let extra: MarkArea | null = null;
       if (target) {
         // Let a page change finish first: a Next.js navigation scrolls back to the top after it renders.
         await page.waitForLoadState("networkidle").catch(() => undefined);
@@ -84,13 +67,16 @@ async function main() {
         });
         await page.waitForTimeout(300);
         mark = (await page.evaluate(drawMarkInPage, { number: index + 1, id: overlayId })) as MarkArea | null;
+        // The extra area the step wants in the picture: its box on the screen now that the mark's control is in view.
+        const box = area ? await area.first().boundingBox() : null;
+        if (box) extra = { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height };
       }
       const png: Buffer = await page.screenshot({ type: "png" });
       if (target) await page.evaluate(removeMarkInPage, overlayId);
       const image = walkthroughImage(walkthroughId, index, stepId, kind);
       const file = path.join(publicDir, image.src);
       mkdirSync(path.dirname(file), { recursive: true });
-      const webp = await encodeWalkthroughImage(png, kind, mark);
+      const webp = await encodeWalkthroughImage(png, kind, mark, extra);
       writeFileSync(file, webp);
       written.add(file);
       sizes.push(webp.length);
