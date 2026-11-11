@@ -96,7 +96,7 @@ describe("the invite query", () => {
     // The Invited query itself keeps expired rows (no expiry condition), so they stay listed.
     expect(db.inviteFindMany.mock.calls.at(-1)![0].where).toEqual({ status: "SENT" });
     const html = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: [], clubs: [], canOpenPeople: false, filters: { clubId: null, role: null, status: "invited" }, invites } as never));
-    expect(html.match(/Expired Nov 1, 2026/g)).toHaveLength(1);
+    expect(html.match(/Expired · Nov 1, 2026/g)).toHaveLength(1);
     await countWaitingClubInvites(now);
     expect(db.inviteCount.mock.calls.at(-1)![0].where.OR).toEqual([{ expiresAt: null }, { expiresAt: { gt: now } }]);
   });

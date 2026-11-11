@@ -152,9 +152,9 @@ export function ClubInvitesWorkspace({
                 <span translate="no">{invite.club.name}</span> · {clubDirectorRoleLabels[invite.role]}{" "}
                 <span className={`status-chip ${statusTone[invite.status]}`}>
                   {statusLabels[invite.status]}
-                  {invite.status === "SENT" && invite.sentAt ? ` ${formatDate(invite.sentAt)}` : ""}
+                  {invite.status === "SENT" && invite.sentAt ? ` · ${formatDate(invite.sentAt)}` : ""}
                 </span>
-                {invite.expired && invite.expiresAt ? <>{" "}<span className="status-chip coral">Expired {formatDate(invite.expiresAt)}</span></> : null}
+                {invite.expired && invite.expiresAt ? <>{" "}<span className="status-chip coral">Expired · {formatDate(invite.expiresAt)}</span></> : null}
                 {!invite.club.isActive && <span className={styles.inactive}> · Inactive club: invites can&apos;t be sent.</span>}
               </span>
             </span>
