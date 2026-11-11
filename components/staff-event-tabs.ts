@@ -90,8 +90,8 @@ export const eventTabSpecs: readonly TabSpec[] = [
     views: [
       // Four views (five at most): All registrations, Attendee list, Imports, Review queues (#1574). The six queue pages are
       // reached from the Review queues cards, which light that view as their parent. /people/matches (every event's possible
-      // duplicate people) stays with All registrations, as before: it is system identity review, not one of this event's queues.
-      { key: "registrations", label: "All registrations", href: "/people", visible: byNav("/people"), alsoOwns: ["/people/matches"] },
+      // duplicate people) is system identity review, so it sits under System, not in this tab (#1886).
+      { key: "registrations", label: "All registrations", href: "/people", visible: byNav("/people") },
       { key: "attendees", label: staffPageTitles.attendeeList, href: "/people/attendees", visible: byNav("/people/attendees") },
       { key: "imports", label: staffPageTitles.imports, href: "/imports", visible: byNav("/imports") },
       // Visible when at least one card would be: the invitation pages are for events open to everyone only.
