@@ -267,7 +267,7 @@ describe("old to new route mapping", () => {
     expect(routeOf("/admin/team")?.destinationPath).toBe("/admin/people");
     expect(routeOf("/admin/accounts")?.destinationPath).toBe("/admin/people");
     expect(routeOf("/staff", "Event")).toMatchObject({ label: "Team" });
-    expect(routeOf("/admin/clubs/invites")?.destinationPath).toBe("/admin/clubs/applications");
+    expect(routeOf("/admin/clubs/invites")?.destinationPath).toBe("/admin/clubs/leaders");
   });
 
   it("maps /more as itself, a real page opened from the launcher and its footer", () => {

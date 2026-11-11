@@ -1,0 +1,12 @@
+.wrap { display: grid; gap: 12px; min-width: 0; }
+.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.bulk :global(.primary-button), .bulk :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--card); padding: 10px 12px; }
+.who { display: grid; flex: 1 1 220px; gap: 2px; min-width: 0; }
+.who strong { font-size: max(var(--type-staff-floor, 0px), 0.95rem); overflow-wrap: anywhere; }
+.who small { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); overflow-wrap: anywhere; }
+.where { margin: 0; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.inactive { color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.actions :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

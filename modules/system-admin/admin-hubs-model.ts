@@ -32,7 +32,7 @@ export type HubViewer = {
 
 export type MetricKey =
   | "upcomingEvents" | "unpublishedEvents" | "copyableEvents" | "archivedEvents" | "calendarPublished" | "calendarUnpublished" | "moduleRequests" | "eventTemplates"
-  | "clubs" | "applicationsWaiting" | "lateRecords" | "openTransfers" | "clubLeaders"
+  | "clubs" | "applicationsWaiting" | "lateRecords" | "openTransfers" | "clubLeaders" | "clubInvitesWaiting"
   | "staffLogins" | "invitesWaiting"
   | "formsTotal" | "clubFormsOn" | "informationFormsOpen" | "draftForms" | "formTemplates" | "savedQuestions"
   | "readinessAttention" | "readinessToConfirm" | "readinessUnknown" | "emailProblems" | "pausedAreas" | "honors";
@@ -119,7 +119,19 @@ export const problemReportsHref = "/admin/problem-reports";
 const clubCards = {
   clubsAndChurches: { href: "/admin/organizations", gate: hubGates.system, metrics: ["clubs"], status: (read) => count(read("clubs")!, "draft", "active club", "active clubs") },
   summary: { href: "/admin/clubs/summary", gate: hubGates.clubs, metrics: ["lateRecords"], status: lateStatus },
-  leaders: { href: "/admin/clubs/leaders", gate: hubGates.clubs, metrics: ["clubLeaders"], status: (read) => count(read("clubLeaders")!, "draft", "current leader", "current leaders") },
+  // One list of who leads a club and who is still invited (#1589). The number beside the leaders is the invites waiting for an answer.
+  leaders: {
+    href: "/admin/clubs/leaders",
+    description: "Current leaders, and invites still waiting: directors and deputies from the club import, and registrars and reporters invited by directors.",
+    gate: hubGates.clubs,
+    metrics: ["clubLeaders", "clubInvitesWaiting"],
+    status: (read) => {
+      const leaders = read("clubLeaders")!;
+      const invites = read("clubInvitesWaiting")!;
+      const text = `${leaders} ${leaders === 1 ? "current leader" : "current leaders"} · ${invites} ${invites === 1 ? "invite" : "invites"} waiting`;
+      return { tone: invites > 0 ? "review" : "draft", text };
+    },
+  },
   records: { href: clubsAdminRecordsHref, gate: hubGates.clubs, metrics: ["lateRecords"], status: lateStatus },
   applications: { href: "/admin/clubs/applications", gate: hubGates.clubs, metrics: ["applicationsWaiting"], status: (read) => waiting(read("applicationsWaiting")!, "waiting", "None waiting") },
   transfers: { href: "/admin/clubs/transfers", gate: hubGates.clubs, metrics: ["openTransfers"], status: (read) => waiting(read("openTransfers")!, "open", "None open") },
@@ -215,7 +227,7 @@ const hubDefs: Record<HubKey, HubDef> = {
     stats: [],
     actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs, metric: "applicationsWaiting" }],
     groups: [
-      { title: "Clubs", cards: [clubCards.summary, clubCards.clubsAndChurches, clubCards.transfers, clubCards.sterling] },
+      { title: "Clubs", cards: [clubCards.summary, clubCards.clubsAndChurches, clubCards.applications, clubCards.transfers, clubCards.sterling] },
       {
         title: "Records and points",
         cards: [
@@ -223,10 +235,6 @@ const hubDefs: Record<HubKey, HubDef> = {
           { href: "/admin/clubs/reports/year-end", description: "Each club's end-of-year report for the club year.", gate: hubGates.clubs },
           { href: "/admin/clubs/summary?view=points#points", description: "Club points for the year, club by club.", gate: hubGates.clubs },
         ],
-      },
-      {
-        title: "Applications",
-        cards: [clubCards.applications, { href: "/admin/clubs/invites", description: "Invitations sent to people who may start a new club.", gate: hubGates.clubs }],
       },
       {
         title: "Club events and forms",

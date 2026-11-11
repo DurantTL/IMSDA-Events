@@ -103,7 +103,7 @@ const destinationKeywords: Record<string, readonly string[]> = {
   "/admin/clubs/reports": ["review monthly records", "records to review", "review records", "club reports"],
   [clubsAdminRecordsHref]: ["monthly record", "monthly records", "club reports", "records"],
   "/admin/clubs/reports/year-end": ["year end", "pathfinder year", "annual report"],
-  "/admin/clubs/invites": ["invite club", "club invitation", "director invite"],
+  "/admin/clubs/leaders": ["club invites", "invite club", "club invitation", "director invite", "waiting invites"],
   "/admin/clubs/import": ["upload clubs", "csv", "bulk clubs"],
   "/admin/clubs/health-import": ["medical", "upload health", "csv"],
   "/admin/clubs/summary#points": ["points", "scores", "standings"],

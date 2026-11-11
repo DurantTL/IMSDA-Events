@@ -1,24 +1,21 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { ClubInvitesWorkspace } from "@/components/club-invites-workspace";
+import { permanentRedirect, redirect } from "next/navigation";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { listClubInvites } from "@/modules/club-imports/invites";
-import { isAccountEmailConfigured } from "@/modules/communications/account-email";
-import { AdminPageHeader } from "@/components/admin-page-header";
+import { clubLeadersHref, parseLeaderFilters } from "@/modules/system-admin/club-leaders-model";
 
 export const metadata: Metadata = { title: "Club invites" };
 export const dynamic = "force-dynamic";
 
-export default async function ClubInvitesPage() {
+/**
+ * Club invites became the Invited view of Club leaders (#1589). The old address keeps working: it asks the same sign-in and
+ * Clubs administration questions as before, then moves permanently to the list, keeping a `club` filter when there is one.
+ */
+export default async function ClubInvitesPage({ searchParams }: { searchParams: Promise<{ club?: string | string[] }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
-  return (
-    <>
-      <AdminPageHeader path="/admin/clubs/invites" />
-      <ClubInvitesWorkspace emailConfigured={isAccountEmailConfigured()} initialInvites={await listClubInvites()} />
-    </>
-  );
+  const { club } = await searchParams;
+  permanentRedirect(clubLeadersHref({ ...parseLeaderFilters({ club }), role: null, status: "invited" }));
 }
