@@ -199,7 +199,7 @@ export function AppShell({
   // Which work context the page is in (#1180). A label only; it grants nothing. The Event administration badge stays.
   const workContext = place.tab === "event-administration" && place.area === "events"
     ? { kind: "event" as const, kindLabel: "Events", label: eventsAdminHomeItem.label, detail: "All assigned events" }
-    : place.area === "clubs" || (place.area === "reports" && pathname.startsWith("/admin/clubs"))
+    : place.area === "clubs"
     ? { kind: "system" as const, kindLabel: "Clubs", label: "Clubs administration", detail: "All clubs" }
     : isProfileRoute
     ? { kind: "profile" as const, kindLabel: "Account", label: "Your account", detail: "Not tied to an event" }

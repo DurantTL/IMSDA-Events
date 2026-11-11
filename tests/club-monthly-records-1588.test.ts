@@ -19,11 +19,11 @@ const read = (path: string) => readFileSync(path, "utf8");
 describe("Monthly records tab views (#1588)", () => {
   const tab = (viewer: StaffAreaViewer) => areaTabs("clubs", viewer).find((item) => item.key === "monthly-records");
 
-  it("lists Monthly Records, Review monthly records and Points, within the five-view cap", () => {
+  it("lists Monthly Records, Year-end, Review monthly records and Points, within the five-view cap", () => {
     const views = tab(clubsAdmin)!.views!;
-    expect(views.map((view) => view.label)).toEqual(["Monthly Records", "Review monthly records", "Points"]);
+    expect(views.map((view) => view.label)).toEqual(["Monthly Records", "Club Year-End Reports", "Review monthly records", "Points"]);
     expect(views.length).toBeLessThanOrEqual(maxViewsPerTab);
-    expect(views.map((view) => view.href)).toEqual(["/admin/clubs/summary?view=records#monthly-records", "/admin/clubs/reports", "/admin/clubs/summary?view=points#points"]);
+    expect(views.map((view) => view.href)).toEqual(["/admin/clubs/summary?view=records#monthly-records", "/admin/clubs/reports/year-end", "/admin/clubs/reports", "/admin/clubs/summary?view=points#points"]);
   });
 
   it("shows nothing to someone without Clubs administration", () => {
@@ -33,7 +33,7 @@ describe("Monthly records tab views (#1588)", () => {
 
   it("carries the club year on every view", () => {
     const views = tab({ ...clubsAdmin, clubYear: "2025-26" })!.views!;
-    expect(views.map((view) => new URL(view.href, "https://x.test").searchParams.get("year"))).toEqual(["2025-26", "2025-26", "2025-26"]);
+    expect(views.map((view) => new URL(view.href, "https://x.test").searchParams.get("year"))).toEqual(["2025-26", "2025-26", "2025-26", "2025-26"]);
   });
 
   it("marks the one current view on each page of the tab", () => {
@@ -55,10 +55,13 @@ describe("Monthly records tab views (#1588)", () => {
     }
   });
 
-  it("keeps Year-end its own Reports tab and the Reports row working", () => {
-    expect(staffPlaceFor("/admin/clubs/reports/year-end")).toMatchObject({ area: "reports", tab: "year-end" });
-    expect(areaTabs("reports", clubsAdmin).map((item) => item.key)).toEqual(["monthly-records", "year-end", "points"]);
-    expect(visibleAreas(clubsAdmin)).toContain("reports");
+  it("lights Clubs -> Monthly records -> Year-end for the year-end page, and Reports is not a Clubs Administrator's row (#1841)", () => {
+    const place = staffPlaceFor("/admin/clubs/reports/year-end");
+    expect(place).toMatchObject({ area: "clubs", tab: "monthly-records", view: "/admin/clubs/reports/year-end" });
+    const marked = markCurrentTab(areaTabs("clubs", clubsAdmin), place).find((item) => item.key === "monthly-records")!;
+    expect(marked.views!.filter((item) => item.current).map((item) => item.key)).toEqual(["/admin/clubs/reports/year-end"]);
+    expect(areaTabs("reports", clubsAdmin)).toEqual([]);
+    expect(visibleAreas(clubsAdmin)).not.toContain("reports");
     // A record whose `from` is not the Monthly Records view stays on the Review view; the Year-end page is not under it.
     expect(staffPlaceFor("/admin/clubs/reports/org_1/2026-10", new URLSearchParams("from=/admin/organizations/org_1/club")).view).toBe("/admin/clubs/reports");
   });
