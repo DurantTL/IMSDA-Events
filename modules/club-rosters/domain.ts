@@ -316,18 +316,26 @@ export function centuryForTwoDigitYear(twoDigit: number, currentYear: number) {
  * `birthDateProblem` for that. Pass `allowTwoDigitYear: false` for dates
  * that aren't birth dates (an expiration date from Sterling Volunteers, say), where the
  * century rule would misread `6/30/28` as 1928: `M/D/YY` is then rejected.
+ * Pass `allowDigitsOnly: true` for a box typed on a phone's number pad, which
+ * has no `/` key (#1850): `MMDDYYYY` (8 digits) and `MMDDYY` (6 digits) are
+ * then read too. Any other run of digits (7, say) stays invalid.
  */
 export function parseRosterBirthDateInput(
   value: string,
   currentYear = new Date().getFullYear(),
-  options: { allowTwoDigitYear?: boolean } = {},
+  options: { allowTwoDigitYear?: boolean; allowDigitsOnly?: boolean } = {},
 ): string | null {
-  const { allowTwoDigitYear = true } = options;
+  const { allowTwoDigitYear = true, allowDigitsOnly = false } = options;
   const trimmed = value.trim();
   const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(trimmed);
   const us = allowTwoDigitYear
     ? /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(trimmed)
     : /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
+  const digits = !allowDigitsOnly
+    ? null
+    : allowTwoDigitYear
+      ? /^(\d{2})(\d{2})(\d{4}|\d{2})$/.exec(trimmed)
+      : /^(\d{2})(\d{2})(\d{4})$/.exec(trimmed);
   let year: number;
   let month: number;
   let day: number;
@@ -335,10 +343,11 @@ export function parseRosterBirthDateInput(
     year = Number(iso[1]);
     month = Number(iso[2]);
     day = Number(iso[3]);
-  } else if (us) {
-    month = Number(us[1]);
-    day = Number(us[2]);
-    year = us[3].length === 2 ? centuryForTwoDigitYear(Number(us[3]), currentYear) : Number(us[3]);
+  } else if (us ?? digits) {
+    const [, monthText, dayText, yearText] = (us ?? digits)!;
+    month = Number(monthText);
+    day = Number(dayText);
+    year = yearText.length === 2 ? centuryForTwoDigitYear(Number(yearText), currentYear) : Number(yearText);
   } else {
     return null;
   }

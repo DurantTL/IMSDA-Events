@@ -25,7 +25,8 @@ function describe(iso: string) {
  * wheel spins through years too fast to land on a birthday, and three plain
  * fields can't run away either, but a director copying dates from a paper
  * roster wants to just type them. Shows the parsed date back so it can be
- * checked. Submits one `YYYY-MM-DD` value under `name`, or an empty one
+ * checked. A phone's number pad has no `/` key, so digits alone work too
+ * (#1850): `04172014` or `041714`. Submits one `YYYY-MM-DD` value under `name`, or an empty one
  * until the typed text is a real date.
  */
 export function BirthDateField({
@@ -46,7 +47,7 @@ export function BirthDateField({
   error?: string;
 }) {
   const [text, setText] = useState(() => typedFrom(defaultValue));
-  const parsed = useMemo(() => (text.trim() ? parseRosterBirthDateInput(text) : null), [text]);
+  const parsed = useMemo(() => (text.trim() ? parseRosterBirthDateInput(text, undefined, { allowDigitsOnly: true }) : null), [text]);
   const invalid = text.trim().length > 0 && parsed === null;
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +60,7 @@ export function BirthDateField({
   useEffect(() => {
     const element = inputRef.current;
     if (!element) return;
-    element.setCustomValidity(invalid ? "Enter a date like 4/17/2014, or 4/17/14." : "");
+    element.setCustomValidity(invalid ? "Enter a date like 4/17/2014 or 04172014." : "");
   }, [invalid]);
 
   return (
@@ -79,7 +80,7 @@ export function BirthDateField({
         value={text}
       />
       <span className="field-help birth-date-parsed" id={`${name}-parsed`}>
-        {parsed ? `Reads as ${describe(parsed)}.` : invalid ? "Enter a date like 4/17/2014, or 4/17/14." : "Month/day/year, e.g. 4/17/2014."}
+        {parsed ? `Reads as ${describe(parsed)}.` : invalid ? "Enter a date like 4/17/2014 or 04172014." : "Month/day/year, e.g. 4/17/2014 or 04172014."}
       </span>
       <FieldError id={`${name}-error`}>{error}</FieldError>
       <input name={name} type="hidden" value={parsed ?? ""} />

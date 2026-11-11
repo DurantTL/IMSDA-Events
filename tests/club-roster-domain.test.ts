@@ -101,6 +101,26 @@ describe("club roster rules", () => {
     expect(parseRosterBirthDateInput("2028-06-30", 2026, { allowTwoDigitYear: false })).toBe("2028-06-30");
   });
 
+  it("reads digits alone, for a phone number pad with no / key, only when asked (#1850)", () => {
+    const digits = { allowDigitsOnly: true };
+    expect(parseRosterBirthDateInput("08241986", 2026, digits)).toBe("1986-08-24");
+    expect(parseRosterBirthDateInput("041714", 2026, digits)).toBe("2014-04-17");
+    expect(parseRosterBirthDateInput("030268", 2026, digits)).toBe("1968-03-02");
+    // Not a real date, an ambiguous length, or a year before 1900: still rejected.
+    expect(parseRosterBirthDateInput("02302010", 2026, digits)).toBeNull();
+    expect(parseRosterBirthDateInput("13012014", 2026, digits)).toBeNull();
+    expect(parseRosterBirthDateInput("0824198", 2026, digits)).toBeNull();
+    expect(parseRosterBirthDateInput("82486", 2026, digits)).toBeNull();
+    expect(parseRosterBirthDateInput("01011899", 2026, digits)).toBeNull();
+    // Slashes and ISO still work with the option on.
+    expect(parseRosterBirthDateInput("4/17/2014", 2026, digits)).toBe("2014-04-17");
+    expect(parseRosterBirthDateInput("2014-04-17", 2026, digits)).toBe("2014-04-17");
+    // Off by default (the CSV import is unchanged), and no MMDDYY when two-digit years are off.
+    expect(parseRosterBirthDateInput("08241986", 2026)).toBeNull();
+    expect(parseRosterBirthDateInput("063028", 2026, { allowDigitsOnly: true, allowTwoDigitYear: false })).toBeNull();
+    expect(parseRosterBirthDateInput("06302028", 2026, { allowDigitsOnly: true, allowTwoDigitYear: false })).toBe("2028-06-30");
+  });
+
   it("flags a roster member missing any field the roster collects (#424)", () => {
     const complete = { attendeeType: "YOUTH", role: "Pathfinder", classLevel: "FRIEND", gender: "FEMALE", birthDateNeeded: false };
     expect(missingRosterFields(complete)).toEqual([]);
