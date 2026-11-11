@@ -336,6 +336,7 @@ export function parseRosterBirthDateInput(
     : allowTwoDigitYear
       ? /^(\d{2})(\d{2})(\d{4}|\d{2})$/.exec(trimmed)
       : /^(\d{2})(\d{2})(\d{4})$/.exec(trimmed);
+  const usOrDigits = us ?? digits;
   let year: number;
   let month: number;
   let day: number;
@@ -343,8 +344,8 @@ export function parseRosterBirthDateInput(
     year = Number(iso[1]);
     month = Number(iso[2]);
     day = Number(iso[3]);
-  } else if (us ?? digits) {
-    const [, monthText, dayText, yearText] = (us ?? digits)!;
+  } else if (usOrDigits) {
+    const [, monthText, dayText, yearText] = usOrDigits;
     month = Number(monthText);
     day = Number(dayText);
     year = yearText.length === 2 ? centuryForTwoDigitYear(Number(yearText), currentYear) : Number(yearText);
