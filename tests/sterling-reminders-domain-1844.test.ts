@@ -189,6 +189,7 @@ describe("who gets which reminder (#1844)", () => {
     });
     expect(plan.messages).toHaveLength(1);
     expect(plan.messages[0]!.rosterMemberIds).toEqual(["m1", "m9"]);
+    expect(plan.messages[0]!.bodyText).toContain("Maple Pathfinders and Oak Adventurers");
     expect(plan.outcomes.every((o) => o.volunteerEmailed)).toBe(true);
   });
 });

@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mail } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { SortableHeader } from "@/components/list-sort";
+import { SortableHeader, SortOrderNote } from "@/components/list-sort";
 import { cardCell } from "@/components/table-card-labels";
 import type { SortDirection } from "@/lib/list-sort";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import {
+  REMINDER_MAX_PEOPLE,
   REMINDER_RECENT_DAYS,
   expiryOrMissingText,
   isReminderState,
@@ -33,8 +35,14 @@ type SendResult = { people: number; directorEmails: number; volunteerEmails: num
 type SortColumn = { href: string; active: boolean; direction: SortDirection };
 
 function dateText(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/Chicago" });
+  return formatInConferenceTime(iso, { month: "long", day: "numeric", year: "numeric" });
 }
+
+const emptyText: Record<ReminderFilter, string> = {
+  expiring: "Nobody is expiring soon. Choose Not current or All to see other people.",
+  "not-current": "Nobody is missing a current check. Choose Expiring soon or All to see other people.",
+  all: "No active adults or staff are on this year's club rosters yet. Rosters come from club imports and from directors.",
+};
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
@@ -66,7 +74,11 @@ export function SterlingFollowUp({ rows, filter, reminderTotal, columns, sortNot
   const selectable = rows.filter((row) => isReminderState(row.state));
   const allPageSelected = selectable.length > 0 && selectable.every((row) => picked.has(row.rosterMemberId));
   const selectedCount = allInFilter ? reminderTotal : picked.size;
-  const canSelectAllInFilter = allPageSelected && reminderTotal > selectable.length && !allInFilter;
+  const hasMoreThanPage = reminderTotal > selectable.length;
+  const overCap = reminderTotal > REMINDER_MAX_PEOPLE;
+  const canSelectAllInFilter = hasMoreThanPage && !overCap && !allInFilter;
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const busyOpening = loading;
 
   useEffect(() => {
     if (done) resultRef.current?.focus();
@@ -99,6 +111,7 @@ export function SterlingFollowUp({ rows, filter, reminderTotal, columns, sortNot
   }
 
   async function openPreview() {
+    if (loading || selectedCount === 0) return;
     const selection: Selection = allInFilter ? { filter, all: true } : { rosterMemberIds: [...picked] };
     setLoading(true);
     setError("");
@@ -121,6 +134,8 @@ export function SterlingFollowUp({ rows, filter, reminderTotal, columns, sortNot
     setPreviewFor(null);
     setRecent(null);
     setError("");
+    // Back to the button that opened the preview.
+    requestAnimationFrame(() => triggerRef.current?.focus());
   }
 
   async function send(confirmRecent: boolean) {
@@ -163,35 +178,41 @@ export function SterlingFollowUp({ rows, filter, reminderTotal, columns, sortNot
       {error && !preview && <div className="inline-notice error" role="alert">{error}</div>}
 
       <div className={styles.toolbar}>
-        <button className="primary-button" disabled={selectedCount === 0 || loading} onClick={() => void openPreview()} type="button">
-          <Mail aria-hidden="true" size={16} /> {loading ? "Preparing the preview…" : "Send reminder"}
+        <button aria-busy={loading || undefined} aria-disabled={selectedCount === 0 || loading || undefined} className="primary-button" onClick={() => void openPreview()} ref={triggerRef} type="button">
+          <Mail aria-hidden="true" size={16} /> {busyOpening ? "Preparing the preview…" : "Send reminder"}
         </button>
+        {selectable.length > 0 && (
+          <label className={styles.selectPage}>
+            <input checked={allInFilter || allPageSelected} disabled={allInFilter} onChange={togglePage} type="checkbox" />
+            <span>Select everyone on this page</span>
+          </label>
+        )}
+        {canSelectAllInFilter && (
+          <button className="secondary-button" onClick={() => setAllInFilter(true)} type="button">Select all {reminderTotal} in this filter</button>
+        )}
+        {selectedCount > 0 && <button className="secondary-button" onClick={clearSelection} type="button">Clear selection</button>}
         <p role="status">
           {selectedCount === 0
             ? "Choose people to remind."
             : `${plural(selectedCount, "person", "people")} selected${allInFilter ? ` (all in ${reminderFilterLabels[filter]})` : ""}.`}
         </p>
-        {canSelectAllInFilter && (
-          <button className="secondary-button" onClick={() => setAllInFilter(true)} type="button">Select all {reminderTotal} in this filter</button>
-        )}
-        {selectedCount > 0 && <button className="secondary-button" onClick={clearSelection} type="button">Clear selection</button>}
       </div>
+      {overCap && hasMoreThanPage && (
+        <p className="field-help">
+          This filter has {reminderTotal} people, more than the {REMINDER_MAX_PEOPLE} one reminder can cover. Sort by club and select a page at a time to send in smaller groups.
+        </p>
+      )}
 
       {rows.length === 0 ? (
-        <p className="report-empty">Nobody is in this list.</p>
+        <p className="report-empty">{emptyText[filter]}</p>
       ) : (
         <div className="report-table-wrap">
-          {sortNote && <p className="quiet-copy">{sortNote}</p>}
+          {sortNote && <SortOrderNote>{sortNote}</SortOrderNote>}
           <table className="report-table table-cards" role="table">
             <caption className="sr-only">People to follow up on Sterling Volunteers</caption>
             <thead role="rowgroup">
               <tr role="row">
-                <th role="columnheader" scope="col">
-                  <label className={styles.check}>
-                    <input checked={allPageSelected} disabled={selectable.length === 0} onChange={togglePage} type="checkbox" />
-                    <span className="sr-only">Select everyone on this page</span>
-                  </label>
-                </th>
+                <th role="columnheader" scope="col"><span className="sr-only">Select</span></th>
                 <SortableHeader active={columns.name.active} direction={columns.name.direction} href={columns.name.href} label="Name" />
                 <SortableHeader active={columns.club.active} direction={columns.club.direction} href={columns.club.href} label="Club" />
                 <th role="columnheader" scope="col">Role</th>
@@ -233,6 +254,7 @@ export function SterlingFollowUp({ rows, filter, reminderTotal, columns, sortNot
       <ConfirmDialog
         busy={sending}
         busyLabel="Sending…"
+        confirmDisabled={(preview?.messages.length ?? 0) === 0}
         confirmLabel={needsConfirm ? "Send anyway" : "Send"}
         error={error}
         onCancel={closePreview}
@@ -271,7 +293,7 @@ export function SterlingFollowUp({ rows, filter, reminderTotal, columns, sortNot
               {preview.messages.length === 0 && <p>Nothing would be sent.</p>}
               {preview.messages.map((message, index) => (
                 <details className={styles.message} key={message.key} open={index === 0}>
-                  <summary><span translate="no">{message.to.name || message.to.email}</span>&nbsp;({message.label})</summary>
+                  <summary><span><span translate="no">{message.to.name || message.to.email}</span> ({message.label})</span></summary>
                   <p>To: <span translate="no">{message.to.email}</span>. Subject: {message.subject}</p>
                   <pre>{message.bodyText}</pre>
                 </details>

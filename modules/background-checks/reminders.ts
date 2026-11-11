@@ -5,6 +5,8 @@ import { getServerEnv } from "@/lib/env";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import { paginate } from "@/lib/pagination";
+import { formatPersonName } from "@/lib/person-name";
+import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/conference-format";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { clubComplianceState } from "@/modules/background-checks/domain";
@@ -47,7 +49,6 @@ import { directorGrantIsActive } from "@/modules/organizations/director-grants-d
  * list carries a state and (for a Sterling date) an expiry, and the emails carry neither.
  */
 
-const CHICAGO = "America/Chicago";
 
 export type ReminderSelection = { rosterMemberIds: string[] } | { filter: ReminderFilter; all: true };
 
@@ -56,7 +57,7 @@ type NowOption = { now?: Date };
 /** Every active adult or staff member of this club year, one row each, with their current state. */
 async function loadRows(now: Date): Promise<Array<SterlingActionRow & { ownEmail: string | null }>> {
   const prisma = getPrisma();
-  const today = calendarDateInEventTimeZone(now, CHICAGO);
+  const today = calendarDateInEventTimeZone(now, CONFERENCE_TIME_ZONE);
   const clubYear = clubYearFor(now);
   const members = await prisma.clubRosterMember.findMany({
     where: {
@@ -107,7 +108,7 @@ async function loadRows(now: Date): Promise<Array<SterlingActionRow & { ownEmail
       personId: member.personId,
       firstName: member.person.firstName,
       lastName: member.person.lastName,
-      name: `${member.person.firstName} ${member.person.lastName}`.trim(),
+      name: formatPersonName(member.person),
       organizationId: member.organizationId,
       clubName: member.organization?.name ?? "",
       role: member.role.trim() || clubRosterAttendeeTypeLabels[member.attendeeType],

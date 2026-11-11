@@ -159,6 +159,12 @@ export type ReminderMessage = {
   bodyText: string;
 };
 
+/** "A", "A and B", "A, B and C". */
+function joinNames(names: readonly string[]) {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 function firstNameOf(name: string) {
   return name.trim().split(/\s+/)[0] || "there";
 }
@@ -171,7 +177,7 @@ const stateWord = (state: ReminderState) => (state === "FLAGGED" ? "expiring soo
 
 const WHAT_TO_DO = [
   "What to do",
-  "Each person completes or renews their Sterling Volunteers background check and training here:",
+  "Each person completes or renews their Sterling Volunteers check and training here:",
   STERLING_VOLUNTEERS_URL,
 ];
 
@@ -187,7 +193,7 @@ export function sterlingDirectorEmail(input: {
   const lines = [
     `Hi ${firstNameOf(input.directorName)},`,
     "",
-    `Conference staff are reminding ${input.clubName} about Sterling Volunteers background checks. These people on your club roster need to take action.`,
+    `Conference staff are reminding ${input.clubName} about Sterling Volunteers checks. These people on your club roster need to take action.`,
     "",
   ];
   if (expiring.length > 0) lines.push("Expiring soon", ...expiring.map((name) => `- ${name}`), "");
@@ -201,10 +207,10 @@ export function sterlingVolunteerEmail(input: { name: string; clubName: string; 
   const lines = [
     `Hi ${firstNameOf(input.name)},`,
     "",
-    `Conference staff are reminding you that your Sterling Volunteers background check for ${input.clubName} is ${stateWord(input.state)}.`,
+    `Conference staff are reminding you that your Sterling Volunteers check for ${input.clubName} is ${stateWord(input.state)}.`,
     "",
     "What to do",
-    "Please complete or renew your Sterling Volunteers background check and training here:",
+    "Please complete or renew your Sterling Volunteers check and training here:",
     STERLING_VOLUNTEERS_URL,
     "",
     "If you have already done this, thank you. It can take a little while to show up.",
@@ -293,32 +299,38 @@ export function planSterlingReminders(input: {
   }
 
   // The volunteer's own email: one per person, even when they are listed in two clubs.
-  const volunteerMessageFor = new Map<string, ReminderMessage>();
+  const volunteerRows = new Map<string, { own: string; rows: ReminderPerson[] }>();
   for (const person of [...input.people].sort((a, b) => a.rosterMemberId.localeCompare(b.rosterMemberId))) {
     const outcome = outcomes.get(person.rosterMemberId)!;
     const own = person.ownEmail ? normalizedAddress(person.ownEmail) : "";
     const alsoDirector = own !== "" && directorAddresses.get(person.organizationId)?.has(own) === true;
     if (own && !alsoDirector) {
       outcome.volunteerEmailed = true;
-      const existing = volunteerMessageFor.get(person.personId);
-      if (existing) {
-        existing.rosterMemberIds.push(person.rosterMemberId);
-        continue;
-      }
-      const content = sterlingVolunteerEmail({ name: person.name, clubName: person.clubName, state: person.state });
-      const message: ReminderMessage = {
-        key: `volunteer:${person.personId}:${own}`,
-        kind: "VOLUNTEER",
-        to: { email: own, name: person.name },
-        recipientLabel: "Volunteer",
-        organizationId: person.organizationId,
-        rosterMemberIds: [person.rosterMemberId],
-        ...content,
-      };
-      volunteerMessageFor.set(person.personId, message);
-      messages.push(message);
+      const known = volunteerRows.get(person.personId);
+      if (known) known.rows.push(person);
+      else volunteerRows.set(person.personId, { own, rows: [person] });
     }
     if (outcome.directorRecipients === 0 && !own) noRecipient.push(person);
+  }
+
+  // One email per volunteer, naming every club they are listed in.
+  for (const [personId, { own, rows }] of volunteerRows) {
+    const first = rows[0]!;
+    const clubs = [...new Set(rows.map((row) => row.clubName))];
+    const content = sterlingVolunteerEmail({
+      name: first.name,
+      clubName: joinNames(clubs),
+      state: rows.some((row) => row.state !== "FLAGGED") ? "NOT_COMPLIANT" : "FLAGGED",
+    });
+    messages.push({
+      key: `volunteer:${personId}:${own}`,
+      kind: "VOLUNTEER",
+      to: { email: own, name: first.name },
+      recipientLabel: "Volunteer",
+      organizationId: first.organizationId,
+      rosterMemberIds: rows.map((row) => row.rosterMemberId),
+      ...content,
+    });
   }
 
   const resolved = [...outcomes.values()];
