@@ -41,7 +41,7 @@ export function dashboardEventsOnce(eventIds: readonly string[] | undefined, now
   return read;
 }
 
-/** `getAreaClubsSummary` without background checks (the Admin hub's read), once per request, club year and conference day. */
+/** `getAreaClubsSummary` with `backgroundChecks: false` (the Admin hub's read), once per request, club year and conference day. */
 export function clubsSummaryOnce(clubYear: string, now: Date): Promise<AreaClubSummary[]> {
   const store = requestStore().clubs;
   const key = `${clubYear}|${calendarDateIn(now)}`;
