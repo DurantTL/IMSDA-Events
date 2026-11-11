@@ -296,6 +296,6 @@ describe("link gates", () => {
     expect(source).toContain("canOpenPeople &&");
     expect(source).toContain("/admin/people/staff/${selected.user.id}");
     const page = readFileSync("app/(workspace)/staff/page.tsx", "utf8");
-    expect(page).toContain("(await resolvePeopleViewer()).scope !== null");
+    expect(page).toContain('(await resolvePeopleViewer()).scope === "full"');
   });
 });

@@ -8,7 +8,8 @@
  */
 import { loadEnvConfig } from "@next/env";
 import { PrismaClient } from "@prisma/client";
-import { findPeople } from "../modules/system-admin/people-directory";
+import { findPeople, getPersonDetail } from "../modules/system-admin/people-directory";
+import { findInviteLookupPerson } from "../modules/system-admin/people-invite-lookup";
 
 loadEnvConfig(process.cwd());
 
@@ -91,6 +92,35 @@ async function main() {
   assert(JSON.stringify(full) === JSON.stringify(everyone), `system administrator list was ${full.join(", ")}`);
   assert(mine(await findPeople(email("plain"), "full", now)).length === 1, "a system administrator's search finds anyone");
   console.log("ok  a system administrator still lists everyone");
+
+  // 4. A person's page (#1804): a Clubs Administrator opens club people only, from either id of a linked pair.
+  for (const name of ["director", "scheduled", "coordinator"]) {
+    assert(await getPersonDetail("account", id(name), "clubs"), `a Clubs Administrator could not open ${name}`);
+  }
+  assert(await getPersonDetail("staff", id("clubsadmin"), "clubs"), "a Clubs Administrator could not open a Clubs Administrator");
+  assert(await getPersonDetail("staff", id("linked"), "clubs"), "a Clubs Administrator could not open a linked login from its staff id");
+  assert(await getPersonDetail("account", id("director"), "clubs"), "a Clubs Administrator could not open a linked pair from its account id");
+  for (const name of ["ended", "revoked", "church", "coordinatorrevoked", "coordinatorexpired", "plain"]) {
+    assert((await getPersonDetail("account", id(name), "clubs")) === null, `a Clubs Administrator opened account ${name}`);
+  }
+  for (const name of ["clubsadminrevoked", "sysadmin", "eventstaff"]) {
+    assert((await getPersonDetail("staff", id(name), "clubs")) === null, `a Clubs Administrator opened staff ${name}`);
+  }
+  for (const [kind, name] of [["account", "plain"], ["account", "church"], ["staff", "sysadmin"], ["staff", "eventstaff"]] as const) {
+    assert(await getPersonDetail(kind, id(name), "full"), `a system administrator could not open ${kind} ${name}`);
+  }
+  console.log("ok  a Clubs Administrator opens club people only; a system administrator opens anyone");
+
+  // 5. The invite lookup for a first club role.
+  const plain = await findInviteLookupPerson(email("plain"), "clubs", now);
+  assert(plain && plain.scope === "clubs" && !plain.clubPerson && plain.accountId === id("plain"), "a website account with no club role should be offered for a first club role");
+  const club = await findInviteLookupPerson(email("director"), "clubs", now);
+  assert(club && club.scope === "clubs" && club.clubPerson, "a club person should open their page from the lookup");
+  assert((await findInviteLookupPerson(email("staff.eventstaff"), "clubs", now)) === null, "a staff login with no website account should find nothing for a Clubs Administrator");
+  assert((await findInviteLookupPerson(email("nobody"), "clubs", now)) === null, "an unknown email should find nothing");
+  const sys = await findInviteLookupPerson(email("staff.eventstaff"), "full", now);
+  assert(sys && sys.scope === "full" && sys.staffId === id("eventstaff"), "a system administrator's lookup should find a staff login");
+  console.log("ok  the invite lookup shows a Clubs Administrator only a website account");
 }
 
 main()

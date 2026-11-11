@@ -36,12 +36,13 @@ export default async function ClubDirectorsPage({
     if (error instanceof OrganizationOperationError) notFound();
     throw error;
   }
+  const peopleScope = (await resolvePeopleViewer()).scope;
   const parentHref = clubPageReturnHref(from, organizationId);
 
   return (
     <>
       <AdminPageHeader path={`/admin/organizations/${organizationId}/directors`} parentName={initial.club.name} viaParent={parentHref !== null} back={parentHref ? { href: parentHref, label: `Back to ${initial.club.name}` } : undefined} />
-      <ClubDirectorsWorkspace canOpenPeople={(await resolvePeopleViewer()).scope !== null} club={initial.club} initialGrants={initial.grants} />
+      <ClubDirectorsWorkspace canOpenPeople={peopleScope !== null} linkCurrentOnly={peopleScope === "clubs"} club={initial.club} initialGrants={initial.grants} />
     </>
   );
 }

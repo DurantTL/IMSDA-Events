@@ -146,6 +146,7 @@ const aliasRoutes: readonly (readonly [route: string, destinationPath: string])[
 
 /** Sub-pages reached from a parent page: [route, parent route, source file that links to it]. */
 const reachedRoutes: readonly (readonly [route: string, parent: string, linkedIn: string])[] = [
+  ["/admin/people/invite-lookup", "/admin/people", "modules/system-admin/people-invite-href.ts"],
   ["/admin/site-content/preview", "/admin/site-content", "components/site-content-workspace.tsx"],
   ["/admin/club-forms/public-page/preview", "/admin/club-forms/public-page", "components/public-club-forms-settings.tsx"],
   ["/admin/clubs/health-import", "/admin/organizations", "app/(workspace)/admin/organizations/page.tsx"],

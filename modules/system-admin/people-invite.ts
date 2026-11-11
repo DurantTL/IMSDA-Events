@@ -20,7 +20,7 @@ import { clubInviteSignUpUrl, createPeopleClubInvite, findOpenClubInvite } from 
 import { createAreaCoordinatorInvite, findOpenAreaCoordinatorInvite } from "@/modules/organizations/area-coordinator-invites";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import type { GrantItem } from "@/modules/system-admin/people-directory-model";
-import { deferredPersonHref } from "@/modules/system-admin/people-invite-href";
+import { deferredPersonHref, inviteLookupHref } from "@/modules/system-admin/people-invite-href";
 
 /**
  * The one Invite a person (#1276). The person inviting ticks the access; this module decides which kind of account each
@@ -114,7 +114,7 @@ async function assertTargetsExist(access: Pick<Access, "events"> & Partial<Pick<
 }
 
 /** What already exists for an email, counting a staff login and website account linked to each other as one person. */
-async function findExistingPerson(email: string) {
+export async function findExistingPerson(email: string) {
   const prisma = getPrisma();
   const [user, account] = await Promise.all([
     prisma.user.findUnique({ where: { email }, select: { id: true, attendeeAccountId: true } }),
@@ -315,6 +315,9 @@ export async function invitePerson(actorUserId: string, input: PeopleInviteInput
   }
 
   const deferredItems = [...staffDeferred, ...familyDeferred];
-  if (deferredItems.length > 0) result.deferred = { personHref: deferredPersonHref(personAfter, deferredItems) };
+  // A Clubs Administrator can open club people only, so a person who isn't one yet is reached through the invite lookup.
+  if (deferredItems.length > 0) {
+    result.deferred = { personHref: actor.systemAdmin ? deferredPersonHref(personAfter, deferredItems) : inviteLookupHref(email, deferredItems) };
+  }
   return result;
 }
