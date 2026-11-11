@@ -7,10 +7,9 @@ import { ListPager } from "@/components/list-pager";
 import { SearchResultStatus, useDebouncedCallback } from "@/components/search-as-you-type";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { paginate } from "@/lib/pagination";
+import { NEEDS_A_LOOK_ID } from "@/modules/background-checks/reminders-domain";
 import styles from "./background-check-review-panel.module.css";
 
-/** The anchor the page's "Needs a look" quick filter jumps to (#1844). */
-export const NEEDS_A_LOOK_ID = "needs-a-look";
 /** Unmatched list-wide rows shown per page (#702). */
 export const UNMATCHED_PAGE_SIZE = 50;
 /** Shown above the conference-wide unmatched rows, pointing at the name lookup. */

@@ -13,6 +13,22 @@ import { serverSort, sortOrderText, sortRows, type SortValue } from "@/lib/list-
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { backgroundCheckSummary } from "@/modules/background-checks/repository";
+import { listSterlingActionPeople } from "@/modules/background-checks/reminders";
+import {
+  DEFAULT_REMINDER_FILTER,
+  NEEDS_A_LOOK_ID,
+  REMINDER_FILTERS,
+  SORT_KEYS as FOLLOW_UP_SORT_KEYS,
+  parseReminderFilter,
+  reminderFilterLabels,
+  type ReminderFilter,
+  type ReminderSortKey,
+} from "@/modules/background-checks/reminders-domain";
+import { ListPager } from "@/components/list-pager";
+import { SterlingFollowUp } from "@/components/sterling-follow-up";
+import { parsePageParam } from "@/lib/pagination";
+import { searchPageHref } from "@/lib/search-page-href";
+import styles from "@/components/sterling-follow-up.module.css";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
@@ -35,20 +51,39 @@ const eventAccessors: Record<EventSortColumn, (event: EventRow) => SortValue> = 
 };
 const eventSortLabels: Record<EventSortColumn, string> = { event: "event", starts: "start date", adults: "adults", needed: "adults needing a check" };
 
+const PAGE_PATH = "/admin/organizations/background-checks";
+const FOLLOW_UP_HASH = "#follow-up";
+const followUpSortLabels: Record<ReminderSortKey, { label: string; kind: "text" | "date" }> = {
+  name: { label: "last name", kind: "text" },
+  club: { label: "club", kind: "text" },
+  expires: { label: "expiry date", kind: "date" },
+};
+
 export default async function BackgroundChecksPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const summary = await backgroundCheckSummary();
   // The event table is the whole list, so it is sorted here (#1458); the order never changes which events are listed.
-  const sorting = serverSort<EventSortColumn>("/admin/organizations/background-checks", await searchParams, EVENT_SORT_COLUMNS, { key: null, dir: "asc" }, { hash: "#events" });
+  const sorting = serverSort<EventSortColumn>(PAGE_PATH, await searchParams, EVENT_SORT_COLUMNS, { key: null, dir: "asc" }, { hash: "#events" });
   const events = sorting.order.key ? sortRows(summary.events, sorting.order.key, sorting.order.dir, eventAccessors) : summary.events;
-  const cards = [
-    { label: "Current checks", value: summary.current, detail: "Clear, or a Sterling check good for more than 60 days. Does not include the expiring-soon checks below", tone: "green" },
-    { label: "Expiring soon", value: summary.expiringSoon, detail: "Marked \"!\" on the roster, or a Sterling check ending within 60 days", tone: "gold" },
-    { label: "Not current", value: summary.notCurrent, detail: "Not in compliance or expired; flagged at youth events", tone: "purple" },
-    { label: "Needs a look", value: summary.reviewCount, detail: `Rows waiting on a staff decision. ${summary.unmatchedCount} more match no club roster or registration yet; that isn't work to do.`, tone: "coral" },
-  ];
+  const params = await searchParams;
+  const filter = parseReminderFilter(params.people);
+  const followUpSort = serverSort<ReminderSortKey>(PAGE_PATH, params, FOLLOW_UP_SORT_KEYS, { key: "expires", dir: "asc" }, { prefix: "people", hash: FOLLOW_UP_HASH });
+  const followUp = await listSterlingActionPeople({
+    filter,
+    sort: followUpSort.order.key ?? "expires",
+    dir: followUpSort.order.dir,
+    page: parsePageParam(typeof params.peoplePage === "string" ? params.peoplePage : undefined),
+  });
+  const filterHref = (value: ReminderFilter) => `${PAGE_PATH}${value === DEFAULT_REMINDER_FILTER ? "" : `?people=${value}`}${FOLLOW_UP_HASH}`;
+  const filterCounts: Record<ReminderFilter, number> = { expiring: followUp.counts.expiring, "not-current": followUp.counts.notCurrent, all: followUp.counts.all };
+  const sortInfo = followUpSortLabels[followUpSort.order.key ?? "expires"];
+  const followUpColumns = {
+    name: { href: followUpSort.hrefFor("name"), active: followUpSort.order.key === "name", direction: followUpSort.order.dir },
+    club: { href: followUpSort.hrefFor("club"), active: followUpSort.order.key === "club", direction: followUpSort.order.dir },
+    expires: { href: followUpSort.hrefFor("expires"), active: followUpSort.order.key === "expires", direction: followUpSort.order.dir },
+  };
   return (
     <section className="page-stack">
       <AdminPageHeader path="/admin/organizations/background-checks" />
@@ -72,12 +107,42 @@ export default async function BackgroundChecksPage({ searchParams }: { searchPar
         )}
       </div>
 
-      <section className="report-summary-grid" aria-label="Sterling Volunteers on file">
-        {cards.map((card) => (
-          <article className={`metric-card report-summary-card accent-${card.tone}`} key={card.label}>
-            <strong>{card.value}</strong><p>{card.label}</p><small>{card.detail}</small>
-          </article>
-        ))}
+      <nav aria-label="Jump to the people who need action">
+        <ul className={styles.filters}>
+          {REMINDER_FILTERS.filter((value) => value !== "all").map((value) => (
+            <li key={value}>
+              <Link aria-current={filter === value ? "true" : undefined} href={filterHref(value)}>{reminderFilterLabels[value]} ({filterCounts[value]})</Link>
+            </li>
+          ))}
+          <li><a href={`#${NEEDS_A_LOOK_ID}`}>Needs a look ({summary.reviewCount})</a></li>
+          <li>
+            <Link aria-current={filter === "all" ? "true" : undefined} href={filterHref("all")}>{reminderFilterLabels.all} ({filterCounts.all})</Link>
+          </li>
+        </ul>
+        <p className={styles.current}>
+          Current checks: {followUp.counts.current}. Counted from the active adults and staff on this year&apos;s club rosters. Expiring soon is within 60 days.
+          {summary.unmatchedCount > 0 && <> {summary.unmatchedCount} more rows in the upload match no club roster or registration yet; that isn&apos;t work to do.</>}
+        </p>
+      </nav>
+
+      <section className="panel" id="follow-up">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Sterling Volunteers</p>
+            <h2>People to follow up</h2>
+            <p>Filter: {reminderFilterLabels[filter].toLowerCase()}. Choose people and send a reminder to their club director(s), and to the volunteer when an email is on file.</p>
+          </div>
+        </div>
+        <ListPager hrefFor={(page) => searchPageHref(PAGE_PATH, params, page, { prefix: "people", hash: FOLLOW_UP_HASH })} label="People to follow up pages" noun="people" nounOne="person" part="count" slice={followUp} />
+        <SterlingFollowUp
+          columns={followUpColumns}
+          filter={filter}
+          key={`${filter}:${followUpSort.order.key}:${followUpSort.order.dir}:${followUp.page}`}
+          reminderTotal={filter === "all" ? followUp.counts.expiring + followUp.counts.notCurrent : followUp.total}
+          rows={followUp.items}
+          sortNote={sortOrderText(sortInfo.label, followUpSort.order.dir, sortInfo.kind)}
+        />
+        <ListPager hrefFor={(page) => searchPageHref(PAGE_PATH, params, page, { prefix: "people", hash: FOLLOW_UP_HASH })} label="People to follow up pages" part="pages" slice={followUp} />
       </section>
 
       <section className="panel" id="events">
