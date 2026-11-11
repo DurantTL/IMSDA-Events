@@ -157,6 +157,21 @@
   overflow-wrap: anywhere;
 }
 
+/* The shared reset removes list markers (#1840): guide lists put them back, numbers for steps and dots for the rest. */
+.bullets {
+  list-style: disc;
+}
+
+.steps {
+  padding-left: 1.6em;
+  list-style: decimal;
+}
+
+.steps > li::marker {
+  color: var(--imsda-purple);
+  font-weight: 700;
+}
+
 .links {
   display: flex;
   flex-wrap: wrap;
@@ -276,14 +291,30 @@
 
 /* A walkthrough step (#1482): the instruction, then its picture, in the usual numbered list. */
 .stepWithPicture {
-  display: grid;
-  gap: 8px;
+  display: list-item;
   min-width: 0;
 }
 
-/* The phone picture is 390 px wide; on a phone it fills the column. The desktop picture is 960 px wide, so its text stays readable. Existing guide screenshots keep their own cap. */
+.stepWithPicture > figure {
+  margin-top: 8px;
+}
+
+/*
+ * Walkthrough pictures (#1840): one frame for every guide. The phone picture is shown 390 x 640 and the desktop one 960 x 600,
+ * each cropped around the marked control. The frame is the line border with the card radius and the shared shadow, so the
+ * picture reads as a screen, not part of the page. Below 768 px the phone picture is capped near its own width, so a small
+ * tablet does not blow it up. Existing guide screenshots keep their own cap.
+ */
 .stepWithPicture .figureImage {
   max-width: min(100%, 960px);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 767.98px) {
+  .stepWithPicture .figureImage {
+    max-width: min(100%, 420px);
+  }
 }
 
 .stepLinks {

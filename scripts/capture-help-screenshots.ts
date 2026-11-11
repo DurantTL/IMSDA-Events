@@ -3,7 +3,9 @@
  *
  * For each walkthrough in `modules/help/walkthroughs.ts` it resets the synthetic fixtures, signs in (for real, through the
  * page, for the sign-in walkthroughs), runs the shared steps from `tests/browser/walkthroughs/`, marks the control with a
- * numbered outline, screenshots the screen at 390 x 844 (phone) and 1280 x 800 (desktop), and saves WebP files to
+ * numbered outline, screenshots the screen at 390 x 844 (phone) and 1280 x 800 (desktop) at twice the pixel density, crops
+ * a phone picture to 390 x 640 around the mark (and the step's optional area; a desktop picture keeps the whole screen, see
+ * `walkthroughCropSizes`), scales it to the file size, and saves WebP files to
  * `public/help/walkthroughs/<guideId>/`. It also writes `public/help/walkthroughs/manifest.json` (capture date and a hash of
  * the walkthrough's source files), which `npm run help:check` compares to warn about stale pictures.
  *
@@ -18,7 +20,7 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import sharp from "sharp";
-import { walkthroughImage, walkthroughImageSizes, walkthroughImageRoot, type WalkthroughImageKind } from "../modules/help/walkthrough-images";
+import { walkthroughCrop, walkthroughImage, walkthroughImageFileSize, walkthroughImageRoot, type MarkArea, type WalkthroughImageKind } from "../modules/help/walkthrough-images";
 import type { WalkthroughManifest } from "../modules/help/walkthrough-check";
 import { readWalkthroughManifest, walkthroughManifestFile, walkthroughSourceHash } from "../modules/help/walkthrough-files";
 import { findWalkthrough } from "../modules/help/walkthroughs";
@@ -30,10 +32,21 @@ const only = process.env.HELP_SHOTS_ONLY || undefined;
 const root = process.cwd();
 const publicDir = path.join(root, "public");
 
-/** Encodes one screenshot: WebP quality 70, effort 6; the desktop screen is resized to 960 px wide. */
-export async function encodeWalkthroughImage(png: Buffer, kind: WalkthroughImageKind) {
-  const size = walkthroughImageSizes[kind];
-  return sharp(png).resize({ width: size.width }).webp({ quality: 70, effort: 6 }).toBuffer();
+/** The capture's pixel density: the screenshot is taken at 2x and then scaled to the file size. */
+const captureScale = 2;
+
+/** WebP quality by picture kind. Lowered from 62 to 45 so all the walkthrough pictures stay under the 6 MB limit; text stays sharp at the 2x phone size. */
+const webpQuality: Record<WalkthroughImageKind, number> = { phone: 45, desktop: 45 };
+
+/** Encodes one screenshot: crops it around the mark, scales it to the file size and saves WebP (quality by kind), effort 6. */
+export async function encodeWalkthroughImage(png: Buffer, kind: WalkthroughImageKind, mark: MarkArea | null, area: MarkArea | null = null) {
+  const crop = walkthroughCrop(kind, mark, area);
+  const file = walkthroughImageFileSize(kind);
+  return sharp(png)
+    .extract({ left: crop.left * captureScale, top: crop.top * captureScale, width: crop.width * captureScale, height: crop.height * captureScale })
+    .resize({ width: file.width, height: file.height })
+    .webp({ quality: webpQuality[kind], effort: 6 })
+    .toBuffer();
 }
 
 async function main() {
@@ -43,25 +56,32 @@ async function main() {
     baseUrl,
     only,
     kinds: ["phone", "desktop"],
-    onStep: async ({ walkthroughId, stepId, index, kind, page, target }) => {
+    deviceScaleFactor: captureScale,
+    onStep: async ({ walkthroughId, stepId, index, kind, page, target, alsoMark, area }) => {
+      let mark: MarkArea | null = null;
+      let extra: MarkArea | null = null;
       if (target) {
         // Let a page change finish first: a Next.js navigation scrolls back to the top after it renders.
         await page.waitForLoadState("networkidle").catch(() => undefined);
         await page.waitForTimeout(400);
         // Bring the control into the middle of the screen, then mark it.
-        await target.first().evaluate((element: Element) => {
+        const second = alsoMark ? await alsoMark.first().elementHandle() : null;
+        await target.first().evaluate((element: Element, other: Element | null) => {
           element.scrollIntoView({ block: "center", inline: "nearest" });
-          (window as unknown as { __walkthroughTarget?: Element }).__walkthroughTarget = element;
-        });
+          (window as unknown as { __walkthroughTargets?: Element[] }).__walkthroughTargets = other ? [element, other] : [element];
+        }, second);
         await page.waitForTimeout(300);
-        await page.evaluate(drawMarkInPage, { number: index + 1, id: overlayId });
+        mark = (await page.evaluate(drawMarkInPage, { number: index + 1, id: overlayId })) as MarkArea | null;
+        // The extra area the step wants in the picture: its box on the screen now that the mark's control is in view.
+        const box = area ? await area.first().boundingBox() : null;
+        if (box) extra = { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height };
       }
       const png: Buffer = await page.screenshot({ type: "png" });
       if (target) await page.evaluate(removeMarkInPage, overlayId);
       const image = walkthroughImage(walkthroughId, index, stepId, kind);
       const file = path.join(publicDir, image.src);
       mkdirSync(path.dirname(file), { recursive: true });
-      const webp = await encodeWalkthroughImage(png, kind);
+      const webp = await encodeWalkthroughImage(png, kind, mark, extra);
       writeFileSync(file, webp);
       written.add(file);
       sizes.push(webp.length);

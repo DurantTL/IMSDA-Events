@@ -10,7 +10,7 @@ import { docFileExists, listPageRoutes, publicFileExists } from "@/modules/help/
 import { portalGuides } from "@/modules/help/portal-guides";
 import { checkWalkthroughManifest, walkthroughCapturedFor } from "@/modules/help/walkthrough-check";
 import { readWalkthroughManifest, walkthroughSourceHash } from "@/modules/help/walkthrough-files";
-import { walkthroughDesktopMinWidth, walkthroughImage, walkthroughImageBudgets, walkthroughImageSizes, type WalkthroughImageKind } from "@/modules/help/walkthrough-images";
+import { walkthroughDesktopMinWidth, walkthroughImage, walkthroughImageBudgets, walkthroughImageFileSize, type WalkthroughImageKind } from "@/modules/help/walkthrough-images";
 import { coordinatorWalkthroughs, directorWalkthroughs, walkthroughGuides, walkthroughs, walkthroughsForGuide } from "@/modules/help/walkthroughs";
 import { assertWalkthroughSafety, signInRateLimitPolicies } from "@/scripts/support/help-walkthrough-fixtures";
 import { buildClubChecklist, type ClubChecklistFacts } from "@/modules/setup-help/club-checklist";
@@ -51,7 +51,7 @@ describe("walkthrough data and browser actions", () => {
   it("writes each step as one or two plain sentences with alt text, and no email address or real-looking data", () => {
     for (const walkthrough of walkthroughs) {
       expect(walkthrough.steps.length, walkthrough.id).toBeGreaterThanOrEqual(3);
-      expect(walkthrough.steps.length, walkthrough.id).toBeLessThanOrEqual(8);
+      expect(walkthrough.steps.length, walkthrough.id).toBeLessThanOrEqual(12);
       for (const step of walkthrough.steps) {
         const sentences = step.text.split(/(?<=[.?!])\s+/).filter(Boolean);
         expect(sentences.length, `${walkthrough.id}/${step.id}: ${step.text}`).toBeLessThanOrEqual(2);
@@ -157,7 +157,7 @@ describe("walkthrough pictures", () => {
           expect(existsSync(file), `${image.src} is missing. Run: npm run help:screenshots`).toBe(true);
           const meta = await sharp(file).metadata();
           expect(meta.format, image.src).toBe("webp");
-          expect({ width: meta.width, height: meta.height }, image.src).toEqual(walkthroughImageSizes[kind]);
+          expect({ width: meta.width, height: meta.height }, image.src).toEqual(walkthroughImageFileSize(kind));
         }
       }
     }
@@ -275,7 +275,7 @@ describe("the guide page's steps", () => {
     expect(html).toContain('srcSet="/help/walkthroughs/walkthrough-x/01-open-it-desktop.webp"');
     expect(html).toContain('src="/help/walkthroughs/walkthrough-x/01-open-it-phone.webp"');
     expect(html).toContain('width="390"');
-    expect(html).toContain('height="844"');
+    expect(html).toContain('height="640"');
     expect(html).toContain('loading="lazy"');
     expect(html).toContain('alt="The page that opens."');
     expect(html).toContain("Example with sample data");

@@ -27,13 +27,13 @@ export function coordinatorSetupFor(id: CoordinatorSetupId): RoleSetupEntry {
       };
     case "club-no-director":
       return {
-        setup: howTo(["A club with no director cannot file Monthly Records or register for events.", "Contact the conference office with the club's name and, if you know it, who should direct it.", "Once added, the director is named here."], "A director is listed for the club."),
+        setup: howTo(["A club with no director cannot file Monthly Records or register for events.", "Contact the conference office with the club's name and, if you know it, who should direct it.", "Once added, the director is named under Who runs this club."], "A director is listed for the club."),
         whoToAsk: askOffice("add a director to a club"),
         guideId: "walkthrough-coordinator-no-director",
       };
     case "whos-missing":
       return {
-        setup: howTo(["Open the club from its row to see what it has filed.", "Contact the club's director about anything missing. The app sends nothing for you.", "For a club with no director, ask the conference office to add one."], "Each club's row shows nothing missing."),
+        setup: howTo(["Choose Open club on its row to see what it has filed.", "Contact the club's director about anything missing. The app sends nothing for you.", "For a club with no director, ask the conference office to add one."], "Each club's row shows nothing missing."),
         whoToAsk: askOffice("add a director to a club"),
         guideId: "walkthrough-coordinator-follow-up",
       };
@@ -46,7 +46,7 @@ export function coordinatorSetupFor(id: CoordinatorSetupId): RoleSetupEntry {
         guideId: "coordinator-getting-started",
       };
     case "points-none":
-      return { setup: howTo(["Points come from submitted Monthly Records and on-time yearly registration.", "Use Who's missing what on Overview to follow up with clubs that have not filed."], "Clubs are ranked by points."), guideId: "walkthrough-coordinator-points" };
+      return { setup: howTo(["Points come from submitted Monthly Records, on-time yearly registration and event points.", "Use Who's missing what on Overview to follow up with clubs that have not filed."], "Clubs are ranked by points."), guideId: "walkthrough-coordinator-points" };
     case "club-no-forms":
       return { setup: howTo(["The club has not submitted a form this year.", "Ask the club's director to fill in the club forms."], "Submitted forms are listed."), whoToAsk: "Only the club's director or deputy submits forms. Ask them.", guideId: "coordinator-find-club" };
     case "club-no-report":

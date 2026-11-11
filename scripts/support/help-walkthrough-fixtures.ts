@@ -23,7 +23,7 @@ export const walkthroughIds = {
 } as const;
 
 export const walkthroughDirector = {
-  email: `${W}.director@example.test`,
+  email: `${W}.dana@example.test`,
   password: "Sample-Walkthrough-Pass-2026!",
   displayName: "Dana Sample",
   firstName: "Dana",
