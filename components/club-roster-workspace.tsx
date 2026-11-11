@@ -66,6 +66,7 @@ import {
 } from "@/modules/club-rosters/roster-view";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
 import styles from "@/components/club-roster-sections.module.css";
+import tableStyles from "@/components/club-roster-table.module.css";
 
 type RosterResponse = {
   members?: RosterMemberRecord[];
@@ -1021,6 +1022,7 @@ function ClubRosterWorkspaceInner({
                         // The birth-date banner above the table already counts an active person's missing birth date, so the row
                         // names only what else is missing (#1004); the Details needed list follows the same rule.
                         const needs = rosterDetailsNeededItems(member);
+                        const nothingNeeded = member.status === "ACTIVE" && needs.length === 0 && !healthRecordFlags?.[member.id];
                         const label = personLabels.get(member.id) ?? `${member.firstName} ${member.lastName}`;
                         const healthOnFile = Boolean(healthTab && healthEntryOnly && (healthTab[member.id]?.status === "CURRENT" || healthTab[member.id]?.status === "NEEDS_UPDATE"));
                         const tools = rosterRowTools({
@@ -1070,18 +1072,18 @@ function ClubRosterWorkspaceInner({
                                   </th>
                                 );
                                 case "age": return (
-                                  <td {...cardCell("Age")} key={column}>
+                                  <td {...cardCell("Age")} className={tableStyles.cardFact} key={column}>
                                     {member.age ?? (member.reportedAge !== null ? `${member.reportedAge} (reported)` : "—")}
                                   </td>
                                 );
-                                case "birthDate": return <td {...cardCell("Birth date")} key={column} translate="no">{birthDates?.[member.id] ?? "—"}</td>;
-                                case "type": return <td {...cardCell("Type")} key={column}>{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>;
-                                case "class": return <td {...cardCell("Current class")} key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : "—"}</td>;
-                                case "grade": return <td {...cardCell("Grade")} key={column}>{member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "—"}</td>;
-                                case "school": return <td {...cardCell("School")} key={column}>{member.schoolType ? clubSchoolTypeLabels[member.schoolType] : "—"}</td>;
-                                case "churchMember": return <td {...cardCell(CHURCH_MEMBER_LABEL)} key={column}>{member.churchMember ? clubChurchMemberLabels[member.churchMember] : "—"}</td>;
+                                case "birthDate": return <td {...cardCell("Birth date")} className={tableStyles.cardFact} key={column} translate="no">{birthDates?.[member.id] ?? "—"}</td>;
+                                case "type": return <td {...cardCell("Type")} className={tableStyles.cardPrimary} key={column}>{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>;
+                                case "class": return <td {...cardCell("Current class")} className={tableStyles.cardPrimary} key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : "—"}</td>;
+                                case "grade": return <td {...cardCell("Grade")} className={tableStyles.cardFact} key={column}>{member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "—"}</td>;
+                                case "school": return <td {...cardCell("School")} className={tableStyles.cardFact} key={column}>{member.schoolType ? clubSchoolTypeLabels[member.schoolType] : "—"}</td>;
+                                case "churchMember": return <td {...cardCell(CHURCH_MEMBER_LABEL)} className={tableStyles.cardFact} key={column}>{member.churchMember ? clubChurchMemberLabels[member.churchMember] : "—"}</td>;
                                 case "details": return (
-                                  <td {...cardCell("Details")} className="roster-card-flags" key={column}>
+                                  <td {...cardCell("Details")} className={`roster-card-flags ${tableStyles.cardStatus}${nothingNeeded ? ` ${tableStyles.cardNothing}` : ""}`} key={column}>
                                     {/* The flex layout lives on this wrapper: a td that is itself flex stops being a table cell and drifts out of line (#435). */}
                                     <div className="roster-flag-list">
                                       {member.status === "INACTIVE" && (
@@ -1093,7 +1095,7 @@ function ClubRosterWorkspaceInner({
                                       {healthRecordFlags?.[member.id] && (
                                         <span className="status-chip">Has a health record</span>
                                       )}
-                                      {member.status === "ACTIVE" && needs.length === 0 && !healthRecordFlags?.[member.id] && (
+                                      {nothingNeeded && (
                                         <>
                                           <span aria-hidden="true">—</span>
                                           <span className="sr-only">Nothing needed</span>
@@ -1102,9 +1104,9 @@ function ClubRosterWorkspaceInner({
                                     </div>
                                   </td>
                                 );
-                                case "gender": return <td {...cardCell("Gender")} key={column}>{member.gender ? clubRosterGenderLabels[member.gender] : "—"}</td>;
+                                case "gender": return <td {...cardCell("Gender")} className={tableStyles.cardFact} key={column}>{member.gender ? clubRosterGenderLabels[member.gender] : "—"}</td>;
                                 case "screening": return (
-                                  <td {...cardCell("Sterling Volunteers")} key={column}>
+                                  <td {...cardCell("Sterling Volunteers")} className={`${tableStyles.cardStatus}${complianceStatuses?.[member.id] ? "" : ` ${tableStyles.cardNothing}`}`} key={column}>
                                     {complianceStatuses?.[member.id] ? (
                                       <>
                                         <span className={`status-chip ${complianceTone[complianceStatuses[member.id]!.state]}`}>
