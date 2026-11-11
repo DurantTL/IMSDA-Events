@@ -1,4 +1,5 @@
 import {
+  clubBaptizedLabels,
   clubChurchMemberLabels,
   clubClassLevelLabels,
   rosterTltCell,
@@ -29,6 +30,8 @@ export const COORDINATOR_ROSTER_EXPORT_COLUMNS = {
   schoolGrade: { header: "Grade" },
   schoolType: { header: "School type" },
   churchMember: { header: "Church member" },
+  /** Baptized (#1852): offered in this export and in every roster view. */
+  baptized: { header: "Baptized" },
   sterling: { header: "Sterling Volunteers status" },
 } as const satisfies Record<string, { header: string }>;
 
@@ -110,6 +113,7 @@ function cell(row: CoordinatorRosterExportRow, key: CoordinatorRosterExportColum
     case "schoolGrade": return member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "";
     case "schoolType": return member.schoolType ? clubSchoolTypeLabels[member.schoolType] : "";
     case "churchMember": return member.churchMember ? clubChurchMemberLabels[member.churchMember] : "";
+    case "baptized": return member.baptized ? clubBaptizedLabels[member.baptized] : "";
     case "sterling": return row.sterling;
   }
 }

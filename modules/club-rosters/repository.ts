@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { ClubRosterChurchMember, ClubRosterSchoolGrade, ClubRosterSchoolType, Prisma } from "@prisma/client";
+import type { ClubRosterBaptized, ClubRosterChurchMember, ClubRosterSchoolGrade, ClubRosterSchoolType, Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { lockClubOrders } from "@/modules/club-orders/repository";
@@ -57,6 +57,7 @@ const memberSelect = {
   schoolGrade: true,
   schoolType: true,
   churchMember: true,
+  baptized: true,
   reportedAge: true,
   gender: true,
   sealedBirthDate: true,
@@ -89,6 +90,8 @@ function serializeMember(member: StoredMember, today: string, includeSchoolDetai
     /** School grade (#1664): shown wherever the class level is. */
     schoolGrade: member.schoolGrade,
     ...(includeSchoolDetails ? { schoolType: member.schoolType, churchMember: member.churchMember } : {}),
+    /** Baptized (#1852): any member type, and shown to every viewer of the roster. */
+    baptized: member.baptized,
     gender: member.gender,
     status: member.status,
     source: member.source,
@@ -101,7 +104,7 @@ function serializeMember(member: StoredMember, today: string, includeSchoolDetai
 }
 
 /** `personId` is optional so records built without it (fixtures, older callers) still fit; the class history link needs it. */
-export type RosterMemberRecord = Omit<ReturnType<typeof serializeMember>, "personId" | "isTlt" | "schoolGrade" | "schoolType" | "churchMember"> & {
+export type RosterMemberRecord = Omit<ReturnType<typeof serializeMember>, "personId" | "isTlt" | "schoolGrade" | "schoolType" | "churchMember" | "baptized"> & {
   personId?: string | null;
   /** Optional on the type so older fixtures still fit (#1851); `listRoster` always sets it. */
   isTlt?: boolean;
@@ -110,6 +113,8 @@ export type RosterMemberRecord = Omit<ReturnType<typeof serializeMember>, "perso
   /** Present only for a viewer allowed to see it (#1668). */
   schoolType?: ClubRosterSchoolType | null;
   churchMember?: ClubRosterChurchMember | null;
+  /** Optional on the type so older fixtures still fit; `listRoster` always sets it. */
+  baptized?: ClubRosterBaptized | null;
 };
 
 function audit(
@@ -271,6 +276,8 @@ export async function addRosterMemberInTransaction(
       ...(input.attendeeType === "YOUTH"
         ? { schoolGrade: input.schoolGrade ?? null, schoolType: input.schoolType ?? null, churchMember: input.churchMember ?? null }
         : {}),
+      // Baptized (#1852) is asked of every member type.
+      baptized: input.baptized ?? null,
       gender: input.gender,
       sealedBirthDate: sealBirthDate(input.birthDate),
       source: options.source ?? "DIRECTOR",
@@ -382,6 +389,7 @@ export async function updateRosterMember(
         ...(input.classLevel === undefined ? {} : { classLevel: input.classLevel }),
         ...tltChanges,
         ...schoolChanges,
+        ...(input.baptized === undefined ? {} : { baptized: input.baptized }),
         ...(input.gender === undefined ? {} : { gender: input.gender }),
         ...(input.status === undefined ? {} : { status: input.status }),
         ...(input.birthDate === undefined ? {} : { sealedBirthDate: sealBirthDate(input.birthDate), reportedAge: null }),
@@ -452,6 +460,7 @@ export async function eraseRosterRow(tx: Prisma.TransactionClient, memberId: str
       schoolGrade: null,
       schoolType: null,
       churchMember: null,
+      baptized: null,
       reportedAge: null,
       personId: null,
       // The column is unused since #544; an erased row never keeps a leftover value.

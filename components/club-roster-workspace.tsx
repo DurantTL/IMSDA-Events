@@ -36,7 +36,9 @@ import {
   clubSchoolGradeLabels,
   clubSchoolGrades,
   clubSchoolTypeLabels,
+  BAPTIZED_LABEL,
   CHURCH_MEMBER_LABEL,
+  clubBaptizedLabels,
   defaultRosterRole,
   rosterSectionOf,
   schoolGradeOrder,
@@ -80,7 +82,7 @@ type RosterResponse = {
 };
 
 /** Every column of the roster except Actions sorts (#1458); the sort lives in the address as `?sort=&dir=`, name A to Z by default. */
-const ROSTER_SORT_COLUMNS = ["name", "age", "birthDate", "type", "class", "grade", "details", "gender", "school", "churchMember", "screening"] as const;
+const ROSTER_SORT_COLUMNS = ["name", "age", "birthDate", "type", "class", "grade", "details", "gender", "school", "churchMember", "baptized", "screening"] as const;
 type RosterSortColumn = typeof ROSTER_SORT_COLUMNS[number];
 const ROSTER_DEFAULT_SORT: SortState<RosterSortColumn> = { key: "name", dir: "asc" };
 /** Whether the address names the name column (or no column), so its direction is the name direction. */
@@ -96,6 +98,7 @@ const rosterSortLabels: Record<RosterSortColumn, { label: string; kind: SortKind
   gender: { label: "gender", kind: "text" },
   school: { label: "school", kind: "text" },
   churchMember: { label: "Seventh-day Adventist church membership", kind: "text" },
+  baptized: { label: "baptized", kind: "text" },
   screening: { label: "Sterling Volunteers status", kind: "text" },
 };
 
@@ -259,6 +262,7 @@ function ClubRosterWorkspaceInner({
   const detailsOnly = detailsRaw === ROSTER_DETAILS_NEEDED_FILTER;
   const [showGender, setShowGender] = useState(false);
   const [showSchool, setShowSchool] = useState(false);
+  const [showBaptized, setShowBaptized] = useState(false);
   /** The grade filter (#1664) lives in the address too (`?grade=`). */
   const [gradeRaw, setGradeRaw] = useAddressParam("grade", "");
   const gradeFilter = gradeRaw === ROSTER_NO_GRADE_FILTER || Object.hasOwn(clubSchoolGradeLabels, gradeRaw) ? gradeRaw : "";
@@ -442,6 +446,7 @@ function ClubRosterWorkspaceInner({
     birthDatesShown: Boolean(birthDates),
     showGender,
     showSchool: schoolDetails && showSchool,
+    showBaptized,
     hasScreening: Boolean(complianceStatuses),
     hasRowActions: !readOnly || canEditGuardians || showHonors,
   });
@@ -461,6 +466,7 @@ function ClubRosterWorkspaceInner({
     gender: (member) => (member.gender ? clubRosterGenderLabels[member.gender] : null),
     school: (member) => (member.schoolType ? clubSchoolTypeLabels[member.schoolType] : null),
     churchMember: (member) => (member.churchMember ? clubChurchMemberLabels[member.churchMember] : null),
+    baptized: (member) => (member.baptized ? clubBaptizedLabels[member.baptized] : null),
     screening: (member) => (complianceStatuses?.[member.id] ? complianceLabel(complianceStatuses[member.id]!) : null),
   };
   const sortPeople = (people: RosterMemberRecord[]) => {
@@ -700,6 +706,8 @@ function ClubRosterWorkspaceInner({
       ...(attendeeType === "YOUTH" && schoolDetails
         ? { schoolType: String(form.get("schoolType") ?? "") || null, churchMember: String(form.get("churchMember") ?? "") || null }
         : {}),
+      // Baptized (#1852) is asked of every member type.
+      baptized: String(form.get("baptized") ?? "") || null,
       gender: String(form.get("gender") ?? "") || null,
       ...(guardianSlots ? { guardians: guardianSlots } : {}),
     };
@@ -899,6 +907,14 @@ function ClubRosterWorkspaceInner({
                   Show school details
                 </button>
               )}
+              <button
+                aria-pressed={showBaptized}
+                className={`secondary-button ${styles.rosterFilterButton}`}
+                onClick={() => setShowBaptized((current) => !current)}
+                type="button"
+              >
+                Show baptized
+              </button>
             </div>
           </div>
           <p className="field-help" id="roster-details-help">
@@ -1014,6 +1030,7 @@ function ClubRosterWorkspaceInner({
                               case "grade": return <SortableHeader active={activeSort.key === "grade"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Grade" onSort={() => rosterSort.toggle("grade")} />;
                               case "school": return <SortableHeader active={activeSort.key === "school"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="School" onSort={() => rosterSort.toggle("school")} />;
                               case "churchMember": return <SortableHeader active={activeSort.key === "churchMember"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="SDA member" fullLabel={CHURCH_MEMBER_LABEL} onSort={() => rosterSort.toggle("churchMember")} />;
+                              case "baptized": return <SortableHeader active={activeSort.key === "baptized"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label={BAPTIZED_LABEL} onSort={() => rosterSort.toggle("baptized")} />;
                               case "details": return <SortableHeader active={activeSort.key === "details"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Details" onSort={() => rosterSort.toggle("details")} />;
                               case "gender": return <SortableHeader active={activeSort.key === "gender"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Gender" onSort={() => rosterSort.toggle("gender")} />;
                               case "screening": return <SortableHeader active={activeSort.key === "screening"} direction={activeSort.dir} key={column} hiddenLabel={section.title} label="Sterling Volunteers" onSort={() => rosterSort.toggle("screening")} />;
@@ -1087,6 +1104,7 @@ function ClubRosterWorkspaceInner({
                                 case "grade": return <td {...cardCell("Grade")} className={tableStyles.cardFact} key={column}>{member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "—"}</td>;
                                 case "school": return <td {...cardCell("School")} className={tableStyles.cardFact} key={column}>{member.schoolType ? clubSchoolTypeLabels[member.schoolType] : "—"}</td>;
                                 case "churchMember": return <td {...cardCell(CHURCH_MEMBER_LABEL)} className={tableStyles.cardFact} key={column}>{member.churchMember ? clubChurchMemberLabels[member.churchMember] : "—"}</td>;
+                                case "baptized": return <td {...cardCell(BAPTIZED_LABEL)} className={tableStyles.cardFact} key={column}>{member.baptized ? clubBaptizedLabels[member.baptized] : "—"}</td>;
                                 case "details": return (
                                   <td {...cardCell("Details")} className={`roster-card-flags ${tableStyles.cardStatus}${nothingNeeded ? ` ${tableStyles.cardNothing}` : ""}`} key={column}>
                                     {/* The flex layout lives on this wrapper: a td that is itself flex stops being a table cell and drifts out of line (#435). */}
@@ -1293,6 +1311,13 @@ function ClubRosterWorkspaceInner({
               </label>
             </>
           )}
+          <label>
+            {BAPTIZED_LABEL}
+            <select defaultValue={editing?.baptized ?? ""} name="baptized">
+              <option value="">Not given</option>
+              {Object.entries(clubBaptizedLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </label>
           <label>
             Role (optional)
             {/* Left blank, youth save as "Pathfinder"; staff and adults stay blank (#424). */}

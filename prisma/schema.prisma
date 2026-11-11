@@ -787,6 +787,13 @@ enum ClubRosterChurchMember {
   NOT_SURE
 }
 
+/// Whether a roster member is baptized (#1852). Its own enum, not the church-member one.
+enum ClubRosterBaptized {
+  YES
+  NO
+  NOT_SURE
+}
+
 /// REMOVED means the club took the person off: birth date and personal
 /// fields are erased and the row stays only as history.
 enum ClubRosterStatus {
@@ -6112,6 +6119,8 @@ model ClubRosterMember {
   schoolType           ClubRosterSchoolType?
   /// Seventh-day Adventist church member (#1668). Optional, never flagged as missing. Not shown to Area Coordinators.
   churchMember         ClubRosterChurchMember?
+  /// Baptized (#1852), any member type. Optional, never flagged as missing. Unlike school type and church member, shown to everyone who can see the roster, Area Coordinators included.
+  baptized             ClubRosterBaptized?
   /// Age as a form reported it (#376), for people imported without a birth
   /// date. Shown with "birth date needed" until the director adds one.
   reportedAge          Int?

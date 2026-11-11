@@ -58,7 +58,7 @@ beforeEach(() => {
 
 describe("roster CSV (#384, #424)", () => {
   it("offers a template with the roster's columns and nothing else", () => {
-    expect(rosterCsvTemplate().trim()).toBe('"First name","Last name","Birth date","Type","Current class","Grade","Role","Gender"');
+    expect(rosterCsvTemplate().trim()).toBe('"First name","Last name","Birth date","Type","Current class","Grade","Role","Gender","Baptized"');
   });
 
   it("reads Excel-style and short-year dates, names, and labels", () => {

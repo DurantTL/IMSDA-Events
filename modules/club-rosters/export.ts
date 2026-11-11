@@ -1,4 +1,4 @@
-import { clubClassLevelLabels, rosterTltCell, clubRosterGenderLabels, clubSchoolGradeLabels } from "@/modules/club-rosters/domain";
+import { clubBaptizedLabels, clubClassLevelLabels, rosterTltCell, clubRosterGenderLabels, clubSchoolGradeLabels } from "@/modules/club-rosters/domain";
 import { guardianColumnParts, type RosterExportColumn } from "@/modules/club-rosters/export-columns";
 import type { GuardianRecord } from "@/modules/club-rosters/guardians-domain";
 import type { RosterMemberRecord } from "@/modules/club-rosters/repository";
@@ -54,6 +54,8 @@ function rosterExportCell(
       return rosterTltCell(member);
     case "schoolGrade":
       return member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "";
+    case "baptized":
+      return member.baptized ? clubBaptizedLabels[member.baptized] : "";
     case "role":
       return member.role || "";
     default:

@@ -731,6 +731,47 @@ describe("club roster storage", () => {
     });
   });
 
+  describe("baptized (#1852)", () => {
+    it("stores it for any member type and lists it for everyone, school details or not", async () => {
+      await addRosterMember("club-1", "2026-27", { ...youth, baptized: "YES" }, actor, { now });
+      await addRosterMember("club-1", "2026-27", { ...youth, firstName: "Sam", attendeeType: "STAFF", role: "Counselor", baptized: "NOT_SURE" }, actor, { now });
+      expect(db.members.map((row) => row.baptized)).toEqual(["YES", "NOT_SURE"]);
+      const plain = await listRoster("club-1", "2026-27", now);
+      expect(plain.map((member) => member.baptized).sort()).toEqual(["NOT_SURE", "YES"]);
+      expect("churchMember" in plain[0]!).toBe(false);
+    });
+
+    it("is optional, edits on its own, and keeps through a move to staff", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, baptized: "NO" }, actor, { now });
+      await updateRosterMember("club-1", memberId, { role: "Scribe" }, actor, now);
+      expect(db.members[0]).toMatchObject({ baptized: "NO" });
+      await updateRosterMember("club-1", memberId, { baptized: "YES" }, actor, now);
+      expect(db.members[0]).toMatchObject({ baptized: "YES" });
+      await updateRosterMember("club-1", memberId, { attendeeType: "STAFF" }, actor, now);
+      expect(db.members[0]).toMatchObject({ baptized: "YES" });
+      await updateRosterMember("club-1", memberId, { baptized: null }, actor, now);
+      expect(db.members[0]).toMatchObject({ baptized: null });
+    });
+
+    it("saves a baptized-only edit and audits the field name, not the value", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+      mocks.writeAuditLog.mockClear();
+      await updateRosterMember("club-1", memberId, { baptized: "YES" }, actor, now);
+      expect(db.members[0]).toMatchObject({ baptized: "YES" });
+      const entry = mocks.writeAuditLog.mock.calls.map((call) => call[0]).find((call) => call.action === "CLUB_ROSTER_MEMBER_UPDATED");
+      expect(entry.metadata).toMatchObject({ fields: ["baptized"] });
+      expect(JSON.stringify(entry)).not.toContain("YES");
+    });
+
+    it("is erased on removal and never written into the audit log as a value", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, baptized: "NOT_SURE" }, actor, { now });
+      await updateRosterMember("club-1", memberId, { baptized: "YES" }, actor, now);
+      expect(JSON.stringify(mocks.writeAuditLog.mock.calls)).not.toContain("NOT_SURE");
+      await removeRosterMember("club-1", memberId, actor, now);
+      expect(db.members[0]).toMatchObject({ status: "REMOVED", baptized: null });
+    });
+  });
+
   describe("grade, school type and church membership (#1664, #1668)", () => {
     const withSchool = { ...youth, schoolGrade: "GRADE_7" as const, schoolType: "PUBLIC_SCHOOL" as const, churchMember: "NOT_SURE" as const };
 
