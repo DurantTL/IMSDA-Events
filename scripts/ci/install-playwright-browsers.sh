@@ -60,7 +60,8 @@ printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' 'Acquire::h
 
 if [ "${PLAYWRIGHT_SETUP_SIMULATE_MIRROR_OUTAGE:-}" = "1" ]; then
   echo "Simulating a package-mirror outage: apt now points at an unresolvable host."
-  for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+  # GitHub runners list the Ubuntu mirrors in apt-mirrors.txt (a mirror+file: source), so it is rewritten too.
+  for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources /etc/apt/apt-mirrors.txt; do
     [ -f "$f" ] || continue
     $SUDO sed -i -E 's#https?://[^ /]+#http://package-mirror-outage.invalid#g' "$f"
   done
