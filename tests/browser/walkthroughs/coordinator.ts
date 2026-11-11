@@ -42,12 +42,20 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
   "walkthrough-coordinator-sign-in": {
     start: "signed-out",
     steps: {
-      "enter-details": async (ctx) => {
+      "open-sign-in": async (ctx) => {
         await open(ctx, "/account/sign-in");
-        await ctx.page.getByLabel("Email address").fill(ctx.coordinator.email);
-        await ctx.page.locator('input[name="password"]').fill(ctx.coordinator.password);
-        return ctx.page.getByRole("button", { name: "Sign in", exact: true });
+        return ctx.page.getByLabel("Email address");
       },
+      "type-email": async (ctx) => {
+        await ctx.page.getByLabel("Email address").fill(ctx.coordinator.email);
+        return ctx.page.getByLabel("Email address");
+      },
+      "type-password": async (ctx) => {
+        const password = ctx.page.locator('input[name="password"]');
+        await password.fill(ctx.coordinator.password);
+        return password;
+      },
+      "sign-in": async (ctx) => ctx.page.getByRole("button", { name: "Sign in", exact: true }),
       confirm: async (ctx) => {
         await ctx.page.getByRole("button", { name: "Sign in", exact: true }).click();
         await ctx.page.waitForURL(/\/account\/two-step/, slow);
@@ -56,8 +64,9 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
       },
       "enter-code": async (ctx) => {
         await ctx.page.getByLabel("Authenticator code").fill(ctx.authenticatorCode());
-        return ctx.page.getByRole("button", { name: "Continue", exact: true });
+        return ctx.page.getByLabel("Authenticator code");
       },
+      continue: async (ctx) => ctx.page.getByRole("button", { name: "Continue", exact: true }),
       "signed-in": async (ctx) => {
         await ctx.page.getByRole("button", { name: "Continue", exact: true }).click();
         await ctx.page.waitForURL((url: URL) => !url.pathname.startsWith("/account/two-step"), slow);
@@ -70,16 +79,33 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
   "walkthrough-coordinator-clubs": {
     start: "signed-in-coordinator",
     steps: {
-      "open-clubs": async (ctx) => {
+      "find-club": async (ctx) => {
         await overview(ctx);
-        return ctx.page.getByRole("heading", { name: "Clubs at a glance" });
+        return ctx.page.getByRole("link", { name: "Find a club" });
       },
       search: async (ctx) => {
-        await overview(ctx);
+        await ctx.page.getByRole("link", { name: "Find a club" }).click();
+        await ctx.page.waitForURL(/\/account\/area-clubs\/clubs/, slow);
         await settle(ctx);
-        return ctx.page.getByPlaceholder("Club, church, city or director");
+        const box = ctx.page.getByLabel("Search clubs");
+        await box.fill("Ridge");
+        // The box is outlined with its icon, and loses the page's own focus ring.
+        await box.blur();
+        // The list narrows after a short pause, and the status line says how many clubs match.
+        await ctx.page.getByText("1 of 4 clubs match").waitFor({ state: "visible", ...slow });
+        await settle(ctx);
+        return { target: box.locator("xpath=.."), area: ctx.page.getByRole("listitem").filter({ hasText: behindClub }) };
       },
-      "open-club": async (ctx) => ctx.page.getByRole("link", { name: /Open club/ }).first(),
+      "open-club": async (ctx) => ({
+        target: ctx.page.getByRole("link", { name: behindClub }),
+        area: ctx.page.getByRole("listitem").filter({ hasText: behindClub }),
+      }),
+      "view-only": async (ctx) => {
+        await ctx.page.getByRole("link", { name: behindClub }).click();
+        await ctx.page.waitForURL(/\/account\/area\//, slow);
+        await settle(ctx);
+        return ctx.page.locator("p.inline-notice").first();
+      },
       "whos-missing": async (ctx) => {
         await overview(ctx);
         return ctx.page.getByRole("heading", { name: "Who's missing what" });
@@ -100,14 +126,25 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
         await settle(ctx);
         return ctx.page.getByRole("navigation", { name: "Report month" }).getByRole("link", { name: /^October 2026/ });
       },
-      "see-states": async (ctx) => {
+      "see-counts": async (ctx) => {
         await ctx.page.getByRole("navigation", { name: "Report month" }).getByRole("link", { name: /^October 2026/ }).click();
         await settle(ctx);
-        return ctx.page.getByText("Submitted", { exact: true }).first();
+        return ctx.page.getByRole("region", { name: "October 2026 records" });
+      },
+      "find-row": async (ctx) => {
+        const row = ctx.page.getByRole("row", { name: new RegExp(filedClub) }).first();
+        return { target: row.locator('[data-state="SUBMITTED"]').first(), area: row };
       },
       "open-record": async (ctx) => {
         const row = ctx.page.getByRole("row", { name: new RegExp(filedClub) }).first();
-        return row.getByRole("link", { name: /Open record/ });
+        return { target: row.getByRole("link", { name: /Open record/ }), area: row };
+      },
+      "read-record": async (ctx) => {
+        const row = ctx.page.getByRole("row", { name: new RegExp(filedClub) }).first();
+        await row.getByRole("link", { name: /Open record/ }).click();
+        await ctx.page.waitForURL(/\/account\/area\/.+\/reports\//, slow);
+        await settle(ctx);
+        return ctx.page.getByText(/View only\. The club files and changes its own reports\./).first();
       },
     },
   },
@@ -119,18 +156,23 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
         await overview(ctx);
         return tab(ctx, "Points");
       },
-      chart: async (ctx) => {
+      leader: async (ctx) => {
         await (await tab(ctx, "Points")).click();
         await ctx.page.waitForURL(/\/account\/area-clubs\/points/, slow);
         await settle(ctx);
-        return ctx.page.getByText("Points leader", { exact: true }).locator("xpath=..");
+        return ctx.page.locator(".club-home-count").filter({ hasText: "Points leader" });
       },
+      chart: async (ctx) => ctx.page.getByRole("figure", { name: /Top clubs by total points/ }),
       table: async (ctx) => ctx.page.getByText(/Show as a table/).first(),
-      "table-open": async (ctx) => {
+      "table-row": async (ctx) => {
         await ctx.page.getByText(/Show as a table/).first().click();
-        const records = ctx.page.getByRole("row", { name: new RegExp(filedClub) }).first().getByRole("link", { name: /Records/ });
-        await records.waitFor({ state: "visible", ...slow });
-        return records;
+        const row = ctx.page.getByRole("row", { name: new RegExp(filedClub) }).first();
+        await row.waitFor({ state: "visible", ...slow });
+        return row;
+      },
+      "table-open": async (ctx) => {
+        const row = ctx.page.getByRole("row", { name: new RegExp(filedClub) }).first();
+        return { target: row.getByRole("link", { name: /Records/ }), area: row };
       },
     },
   },
@@ -140,17 +182,31 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
     steps: {
       "find-club": async (ctx) => {
         await overview(ctx);
-        return missingRow(ctx, behindClub).getByText("Missing 1 earlier month");
+        const row = missingRow(ctx, behindClub);
+        return { target: row.getByRole("rowheader"), area: row };
       },
-      "next-step": async (ctx) => missingRow(ctx, behindClub).getByText(/Contact the club's director/),
-      "open-club": async (ctx) => missingRow(ctx, behindClub).getByRole("link", { name: "Open club" }),
+      "what-missing": async (ctx) => {
+        const row = missingRow(ctx, behindClub);
+        return { target: row.getByText("Missing", { exact: true }), alsoMark: row.getByText("Missing 1 earlier month"), area: row.getByRole("rowheader") };
+      },
+      "next-step": async (ctx) => {
+        const row = missingRow(ctx, behindClub);
+        return { target: row.getByRole("cell", { name: /Contact the club's director/ }), area: row.getByRole("rowheader") };
+      },
+      "open-club": async (ctx) => {
+        const row = missingRow(ctx, behindClub);
+        return { target: row.getByRole("link", { name: "Open club" }), area: row.getByRole("rowheader") };
+      },
       "club-records": async (ctx) => {
         await missingRow(ctx, behindClub).getByRole("link", { name: "Open club" }).click();
         await ctx.page.waitForURL(/\/account\/area\//, slow);
         await settle(ctx);
-        return ctx.page.getByRole("heading", { name: "Monthly Records" });
+        return ctx.page.locator('section[aria-labelledby="open-club-reports"]');
       },
-      contact: async (ctx) => ctx.page.getByText("Sam Example").first(),
+      contact: async (ctx) => {
+        const card = ctx.page.locator('section[aria-labelledby="open-club-team"]');
+        return { target: card.getByRole("listitem").first(), area: card.getByRole("heading", { name: "Who runs this club" }) };
+      },
     },
   },
 
@@ -159,15 +215,25 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
     steps: {
       "getting-started": async (ctx) => {
         await overview(ctx);
-        return ctx.page.getByText("A director for every club");
+        return ctx.page.locator("li").filter({ hasText: "A director for every club" }).first();
       },
-      "no-director": async (ctx) => missingRow(ctx, noDirectorClub).getByText("No director", { exact: true }),
-      "ask-office": async (ctx) => missingRow(ctx, noDirectorClub).getByText(/Ask the conference office to add a director/),
+      "no-director": async (ctx) => {
+        const row = missingRow(ctx, noDirectorClub);
+        return { target: row.getByText("No director", { exact: true }), area: row.getByRole("rowheader") };
+      },
+      "ask-office": async (ctx) => {
+        const row = missingRow(ctx, noDirectorClub);
+        return { target: row.getByRole("cell", { name: /Ask the conference office to add a director/ }), area: row.getByRole("rowheader") };
+      },
+      "open-club": async (ctx) => {
+        const row = missingRow(ctx, noDirectorClub);
+        return { target: row.getByRole("link", { name: "Open club" }), area: row.getByRole("rowheader") };
+      },
       "club-admins": async (ctx) => {
         await missingRow(ctx, noDirectorClub).getByRole("link", { name: "Open club" }).click();
         await ctx.page.waitForURL(/\/account\/area\//, slow);
         await settle(ctx);
-        // The whole Club admins card: a mark on the sentence alone would sit on top of its icon.
+        // The whole card: a mark on the sentence alone would sit on top of its icon.
         const card = ctx.page.locator('section[aria-labelledby="open-club-team"]');
         await ctx.page.getByText(/No club director is assigned yet/).waitFor({ state: "visible", ...slow });
         return card;

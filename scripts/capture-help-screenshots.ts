@@ -35,14 +35,17 @@ const publicDir = path.join(root, "public");
 /** The capture's pixel density: the screenshot is taken at 2x and then scaled to the file size. */
 const captureScale = 2;
 
-/** Encodes one screenshot: crops it around the mark, scales it to the file size and saves WebP quality 62, effort 6. */
+/** WebP quality by picture kind. Lowered from 62 to 45 so all the walkthrough pictures stay under the 6 MB limit; text stays sharp at the 2x phone size. */
+const webpQuality: Record<WalkthroughImageKind, number> = { phone: 45, desktop: 45 };
+
+/** Encodes one screenshot: crops it around the mark, scales it to the file size and saves WebP (quality by kind), effort 6. */
 export async function encodeWalkthroughImage(png: Buffer, kind: WalkthroughImageKind, mark: MarkArea | null, area: MarkArea | null = null) {
   const crop = walkthroughCrop(kind, mark, area);
   const file = walkthroughImageFileSize(kind);
   return sharp(png)
     .extract({ left: crop.left * captureScale, top: crop.top * captureScale, width: crop.width * captureScale, height: crop.height * captureScale })
     .resize({ width: file.width, height: file.height })
-    .webp({ quality: 62, effort: 6 })
+    .webp({ quality: webpQuality[kind], effort: 6 })
     .toBuffer();
 }
 

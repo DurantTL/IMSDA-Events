@@ -202,7 +202,7 @@ modules. A change to something not listed (a shared hook, a helper, global CSS, 
 warning, so when you change shared look or behavior, re-run `npm run test:walkthroughs` (it fails on a missing control) and
 refresh the pictures by hand. Add a file to `sourceFiles` when a walkthrough's pictures start to depend on it.
 
-**Size budget and look (#1840).** The capture takes each screen at twice the pixel density and saves WebP quality 62. A phone
+**Size budget and look (#1840).** The capture takes each screen at twice the pixel density and saves WebP quality 45. A phone
 picture is cropped to 390 x 640 around the marked control (shown 390 x 640, file 780 x 1280). A desktop picture is not
 cropped: it keeps the whole 1280 x 800 screen so no name or heading is cut off (shown 960 x 600, file 1440 x 900). The marked
 control gets the numbered outline, the rest of the screen a light shade, and the picture a rounded frame with the shared
