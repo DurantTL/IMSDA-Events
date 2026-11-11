@@ -12,9 +12,11 @@ import {
   actionForSurface,
   buildResultLayout,
   destinationSearchStatus,
+  entriesSignature,
   hasSearchWords,
   listDestinations,
   listExpanded,
+  recordMoreNotes,
   recordSearchStatus,
   selectDestination,
   type ResultEntry,
@@ -62,7 +64,8 @@ export function DestinationSearch({
   const listId = `${baseId}-list`;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [activeRaw, setActive] = useState(-1);
+  // The active row is tied to the rows it was set on, so new rows (records arriving) never move it onto a different record.
+  const [activeState, setActiveState] = useState({ index: -1, signature: "" });
   const inputRef = useRef<HTMLInputElement>(null);
   // Where focus was before the field took it, so Escape can hand it back.
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -77,7 +80,10 @@ export function DestinationSearch({
   );
   const results = layout.entries;
   const groups = layout.sections;
+  const signature = entriesSignature(results);
+  const activeRaw = activeState.signature === signature ? activeState.index : -1;
   const active = clampActiveIndex(activeRaw, results.length);
+  const setActive = (index: number) => setActiveState({ index, signature });
   const expanded = listExpanded(open, results.length);
   const waitingOnRecords = records && hasQuery && recordSearch.pending;
   const optionId = (index: number) => `${baseId}-option-${index}`;
@@ -225,6 +231,9 @@ export function DestinationSearch({
       {open && hasQuery && results.length === 0 && !waitingOnRecords && (
         <p className="destination-search-empty">{records ? "Nothing matches. Try a different word." : "No pages match. Try a different word."}</p>
       )}
+      {open && records && hasQuery && !recordSearch.pending && recordMoreNotes(recordSearch.result).map((note) => (
+        <p className="destination-search-empty" key={note}>{note}</p>
+      ))}
       {open && records && hasQuery && recordSearch.failed && results.length > 0 && (
         <p className="destination-search-empty">Clubs, events and churches could not be searched.</p>
       )}

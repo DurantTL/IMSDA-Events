@@ -3,6 +3,9 @@ import {
   buildResultLayout,
   destinationKeyAction,
   formatEventDates,
+  recordAnswerFor,
+  recordMoreNotes,
+  entriesSignature,
   recordSearchStatus,
   selectDestination,
   type SearchDestination,
@@ -138,5 +141,36 @@ describe("See all targets by role", () => {
   it("event staff get none", () => {
     const viewer = { systemAdmin: false, clubsAdministration: false };
     for (const group of ["clubs", "events", "churches"] as const) expect(staffSearchSeeAllHref({ group, ...base, ...viewer })).toBeNull();
+  });
+});
+
+describe("records for the words typed now", () => {
+  const settled = { query: "maple", result: result(), failed: false };
+  it("uses a settled answer only for exactly the words it answered", () => {
+    expect(recordAnswerFor(settled, "maple")).toBe(settled);
+    expect(recordAnswerFor(settled, "camp meeting")).toBeNull();
+    // With no answer the list is pages-only, so Enter on row 0 cannot open an earlier search's record.
+    const stale = buildResultLayout({ pages, hasQuery: true, records: { enabled: true, result: recordAnswerFor(settled, "camp meeting")?.result ?? null } });
+    expect(stale.entries.every((entry) => entry.kind === "page")).toBe(true);
+  });
+
+  it("changes the entries signature when different rows arrive, so an arrowed index is dropped", () => {
+    const before = buildResultLayout({ pages, hasQuery: true, records: { enabled: true, result: null } }).entries;
+    const after = buildResultLayout({ pages, hasQuery: true, records: { enabled: true, result: result() } }).entries;
+    expect(entriesSignature(before)).not.toBe(entriesSignature(after));
+    expect(entriesSignature(after)).toBe(entriesSignature(after));
+  });
+});
+
+describe("a group cut short with no See all page", () => {
+  const cut = result({ events: { ...result().events, more: true, seeAllHref: null } });
+  it("gets a note, not a list option", () => {
+    expect(recordMoreNotes(cut)).toEqual(["More events match. Type more words to narrow."]);
+    expect(recordMoreNotes(result())).toEqual([]);
+    expect(recordMoreNotes(null)).toEqual([]);
+    expect(buildResultLayout({ pages: [], hasQuery: true, records: { enabled: true, result: cut } }).entries.some((entry) => entry.label.includes("More events"))).toBe(false);
+  });
+  it("is announced in the status line once the answer is in", () => {
+    expect(recordSearchStatus({ query: "synth", pageCount: 0, result: cut, pending: false, failed: false })).toContain("More events match. Type more words to narrow.");
   });
 });

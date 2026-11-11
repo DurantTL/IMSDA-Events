@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { hasSearchWords } from "@/components/destination-search-model";
+import { hasSearchWords, recordAnswerFor } from "@/components/destination-search-model";
 import { STAFF_SEARCH_MAX_QUERY_LENGTH, type StaffSearchResult } from "@/modules/staff-search/domain";
 
 /** Wait this long after the last keystroke before asking the server. */
@@ -24,7 +24,7 @@ export function useStaffRecordSearch(query: string, enabled: boolean) {
     if (!active) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetch(`/api/staff/search?q=${encodeURIComponent(words)}`, { signal: controller.signal, headers: { accept: "application/json" } })
+      fetch(`/api/staff/search?q=${encodeURIComponent(words)}`, { signal: controller.signal, headers: { accept: "application/json" }, cache: "no-store" })
         .then(async (response) => {
           if (!response.ok) throw new Error(`Search answered ${response.status}`);
           return (await response.json()) as StaffSearchResult;
@@ -41,12 +41,13 @@ export function useStaffRecordSearch(query: string, enabled: boolean) {
     };
   }, [active, words]);
 
-  const current = active && settled.query === words;
+  // Rows are shown only for the words they answer: while a newer answer is pending the list is pages-only, so Enter can
+  // never open a record found for earlier words.
+  const answer = active ? recordAnswerFor(settled, words) : null;
   return {
-    /** The answer for the typed words; the previous one stays up while a newer one loads, and none for an empty box. */
-    result: active ? settled.result : null,
+    result: answer?.result ?? null,
     /** True from the first keystroke until the answer for these words arrives. */
-    pending: active && !current,
-    failed: active && current && settled.failed,
+    pending: active && !answer,
+    failed: Boolean(answer?.failed),
   };
 }

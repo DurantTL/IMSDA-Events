@@ -688,6 +688,18 @@ export function recordSearchStatus(input: {
   pending: boolean;
   failed: boolean;
 }): string {
+  const notes = recordMoreNotes(input.result);
+  const base = recordSearchStatusBase(input);
+  return notes.length > 0 && !input.pending ? `${base} ${notes.join(" ")}` : base;
+}
+
+function recordSearchStatusBase(input: {
+  query: string;
+  pageCount: number;
+  result: StaffSearchResult | null;
+  pending: boolean;
+  failed: boolean;
+}): string {
   if (!hasSearchWords(input.query)) return destinationSearchStatus(input.query, input.pageCount);
   const parts: string[] = [];
   if (input.pageCount > 0) parts.push(countWord(input.pageCount, "page", "pages"));
@@ -702,4 +714,22 @@ export function recordSearchStatus(input: {
   if (input.pending) return parts.length > 0 ? `${parts.join(", ")} so far. Searching clubs, events and churches. ${use}` : "Searching clubs, events and churches.";
   if (parts.length === 0) return input.failed ? "Clubs, events and churches could not be searched." : "Nothing matches. Try a different word.";
   return `${parts.join(", ")}.${failure} ${use}`.replace("  ", " ");
+}
+
+/** The settled answer, only when it is for exactly these words (never rows found for earlier words). */
+export function recordAnswerFor<T extends { query: string }>(settled: T, words: string): T | null {
+  return settled.query === words ? settled : null;
+}
+
+/** A short note per group that has more matches than are listed but no page to see them on. Not a list option. */
+export function recordMoreNotes(result: StaffSearchResult | null): string[] {
+  if (!result) return [];
+  return recordGroupOrder
+    .filter((group) => result[group].more && !result[group].seeAllHref)
+    .map((group) => `More ${recordGroupHeadings[group].toLowerCase()} match. Type more words to narrow.`);
+}
+
+/** The entry keys, joined: changes whenever the listed rows change, so an active index can be tied to the rows it was set on. */
+export function entriesSignature(entries: readonly ResultEntry[]): string {
+  return entries.map((entry) => entry.key).join("|");
 }

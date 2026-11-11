@@ -50,7 +50,7 @@ const event = (id: string, name: string, extra: Row = {}): Row => ({
 });
 const member = (userId: string, role: string, extra: Row = {}) => ({ userId, role, status: "ACTIVE", permissions: [], ...extra });
 
-const database = vi.hoisted(() => ({ organizations: [] as Row[], events: [] as Row[], clubsAdministrators: new Set<string>(), organizationCalls: [] as Row[], eventCalls: [] as Row[] }));
+const database = vi.hoisted(() => ({ organizations: [] as Row[], events: [] as Row[], clubsAdministratorGrants: [] as { userId: string; revokedAt: Date | null }[], siteContentEditorGrants: [] as { userId: string; revokedAt: Date | null }[], organizationCalls: [] as Row[], eventCalls: [] as Row[] }));
 
 const prisma = {
   organization: {
@@ -70,7 +70,10 @@ const prisma = {
     }),
   },
   clubsAdministratorGrant: {
-    findFirst: vi.fn(async (args: { where: { userId: string } }) => (database.clubsAdministrators.has(args.where.userId) ? { id: "grant" } : null)),
+    findFirst: vi.fn(async (args: { where: Row }) => (database.clubsAdministratorGrants.find((grant) => matches(args.where, grant)) ? { id: "grant" } : null)),
+  },
+  siteContentEditorGrant: {
+    findFirst: vi.fn(async (args: { where: Row }) => (database.siteContentEditorGrants.find((grant) => matches(args.where, grant)) ? { id: "grant" } : null)),
   },
 };
 
@@ -85,13 +88,15 @@ const eventAdmin = { id: "u_eventadmin", globalRole: null };
 const registrar = { id: "u_registrar", globalRole: null };
 const kitchen = { id: "u_kitchen", globalRole: null };
 const clubsAdmin = { id: "u_clubsadmin", globalRole: null };
+const revokedClubsAdmin = { id: "u_revoked", globalRole: null };
 const siteEditor = { id: "u_siteeditor", globalRole: null };
 
 beforeEach(() => {
   vi.clearAllMocks();
   database.organizationCalls.length = 0;
   database.eventCalls.length = 0;
-  database.clubsAdministrators = new Set([clubsAdmin.id]);
+  database.clubsAdministratorGrants = [{ userId: clubsAdmin.id, revokedAt: null }, { userId: revokedClubsAdmin.id, revokedAt: long("2026-12-01T00:00:00Z") }];
+  database.siteContentEditorGrants = [{ userId: siteEditor.id, revokedAt: null }];
   database.organizations = [
     org("club_a", "CLUB", "Synth Pathfinders", { parentOrganization: sponsor }),
     org("club_b", "CLUB", "Maple Adventurers", { city: "Other Town", directorGrants: [director("Dana Quill")] }),
@@ -174,12 +179,29 @@ describe("what each role finds", () => {
     expect(result.events.items.every((item) => item.href.startsWith("/overview?event="))).toBe(true);
   });
 
+  it("revoked Clubs Administrator: no clubs, and club events only through their own assignment", async () => {
+    const result = await searchStaffRecords(revokedClubsAdmin, "synth", now);
+    expect(result.clubs.items).toEqual([]);
+    expect(result.events.items).toEqual([]);
+    expect(prisma.organization.findMany).not.toHaveBeenCalled();
+  });
+
   it("site content editor with no event assignment: nothing at all", async () => {
     const result = await searchStaffRecords(siteEditor, "synth", now);
     expect(result.clubs.items).toEqual([]);
     expect(result.events.items).toEqual([]);
     expect(result.churches.items).toEqual([]);
     expect(prisma.organization.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("a group cut short with nowhere to see the rest", () => {
+  it("reports more for an event administrator but offers no See all page", async () => {
+    database.events = Array.from({ length: 8 }, (_, index) => event(`ev_${index}`, `Synth Event ${index}`, { memberships: [member(eventAdmin.id, "EVENT_ADMIN")] }));
+    const result = await searchStaffRecords(eventAdmin, "synth", now);
+    expect(result.events.items).toHaveLength(5);
+    expect(result.events.more).toBe(true);
+    expect(result.events.seeAllHref).toBeNull();
   });
 });
 
