@@ -17,7 +17,7 @@ export async function loadHomeLayout(userId: string, roles: AdminRoles): Promise
 }
 
 export async function saveHomeLayout(userId: string, modules: readonly HomeLayoutEntry[]): Promise<void> {
-  const value = modules.map(({ key, shown }) => ({ key, shown }));
+  const value = modules.map(({ key, shown, links }) => (links ? { key, shown, links } : { key, shown }));
   await getPrisma().staffHomeLayout.upsert({
     where: { userId },
     create: { userId, modules: value },

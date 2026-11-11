@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { EventsFillingUpModule, MonthlyRecordsModule, SeasonNumbersModule } from "@/components/home-modules";
 import { ComingUpPage, NeedsYouPage } from "@/components/home-pages";
 import { StaffHomeBoard } from "@/components/staff-home-board";
 import { StaffInstallCard } from "@/components/staff-install-card";
@@ -13,6 +14,8 @@ import { buildNeedsView } from "@/modules/system-admin/home-needs-model";
 import { loadComingUp } from "@/modules/system-admin/home-coming-up-repository";
 import type { HomeModuleKey } from "@/modules/system-admin/home-layout-domain";
 import { loadHomeLayout } from "@/modules/system-admin/home-layout-repository";
+import { loadHomeModules } from "@/modules/system-admin/home-modules-repository";
+import { usableQuickLinks } from "@/modules/system-admin/home-quick-links-domain";
 import { loadNeedsInput } from "@/modules/system-admin/home-needs-repository";
 
 export const metadata: Metadata = { title: "Home" };
@@ -28,7 +31,6 @@ export default async function HomeNeedsYouPage() {
   if (!user) redirect(await staffLoginRedirectPath());
   const roles = await resolveAdminRoles(user);
   const held = heldAdminRoles(roles);
-  const view = buildNeedsView(await loadNeedsInput(roles, held));
   const header = (
     <>
       <StaffPageHeader description="What needs you, and what is coming up." />
@@ -38,6 +40,7 @@ export default async function HomeNeedsYouPage() {
 
   if (held.length === 0) {
     // No admin role: today's view, with no Arrange or Customize.
+    const view = buildNeedsView(await loadNeedsInput(roles, held));
     const comingUp = view.allClear || view.noAdminRole ? await loadComingUp(user, async () => held) : null;
     return (
       <section className="page-stack">
@@ -51,14 +54,24 @@ export default async function HomeNeedsYouPage() {
   const shown = new Set<HomeModuleKey>(layout.modules.filter((module) => module.shown).map((module) => module.key));
   const comingUpShown = shown.has("coming-up");
   // Coming up sits under the all-clear message (#1747) only when it is not its own card.
+  // The module reads start first: a system administrator's every-event read then also serves Needs you's own events, so
+  // each heavy read runs once per request (modules/system-admin/request-reads.ts).
+  const modulesRead = loadHomeModules(roles, shown);
+  const view = buildNeedsView(await loadNeedsInput(roles, held));
   const comingUp = comingUpShown || view.allClear ? await loadComingUp(user, async () => held) : null;
   const bodies: Partial<Record<HomeModuleKey, ReactNode>> = {};
   if (shown.has("needs-you")) bodies["needs-you"] = <NeedsYouPage view={view} headingLevel={3} comingUp={comingUpShown ? null : comingUp} />;
   if (comingUpShown && comingUp) bodies["coming-up"] = <ComingUpPage events={comingUp.events} nextStep={comingUp.nextStep} />;
+  // Only the modules turned on are read, each scoped to the person's own roles.
+  const data = await modulesRead;
+  if (shown.has("events-filling-up")) bodies["events-filling-up"] = <EventsFillingUpModule view={data["events-filling-up"] ?? null} />;
+  if (shown.has("season-numbers")) bodies["season-numbers"] = <SeasonNumbersModule view={data["season-numbers"] ?? null} />;
+  if (shown.has("monthly-records")) bodies["monthly-records"] = <MonthlyRecordsModule view={data["monthly-records"] ?? null} />;
+  const quickLinkOptions = usableQuickLinks(roles).map(({ key, label, href }) => ({ key, label, href }));
   return (
     <section className="page-stack">
       {header}
-      <StaffHomeBoard modules={layout.modules} bodies={bodies} />
+      <StaffHomeBoard modules={layout.modules} bodies={bodies} quickLinkOptions={quickLinkOptions} />
     </section>
   );
 }

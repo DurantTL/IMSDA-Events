@@ -5,8 +5,9 @@
  * To add a module: add one entry to `HOME_MODULES` and add its key to the roles that start with it in `HOME_ROLE_DEFAULTS`.
  */
 import { heldAdminRoles, type AdminRole, type AdminRoles } from "@/modules/access/admin-roles-domain";
+import { cleanQuickLinkKeys, defaultQuickLinkKeys } from "@/modules/system-admin/home-quick-links-domain";
 
-export type HomeModuleKey = "needs-you" | "coming-up";
+export type HomeModuleKey = "needs-you" | "coming-up" | "events-filling-up" | "season-numbers" | "monthly-records" | "quick-links";
 
 export type HomeModuleDefinition = {
   key: HomeModuleKey;
@@ -18,11 +19,18 @@ export type HomeModuleDefinition = {
 };
 
 const anyAdminRole = (roles: AdminRoles) => heldAdminRoles(roles).length > 0;
+/** Admins who can see event data: a system administrator, or assigned to at least one event. */
+const canSeeEvents = (roles: AdminRoles) => roles.systemAdmin || roles.eventAdminEventIds.length > 0;
+const canSeeClubs = (roles: AdminRoles) => roles.systemAdmin || roles.clubsAdministrator;
 
 /** Every module, in the order Customize lists unused ones. */
 export const HOME_MODULES: readonly HomeModuleDefinition[] = [
   { key: "needs-you", label: "Needs you", hideable: false, mayUse: anyAdminRole },
   { key: "coming-up", label: "Coming up", hideable: true, mayUse: anyAdminRole },
+  { key: "events-filling-up", label: "Events filling up", hideable: true, mayUse: canSeeEvents },
+  { key: "season-numbers", label: "Season numbers", hideable: true, mayUse: anyAdminRole },
+  { key: "monthly-records", label: "Monthly Records by area", hideable: true, mayUse: canSeeClubs },
+  { key: "quick-links", label: "Quick links", hideable: true, mayUse: anyAdminRole },
 ];
 
 /**
@@ -30,9 +38,9 @@ export const HOME_MODULES: readonly HomeModuleDefinition[] = [
  * a later module joins its roles here in the issue that builds it.
  */
 export const HOME_ROLE_DEFAULTS: Record<AdminRole, HomeModuleKey[]> = {
-  SYSTEM_ADMIN: ["needs-you"],
-  EVENTS_ADMIN: ["needs-you", "coming-up"],
-  CLUBS_ADMIN: ["needs-you"],
+  SYSTEM_ADMIN: ["needs-you", "events-filling-up", "season-numbers", "monthly-records", "quick-links"],
+  EVENTS_ADMIN: ["needs-you", "events-filling-up", "season-numbers", "coming-up"],
+  CLUBS_ADMIN: ["needs-you", "monthly-records", "season-numbers"],
 };
 
 /** Roles are merged in this order, whatever order they are held in. */
@@ -41,7 +49,8 @@ const MERGE_ORDER: readonly AdminRole[] = ["SYSTEM_ADMIN", "EVENTS_ADMIN", "CLUB
 /** The most modules one saved layout can hold. */
 export const HOME_LAYOUT_MAX = 32;
 
-export type HomeLayoutEntry = { key: HomeModuleKey; shown: boolean };
+/** `links` (catalogue keys) belongs to the Quick links entry only. */
+export type HomeLayoutEntry = { key: HomeModuleKey; shown: boolean; links?: string[] };
 export type HomeLayoutModule = HomeLayoutEntry & { label: string; hideable: boolean };
 export type HomeLayout = { modules: HomeLayoutModule[]; customized: boolean };
 
@@ -80,11 +89,15 @@ function cleanEntries(value: unknown, roles: AdminRoles): HomeLayoutEntry[] | nu
   const out: HomeLayoutEntry[] = [];
   for (const item of value.slice(0, HOME_LAYOUT_MAX)) {
     if (!item || typeof item !== "object") continue;
-    const { key, shown } = item as { key?: unknown; shown?: unknown };
+    const { key, shown, links } = item as { key?: unknown; shown?: unknown; links?: unknown };
     if (typeof key !== "string" || !byKey.has(key) || !usable.has(key as HomeModuleKey) || seen.has(key)) continue;
     seen.add(key);
     const definition = byKey.get(key)!;
-    out.push({ key: key as HomeModuleKey, shown: definition.hideable ? shown === true : true });
+    const entry: HomeLayoutEntry = { key: key as HomeModuleKey, shown: definition.hideable ? shown === true : true };
+    // Quick links keeps its picks (catalogue keys the person may use now); a missing list means "use the defaults".
+    const picks = key === "quick-links" ? cleanQuickLinkKeys(links, roles) : null;
+    if (picks) entry.links = picks;
+    out.push(entry);
   }
   return out;
 }
@@ -96,10 +109,12 @@ function withMissingHidden(entries: HomeLayoutEntry[], roles: AdminRoles): HomeL
   return [...entries, ...missing];
 }
 
-function describe(entries: readonly HomeLayoutEntry[]): HomeLayoutModule[] {
+function describe(entries: readonly HomeLayoutEntry[], roles: AdminRoles): HomeLayoutModule[] {
   return entries.map((entry) => {
     const definition = byKey.get(entry.key)!;
-    return { key: entry.key, shown: entry.shown, label: definition.label, hideable: definition.hideable };
+    const described: HomeLayoutModule = { key: entry.key, shown: entry.shown, label: definition.label, hideable: definition.hideable };
+    if (entry.key === "quick-links") described.links = entry.links ?? defaultQuickLinkKeys(roles);
+    return described;
   });
 }
 
@@ -107,8 +122,8 @@ function describe(entries: readonly HomeLayoutEntry[]): HomeLayoutModule[] {
 export function resolveHomeLayout(saved: unknown, roles: AdminRoles): HomeLayout {
   const held = heldAdminRoles(roles);
   const entries = cleanEntries(saved, roles);
-  if (!entries || entries.length === 0) return { modules: describe(defaultHomeLayout(held, roles)), customized: false };
-  return { modules: describe(withMissingHidden(entries, roles)), customized: true };
+  if (!entries || entries.length === 0) return { modules: describe(defaultHomeLayout(held, roles), roles), customized: false };
+  return { modules: describe(withMissingHidden(entries, roles), roles), customized: true };
 }
 
 /** For saving: the checked list to store, or null when the input is not a list or holds nothing usable. */

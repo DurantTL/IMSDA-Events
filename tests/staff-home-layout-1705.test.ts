@@ -24,20 +24,24 @@ const keys = (layout: { modules: { key: string; shown: boolean }[] }) => layout.
 
 describe("Home layout defaults (#1705)", () => {
   it("keeps the defaults in one table", () => {
-    expect(HOME_ROLE_DEFAULTS).toEqual({ SYSTEM_ADMIN: ["needs-you"], EVENTS_ADMIN: ["needs-you", "coming-up"], CLUBS_ADMIN: ["needs-you"] });
+    expect(HOME_ROLE_DEFAULTS).toEqual({
+      SYSTEM_ADMIN: ["needs-you", "events-filling-up", "season-numbers", "monthly-records", "quick-links"],
+      EVENTS_ADMIN: ["needs-you", "events-filling-up", "season-numbers", "coming-up"],
+      CLUBS_ADMIN: ["needs-you", "monthly-records", "season-numbers"],
+    });
   });
 
   it("gives each role its own default set and lists the rest turned off", () => {
-    expect(keys(resolveHomeLayout(null, system))).toEqual(["needs-you:on", "coming-up:off"]);
-    expect(keys(resolveHomeLayout(null, clubs))).toEqual(["needs-you:on", "coming-up:off"]);
-    expect(keys(resolveHomeLayout(null, events))).toEqual(["needs-you:on", "coming-up:on"]);
+    expect(keys(resolveHomeLayout(null, system))).toEqual(["needs-you:on", "events-filling-up:on", "season-numbers:on", "monthly-records:on", "quick-links:on", "coming-up:off"]);
+    expect(keys(resolveHomeLayout(null, clubs))).toEqual(["needs-you:on", "monthly-records:on", "season-numbers:on", "coming-up:off", "quick-links:off"]);
+    expect(keys(resolveHomeLayout(null, events))).toEqual(["needs-you:on", "events-filling-up:on", "season-numbers:on", "coming-up:on", "quick-links:off"]);
     expect(resolveHomeLayout(null, events).customized).toBe(false);
   });
 
   it("merges roles in System, Events, Clubs order without repeats", () => {
-    expect(defaultHomeLayout(["EVENTS_ADMIN", "CLUBS_ADMIN"])).toEqual([{ key: "needs-you", shown: true }, { key: "coming-up", shown: true }]);
-    expect(defaultHomeLayout(["CLUBS_ADMIN", "SYSTEM_ADMIN"])).toEqual([{ key: "needs-you", shown: true }, { key: "coming-up", shown: false }]);
-    expect(keys(resolveHomeLayout(null, eventsAndClubs))).toEqual(["needs-you:on", "coming-up:on"]);
+    expect(defaultHomeLayout(["EVENTS_ADMIN", "CLUBS_ADMIN"]).map((e) => `${e.key}:${e.shown ? "on" : "off"}`)).toEqual(["needs-you:on", "events-filling-up:on", "season-numbers:on", "coming-up:on", "monthly-records:on", "quick-links:off"]);
+    expect(defaultHomeLayout(["CLUBS_ADMIN", "SYSTEM_ADMIN"]).map((e) => `${e.key}:${e.shown ? "on" : "off"}`)).toEqual(["needs-you:on", "events-filling-up:on", "season-numbers:on", "monthly-records:on", "quick-links:on", "coming-up:off"]);
+    expect(keys(resolveHomeLayout(null, eventsAndClubs))).toEqual(["needs-you:on", "events-filling-up:on", "season-numbers:on", "coming-up:on", "monthly-records:on", "quick-links:off"]);
   });
 
   it("Reset is the same list as nothing saved", () => {
@@ -50,19 +54,19 @@ describe("Home layout defaults (#1705)", () => {
 describe("Home layout resolving (#1705)", () => {
   it("keeps a saved order and hidden modules in their place", () => {
     const layout = resolveHomeLayout([{ key: "coming-up", shown: false }, { key: "needs-you", shown: true }], events);
-    expect(keys(layout)).toEqual(["coming-up:off", "needs-you:on"]);
+    expect(keys(layout)).toEqual(["coming-up:off", "needs-you:on", "events-filling-up:off", "season-numbers:off", "quick-links:off"]);
     expect(layout.customized).toBe(true);
   });
 
   it("skips unknown and unusable keys, and repeats", () => {
     const layout = resolveHomeLayout([{ key: "money", shown: true }, { key: "needs-you", shown: true }, { key: "needs-you", shown: false }, null, 4, { key: 7 }], clubs);
-    expect(keys(layout)).toEqual(["needs-you:on", "coming-up:off"]);
+    expect(keys(layout)).toEqual(["needs-you:on", "coming-up:off", "season-numbers:off", "monthly-records:off", "quick-links:off"]);
     expect(resolveHomeLayout([{ key: "needs-you", shown: true }], none).modules).toEqual([]);
   });
 
   it("never hides Needs you", () => {
     expect(keys(resolveHomeLayout([{ key: "needs-you", shown: false }], events))[0]).toBe("needs-you:on");
-    expect(sanitizeHomeLayoutInput([{ key: "needs-you", shown: false }], events)).toEqual([{ key: "needs-you", shown: true }, { key: "coming-up", shown: false }]);
+    expect(sanitizeHomeLayoutInput([{ key: "needs-you", shown: false }], events)).toEqual([{ key: "needs-you", shown: true }, { key: "coming-up", shown: false }, { key: "events-filling-up", shown: false }, { key: "season-numbers", shown: false }, { key: "quick-links", shown: false }]);
   });
 
   it("falls back to the defaults for malformed saved data", () => {
@@ -72,14 +76,14 @@ describe("Home layout resolving (#1705)", () => {
   });
 
   it("appends a newly usable module hidden at the end", () => {
-    expect(keys(resolveHomeLayout([{ key: "needs-you", shown: true }], events))).toEqual(["needs-you:on", "coming-up:off"]);
+    expect(keys(resolveHomeLayout([{ key: "needs-you", shown: true }], events))).toEqual(["needs-you:on", "coming-up:off", "events-filling-up:off", "season-numbers:off", "quick-links:off"]);
   });
 
   it("rejects input that is not a usable list", () => {
     expect(sanitizeHomeLayoutInput("nope", events)).toBeNull();
     expect(sanitizeHomeLayoutInput([], events)).toBeNull();
     expect(sanitizeHomeLayoutInput([{ key: "money", shown: true }], events)).toBeNull();
-    expect(sanitizeHomeLayoutInput(Array.from({ length: 500 }, () => ({ key: "coming-up", shown: true })), events)).toEqual([{ key: "coming-up", shown: true }, { key: "needs-you", shown: true }]);
+    expect(sanitizeHomeLayoutInput(Array.from({ length: 500 }, () => ({ key: "coming-up", shown: true })), events)).toEqual([{ key: "coming-up", shown: true }, { key: "needs-you", shown: true }, { key: "events-filling-up", shown: false }, { key: "season-numbers", shown: false }, { key: "quick-links", shown: false }]);
   });
 
   it("moves items and words the move", () => {
@@ -128,9 +132,9 @@ describe("Home layout saving (#1705)", () => {
     roles = held;
     const response = await put(swap);
     expect(response.status).toBe(200);
-    expect(keys((await response.json()).layout)).toEqual(["coming-up:on", "needs-you:on"]);
+    expect(keys((await response.json()).layout).slice(0, 2)).toEqual(["coming-up:on", "needs-you:on"]);
     expect(writes).toEqual(["user_a"]);
-    expect(keys(await loadHomeLayout("user_a", held))).toEqual(["coming-up:on", "needs-you:on"]);
+    expect(keys(await loadHomeLayout("user_a", held)).slice(0, 2)).toEqual(["coming-up:on", "needs-you:on"]);
     const reset = await del();
     expect(reset.status).toBe(200);
     expect((await reset.json()).layout.customized).toBe(false);
@@ -174,7 +178,7 @@ describe("Home layout saving (#1705)", () => {
     expect((await put("nope")).status).toBe(400);
     expect(writes).toEqual([]);
     await put(swap);
-    expect(keys(await loadHomeLayout("user_b", events))).toEqual(["needs-you:on", "coming-up:on"]);
+    expect(keys(await loadHomeLayout("user_b", events)).slice(0, 2)).toEqual(["needs-you:on", "events-filling-up:on"]);
   });
 });
 
@@ -231,6 +235,7 @@ describe("Home page (#1705)", () => {
     vi.doMock("@/modules/system-admin/home-needs-repository", () => ({ loadNeedsInput: async () => ({ held: [], events: null, attention: null }) }));
     vi.doMock("@/modules/system-admin/home-needs-model", () => ({ buildNeedsView: () => ({ allClear: false, noAdminRole: true, sections: [] }) }));
     vi.doMock("@/modules/system-admin/home-coming-up-repository", () => ({ loadComingUp: async () => ({ events: [], nextStep: null }) }));
+    vi.doMock("@/modules/system-admin/home-modules-repository", () => ({ loadHomeModules: async () => ({}) }));
     vi.doMock("@/modules/system-admin/home-layout-repository", () => ({ loadHomeLayout: async (_id: string, roles: AdminRoles) => resolveHomeLayout(null, roles) }));
     vi.doMock("@/components/staff-install-card", () => ({ StaffInstallCard: () => null }));
     vi.doMock("@/components/staff-page-header", () => ({ StaffPageHeader: () => null }));

@@ -1,0 +1,189 @@
+/* Staff Home modules (#1705): cards for Events filling up, Season numbers and Monthly Records. One column on a phone, nothing scrolls sideways. */
+.module {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.message {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 12px 14px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  line-height: 1.5;
+}
+
+.message[data-tone="unavailable"] {
+  border-style: dashed;
+}
+
+.chip {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.eventRow {
+  display: grid;
+  gap: 6px;
+  min-height: var(--touch-target, 44px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 12px 14px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.rowTitle {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.rowMeta,
+.rowText {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.rowMeta {
+  font-weight: 700;
+}
+
+.bar {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--imsda-navy-soft);
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  background: var(--imsda-navy);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--touch-target, 44px);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tile {
+  min-width: 0;
+}
+
+.tileLink {
+  display: grid;
+  gap: 2px;
+  min-height: var(--touch-target, 44px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 10px 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tileValue {
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.5rem);
+  font-weight: 800;
+}
+
+.tileLabel {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.trend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  color: var(--imsda-navy);
+}
+
+.spark {
+  width: 120px;
+  height: 32px;
+  flex: none;
+}
+
+.recordRow {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 12px 14px;
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.counts div {
+  display: grid;
+  gap: 2px;
+}
+
+.counts dt {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.counts dd {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.25rem);
+  font-weight: 800;
+}

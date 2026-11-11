@@ -9,7 +9,6 @@ import { listClubFormsForHub } from "@/modules/club-forms/hub";
 import { countStaffTransferQueue } from "@/modules/club-transfers/repository";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-club-year";
 import { monthlyStatusTotals } from "@/modules/club-reports/area-summary-domain";
-import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
 import { chooseReportMonth } from "@/modules/club-reports/club-directory-domain";
 import { loadFormsHub } from "@/modules/forms-hub/load";
 import { listFormTemplateLibrary } from "@/modules/forms/form-template-library";
@@ -17,6 +16,7 @@ import { getAdminAttentionSummary } from "@/modules/system-admin/attention-repos
 import { listAreaPauses } from "@/modules/system-admin/area-pause";
 import { countWaitingClubInvites, listClubLeaders } from "@/modules/system-admin/club-leaders";
 import { listPendingInvitesPage } from "@/modules/system-admin/pending-invites";
+import { clubsSummaryOnce } from "@/modules/system-admin/request-reads";
 import { getSystemReadiness } from "@/modules/system-admin/readiness-repository";
 import { neededMetrics, type HubKey, type HubViewer, type MetricKey, type MetricValues } from "@/modules/system-admin/admin-hubs-model";
 
@@ -49,7 +49,7 @@ export function lateRecordCount(clubs: Parameters<typeof monthlyStatusTotals>[0]
 const clubsSummary = (context: Context) =>
   shared(context, "clubsSummary", async () => {
     const clubYear = context.clubYear ?? resolveAreaClubYear(undefined, context.now);
-    const clubs = await getAreaClubsSummary(clubYear, context.now, { backgroundChecks: false });
+    const clubs = await clubsSummaryOnce(clubYear, context.now);
     return { clubs: clubs.length, late: lateRecordCount(clubs, clubYear, context.now) };
   });
 
