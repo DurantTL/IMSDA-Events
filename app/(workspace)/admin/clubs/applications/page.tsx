@@ -1,11 +1,24 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
-import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { NewClubApplicationsQueue } from "@/components/new-club-applications-queue";
+import {
+  StaffApplicationLinks,
+  StaffApplicationList,
+  StaffApplicationMissing,
+  StaffApplicationRecord,
+  StaffApplicationViews,
+  StaffApplicationsIntro,
+} from "@/components/staff-club-applications";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { listNewClubApplications, listNewClubInvites, listPublicSponsorOptions } from "@/modules/club-applications/repository";
+import {
+  countWaitingNewClubApplications,
+  getNewClubApplication,
+  listNewClubApplications,
+  listNewClubInvites,
+  listPublicSponsorOptions,
+} from "@/modules/club-applications/repository";
+import { parseApplicationId, parseApplicationView } from "@/modules/club-applications/queue-model";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
@@ -13,38 +26,53 @@ export const metadata: Metadata = { title: "New club applications" };
 export const dynamic = "force-dynamic";
 
 /**
- * The new club application queue (#817) for system administrators and Clubs Administrators,
- * who approve and decline. Area Coordinators read the same list, view only, from their
- * Clubs menu.
+ * The new club application queue (#817, #1589) for system administrators and Clubs Administrators,
+ * who approve and decline. `?status=` picks Waiting (the default), Decided or Private links;
+ * `?application=<id>` shows one application in full, where the decision is made. Area Coordinators read
+ * the same applications, view only, from their Clubs menu.
  */
-export default async function NewClubApplicationsAdminPage() {
+export default async function NewClubApplicationsAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string | string[]; application?: string | string[] }>;
+}) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN";
-  const [applications, invites, churches] = await Promise.all([
-    listNewClubApplications(viewer),
-    listNewClubInvites(viewer),
-    listPublicSponsorOptions(),
+  const query = await searchParams;
+  const applicationId = parseApplicationId(query.application);
+  const showSettingsLink = viewer === "SYSTEM_ADMIN";
+
+  if (applicationId) {
+    const [application, churches] = await Promise.all([getNewClubApplication(viewer, applicationId), listPublicSponsorOptions()]);
+    const requested = parseApplicationView(query.status);
+    return (
+      <>
+        <AdminPageHeader path="/admin/clubs/applications" />
+        {application
+          ? <StaffApplicationRecord application={application} churches={churches} />
+          : <StaffApplicationMissing view={requested === "decided" ? "decided" : "waiting"} />}
+      </>
+    );
+  }
+
+  const view = parseApplicationView(query.status);
+  const [applications, invites, waitingCount] = await Promise.all([
+    view === "links" ? [] : listNewClubApplications(viewer, new Date(), view),
+    view === "links" ? listNewClubInvites(viewer) : [],
+    countWaitingNewClubApplications(viewer),
   ]);
   return (
     <>
       <AdminPageHeader path="/admin/clubs/applications" />
-      <StaffPageHeader
-        description="Directors apply from the public “Register a new club” page or a private link you send. Approving creates the club under its sponsoring church or company and emails the director the club invite. The Sterling Volunteers status is a flag to review, not a block."
-        tools={[
-          { href: "/clubs/register", label: "View the public form" },
-          // Platform settings is for system administrators only (#1839): a Clubs Administrator would land on "no access".
-          ...(viewer === "SYSTEM_ADMIN" ? [{ href: "/admin/settings", label: "Notification address" }] : []),
-        ]}
-      />
-      <NewClubApplicationsQueue
-        applications={applications}
-        canDecide
-        churches={churches}
-        emailConfigured={isAccountEmailConfigured()}
-        invites={invites}
-      />
+      <section className="page-stack">
+        <StaffApplicationsIntro showSettingsLink={showSettingsLink} />
+        <StaffApplicationViews view={view} waitingCount={waitingCount} />
+        {view === "links"
+          ? <StaffApplicationLinks emailConfigured={isAccountEmailConfigured()} invites={invites} />
+          : <StaffApplicationList applications={applications} view={view} />}
+      </section>
     </>
   );
 }

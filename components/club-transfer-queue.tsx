@@ -1,10 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeftRight, ChevronDown, Filter } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TransferDate, transferEventLabel } from "@/components/transfer-format";
+import styles from "@/components/club-transfer-queue.module.css";
 import {
+  parseStaffQueueView,
+  staffQueueEmptyText,
+  staffQueueHref,
   memberTransferStaffReasonLabels,
   memberTransferStaffStatusLabels,
   staffQueueFilters,
@@ -38,9 +43,9 @@ type Candidate = { rosterMemberId: string; firstName: string; lastName: string; 
 /** One queue card. Hook-free so it renders on its own in tests. */
 export function StaffTransferCard({ transfer, onAction }: { transfer: StaffTransferRecord; onAction: (action: Action) => void }) {
   return (
-    <li className="transfer-card">
+    <li className={`transfer-card ${styles.card}`} id={`transfer-${transfer.id}`}>
       <div className="transfer-card-head">
-        <strong translate="no">{transfer.matchedMemberName ?? transfer.requestedName}</strong>
+        <h3 className={styles.name} translate="no">{transfer.matchedMemberName ?? transfer.requestedName}</h3>
         <span className={`status-chip ${transfer.overdue || transfer.status === "DECLINED" || transfer.status === "UNMATCHED" ? "coral" : "gold"}`}>
           {transfer.overdue ? "Overdue" : memberTransferStaffStatusLabels[transfer.status as MemberTransferStatus]}
         </span>
@@ -67,14 +72,23 @@ export function StaffTransferCard({ transfer, onAction }: { transfer: StaffTrans
       <div className="transfer-card-actions">
         {transfer.canFinish && <button className="primary-button" onClick={() => onAction({ transfer, kind: "finish" })} type="button">Finish</button>}
         {transfer.canOverride && <button className="secondary-button" onClick={() => onAction({ transfer, kind: "override" })} type="button">Override</button>}
-        {transfer.canCancel && <button className="secondary-button" onClick={() => onAction({ transfer, kind: "cancel" })} type="button">Close</button>}
+        {transfer.canCancel && (
+          // Close ends the request without moving anyone, so it sits apart from Finish and Override.
+          <div className={styles.closeZone}>
+            <button className={`secondary-button ${styles.close}`} onClick={() => onAction({ transfer, kind: "cancel" })} type="button">Close</button>
+          </div>
+        )}
       </div>
     </li>
   );
 }
 
-export function ClubTransferQueue() {
-  const [filter, setFilter] = useState<StaffQueueFilter>("open");
+/**
+ * `filter` is the page's `?view=`, read on the server; changing the select puts the new view in the address (Back undoes it)
+ * and the page passes it back in, which reloads the list.
+ */
+export function ClubTransferQueue({ filter = "open" }: { filter?: StaffQueueFilter }) {
+  const router = useRouter();
   const [transfers, setTransfers] = useState<StaffTransferRecord[] | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -99,7 +113,11 @@ export function ClubTransferQueue() {
   }, [filter]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
+    // A new view starts from "Loading…", so the last view's cards never sit under the new view's name.
+    const timer = window.setTimeout(() => {
+      setTransfers(null);
+      void load();
+    }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
 
@@ -163,7 +181,6 @@ export function ClubTransferQueue() {
     <section aria-labelledby="transfer-queue-heading" className="panel">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Clubs</p>
           <h2 id="transfer-queue-heading"><ArrowLeftRight aria-hidden="true" size={18} /> Member transfer queue</h2>
           <p>
             Requests a sending club hasn&apos;t answered in 14 days, declined requests, and requests that didn&apos;t
@@ -176,7 +193,7 @@ export function ClubTransferQueue() {
           <Filter aria-hidden="true" size={16} />
           <span>Show</span>
           <span className="transfer-filter-select">
-            <select onChange={(event) => setFilter(event.target.value as StaffQueueFilter)} value={filter}>
+            <select onChange={(event) => router.push(staffQueueHref(parseStaffQueueView(event.target.value)))} value={filter}>
               {staffQueueFilters.map((value) => <option key={value} value={value}>{filterLabels[value]}</option>)}
             </select>
             <ChevronDown aria-hidden="true" size={15} />
@@ -186,7 +203,7 @@ export function ClubTransferQueue() {
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       {transfers === null ? <p className="report-empty">Loading…</p> : transfers.length === 0 ? (
-        <p className="report-empty">Nothing here.</p>
+        <p className="report-empty">{staffQueueEmptyText[filter]}</p>
       ) : (
         <ul className="transfer-list">
           {transfers.map((transfer) => <StaffTransferCard key={transfer.id} onAction={(next) => void start(next)} transfer={transfer} />)}
