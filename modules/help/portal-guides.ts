@@ -58,8 +58,8 @@ const writtenPortalGuides: readonly PortalGuide[] = [
       "Some cards have more buttons, such as Continue payment, Update contact details, Registration details or Request cancellation. A card shows only the ones allowed for that registration right now.",
       "A registration is listed here when its contact email is the verified email address on your account. It is never matched on a name. Being named on someone else's registration does not add it to your account.",
       "If a registration is missing, it was probably made with a different email. Under Need to change something? on My registrations, choose Find a registration made with another email.",
-      "On Manage my registration, type the Confirmation code and the Registration contact email, then choose Manage my registration. The code is in your confirmation email.",
-      "No code? Under Lost the code?, type the Registration contact email, then choose Email a private link. The page always says to check the inbox, whether or not a match was found. This is for your privacy.",
+      "On Manage my registration, type the Confirmation code and the \"Registration contact email (to use with your code)\", then choose Manage my registration. The code is in your confirmation email.",
+      "No code? In the second box, under Lost the code?, type the \"Registration contact email (to get a link by email)\", then choose Email a private link. After you choose it, the page asks you to check your inbox. If nothing arrives, check spam, or ask the event team.",
       "Still missing? Ask the event team to correct the email address on file. Once it matches your account's email, the registration appears in My registrations.",
     ],
     verify: [

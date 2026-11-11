@@ -39,12 +39,17 @@ export default function AuthenticatorHelpPage() {
             <li data-met="true"><span>1Password (if you already use it for other passwords)</span></li>
           </ul>
           <p>
-            <strong>2. Get the key.</strong> On the two-step sign-in setup screen, choose An
-            authenticator app, then Continue. Then choose &quot;Set up an authenticator.&quot; A
-            text key appears on the page. Copy it, or type it into your app, to add this account.
+            <strong>2. Open two-step sign-in setup.</strong> This screen opens by itself after you
+            sign in when your account needs two-step sign-in. You can also open Profile in the
+            account tabs. Choose &quot;Set up two-step sign-in.&quot;
           </p>
           <p>
-            <strong>3. Confirm with a code.</strong> The app now shows a six-digit code for this
+            <strong>3. Pick the app.</strong> Choose An authenticator app, then Continue. Then
+            choose &quot;Set up an authenticator.&quot; A text key appears on the page. Select the
+            key and copy it, then paste it into your app to add this account.
+          </p>
+          <p>
+            <strong>4. Confirm with a code.</strong> The app now shows a six-digit code for this
             account. Type it into Code from your authenticator, then choose Confirm and turn on.
             Save the recovery codes you are shown. They appear only once.
           </p>
@@ -53,7 +58,7 @@ export default function AuthenticatorHelpPage() {
             face or screen lock. It works just as well. You only need one of the two.
           </p>
           <p className="field-help">
-            <Link href="/account">Back to your account</Link>
+            <Link href="/account/profile">Open your profile</Link>
           </p>
         </div>
       </section>
