@@ -618,6 +618,8 @@ jobs:
       - run: npm i --no-save playwright@1.63.0
       # Shared setup (#1872): retries the Ubuntu mirror and carries on with the runner's own libraries when it is down.
       - run: scripts/ci/install-playwright-browsers.sh chromium
+        env:
+          PLAYWRIGHT_SETUP_SIMULATE_MIRROR_OUTAGE: "1"
       # Fictitious CI-only values for production mode. The first seven are the same values as the "http-scripts"
       # job's block (keep them in step with it); RESEND_API_URL is only here: it points the app's email at the
       # suite's dev outbox on port 3999, and RESEND_API_KEY stays the placeholder so nothing is ever sent.
@@ -715,6 +717,8 @@ jobs:
       - run: npm i --no-save playwright@1.63.0
       # Shared setup (#1872): retries the Ubuntu mirror and carries on with the runner's own libraries when it is down.
       - run: scripts/ci/install-playwright-browsers.sh chromium
+        env:
+          PLAYWRIGHT_SETUP_SIMULATE_MIRROR_OUTAGE: "1"
       # Fictitious CI-only values for production mode: the same block as the "club-journeys" job (keep them in step), plus the
       # fictitious Square values from browser-privacy.yml. The second app has the Security check on with Cloudflare's published
       # test keys (the same ones browser-privacy.yml uses).

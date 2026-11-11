@@ -80,6 +80,8 @@ jobs:
       - run: npm i --no-save playwright@1.63.0
       # Shared setup (#1872): retries the Ubuntu mirror and carries on with the runner's own libraries when it is down.
       - run: scripts/ci/install-playwright-browsers.sh chromium firefox webkit
+        env:
+          PLAYWRIGHT_SETUP_SIMULATE_MIRROR_OUTAGE: "1"
       # Fictitious CI-only values for production mode. Keep this block identical
       # to the one in ci.yml ("verify").
       - name: Start the built app
