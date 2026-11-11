@@ -66,6 +66,7 @@ export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = fa
   const pendingFocus = useRef<string | null>(null);
   const dirty = useRef(false);
   const requestId = useRef(0);
+  const needsRefresh = useRef(false);
 
   useEffect(() => {
     confirmed.current = initial;
@@ -85,8 +86,10 @@ export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = fa
 
   const shownModules = modules.filter((item) => item.shown);
 
-  async function persist(next: HomeLayoutModule[], request: () => Promise<HomeLayoutResult> = () => action(next.map(({ key, shown }) => ({ key, shown })))) {
+  /** `refresh` is true for a show/hide change or a reset, so newly shown modules load; a move only applies the returned layout. */
+  async function persist(next: HomeLayoutModule[], refresh: boolean, request: () => Promise<HomeLayoutResult> = () => action(next.map(({ key, shown }) => ({ key, shown }))), onSaved?: () => void) {
     const id = ++requestId.current;
+    if (refresh) needsRefresh.current = true;
     setError("");
     let result: HomeLayoutResult;
     try {
@@ -94,15 +97,21 @@ export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = fa
     } catch {
       result = { ok: false, message: "Your layout could not be saved." };
     }
+    // A later request has replaced this one: its answer is the one that counts.
     if (id !== requestId.current) return;
     if (!result.ok) {
+      needsRefresh.current = false;
       setModules(confirmed.current);
       setError(`${result.message} Your last saved layout is showing.`);
       return;
     }
     confirmed.current = result.layout.modules;
-    apply(result.layout.modules);
-    router.refresh();
+    if (!dirty.current) apply(result.layout.modules);
+    onSaved?.();
+    if (needsRefresh.current) {
+      needsRefresh.current = false;
+      router.refresh();
+    }
   }
 
   function apply(next: HomeLayoutModule[]) {
@@ -135,7 +144,7 @@ export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = fa
   function commit() {
     if (!dirty.current) return;
     dirty.current = false;
-    void persist(latest.current);
+    void persist(latest.current, false);
   }
 
   function handleKeyDown(scope: Scope, key: HomeModuleKey, event: KeyboardEvent<HTMLButtonElement>) {
@@ -178,19 +187,18 @@ export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = fa
   function toggle(key: HomeModuleKey, shown: boolean) {
     const next = latest.current.map((item) => (item.key === key && item.hideable ? { ...item, shown } : item));
     apply(next);
-    void persist(next);
+    void persist(next, true);
   }
 
   function reset() {
-    void persist(latest.current, resetAction);
-    setMessage("Home reset to the default layout");
+    void persist(latest.current, true, resetAction, () => setMessage("Home reset to the default layout"));
   }
 
   function handleFor(scope: Scope, item: HomeLayoutModule) {
     return (
       <button
         type="button"
-        className={styles.handle}
+        className={`icon-button ${styles.handle}`}
         aria-label={`Move ${item.label}`}
         data-handle={`${scope}:${item.key}`}
         onKeyDown={(event) => handleKeyDown(scope, item.key, event)}

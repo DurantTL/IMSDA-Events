@@ -53,7 +53,7 @@ export default async function HomeNeedsYouPage() {
   // Coming up sits under the all-clear message (#1747) only when it is not its own card.
   const comingUp = comingUpShown || view.allClear ? await loadComingUp(user, async () => held) : null;
   const bodies: Partial<Record<HomeModuleKey, ReactNode>> = {};
-  if (shown.has("needs-you")) bodies["needs-you"] = <NeedsYouPage view={view} comingUp={comingUpShown ? null : comingUp} />;
+  if (shown.has("needs-you")) bodies["needs-you"] = <NeedsYouPage view={view} headingLevel={3} comingUp={comingUpShown ? null : comingUp} />;
   if (comingUpShown && comingUp) bodies["coming-up"] = <ComingUpPage events={comingUp.events} nextStep={comingUp.nextStep} />;
   return (
     <section className="page-stack">

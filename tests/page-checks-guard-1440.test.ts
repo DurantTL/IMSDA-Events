@@ -200,6 +200,7 @@ describe("C4: a fixed bar must not cover text", () => {
     ".dialog": "overlay: the menu line's dialog, a sheet on a phone (staff-shell and club-portal-nav modules)",
     '.fb-shell[data-inspector="open"] .fb-sidebar': "overlay: builder inspector takes the whole phone screen",
     ".fb-phone-sheet": "overlay: builder phone sheet",
+    ".panel": "overlay: the staff Home Customize dialog, a side panel on computers and a bottom sheet on phones (staff-home-board.module.css); a modal dialog, not an action bar",
   };
   const fixed = allRules.filter((rule) => /position:\s*fixed/.test(rule.body) && !/^(html|body)\b/.test(rule.selector));
 

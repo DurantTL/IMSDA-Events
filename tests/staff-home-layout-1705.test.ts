@@ -219,3 +219,33 @@ describe("Home board render (#1705)", () => {
     expect(reorderShown([...modules], ["needs-you"]).map((m) => m.key)).toEqual(["needs-you", "coming-up"]);
   });
 });
+
+describe("Home page (#1705)", () => {
+  async function renderHome(held: AdminRoles) {
+    vi.resetModules();
+    vi.doMock("server-only", () => ({}));
+    vi.doMock("next/navigation", () => ({ redirect: vi.fn(), useRouter: () => ({ refresh: vi.fn() }) }));
+    vi.doMock("@/modules/access/current-session", () => ({ getCurrentSession: async () => ({ user: { id: "user_a", globalRole: null } }) }));
+    vi.doMock("@/modules/access/admin-roles", () => ({ resolveAdminRoles: async () => held }));
+    vi.doMock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
+    vi.doMock("@/modules/system-admin/home-needs-repository", () => ({ loadNeedsInput: async () => ({ held: [], events: null, attention: null }) }));
+    vi.doMock("@/modules/system-admin/home-needs-model", () => ({ buildNeedsView: () => ({ allClear: false, noAdminRole: true, sections: [] }) }));
+    vi.doMock("@/modules/system-admin/home-coming-up-repository", () => ({ loadComingUp: async () => ({ events: [], nextStep: null }) }));
+    vi.doMock("@/modules/system-admin/home-layout-repository", () => ({ loadHomeLayout: async (_id: string, roles: AdminRoles) => resolveHomeLayout(null, roles) }));
+    vi.doMock("@/components/staff-install-card", () => ({ StaffInstallCard: () => null }));
+    vi.doMock("@/components/staff-page-header", () => ({ StaffPageHeader: () => null }));
+    vi.doMock("@/components/home-pages", () => ({ NeedsYouPage: () => null, ComingUpPage: () => null }));
+    vi.doMock("@/components/staff-home-board", () => ({ StaffHomeBoard: function StaffHomeBoard() { return null; } }));
+    const page = await import("@/app/(workspace)/home/page");
+    const tree = await page.default();
+    return JSON.stringify(tree, (_key, value) => (typeof value === "function" ? value.name : value));
+  }
+
+  it("gives a person with no admin role no board, Arrange or Customize", async () => {
+    expect(await renderHome(none)).not.toContain("StaffHomeBoard");
+  });
+
+  it("gives an admin the board", async () => {
+    expect(await renderHome(events)).toContain("StaffHomeBoard");
+  });
+});
