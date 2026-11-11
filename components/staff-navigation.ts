@@ -33,7 +33,6 @@ import {
   ToggleRight,
   Trophy,
   UserCog,
-  UserPlus,
   Users,
   UsersRound,
   WalletCards,
@@ -352,7 +351,6 @@ export const clubsAdminGroups: readonly ClubsNavGroup[] = [
     label: "Applications",
     items: [
       { href: "/admin/clubs/applications", label: "New club applications", icon: ClipboardPen },
-      { href: "/admin/clubs/invites", label: "Club invites", icon: UserPlus },
     ],
   },
   {
@@ -403,6 +401,8 @@ export function clubsAdminActiveHref(pathname: string, summaryView?: string | nu
     if (viewItem) return viewItem.href;
   }
   if (pathname === "/admin/clubs/reports" || (pathname.startsWith("/admin/clubs/reports/") && !pathname.startsWith("/admin/clubs/reports/year-end"))) return clubsAdminRecordsHref;
+  // Club invites became the Invited view of Club leaders (#1589); the old address redirects there, but the sidebar still lights it.
+  if (pathname === "/admin/clubs/invites" || pathname.startsWith("/admin/clubs/invites/")) return "/admin/clubs/leaders";
   return clubsAdminNavigation.reduce<string | null>((best, item) => (
     (pathname === item.href || (item.href !== "/admin/clubs" && pathname.startsWith(`${item.href}/`))) && (!best || item.href.length > best.length) ? item.href : best
   ), null);

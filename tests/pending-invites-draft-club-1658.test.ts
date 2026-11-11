@@ -14,10 +14,10 @@ const draft: PendingInvite = { kind: "club", id: "c1", name: "Pat Example", emai
 
 describe("pending invites component, draft club invite", () => {
   for (const emailConfigured of [true, false]) {
-    it(`has no Resend or Copy link and links to Club invites (email configured: ${emailConfigured})`, () => {
+    it(`has no Resend or Copy link and links to the Draft view of Club leaders (email configured: ${emailConfigured})`, () => {
       const html = renderToStaticMarkup(createElement(PendingInvites, { emailConfigured, invites: [draft] }));
       expect(html).toContain("Not sent yet");
-      expect(html).toContain('href="/admin/clubs/invites"');
+      expect(html).toContain('href="/admin/clubs/leaders?status=draft"');
       expect(html).not.toContain("Resend");
       expect(html).not.toContain("Copy sign-up link");
       expect(html).not.toMatch(/Sent \w{3} /);

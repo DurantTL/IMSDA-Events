@@ -16,6 +16,7 @@ import {
 import type { YearEndReportRecord } from "@/modules/club-reports/year-end-repository";
 import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import styles from "@/components/club-year-end-report-form.module.css";
 
 type Contact = {
   contactName: string;
@@ -255,7 +256,7 @@ export function ClubYearEndReportForm({
               const original = field.source === "prefill" ? (info?.prefill ?? null) : null;
               const overridden = original !== null && typed !== null && typed !== original;
               return (
-                <div className="club-report-item" key={field.key}>
+                <div className={`club-report-item ${styles.count}`} key={field.key}>
                   <label htmlFor={`ye-${field.key}`}>
                     <strong>{field.label}</strong>
                     <small>
@@ -263,7 +264,7 @@ export function ClubYearEndReportForm({
                       {overridden ? ` · you changed it from ${original}` : ""}
                     </small>
                   </label>
-                  <span className="intro-actions">
+                  <span className={styles.controls}>
                     <input
                       id={`ye-${field.key}`}
                       inputMode="numeric"
@@ -276,7 +277,7 @@ export function ClubYearEndReportForm({
                     {overridden && !locked && (
                       <button
                         aria-label={`Restore ${original} for ${field.label}`}
-                        className="text-button"
+                        className={`text-button ${styles.restore}`}
                         onClick={() => setValues((previous) => ({ ...previous, [field.key]: String(original) }))}
                         type="button"
                       >

@@ -69,11 +69,11 @@ describe("Admin hub model (#1569)", () => {
   it("keeps the unit with each count, singular and plural, and keeps distinct counts distinct", () => {
     const one = buildHubView("clubs", system, allMetrics("clubs", system, 1));
     expect(one.stats.map((stat) => stat.label)).toEqual(["Active club", "Application waiting", "Late Monthly Record", "Open member transfer"]);
-    const many = buildHubView("clubs", system, { clubs: 42, applicationsWaiting: 4, lateRecords: 3, openTransfers: 1, clubLeaders: 168 });
+    const many = buildHubView("clubs", system, { clubs: 42, applicationsWaiting: 4, lateRecords: 3, openTransfers: 1, clubLeaders: 168, clubInvitesWaiting: 5 });
     expect(many.stats.map((stat) => [stat.display, stat.label])).toEqual([["42", "Active clubs"], ["4", "Applications waiting"], ["3", "Late Monthly Records"], ["1", "Open member transfer"]]);
     const texts = many.groups.flatMap((group) => group.cards).map((card) => card.status?.text);
     // Only the leaders card keeps its chip: every other number is already a key figure above (#1733).
-    expect(texts).toEqual([undefined, undefined, "168 current leaders", undefined, undefined, undefined]);
+    expect(texts).toEqual([undefined, undefined, "168 current leaders · 5 invites waiting", undefined, undefined, undefined]);
     expect(new Set(many.stats.map((stat) => stat.key)).size).toBe(many.stats.length);
   });
 
@@ -86,7 +86,7 @@ describe("Admin hub model (#1569)", () => {
     const cards = view.groups.flatMap((group) => group.cards);
     // A number already shown as a stat tile is not repeated as a card chip (#1733).
     expect(cards.find((card) => card.title === "New club applications")?.status).toBeNull();
-    expect(cards.find((card) => card.title === "Club leaders")?.status?.text).toBe("3 current leaders");
+    expect(cards.find((card) => card.title === "Club leaders")?.status?.text).toBe("3 current leaders · 3 invites waiting");
   });
 
   it("shows the main action as a filled button only while something is waiting behind it (#1733)", () => {
