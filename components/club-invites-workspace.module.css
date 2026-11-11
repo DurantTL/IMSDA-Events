@@ -10,3 +10,4 @@
 .inactive { color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .actions :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.empty { margin: 0; border: 1px dashed var(--line); border-radius: var(--radius-card); padding: 14px; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

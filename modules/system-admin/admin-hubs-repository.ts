@@ -77,7 +77,7 @@ const readers: Record<MetricKey, (context: Context) => Promise<number>> = {
   applicationsWaiting: ({ viewer }) => countWaitingNewClubApplications(viewer.isSystemAdmin ? "SYSTEM_ADMIN" : "CLUBS_ADMIN"),
   openTransfers: ({ now }) => countStaffTransferQueue("open", now),
   clubLeaders: async ({ now }) => (await listClubLeaders({ clubId: null, role: null }, 1, now)).total,
-  clubInvitesWaiting: () => countWaitingClubInvites(),
+  clubInvitesWaiting: ({ now }) => countWaitingClubInvites(now),
   staffLogins: () => getPrisma().user.count({ where: { accountStatus: "ACTIVE" } }),
   invitesWaiting: async () => (await listPendingInvitesPage({ query: "", scope: "full" }, 1)).total,
   formsTotal: async (context) => (await formsHub(context)).length,

@@ -2,8 +2,9 @@
 
 import { EventSetupHelp } from "@/components/event-setup-help";
 import { useConfirm } from "@/components/use-confirm";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Ban, Pencil, Send } from "lucide-react";
 import type { ClubInviteRecord } from "@/modules/club-imports/invites";
 import type { StatusWord } from "@/modules/registrations/status-words";
@@ -31,6 +32,7 @@ export function ClubInvitesWorkspace({
   status,
   drafts,
   club,
+  emptyText,
 }: {
   invites: ClubInviteRecord[];
   emailConfigured: boolean;
@@ -38,13 +40,15 @@ export function ClubInvitesWorkspace({
   drafts: { all: number; club: number | null };
   /** The one club the list is narrowed to, for its own Send button. */
   club: { id: string; name: string } | null;
+  /** What the list says when nothing is in it. The workspace stays mounted then, so a notice about the last action still shows. */
+  emptyText: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<ReactNode>("");
 
-  async function call(url: string, method: string, body: unknown, success: (result: InvitesResponse) => string) {
+  async function call(url: string, method: string, body: unknown, success: (result: InvitesResponse) => ReactNode) {
     setBusy(true);
     setError("");
     setNotice("");
@@ -80,7 +84,7 @@ export function ClubInvitesWorkspace({
       input: { label: `New email for ${invite.name || "this invite"} (${invite.club.name})`, defaultValue: invite.email, type: "email", required: true },
     });
     if (!email || email.trim().toLowerCase() === invite.email) return;
-    void call(`/api/admin/club-invites/${encodeURIComponent(invite.id)}`, "PATCH", { email }, () => "Email changed. The invite is waiting to be sent.");
+    void call(`/api/admin/club-invites/${encodeURIComponent(invite.id)}`, "PATCH", { email }, () => <>Email changed. The invite is waiting to be sent in the <Link href="/admin/clubs/leaders?status=draft">Draft view</Link>.</>);
   }
 
   async function cancel(invite: ClubInviteRecord) {
@@ -111,10 +115,10 @@ export function ClubInvitesWorkspace({
             <button
               className="secondary-button"
               disabled={busy || drafts.club === 0 || !emailConfigured}
-              onClick={() => send({ organizationId: club.id }, drafts.club ?? 0, `for ${club.name}`)}
+              onClick={() => send({ organizationId: club.id }, drafts.club ?? 0, `for ${club.name}, every role`)}
               type="button"
             >
-              <Send aria-hidden="true" size={14} /> <span translate="no">Send unsent for {club.name}</span> ({drafts.club})
+              <Send aria-hidden="true" size={14} /> <span translate="no">Send all unsent for {club.name}</span>, every role ({drafts.club})
             </button>
           )}
         </p>
@@ -129,7 +133,10 @@ export function ClubInvitesWorkspace({
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
       {invites.length === 0 && (
-        <EventSetupHelp context="club invites" id="club-invites-none" />
+        <>
+          <p className={styles.empty}>{emptyText}</p>
+          <EventSetupHelp context="club invites" id="club-invites-none" />
+        </>
       )}
 
       {invites.length > 0 && <ul className={styles.list}>
@@ -144,6 +151,7 @@ export function ClubInvitesWorkspace({
                   {statusLabels[invite.status]}
                   {invite.status === "SENT" && invite.sentAt ? ` ${formatDate(invite.sentAt)}` : ""}
                 </span>
+                {invite.expired && invite.expiresAt ? <>{" "}<span className="status-chip coral">Expired {formatDate(invite.expiresAt)}</span></> : null}
                 {!invite.club.isActive && <span className={styles.inactive}> · Inactive club: invites can&apos;t be sent.</span>}
               </span>
             </span>

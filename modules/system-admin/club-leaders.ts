@@ -53,7 +53,7 @@ export async function listClubLeaders(filters: ClubLeaderFilters, requestedPage 
  * The Invited and Draft views (#1589): club invites by status, narrowed by club and role, paged and ordered in the database
  * like the current leaders. Accepted and cancelled invites are never read.
  */
-export async function listClubLeaderInvites(filters: ClubLeaderFilters, requestedPage = 1): Promise<{ invites: ClubInviteRecord[]; total: number; page: number; pageSize: number }> {
+export async function listClubLeaderInvites(filters: ClubLeaderFilters, requestedPage = 1, now = new Date()): Promise<{ invites: ClubInviteRecord[]; total: number; page: number; pageSize: number }> {
   const prisma = getPrisma();
   const where = buildInvitesWhere(filters);
   const total = await prisma.clubInvite.count({ where });
@@ -65,12 +65,15 @@ export async function listClubLeaderInvites(filters: ClubLeaderFilters, requeste
     take: CLUB_LEADERS_PAGE_SIZE,
     select: clubInviteSelect,
   });
-  return { invites: rows.map(toClubInviteRecord), total, page, pageSize: CLUB_LEADERS_PAGE_SIZE };
+  return { invites: rows.map((row) => toClubInviteRecord(row, now)), total, page, pageSize: CLUB_LEADERS_PAGE_SIZE };
 }
 
-/** Invites waiting for the person: sent and neither accepted nor cancelled. The Clubs dashboard and hub show this number. */
-export function countWaitingClubInvites(): Promise<number> {
-  return getPrisma().clubInvite.count({ where: { status: "SENT" } });
+/**
+ * Invites waiting for the person: sent, not accepted or cancelled, and not past their expiry (an expired one cannot be
+ * accepted any more; it stays listed under Invited because it needs a Resend). The dashboard and hub show this number.
+ */
+export function countWaitingClubInvites(now = new Date()): Promise<number> {
+  return getPrisma().clubInvite.count({ where: { status: "SENT", OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] } });
 }
 
 /** Drafts the Send buttons would email: every unsent invite, and those of the one club picked (the Send route's own scope). */

@@ -64,6 +64,7 @@ export const clubInviteSelect = {
   sentAt: true,
   sentCount: true,
   acceptedAt: true,
+  expiresAt: true,
   organization: { select: { id: true, name: true, isActive: true } },
 } as const;
 
@@ -76,8 +77,9 @@ export function toClubInviteRecord(invite: {
   sentAt: Date | null;
   sentCount: number;
   acceptedAt: Date | null;
+  expiresAt: Date | null;
   organization: { id: string; name: string; isActive: boolean };
-}) {
+}, now = new Date()) {
   return {
     id: invite.id,
     email: invite.email,
@@ -87,6 +89,9 @@ export function toClubInviteRecord(invite: {
     sentAt: invite.sentAt?.toISOString() ?? null,
     sentCount: invite.sentCount,
     acceptedAt: invite.acceptedAt?.toISOString() ?? null,
+    expiresAt: invite.expiresAt?.toISOString() ?? null,
+    /** A sent invite past its date can no longer be accepted; Resend renews it. */
+    expired: invite.status === "SENT" && Boolean(invite.expiresAt && invite.expiresAt <= now),
     club: invite.organization,
   };
 }
@@ -97,7 +102,8 @@ export async function listClubInvites() {
     orderBy: [{ organization: { name: "asc" } }, { role: "asc" }, { createdAt: "asc" }],
     select: clubInviteSelect,
   });
-  return invites.map(toClubInviteRecord);
+  const now = new Date();
+  return invites.map((invite) => toClubInviteRecord(invite, now));
 }
 
 export type ClubInviteRecord = Awaited<ReturnType<typeof listClubInvites>>[number];
@@ -425,7 +431,7 @@ export async function createClubTeamInvite(
  * stand or fall together. It is the ordinary invite (accepting creates the
  * ordinary director grant) with source APPLICATION. When account email isn't
  * set up the invite is left PENDING, for an administrator to send from
- * /admin/clubs/invites, rather than failing the approval; nothing is lost.
+ * the Draft view of Club leaders (/admin/clubs/leaders?status=draft), rather than failing the approval; nothing is lost.
  * Returns the queued message id (null when none was queued).
  */
 export async function createApplicationDirectorInvite(

@@ -125,6 +125,11 @@ const clubCards = {
     description: "Current leaders, and invites still waiting: directors and deputies from the club import, and registrars and reporters invited by directors.",
     gate: hubGates.clubs,
     metrics: ["clubLeaders", "clubInvitesWaiting"],
+    // The Clubs dashboard draws the waiting-invites number itself, so its card says only how many lead (#1733).
+    statusBesideFigures: (read) => {
+      const leaders = read("clubLeaders");
+      return leaders === null ? UNAVAILABLE_STATUS : count(leaders, "draft", "current leader", "current leaders");
+    },
     status: (read) => {
       const leaders = read("clubLeaders")!;
       const invites = read("clubInvitesWaiting")!;

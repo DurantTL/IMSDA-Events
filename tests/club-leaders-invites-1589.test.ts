@@ -83,10 +83,33 @@ describe("the invite query", () => {
     expect((await listClubLeaderInvites({ clubId: null, role: null, status: "invited" }, 99)).page).toBe(3);
   });
 
+  it("lists an expired sent invite and marks it, while the waiting count leaves it out", async () => {
+    const now = new Date("2026-11-11T12:00:00Z");
+    db.inviteCount.mockResolvedValue(2);
+    db.inviteFindMany.mockResolvedValue([
+      { ...invite("old"), expiresAt: new Date("2026-11-01T12:00:00Z") },
+      { ...invite("fresh"), expiresAt: new Date("2026-11-20T12:00:00Z") },
+      { ...invite("import"), expiresAt: null },
+    ]);
+    const { invites } = await listClubLeaderInvites({ clubId: null, role: null, status: "invited" }, 1, now);
+    expect(invites.map((row) => [row.id, row.expired])).toEqual([["old", true], ["fresh", false], ["import", false]]);
+    // The Invited query itself keeps expired rows (no expiry condition), so they stay listed.
+    expect(db.inviteFindMany.mock.calls.at(-1)![0].where).toEqual({ status: "SENT" });
+    const html = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: [], clubs: [], canOpenPeople: false, filters: { clubId: null, role: null, status: "invited" }, invites } as never));
+    expect(html.match(/Expired Nov 1, 2026/g)).toHaveLength(1);
+    await countWaitingClubInvites(now);
+    expect(db.inviteCount.mock.calls.at(-1)![0].where.OR).toEqual([{ expiresAt: null }, { expiresAt: { gt: now } }]);
+  });
+
   it("counts waiting invites as SENT only, and drafts for everyone and for the picked club", async () => {
     db.inviteCount.mockResolvedValue(4);
     expect(await countWaitingClubInvites()).toBe(4);
-    expect(db.inviteCount).toHaveBeenLastCalledWith({ where: { status: "SENT" } });
+    // Expired invites cannot be accepted, so they are not "waiting": the count leaves out SENT invites past their expiry.
+    const where = db.inviteCount.mock.calls.at(-1)![0].where;
+    expect(where).toEqual({ status: "SENT", OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }] });
+    const fixed = new Date("2026-11-11T12:00:00Z");
+    await countWaitingClubInvites(fixed);
+    expect(db.inviteCount.mock.calls.at(-1)![0].where.OR[1].expiresAt.gt).toEqual(fixed);
     db.inviteCount.mockClear();
     expect(await countDraftClubInvites("org_1")).toEqual({ all: 4, club: 4 });
     expect(db.inviteCount.mock.calls.map((call) => call[0].where)).toEqual([{ status: "PENDING" }, { status: "PENDING", organizationId: "org_1" }]);
@@ -118,7 +141,8 @@ describe("the list on each status", () => {
     const row = { id: "a", email: "a@example.test", name: "Person a", role: "DIRECTOR", status: "PENDING", sentAt: null, sentCount: 0, acceptedAt: null, club: { id: "org_1", name: "Synthetic Club", isActive: true } };
     const html = render({ filters: { clubId: "org_1", role: null, status: "draft" }, invites: [row], drafts: { all: 7, club: 2 } });
     expect(html).toContain("Send all unsent (7)");
-    expect(html).toContain("Send unsent for Synthetic Club");
+    expect(html).toContain("Send all unsent for Synthetic Club");
+    expect(html).toContain(", every role");
     expect(html).not.toContain("Resend");
     expect(html).toContain("Draft");
   });
@@ -128,6 +152,25 @@ describe("the list on each status", () => {
     expect(render({ filters: { clubId: null, role: null, status: "invited" } })).toContain("No invites are waiting.");
     expect(render({ filters: { clubId: "org_1", role: null, status: "draft" } })).toContain("No draft invites match that club and role.");
     expect(render({ filters: { clubId: null, role: null } })).toContain("No current club leaders found.");
+  });
+
+  it("draws the empty state with the setup help and its Import clubs step on Invited and Draft", () => {
+    for (const status of ["invited", "draft"]) {
+      const html = render({ filters: { clubId: null, role: null, status } });
+      expect(html, status).toContain('data-setup-help="link"');
+      expect(html, status).toContain('href="/admin/clubs/import"');
+      expect(html, status).toContain("Import clubs");
+    }
+  });
+
+  it("keeps the invite workspace mounted when the list is empty, so an action's notice is not lost", () => {
+    const source = readFileSync("components/club-leaders-list.tsx", "utf8");
+    expect(source).toMatch(/showingInvites \? \(\s*<ClubInvitesWorkspace/);
+    expect(source).not.toMatch(/rows\.length === 0 \? \(\s*<p[^>]*>\{emptyText[^]*?ClubInvitesWorkspace/);
+    const workspace = readFileSync("components/club-invites-workspace.tsx", "utf8");
+    expect(workspace).toContain('role="status">{notice}');
+    expect(workspace).toContain("emptyText");
+    expect(workspace).toContain("/admin/clubs/leaders?status=draft");
   });
 
   it("keeps the status when filters are cleared", () => {
@@ -176,6 +219,10 @@ describe("the Clubs dashboard count and the hub", () => {
     expect(cards.map((card) => card.title)).not.toContain("Club invites");
     const leaders = cards.find((card) => card.href === "/admin/clubs/leaders")!;
     expect(leaders.status?.text).toBe("168 current leaders · 0 invites waiting");
+    // The Clubs dashboard draws the waiting-invites number itself, so its card shows only the leaders (#1733).
+    const beside = buildHubView("club-administration", viewer, { clubLeaders: 168, clubInvitesWaiting: 4 }, ["clubInvitesWaiting"]).groups.flatMap((group) => group.cards).find((card) => card.href === "/admin/clubs/leaders")!;
+    expect(beside.status?.text).toBe("168 current leaders");
+    expect(readFileSync("app/(workspace)/admin/clubs/page.tsx", "utf8")).toContain('"applicationsWaiting", "clubInvitesWaiting"');
     expect(leaders.description).toContain("registrars and reporters invited by directors");
     const waiting = buildHubView("club-administration", viewer, { clubLeaders: 1, clubInvitesWaiting: 1 }).groups.flatMap((group) => group.cards).find((card) => card.href === "/admin/clubs/leaders")!;
     expect(waiting.status).toEqual({ tone: "review", text: "1 current leader · 1 invite waiting" });
@@ -192,5 +239,56 @@ describe("navigation", () => {
     expect(systemNavActiveItem("/admin/clubs/applications")?.label).toBe("New club applications");
     expect(staffPlaceFor("/admin/clubs/invites")).toMatchObject({ area: "clubs", tab: "leaders" });
     expect(staffPlaceFor("/admin/clubs/leaders", new URLSearchParams("status=draft"))).toMatchObject({ area: "clubs", tab: "leaders" });
+  });
+});
+
+describe("the Club leaders page", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    access.user = { id: "u1" };
+    access.allowed = true;
+    db.inviteCount.mockResolvedValue(0);
+    db.inviteFindMany.mockResolvedValue([]);
+  });
+
+  async function openPage(query: Record<string, string>) {
+    vi.resetModules();
+    const grant = { count: vi.fn(async () => 0), findMany: vi.fn(async () => []) };
+    vi.doMock("@/lib/prisma", () => ({ getPrisma: () => ({ clubInvite: { findMany: db.inviteFindMany, count: db.inviteCount }, clubDirectorGrant: grant }) }));
+    vi.doMock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
+    vi.doMock("@/components/club-leaders-list", () => ({ ClubLeadersList: () => null }));
+    vi.doMock("@/modules/system-admin/people-access", () => ({ resolvePeopleViewer: async () => ({ scope: null }) }));
+    vi.doMock("@/modules/system-admin/people-directory", () => ({ listClubOptions: async () => [] }));
+    vi.doMock("@/modules/communications/account-email", () => ({ isAccountEmailConfigured: () => true }));
+    const { default: Page } = await import("@/app/(workspace)/admin/clubs/leaders/page");
+    await Page({ searchParams: Promise.resolve(query) });
+    return grant;
+  }
+
+  it("sends a signed-out or unauthorized visitor away before reading anything", async () => {
+    access.user = null;
+    await expect(openPage({ status: "invited" })).rejects.toThrow("REDIRECT /staff/sign-in");
+    access.user = { id: "u1" };
+    access.allowed = false;
+    await expect(openPage({ status: "draft" })).rejects.toThrow("REDIRECT /no-access");
+    expect(db.inviteFindMany).not.toHaveBeenCalled();
+    expect(db.inviteCount).not.toHaveBeenCalled();
+  });
+
+  it("never reads invites on Current", async () => {
+    const grant = await openPage({});
+    expect(grant.findMany).toHaveBeenCalled();
+    expect(db.inviteFindMany).not.toHaveBeenCalled();
+    expect(db.inviteCount).not.toHaveBeenCalled();
+  });
+
+  it("reads the draft counts only on Draft", async () => {
+    await openPage({ status: "invited", club: "org_1" });
+    expect(db.inviteCount.mock.calls.map((call) => call[0].where.status)).toEqual(["SENT"]);
+    vi.clearAllMocks();
+    await openPage({ status: "draft", club: "org_1" });
+    expect(db.inviteCount.mock.calls.map((call) => call[0].where)).toEqual(
+      expect.arrayContaining([{ status: "PENDING", organizationId: "org_1" }, { status: "PENDING" }]),
+    );
   });
 });

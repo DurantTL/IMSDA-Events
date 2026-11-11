@@ -78,10 +78,10 @@ export function ClubLeadersList({
       {rows.length === 0
         ? <p className={styles.count} role="status">{showingInvites ? `No ${statusLabel} club invites found.` : "No current club leaders found."}</p>
         : <ListPager hrefFor={hrefFor} label="Club leader pages" noun={noun} nounOne={nounOne} part="count" slice={position} />}
-      {rows.length === 0 ? (
+      {showingInvites ? (
+        <ClubInvitesWorkspace club={clubName && filters.clubId ? { id: filters.clubId, name: clubName } : null} drafts={drafts} emailConfigured={emailConfigured} emptyText={emptyText(status, filtered)} invites={[...invites]} status={status === "draft" ? "draft" : "invited"} />
+      ) : rows.length === 0 ? (
         <p className={styles.empty}>{emptyText(status, filtered)}</p>
-      ) : showingInvites ? (
-        <ClubInvitesWorkspace club={clubName && filters.clubId ? { id: filters.clubId, name: clubName } : null} drafts={drafts} emailConfigured={emailConfigured} invites={[...invites]} status={status === "draft" ? "draft" : "invited"} />
       ) : (
         <ul className={styles.list}>
           {leaders.map((leader) => {

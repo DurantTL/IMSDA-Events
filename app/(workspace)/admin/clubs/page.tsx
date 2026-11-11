@@ -75,7 +75,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
     known: { clubs: clubs.length, lateRecords, applicationsWaiting: waitingCount, clubInvitesWaiting: waitingInvites },
   });
   // The club pages that read ?year= keep the year the viewer picked (#1566).
-  const hubView = buildHubView("club-administration", hubViewer, hubValues, ["clubs", "applicationsWaiting"]);
+  const hubView = buildHubView("club-administration", hubViewer, hubValues, ["clubs", "applicationsWaiting", "clubInvitesWaiting"]);
   const hubViewForYear = {
     ...hubView,
     groups: hubView.groups.map((group) => ({ ...group, cards: group.cards.map((card) => ({ ...card, href: clubsAdminHrefForYear(card.href, params.year ? clubYear : null) })) })),
