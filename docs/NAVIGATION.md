@@ -162,8 +162,8 @@ follows the same pattern: `area/[organizationId]` → "All clubs";
 - `admin/clubs/reports` (back link: the Monthly Records tab),
   `admin/organizations/background-checks` → "Back to Clubs and churches"
 - `admin/clubs/import` and `admin/clubs/health-import` (the health one only while the Health Record feature is on) are
-  views of the Clubs tab Club summary (the Club directory), linked from its directory view, with a Preview, Review,
-  Results step list (#1589)
+  views of the Clubs tab Club summary (the Club directory) → "Back to Club summary", with a Preview,
+  Review, Results step list (#1589)
 - `more/clubs` (a Pathfinder event's club oversight) → "Back to More"
 - `more/clubs/[organizationId]` → "Back to clubs"; its links to each monthly
   report pass `from` back to itself

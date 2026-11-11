@@ -189,7 +189,7 @@ Home is on the rail for every staff viewer and has two tabs. **Needs you** (`/ho
 
 ## Club administration (#1568)
 
-`/admin/clubs` keeps its key numbers, with Review applications as the one main action, and lists every destination of the Clubs area as a card with its own status, in card groups (Clubs, Records and points, Applications and checks, Club events and forms, People, Catalogs; Import clubs and Import health records sit in the Clubs group beside Club summary). A card is a link only and is drawn only for a page the person can open; a number that cannot be read shows "Unavailable". Below the cards the page keeps New clubs (with its approve buttons), Registered clubs, Club events and Quick actions as they were. The Clubs tab Club administration overview lights as before.
+`/admin/clubs` keeps its key numbers, with Review applications as the one main action, and lists every destination of the Clubs area as a card with its own status, in card groups (Clubs, Records and points, Applications, Club events and forms, People, Catalogs and imports). A card is a link only and is drawn only for a page the person can open; a number that cannot be read shows "Unavailable". Below the cards the page keeps New clubs (with its approve buttons), Registered clubs, Club events and Quick actions as they were. The Clubs tab Club administration overview lights as before.
 
 ## Admin hub pages (#1569)
 
