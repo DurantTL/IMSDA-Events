@@ -81,9 +81,10 @@ describe("destination registry per role", () => {
       .toEqual(["Conference calendar"]);
   });
 
+  // Check-in staff also get the three check-in sub-pages, which they may open (#1661).
   it("gives limited event staff only their own event destinations and their profile", () => {
     const destinations = buildSearchDestinations(limitedStaff);
-    expect(labels(destinations)).toEqual(["Event:Check-in", "Profile:Your account"]);
+    expect(labels(destinations)).toEqual(["Event:Check-in", "Event:Name badges", "Event:Attendee passes", "Event:Issue keys and items", "Profile:Your account"]);
     // The Dashboard needs the event view, which this role lacks.
     expect(labels(buildSearchDestinations({ ...base, permissions: ["VIEW_EVENT"] }))).toEqual(["Event:Event home", "Profile:Your account"]);
     expect(destinations.some((destination) => destination.scope === "System")).toBe(false);
@@ -120,7 +121,7 @@ describe("destination registry per role", () => {
     const results = find(limitedStaff, "payments finance team imports promo settings");
     expect(results).toEqual([]);
     // The Help guide for check-in (#1435) is also a result for this viewer; the event pages are only Check-in.
-    expect(find(limitedStaff, "check-in").filter((result) => result.scope === "Event").map((result) => result.label)).toEqual(["Check-in"]);
+    expect(find(limitedStaff, "check-in").filter((result) => result.scope === "Event").map((result) => result.label)).toEqual(["Check-in", "Name badges", "Attendee passes", "Issue keys and items"]);
   });
 
   it("follows the module rules: a card hidden for the event is not a result, and nothing is offered without an event", () => {
