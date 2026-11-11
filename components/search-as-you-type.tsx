@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { linkLeavingPage } from "@/components/link-guard";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { ChangeEvent, FormEvent, FormHTMLAttributes, KeyboardEvent, ReactNode, RefObject } from "react";
 
@@ -355,6 +356,19 @@ export function useSearchAsYouType({
     go(href, mode);
   };
   const debouncer = useDebouncedCallback(() => applyNow("replace"), delayMs);
+
+  // A link the person follows away from the page wins over typed text still waiting for its pause (#1873). Otherwise
+  // the search's address lands a moment after the click and takes them back to the list instead of the page they
+  // chose. A new-tab click, a download or a menu link leaves the page where it is, so the search still applies. Capture
+  // phase, so it runs before the link's own navigation.
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const link = linkLeavingPage(event);
+      if (link && !formRef.current?.contains(link)) debouncer.cancel();
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [debouncer]);
 
   return {
     formProps: {

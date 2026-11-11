@@ -42,7 +42,7 @@ export function clubSetupFor(id: ClubSetupId, base: string): RoleSetupEntry {
   switch (id) {
     case "roster-empty":
       return {
-        setup: howTo(["Choose Open roster to add people.", "Add each member, or carry last year's roster forward.", "Home then shows how many people are on the roster."], "The roster lists your club's people for this year."),
+        setup: howTo(["Choose Add to roster.", "Fill in the name, birth date and gender, then choose Add to roster again. Repeat for each member, or import a CSV file.", "Home then shows how many people are on the roster."], "The roster lists your club's people for this year."),
         guideId: "walkthrough-director-roster",
       };
     case "honors-no-members":
@@ -50,7 +50,7 @@ export function clubSetupFor(id: ClubSetupId, base: string): RoleSetupEntry {
       return { setup: { href: `${base}/roster`, label: "Add people to the roster" }, guideId: "director-honors-and-sterling" };
     case "events-none-registered":
       return {
-        setup: howTo(["Choose Open club events.", "Pick the event and start your club's registration.", "Add your people and submit."], "The event shows here with your club's registration status."),
+        setup: howTo(["Open Club events.", "Choose Register beside the event.", "Pick your people, fill in the steps and choose Submit registration."], "The event shows here with your club's registration status."),
         guideId: "walkthrough-director-register-event",
       };
     case "events-none-published":
@@ -65,7 +65,7 @@ export function clubSetupFor(id: ClubSetupId, base: string): RoleSetupEntry {
     case "event-team-none":
       return {
         setup: howTo(
-          ["Choose Register a team on this page.", "Pick the people from your roster.", "Submit the registration."],
+          ["Choose Register a team on this page.", "Pick the people from your roster.", "Choose Submit registration."],
           "Your club's team shows here with its status.",
         ),
         guideId: "walkthrough-director-register-event",
@@ -133,12 +133,12 @@ export function clubSetupFor(id: ClubSetupId, base: string): RoleSetupEntry {
       };
     case "meetings-none":
       return {
-        setup: howTo(["Choose Add meeting notes.", "Enter the date, who attended and what you did.", "Save. The month's Monthly Record fills in from the notes."], "The meeting is listed for the month."),
+        setup: howTo(["Choose Add meeting note.", "Enter the date, who attended and what you did.", "Choose Add meeting note to save. The month's Monthly Record fills in from the notes."], "The meeting is listed for the month."),
         guideId: "walkthrough-director-monthly-records",
       };
     case "sterling-follow-up":
       return {
-        setup: howTo(["Find each person listed here on the roster.", "Ask the conference office how to start or renew their Sterling Volunteers check.", "Their status changes here once the check is current."], "Everyone registered from your club is current."),
+        setup: howTo(["Find each person listed here on Roster. Look at the Sterling Volunteers column.", "Ask the conference office how to start or renew their Sterling Volunteers check.", "Their status changes here once the check is current."], "Everyone registered from your club is current."),
         whoToAsk: askOffice("start or renew a Sterling Volunteers check"),
         guideId: "director-honors-and-sterling",
       };

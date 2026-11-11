@@ -255,6 +255,7 @@ const systemTitleRules: readonly SystemTitleRule[] = [
   [/^\/admin\/club-supplies(\/|$)/, "Club supply catalog"],
   [/^\/admin\/honors(\/|$)/, "Honor catalog"],
   [/^\/admin\/master-award-rules(\/|$)/, "Master Award rules"],
+  [/^\/admin\/people\/invite-lookup(\/|$)/, "Give a club role"],
   [/^\/admin\/(people|team|accounts)(\/|$)/, "People & access"],
   [/^\/admin\/health-access(\/|$)/, "Break-glass and legal holds"],
   [/^\/admin\/events(\/|$)/, "All events"],

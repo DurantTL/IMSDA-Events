@@ -35,6 +35,19 @@ function OnOff({ on, offLabel = "Off" }: { on: boolean; offLabel?: string }) {
   return on ? <Chip tone="green">On</Chip> : <Chip>{offLabel}</Chip>;
 }
 
+/** The email and the kinds of account under the person's name (the header's `below` slot). */
+export function PersonIdentity({ person }: { person: Pick<PersonDetail, "email" | "staffId" | "accountId"> }) {
+  return (
+    <div className={styles.who}>
+      <span translate="no">{person.email}</span>
+      <ul aria-label="Account kinds" className={styles.chips}>
+        {person.staffId !== null ? <li className={`${styles.chip} ${styles.kind}`}>Staff login</li> : null}
+        {person.accountId !== null ? <li className={`${styles.chip} ${styles.kind}`}>Website account</li> : null}
+      </ul>
+    </div>
+  );
+}
+
 /**
  * The person page (#1275): System-wide, Events, Clubs and Account. A control is drawn only when the route behind it
  * would admit the viewer: system administrators get all of them; a Clubs Administrator gets the Area Coordinator and
@@ -64,17 +77,9 @@ export function PersonAccess({
   const addableEvents = eventOptions.filter((event) => !onEventIds.has(event.id));
   return (
     <div className={styles.wrap}>
-      <div className={styles.who}>
-        <strong translate="no">{person.name || person.email}</strong>
-        <span translate="no">{person.email}</span>
-        <ul aria-label="Account kinds" className={styles.chips}>
-          {hasStaff ? <li className={`${styles.chip} ${styles.kind}`}>Staff login</li> : null}
-          {hasAccount ? <li className={`${styles.chip} ${styles.kind}`}>Website account</li> : null}
-        </ul>
-      </div>
-
       <section aria-labelledby="people-system-wide" className={styles.box}>
         <h2 id="people-system-wide">System-wide</h2>
+        <p className={styles.lead}>System-wide roles apply everywhere, not to one event or club.</p>
         <ul className={styles.facts}>
           <Fact label={systemRoleText.SYSTEM_ADMIN.name}>
             {!hasStaff ? <span className={styles.muted}>Needs a staff login</span>
@@ -118,6 +123,7 @@ export function PersonAccess({
       {scope === "full" && person.events ? (
         <section aria-labelledby="people-events" className={styles.box}>
           <h2 id="people-events">Events</h2>
+          <p className={styles.lead}>Event staff membership: one role on each event team. Health information and Finalize invoices are explicit extras, given separately from the role.</p>
           {!hasStaff ? (
             <p className={styles.lead}>Needs a staff login.</p>
           ) : person.events.length === 0 ? (
@@ -135,6 +141,7 @@ export function PersonAccess({
 
       <section aria-labelledby="people-clubs" className={styles.box}>
         <h2 id="people-clubs">Clubs</h2>
+        <p className={styles.lead}>Club roles: what this person can do for one club, from the website account.</p>
         {!hasAccount ? (
           <p className={styles.lead}>Needs a website account.</p>
         ) : person.clubs.length === 0 ? (
@@ -168,6 +175,7 @@ export function PersonAccess({
       {scope === "full" ? (
         <section aria-labelledby="people-account" className={styles.box}>
           <h2 id="people-account">Account</h2>
+          <p className={styles.lead}>Login identity: how this person signs in, and who they are to the system.</p>
           <p className="field-help" style={{ margin: "4px 0 0" }}>
             Reset two-step sign-in when someone loses their phone: their authenticator and passkeys are removed, they&apos;re
             signed out, and they set it up again at their next sign-in. Nobody can turn it off themselves.

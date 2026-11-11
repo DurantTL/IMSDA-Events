@@ -22,15 +22,15 @@ export default function AuthenticatorHelpPage() {
           <p className="eyebrow">Two-step sign-in</p>
           <h1>Setting up an authenticator app</h1>
           <p>
-            An authenticator app shows a fresh six-digit code every thirty seconds. You enter that
-            code, along with your password, when this account needs a second step. It works without
-            a network connection once it is set up.
+            An authenticator app shows a new six-digit code every thirty seconds. When this account
+            asks for a second step, you type the code the app shows. The app keeps working without
+            an internet connection once it is set up.
           </p>
         </div>
         <div className="auth-form">
           <p>
-            <strong>1. Install an app.</strong> Any of these work — pick whichever you already have,
-            or one that matches your phone:
+            <strong>1. Install an app on your phone.</strong> Any of these works. Pick one you
+            already have:
           </p>
           <ul className="password-requirements" aria-label="Authenticator apps">
             <li data-met="true"><span>Google Authenticator (iOS and Android)</span></li>
@@ -39,21 +39,26 @@ export default function AuthenticatorHelpPage() {
             <li data-met="true"><span>1Password (if you already use it for other passwords)</span></li>
           </ul>
           <p>
-            <strong>2. Add this account.</strong> On the account&apos;s security page, choose
-            &quot;Set up an authenticator.&quot; A QR code (or a text key you can type in) appears —
-            scan it, or add it, from inside the app you installed.
+            <strong>2. Open two-step sign-in setup.</strong> This screen opens by itself after you
+            sign in when your account needs two-step sign-in. You can also open Profile in the
+            account tabs. Choose &quot;Set up two-step sign-in.&quot;
           </p>
           <p>
-            <strong>3. Confirm with a code.</strong> The app now shows a six-digit code for this
-            account. Type that code back into IMAdventist to turn the authenticator on.
+            <strong>3. Pick the app.</strong> Choose An authenticator app, then Continue. Then
+            choose &quot;Set up an authenticator.&quot; A text key appears on the page. Select the
+            key and copy it, then paste it into your app to add this account.
+          </p>
+          <p>
+            <strong>4. Confirm with a code.</strong> The app now shows a six-digit code for this
+            account. Type it into Code from your authenticator, then choose Confirm and turn on.
+            Save the recovery codes you are shown. They appear only once.
           </p>
           <p className="field-help">
-            Prefer not to use an app? A passkey — your phone or computer&apos;s own fingerprint, face,
-            or screen lock — works just as well and is set up the same way. Only one of the two is
-            required.
+            Prefer not to use an app? A passkey uses your phone or computer&apos;s own fingerprint,
+            face or screen lock. It works just as well. You only need one of the two.
           </p>
           <p className="field-help">
-            <Link href="/account">Back to your account</Link>
+            <Link href="/account/profile">Open your profile</Link>
           </p>
         </div>
       </section>

@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { parseGrantParam, parsePeopleQuery, planGrantItems } from "@/modules/system-admin/people-directory-model";
 import { PendingInvites } from "@/components/pending-invites";
-import { PersonAccess } from "@/components/person-access";
+import { PersonAccess, PersonIdentity } from "@/components/person-access";
+import { DetailPage } from "@/components/page-templates/detail-page";
 import { PersonGrantPanel } from "@/components/person-grant-panel";
 import { listPendingInvites } from "@/modules/system-admin/pending-invites";
 import { AdminPageHeader } from "@/components/admin-page-header";
@@ -53,32 +54,39 @@ export default async function PersonAccessPage({
   const cleanHref = `/admin/people/${kind}/${encodeURIComponent(id)}${from ? `?from=${encodeURIComponent(from)}` : ""}`;
   return (
     <>
-      <AdminPageHeader
-        path={`/admin/people/${kind}/${id}`}
-        back={{ href: from ? `/admin/people?q=${encodeURIComponent(from)}` : "/admin/people", label: "Back to People & access" }}
-      />
-      {grantRows.length > 0 || pending.invites.length > 0 ? (
-        <div className={styles.wrap} style={{ marginBottom: 14 }}>
-          {grantRows.length > 0 ? (
-            <PersonGrantPanel
-              cleanHref={cleanHref}
-              clubNames={Object.fromEntries(clubOptions.map((club) => [club.id, club.name]))}
-              eventNames={Object.fromEntries(eventOptions.map((event) => [event.id, event.name]))}
-              person={{ staffId: person.staffId, accountId: person.accountId, staffEmail: person.staffEmail, accountEmail: person.accountEmail, displayName: person.staff?.displayName ?? person.name }}
-              rows={grantRows}
-            />
-          ) : null}
-          <PendingInvites emailConfigured={pending.emailConfigured} heading="Pending invites for this person" invites={pending.invites} />
-        </div>
-      ) : null}
-      <PersonAccess
-        clubOptions={clubOptions}
-        eventOptions={eventOptions}
-        linkedEmailChangesTogether={linkedEmailChangesTogether}
-        person={person}
-        scope={viewer.scope}
-        viewerUserId={viewer.user.id}
-      />
+      {/* The back link is the header's: one link, named for where it goes. */}
+      <AdminPageHeader back={null} path={`/admin/people/${kind}/${id}`} />
+      <DetailPage
+        header={{
+          title: person.name || person.email,
+          exactName: true,
+          back: { href: from ? `/admin/people?q=${encodeURIComponent(from)}` : "/admin/people", label: "Back to People & access" },
+          below: <PersonIdentity person={person} />,
+        }}
+      >
+        {grantRows.length > 0 || pending.invites.length > 0 ? (
+          <div className={styles.wrap}>
+            {grantRows.length > 0 ? (
+              <PersonGrantPanel
+                cleanHref={cleanHref}
+                clubNames={Object.fromEntries(clubOptions.map((club) => [club.id, club.name]))}
+                eventNames={Object.fromEntries(eventOptions.map((event) => [event.id, event.name]))}
+                person={{ staffId: person.staffId, accountId: person.accountId, staffEmail: person.staffEmail, accountEmail: person.accountEmail, displayName: person.staff?.displayName ?? person.name }}
+                rows={grantRows}
+              />
+            ) : null}
+            <PendingInvites emailConfigured={pending.emailConfigured} heading="Pending invites for this person" invites={pending.invites} />
+          </div>
+        ) : null}
+        <PersonAccess
+          clubOptions={clubOptions}
+          eventOptions={eventOptions}
+          linkedEmailChangesTogether={linkedEmailChangesTogether}
+          person={person}
+          scope={viewer.scope}
+          viewerUserId={viewer.user.id}
+        />
+      </DetailPage>
     </>
   );
 }

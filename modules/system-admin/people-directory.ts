@@ -245,9 +245,23 @@ export type PersonDetail = {
   clubs: PersonClubRow[];
 };
 
+/** True when either side of the person is a club person, by the same rule as a Clubs Administrator's list. */
+export async function isClubPerson(ids: { staffId: string | null; accountId: string | null }, now: Date): Promise<boolean> {
+  const prisma = getPrisma();
+  const where = clubPeopleWhere(now);
+  const [staff, account] = await Promise.all([
+    ids.staffId ? prisma.user.findFirst({ where: { AND: [{ id: ids.staffId }, where.staff] }, select: { id: true } }) : null,
+    ids.accountId ? prisma.attendeeAccount.findFirst({ where: { AND: [{ id: ids.accountId }, where.account] }, select: { id: true } }) : null,
+  ]);
+  return Boolean(staff || account);
+}
+
 /**
  * One person, from either id of a linked pair. `scope: "clubs"` (a Clubs Administrator viewing) loads
- * no event memberships and no sign-in details, and only club-type organizations.
+ * no event memberships and no sign-in details, and only club-type organizations. A Clubs Administrator is shown club
+ * people only (#1804, the same people as the list, `clubPeopleWhere`): anyone else answers `null`, as if there were no
+ * such person. A linked staff login and website account are one person, so either side being a club person opens the
+ * page from either id. A system administrator (`"full"`) is shown anyone.
  */
 export async function getPersonDetail(
   kind: "staff" | "account",
@@ -270,6 +284,7 @@ export async function getPersonDetail(
   }
   const full = scope === "full";
   const now = new Date();
+  if (!full && !(await isClubPerson({ staffId, accountId }, now))) return null;
 
   const [memberships, user, account] = await Promise.all([
     full && staffId ? prisma.eventMembership.findMany({

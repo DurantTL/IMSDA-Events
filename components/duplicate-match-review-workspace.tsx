@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
@@ -18,6 +19,7 @@ import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import type { PersonMatchCandidateRecord } from "@/modules/people/duplicate-match-repository";
 import type { PersonMergeRecord } from "@/modules/people/person-merge-repository";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/page-header";
 
 const signalLabels: Record<string, string> = {
   PHONE_MATCH: "Same phone number",
@@ -231,23 +233,22 @@ export function DuplicateMatchReviewWorkspace({
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Identity</p>
-          <h2>Possible duplicate people</h2>
-          <p>
-            People who may be the same person, based on rule-based evidence — never applied
-            automatically. Review the evidence for each pair, then dismiss it, defer it for later,
-            or merge the records. A merge links the two records and keeps both with their full
-            history, and it can be undone.
-          </p>
-        </div>
-        <div className="intro-actions">
+      <PageHeader
+        title="Possible duplicate people"
+        description="Identity review across the whole system: people who may be the same person, from rule-based evidence, never applied automatically."
+        secondary={(
           <button className="secondary-button" type="button" onClick={runGeneration} disabled={generating}>
             <RefreshCw aria-hidden="true" size={15} /> {generating ? "Scanning…" : "Scan for new candidates"}
           </button>
-        </div>
-      </div>
+        )}
+        below={(
+          <p className="quiet-copy">
+            Review the evidence for each pair, then dismiss it, defer it for later, or merge the records. A merge links the two
+            records and keeps both with their full history, and it can be undone. This is separate from an event&apos;s
+            registration duplicates, which are in the <Link href="/people/duplicates">Duplicate finder</Link>.
+          </p>
+        )}
+      />
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}
