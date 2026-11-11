@@ -55,7 +55,7 @@ export async function listUnmatchedSquarePayments(
     includeUnattributed?: boolean;
     days?: number;
     configuration?: SquareRuntimeConfiguration;
-  } = {},
+  },
 ): Promise<{
   findings: SquareReconciliationFinding[];
   examined: number;
