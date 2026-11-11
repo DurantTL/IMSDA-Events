@@ -58,7 +58,8 @@ jobs:
       - run: npm run event-content:sync
       - run: npm run build
       - run: npm i --no-save playwright@1.63.0
-      - run: npx playwright install --with-deps chromium firefox webkit
+      # Shared setup (#1872): retries the Ubuntu mirror and carries on with the runner's own libraries when it is down.
+      - run: scripts/ci/install-playwright-browsers.sh chromium firefox webkit
       # Fictitious CI-only values for production mode. Keep the secrets identical to the block in ci.yml ("verify").
       # The Square values are fictitious too: they only make the app offer the card form, so the check can see what a
       # blocker does to it. Nothing is charged. The embed host is the check's own local page.

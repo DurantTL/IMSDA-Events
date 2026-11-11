@@ -29,6 +29,7 @@ on:
       - "modules/**"
       - "lib/**"
       - ".github/workflows/browser-translation.yml"
+      - "scripts/ci/install-playwright-browsers.sh"
   workflow_dispatch:
 
 permissions:
@@ -77,7 +78,8 @@ jobs:
       - run: npm run build
       # Playwright is deliberately not a dependency; `--no-save` keeps the lockfile untouched.
       - run: npm i --no-save playwright@1.63.0
-      - run: npx playwright install --with-deps chromium firefox webkit
+      # Shared setup (#1872): retries the Ubuntu mirror and carries on with the runner's own libraries when it is down.
+      - run: scripts/ci/install-playwright-browsers.sh chromium firefox webkit
       # Fictitious CI-only values for production mode. Keep this block identical
       # to the one in ci.yml ("verify").
       - name: Start the built app
