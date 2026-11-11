@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createElement } from "react";
+import { act, createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
@@ -53,6 +53,19 @@ describe("a clicked link wins over a pending typed search (#1873)", () => {
     await flush(SEARCH_DEBOUNCE_MS + 50);
     expect(nav.replace).not.toHaveBeenCalled();
     expect(nav.push).not.toHaveBeenCalled();
+  });
+
+  it("keeps the pending search for a new-tab click, a new-tab link or an in-page link", async () => {
+    const input = await renderSearch();
+    await typeInto(input, "Trailblazers");
+    await act(async () => { link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true })); });
+    link.target = "_blank";
+    await click(link);
+    link.removeAttribute("target");
+    link.setAttribute("href", "#records");
+    await click(link);
+    await flush(SEARCH_DEBOUNCE_MS + 50);
+    expect(nav.replace).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the pending search when the click is not on a link", async () => {

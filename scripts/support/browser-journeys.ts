@@ -207,7 +207,6 @@ export async function assertHealthy(page: Page, label: string, failures: Failure
   if (state.overlay) failures.push(`${label}: the framework error overlay is showing`);
 }
 
-/** Text a person would read in the page body. */
 /**
  * When a journey step fails (#1873): print the page's current address and save a full-page screenshot to
  * JOURNEY_FAILURE_DIR (default test-results/journey-failures), which CI uploads as an artifact. Never throws, so the
@@ -228,6 +227,7 @@ export async function saveFailureEvidence(page: Page | null, label: string) {
   }
 }
 
+/** Text a person would read in the page body. */
 export async function bodyText(page: Page): Promise<string> {
   return page.evaluate(() => document.body?.innerText ?? "");
 }
