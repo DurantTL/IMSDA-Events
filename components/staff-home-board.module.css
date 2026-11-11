@@ -229,3 +229,66 @@
   border-top: 1px solid var(--line);
   padding: 12px 16px;
 }
+
+.quickEmpty {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.quickList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quickLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target, 44px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--card);
+  padding: 0 14px;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.picks {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 12px 0 0;
+}
+
+.picksTitle {
+  padding: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 800;
+}
+
+.pickLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--touch-target, 44px);
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pickLabel input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}

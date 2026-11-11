@@ -3,8 +3,10 @@
 import { GripVertical } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import styles from "@/components/staff-home-board.module.css";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
+import { QUICK_LINKS_MAX } from "@/modules/system-admin/home-quick-links-domain";
 import { moveAnnouncement, moveItem, type HomeLayout, type HomeLayoutModule, type HomeModuleKey } from "@/modules/system-admin/home-layout-domain";
 
 type Scope = "arrange" | "customize";
@@ -39,10 +41,34 @@ export function reorderShown(modules: readonly HomeLayoutModule[], shownKeys: re
   return modules.map((item) => (item.shown ? byKey.get(shownKeys[next++])! : item));
 }
 
-export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = false, action = saveLayout, resetAction = resetLayout }: {
+export type QuickLinkOption = { key: string; label: string; href: string };
+
+/** The Quick links card body: links to pages the person picked, or a short message with a button to pick some. */
+function QuickLinksBody({ picks, options, onPick }: { picks: readonly string[]; options: readonly QuickLinkOption[]; onPick: () => void }) {
+  const links = picks.map((key) => options.find((option) => option.key === key)).filter((option): option is QuickLinkOption => option !== undefined);
+  if (links.length === 0) {
+    return (
+      <div className={styles.quickEmpty} data-testid="home-quick-links-empty">
+        <p className={styles.loading}>No quick links yet. Pick the pages you open most.</p>
+        <button type="button" className="secondary-button" onClick={onPick}>Choose links</button>
+      </div>
+    );
+  }
+  return (
+    <ul className={styles.quickList} data-testid="home-quick-links">
+      {links.map((link) => (
+        <li key={link.key}><Link className={styles.quickLink} href={link.href}>{link.label}</Link></li>
+      ))}
+    </ul>
+  );
+}
+
+export function StaffHomeBoard({ modules: initial, bodies, quickLinkOptions = [], defaultArranging = false, action = saveLayout, resetAction = resetLayout }: {
   modules: HomeLayoutModule[];
   /** Server-rendered module bodies by key; a shown module without one is still loading. */
   bodies: Partial<Record<HomeModuleKey, ReactNode>>;
+  /** The pages this person may pick for Quick links, from the server. */
+  quickLinkOptions?: QuickLinkOption[];
   /** Starts in Arrange mode (tests and previews). */
   defaultArranging?: boolean;
   action?: (input: unknown) => Promise<HomeLayoutResult>;
@@ -85,9 +111,10 @@ export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = fa
   });
 
   const shownModules = modules.filter((item) => item.shown);
+  const quickLinksModule = modules.find((item) => item.key === "quick-links");
 
   /** `refresh` is true for a show/hide change or a reset, so newly shown modules load; a move only applies the returned layout. */
-  async function persist(next: HomeLayoutModule[], refresh: boolean, request: () => Promise<HomeLayoutResult> = () => action(next.map(({ key, shown }) => ({ key, shown }))), onSaved?: () => void) {
+  async function persist(next: HomeLayoutModule[], refresh: boolean, request: () => Promise<HomeLayoutResult> = () => action(next.map(({ key, shown, links }) => (links ? { key, shown, links } : { key, shown }))), onSaved?: () => void) {
     const id = ++requestId.current;
     if (refresh) needsRefresh.current = true;
     setError("");
@@ -190,6 +217,18 @@ export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = fa
     void persist(next, true);
   }
 
+  /** Adds or removes one Quick links pick; the list lives on the quick-links entry and saves right away. */
+  function togglePick(linkKey: string, picked: boolean) {
+    const next = latest.current.map((item) => {
+      if (item.key !== "quick-links") return item;
+      const current = item.links ?? [];
+      const links = picked ? (current.includes(linkKey) || current.length >= QUICK_LINKS_MAX ? current : [...current, linkKey]) : current.filter((key) => key !== linkKey);
+      return { ...item, links };
+    });
+    apply(next);
+    void persist(next, false);
+  }
+
   function reset() {
     void persist(latest.current, true, resetAction, () => setMessage("Home reset to the default layout"));
   }
@@ -244,7 +283,9 @@ export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = fa
               {arranging ? handleFor("arrange", item) : null}
             </div>
             <div className={styles.cardBody}>
-              {bodies[item.key] ?? <p className={styles.loading}>Loading {item.label}</p>}
+              {item.key === "quick-links"
+                ? <QuickLinksBody picks={item.links ?? []} options={quickLinkOptions} onPick={() => setCustomizing(true)} />
+                : bodies[item.key] ?? <p className={styles.loading}>Loading {item.label}</p>}
             </div>
           </li>
         ))}
@@ -282,6 +323,26 @@ export function StaffHomeBoard({ modules: initial, bodies, defaultArranging = fa
                   </li>
                 ))}
               </ul>
+              {quickLinksModule && quickLinkOptions.length > 0 ? (
+                <fieldset className={styles.picks}>
+                  <legend className={styles.picksTitle}>Quick links to show</legend>
+                  <p className={styles.hint}>Up to {QUICK_LINKS_MAX} pages you can open.</p>
+                  {quickLinkOptions.map((option) => {
+                    const picked = (quickLinksModule.links ?? []).includes(option.key);
+                    return (
+                      <label key={option.key} className={styles.pickLabel}>
+                        <input
+                          type="checkbox"
+                          checked={picked}
+                          disabled={!picked && (quickLinksModule.links ?? []).length >= QUICK_LINKS_MAX}
+                          onChange={(event) => togglePick(option.key, event.target.checked)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                    );
+                  })}
+                </fieldset>
+              ) : null}
             </div>
             <div className={styles.panelFoot}>
               <button type="button" className="secondary-button" onClick={reset}>Reset to default</button>

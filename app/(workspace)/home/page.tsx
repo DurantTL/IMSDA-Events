@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { EventsFillingUpModule, MonthlyRecordsModule, SeasonNumbersModule } from "@/components/home-modules";
 import { ComingUpPage, NeedsYouPage } from "@/components/home-pages";
 import { StaffHomeBoard } from "@/components/staff-home-board";
 import { StaffInstallCard } from "@/components/staff-install-card";
@@ -13,6 +14,8 @@ import { buildNeedsView } from "@/modules/system-admin/home-needs-model";
 import { loadComingUp } from "@/modules/system-admin/home-coming-up-repository";
 import type { HomeModuleKey } from "@/modules/system-admin/home-layout-domain";
 import { loadHomeLayout } from "@/modules/system-admin/home-layout-repository";
+import { loadHomeModules } from "@/modules/system-admin/home-modules-repository";
+import { usableQuickLinks } from "@/modules/system-admin/home-quick-links-domain";
 import { loadNeedsInput } from "@/modules/system-admin/home-needs-repository";
 
 export const metadata: Metadata = { title: "Home" };
@@ -55,10 +58,16 @@ export default async function HomeNeedsYouPage() {
   const bodies: Partial<Record<HomeModuleKey, ReactNode>> = {};
   if (shown.has("needs-you")) bodies["needs-you"] = <NeedsYouPage view={view} headingLevel={3} comingUp={comingUpShown ? null : comingUp} />;
   if (comingUpShown && comingUp) bodies["coming-up"] = <ComingUpPage events={comingUp.events} nextStep={comingUp.nextStep} />;
+  // Only the modules turned on are read, each scoped to the person's own roles.
+  const data = await loadHomeModules(roles, shown);
+  if (shown.has("events-filling-up")) bodies["events-filling-up"] = <EventsFillingUpModule view={data["events-filling-up"] ?? null} />;
+  if (shown.has("season-numbers")) bodies["season-numbers"] = <SeasonNumbersModule view={data["season-numbers"] ?? null} />;
+  if (shown.has("monthly-records")) bodies["monthly-records"] = <MonthlyRecordsModule view={data["monthly-records"] ?? null} />;
+  const quickLinkOptions = usableQuickLinks(roles).map(({ key, label, href }) => ({ key, label, href }));
   return (
     <section className="page-stack">
       {header}
-      <StaffHomeBoard modules={layout.modules} bodies={bodies} />
+      <StaffHomeBoard modules={layout.modules} bodies={bodies} quickLinkOptions={quickLinkOptions} />
     </section>
   );
 }
