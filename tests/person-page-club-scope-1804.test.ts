@@ -167,6 +167,14 @@ describe("findInviteLookupPerson", () => {
     });
   });
 
+  it("finds nothing for a Clubs Administrator when the email is a staff login's linked to an account with another email", async () => {
+    mocks.userFindUnique.mockResolvedValue({ id: "u-1", attendeeAccountId: "a-1" });
+    expect(await findInviteLookupPerson("staff@example.test", "clubs", now)).toBeNull();
+    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+    expect(mocks.accountFindUnique).toHaveBeenCalledTimes(1);
+    expect(mocks.accountFindUnique.mock.calls[0]![0].where).toEqual({ email: "staff@example.test" });
+  });
+
   it("finds nothing for a Clubs Administrator when no website account uses the email", async () => {
     expect(await findInviteLookupPerson("nobody@example.test", "clubs", now)).toBeNull();
   });
@@ -192,6 +200,17 @@ describe("the pages", () => {
       expect(source).toContain("if (!viewer.user) redirect(await staffLoginRedirectPath());");
       expect(source).toContain('if (!viewer.scope) redirect("/no-access");');
     }
+  });
+
+  it("the lookup page looks nobody up for a Clubs Administrator unless a club role is chosen", () => {
+    expect(lookup).toContain('const canLookUp = viewer.scope === "full" || items.length > 0;');
+    expect(lookup).toContain("email && canLookUp ? await findInviteLookupPerson");
+  });
+
+  it("the lookup page uses the shared email input and filter form, and links the next steps to People & access", () => {
+    expect(lookup).toContain("<EmailInput");
+    expect(lookup).toContain("<GetFilterForm");
+    expect(lookup).toContain('<Link href="/admin/people">Invite a person</Link>');
   });
 
   it("the lookup never passes staff details to the grant panel for a Clubs Administrator", () => {

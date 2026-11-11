@@ -126,6 +126,12 @@ export async function findExistingPerson(email: string) {
   };
 }
 
+/** What exists for an email counting the website account's own email only; no staff login is looked at or carried. */
+async function findAccountOnlyPerson(email: string) {
+  const account = await getPrisma().attendeeAccount.findUnique({ where: { email }, select: { id: true } });
+  return { staffId: null, accountId: account?.id ?? null };
+}
+
 function staffGrantItems(access: StaffAccessInput): GrantItem[] {
   return [
     ...(access.systemAdmin ? [{ type: "sa" } as const] : []),
@@ -235,7 +241,11 @@ export async function invitePerson(actorUserId: string, input: PeopleInviteInput
   }
   await assertTargetsExist(access);
 
-  const existing = await findExistingPerson(email);
+  // A Clubs Administrator's invite is matched on the website account's own email only (never through a staff login), and
+  // can only carry family items, so a staff login's email gets a normal club invite.
+  const existing = actor.systemAdmin
+    ? await findExistingPerson(email)
+    : await findAccountOnlyPerson(email);
   const createStaff = staffItems && !existing.staffId;
   const inviteFamily = familyItems && !existing.accountId;
   if (inviteFamily) {

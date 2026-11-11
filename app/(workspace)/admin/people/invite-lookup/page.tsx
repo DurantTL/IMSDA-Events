@@ -1,7 +1,10 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { EmailInput } from "@/components/email-input";
+import { GetFilterForm } from "@/components/get-filter-form";
 import { PersonGrantPanel } from "@/components/person-grant-panel";
 import styles from "@/components/people-directory.module.css";
 import { resolvePeopleViewer } from "@/modules/system-admin/people-access";
@@ -30,7 +33,9 @@ export default async function InviteLookupPage({
   const email = normalizeLookupEmail(query.email);
   // Only the family items (Area Coordinator, club roles) can be given from here.
   const items = parseGrantParam(query.grant).filter((item) => item.type === "ac" || item.type === "club");
-  const person = email ? await findInviteLookupPerson(email, viewer.scope) : null;
+  // A Clubs Administrator looks a person up only to give a club role, so with no role chosen nothing is looked up.
+  const canLookUp = viewer.scope === "full" || items.length > 0;
+  const person = email && canLookUp ? await findInviteLookupPerson(email, viewer.scope) : null;
 
   if (person?.scope === "full") redirect(deferredPersonHref(person, items));
   if (person?.scope === "clubs" && person.clubPerson) redirect(deferredPersonHref({ staffId: null, accountId: person.accountId }, items));
@@ -52,23 +57,29 @@ export default async function InviteLookupPage({
     <>
       <AdminPageHeader path="/admin/people/invite-lookup" back={{ href: "/admin/people", label: "Back to People & access" }} />
       <div className={styles.wrap}>
-        <form action="/admin/people/invite-lookup" className={styles.box} method="get">
+        <GetFilterForm action="/admin/people/invite-lookup" className={styles.box} noValidate>
           <h2>Find the person by email</h2>
           <p className={styles.lead}>Use this to give a club role to someone who already has a website account but no club role yet.</p>
           <div className={styles.inline}>
             <label className={styles.field}>
               Email
-              <input autoComplete="off" defaultValue={email} maxLength={254} name="email" required type="email" />
+              <EmailInput autoComplete="off" defaultValue={email} label="Email" maxLength={254} name="email" required />
             </label>
             <button className="primary-button" type="submit">Look up</button>
           </div>
           {items.length > 0 ? <input name="grant" type="hidden" value={formatGrantParam(items)} /> : null}
-        </form>
+        </GetFilterForm>
 
-        {email && !person ? (
+        {!canLookUp ? (
+          <div className={styles.box}>
+            <p>Choose the club role in <Link href="/admin/people">Invite a person</Link> first, then you are sent back here to find the person.</p>
+          </div>
+        ) : null}
+
+        {email && canLookUp && !person ? (
           <div className={styles.box}>
             <h2>No website account found</h2>
-            <p>No website account uses {email}. Choose the club role in Invite a person instead; it sends them a club invite.</p>
+            <p>No website account uses {email}. Choose the club role in <Link href="/admin/people">Invite a person</Link> instead; it sends them a club invite.</p>
           </div>
         ) : null}
 
@@ -90,7 +101,7 @@ export default async function InviteLookupPage({
                 rows={rows}
               />
             ) : (
-              <p className={styles.note}>There is no club role to give yet. Choose the club role in Invite a person, then come back here.</p>
+              <p className={styles.note}>There is no club role to give yet. Choose the club role in <Link href="/admin/people">Invite a person</Link>, then come back here.</p>
             )}
           </div>
         ) : null}

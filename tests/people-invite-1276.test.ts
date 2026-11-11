@@ -263,6 +263,26 @@ describe("an email that already has an account (no duplicates, no linking)", () 
     expect(mocks.acCreate).not.toHaveBeenCalled();
   });
 
+  it("sends a Clubs Administrator to the lookup, with no ids in the link, for an existing website account", async () => {
+    signInAs("clubsAdmin");
+    accounts.push({ id: "acct-pat", email: "pat@example.test", linkedUser: { id: "u-pat" } });
+    const body = await (await invite({ clubs: [{ organizationId: "club_1", role: "REPORTER" }] })).json();
+    expect(body.deferred.personHref).toBe("/admin/people/invite-lookup?email=pat%40example.test&grant=" + encodeURIComponent("c:club_1:REPORTER"));
+    expect(body.deferred.personHref).not.toContain("acct-pat");
+    expect(body.deferred.personHref).not.toContain("u-pat");
+    expect(mocks.clubInviteCreate).not.toHaveBeenCalled();
+  });
+
+  it("matches a Clubs Administrator's invite on the account's own email only, never a staff login's email", async () => {
+    signInAs("clubsAdmin");
+    users.push({ id: "u-pat", email: "pat@example.test", globalRole: null, attendeeAccountId: "acct-other" });
+    accounts.push({ id: "acct-other", email: "other@example.test", linkedUser: { id: "u-pat" } });
+    const body = await (await invite({ clubs: [{ organizationId: "club_1", role: "REPORTER" }] })).json();
+    expect(body.deferred).toBeNull();
+    expect(body.created.clubInviteIds).toHaveLength(1);
+    expect(mocks.clubInviteCreate).toHaveBeenCalledTimes(1);
+  });
+
   it("creates the staff login when only a family account exists, and defers the family side", async () => {
     accounts.push({ id: "acct-pat", email: "pat@example.test", linkedUser: null });
     const body = await (await invite({ clubsAdministrator: true, areaCoordinator: true })).json();

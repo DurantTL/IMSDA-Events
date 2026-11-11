@@ -118,6 +118,9 @@ async function main() {
   assert(club && club.scope === "clubs" && club.clubPerson, "a club person should open their page from the lookup");
   assert((await findInviteLookupPerson(email("staff.eventstaff"), "clubs", now)) === null, "a staff login with no website account should find nothing for a Clubs Administrator");
   assert((await findInviteLookupPerson(email("nobody"), "clubs", now)) === null, "an unknown email should find nothing");
+  assert((await findInviteLookupPerson(email("staff.linked"), "clubs", now)) === null, "a staff login's email should not resolve to its linked account for a Clubs Administrator");
+  const linkedFull = await findInviteLookupPerson(email("staff.linked"), "full", now);
+  assert(linkedFull && linkedFull.scope === "full" && linkedFull.accountId === id("director"), "a system administrator's lookup should resolve a staff email to its linked account");
   const sys = await findInviteLookupPerson(email("staff.eventstaff"), "full", now);
   assert(sys && sys.scope === "full" && sys.staffId === id("eventstaff"), "a system administrator's lookup should find a staff login");
   console.log("ok  the invite lookup shows a Clubs Administrator only a website account");
