@@ -4,10 +4,10 @@
  * it at the same width on every row, with the restore button beside it.
  */
 div.count { flex-wrap: wrap; }
-.count > label { flex: 1 1 16rem; }
+div.count > label { flex: 1 1 16rem; }
 .controls { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
 .controls > input[type="number"] { width: 7.5rem; min-height: 44px; }
-.restore { min-width: 44px; min-height: 44px; justify-content: center; }
+.restore { flex-shrink: 0; min-width: 44px; min-height: 44px; justify-content: center; white-space: nowrap; }
 
 @media (max-width: 600px) {
   div.count { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 8px; }
