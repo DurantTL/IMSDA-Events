@@ -1,7 +1,8 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
-import { findDashboardEvents, moneyToCents, toDashboardEventSource } from "@/modules/system-admin/repository";
+import { moneyToCents, toDashboardEventSource } from "@/modules/system-admin/repository";
+import { dashboardEventsOnce } from "@/modules/system-admin/request-reads";
 import { failedEmailWheres } from "@/modules/system-admin/email-problem-filters";
 import { EMAIL_PROBLEM_WINDOW_DAYS } from "@/modules/system-admin/attention-model";
 import type { EventsAdminEventSource } from "@/modules/events/events-admin-home-model";
@@ -14,7 +15,8 @@ import { registrationBalance } from "@/modules/system-admin/dashboard";
  */
 export async function getEventsAdminEventSources(eventIds: readonly string[], now = new Date()): Promise<EventsAdminEventSource[]> {
   const prisma = getPrisma();
-  const rows = await findDashboardEvents(prisma, { eventIds, endsOnOrAfter: now });
+  // Shared per request with the Home modules, so Home reads these events once.
+  const rows = await dashboardEventsOnce(eventIds, now);
   if (rows.length === 0) return [];
   // Billing mode and draft registrations, for exactly the events the shared read returned.
   const extras = await prisma.event.findMany({

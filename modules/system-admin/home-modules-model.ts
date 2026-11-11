@@ -8,6 +8,10 @@ import type { AreaClubSummary } from "@/modules/club-reports/area-summary-domain
 import { monthlyStatusTotals } from "@/modules/club-reports/area-summary-domain";
 import { chooseReportMonth } from "@/modules/club-reports/club-directory-domain";
 import { reportMonthLabel } from "@/modules/club-reports/domain";
+import { calendarDateIn } from "@/modules/calendar/domain";
+import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/conference-format";
+import { clubYearFor } from "@/modules/club-rosters/domain";
+import { eventInstant } from "@/modules/events/event-times";
 
 export const EVENTS_FILLING_UP_MAX = 5;
 export const TREND_DAYS = 30;
@@ -71,17 +75,32 @@ export function buildEventsFillingUp(sources: readonly SystemAdminEventSource[],
   };
 }
 
-/** New items per day for the last `days` days, oldest first, ending with the day of `now` (UTC days). */
-export function dailyCounts(dates: readonly Date[], now: Date, days = TREND_DAYS): number[] {
-  const counts = new Array<number>(days).fill(0);
-  const day = 86_400_000;
-  const todayStart = Math.floor(now.getTime() / day) * day;
-  for (const date of dates) {
-    const back = Math.floor((todayStart - Math.floor(date.getTime() / day) * day) / day);
-    if (back < 0 || back >= days) continue;
-    counts[days - 1 - back] += 1;
-  }
-  return counts;
+/** The calendar date `back` days before `date` ("2026-11-12"), by plain date arithmetic. */
+export function dateBefore(date: string, back: number): string {
+  return new Date(Date.parse(`${date}T12:00:00Z`) - back * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Daily counts for the `days` conference-calendar days ending `today`, oldest first, from per-day rows (days with none are 0). */
+export function dailyCountsFromRows(rows: ReadonlyArray<{ day: string; count: number }>, today: string, days = TREND_DAYS): number[] {
+  const byDay = new Map(rows.map((row) => [row.day, Number(row.count)]));
+  return Array.from({ length: days }, (_, at) => byDay.get(dateBefore(today, days - 1 - at)) ?? 0);
+}
+
+/**
+ * The club year's first day (inclusive) and the next year's first day (exclusive) as instants: midnight on September 1 on the
+ * conference calendar, the same calendar the report months use, so an event starting late August 31 Central is in the old year.
+ */
+export function clubYearInstants(clubYear: string): { from: Date; to: Date } {
+  const start = Number(clubYear.slice(0, 4));
+  return {
+    from: eventInstant(`${start}-09-01`, "00:00", CONFERENCE_TIME_ZONE),
+    to: eventInstant(`${start + 1}-09-01`, "00:00", CONFERENCE_TIME_ZONE),
+  };
+}
+
+/** The club year (Sept to Aug) that the conference calendar date of `now` is in. */
+export function conferenceClubYear(now: Date): string {
+  return clubYearFor(new Date(`${calendarDateIn(now)}T12:00:00Z`));
 }
 
 export type SeasonTile = { key: "registrations" | "people" | "clubs"; label: string; value: number | null; href: string };

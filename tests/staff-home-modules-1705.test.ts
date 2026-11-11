@@ -14,12 +14,25 @@ import {
   buildEventsFillingUp,
   buildMonthlyRecords,
   buildSeasonNumbers,
-  dailyCounts,
+  clubYearInstants,
+  conferenceClubYear,
+  dailyCountsFromRows,
   daysToGoText,
 } from "@/modules/system-admin/home-modules-model";
 import type { SystemAdminEventSource } from "@/modules/system-admin/dashboard";
 import type { AreaClubSummary } from "@/modules/club-reports/area-summary-domain";
 
+// A request-scoped store stands in for React's `cache`, reset before each test (one test is one request).
+const store = vi.hoisted(() => ({ resets: [] as Array<() => void> }));
+vi.mock("react", async (original) => ({
+  ...(await original<typeof import("react")>()),
+  cache: (fn: (...args: never[]) => unknown) => {
+    let done = false;
+    let value: unknown;
+    store.resets.push(() => { done = false; });
+    return (...args: never[]) => { if (!done) { value = fn(...args); done = true; } return value; };
+  },
+}));
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
@@ -81,13 +94,35 @@ describe("Events filling up model (#1705)", () => {
 });
 
 describe("Season numbers model (#1705)", () => {
-  it("buckets daily counts over 30 days, oldest first", () => {
-    const counts = dailyCounts([now, new Date("2026-11-12T01:00:00Z"), new Date("2026-11-11T20:00:00Z"), new Date("2026-10-14T12:00:00Z"), new Date("2026-10-13T12:00:00Z"), new Date("2026-11-13T12:00:00Z")], now);
+  it("fills 30 conference days from per-day rows, oldest first, with zeros for quiet days", () => {
+    const counts = dailyCountsFromRows([{ day: "2026-11-12", count: 2 }, { day: "2026-11-11", count: 1 }, { day: "2026-10-14", count: 1 }, { day: "2026-10-13", count: 5 }], "2026-11-12");
     expect(counts).toHaveLength(30);
     expect(counts[29]).toBe(2);
     expect(counts[28]).toBe(1);
     expect(counts[0]).toBe(1);
     expect(counts.reduce((a, b) => a + b, 0)).toBe(4);
+  });
+
+  it("puts the club year boundary at midnight Sept 1 on the conference calendar", () => {
+    const { from, to } = clubYearInstants("2026-27");
+    expect(from.toISOString()).toBe("2026-09-01T05:00:00.000Z");
+    expect(to.toISOString()).toBe("2027-09-01T05:00:00.000Z");
+    // An event starting 9 pm Central on Aug 31 (02:00 UTC Sept 1) is still in the old year.
+    const lateAugust = new Date("2026-09-01T02:00:00Z");
+    expect(lateAugust >= from).toBe(false);
+    expect(lateAugust >= clubYearInstants("2025-26").from && lateAugust < from).toBe(true);
+  });
+
+  it("picks the club year from the conference date, not UTC", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-09-01T02:00:00Z"));
+      expect(conferenceClubYear(new Date())).toBe("2025-26");
+      vi.setSystemTime(new Date("2026-09-01T06:00:00Z"));
+      expect(conferenceClubYear(new Date())).toBe("2026-27");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("builds tiles by what the person sees, with a trend summary", () => {
@@ -181,9 +216,9 @@ vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     registration: {
       count: async (args: { where: unknown }) => { prismaCalls.push({ op: "registration.count", where: args.where }); if (failing.has("registration.count")) throw new Error("down"); return 12; },
-      findMany: async (args: { where: unknown }) => { prismaCalls.push({ op: "registration.findMany", where: args.where }); return [{ createdAt: new Date("2026-11-12T10:00:00Z") }, { createdAt: new Date("2026-11-11T10:00:00Z") }]; },
     },
     registrationAttendee: { count: async (args: { where: unknown }) => { prismaCalls.push({ op: "attendee.count", where: args.where }); return 30; } },
+    $queryRaw: async (sql: { values: unknown[] }) => { prismaCalls.push({ op: "queryRaw", where: sql.values }); return [{ day: "2026-11-12", count: 2 }, { day: "2026-11-11", count: 1 }]; },
   }),
 }));
 vi.mock("@/modules/system-admin/repository", () => ({
@@ -201,25 +236,26 @@ vi.mock("@/modules/club-reports/area-summary-repository", () => ({
 const { loadHomeModules } = await import("@/modules/system-admin/home-modules-repository");
 const all = new Set<HomeModuleKey>(["needs-you", "coming-up", "events-filling-up", "season-numbers", "monthly-records", "quick-links"]);
 
-beforeEach(() => { dashboardCalls.length = 0; prismaCalls.length = 0; summaryCalls.length = 0; failing = new Set(); });
+beforeEach(() => { store.resets.forEach((reset) => reset()); dashboardCalls.length = 0; prismaCalls.length = 0; summaryCalls.length = 0; failing = new Set(); });
 
 describe("Home module reads and scope (#1705)", () => {
   it("reads an Events admin's own event only", async () => {
     const data = await loadHomeModules(events, all, now);
     expect(dashboardCalls).toEqual([{ eventIds: ["evt_1"], endsOnOrAfter: now }]);
     expect(prismaCalls.length).toBeGreaterThan(0);
-    for (const call of prismaCalls) expect(JSON.stringify(call.where)).toContain('"id":{"in":["evt_1"]}');
+    for (const call of prismaCalls) expect(JSON.stringify(call.where)).toContain(call.op === "queryRaw" ? "evt_1" : '"id":{"in":["evt_1"]}');
+    expect(prismaCalls.filter((call) => call.op === "queryRaw")).toHaveLength(1);
     expect(summaryCalls).toEqual([]);
     expect(data["monthly-records"]).toBeUndefined();
     expect(data["season-numbers"]?.tiles.map((tile) => tile.key)).toEqual(["registrations", "people"]);
-    expect(data["season-numbers"]?.trend?.total).toBe(2);
+    expect(data["season-numbers"]?.trend?.total).toBe(3);
     expect(data["events-filling-up"]?.rows.map((row) => row.id)).toEqual(["evt_1"]);
   });
 
   it("reads every event for a system administrator, and the club summary once", async () => {
     const data = await loadHomeModules(system, all, now);
     expect(dashboardCalls[0]!.eventIds).toBeUndefined();
-    for (const call of prismaCalls) expect(JSON.stringify(call.where)).not.toContain('"id":{"in"');
+    for (const call of prismaCalls) expect(JSON.stringify(call.where)).not.toMatch(/"id":\{"in"|evt_1/);
     expect(summaryCalls).toEqual(["2026-27"]);
     expect(data["season-numbers"]?.tiles.map((tile) => tile.key)).toEqual(["registrations", "people", "clubs"]);
     expect(data["monthly-records"]?.rows[0]).toMatchObject({ submitted: 1, started: 1 });
