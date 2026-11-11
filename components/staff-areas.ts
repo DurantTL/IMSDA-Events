@@ -142,11 +142,9 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
       key: "club-administration",
       destination: clubsAdminHomeItem.href,
       visible: clubs,
-      // Pages the Clubs Administrator's sidebar listed that no tab owns: the club imports and Sterling Volunteers.
+      // Pages the Clubs Administrator's sidebar listed that no tab owns: Sterling Volunteers. The club imports belong to the Club directory (#1589).
       views: [
         { href: clubsAdminHomeItem.href, label: "Overview", visible: clubs },
-        { href: "/admin/clubs/import", visible: clubs },
-        { href: clubsAdminHealthImportHref, visible: (v) => clubs(v) && v.healthImport },
         { href: "/admin/organizations/background-checks", visible: clubs },
       ],
     },
@@ -157,6 +155,9 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
       views: [
         { href: "/admin/clubs/summary", label: "All clubs", visible: clubs },
         { href: "/admin/clubs/summary?view=events#club-events", visible: clubs },
+        // The club imports are tasks of the directory: preview, review, then results (#1589).
+        { href: "/admin/clubs/import", visible: clubs },
+        { href: clubsAdminHealthImportHref, visible: (v) => clubs(v) && v.healthImport },
       ],
     },
     { key: "clubs-and-churches", destination: "/admin/organizations", visible: sys },
@@ -343,8 +344,8 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   // Club invites is the Invited view of Club leaders (#1589).
   if (under(pathname, "/admin/clubs/leaders") || under(pathname, "/admin/clubs/invites")) return place("clubs", "leaders");
   if (under(pathname, "/admin/clubs/transfers")) return place("clubs", "transfers");
-  if (under(pathname, "/admin/clubs/import")) return place("clubs", "club-administration", "/admin/clubs/import");
-  if (under(pathname, "/admin/clubs/health-import")) return place("clubs", "club-administration", clubsAdminHealthImportHref);
+  if (under(pathname, "/admin/clubs/import")) return place("clubs", "club-summary", "/admin/clubs/import");
+  if (under(pathname, "/admin/clubs/health-import")) return place("clubs", "club-summary", clubsAdminHealthImportHref);
   if (under(pathname, "/admin/organizations/background-checks") || under(pathname, "/admin/background-checks")) return place("clubs", "club-administration", "/admin/organizations/background-checks");
   if (under(pathname, "/admin/organizations")) return place("clubs", "clubs-and-churches");
 

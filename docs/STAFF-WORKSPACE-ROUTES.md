@@ -20,8 +20,8 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/club-supplies` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/club-supplies/page.tsx` |
 | `/admin/clubs` | Page link | Clubs | Club administration | Overview | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/page.tsx` |
 | `/admin/clubs/applications` | System management | Clubs | New club applications | Applications | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/applications/page.tsx` |
-| `/admin/clubs/health-import` | Page link | Clubs | Club administration | Import health records | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/health-import/page.tsx` |
-| `/admin/clubs/import` | Page link | Clubs | Club administration | Import clubs | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/import/page.tsx` |
+| `/admin/clubs/health-import` | Page link | Clubs | Club summary | Import health records | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/health-import/page.tsx` |
+| `/admin/clubs/import` | Page link | Clubs | Club summary | Import clubs | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/import/page.tsx` |
 | `/admin/clubs/invites` | System management | Clubs | Club leaders | Invited (redirect, #1589) | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/invites/page.tsx` |
 | `/admin/clubs/leaders` | System management | Clubs | Club leaders | Current, Invited, Draft (`?status=`) | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/leaders/page.tsx` |
 | `/admin/clubs/reports` | System management | Clubs | Monthly Records | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/page.tsx` |
@@ -189,7 +189,7 @@ Home is on the rail for every staff viewer and has two tabs. **Needs you** (`/ho
 
 ## Club administration (#1568)
 
-`/admin/clubs` keeps its key numbers, with Review applications as the one main action, and lists every destination of the Clubs area as a card with its own status, in card groups (Clubs, Records and points, Applications, Club events and forms, People, Catalogs and imports). A card is a link only and is drawn only for a page the person can open; a number that cannot be read shows "Unavailable". Below the cards the page keeps New clubs (with its approve buttons), Registered clubs, Club events and Quick actions as they were. The Clubs tab Club administration overview lights as before.
+`/admin/clubs` keeps its key numbers, with Review applications as the one main action, and lists every destination of the Clubs area as a card with its own status, in card groups (Clubs, Records and points, Applications and checks, Club events and forms, People, Catalogs; Import clubs and Import health records sit in the Clubs group beside Club summary). A card is a link only and is drawn only for a page the person can open; a number that cannot be read shows "Unavailable". Below the cards the page keeps New clubs (with its approve buttons), Registered clubs, Club events and Quick actions as they were. The Clubs tab Club administration overview lights as before.
 
 ## Admin hub pages (#1569)
 
@@ -206,7 +206,8 @@ Each Admin tab (Events, Clubs, People, Forms, Catalogs and settings) opens its o
 | Honors Weekend classes, instructors, rosters and schedule (`/more/honors/**`) | Event setup (the `/more` page, grouped cards) lists the classes card under Program, and the classes page links the other three |
 | Event features (`/more/features`) | A card in the Basics group of Event setup (the tab has no view strip) |
 | Event module requests (`/admin/feature-requests`) | The Event module requests section of the System administration dashboard (`/admin`); it is the page's own title now |
-| Club invites, Import clubs, Import health records, Sterling Volunteers | Views of the Clubs tabs New club applications and Club administration |
+| Club invites, Sterling Volunteers | Views of the Clubs tabs New club applications and Club administration |
+| Import clubs, Import health records | Views of the Clubs tab Club summary (the Club directory), as steps: Preview, Review, Results (#1589) |
 | Archived events (`/archived-events`) | Events tab for system administrators and Event Administrators, and the event bar's Archived events link beside the switcher (an icon on a phone, #1734), for everyone else |
 
 ## Event setup (#1586)

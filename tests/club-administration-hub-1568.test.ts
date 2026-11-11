@@ -24,11 +24,12 @@ const titles = (viewer: HubViewer) => view(viewer).groups.map((group) => [group.
 describe("Club administration uses the hub pattern (#1568)", () => {
   it("groups every destination as the approved mockup does, with the registries' titles", () => {
     expect(titles(system)).toEqual([
-      ["Clubs", ["Club summary", "Clubs and churches", "New club applications", "Club member transfers", "Sterling Volunteers"]],
+      ["Clubs", ["Club summary", "Import clubs", "Import health records", "Clubs and churches"]],
+      ["Applications and checks", ["New club applications", "Club member transfers", "Sterling Volunteers"]],
       ["Records and points", ["Monthly Records", "Club Year-End Reports", "Points"]],
       ["Club events and forms", ["Club events", "Club forms", "Public club forms page"]],
       ["People", ["Club leaders", "People & access"]],
-      ["Catalogs and imports", ["Honor catalog", "Club supply catalog", "Conference club orders", "Import clubs", "Import health records"]],
+      ["Catalogs", ["Honor catalog", "Club supply catalog", "Conference club orders"]],
     ]);
     // Titles the Clubs registry names come from it, not from a second copy.
     const registry = new Map([clubsAdminHomeItem, ...clubsAdminGroups.flatMap((group) => group.items)].map((item) => [item.href, item.label]));
@@ -52,13 +53,14 @@ describe("Club administration uses the hub pattern (#1568)", () => {
   });
 
   it("drops what a Clubs Administrator cannot open, and Import health records while the feature is off", () => {
-    expect(titles(clubsAdmin)[0]).toEqual(["Clubs", ["Club summary", "New club applications", "Club member transfers", "Sterling Volunteers"]]);
+    expect(titles(clubsAdmin).slice(0, 2)).toEqual([["Clubs", ["Club summary", "Import clubs", "Import health records"]], ["Applications and checks", ["New club applications", "Club member transfers", "Sterling Volunteers"]]]);
     const hrefs = (viewer: HubViewer) => view(viewer).groups.flatMap((group) => group.cards.map((card) => card.href));
     expect(hrefs(clubsAdmin)).not.toContain("/admin/organizations");
     expect(hrefs(clubsAdmin)).toContain("/admin/clubs/health-import");
     expect(hrefs(clubsAdminNoHealth)).not.toContain("/admin/clubs/health-import");
     expect(hrefs({ ...system, healthImport: undefined })).not.toContain("/admin/clubs/health-import");
-    expect(titles(clubsAdminNoHealth).at(-1)).toEqual(["Catalogs and imports", ["Honor catalog", "Club supply catalog", "Conference club orders", "Import clubs"]]);
+    expect(titles(clubsAdminNoHealth)[0]).toEqual(["Clubs", ["Club summary", "Import clubs"]]);
+    expect(titles(clubsAdminNoHealth).at(-1)).toEqual(["Catalogs", ["Honor catalog", "Club supply catalog", "Conference club orders"]]);
   });
 
   it("never leaves a lone card in a group, whatever the gates remove", () => {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, CircleAlert, FileUp, Upload } from "lucide-react";
+import { ImportSteps } from "@/components/import-steps";
 import { confirmPayload } from "@/modules/club-imports/confirm-payload";
 import { churchStem, earlierImportNotice, inFileDuplicateKeys, skipReasonLabel, submissionYearNote } from "@/modules/club-imports/domain";
 import type { AnnotatedImportDraft, ClubImportResult } from "@/modules/club-imports/repository";
@@ -160,6 +161,8 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
         </div>
       </div>
 
+      <ImportSteps current={results ? "Results" : drafts ? "Review" : "Preview"} />
+
       {error && <div className="inline-notice error" role="alert">{error}</div>}
 
       {results && (
@@ -193,6 +196,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
             <p className="field-help">Skipped by you, nothing created: {leftOut.map((name, index) => <span key={`${name}-${index}`}>{index ? ", " : ""}<span translate="no">{name}</span></span>)}.</p>
           )}
           {results.some((result) => result.kind !== "CLUB_LIST") && <p className="field-help club-import-next">Next: <a href="/admin/clubs/leaders?status=draft">review and send the club invites</a>.</p>}
+          <p className="field-help club-import-next"><a href="/admin/clubs/summary">Back to the Club directory</a></p>
         </section>
       )}
 
