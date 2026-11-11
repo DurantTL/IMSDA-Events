@@ -3,7 +3,6 @@ import "server-only";
 import { getPrisma } from "@/lib/prisma";
 import { logError } from "@/lib/logger";
 import type { AdminRoles } from "@/modules/access/admin-roles-domain";
-import { resolveAreaClubYear } from "@/modules/club-reports/area-club-year";
 import { Prisma } from "@prisma/client";
 import { calendarDateIn } from "@/modules/calendar/domain";
 import { CONFERENCE_TIME_ZONE } from "@/modules/calendar/conference-format";
@@ -58,8 +57,8 @@ export async function loadHomeModules(roles: AdminRoles, shown: ReadonlySet<Home
   const eventIds = roles.systemAdmin ? undefined : [...roles.eventAdminEventIds];
   const clubYear = conferenceClubYear(now);
 
-  // One club summary read serves Active clubs and Monthly Records.
-  const summary = () => clubsSummaryOnce(resolveAreaClubYear(undefined, now), now);
+  // One club summary read serves Active clubs and Monthly Records, for the same conference-calendar club year as the other tiles.
+  const summary = () => clubsSummaryOnce(clubYear, now);
 
   const data: HomeModuleData = {};
   await Promise.all([
@@ -88,7 +87,7 @@ export async function loadHomeModules(roles: AdminRoles, shown: ReadonlySet<Home
       })()
       : null,
     allowed("monthly-records")
-      ? attempt("monthly records", async () => buildMonthlyRecords(await summary(), resolveAreaClubYear(undefined, now), now)).then((view) => { data["monthly-records"] = view; })
+      ? attempt("monthly records", async () => buildMonthlyRecords(await summary(), clubYear, now)).then((view) => { data["monthly-records"] = view; })
       : null,
   ]);
   return data;
@@ -108,6 +107,8 @@ async function newRegistrationsByDay(prisma: ReturnType<typeof getPrisma>, event
     WHERE r."status"::text IN ('SUBMITTED', 'CONFIRMED')
       AND e."archivedAt" IS NULL
       ${scope}
+      -- A plain bound on the stored UTC time (a day early, so no conference day is cut) lets the index narrow the rows.
+      AND r."createdAt" >= ${dateBefore(first, 1)}::timestamp
       AND ((r."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${CONFERENCE_TIME_ZONE})::date >= ${first}::date
       AND ((r."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${CONFERENCE_TIME_ZONE})::date <= ${today}::date
     GROUP BY 1`);
