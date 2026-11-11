@@ -1,3 +1,4 @@
+import { reachedDestinations } from "@/components/reached-destinations";
 import { createElement } from "react";
 import type { ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -147,7 +148,7 @@ describe("the selected event is kept", () => {
     expect(markup).toContain("System administration");
     expect(markup).toContain("Admin menu");
     expect(markup).not.toContain('id="event-picker"');
-    expect(buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false }).filter((entry) => entry.scope === "System")).toHaveLength(systemNavGroups.flatMap((group) => group.items).length + 1);
+    expect(buildSearchDestinations({ isSystemAdmin: true, selectedEventId: "", permissions: [], clubOversight: false, clubEvent: false, clubFormsAccess: false }).filter((entry) => entry.scope === "System")).toHaveLength(systemNavGroups.flatMap((group) => group.items).length + 1 + reachedDestinations.filter((entry) => entry.scope === "System").length);
   });
 });
 

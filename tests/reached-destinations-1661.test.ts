@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { buildSearchDestinations, searchDestinations, type DestinationSearchContext } from "@/components/destination-search-model";
-import { reachedDestinations } from "@/components/reached-destinations";
+import { reachedDestinations, type ReachedDestination } from "@/components/reached-destinations";
 import { buildRouteMapping } from "@/components/route-mapping";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { closeoutPermissions } from "@/components/issued-assets-views-model";
+import { systemNavGroups, systemSubpageTitle } from "@/components/system-navigation";
 import type { EventPermission } from "@/modules/access/permissions";
 
-/** Search lists pages with no menu entry for a viewer who may open them, with their parent group (#1661, part 1). Synthetic ids only. */
+/** Search lists pages with no menu entry for a viewer who may open them, with their parent group (#1661, parts 1 and 2). Synthetic ids only. */
 
 const base: DestinationSearchContext = {
   isSystemAdmin: false,
@@ -22,18 +24,33 @@ const reachedRoutes = new Set(reachedDestinations.map((entry) => entry.route));
 const reachedIn = (context: DestinationSearchContext) =>
   buildSearchDestinations(context).filter((destination) => reachedRoutes.has(destination.href.split("?")[0]));
 
-const needs: Record<string, EventPermission> = Object.fromEntries(reachedDestinations.map((entry) => [entry.route, entry.permission]));
-const everyPermission = [...new Set(Object.values(needs))];
+const eventEntries = reachedDestinations.filter((entry) => entry.scope === "Event");
+const systemEntries = reachedDestinations.filter((entry) => entry.scope === "System");
+const everyPermission = [...new Set(eventEntries.flatMap((entry) => entry.permissions))];
+const routeOf = (destination: { href: string }) => destination.href.split("?")[0];
+const routesIn = (context: DestinationSearchContext) => reachedIn(context).map(routeOf);
+
+/** The smallest context that passes the page's own rule. */
+function passing(entry: ReachedDestination): DestinationSearchContext {
+  if (entry.scope === "System") return { ...base, selectedEventId: "", isSystemAdmin: true };
+  return {
+    ...base,
+    permissions: entry.oversight === "only" ? [] : [entry.permissions[0]],
+    clubEvent: entry.audience === "CLUB",
+    clubOversight: entry.oversight === "only",
+  };
+}
 
 describe("the registry", () => {
-  it("lists the 17 pages of part 1 once each", () => {
-    expect(reachedDestinations).toHaveLength(17);
-    expect(reachedRoutes.size).toBe(17);
+  it("lists the 36 pages once each", () => {
+    expect(reachedDestinations).toHaveLength(36);
+    expect(reachedRoutes.size).toBe(36);
+    expect(systemEntries).toHaveLength(6);
   });
 
   it("accounts for every reached row: in the registry, or excluded here with a reason", () => {
     const notSearchable = "not searchable";
-    const part2 = "planned for part 2";
+    const inClubsMenu = `${notSearchable}: already in the Clubs administrator menu`;
     const excluded: Record<string, string> = {
       "/admin/site-content/preview": `${notSearchable}: preview`,
       "/admin/club-forms/public-page/preview": `${notSearchable}: preview`,
@@ -46,29 +63,10 @@ describe("the registry", () => {
       "/event-setup/from-template": `${notSearchable}: setup step`,
       "/people/matches": `${notSearchable}: identity merging stays a human decision`,
       "/help/glossary": `${notSearchable}: already in search`,
-      "/more/reports/clubs": part2,
-      "/admin/clubs/health-import": part2,
-      "/admin/clubs/import": part2,
-      "/admin/organizations/import": part2,
-      "/admin/organizations/directory": part2,
-      "/admin/organizations/map-locations": part2,
-      "/admin/clubs/reports/year-end": part2,
-      "/admin/club-supplies/conference-orders": part2,
-      "/admin/problem-reports": part2,
-      "/admin/feature-requests": part2,
-      "/information-forms/responses": part2,
-      "/more/clubs/reports": part2,
-      "/more/issued-assets/closeout": part2,
-      "/more/kitchen-report": part2,
-      "/more/kitchen-report/closeout": part2,
-      "/more/kitchen-report/scanner-import": part2,
-      "/more/team-results": part2,
-      "/people/directory-review": part2,
-      "/people/duplicates": part2,
-      "/people/pending-teams": part2,
-      "/people/responsible-adults": part2,
-      "/people/staff-invitations": part2,
-      "/people/staff-invitations/approvals": part2,
+      "/admin/clubs/health-import": inClubsMenu,
+      "/admin/clubs/import": inClubsMenu,
+      "/admin/clubs/reports/year-end": inClubsMenu,
+      "/information-forms/responses": `${notSearchable}: opens one form's responses and needs a form chosen first`,
     };
     const reachedRows = buildRouteMapping().filter((row) => row.kind === "reached").map((row) => row.route);
     // Every registry route is a reached row, and none is also excluded.
@@ -81,10 +79,55 @@ describe("the registry", () => {
     expect(reachedRows.filter((route) => !reachedRoutes.has(route) && !(route in excluded))).toEqual([]);
   });
 
-  it("matches the permission each page checks on the server", () => {
+  it("matches the check each page makes on the server", () => {
     for (const entry of reachedDestinations) {
-      const file = join(process.cwd(), "app/(workspace)", entry.route, "page.tsx");
-      expect(readFileSync(file, "utf8"), entry.route).toContain(`!permissions.includes("${entry.permission}")`);
+      const source = readFileSync(join(process.cwd(), "app/(workspace)", entry.route, "page.tsx"), "utf8");
+      if (entry.scope === "System") {
+        // A system-administrator page redirects anyone else; the supply orders page admits an active Clubs Administrator too.
+        expect(source, entry.route).toContain(entry.systemAccess === "clubsAdmin" ? "!(await hasClubsAdministration(user))" : 'user.globalRole !== "SYSTEM_ADMIN"');
+        continue;
+      }
+      if (entry.oversight === "only") {
+        expect(source, entry.route).toContain("resolveClubOversight");
+        expect(source, entry.route).toContain("!allowed");
+        continue;
+      }
+      if (entry.oversight === "or") {
+        // Report access, or event-manager oversight of this club event (see modules/reporting/club-reports-access.ts).
+        expect(source, entry.route).toContain("resolveClubReportsAccess");
+        expect(source, entry.route).toContain("!allowed");
+        expect(entry.permissions).toEqual(["VIEW_REPORTS"]);
+        continue;
+      }
+      if (entry.permissions === closeoutPermissions) {
+        expect(source, entry.route).toContain("closeoutPermissions.some");
+        continue;
+      }
+      expect(entry.permissions, entry.route).toHaveLength(1);
+      expect(source, entry.route).toContain(`!permissions.includes("${entry.permissions[0]}")`);
+      // A page that is for one audience says "Not available" on the other.
+      if (entry.audience) expect(source, entry.route).toContain(`event.audience !== "${entry.audience}"`);
+    }
+  });
+
+  it("reads the club access rules it mirrors", () => {
+    const access = readFileSync(join(process.cwd(), "modules/reporting/club-reports-access.ts"), "utf8");
+    expect(access).toContain('includes("VIEW_REPORTS")');
+    expect(access).toContain("resolveClubOversight");
+    const oversight = readFileSync(join(process.cwd(), "modules/club-rosters/event-oversight.ts"), "utf8");
+    expect(oversight).toContain('audience === "CLUB"');
+    expect(oversight).toContain('globalRole === "SYSTEM_ADMIN" || context.membership?.role === "EVENT_ADMIN"');
+    // The shell computes the search flag the same way.
+    const shell = readFileSync(join(process.cwd(), "components/workspace-shell.tsx"), "utf8");
+    expect(shell).toContain('event.audience === "CLUB"');
+    expect(shell).toContain('isSystemAdmin || rolesByEvent.get(event.id) === "EVENT_ADMIN"');
+  });
+
+  it("labels each System page as the page titles itself, and lists none a System menu item already has", () => {
+    const menuHrefs = new Set(systemNavGroups.flatMap((group) => group.items.map((item) => item.href.split("?")[0].split("#")[0])));
+    for (const entry of systemEntries) {
+      expect(systemSubpageTitle(entry.route), entry.route).toBe(entry.label);
+      expect(menuHrefs.has(entry.route), `${entry.route} is already a System menu item`).toBe(false);
     }
   });
 });
@@ -92,20 +135,33 @@ describe("the registry", () => {
 describe("search finds each page for a viewer who may open it", () => {
   for (const entry of reachedDestinations) {
     it(`${entry.parent} > ${entry.label}`, () => {
-      const context = as(entry.permission);
+      const context = passing(entry);
       const byLabel = searchDestinations(buildSearchDestinations(context), entry.label);
-      const hit = byLabel.find((destination) => destination.href.split("?")[0] === entry.route);
+      const hit = byLabel.find((destination) => routeOf(destination) === entry.route);
       expect(hit, "found by its label").toBeDefined();
-      expect(hit).toMatchObject({ scope: "Event", parent: entry.parent, href: `${entry.route}?event=evt_synthetic` });
+      const href = entry.scope === "System" ? entry.route : `${entry.route}?event=evt_synthetic`;
+      expect(hit).toMatchObject({ scope: entry.scope, parent: entry.parent, href });
       const byParent = searchDestinations(buildSearchDestinations(context), `${entry.parent.split(" ")[0]} ${entry.label.split(" ")[0]}`, 40);
-      expect(byParent.map((destination) => destination.href.split("?")[0])).toContain(entry.route);
+      expect(byParent.map(routeOf)).toContain(entry.route);
     });
 
-    it(`${entry.label} is not listed without ${entry.permission}`, () => {
-      const others = everyPermission.filter((permission) => permission !== entry.permission);
-      for (const context of [as(), as("VIEW_EVENT"), as(...others)]) {
-        expect(reachedIn(context).map((destination) => destination.href.split("?")[0])).not.toContain(entry.route);
+    it(`${entry.label} is not listed without its rule`, () => {
+      const denied: DestinationSearchContext[] = [as(), as("VIEW_EVENT"), { ...base, selectedEventId: "" }];
+      if (entry.scope === "Event") {
+        const others = everyPermission.filter((permission) => !entry.permissions.includes(permission));
+        denied.push(
+          { ...as(...others), clubEvent: entry.audience === "CLUB" },
+          // Everything but the event: nothing is listed without one.
+          { ...passing(entry), selectedEventId: "" },
+        );
+        // The other audience.
+        if (entry.audience) denied.push({ ...passing(entry), clubEvent: entry.audience !== "CLUB" });
+      } else {
+        // Every event permission, club oversight and a selected event do not make a System page appear.
+        denied.push({ ...as(...everyPermission), clubOversight: true, clubEvent: true, clubFormsAccess: true });
+        denied.push({ ...base, selectedEventId: "", permissions: everyPermission, siteContentEditor: true });
       }
+      for (const context of denied) expect(routesIn(context), JSON.stringify(context)).not.toContain(entry.route);
     });
   }
 
@@ -117,10 +173,10 @@ describe("search finds each page for a viewer who may open it", () => {
     expect(searchDestinations(all, "ledger health").map((destination) => destination.label)).toContain("Ledger check");
   });
 
-  it("shows only the finance pages to a finance-only viewer", () => {
-    const routes = reachedIn(as("MANAGE_FINANCE")).map((destination) => destination.href.split("?")[0]);
-    expect(routes).toHaveLength(10);
-    expect(routes.every((route) => route.startsWith("/finance/") || route === "/more/ledger-health")).toBe(true);
+  it("shows only the finance pages, the meal closeout and the item closeout to a finance-only viewer", () => {
+    const routes = routesIn(as("MANAGE_FINANCE"));
+    expect(routes).toHaveLength(12);
+    expect(routes.filter((route) => !route.startsWith("/finance/") && route !== "/more/ledger-health").sort()).toEqual(["/more/issued-assets/closeout", "/more/kitchen-report/closeout"]);
   });
 
   it("shows nothing to a restricted viewer", () => {
@@ -147,5 +203,69 @@ describe("search finds each page for a viewer who may open it", () => {
     const firstReached = results.findIndex((destination) => reachedRoutes.has(destination.href.split("?")[0]));
     const lastMenu = results.map((destination, index) => (destination.scope === "Event" && !reachedRoutes.has(destination.href.split("?")[0]) ? index : -1)).reduce((a, b) => Math.max(a, b), -1);
     expect(firstReached).toBeGreaterThan(lastMenu);
+  });
+
+  it("hides the staff invitation pages on a club event", () => {
+    const invitations = ["/people/staff-invitations", "/people/staff-invitations/approvals"];
+    expect(routesIn(as("MANAGE_REGISTRATION"))).toEqual(expect.arrayContaining(invitations));
+    const club = routesIn({ ...as(...everyPermission), clubEvent: true, clubOversight: true });
+    for (const route of invitations) expect(club).not.toContain(route);
+    expect(club).toContain("/people/pending-teams");
+  });
+
+  it("lists the club monthly records only with oversight of a club event", () => {
+    const route = "/more/clubs/reports";
+    const oversight = { ...as(), clubEvent: true, clubOversight: true };
+    expect(routesIn(oversight)).toContain(route);
+    // No oversight: no permission opens it, not even every one of them.
+    expect(routesIn({ ...as(...everyPermission), clubEvent: true, clubOversight: false })).not.toContain(route);
+    // Oversight is for a club event only.
+    expect(routesIn({ ...oversight, clubEvent: false })).not.toContain(route);
+    expect(routesIn({ ...oversight, selectedEventId: "" })).not.toContain(route);
+  });
+
+  it("opens the club reports and team results to report access or oversight, on a club event only", () => {
+    const pages = ["/more/team-results", "/more/reports/clubs"];
+    for (const context of [{ ...as("VIEW_REPORTS"), clubEvent: true }, { ...as(), clubEvent: true, clubOversight: true }]) {
+      expect(routesIn(context)).toEqual(expect.arrayContaining(pages));
+    }
+    expect(routesIn({ ...as("VIEW_REPORTS"), clubEvent: false })).not.toEqual(expect.arrayContaining(pages));
+    expect(routesIn({ ...as("MANAGE_REGISTRATION", "MANAGE_FINANCE"), clubEvent: true })).toEqual(expect.not.arrayContaining(pages));
+  });
+
+  it("names the parent as this viewer's menu does", () => {
+    const parentOf = (context: DestinationSearchContext, route: string) => reachedIn(context).find((destination) => routeOf(destination) === route)?.parent;
+    const club = { ...as(), clubEvent: true, clubOversight: true };
+    expect(parentOf(club, "/more/clubs/reports")).toBe("Clubs and churches");
+    expect(parentOf({ ...club, isSystemAdmin: true }, "/more/clubs/reports")).toBe("This event's clubs");
+  });
+
+  it("never shows a System page to a viewer who is not a system administrator", () => {
+    const everything: DestinationSearchContext = { ...as(...everyPermission), clubOversight: true, clubEvent: true, clubFormsAccess: true, siteContentEditor: true };
+    const systemRoutes = systemEntries.map((entry) => entry.route).filter((route) => route !== "/admin/club-supplies/conference-orders");
+    const results = buildSearchDestinations(everything).filter((destination) => destination.scope === "System");
+    expect(results.map(routeOf).filter((route) => systemRoutes.includes(route))).toEqual([]);
+    expect(routesIn(everything)).not.toContain("/admin/club-supplies/conference-orders");
+  });
+
+  it("shows every System page to a system administrator, with no event selected", () => {
+    const admin: DestinationSearchContext = { ...base, isSystemAdmin: true, selectedEventId: "", permissions: [] };
+    const results = buildSearchDestinations(admin).filter((destination) => destination.scope === "System" && reachedRoutes.has(routeOf(destination)));
+    expect(results.map(routeOf).sort()).toEqual(systemEntries.map((entry) => entry.route).sort());
+    expect(results.every((destination) => !destination.href.includes("event="))).toBe(true);
+    // Event pages still need an event.
+    expect(routesIn(admin).filter((route) => eventEntries.some((entry) => entry.route === route))).toEqual([]);
+  });
+
+  it("shows a Clubs Administrator the conference orders and none of the system-administrator pages", () => {
+    const clubsAdmin: DestinationSearchContext = { ...base, selectedEventId: "", clubsAdmin: { healthImport: true } };
+    const results = buildSearchDestinations(clubsAdmin).filter((destination) => reachedRoutes.has(routeOf(destination)));
+    expect(results.map(routeOf)).toEqual(["/admin/club-supplies/conference-orders"]);
+    expect(results[0]).toMatchObject({ scope: "System", parent: "Club supply catalog", label: "Conference club orders" });
+  });
+
+  it("keeps the club pages excluded as already in the Clubs menu", () => {
+    const clubs = buildSearchDestinations({ ...base, selectedEventId: "", clubsAdmin: { healthImport: true } }).map(routeOf);
+    for (const route of ["/admin/clubs/import", "/admin/clubs/health-import", "/admin/clubs/reports/year-end"]) expect(clubs).toContain(route);
   });
 });

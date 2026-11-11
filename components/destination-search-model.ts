@@ -250,6 +250,22 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
     }
   }
 
+  // Pages with no menu entry (#1661), each only for a viewer who passes the page's own check.
+  const reached = visibleReachedDestinations(context);
+  // System pages need no event. A page a System menu item already lists stays one result.
+  for (const entry of reached.filter((candidate) => candidate.scope === "System")) {
+    if (systemPaths.has(entry.route)) continue;
+    add({
+      key: `System:${entry.route}`,
+      scope: "System",
+      label: entry.label,
+      parent: entry.parent,
+      description: entry.description,
+      href: withCurrentEvent(entry.route, context.selectedEventId),
+      keywords: entry.keywords,
+    });
+  }
+
   if (context.selectedEventId) {
     const eventId = context.selectedEventId;
     const eventQuery = `?event=${encodeURIComponent(eventId)}`;
@@ -289,9 +305,9 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
       addEvent(path, navItem?.label ?? card.title, card.description, card.href);
     }
 
-    // Pages with no menu entry (#1661): each only for a viewer who passes the page's own check, after every menu item.
+    // Event pages with no menu entry (#1661): each only for a viewer who passes the page's own check, after every menu item.
     const listed = new Set(destinations.filter((destination) => destination.scope === "Event").map((destination) => pathOf(destination.href)));
-    for (const entry of visibleReachedDestinations(context)) {
+    for (const entry of reached.filter((candidate) => candidate.scope === "Event")) {
       if (listed.has(entry.route) || systemPaths.has(entry.route)) continue;
       add({
         key: `Event:${entry.route}`,
