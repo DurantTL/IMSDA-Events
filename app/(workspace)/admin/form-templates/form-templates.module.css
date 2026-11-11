@@ -1,0 +1,29 @@
+/* The Form templates list (#1593): chips and notes inside the shared table-cards table. */
+.stack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.note {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.problem {
+  flex-basis: 100%;
+  color: var(--coral);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  justify-content: flex-start;
+}
+
+.empty {
+  margin: 0;
+}

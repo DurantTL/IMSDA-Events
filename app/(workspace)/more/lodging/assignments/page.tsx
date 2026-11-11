@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccessRestricted } from "@/components/access-restricted";
-import { BackLink } from "@/components/back-link";
+import { LodgingViewsStrip } from "@/components/lodging-views-strip";
 import { LodgingAssignmentsWorkspace } from "@/components/lodging-assignments-workspace";
+import { StaffPageHeader } from "@/components/staff-page-header";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { resolveEventContext } from "@/modules/events/selection";
 import { getAssignmentWorkspace } from "@/modules/lodging/assignment-view";
 import { LodgingError } from "@/modules/lodging/errors";
+import { lodgingViewAccess } from "@/modules/lodging/lodging-views-model";
 
 export const metadata: Metadata = { title: staffPageTitles.lodgingAssignments };
 
 export default async function LodgingAssignmentsPage({ searchParams }: { searchParams: Promise<{ event?: string }> }) {
   const { event: requested } = await searchParams;
   const { event, permissions } = await resolveEventContext(requested);
+  // The strip lists only the pages this viewer passes the same check for (#1578).
+  const strip = <LodgingViewsStrip access={lodgingViewAccess(permissions)} current="assignments" eventId={event.id} />;
   // Decided here on the server, and again by every API route the screen calls.
   if (!permissions.includes("MANAGE_REGISTRATION")) {
-    return <AccessRestricted title="Lodging assignments are restricted" detail="Staff who manage registrations can place guests in rooms and sites." whoToAsk="your event administrator" />;
+    return <>{strip}<AccessRestricted title="Lodging assignments are restricted" detail="Staff who manage registrations can place guests in rooms and sites." whoToAsk="your event administrator" /></>;
   }
   const view = await getAssignmentWorkspace(event.id, { canSeeSensitive: permissions.includes("VIEW_SENSITIVE_DATA") }).catch((error: unknown) => {
     if (error instanceof LodgingError && error.code === "NO_PROPERTY") return null;
@@ -23,18 +27,19 @@ export default async function LodgingAssignmentsPage({ searchParams }: { searchP
   });
   if (!view) {
     return (
-      <section className="panel">
-        <h2>{staffPageTitles.lodgingAssignments}</h2>
-        <p>This event has no lodging property yet. {permissions.includes("CONFIGURE_EVENT") ? <>An event administrator chooses one on the <Link href={`/more/lodging?event=${encodeURIComponent(event.id)}`}>Lodging page</Link> first.</> : "Ask your event administrator to choose one first."}</p>
-      </section>
+      <>
+        {strip}
+        <StaffPageHeader description="Lodging is set up per event, starting with its property." />
+        <section className="panel">
+          <p>This event has no lodging property yet. {permissions.includes("CONFIGURE_EVENT") ? <>An event administrator chooses one on the <Link href={`/more/lodging?event=${encodeURIComponent(event.id)}`}>Lodging page</Link> first.</> : "Ask your event administrator to choose one first."}</p>
+        </section>
+      </>
     );
   }
   return (
     <>
-      {/* The Lodging page is for event administrators (CONFIGURE_EVENT, as it checks), so others get no link to a closed page (#1735). */}
-      {permissions.includes("CONFIGURE_EVENT") ? <BackLink href={`/more/lodging?event=${encodeURIComponent(event.id)}`} variant="staff">Back to lodging</BackLink> : null}
+      {strip}
       <LodgingAssignmentsWorkspace
-        eventName={event.name}
         initialView={view}
         canConfigure={permissions.includes("CONFIGURE_EVENT")}
         canExport={permissions.includes("VIEW_REPORTS")}

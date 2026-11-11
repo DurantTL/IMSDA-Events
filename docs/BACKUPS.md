@@ -396,8 +396,12 @@ docker run --rm --env-file /home/u_events/.xcloud/.env.backup \
 # Uploaded files:
 docker run --rm -v imsda_events_assets:/assets -v /root/restore:/restore:ro \
   --entrypoint sh ghcr.io/duranttl/imsda-events-backup:main -c \
-  'find /assets -mindepth 1 -maxdepth 1 -exec rm -rf {} + && tar -xzf /restore/imsda-assets-<stamp>.tar.gz -C /assets'
+  'find /assets -mindepth 1 -maxdepth 1 -exec rm -rf {} + && tar -xzf /restore/imsda-assets-<stamp>.tar.gz -C /assets && chown -R 1000:1000 /assets'
 ```
+
+The last step hands the restored files to uid 1000, the app container's `node`
+user (#1798). An archive made while the app still ran as root restores files
+owned by root, which the app refuses to start on.
 
 Restart the app and sweeper, then check `/api/health` and a few registrations.
 Delete `/root/restore` afterwards; it holds personal data.

@@ -2,8 +2,9 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { FormPage } from "@/components/page-templates/form-page";
 import { EventSettingsWorkspace } from "@/components/event-settings-workspace";
+import { EventStartChoices } from "@/components/event-start-choices";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { formatDateRange } from "@/modules/calendar/domain";
 import { getCalendarEntryPrefill } from "@/modules/calendar/event-links";
@@ -25,24 +26,25 @@ export default async function EventSetupPage({ searchParams }: { searchParams: P
   const carry = fromCalendarEntry && prefill?.ok ? `?fromCalendarEntry=${encodeURIComponent(fromCalendarEntry)}` : "";
 
   return (
-    <section className="page-stack">
-      <StaffPageHeader description="Start blank, from a template, or from a past event." />
-      {prefill?.ok === false && (
-        <p className="inline-notice error" role="alert">
-          {prefill.reason} <Link href="/admin/calendar">Back to the calendar</Link>
-        </p>
+    <FormPage
+      header={{ title: "Create an event", description: "Start blank, from a template, or from a past event." }}
+      notices={(
+        <>
+          {prefill?.ok === false && (
+            <p className="inline-notice error" role="alert">
+              {prefill.reason} <Link href="/admin/calendar">Back to the calendar</Link>
+            </p>
+          )}
+          {prefill?.ok && (
+            <p className="inline-notice" role="status" data-testid="event-setup-from-calendar">
+              Setting up a registration event from the calendar item <strong>{prefill.entry.title}</strong> ({formatDateRange(prefill.entry.startsOn, prefill.entry.endsOn)}).
+              The event is linked to it, so the calendar shows the pair once.
+            </p>
+          )}
+          <EventStartChoices current="blank" carry={carry} />
+        </>
       )}
-      {prefill?.ok && (
-        <p className="inline-notice" role="status" data-testid="event-setup-from-calendar">
-          Setting up a registration event from the calendar item <strong>{prefill.entry.title}</strong> ({formatDateRange(prefill.entry.startsOn, prefill.entry.endsOn)}).
-          The event is linked to it, so the calendar shows the pair once.
-        </p>
-      )}
-      <div className="event-setup-entry-actions">
-        <Link className="secondary-button" href={`/event-setup/from-template${carry}`}>Start from a template</Link>
-        <Link className="secondary-button" href={`/event-setup${carry}#blank-event`}>Start blank</Link>
-        <Link className="secondary-button" href="/event-setup/copy">Copy from a past event</Link>
-      </div>
+    >
       <div id="blank-event">
         <EventSettingsWorkspace
           mode="create"
@@ -52,6 +54,6 @@ export default async function EventSetupPage({ searchParams }: { searchParams: P
             : undefined}
         />
       </div>
-    </section>
+    </FormPage>
   );
 }

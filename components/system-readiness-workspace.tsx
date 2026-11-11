@@ -1,6 +1,5 @@
 "use client";
 
-import { StaffPageHeader } from "@/components/staff-page-header";
 import { useState } from "react";
 import Link from "next/link";
 import {
@@ -67,24 +66,19 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
   const remaining = buildRemainingSetup(readiness);
 
   return (
-    <section className="page-stack">
-      <StaffPageHeader
-        description={(
-          <>
-            What the app can check by itself, and what a person has to confirm before real club data and the next
-            event. Ticking an item only records that someone did the work. It never deploys, migrates, sends or
-            unlocks anything.{" "}
-            <strong>
-              {summary.automaticAttention === 0
-                ? "No automatic check needs attention."
-                : `${summary.automaticAttention} automatic ${summary.automaticAttention === 1 ? "check needs" : "checks need"} attention.`}{" "}
-              {readiness.ticksAvailable
-                ? `${summary.manualDone} of ${summary.manualTotal} manual items ticked.`
-                : "Manual ticks could not be read."}
-            </strong>
-          </>
-        )}
-      />
+    <div className="page-stack">
+      <p className={styles.summary} data-testid="readiness-summary" role="status">
+        <strong>
+          {[
+            summary.automaticAttention > 0 ? `${summary.automaticAttention} automatic ${summary.automaticAttention === 1 ? "check needs" : "checks need"} attention.` : null,
+            summary.automaticUnknown > 0 ? `${summary.automaticUnknown} could not be checked.` : null,
+            summary.automaticAttention === 0 && summary.automaticUnknown === 0 ? "No automatic check needs attention." : null,
+          ].filter(Boolean).join(" ")}{" "}
+          {readiness.ticksAvailable
+            ? `${summary.manualDone} of ${summary.manualTotal} manual items ticked.`
+            : "Manual ticks could not be read."}
+        </strong>
+      </p>
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="inline-notice" role="status">{notice}</p>}
@@ -260,6 +254,6 @@ export function SystemReadinessWorkspace({ initialReadiness }: { initialReadines
           </ul>
         </section>
       ))}
-    </section>
+    </div>
   );
 }

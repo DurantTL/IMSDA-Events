@@ -98,7 +98,9 @@ may break anywhere), `bar-over-text` (when a page opens, a sticky or fixed actio
 holds a button sits on top of text; an action bar stays in the page flow until the reader
 has scrolled past the heading or intro, see `usePinAfterScroll`), and `loading-screen` (the
 shell's "Loading IMSDA Events…" is waited out before measuring, and a page that never leaves
-it is a finding). The sign-in, recovery, calendar and club-directory pages and the
+it is a finding). The audit opens every page through one helper
+(`gotoSettled`) that waits the loading screen out, and checks that something is present with a wait (`appears`), never an
+instant count, so a slow run is not reported as a page bug (#1829, #1830; `tests/mobile-audit-waits-1829.test.ts`). The sign-in, recovery, calendar and club-directory pages and the
 invalid-link states are in `pages`.
 
 **Rules added in #997** (they run on every page): `table-wider-than-box` (601 px and over: a data table wider than
@@ -207,6 +209,8 @@ invites, Sterling Volunteers, team, accounts, club forms, attendee listing.
   tracking report and CSV share `CLASS_TRACKING_EXPORT_HEADERS`).
 
 ### 44px tap targets
+
+Dense staff rows (#1775, L13): inside an element marked `dense-rows` (the registrations list and the arrivals list), row controls are 44px except with a mouse or trackpad (`pointer: fine`) at 1024px and wider, where they are `--touch-target-dense` (36px). Touch is 44px at every width; the audit's `dense-rows` check measures both at 1024 and 1280 px.
 
 `:root { --touch-target: 44px }` is set at 768 px and under; the rules this section lists apply at **600 px and under** (phones), the width the audit uses, so the registration form builder and other tablet layouts keep their sizes. At 600 px and under:
 
@@ -317,11 +321,12 @@ without `table-cards` unless its file is on that test's allow-list.
 
 ## Phones, iPad and the staff shell (#1566)
 
-**Width decides, never the device.** Below 1024 px, or whenever the tab row would not fit (`StaffTabRow` measures it with a
-`ResizeObserver` and sets `data-fit="tight"`), the row is the menu line; at 800 px and under the icon rail goes and the five-slot bottom bar
+**Width decides, never the device.** Only when the tab row would not fit (`StaffTabRow` measures it with a
+`ResizeObserver` and sets `data-fit="tight"`), at any width, the row is the menu line (L11, #1734); a row that fits stays, even on a
+phone. At 800 px and under the icon rail goes and the five-slot bottom bar
 (Home, Events, Check-in, Clubs, More) appears. Nothing asks for "iPad" or "iPhone". An iPad split view is just a narrower window, so
-507, 678 and 981 px behave like any other width: 507 px is the phone layout (bar plus menu line), 678 and 981 px have the menu line without
-the bar, and 1180 px and up show the tab row if it fits. The same holds for 200% zoom (a 1280 px screen at 200% is a 640 px viewport, 1024 px at 200% is 512 px).
+507, 678 and 981 px behave like any other width: 507 px is the phone layout (the bar, and the menu line where the tabs do not fit), and
+678, 981 and 1180 px and up have no bar and show the tab row if it fits. The same holds for 200% zoom (a 1280 px screen at 200% is a 640 px viewport, 1024 px at 200% is 512 px).
 
 **Safe areas.** `app/layout.tsx` exports `viewport` with `viewportFit: "cover"`, so the page runs under the notch and home
 indicator and `env(safe-area-inset-*)` is real (it is `0` in an ordinary browser tab). `body` pads left, right and top by the inset; fixed
@@ -346,4 +351,5 @@ every Clubs link carries `?year=` (`withClubYear`) so passing through a page tha
 People, Reports and Help show neither picker. Moving between tabs and rail areas keeps the event (`carry`), never replaces it.
 
 **The task check.** `npm run test:staff-phone-tasks` (`scripts/verify-staff-phone-tasks.ts`) walks the task list at 390 and 820 px against a
-production build, as a system administrator and again as check-in staff and kitchen-only staff. It is not in CI (run it locally).
+production build, as a system administrator and again as check-in staff and kitchen-only staff. CI runs it in the "club-journeys"
+job after the journeys (about 40 seconds on the app that job already built).

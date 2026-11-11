@@ -2,6 +2,7 @@ import { ExportLink } from "@/components/export-link";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { eventLocalDateTime } from "@/modules/meals/scanner-import";
+import styles from "./meals-kitchen.module.css";
 import { kitchenColumnDefinitions, kitchenCountKindLabels, kitchenCountKinds, type KitchenCountsReport } from "@/modules/meals/kitchen-counts";
 
 const figure = (value: number | undefined) => (value === undefined ? "—" : String(value));
@@ -55,7 +56,7 @@ export function KitchenCountsTable({
           <tbody role="rowgroup">
             {report.rows.map((row) => (
               <tr key={row.key} role="row">
-                <th role="rowheader" scope="row">{row.label}</th>
+                <th className={styles.wrap} role="rowheader" scope="row">{row.label}</th>
                 <td role="cell" data-label="Ordered">{row.ordered}</td>
                 <td role="cell" data-label="Served">{row.served}</td>
                 {kitchenCountKinds.map((kind) => (
@@ -89,7 +90,7 @@ export function KitchenCountsTable({
           <summary>Entry history (every entry stays; a correction replaces an earlier one)</summary>
           {report.rows.filter((row) => row.history.length > 0).map((row) => (
             <div key={row.key}>
-              <h4>{row.label}</h4>
+              <h4 className={styles.wrap}>{row.label}</h4>
               <ul className="field-help">
                 {row.history.map((entry) => (
                   <li key={entry.id}>

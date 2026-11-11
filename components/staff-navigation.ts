@@ -131,6 +131,7 @@ export const staffPageTitles = {
   attendeeList: "Attendee list",
   kitchenReport: "Kitchen report",
   kitchenCounts: "Kitchen counts",
+  scannerResults: "Scanner results",
   mealCloseout: "Meal closeout",
   imports: "Imports",
   team: "Team",
@@ -169,7 +170,7 @@ export const staffPageTitles = {
   eventPatches: "Event patches",
   emergencyPlan: "Emergency plan",
   operationalHealth: "Operational health",
-  merchandise: "Merchandise catalog",
+  merchandise: "Merchandise",
   assignmentRoster: "Assignment roster",
   programAssignments: "Seminar assignments",
   lodging: "Lodging",
@@ -240,6 +241,8 @@ const subpageRules: readonly SubpageRule[] = [
   ["/more/event-content", "prefix", staffPageTitles.eventContent],
   ["/more/event-patches", "prefix", staffPageTitles.eventPatches],
   ["/more/emergency-plan", "prefix", staffPageTitles.emergencyPlan],
+  // A member's health record (#1584): the title never carries the person's name.
+  ["/more/health-records/", "under", "Health record"],
   ["/more/health", "prefix", staffPageTitles.operationalHealth],
   ["/more/ledger-health", "prefix", staffPageTitles.ledgerCheck],
   ["/finance/tools", "prefix", staffPageTitles.moreMoneyTools],
@@ -256,6 +259,7 @@ const subpageRules: readonly SubpageRule[] = [
   ["/finance/cancellation-requests", "prefix", "Refunds"],
   ["/more/kitchen-report/counts", "prefix", staffPageTitles.kitchenCounts],
   ["/more/kitchen-report/closeout", "prefix", staffPageTitles.mealCloseout],
+  ["/more/kitchen-report/scanner-import", "prefix", staffPageTitles.scannerResults],
   ["/events-admin", "exact", "Event administration"],
   ["/more/kitchen-report", "prefix", staffPageTitles.kitchenReport],
   ["/more/merchandise", "prefix", staffPageTitles.merchandise],
@@ -457,6 +461,25 @@ export const eventFeaturesItem: NavigationItem = {
 /** Whether the page is the Event features page or below it, which lights that item (and not More). */
 export function isEventFeaturesPath(pathname: string): boolean {
   return pathname === eventFeaturesRoute || pathname.startsWith(`${eventFeaturesRoute}/`);
+}
+
+/**
+ * The title the staff shell draws as a page's `h1` (#685, #1772): the profile page, a named sub-page, Event features, or
+ * the label of the navigation item the path falls under. A page that draws its own `PageHeader` title is listed in
+ * `components/page-header-routes.ts` and the shell skips this.
+ */
+export function staffShellPageTitle(pathname: string): string {
+  if (pathname === "/profile" || pathname.startsWith("/profile/")) return "Your account";
+  const subpage = staffSubpageTitle(pathname);
+  if (subpage) return subpage;
+  if (isEventFeaturesPath(pathname)) return "Event features";
+  const current = isSystemWorkspacePath(pathname)
+    ? systemNavigation
+    // The most specific match wins, so /people/attendees is "Attendee list", not "Registrations".
+    : navigation.reduce<NavigationItem | null>((best, item) => (
+      pathname.startsWith(item.href) && (!best || item.href.length > best.href.length) ? item : best
+    ), null) ?? navigation[0];
+  return current.label;
 }
 
 /** Sidebar-only items that are not in `navigation` (its hrefs are page lookups), placed after the item with this href. */

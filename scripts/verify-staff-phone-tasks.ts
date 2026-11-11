@@ -19,10 +19,10 @@
  * LOCAL USE ONLY, like scripts/verify-mobile-layout.ts: it mints sessions that skip the second factor and writes one
  * synthetic kitchen-staff account (phonetask.kitchen@imsda-events.test), so it refuses to run with NODE_ENV=production,
  * with a DATABASE_URL or STAFF_PHONE_BASE_URL that is not on this machine, or against a database without the seeded
- * accounts. Run it against a production build (`npm run build && npm run start`) on a migrated and seeded database; it is
- * not part of CI.
+ * accounts. Run it against a production build (`npm run build && npm run start`) on a migrated and seeded database. CI runs
+ * it in the "club-journeys" job, after the journeys, against that job's own database.
  *
- *   npm i --no-save playwright-core@1.56.1
+ *   npm i --no-save playwright-core@1.56.1   (the CI job gets playwright-core from the playwright package it installs)
  *   STAFF_PHONE_BASE_URL=http://localhost:3000 npm run test:staff-phone-tasks
  *
  * Environment:
@@ -428,12 +428,17 @@ const tasks: Task[] = [
               menuLine: menuLineShown,
               tabsShown: Boolean(tabs) && getComputedStyle(tabs!.parentElement as Element).visibility !== "hidden" && getComputedStyle(tabs!.parentElement as Element).display !== "none" && (tabs!.parentElement as HTMLElement).getBoundingClientRect().height > 0,
               tight: row?.getAttribute("data-fit") ?? "",
+              // The hidden row stays in the page and measurable, so its natural width can be compared with the room at any time.
+              tabsWidth: tabs ? tabs.getBoundingClientRect().width : 0,
+              room: row ? row.clientWidth : 0,
               railReachable: !rail || rail.scrollHeight <= rail.clientHeight + 1 || getComputedStyle(rail).overflowY === "auto",
             };
           });
           check(state.bar === condition.width <= phoneBarMaxWidth, `${label}: the bottom bar is ${state.bar ? "shown" : "hidden"} (shown at 800px and under only)`);
           check(state.menuLine !== state.tabsShown, `${label}: exactly one of the menu line and the tab row is shown`);
-          if (condition.width < 1024) check(state.menuLine, `${label}: below 1024px the row is the menu line`);
+          // L11 (#1734): the row is the menu line only when its tabs would not fit, at any width, never because the screen is narrow.
+          const fits = state.tabsWidth <= state.room + 0.5;
+          check(state.menuLine === !fits, `${label}: the row is the ${state.menuLine ? "menu line" : "tab row"} and its tabs (${Math.round(state.tabsWidth)}px) ${fits ? "fit" : "do not fit"} the ${state.room}px line`);
           check(state.railReachable, `${label}: every rail area can be reached`);
           // At the bottom of the page the last content is clear of the fixed bottom bar.
           await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));

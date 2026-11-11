@@ -117,6 +117,7 @@
   --workspace-width: 1420px;
   --sidebar-width: 260px;
   --touch-target: 44px;
+  --touch-target-dense: 36px;
   --target-desktop: 36px;
   --target-cta: 48px;
   --radius-sm: 8px;
@@ -129,6 +130,9 @@
   --radius-modal: 20px;
   --radius-hero: 24px;
   --radius-pill: 999px;
+  --radius-element: 10px;
+  --radius-container: 12px;
+  --radius-overlay: 20px;
   --bp-phone: 600px;
   --bp-club-nav: 640px;
   --bp-tablet: 768px;

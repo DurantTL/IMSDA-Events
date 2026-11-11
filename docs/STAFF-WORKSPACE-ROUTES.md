@@ -26,7 +26,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/clubs/leaders` | System management | Clubs | Club leaders | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/leaders/page.tsx` |
 | `/admin/clubs/reports` | System management | Clubs | Monthly Records | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/page.tsx` |
 | `/admin/clubs/reports/[organizationId]/[month]` | System management | Clubs | Monthly Records | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/[organizationId]/[month]/page.tsx` |
-| `/admin/clubs/reports/year-end` | Page link | Reports | Club Year-End Reports | - | More, Areas | Reports menu | - | `app/(workspace)/admin/clubs/reports/year-end/page.tsx` |
+| `/admin/clubs/reports/year-end` | System management | Clubs | Club Year-End Reports | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/reports/year-end/page.tsx` |
 | `/admin/clubs/summary` | System management | Clubs | Club summary | All clubs | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/summary/page.tsx` |
 | `/admin/clubs/transfers` | System management | Clubs | Club member transfers | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/clubs/transfers/page.tsx` |
 | `/admin/email` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/email/page.tsx` |
@@ -178,7 +178,8 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/clubs/summary` | Clubs | Club summary | All clubs |
 | `/admin/clubs/summary?view=events` | Clubs | Club summary | Club events |
 | `/admin/clubs/summary?view=records` | Clubs | Monthly Records | - |
-| `/admin/clubs/summary?view=points` | Reports | Points | - |
+| `/admin/clubs/summary?view=points` | Clubs | Monthly records | Points |
+| `/admin/clubs/reports/year-end` | Clubs | Monthly records | Club Year-End Reports |
 | `/finance` | Events (inside an event) | Money | Payments |
 | `/finance?filter=BALANCE` | Events (inside an event) | Money | Balances due |
 

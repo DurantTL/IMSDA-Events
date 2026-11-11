@@ -9,6 +9,7 @@ import { listAnnouncements } from "@/modules/communications/repository";
 import type { CommunicationsView, MessagingWorkspaceData } from "@/modules/communications/types";
 import { StaffContextualHelp } from "@/components/contextual-help-slot";
 import { AccessRestricted } from "@/components/access-restricted";
+import { PageHeader } from "@/components/page-header";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { AdminPageHeader } from "@/components/admin-page-header";
@@ -95,7 +96,13 @@ export default async function CommunicationsPage({
   const { event, permissions } = await resolveEventContext(requested);
   // Event data needs the event view permission; kitchen staff (#1029) hold only the kitchen counts permission.
   if (!permissions.includes("VIEW_EVENT")) {
-    return <AccessRestricted title="Emails are restricted" detail="Your event role does not include this page." whoToAsk="your event administrator" />;
+    // The page draws its own title (#1772), so the restricted state keeps the page's one h1 too.
+    return (
+      <>
+        <PageHeader title={staffPageTitles.emails} />
+        <AccessRestricted title="Emails are restricted" detail="Your event role does not include this page." whoToAsk="your event administrator" />
+      </>
+    );
   }
   const canManage = permissions.includes("MANAGE_COMMUNICATIONS");
   const [announcements, messaging, optOuts] = await Promise.all([

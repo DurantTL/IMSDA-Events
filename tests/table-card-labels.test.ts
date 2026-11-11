@@ -59,6 +59,8 @@ describe("phone table cards render their labels and roles on the server (#686)",
     const html = renderToStaticMarkup(createElement(AreaMonthlyReportsTable, { clubs: [club], clubYear: "2026-27", links }));
     const labels = cells(html).filter((cell) => cell.tag === "td").map((cell) => label(cell.attrs));
     expect(labels).toEqual(["Sep", "Oct", "Nov", "Submitted", "Draft", "Missing", "Total points"]);
+    // Every started month is a link whatever its status (#1842).
+    expect(html).toContain('href="/c/club_1/2026-11"');
     expect(html).toContain('role="rowgroup"');
     expect(html).toContain('role="row"');
   });

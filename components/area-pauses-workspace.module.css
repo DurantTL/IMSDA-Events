@@ -44,3 +44,8 @@
   min-height: 44px;
   min-width: 44px;
 }
+
+.summary {
+  margin: 0;
+  min-width: 0;
+}

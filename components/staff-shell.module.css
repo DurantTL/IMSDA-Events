@@ -210,18 +210,10 @@
 /* ---------- page header (title and Event administration badge) ---------- */
 .pageHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 14px 0 6px; }
 .pageHeader > div { min-width: 0; }
-.pageHeader h1 {
-  margin: 0;
-  color: var(--ink);
-  font-size: clamp(1.35rem, 2vw, 1.7rem);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
-}
+/* The title look is the PageHeader's (#1772): one source, so the shell's title and a page's own title cannot drift. */
+.pageTitle { composes: title from "./page-header.module.css"; }
 @media (max-width: 800px) {
   .pageHeader { padding: 10px 0 6px; }
-  .pageHeader h1 { font-size: 1.18rem; }
 }
 
 /* ---------- menu dialog: a sheet on a phone, a dialog on wider screens ---------- */

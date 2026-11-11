@@ -1,4 +1,5 @@
 // Keyboard rules for the editor shell (#1132), kept free of the DOM so they can be tested.
+import { BUILDER_SETTINGS_HASH, LIVE_PREVIEW_HASH } from "@/components/form-page-views";
 
 export type SlashKeyEvent = {
   key: string;
@@ -20,6 +21,18 @@ export type SlashKeyEvent = {
 export function focusTargetAction(state: { handled: boolean; hydrated: boolean; selected: boolean; settingsOpen: boolean; sidebarVisible: boolean }): "skip" | "reveal" | "focus" {
   if (state.handled || !state.hydrated || !state.selected || !state.settingsOpen) return "skip";
   return state.sidebarVisible ? "focus" : "reveal";
+}
+
+/**
+ * What a hash on arrival does (#1572): the links of a form's other pages end in the Form settings or preview hash. A setup
+ * warning's question (`hasFocusTarget`) wins, and with no form open or any other hash nothing happens. At phone width the
+ * preview hash does nothing: the phone layout scrolls to its step chips, so focus would land on a preview that is off screen.
+ */
+export function hashAction(state: { hash: string; hasFocusTarget: boolean; formOpen: boolean; phone?: boolean }): "settings" | "preview" | null {
+  if (state.hasFocusTarget || !state.formOpen) return null;
+  if (state.hash === BUILDER_SETTINGS_HASH) return "settings";
+  if (state.hash === LIVE_PREVIEW_HASH) return state.phone ? null : "preview";
+  return null;
 }
 
 export type UndoKeyEvent = SlashKeyEvent & {

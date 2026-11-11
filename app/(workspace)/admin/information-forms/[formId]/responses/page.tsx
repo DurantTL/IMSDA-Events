@@ -5,6 +5,8 @@ import { InformationFormResponsesView } from "@/components/information-form-resp
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { loadInformationFormResponsesPage } from "@/modules/information-forms/responses-page";
+import { informationFormPageViews } from "@/components/form-page-views";
+import { generalInformationConfig } from "@/components/registration-builder/information-mode";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 
 export const metadata: Metadata = { title: staffPageTitles.formResponses };
@@ -25,8 +27,9 @@ export default async function GeneralInformationFormResponsesPage({ params, sear
   const base = `/admin/information-forms/${encodeURIComponent(formId)}/responses`;
   return (
     <>
-    <AdminSectionHeaderFor path={`/admin/information-forms/${formId}/responses`} section="system" parentName={data.name} />
+    <AdminSectionHeaderFor path={`/admin/information-forms/${formId}/responses`} section="system" />
     <InformationFormResponsesView
+      views={informationFormPageViews(generalInformationConfig(), formId, "responses")}
       closeHref={base}
       exportHref={`/api/admin/information-forms/${encodeURIComponent(formId)}/responses/export`}
       membersExportHref={data.hasMemberList ? `/api/admin/information-forms/${encodeURIComponent(formId)}/responses/export?format=members` : undefined}

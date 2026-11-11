@@ -1,0 +1,65 @@
+{
+  "note": "Staff pages whose shell title differs from the route-mapping label (the tab, menu item or hub card that opens them) on November 10, 2026 (#1772, rule D2). Reviewed list: it only shrinks. A page that now matches, or that draws its own title, must be removed from it; a new mismatch fails. Renaming these pages is the work of the redesign page groups.",
+  "routes": {
+    "/admin/clubs/reports": {
+      "title": "Review monthly records",
+      "label": "Monthly Records",
+      "reason": "The page is titled by what it does (review monthly records); the tab says Monthly Records."
+    },
+    "/more/clubs": {
+      "title": "Clubs",
+      "label": "This event's clubs",
+      "reason": "The page says Clubs; the More card says This event's clubs."
+    },
+    "/admin": {
+      "title": "System management",
+      "label": "System administration home",
+      "reason": "The shell titles the System home System management; the route-mapping label describes the link."
+    },
+    "/admin/hubs/events": {
+      "title": "Events",
+      "label": "Events hub",
+      "reason": "The hub's title is its name; the route-mapping label adds the word hub."
+    },
+    "/admin/hubs/clubs": {
+      "title": "Clubs",
+      "label": "Clubs hub",
+      "reason": "The hub's title is its name; the route-mapping label adds the word hub."
+    },
+    "/admin/hubs/people": {
+      "title": "People",
+      "label": "People hub",
+      "reason": "The hub's title is its name; the route-mapping label adds the word hub."
+    },
+    "/admin/hubs/forms": {
+      "title": "Forms",
+      "label": "Forms hub",
+      "reason": "The hub's title is its name; the route-mapping label adds the word hub."
+    },
+    "/admin/hubs/catalogs": {
+      "title": "Catalogs and settings",
+      "label": "Catalogs and settings hub",
+      "reason": "The hub's title is its name; the route-mapping label adds the word hub."
+    },
+    "/home": {
+      "title": "Home",
+      "label": "Home: Needs you",
+      "reason": "Both Home tabs share the title Home; the route-mapping label names the tab."
+    },
+    "/home/coming-up": {
+      "title": "Home",
+      "label": "Home: Coming up",
+      "reason": "Both Home tabs share the title Home; the route-mapping label names the tab."
+    },
+    "/events-admin": {
+      "title": "Event administration",
+      "label": "Events Administrator dashboard",
+      "reason": "The dashboard's title is Event administration; the route-mapping label says Events Administrator dashboard."
+    },
+    "/admin/clubs": {
+      "title": "Club administration",
+      "label": "Clubs Administrator dashboard",
+      "reason": "The dashboard's title is Club administration; the route-mapping label says Clubs Administrator dashboard."
+    }
+  }
+}

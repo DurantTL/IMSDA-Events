@@ -2,12 +2,13 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { FormPage } from "@/components/page-templates/form-page";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { formatDateRange } from "@/modules/calendar/domain";
 import { getCalendarEntryPrefill } from "@/modules/calendar/event-links";
 import { listEventTemplates } from "@/modules/event-templates/repository";
 import { StartFromTemplate } from "@/components/start-from-template";
+import { EventStartChoices } from "@/components/event-start-choices";
 import { templateFeatureDefaults } from "@/modules/event-templates/feature-defaults";
 
 export const metadata: Metadata = { title: "Start from template" };
@@ -31,25 +32,30 @@ export default async function StartFromTemplatePage({ searchParams }: { searchPa
   const carry = fromCalendarEntry && prefill?.ok ? `?fromCalendarEntry=${encodeURIComponent(fromCalendarEntry)}` : "";
 
   return (
-    <section className="page-stack">
-      <StaffPageHeader description="Pick a template and the new event starts with its forms and settings." />
-      {prefill?.ok === false && (
-        <p className="inline-notice error" role="alert">
-          {prefill.reason} <Link href="/admin/calendar">Back to the calendar</Link>
-        </p>
+    <FormPage
+      header={{ title: "Start from template", description: "Pick a template and the new event starts with its forms and settings." }}
+      notices={(
+        <>
+          {prefill?.ok === false && (
+            <p className="inline-notice error" role="alert">
+              {prefill.reason} <Link href="/admin/calendar">Back to the calendar</Link>
+            </p>
+          )}
+          {prefill?.ok && (
+            <p className="inline-notice" role="status" data-testid="event-setup-from-calendar">
+              Setting up a registration event from the calendar item <strong>{prefill.entry.title}</strong> ({formatDateRange(prefill.entry.startsOn, prefill.entry.endsOn)}).
+              The event is linked to it, so the calendar shows the pair once.
+            </p>
+          )}
+          <EventStartChoices current="template" carry={carry} />
+        </>
       )}
-      {prefill?.ok && (
-        <p className="inline-notice" role="status" data-testid="event-setup-from-calendar">
-          Setting up a registration event from the calendar item <strong>{prefill.entry.title}</strong> ({formatDateRange(prefill.entry.startsOn, prefill.entry.endsOn)}).
-          The event is linked to it, so the calendar shows the pair once.
-        </p>
-      )}
-      <p><Link href={`/event-setup${carry}#blank-event`}>Start blank</Link> instead: fill in the event details by hand.</p>
+    >
       <StartFromTemplate
         templates={templates}
         featureDefaults={featureDefaults}
         calendarPrefill={prefill?.ok ? { entryId: prefill.entry.id, title: prefill.entry.title, startsOn: prefill.entry.startsOn, endsOn: prefill.entry.endsOn } : undefined}
       />
-    </section>
+    </FormPage>
   );
 }

@@ -55,6 +55,7 @@ import {
 } from "@/modules/checkin/live-changes";
 import type { ClubCheckInInfo } from "@/modules/club-registrations/repository";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
+import styles from "@/components/check-in-workspace.module.css";
 
 /** Arrivals rendered per page; search always runs across the whole roster (#702). */
 export const ARRIVALS_PAGE_SIZE = 50;
@@ -528,7 +529,7 @@ export function CheckInWorkspace({
         ]}
       />
 
-      <div className="checkin-hero">
+      <div className={`checkin-hero ${styles.tally}`}>
         <div>
           <p className="hero-eyebrow">On-site operations</p>
           <h2>Ready for arrivals</h2>
@@ -719,7 +720,7 @@ export function CheckInWorkspace({
         </section>
       )}
 
-      <section className="panel">
+      <section className={`panel dense-rows ${styles.roster}`}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">{locationName ? `Arrivals \u00b7 ${locationName}` : "Arrival roster"}</p>

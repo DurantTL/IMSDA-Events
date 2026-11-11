@@ -59,16 +59,29 @@ describe("staff areas (#1565)", () => {
     const system = viewers.system;
     // Home (#1568): Needs you and Coming up.
     expect(keys("home", system)).toEqual(["needs-you", "coming-up"]);
-    expect(keys("events", system)).toEqual(["calendar", "create", "copy", "templates", "archived"]);
+    expect(keys("events", system)).toEqual(["all-events", "calendar", "create", "copy", "templates", "archived"]);
     expect(keys("clubs", system)).toEqual(["club-administration", "club-summary", "clubs-and-churches", "applications", "leaders", "transfers", "monthly-records"]);
     expect(keys("people", system)).toEqual(["people-access", "break-glass"]);
-    expect(keys("reports", system)).toEqual(["monthly-records", "year-end", "points", "analytics", "system-report"]);
+    expect(keys("reports", system)).toEqual(["system-report", "analytics"]);
     expect(keys("admin", system)).toEqual(["system-administration", "hub-events", "hub-clubs", "hub-people", "hub-forms", "hub-catalogs"]);
     expect(visibleAreas(system)).toEqual(["home", "events", "clubs", "people", "reports", "admin"]);
   });
 
+  it("shows the Reports area to System Administrators only, opening System report (#1841)", () => {
+    expect(keys("reports", viewers.system)).toEqual(["system-report", "analytics"]);
+    for (const name of ["clubs", "events", "staff", "editor"]) {
+      expect(keys("reports", viewers[name]!), name).toEqual([]);
+      expect(visibleAreas(viewers[name]!), name).not.toContain("reports");
+    }
+    expect(areaTabs("reports", viewers.system)[0]).toMatchObject({ key: "system-report", href: "/admin/system-report" });
+    expect(railItems(viewers.system, null).find((item) => item.area === "reports")).toMatchObject({ href: "/admin/system-report" });
+    expect(staffPlaceFor("/admin/clubs/reports/year-end")).toMatchObject({ area: "clubs", tab: "monthly-records", view: "/admin/clubs/reports/year-end" });
+  });
+
   it("filters the rail and the rows by role", () => {
-    expect(visibleAreas(viewers.clubs)).toEqual(["home", "events", "clubs", "people", "reports", "admin"]);
+    // Reports holds whole-system reports only (#1841): a Clubs Administrator who is not a System Administrator does not see it.
+    expect(visibleAreas(viewers.clubs)).toEqual(["home", "events", "clubs", "people", "admin"]);
+    expect(keys("reports", viewers.clubs)).toEqual([]);
     expect(keys("clubs", viewers.clubs)).not.toContain("clubs-and-churches");
     expect(keys("people", viewers.clubs)).toEqual(["people-access"]);
     expect(keys("admin", viewers.clubs)).toEqual(["hub-forms", "hub-catalogs"]);
@@ -128,7 +141,7 @@ describe("staff areas (#1565)", () => {
       ["/admin/clubs/summary", "", "clubs", "club-summary"],
       ["/admin/clubs/summary", "view=points", "clubs", "monthly-records"],
       ["/admin/clubs/summary", "view=records", "clubs", "monthly-records"],
-      ["/admin/clubs/reports/year-end", "", "reports", "year-end"],
+      ["/admin/clubs/reports/year-end", "", "clubs", "monthly-records"],
       ["/admin/clubs/reports/org_1/2026-10", "", "clubs", "monthly-records"],
       ["/admin/people", "", "people", "people-access"],
       ["/admin/health-access", "", "people", "break-glass"],
@@ -259,7 +272,7 @@ describe("event tabs (#1565)", () => {
     expect(place("/finance/cancellation-requests")).toEqual({ tab: "money", view: "refunds" });
     expect(place("/finance/tools")).toEqual({ tab: "money", view: "more-tools" });
     expect(place("/more/promo-codes")).toEqual({ tab: "money", view: "promo" });
-    expect(place(kitchenCountsPath)).toEqual({ tab: "reports", view: "kitchen-counts" });
+    expect(place(kitchenCountsPath)).toEqual({ tab: "reports", view: "kitchen" });
     expect(place("/more/reports/packets")).toEqual({ tab: "reports", view: "printouts" });
     expect(place("/more/reports/printouts")).toEqual({ tab: "reports", view: "printouts" });
     expect(place("/more/reports/clubs")).toEqual({ tab: "reports", view: "printouts" });

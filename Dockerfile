@@ -67,6 +67,20 @@ COPY --from=build /app ./
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# Run as the image's unprivileged `node` user (uid 1000), not root (#1798). The
+# app's code stays owned by root, so the running app cannot change it. Only two
+# folders are writable: uploaded event files (a volume in every deployment; a
+# new, empty named volume takes this folder's owner) and Next's own cache.
+# A volume or key file that an earlier root container owns must be handed to
+# uid 1000 once on the server: see docs/DEPLOY-DOCKER.md, "Running as the node
+# user". The entrypoint refuses to start, before any migration, when it is not.
+# The build's own cache is not needed to serve; starting the folder empty also
+# keeps the ownership change from copying it into another layer.
+RUN rm -rf /app/.next/cache \
+  && mkdir -p /app/storage/event-assets /app/.next/cache \
+  && chown -R node:node /app/storage /app/.next/cache
+USER node
+
 EXPOSE 3000
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["npm", "run", "start"]

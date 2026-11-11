@@ -7,21 +7,25 @@
   gap: 16px;
   width: min(100%, 760px);
   margin: 0 auto;
-  padding: 16px;
+  /* Keep content clear of the notch, the home bar and rounded corners on a phone or iPad. */
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
-.cisCard { min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--card); padding: 18px; }
-.cisCard h1, .cisHeader h1 { margin: 0; font-size: 1.5rem; line-height: 1.25; overflow-wrap: anywhere; }
-.cisCard h2 { margin: 0 0 8px; font-size: 1.2rem; line-height: 1.3; overflow-wrap: anywhere; }
-.cisPayment h3 { margin: 0 0 6px; font-size: 1.05rem; }
-.cisHeader { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.cisHeader > div { min-width: 0; flex: 1 1 14rem; }
+.cisCard { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--card); padding: 18px; }
+.cisCard h1, .cisBar h1 { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.5rem); line-height: 1.25; overflow-wrap: anywhere; }
+.cisCard h2 { margin: 0 0 8px; font-size: max(var(--type-staff-floor, 0px), 1.2rem); line-height: 1.3; overflow-wrap: anywhere; }
+.cisPayment h3, .cisWho h3 { margin: 0 0 6px; font-size: max(var(--type-staff-floor, 0px), 1.05rem); }
+/* Header bar: the station's name first, the event beneath, Stop station at the end (#1577). */
+.cisBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border-radius: var(--radius-panel); background: linear-gradient(118deg, var(--imsda-navy) 0%, var(--imsda-navy-deep) 55%, var(--imsda-purple) 135%); color: var(--card); padding: 14px 18px; }
+.cisBar > div { min-width: 0; flex: 1 1 14rem; }
+.cisBar .cisEyebrow, .cisBar .cisSub { color: var(--imsda-navy-soft); }
+.cisBar button:focus-visible { outline-color: var(--focus-ring-on-dark); }
 .cisEyebrow { margin: 0; color: var(--muted); font-size: 0.875rem; font-weight: 700; }
 .cisSub { margin: 2px 0 0; color: var(--muted); font-size: 0.95rem; overflow-wrap: anywhere; }
 .cisHelp { margin: 4px 0 0; color: var(--muted); font-size: 0.875rem; line-height: 1.5; }
 .cisLookup label { font-size: 1rem; }
 .cisLookupRow { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 .cisShell input[type="text"], .cisShell input:not([type]) {
-  min-height: 48px; min-width: 0; border: 1px solid var(--field-border); border-radius: 10px; background: var(--card); color: var(--ink); padding: 8px 12px; font: inherit; font-size: 1.05rem;
+  min-height: 48px; min-width: 0; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); color: var(--ink); padding: 8px 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 1.05rem);
 }
 .cisLookupRow input { flex: 1 1 14rem; }
 .cisForm input[inputmode] { width: 100%; }
@@ -30,15 +34,19 @@
 .cisPerson { border: 1px solid var(--line); border-radius: var(--radius-card); }
 .cisPersonBody { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; min-height: 56px; padding: 8px 12px; }
 .cisPersonBody > span:not(.cisType):not(.cisStatus) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-.cisPersonPick { cursor: pointer; }
+.cisPersonPick { cursor: pointer; min-height: 64px; }
+.cisPerson:has(input[type="checkbox"]:checked) { border-color: var(--green); background: var(--green-soft); }
+.cisPersonBody:has(input:focus-visible) { outline: 3px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-card); }
 .cisPersonPick input[type="checkbox"], .cisChoice input[type="radio"] { width: 24px; height: 24px; flex: 0 0 auto; margin: 0; }
 .cisPerson strong { overflow-wrap: anywhere; }
 .cisType { color: var(--muted); font-size: 0.95rem; }
 .cisStatus { border-radius: var(--radius-pill); padding: 2px 10px; font-size: 0.875rem; font-weight: 700; }
-.cisStatusOk { background: #eef8f2; color: #1c6b4a; }
-.cisStatusHold { background: var(--imsda-gold-soft); color: #6f5316; }
+.cisStatusOk { background: var(--green-soft); color: var(--green); }
+.cisStatusHold { background: var(--imsda-gold-soft); color: var(--gold-text); }
 .cisActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-.cisPayment { display: grid; gap: 8px; margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+/* Money comes first, then Who is here (#1577). */
+.cisPayment { display: grid; gap: 8px; margin-top: 8px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--secondary-bg); padding: 14px 16px; }
+.cisWho { display: grid; gap: 4px; margin-top: 16px; }
 .cisPayment :global(.checkin-payment-due) { margin-top: 0; }
 .cisForm fieldset { display: grid; gap: 8px; margin: 0; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 12px; }
 .cisForm legend { padding: 0 6px; font-weight: 700; }
@@ -46,6 +54,6 @@
 .cisChoice { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .cisChoice label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
 .cisDue, .cisOk, .cisError, .cisDeskNotice { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0 0; font-size: 1rem; }
-.cisOk { color: #1c6b4a; font-weight: 700; }
-.cisError { border-radius: 9px; background: var(--coral-soft); color: var(--coral); padding: 9px 11px; }
-.cisDeskNotice { border-radius: 9px; background: var(--imsda-gold-soft); color: #6f5316; padding: 9px 11px; font-weight: 700; }
+.cisOk { color: var(--green); font-weight: 700; }
+.cisError { border-radius: var(--radius-sm); background: var(--coral-soft); color: var(--coral); padding: 9px 11px; }
+.cisDeskNotice { border-radius: var(--radius-sm); background: var(--imsda-gold-soft); color: var(--gold-text); padding: 9px 11px; font-weight: 700; }

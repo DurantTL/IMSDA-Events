@@ -93,7 +93,13 @@ export function EventTemplateFromEvent({ events, templates }: Props) {
     setBusy(false);
   }
 
-  if (events.length === 0) return <p>There are no events to save as a template yet.</p>;
+  if (events.length === 0) {
+    return (
+      <div className="inline-notice" role="status">
+        <p>There are no events to save as a template yet. <Link href="/event-setup">Create an event</Link>, review it, then come back to save it.</p>
+      </div>
+    );
+  }
 
   if (saved) {
     return (

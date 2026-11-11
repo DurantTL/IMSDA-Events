@@ -8,6 +8,7 @@ import {
   type MonthCell,
   type MonthlyStatusTotals,
 } from "@/modules/club-reports/area-summary-domain";
+import { reportMonthLabel } from "@/modules/club-reports/domain";
 import type { CoordinatorMonthTotals, RecordState } from "@/modules/club-reports/coordinator-overview-domain";
 import styles from "./club-report-charts.module.css";
 
@@ -61,6 +62,8 @@ export type RecordsByMonthChartProps = {
   /** "YYYY-MM" to outline. */
   selectedMonth?: string;
   title?: string;
+  /** The Monthly Records view of one month (#1842). When given, each month label under the chart is a link to it. */
+  monthHref?: (month: string) => string;
 } & (
   | { variant: "staff"; totals: readonly MonthlyStatusTotals[] }
   | { variant: "coordinator"; totals: readonly CoordinatorMonthTotals[] }
@@ -85,6 +88,15 @@ function coordinatorSeries(total: CoordinatorMonthTotals): Series[] {
   ];
 }
 
+/** "March 2027: 12 submitted, 3 not submitted" (#1842): the name of a month's link under the chart, from the numbers the chart already has. */
+export function recordsMonthLinkName(props: Pick<RecordsByMonthChartProps, "variant" | "totals">, month: string) {
+  const total = props.totals.find((entry) => entry.month === month);
+  if (!total) return reportMonthLabel(month);
+  const series = props.variant === "staff" ? staffSeries(total as MonthlyStatusTotals) : coordinatorSeries(total as CoordinatorMonthTotals);
+  const parts = series.filter((entry) => entry.value > 0).map((entry) => `${number(entry.value)} ${entry.label.toLowerCase()}`);
+  return `${reportMonthLabel(month)}: ${parts.length > 0 ? parts.join(", ") : "no clubs"}`;
+}
+
 /** The chart's text summary, for the SVG description. */
 export function recordsChartDescription(props: Pick<RecordsByMonthChartProps, "clubYear" | "variant" | "totals">) {
   const parts = props.totals.map((total) => {
@@ -96,7 +108,7 @@ export function recordsChartDescription(props: Pick<RecordsByMonthChartProps, "c
 }
 
 export function RecordsByMonthChart(props: RecordsByMonthChartProps) {
-  const { clubYear, selectedMonth, title = "Records by month", variant } = props;
+  const { clubYear, selectedMonth, title = "Records by month", variant, monthHref } = props;
   const base = safe(useId());
   const titleId = `${base}-title`;
   const descId = `${base}-desc`;
@@ -154,11 +166,23 @@ export function RecordsByMonthChart(props: RecordsByMonthChartProps) {
           );
         })}
       </svg>
-      <div aria-hidden="true" className={styles.months}>
-        {rows.map(({ total }) => (
-          <span className={total.month === selectedMonth ? styles.monthSelected : undefined} key={total.month}>{shortMonth(total.month)}</span>
-        ))}
-      </div>
+      {monthHref ? (
+        <nav aria-label={`${title}: open a month`}>
+          <ul className={`${styles.months} ${styles.monthLinks}`}>
+            {rows.map(({ total }) => (
+              <li key={total.month}>
+                <Link aria-current={total.month === selectedMonth ? "true" : undefined} aria-label={recordsMonthLinkName(props, total.month)} className={`${styles.monthLink}${total.month === selectedMonth ? ` ${styles.monthSelected}` : ""}`} href={monthHref(total.month)} prefetch={false}>{shortMonth(total.month)}</Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : (
+        <div aria-hidden="true" className={styles.months}>
+          {rows.map(({ total }) => (
+            <span className={total.month === selectedMonth ? styles.monthSelected : undefined} key={total.month}>{shortMonth(total.month)}</span>
+          ))}
+        </div>
+      )}
       {selectedMonth && <p className={styles.selectedNote}>{`Outlined: ${rows.find((row) => row.total.month === selectedMonth)?.total.label ?? selectedMonth}.`}</p>}
       <ul aria-label="Legend" className={styles.legend}>
         {legend.map((entry) => (
@@ -313,19 +337,19 @@ export function PointsBars({ clubs, clubYear, hideTable = false, limit = 10, sca
 
 /* ------------------------------------------------------------------ Year strip */
 
-type StripItem = { month: string; icon: string; word: string; className: string };
+type StripItem = { month: string; icon: string; word: string; className: string; /** A record can exist for this month (it has started), so the square can link to it (#1842). */ started: boolean };
 
 function staffItem(cell: MonthCell): StripItem {
   switch (cell.status) {
     case "SUBMITTED":
     case "LATE":
       return cell.reviewed
-        ? { month: cell.month, icon: "✓", word: "Reviewed", className: styles.seriesDark! }
-        : { month: cell.month, icon: "●", word: "To review", className: styles.seriesLight! };
-    case "DRAFT": return { month: cell.month, icon: "✎", word: "Draft", className: styles.stripDraft! };
-    case "MISSING": return { month: cell.month, icon: "✕", word: "Missing", className: styles.seriesHatch! };
-    case "DUE": return { month: cell.month, icon: "◷", word: "Due", className: styles.stripDue! };
-    default: return { month: cell.month, icon: "○", word: "Not yet due", className: styles.seriesPale! };
+        ? { month: cell.month, icon: "✓", word: "Reviewed", className: styles.seriesDark!, started: true }
+        : { month: cell.month, icon: "●", word: "To review", className: styles.seriesLight!, started: true };
+    case "DRAFT": return { month: cell.month, icon: "✎", word: "Draft", className: styles.stripDraft!, started: true };
+    case "MISSING": return { month: cell.month, icon: "✕", word: "Missing", className: styles.seriesHatch!, started: true };
+    case "DUE": return { month: cell.month, icon: "◷", word: "Due", className: styles.stripDue!, started: true };
+    default: return { month: cell.month, icon: "○", word: "Not yet due", className: styles.seriesPale!, started: false };
   }
 }
 
@@ -335,7 +359,12 @@ const coordinatorWords: Record<RecordState, { icon: string; word: string; classN
   NOT_DUE: { icon: "○", word: "Not due yet", className: styles.seriesPale! },
 };
 
-export type YearStripProps = { selectedMonth?: string; clubName?: string } & (
+export type YearStripProps = {
+  selectedMonth?: string;
+  clubName?: string;
+  /** The club's record for one month (#1842). When given, every square for a month that has started is a link to it. */
+  recordHref?: (month: string) => string;
+} & (
   | { variant: "staff"; cells: readonly MonthCell[] }
   | { variant: "coordinator"; states: ReadonlyArray<{ month: string; state: RecordState }> }
 );
@@ -343,12 +372,34 @@ export type YearStripProps = { selectedMonth?: string; clubName?: string } & (
 export function YearStrip(props: YearStripProps) {
   const items: StripItem[] = props.variant === "staff"
     ? props.cells.map(staffItem)
-    : props.states.map((entry) => ({ month: entry.month, ...coordinatorWords[entry.state] }));
+    : props.states.map((entry) => ({ month: entry.month, ...coordinatorWords[entry.state], started: entry.state !== "NOT_DUE" }));
   const label = `${props.clubName ? `${props.clubName}, year` : "Year"} at a glance: ${items.map((item) => `${shortMonth(item.month)} ${item.word}`).join(", ")}.`;
+  const squareClass = (item: StripItem) => `${styles.stripCell} ${item.className}${item.month === props.selectedMonth ? ` ${styles.stripSelected}` : ""}`;
+  const { recordHref } = props;
+  if (recordHref) {
+    // Links cannot sit inside an image role, so each square carries its own name: "Club, March 2027: reviewed".
+    const who = props.clubName ?? "Club";
+    return (
+      <span aria-label={label} className={`${styles.strip} ${styles.stripLinks}`} role="group">
+        {items.map((item) => {
+          const name = `${who}, ${reportMonthLabel(item.month)}: ${item.word.toLowerCase()}`;
+          return item.started ? (
+            <Link aria-label={name} className={styles.stripLink} href={recordHref(item.month)} key={item.month} prefetch={false} title={`${shortMonth(item.month)}: ${item.word}`}>
+              <span aria-hidden="true" className={squareClass(item)}>{item.icon}</span>
+            </Link>
+          ) : (
+            <span aria-label={name} className={styles.stripLink} key={item.month} role="img" title={`${shortMonth(item.month)}: ${item.word}`}>
+              <span aria-hidden="true" className={squareClass(item)}>{item.icon}</span>
+            </span>
+          );
+        })}
+      </span>
+    );
+  }
   return (
     <span aria-label={label} className={styles.strip} role="img">
       {items.map((item) => (
-        <span aria-hidden="true" className={`${styles.stripCell} ${item.className}${item.month === props.selectedMonth ? ` ${styles.stripSelected}` : ""}`} key={item.month} title={`${shortMonth(item.month)}: ${item.word}`}>
+        <span aria-hidden="true" className={squareClass(item)} key={item.month} title={`${shortMonth(item.month)}: ${item.word}`}>
           {item.icon}
         </span>
       ))}

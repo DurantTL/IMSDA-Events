@@ -446,11 +446,11 @@ describe("a phone reaches exactly the pages a desktop reaches (#475, #1565)", ()
     );
     const bar = markup.slice(markup.indexOf('<nav class="mobile-nav"'));
     const hrefs = [...bar.matchAll(/<a [^>]*href="([^"?]+)/g)].map((match) => match[1]);
-    expect(hrefs).toEqual(["/home", "/admin/calendar", "/check-in", "/admin/clubs", "/more"]);
+    expect(hrefs).toEqual(["/home", "/admin/events", "/check-in", "/admin/clubs", "/more"]);
     expect([...bar.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1])).toEqual(["Home", "Events", "Check-in", "Clubs", "More"]);
     // The same links the rail offers.
     const rail = markup.slice(markup.indexOf('id="primary-navigation"'), markup.indexOf("</nav>", markup.indexOf('id="primary-navigation"')));
-    for (const href of ["/home", "/admin/calendar", "/admin/clubs"]) expect(rail).toContain(`href="${href}`);
+    for (const href of ["/home", "/admin/events", "/admin/clubs"]) expect(rail).toContain(`href="${href}`);
   });
 
   it("keeps every page that left the sidebar reachable as a view or a More card, with the permission it had (#964, #1565)", () => {

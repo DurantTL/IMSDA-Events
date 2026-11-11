@@ -1,13 +1,13 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { EmailDeliverySection } from "@/components/email-delivery-section";
 import { EmailHealthSection } from "@/components/email-health-section";
 import { MessageFileStorageSection } from "@/components/message-file-storage-section";
 import { getMessageFileStorageUsage } from "@/modules/communications/message-file-usage";
 import { NotificationsWorkspace } from "@/components/notifications-workspace";
-import { StaffPageHeader } from "@/components/staff-page-header";
+import { NavigationLink as Link } from "@/components/navigation-link";
+import { PageHeader } from "@/components/page-header";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listEventEmailStates } from "@/modules/communications/event-email-pause";
 import { isEmailEnvironmentConfigured, isPlatformEmailConfigured } from "@/modules/communications/effective-delivery";
@@ -52,13 +52,10 @@ export default async function EmailPage() {
   return (
     <section className="page-stack notifications-page">
       <AdminSectionHeaderFor path="/admin/email" section="system" />
-      <StaffPageHeader
-        description={(
-          <>
-            Who email comes from, which events are paused, the automatic staff alerts, and whether email is getting through.{" "}
-            <Link className="text-button" href="/communications">Open the delivery log</Link>
-          </>
-        )}
+      <PageHeader
+        description="Who email comes from, which events are paused, the automatic staff alerts, and whether email is getting through."
+        secondary={<Link className="secondary-button" href="/communications">Open the delivery log</Link>}
+        title="Email"
       />
       <EmailDeliverySection
         events={emailEvents}

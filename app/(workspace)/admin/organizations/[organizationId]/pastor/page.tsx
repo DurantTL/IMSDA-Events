@@ -1,7 +1,9 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { adminBackLink } from "@/components/admin-section-nav";
 import { ChurchPastorContact } from "@/components/church-pastor-contact";
+import { DetailPage } from "@/components/page-templates/detail-page";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getChurchPastorContactView } from "@/modules/organizations/contacts-repository";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
@@ -16,20 +18,27 @@ export default async function StaffChurchPastorContactPage({ params }: { params:
   const { organizationId } = await params;
   const view = await getChurchPastorContactView(organizationId, { id: user.id, globalRole: user.globalRole });
   if (!view) notFound();
+  const path = `/admin/organizations/${organizationId}/pastor`;
   return (
-    <section className="page-stack">
-      <AdminSectionHeaderFor path={`/admin/organizations/${organizationId}/pastor`} section="system" />
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Church contacts</p>
-          <h2>Pastor contact for {view.organization.name}</h2>
-          <p>
-            The church&apos;s pastor, kept with dates and history. This is not the billing contact: the treasurer is the billing
-            contact and invoices go there. Nothing is sent to the pastor from this record.
+    <>
+      {/* The back link is the header's: one link, named for where it goes. */}
+      <AdminSectionHeaderFor back={null} path={path} section="system" />
+      <DetailPage
+        header={{
+          title: view.organization.name,
+          exactName: true,
+          eyebrow: "Pastor contact",
+          description: "The church's pastor, kept with dates and history.",
+          back: adminBackLink("system", path) ?? undefined,
+        }}
+        notices={(
+          <p className="inline-notice" role="status">
+            This is not the billing contact: the treasurer is the billing contact and invoices go there. Nothing is sent to the pastor from this record.
           </p>
-        </div>
-      </div>
-      <ChurchPastorContact active={view.active} history={view.history} organizationId={view.organization.id} />
-    </section>
+        )}
+      >
+        <ChurchPastorContact active={view.active} history={view.history} organizationId={view.organization.id} />
+      </DetailPage>
+    </>
   );
 }

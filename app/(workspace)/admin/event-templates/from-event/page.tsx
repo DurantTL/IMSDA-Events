@@ -36,7 +36,7 @@ export default async function SaveEventAsTemplatePage() {
   return (
     <section className="page-stack">
       <AdminSectionHeaderFor path="/admin/event-templates/from-event" section="system" />
-      <StaffPageHeader description="Turn a reviewed event's settings and forms into a template." />
+      <StaffPageHeader description="Preview what is copied from a reviewed event, then save it as a draft template. The event itself never changes, and later template edits never change events already made." />
       <EventTemplateFromEvent events={sources} templates={templates} />
     </section>
   );

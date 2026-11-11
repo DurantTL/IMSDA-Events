@@ -1,0 +1,78 @@
+.card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 14px 16px;
+  overflow-wrap: anywhere;
+}
+
+.heading {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 1.075rem);
+  font-weight: 700;
+}
+
+.text {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.steps {
+  margin: 0;
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 62ch;
+  list-style: decimal;
+}
+
+.steps > li {
+  display: list-item;
+}
+
+.icon {
+  display: inline-block;
+  vertical-align: text-bottom;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions > button {
+  min-height: 44px;
+}
+
+/* Phones: the shared buttons stretch a secondary button to the full width, so Install and Not now share the row evenly. */
+@media (max-width: 600px) {
+  .actions > button {
+    flex: 1 1 0;
+    width: auto;
+    justify-content: center;
+  }
+}
+
+.restore {
+  margin: 4px 0 0;
+}
+
+.restore > button {
+  min-height: 44px;
+}
+
+/* The status line left after Not now (Home) or after bringing the card back (Help). */
+.notice {
+  margin: 0;
+  color: var(--muted);
+}
+
+.notice:focus-visible {
+  outline: 2px solid var(--imsda-purple);
+  outline-offset: 2px;
+}

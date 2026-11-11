@@ -2,6 +2,9 @@ import { ExportLink } from "@/components/export-link";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { areaHealthHref } from "@/modules/coordinator-health/domain";
 import { ColumnHeader } from "@/components/column-header";
+import { RecordCellLink } from "@/components/month-heading-link";
+import monthGridStyles from "@/components/month-heading-link.module.css";
+import { reportMonthLabel } from "@/modules/club-reports/domain";
 import { yearLabel } from "@/modules/club-rosters/home-view";
 import { CoordinatorSectionHeading } from "@/components/coordinator-section-heading";
 import { CoordinatorSetupHelp } from "@/components/role-setup-help";
@@ -16,6 +19,7 @@ import { COORDINATOR_SCOPE_TEXT, fullYearExportLabel } from "@/modules/club-repo
 import {
   CLUB_EVENTS_ACTIONS_TEXT,
   MONTHLY_RECORDS_HELP,
+  coordinatorRecordsHref,
   monthlyRecordCells,
   monthlyRecordCounts,
 } from "@/modules/club-reports/coordinator-destinations-domain";
@@ -123,12 +127,12 @@ export function CoordinatorMonthlyRecords({
   return (
     <CoordinatorScrollRegion className="club-reports-grid" label={`Monthly Records by club and month, ${clubYear}`}>
       {sortedLabel && <SortOrderNote>{sortOrderText(sortedLabel, sorting!.order.dir, key === "club" ? "text" : key?.startsWith("month-") ? "state" : "number")}</SortOrderNote>}
-      <table className="report-table table-cards table-cards-xwide" role="table">
+      <table className={`report-table table-cards table-cards-xwide ${monthGridStyles.monthGrid}`} role="table">
         <caption className="sr-only">Monthly Record status by club for {clubYear}</caption>
         <thead role="rowgroup">
           <tr role="row">
             <ColumnHeader column="club" label="Club / church" sorting={sorting} />
-            {months.map(({ month, short }) => <ColumnHeader column={`month-${month}`} key={month} label={short} hiddenLabel="record" sorting={sorting} />)}
+            {months.map(({ month, short }) => <ColumnHeader column={`month-${month}`} key={month} label={short} hiddenLabel="record" monthLink={{ href: coordinatorRecordsHref({ clubYear, month, query }), label: reportMonthLabel(month) }} sorting={sorting} />)}
             <ColumnHeader column="submitted" label="Submitted" sorting={sorting} />
             <ColumnHeader column="notSubmitted" label="Not submitted" sorting={sorting} />
           </tr>
@@ -149,6 +153,11 @@ export function CoordinatorMonthlyRecords({
                         Submitted{cell.status.detail && <small> ({cell.status.detail})</small>}
                         <span className="sr-only">: {club.name}, {cell.label}. Opens the record, view only.</span>
                       </Link>
+                    ) : cell.status.state === "NOT_SUBMITTED" ? (
+                      // Opens the record page, which says "No submitted report ... yet" (#1842).
+                      <RecordCellLink href={`/account/area/${encodeURIComponent(club.id)}/reports/${cell.month}`} name={`${club.name}, ${cell.label}: ${cell.status.label.toLowerCase()}`}>
+                        {cell.status.label}{cell.status.detail && <small> ({cell.status.detail})</small>}
+                      </RecordCellLink>
                     ) : (
                       <span>{cell.status.label}{cell.status.detail && <small> ({cell.status.detail})</small>}</span>
                     )}

@@ -150,14 +150,14 @@ Ticking only records that someone did the work. This sheet remains the full inst
   `/home/u_events/.xcloud/.env` (mode 600) together with every other
   production secret (`docs/DEPLOY-DOCKER.md`). So anyone who can log in as the
   site user, or reveal environment variables in the hosting panel, can read it,
-  and it shows in `docker inspect`. #876 moves it to a root-only file,
+  and it shows in `docker inspect`. #876 moves it to a protected file,
   `/etc/imsda/secret-encryption-key` (after a key rotation, the current version's
-  file `/etc/imsda/secret-encryption-key-vN`; root, mode 0400), mounted read-only into the
+  file `/etc/imsda/secret-encryption-key-vN`; owner uid 1000, mode 0400, in a root-only folder), mounted read-only into the
   app container and named by `SECRET_ENCRYPTION_KEY_FILE`. The exact steps are in
   "Loading the encryption key from a protected file" in `docs/DEPLOY-DOCKER.md`;
   once done, the env file and the panel no longer hold the key. The app container
-  runs as root (the `Dockerfile` has no `USER`), so root-owned 0400 is readable;
-  recheck this if a `USER` is ever added.
+  runs as the image's `node` user (uid 1000, #1798), so the file is owned by uid
+  1000; a root-owned 0400 file is not readable and the container refuses to start.
 - **Recommended setup** (the custodian adapts it to the host):
   1. **Only SSH, with keys.** Log in to the server by SSH key only. Turn off
      password login. Give access only to the named people on item 1's list.

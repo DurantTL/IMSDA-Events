@@ -182,6 +182,21 @@ docker run --rm $(run_args) --entrypoint node "$IMAGE" \
     });' \
   || fail "environment check failed (above). Nothing was changed; the current app is still running."
 
+# The image runs as an unprivileged user (#1798). Check, while the current app
+# still serves, that this user can use the uploads volume and the key files:
+# after the swap a refusal would mean the site is down until the rollback.
+# Images from before #1798 have no such check (grep answers 1) and run as root.
+preflight_supported=0
+docker run --rm --entrypoint grep "$IMAGE" -q IMSDA_PREFLIGHT_ONLY /usr/local/bin/docker-entrypoint.sh || preflight_supported=$?
+[ "$preflight_supported" -le 1 ] || fail "could not inspect $IMAGE (docker exit $preflight_supported). Nothing was changed."
+if [ "$preflight_supported" -eq 0 ]; then
+  log "Checking the uploads volume and key files against the new image's user"
+  # shellcheck disable=SC2046
+  docker run --rm $(run_args) -e IMSDA_PREFLIGHT_ONLY=1 \
+    -v "$ASSETS_VOLUME:/app/storage/event-assets" "$IMAGE" true \
+    || fail "the new image's user cannot use the uploads volume or a key file (above). Nothing was changed; the current app is still running. See docs/DEPLOY-DOCKER.md, 'Running as the node user'."
+fi
+
 # --- 4. Swap -----------------------------------------------------------------
 if container_exists "$OLD"; then
   container_running "$APP" || fail "$OLD exists and $APP is not running. Sort out which one should run before deploying."

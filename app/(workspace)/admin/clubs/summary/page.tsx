@@ -29,7 +29,7 @@ import {
   OVERVIEW_SORT_COLUMNS,
   gridSortColumns,
 } from "@/modules/club-reports/area-table-sort";
-import { buildStaffMonthlyRecords } from "@/modules/club-reports/staff-monthly-records-domain";
+import { buildStaffMonthlyRecords, staffRecordsHref } from "@/modules/club-reports/staff-monthly-records-domain";
 import { buildStaffPoints } from "@/modules/club-reports/staff-points-domain";
 import { parseClubPageFrom, recordFromParam, withRecordFrom } from "@/modules/club-reports/record-return-domain";
 import { AdminPageHeader } from "@/components/admin-page-header";
@@ -96,6 +96,7 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
   const fromClub = clubFrom && fromClubName ? clubFrom : null;
   const links = {
     clubHref: (id: string) => clubDirectoryClubHref(id, clubYear),
+    monthHref: (month: string) => staffRecordsHref({ clubYear, month }),
     reportHref: (id: string, month: string) => withRecordFrom(`/admin/clubs/reports/${encodeURIComponent(id)}/${encodeURIComponent(month)}?year=${encodeURIComponent(clubYear)}`, recordsFrom),
   };
   return (

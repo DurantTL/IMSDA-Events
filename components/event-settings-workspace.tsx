@@ -910,8 +910,7 @@ export function EventSettingsWorkspace({
       <div className="page-intro">
         <div>
           <p className="eyebrow">{mode === "create" ? "New event setup" : "Event setup"}</p>
-          {/* In edit mode the staff header already carries the page's one H1, "Event settings" (#742). */}
-          {mode === "create" && <h2>Create an event draft</h2>}
+          {/* The page's one H1 is the PageHeader's "Create an event" (create mode) or the shell's "Event settings" (#742, #1772), so no second title here. */}
           <p>
             {mode === "create"
               ? "Start with the information attendees and staff need. The event stays private until its registration form and publish checklist are ready."

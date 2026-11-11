@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AccessRestricted } from "@/components/access-restricted";
 import { HealthBreakGlassForm } from "@/components/health-break-glass-form";
 import { HealthPrivacyAcknowledgment } from "@/components/health-privacy-acknowledgment";
+import { HealthRecordPageHeader } from "@/components/health-record-page-header";
 import { HealthRecordView, HealthStatusChip } from "@/components/health-record-view";
 import { requireStaffHealthViewer } from "@/modules/health-records/access";
 import { BREAK_GLASS_REQUIRED_MESSAGE } from "@/modules/health-records/break-glass";
@@ -38,7 +39,12 @@ export default async function StaffHealthRecordPage({
     throw error;
   });
   if (!viewer) {
-    return <AccessRestricted detail="Health records need the health information permission." title="Health records are restricted" whoToAsk="a system administrator" />;
+    return (
+      <>
+        <HealthRecordPageHeader />
+        <AccessRestricted detail="Health records need the health information permission." title="Health records are restricted" whoToAsk="a system administrator" />
+      </>
+    );
   }
   const health = await viewHealthRecord(viewer, organizationId, memberId, new Date(), { eventId: event }).catch((error: unknown) => {
     // The one-time privacy notice (#923) comes before any record opens.
@@ -54,22 +60,39 @@ export default async function StaffHealthRecordPage({
     if (personId) {
       return (
         <section className="page-stack club-form-page">
+          <HealthRecordPageHeader eventId={event} />
           <header><h2>Break-glass access is required</h2></header>
           <HealthBreakGlassForm message={BREAK_GLASS_REQUIRED_MESSAGE} personId={personId} />
         </section>
       );
     }
-    return <AccessRestricted detail={BREAK_GLASS_REQUIRED_MESSAGE} title="Break-glass access is required" whoToAsk="a system administrator" />;
+    return (
+      <>
+        <HealthRecordPageHeader eventId={event} />
+        <AccessRestricted detail={BREAK_GLASS_REQUIRED_MESSAGE} title="Break-glass access is required" whoToAsk="a system administrator" />
+      </>
+    );
   }
-  if (!health) return <HealthPrivacyAcknowledgment as="STAFF" />;
+  if (!health) {
+    return (
+      <>
+        <HealthRecordPageHeader eventId={event} />
+        <HealthPrivacyAcknowledgment as="STAFF" />
+      </>
+    );
+  }
   return (
     <section className="page-stack club-form-page">
-      <header>
-        <h2>Health record: <ExactValue>{`${health.member.firstName} ${health.member.lastName}`.trim()}</ExactValue></h2>
-        <p translate="no">{health.club.name}</p>
-        <p><HealthStatusChip status={health.status} /></p>
-        <p className="quiet-copy">View only. Opening this page is recorded.</p>
-      </header>
+      <HealthRecordPageHeader
+        eventId={event}
+        subject={(
+          <>
+            <h2><ExactValue>{`${health.member.firstName} ${health.member.lastName}`.trim()}</ExactValue></h2>
+            <p translate="no">{health.club.name}</p>
+            <p><HealthStatusChip status={health.status} /></p>
+          </>
+        )}
+      />
       <HealthRecordView health={health} />
     </section>
   );

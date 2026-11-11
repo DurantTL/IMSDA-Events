@@ -211,7 +211,7 @@ describe("back links", () => {
 
   it("adds the missing System back links", () => {
     expect(adminBackLink("system", "/admin/event-templates/t1")).toEqual({ href: "/admin/event-templates", label: "Back to Event templates" });
-    expect(adminBackLink("system", "/admin/information-forms/f1/responses", { parentName: "Camp survey" })).toEqual({ href: "/admin/information-forms/f1", label: "Back to Camp survey" });
+    expect(adminBackLink("system", "/admin/information-forms/f1/responses", { parentName: "Camp survey" })).toEqual({ href: "/admin/information-forms", label: "Back to information forms" });
     expect(adminBackLink("system", "/admin/information-forms/f1")).toEqual({ href: "/admin/information-forms", label: "Back to information forms" });
     expect(adminBackLink("system", "/admin/form-templates/key")?.href).toBe("/admin/form-templates");
     expect(adminBackLink("clubs", "/admin/club-forms/key")?.href).toBe("/admin/club-forms");

@@ -6,6 +6,9 @@ import { hasUnsavedTemplateEdits, publishDisabledReason, saveDisabledReason, UNS
 import type { EventTemplateRecord } from "@/modules/event-templates/repository";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { savedMessage } from "@/components/form-message";
+import { editorStatusChip, templateVersionChip } from "@/components/event-template-list-model";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import styles from "./event-template-editor.module.css";
 
 type EventTemplateEditorProps = {
   initialTemplate: EventTemplateRecord;
@@ -57,6 +60,9 @@ export function EventTemplateEditor({ initialTemplate }: EventTemplateEditorProp
     { name, description, payloadText },
     { name: template.name, description: template.description, payload: version?.payload ?? {} },
   );
+  // Unsaved edits to an editable template are protected from an accidental leave (#1593); an archived template is read-only.
+  useUnsavedChangesGuard(hasUnsavedEdits && !isArchived);
+  const statusChip = editorStatusChip(isArchived, version?.status);
   const saveReason = saveDisabledReason({ isArchived, saving });
   const publishReason = publishDisabledReason({ isArchived, isDraft, publishing });
 
@@ -161,7 +167,7 @@ export function EventTemplateEditor({ initialTemplate }: EventTemplateEditorProp
 
   return (
     <div className="page-stack event-settings-workspace">
-      <p className="muted">For administrators comfortable editing JSON.</p>
+      <p className="muted">The payload below is JSON. Every field is checked when you save, publish or use the template.</p>
       {error ? <div className="inline-notice error" role="alert">{error}</div> : null}
       {notice ? <div className="inline-notice success" role="status">{notice}</div> : null}
       {fieldErrors.length > 0 ? (
@@ -198,7 +204,11 @@ export function EventTemplateEditor({ initialTemplate }: EventTemplateEditorProp
           </label>
           {nameErrors.length > 0 ? <span id="template-name-error" className="form-error">{nameErrors.map((entry) => entry.message).join(" ")}</span> : null}
           </div>
-          <p>Status: {template.status} — version {version?.versionNumber ?? "—"} ({version?.status ?? "none"})</p>
+          <p className={styles.statusLine} data-testid="event-template-status">
+            <span className={`status-chip ${statusChip.tone}`}>{statusChip.label}</span>
+            <span>Version {version?.versionNumber ?? "—"}{version ? ` (${version.status === "DRAFT" ? "draft" : version.status === "PUBLISHED" ? "published" : "earlier"})` : ""}</span>
+            {hasUnsavedEdits && !isArchived ? <span className={styles.dirty} role="status">Unsaved changes</span> : null}
+          </p>
         </div>
         <label>Description
           <textarea
@@ -221,6 +231,7 @@ export function EventTemplateEditor({ initialTemplate }: EventTemplateEditorProp
             value={payloadText}
             onChange={(event) => setPayloadText(event.target.value)}
             rows={20}
+            className={styles.payload}
             spellCheck={false}
             disabled={isArchived}
           />
@@ -250,30 +261,35 @@ export function EventTemplateEditor({ initialTemplate }: EventTemplateEditorProp
           </ul>
         ) : null}
         {hasUnsavedEdits && !isArchived ? <p className="muted">You have unsaved changes. Save them before publishing.</p> : null}
-        <p>
+        <p className={styles.copyNote}>Publishing makes this version the one Create event copies. Events already made from an earlier version are unaffected.</p>
+        <div className={styles.actionBar}>
           <button type="button" className="secondary-button" disabled={Boolean(saveReason)} title={saveReason || undefined} aria-describedby={saveReason ? "template-action-hints" : undefined} onClick={saveDraft}>
             {saving ? "Saving…" : isDraft ? "Save draft" : "Save as new draft"}
-          </button>{" "}
+          </button>
           <button type="button" className="primary-button" disabled={Boolean(publishReason)} title={publishReason || undefined} aria-describedby={publishReason ? "template-action-hints" : undefined} onClick={publish}>
             {publishing ? "Publishing…" : "Publish"}
-          </button>{" "}
+          </button>
           {template.status !== "ARCHIVED" ? (
             <button type="button" className="secondary-button" onClick={() => { setArchiveError(""); setArchiveOpen(true); }}>Archive template</button>
           ) : (
             <button type="button" className="secondary-button" disabled={unarchiving} onClick={unarchive}>{unarchiving ? "Unarchiving…" : "Unarchive template"}</button>
           )}
-        </p>
+        </div>
       </section>
 
       <section className="panel form-stack event-settings-panel">
         <div className="section-heading"><div><h2>Versions</h2></div></div>
-        <ul>
-          {template.versions.map((entry) => (
-            <li key={entry.id}>
-              Version {entry.versionNumber} — {entry.status}
-              {entry.publishedAt ? ` — published ${formatInConferenceTime(entry.publishedAt, { dateStyle: "medium", timeStyle: "short" })}` : ""}
-            </li>
-          ))}
+        <ul className={styles.versions}>
+          {template.versions.map((entry) => {
+            const chip = templateVersionChip(entry.status);
+            return (
+              <li className={styles.version} key={entry.id}>
+                <strong>Version {entry.versionNumber}</strong>
+                <span className={`status-chip ${chip.tone}`}>{chip.label}</span>
+                {entry.publishedAt ? <span>published {formatInConferenceTime(entry.publishedAt, { dateStyle: "medium", timeStyle: "short" })}</span> : null}
+              </li>
+            );
+          })}
         </ul>
       </section>
 

@@ -1,0 +1,46 @@
+/* System organization pages (#1592): the directory, contacts, location, import and map-location review. Tokens only. */
+.stack { display: grid; gap: 16px; min-width: 0; }
+.panelTitle { margin: 0 0 8px; overflow-wrap: anywhere; }
+.record { margin: 0; overflow-wrap: anywhere; line-height: 1.55; }
+.meta { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; overflow-wrap: anywhere; }
+.empty { margin: 0; line-height: 1.55; }
+.note { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.55; overflow-wrap: anywhere; }
+.actionRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.actionRow > button { min-height: 44px; }
+
+/* One column on a phone and an iPad; two columns only where there is room beside the shell. */
+.form { display: grid; gap: 6px; max-width: 28rem; min-width: 0; }
+.form label { overflow-wrap: anywhere; }
+.fieldGrid { display: grid; grid-template-columns: 1fr; gap: 12px; min-width: 0; }
+@media (min-width: 1024px) {
+  .fieldGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.saveRow { display: grid; justify-items: start; gap: 8px; margin-top: 8px; min-width: 0; }
+.saveRow > button { min-height: 44px; }
+
+/* The one save or error result, next to the form. It takes focus on a failed save, so it shows a ring. */
+.result { max-width: 100%; overflow-wrap: anywhere; }
+.result:focus-visible { outline: 2px solid var(--imsda-purple); outline-offset: 2px; }
+
+.history { margin: 12px 0 0; }
+.history summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; }
+.history ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.history li { overflow-wrap: anywhere; line-height: 1.5; }
+
+/* A button that stays focusable while it cannot be used (aria-disabled) still looks unavailable. */
+.held[aria-disabled="true"] { cursor: not-allowed; opacity: 0.58; }
+
+/* Links read as links without colour: underlined, in the link colour token. */
+.textLink { color: var(--imsda-purple); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+
+.textButton { display: inline-flex; align-items: center; min-height: 44px; border: 0; background: transparent; padding: 0 4px; color: var(--imsda-purple); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* Import and map-location review: what the file or lookup proposes, and what is already accepted. */
+.statusLine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 0 12px; line-height: 1.55; }
+.statusLine strong { overflow-wrap: anywhere; }
+.matchSelect { max-width: 100%; margin-top: 6px; }
+.cellNotes { display: grid; gap: 3px; margin-top: 4px; }
+.cellNotes > span { display: block; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.45; overflow-wrap: anywhere; }
+.reviewActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.reviewActions > :is(a, button) { min-height: 44px; }
+.reviewActions > a { display: inline-flex; align-items: center; }

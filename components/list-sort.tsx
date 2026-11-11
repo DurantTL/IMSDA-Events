@@ -31,6 +31,7 @@ export function SortableHeader({
   hiddenLabel,
   dataCol,
   fullLabel,
+  after,
 }: {
   label: string;
   active: boolean;
@@ -47,6 +48,8 @@ export function SortableHeader({
   dataCol?: string;
   /** The whole name when `label` is a short form on screen ("SDA member"); read out after the short form, never shown. */
   fullLabel?: string;
+  /** Extra content after the sort control in the same header cell, such as a link to that column's own view (#1842). */
+  after?: React.ReactNode;
 }) {
   const content = (
     <>
@@ -65,6 +68,7 @@ export function SortableHeader({
       ) : (
         <button className="table-sort-button" disabled={disabled} onClick={onSort} type="button">{content}</button>
       )}
+      {after}
     </th>
   );
 }

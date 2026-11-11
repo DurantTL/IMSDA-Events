@@ -9,7 +9,7 @@ import { clubPageReturnHref } from "@/modules/club-reports/club-page-links";
 import { recordBackLink } from "@/modules/club-reports/record-return-domain";
 import { getPrisma } from "@/lib/prisma";
 import { calendarDateIn } from "@/modules/calendar/domain";
-import { ON_TIME_POINTS, formatDueDate, isLockedForClub, isReportMonth, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
+import { ON_TIME_POINTS, formatDueDate, isLockedForClub, isReportMonth, noSubmittedReportMessage, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
 import { getClubReport, reportPrefill } from "@/modules/club-reports/repository";
 import { getClubReportReview } from "@/modules/club-reports/review";
 import { clubYearFor } from "@/modules/club-rosters/domain";
@@ -52,6 +52,12 @@ export default async function StaffClubReportPage({
     <section className="page-stack">
       <AdminPageHeader path={`/admin/clubs/reports/${organizationId}/${month}`} year={clubYear} back={back} />
       <div className="page-intro"><div><p className="eyebrow">Monthly Record</p><h2 translate="no">{club.name}</h2></div></div>
+      {report?.status !== "SUBMITTED" && (
+        // A real club and month with nothing submitted (a draft counts as not submitted) says so before the form (#1842).
+        <div className="panel" data-testid="report-not-submitted" role="status">
+          <p><strong>Not submitted yet.</strong> {noSubmittedReportMessage(month)}{report ? " A draft is saved but not submitted." : ""}</p>
+        </div>
+      )}
       {report?.status === "SUBMITTED" && (
         <section className="panel club-report-review-panel" aria-labelledby="club-report-review-heading">
           <h3 id="club-report-review-heading">Review</h3>

@@ -67,3 +67,10 @@
 .message { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 
 .fieldError { color: var(--coral); font-weight: 700; }
+
+/* Club, role and location filters (#1762). */
+.locationField { display: grid; gap: 4px; max-width: 360px; font-weight: 700; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.locationField select { min-height: 44px; font-weight: 500; }
+
+/* .field-help has a negative top margin; the line sits right under the buttons. */
+.excelHelp { margin: 4px 0 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

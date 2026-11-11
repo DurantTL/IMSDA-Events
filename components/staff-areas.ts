@@ -74,6 +74,7 @@ export const homeDestinations = {
 
 const reviewMonthlyRecordsHref = "/admin/clubs/reports";
 const clubPointsHref = "/admin/clubs/summary?view=points#points";
+const clubYearEndHref = "/admin/clubs/reports/year-end";
 
 const registered: readonly Registered[] = [
   ...systemNavGroups.flatMap((group) => group.items.map(({ href, label }) => ({ href, label }))),
@@ -116,7 +117,7 @@ const waitingClubApplications = (v: StaffAreaViewer) => v.counts.CLUBS_ADMIN;
 
 /**
  * The tab rows. Registry destinations are named by href; a tab whose page does not exist yet is not here (#1559: menus never
- * list planned work). Left out for that reason: Events > "All events" (no in-shell all-events list yet).
+ * list planned work).
  */
 export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
   // Home (#1568): the work waiting for this person, then the events coming up. Every staff viewer has both; each page reads
@@ -126,6 +127,8 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
     { key: "coming-up", destination: homeDestinations.comingUp.href, visible: () => true },
   ],
   events: [
+    // All events (#1570): every current event, for System Administrators. An Event Administrator's own events are Event administration.
+    { key: "all-events", destination: "/admin/events", visible: sys },
     { key: "event-administration", destination: eventsAdminHomeItem.href, visible: events },
     { key: "calendar", destination: "/admin/calendar", visible: sys },
     { key: "create", destination: "/event-setup", visible: sys },
@@ -176,6 +179,9 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
       // Each view is a page that checks Clubs administration itself, so each is gated the same way (#1588).
       views: [
         { href: clubsAdminRecordsHref, label: "Monthly Records", visible: clubs },
+        // Year-end second (#1841): at 390px the four views then sit in two rows before and after the web font swaps in, so
+        // the page does not jump on load.
+        { href: clubYearEndHref, visible: clubs },
         { href: reviewMonthlyRecordsHref, label: "Review monthly records", visible: clubs },
         { href: clubPointsHref, label: "Points", visible: clubs },
       ],
@@ -185,12 +191,11 @@ export const areaTabSpecs: Record<StaffArea, readonly TabSpec[]> = {
     { key: "people-access", destination: "/admin/people", visible: eitherClubsOrSys },
     { key: "break-glass", destination: "/admin/health-access", visible: sys },
   ],
+  // Whole-system reports only (#1841), for System Administrators. Club reports (records, year-end, points) are views of
+  // Clubs -> Monthly records.
   reports: [
-    { key: "monthly-records", destination: clubsAdminRecordsHref, visible: clubs },
-    { key: "year-end", destination: "/admin/clubs/reports/year-end", visible: clubs },
-    { key: "points", destination: clubPointsHref, visible: clubs },
-    { key: "analytics", destination: "/admin/analytics", visible: sys },
     { key: "system-report", destination: "/admin/system-report", visible: sys },
+    { key: "analytics", destination: "/admin/analytics", visible: sys },
   ],
   admin: [
     { key: "system-administration", destination: "/admin", visible: sys },
@@ -245,7 +250,7 @@ export function areaTabs(area: StaffArea, viewer: StaffAreaViewer): AreaTab[] {
       return {
         key: spec.key,
         label,
-        href: area === "clubs" || area === "reports" ? withYear(baseHref, viewer) : baseHref,
+        href: area === "clubs" ? withYear(baseHref, viewer) : baseHref,
         ...(count && count > 0 ? { count } : {}),
         views: resolveViews(spec.views, viewer, area),
       };
@@ -288,7 +293,7 @@ function under(pathname: string, path: string) {
 
 /**
  * The one place a page lives: its rail area, its tab in that area's row and the view inside it. A page two areas both
- * list belongs to one of them for the marking: Monthly Records to Clubs, Event administration to Events. Home's pages,
+ * list belongs to one of them for the marking: Monthly Records, Year-end and Points to Clubs, Event administration to Events. Home's pages,
  * Help and Profile belong to Home (Help and Profile with no tab), so the rail never lights an area the page is not in.
  */
 export function staffPlaceFor(pathname: string, params: { get(name: string): string | null } = { get: () => null }): StaffPlace {
@@ -298,6 +303,9 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   if (pathname === homeDestinations.comingUp.href) return place("home", "coming-up");
   if (pathname === homeDestinations.needsYou.href) return place("home", "needs-you");
   if (under(pathname, "/help") || under(pathname, "/profile")) return place("home", null);
+  // Submitted club forms belong to the clubs, not to an event (#1573): with no `event` parameter they sit in Admin -> Forms beside
+  // the definitions. With one (the person came from that event's More card) they stay in the event shell.
+  if (under(pathname, "/more/club-forms") && !params.get("event")) return place("admin", "hub-forms", "/admin/club-forms");
   if (isEventScopedPath(pathname)) return { area: "events", tab: null, view: null, inEvent: true };
 
   if (pathname === "/admin") return place("admin", "system-administration");
@@ -309,13 +317,15 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   // A card on the Events hub, so it lights the Events tab and not the /admin fallback below.
   if (under(pathname, "/admin/feature-requests")) return place("admin", "hub-events");
   if (pathname === "/events-admin") return place("events", "event-administration");
+  if (under(pathname, "/admin/events")) return place("events", "all-events");
   if (under(pathname, "/event-setup")) return place("events", pathname === "/event-setup/copy" ? "copy" : "create");
   if (under(pathname, "/admin/calendar")) return place("events", "calendar");
   if (under(pathname, "/admin/event-templates")) return place("events", "templates");
   if (under(pathname, "/archived-events")) return place("events", "archived");
 
   if (pathname === "/admin/clubs") return place("clubs", "club-administration", "/admin/clubs");
-  if (under(pathname, "/admin/clubs/reports/year-end")) return place("reports", "year-end");
+  // Year-end is a view of the Monthly records tab (#1841); it stays before the generic reports branch below.
+  if (under(pathname, "/admin/clubs/reports/year-end")) return place("clubs", "monthly-records", clubYearEndHref);
   // The review queue and a single club's record are the Review view of the Monthly records tab (#1588); a record opened from
   // the Monthly Records view (a `from` naming that page) keeps that view lit instead.
   if (under(pathname, "/admin/clubs/reports")) {
@@ -323,7 +333,7 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
     return place("clubs", "monthly-records", fromRecords ? clubsAdminRecordsHref : reviewMonthlyRecordsHref);
   }
   if (under(pathname, "/admin/clubs/summary")) {
-    // Points and Monthly Records are two views of one tab, so one area lights for both (the Reports row still lists Points).
+    // Points and Monthly Records are two views of one tab, so one area lights for both (Reports holds only whole-system reports).
     if (view === "points") return place("clubs", "monthly-records", clubPointsHref);
     if (view === "records") return place("clubs", "monthly-records", clubsAdminRecordsHref);
     return place("clubs", "club-summary", view === "events" ? "/admin/clubs/summary?view=events#club-events" : "/admin/clubs/summary");

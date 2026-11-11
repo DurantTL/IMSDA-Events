@@ -10,6 +10,7 @@ import { listPendingModuleRequests } from "@/modules/event-modules/requests";
 import { FEATURE_REQUEST_READ_LIMIT } from "@/modules/system-admin/home-model";
 import styles from "../system-admin.module.css";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
+import { ListPage } from "@/components/page-templates/list-page";
 
 export const metadata: Metadata = { title: "Event module requests" };
 
@@ -27,27 +28,34 @@ export default async function FeatureRequestsPage() {
   }
 
   return (
-    <section className={`page-stack ${styles.workspace}`}>
+    <>
       <AdminSectionHeaderFor path="/admin/feature-requests" section="system" />
-      <section className="panel module-requests" id="module-requests" aria-labelledby="module-requests-heading">
-        <div className={styles.sectionHeading}>
-          <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Event module requests</h2><p>Event admins asking for a feature to be turned on. Approving turns it on for that event; declining needs a reason. Only the buttons in this list decide a request.</p></div>
-          <span>{requests ? `${requests.length >= FEATURE_REQUEST_READ_LIMIT ? `${FEATURE_REQUEST_READ_LIMIT}+` : requests.length} waiting` : "Unavailable"}</span>
-        </div>
-        {requests === null
-          ? <p className={styles.unavailable} role="status"><CircleAlert aria-hidden="true" size={16} /><span><strong>Unavailable.</strong> The feature-request list could not be read just now. This is not zero. Reload to try again.</span></p>
-          : requests.length === 0
-            ? <p className="quiet-copy">No requests are waiting.</p>
-            : <ModuleRequestQueue requests={requests.map((request) => ({
-                id: request.id,
-                eventId: request.eventId,
-                eventName: request.eventName,
-                moduleTitle: request.moduleTitle,
-                requesterName: request.requesterName,
-                reason: request.reason,
-                createdLabel: formatRequestDate(request.createdAt),
-              }))} />}
-      </section>
-    </section>
+      <ListPage
+        header={{
+          title: "Event module requests",
+          description: "Event admins asking for a feature to be turned on. Approving turns it on for that event; declining needs a reason. Only the buttons in this list decide a request.",
+        }}
+      >
+        <section className="panel module-requests" id="module-requests" aria-labelledby="module-requests-heading">
+          <div className={styles.sectionHeading}>
+            <div><p className="eyebrow">Event modules</p><h2 id="module-requests-heading" tabIndex={-1}>Requests to review</h2></div>
+            <span>{requests ? `${requests.length >= FEATURE_REQUEST_READ_LIMIT ? `${FEATURE_REQUEST_READ_LIMIT}+` : requests.length} waiting` : "Unavailable"}</span>
+          </div>
+          {requests === null
+            ? <p className={styles.unavailable} role="status"><CircleAlert aria-hidden="true" size={16} /><span><strong>Unavailable.</strong> The feature-request list could not be read just now. This is not zero. Reload to try again.</span></p>
+            : requests.length === 0
+              ? <p className="quiet-copy">No requests are waiting.</p>
+              : <ModuleRequestQueue requests={requests.map((request) => ({
+                  id: request.id,
+                  eventId: request.eventId,
+                  eventName: request.eventName,
+                  moduleTitle: request.moduleTitle,
+                  requesterName: request.requesterName,
+                  reason: request.reason,
+                  createdLabel: formatRequestDate(request.createdAt),
+                }))} />}
+        </section>
+      </ListPage>
+    </>
   );
 }

@@ -1,0 +1,51 @@
+.card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 14px 16px;
+  overflow-wrap: anywhere;
+}
+
+.heading {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 1.075rem);
+}
+
+.sub {
+  margin: 4px 0 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+}
+
+.lead,
+.text,
+.status {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.steps,
+.facts {
+  margin: 0;
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 62ch;
+}
+
+/* The order of the Safari steps matters, so they keep their numbers. */
+.steps {
+  list-style: decimal;
+}
+
+.facts {
+  list-style: disc;
+}
+
+.steps > li,
+.facts > li {
+  display: list-item;
+}

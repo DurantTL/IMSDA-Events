@@ -25,7 +25,7 @@ export default async function EventTemplateEditorPage({
   return (
     <section className="page-stack">
       <AdminSectionHeaderFor path={`/admin/event-templates/${templateId}`} section="system" />
-      <StaffPageHeader description={`Editing ${template.name}`} />
+      <StaffPageHeader description={`Editing ${template.name}. Events already made from it keep what they were created with.`} />
       <EventTemplateProvenance template={template} />
       <EventTemplateEditor initialTemplate={template} />
     </section>

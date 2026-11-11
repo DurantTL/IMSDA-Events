@@ -1,7 +1,9 @@
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { adminBackLink } from "@/components/admin-section-nav";
 import { ChurchLocationForm } from "@/components/church-location-form";
+import { FormPage } from "@/components/page-templates/form-page";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getChurchLocation } from "@/modules/organizations/church-location-repository";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
@@ -28,12 +30,23 @@ export default async function StaffChurchLocationPage({
   // The header is told which page this is; it is a pathname for choosing tabs, not a link to the page (#542).
   const headerPath = ["/admin/organizations", organizationId, "location"].join("/");
   return (
-    <section className="page-stack">
-      <AdminSectionHeaderFor path={headerPath} section="system" />
-      <ChurchLocationForm
-        endpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/location`}
-        initialLocation={location}
-      />
-    </section>
+    <>
+      {/* The back link is the header's: one link, named for where it goes. */}
+      <AdminSectionHeaderFor back={null} path={headerPath} section="system" />
+      <FormPage
+        header={{
+          title: location.name,
+          exactName: true,
+          eyebrow: "Church location",
+          description: "The town and map point that place this church's listed clubs on the public club map.",
+          back: adminBackLink("system", headerPath) ?? undefined,
+        }}
+      >
+        <ChurchLocationForm
+          endpoint={`/api/admin/organizations/${encodeURIComponent(organizationId)}/location`}
+          initialLocation={location}
+        />
+      </FormPage>
+    </>
   );
 }

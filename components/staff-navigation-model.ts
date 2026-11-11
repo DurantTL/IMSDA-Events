@@ -5,6 +5,7 @@ import {
   areaTabs,
   markCurrentTab,
   railItems,
+  visibleAreas,
   staffPlaceFor,
   withClubYear,
   type AreaTab,
@@ -75,7 +76,6 @@ export type StaffNavigation = {
 export function buildStaffNavigation(input: StaffNavigationInput): StaffNavigation {
   const { pathname, search, isSystemAdmin, adminRoleView, siteContentEditor, selectedEvent } = input;
   const eventlessProfile = Boolean(input.eventlessProfile);
-  const place = staffPlaceFor(pathname, search);
   const held = adminRoleView?.held ?? (isSystemAdmin ? heldAdminRoles({ systemAdmin: true, clubsAdministrator: true, eventAdminEventIds: [] }) : []);
   const activeRole = adminRoleView?.active ?? (held.includes("SYSTEM_ADMIN") ? "SYSTEM_ADMIN" : null);
   const viewer: StaffAreaViewer = {
@@ -88,6 +88,13 @@ export function buildStaffNavigation(input: StaffNavigationInput): StaffNavigati
     clubYear: requestedClubYear(search.get("year")),
     counts: adminRoleView?.counts ?? {},
   };
+  // Submitted club forms with no event sit in Admin -> Forms (#1573). A viewer with no Admin area (an Event Admin who came from an
+  // alert email) keeps the event shell they always had there, so the rail and the tabs still show where they are.
+  const clubFormsPath = pathname === "/more/club-forms" || pathname.startsWith("/more/club-forms/");
+  const placed = staffPlaceFor(pathname, search);
+  const place: StaffPlace = clubFormsPath && placed.area === "admin" && !visibleAreas(viewer).includes("admin")
+    ? { area: "events", tab: null, view: null, inEvent: true }
+    : placed;
   const selectedEventId = selectedEvent?.id ?? "";
   const permissions = selectedEvent?.permissions ?? [];
   const eventQuery = selectedEventId ? `?event=${encodeURIComponent(selectedEventId)}` : "";

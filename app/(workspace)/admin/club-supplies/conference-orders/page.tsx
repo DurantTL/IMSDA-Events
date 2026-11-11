@@ -2,6 +2,7 @@ import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { ListPage } from "@/components/page-templates/list-page";
 import { ConferenceClubOrdersWorkspace } from "@/components/conference-club-orders-workspace";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -23,16 +24,9 @@ export default async function ConferenceClubOrdersPage() {
   return (
     <>
       <AdminPageHeader path="/admin/club-supplies/conference-orders" />
-      <section className="page-stack">
-        <div className="page-intro">
-          <div>
-            <p className="eyebrow">Club supplies</p>
-            <h1>Conference club orders</h1>
-            <p>Patches and pins clubs ordered from the conference, billed to their churches.</p>
-          </div>
-        </div>
+      <ListPage header={{ title: "Conference club orders", description: "Patches and pins clubs ordered from the conference, billed to their churches." }}>
         <ConferenceClubOrdersWorkspace bills={bills} orders={orders} />
-      </section>
+      </ListPage>
     </>
   );
 }

@@ -1,0 +1,36 @@
+/* Links added to the month grids (#1842). Tokens only; 44px tap targets on touch screens. */
+.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* The whole 44px box is the target; the word inside stays small. */
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  vertical-align: middle;
+  text-decoration: underline;
+}
+
+.link:hover { text-decoration: underline; }
+
+.cell {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: underline;
+}
+
+/* The month-by-month grids (#1842): month columns wrap and use tight side padding so 12 months plus the totals fit the
+   box at 1280px with the 44px links inside them. Doubled class beats the grid's nowrap rule in globals.css. */
+table.monthGrid.monthGrid :is(td, th):not(:first-child) {
+  padding-inline: 5px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}

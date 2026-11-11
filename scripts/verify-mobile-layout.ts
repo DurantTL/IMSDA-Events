@@ -30,13 +30,15 @@
  *  - squeezed text (#996): no visible text in a box narrower than about four characters, no text that wraps one
  *    character per line, and no ordinary word (6 to 15 letters) broken in the middle; only emails, codes and
  *    unbroken strings that cannot fit may break anywhere;
- *  - a `table-cards` table sits in a `table-box` container (`table-cards-no-box`), so it can become cards;
+ *  - a `table-cards` table sits in a `table-box` container (`table-cards-no-box`), so it can become cards (a `data-cards="touch"`
+ *    table, the club roster, is exempt on a desktop window with a mouse at 1024px or wider, where it stays a table, #1838);
  *  - tables never scroll sideways (#1457), at every width: a table whose scrolling box is wider than the box is `table-scrolls-sideways`
  *    (no scroll-cue exemption; a table that does not fit is the shared `table-cards` cards, switched by its container's width),
  *    and a table clipped by its box or sticking out of it is `table-wider-than-box` (#997);
  *  - sticky bars (#996): when a page opens, no sticky or fixed action bar (one holding a button) sits on top of text;
  *  - the shell's "Loading IMAdventist…" fallback is waited out before anything is measured, and a page that never
- *    leaves it is a finding;
+ *    leaves it is a finding. Every page a step opens goes through `gotoSettled`, and a "should be there" check waits for the
+ *    element with `appears` instead of counting at once (#1829, #1830), so a slow run is not reported as a page bug;
  *  - a full-page screenshot of every page and width, saved as an artifact.
  *
  * Every layout assertion is made for every page at every width. A finding that
@@ -90,6 +92,8 @@ loadEnvConfig(process.cwd());
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Page = any;
 type Context = any;
+type Locator = any;
+type Browser = any;
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 const baseUrl = (process.env.MOBILE_LAYOUT_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -299,6 +303,8 @@ const pages: PageSpec[] = [
   { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
   area("clubs", "/account/area-clubs/clubs"),
   area("events", "/account/area-clubs/events"),
+  // The coordinator attendee report with its club, role and location filters (#1762).
+  area("event-report", `/account/area-clubs/events/${clubEventId}/report`),
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
   area("points", "/account/area-clubs/points"),
@@ -351,6 +357,7 @@ const pages: PageSpec[] = [
   // Check-out for a person with keys out, a held cash deposit, a lost key and a charge (#214), and the closeout.
   staff("issued-assets-checkout", `/check-in/assets?attendee=${P}_reg_attendee_3_0`),
   staff("issued-assets-closeout", "/more/issued-assets/closeout"),
+  staff("merchandise", "/more/merchandise"),
   staff("kitchen-report", "/more/kitchen-report"),
   staff("kitchen-scanner-import", "/more/kitchen-report/scanner-import"),
   // Meal money closeout (#212): the money table, the exceptions and their review forms.
@@ -359,6 +366,8 @@ const pages: PageSpec[] = [
   staff("kitchen-counts", "/more/kitchen-report/counts"),
   // The same page as a Kitchen staff user (#1029): no event view, so the sidebar and phone tabs show only Kitchen counts.
   staff("kitchen-counts-as-kitchen-staff", "/more/kitchen-report/counts", "kitchen"),
+  // Meals setup (#1579): the views strip, the services and orders as phone cards, and the price grid.
+  staff("meals-setup", "/more/meals"),
   staff("more-menu", "/more"),
   staff("event-features", "/more/features"),
   // The More launcher as a system administrator: every switchable module card has Turn off, and its confirm must fit (#810).
@@ -412,7 +421,9 @@ const pages: PageSpec[] = [
   },
   // The printable name badge sheets (#981): the sheet preview must not make the page scroll sideways.
   staff("check-in-badges", "/check-in/badges"),
+  staff("check-in-passes", "/check-in/passes"),
   staff("communications", "/communications"),
+  staff("community", "/community"),
   // The template editor with attachments, a picture and a button (#824), and a draft announcement with attachments.
   staff("communications-editor", `/communications?event=${blocksEventId}&view=templates`, "system-admin"),
   staff("communications-announcement-attachments", `/communications?event=${blocksEventId}`, "system-admin"),
@@ -423,6 +434,8 @@ const pages: PageSpec[] = [
   staff("communications-scheduled", `/communications/scheduled?event=${blocksEventId}`, "system-admin"),
   staff("communications-scheduled-new", `/communications/scheduled?event=${blocksEventId}&new=1`, "system-admin"),
   staff("registration-builder", "/registration-builder"),
+  // The event's information forms list (#1572): the titled list page with its description and the form cards.
+  { ...staff("information-forms", "/information-forms"), expectText: /Information forms/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
@@ -445,9 +458,16 @@ const pages: PageSpec[] = [
   // Creating an event asks for start and end times next to the dates (#1406).
   { name: "staff-event-setup-blank", path: "/event-setup", role: "system-admin", expectText: /Start time/ },
   { name: "staff-event-setup-from-template", path: "/event-setup/from-template", role: "system-admin", expectText: /Start time/ },
+  { name: "staff-event-setup-copy", path: "/event-setup/copy", role: "system-admin", expectText: /Copy from a past event/ },
+  // All events (#1570): the system-wide event directory, a table that becomes cards on a phone.
+  { ...staff("staff-all-events", "/admin/events", "system-admin"), expectText: /All events/ },
   staff("calendar-admin", "/admin/calendar", "system-admin"),
   staff("churches-clubs", "/admin/organizations", "system-admin"),
   staff("churches-clubs-directory", "/admin/organizations/directory", "system-admin"),
+  // The System organization contact and location pages (#1592), opened for a church with a club under it.
+  staff("church-billing-contact", `/admin/organizations/${churchA}/billing`, "system-admin"),
+  staff("church-pastor-contact", `/admin/organizations/${churchA}/pastor`, "system-admin"),
+  staff("church-location", `/admin/organizations/${churchA}/location`, "system-admin"),
   staff("club-invites", "/admin/clubs/invites", "system-admin"),
   staff("club-applications", "/admin/clubs/applications", "system-admin"),
   staff("club-reports-summary", "/admin/clubs/summary", "system-admin"),
@@ -482,6 +502,8 @@ const pages: PageSpec[] = [
   staff("system-report", "/admin/system-report", "system-admin"),
   staff("club-supplies", "/admin/club-supplies", "system-admin"),
   staff("club-forms", "/admin/club-forms", "system-admin"),
+  // Submitted club forms with no event (#1573): they sit in Admin -> Forms, not in an event's shell.
+  { name: "staff-club-forms-submissions-no-event", path: "/more/club-forms", role: "system-admin" },
   // The club form settings page, with the "Email these addresses when this form is submitted" box (#1017).
   staff("club-form-alerts", "/admin/club-forms/off_premises_permission_slip", "system-admin"),
   // The form template library and its editor (#1064).
@@ -489,7 +511,9 @@ const pages: PageSpec[] = [
   staff("form-template-editor", "/admin/form-templates/simple_rsvp", "system-admin"),
   staff("map-locations", "/admin/organizations/map-locations", "system-admin"),
   staff("honor-catalog", "/admin/honors", "system-admin"),
+  staff("master-award-rules", "/admin/master-award-rules", "system-admin"),
   staff("year-end-reports", "/admin/clubs/reports/year-end", "system-admin"),
+  staff("year-end-report-detail", `/admin/clubs/reports/year-end/${clubA}/2026-27`, "system-admin"),
   staff("church-import", "/admin/organizations/import", "system-admin"),
   staff("club-import", "/admin/clubs/import", "system-admin"),
   // The club-list JSON preview (#1038): new and unmatched rows, a check note, every card opened.
@@ -2199,6 +2223,9 @@ function auditInPage(args: { touch: boolean; cards: boolean; minTarget: number; 
   for (const table of Array.from(document.querySelectorAll("table.table-cards"))) {
     if (!visible(table) || inHiddenTree(table)) continue;
     const parent = table.parentElement;
+    // A table marked data-cards="touch" (the club roster, #1838) is cards on phones and tablets only: a desktop window with a mouse,
+    // 1024px or wider, drops its container on purpose so it stays a table there. Anywhere else it still needs the container.
+    if (table.getAttribute("data-cards") === "touch" && matchMedia("(hover: hover) and (pointer: fine) and (min-width: 1024px)").matches) continue;
     if (parent && !/(^|\s)table-box(\s|$)/.test(getComputedStyle(parent).containerName)) cardsWithoutBox.push(`${describe(table)} sits in ${describe(parent)}, which is not a table-box container: it never becomes cards`);
   }
 
@@ -3417,7 +3444,7 @@ async function auditFilterCombobox(page: Page, spec: PageSpec, width: number, pr
   if (!labelText) return;
   const name = `${spec.name} (${labelText} filter list)`;
   const combobox = page.locator('.club-roster-tools input[role="combobox"]:visible').first();
-  if ((await combobox.count()) === 0) {
+  if (!(await appears(combobox))) {
     record("dialog-open-failed", name, width, `no ${labelText} combobox in the filter row`);
     return;
   }
@@ -3479,9 +3506,9 @@ async function auditFilterCombobox(page: Page, spec: PageSpec, width: number, pr
       await page.keyboard.press("ArrowDown");
       await page.keyboard.press("ArrowDown");
       const active = await combobox.getAttribute("aria-activedescendant");
-      if (!active || (await page.locator(`[id="${active}"]`).count()) === 0) record("filter-list-keyboard", name, width, `${state}: no active option after the arrow keys (aria-activedescendant=${active})`);
+      if (!active || !(await appears(page.locator(`[id="${active}"]`), 3000, "attached"))) record("filter-list-keyboard", name, width, `${state}: no active option after the arrow keys (aria-activedescendant=${active})`);
       const controls = await combobox.getAttribute("aria-controls");
-      if (!controls || (await page.locator(`[id="${controls}"][role="listbox"]`).count()) === 0) record("filter-list-keyboard", name, width, `${state}: aria-controls does not point at the listbox`);
+      if (!controls || !(await appears(page.locator(`[id="${controls}"][role="listbox"]`), 3000, "attached"))) record("filter-list-keyboard", name, width, `${state}: aria-controls does not point at the listbox`);
       await page.keyboard.press("Escape");
       await page.waitForTimeout(80);
       if ((await combobox.getAttribute("aria-expanded")) !== "false") record("filter-list-keyboard", name, width, `${state}: Escape did not close the list`);
@@ -3783,7 +3810,7 @@ async function auditGeneralLinkFlow(page: Page, spec: PageSpec, width: number, p
 async function auditPendingTeamsFlow(page: Page, spec: PageSpec, width: number, prefix: string) {
   const name = `${spec.name} (reject form open)`;
   try {
-    await page.goto(`${baseUrl}${spec.path}`, { waitUntil: "load" });
+    await gotoSettled(page, `${baseUrl}${spec.path}`);
     await page.locator(".pending-team-reject:visible").first().click({ timeout: 5000 });
     await page.waitForTimeout(200);
     await auditState(page, name, width, `${prefix}-reject-open`);
@@ -3847,7 +3874,7 @@ async function auditWorkspaceNavigationFlow(page: Page, spec: PageSpec, width: n
   } finally {
     await page.emulateMedia({ reducedMotion: "reduce" });
     // Restore the instrumented method and leave the next page a fresh document.
-    await page.goto(before, { waitUntil: "load" });
+    await gotoSettled(page, before);
   }
 }
 
@@ -3921,7 +3948,7 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
       });
       if (!fit) throw new Error("Account destinations overflow or have undersized touch targets");
       for (const href of ["/account/registrations", "/account/profile", "/account/help"]) {
-        if (!(await menu.locator(`a[href="${href}"]`).count())) throw new Error(`Missing account destination ${href}`);
+        if (!(await appears(menu.locator(`a[href="${href}"]`), 5000, "attached"))) throw new Error(`Missing account destination ${href}`);
       }
       await page.keyboard.press("Escape");
       if (await menu.getAttribute("open") !== null) throw new Error("Escape did not close the account menu");
@@ -3950,7 +3977,7 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
     record("audit-failed", `${spec.name} (portal navigation)`, width, (error as Error).message.split("\n")[0] ?? "failed");
   } finally {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto(before, { waitUntil: "load" });
+    await gotoSettled(page, before);
   }
 }
 
@@ -3958,6 +3985,26 @@ async function auditPortalNavigationFlow(page: Page, spec: PageSpec, width: numb
 async function waitForShell(page: Page) {
   return page.waitForFunction(() => !document.querySelector(".shell-loading") && !/Loading IMAdventist/.test(document.body.innerText), undefined, { timeout: 20_000 })
     .then(() => true, () => false);
+}
+
+/**
+ * The one place the audit opens a page inside a step (#1830): go there, then wait out the shell's loading fallback, so what is
+ * measured or clicked next is the page and not its "Loading IMAdventist…" screen. Never call `page.goto` anywhere else.
+ */
+async function gotoSettled(page: Page, url: string, options: { timeout?: number } = {}) {
+  const response = await page.goto(url, { waitUntil: "load", ...options });
+  await waitForShell(page);
+  return response;
+}
+
+/**
+ * Presence check that waits (#1829): true as soon as the element is visible, false when it has not shown up after `timeoutMs`.
+ * Use it for "this should be there"; an instant `.count()` right after a click or a fetch races the page and fails on a slow run.
+ * Pass `"attached"` when the element only has to exist. Where a step calls it and ignores the answer, it is only a wait before a
+ * count that follows and reports what was found, so the selector there matches the measurement's `:visible`-ness.
+ */
+async function appears(locator: Locator, timeoutMs = 10_000, state: "visible" | "attached" = "visible") {
+  return locator.first().waitFor({ state, timeout: timeoutMs }).then(() => true, () => false);
 }
 
 /** The #996 rules: squeezed text, an action bar over text when the page opens (scroll 0), and the loading screen. */
@@ -4095,7 +4142,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   const url = `${baseUrl}${spec.path}`;
   // "load", then a bounded wait for quiet: Next prefetches every visible link, so
   // the network is not always idle on a busy page.
-  const response = await page.goto(url, { waitUntil: "load", timeout: 60_000 });
+  const response = await gotoSettled(page, url, { timeout: 60_000 });
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => undefined);
   const status = response?.status() ?? 0;
   const finalPath = new URL(page.url()).pathname;
@@ -4211,7 +4258,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== before) await page.goto(before, { waitUntil: "load" });
+    if (page.url() !== before) await gotoSettled(page, before);
   }
 
   // The bulk honor popup (#819), with its type-to-search list open and narrowed and
@@ -4244,7 +4291,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== bulkBefore) await page.goto(bulkBefore, { waitUntil: "load" });
+    if (page.url() !== bulkBefore) await gotoSettled(page, bulkBefore);
   }
 
   // The More launcher's Turn off confirm (#810): open the launcher, press the first Turn off, and the
@@ -4255,14 +4302,14 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     const desktopName = `${spec.name} (features page)`;
     const before = page.url();
     try {
-      await page.goto(`${baseUrl}/more/features`, { waitUntil: "load" });
-      if ((await page.locator('button[aria-label$="Press to turn off."]:visible, button[aria-label$="Press to turn on."]:visible').count()) === 0) {
+      await gotoSettled(page, `${baseUrl}/more/features`);
+      if (!(await appears(page.locator('button[aria-label$="Press to turn off."]:visible, button[aria-label$="Press to turn on."]:visible')))) {
         record("dialog-open-failed", desktopName, width, "a system administrator sees no feature switch on /more/features");
       }
     } catch (error) {
       record("dialog-open-failed", desktopName, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== before) await page.goto(before, { waitUntil: "load" });
+    if (page.url() !== before) await gotoSettled(page, before);
   }
   if (spec.name === "staff-more-launcher-admin" && width <= phoneMaxWidthPx) {
     const launcherName = `${spec.name} (turn off confirm)`;
@@ -4270,7 +4317,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await page.locator('a[aria-haspopup="dialog"]:visible').first().click({ timeout: 3000 });
       await page.waitForTimeout(250);
       const toggle = page.locator(".more-launcher [data-module-toggle]:visible").first();
-      if ((await toggle.count()) === 0) {
+      if (!(await appears(toggle))) {
         record("dialog-open-failed", launcherName, width, "a system administrator sees no Turn off control in the More launcher");
       } else {
         await toggle.scrollIntoViewIfNeeded({ timeout: 3000 });
@@ -4399,10 +4446,12 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await search.fill("mobilecheck");
       await page.waitForTimeout(150);
       const boxes = taught.locator('[data-testid="honor-multi-options"] input[type="checkbox"]:visible');
+      await appears(boxes);
       const listed = await boxes.count();
       if (listed < 4) record("dialog-open-failed", `${spec.name} (several honors)`, width, `the honor search listed ${listed} synthetic honors, expected 4`);
       for (let index = 0; index < Math.min(listed, 3); index += 1) await boxes.nth(index).check({ timeout: 3000 });
       await page.waitForTimeout(150);
+      await appears(taught.locator('ul[aria-label^="Chosen honors"] li:visible'));
       const chosen = await taught.locator('ul[aria-label^="Chosen honors"] li:visible').count();
       if (chosen !== 3) record("dialog-open-failed", `${spec.name} (several honors)`, width, `expected 3 chosen honors, found ${chosen}`);
       await auditBuilder("add form, several honors chosen", "several-honors-add");
@@ -4413,6 +4462,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await prerequisiteSearch.fill("mobilecheck");
       await page.waitForTimeout(150);
       await prerequisite.locator('[data-testid="honor-multi-prerequisite-options"] input[type="checkbox"]:visible').first().check({ timeout: 3000 });
+      await appears(prerequisite.locator('ul[aria-label^="Chosen prerequisite honors"] li:visible'));
       const prerequisiteChosen = await prerequisite.locator('ul[aria-label^="Chosen prerequisite honors"] li:visible').count();
       if (prerequisiteChosen !== 1) record("dialog-open-failed", `${spec.name} (several honors)`, width, `expected 1 chosen prerequisite honor, found ${prerequisiteChosen}`);
       await auditBuilder("add form, a prerequisite honor chosen", "prerequisite-add");
@@ -4420,13 +4470,14 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await edit.scrollIntoViewIfNeeded({ timeout: 3000 });
       await edit.click({ timeout: 3000 });
       await page.waitForTimeout(250);
+      await appears(page.locator('[data-testid="honor-multi-taught"]:visible').first().locator('ul[aria-label^="Chosen honors"] li:visible'));
       const editChosen = await page.locator('[data-testid="honor-multi-taught"]:visible').first().locator('ul[aria-label^="Chosen honors"] li:visible').count();
       if (editChosen < 4) record("dialog-open-failed", `${spec.name} (several honors)`, width, `the edit form listed ${editChosen} chosen honors, expected the class's 4`);
       await auditBuilder("edit form, class with four honors", "several-honors-edit");
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (several honors)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== builderBefore) await page.goto(builderBefore, { waitUntil: "load" });
+    if (page.url() !== builderBefore) await gotoSettled(page, builderBefore);
   }
 
   // The template editor with attachments (#824): the attachments list, the picture picker and the button form each
@@ -4446,13 +4497,14 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await page.waitForTimeout(300);
       const attachments = page.locator(".message-attachments-field:visible").first();
       await attachments.scrollIntoViewIfNeeded({ timeout: 5000 });
+      await appears(attachments.locator("li"));
       const listed = await attachments.locator("li").count();
       if (listed !== 2) record("dialog-open-failed", `${spec.name} (attachments)`, width, `the attachments list showed ${listed} files, expected the template's 2`);
       await auditEditor("attachments listed", "attachments");
       await page.locator('button[aria-label="Insert image"]:visible').first().click({ timeout: 5000 });
       await page.waitForTimeout(150);
-      const pictures = await page.locator(".message-editor-image-list li:visible").count();
-      if (pictures < 1) record("dialog-open-failed", `${spec.name} (picture picker)`, width, "the picker listed no uploaded picture");
+      const picturesShown = await appears(page.locator(".message-editor-image-list li:visible"));
+      if (!picturesShown) record("dialog-open-failed", `${spec.name} (picture picker)`, width, "the picker listed no uploaded picture");
       await auditEditor("picture picker open", "picture-picker");
       await page.locator('button[aria-label="Insert image"]:visible').first().click({ timeout: 5000 });
       await page.locator('button[aria-label="Button link"]:visible').first().click({ timeout: 5000 });
@@ -4462,7 +4514,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (attachments editor)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== editorBefore) await page.goto(editorBefore, { waitUntil: "load" });
+    if (page.url() !== editorBefore) await gotoSettled(page, editorBefore);
   }
 
   // The Custom message template (#850) starts blank and unpublished: its explanation, empty fields and the shorter token
@@ -4485,7 +4537,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (custom message)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== customBefore) await page.goto(customBefore, { waitUntil: "load" });
+    if (page.url() !== customBefore) await gotoSettled(page, customBefore);
   }
 
   // Email selected (#850): tick a registration, open the dialog, and look at Custom message (not yet published for
@@ -4508,22 +4560,23 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       await page.waitForTimeout(400);
       const select = page.locator('[role="dialog"] select').first();
       await select.selectOption("CUSTOM_MESSAGE", { timeout: 5000 });
-      await page.waitForTimeout(600);
-      const notice = await page.locator('[role="dialog"]:has-text("Custom message template has not been published")').count();
-      if (notice === 0) record("dialog-open-failed", `${spec.name} (custom message)`, width, "the dialog did not say the custom message is unpublished");
+      // The notice shows only once the dialog's preview fetch has come back (#1829), so wait for it instead of counting at once.
+      const noticeShown = await appears(page.locator('[role="dialog"]:has-text("Custom message template has not been published")'));
+      if (!noticeShown) record("dialog-open-failed", `${spec.name} (custom message)`, width, "the dialog did not say the custom message is unpublished");
+      // Read after the notice has appeared: Send is only settled once the preview has answered.
       const sendDisabled = await page.locator('[role="dialog"] button.primary-button').first().isDisabled();
       if (!sendDisabled) record("dialog-open-failed", `${spec.name} (custom message)`, width, "Send is enabled while the custom message is unpublished");
       await auditDialog("custom message unpublished", "email-selected-custom");
       await select.selectOption("EVENT_ANNOUNCEMENT", { timeout: 5000 });
       await page.waitForTimeout(400);
-      if ((await page.locator('[role="dialog"]:has-text("Formatting:")').count()) === 0) record("dialog-open-failed", `${spec.name} (announcement)`, width, "the announcement message has no formatting hint");
+      if (!(await appears(page.locator('[role="dialog"]:has-text("Formatting:")')))) record("dialog-open-failed", `${spec.name} (announcement)`, width, "the announcement message has no formatting hint");
       await auditDialog("event announcement hint", "email-selected-announcement");
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (email selected)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== peopleBefore) await page.goto(peopleBefore, { waitUntil: "load" });
+    if (page.url() !== peopleBefore) await gotoSettled(page, peopleBefore);
   }
 
   // Scanner name search (#889): open the scanner, search a first name several registrations share, and the pick list
@@ -4542,7 +4595,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       const open = await page.evaluate(auditInPage, { touch, cards: width <= cardsMaxWidth, minTarget: touchTarget, tolerance: touchTolerance });
       if (open.scrollWidth > open.innerWidth) record("horizontal-scroll", stateName, width, `page is ${open.scrollWidth}px wide in a ${open.innerWidth}px window; sticking out: ${open.overflowers.join("; ") || "(nothing identified)"}`);
       for (const target of open.smallTargets) record("small-tap-target", stateName, width, target);
-      if ((await page.locator('[role="dialog"] button:has-text("Start camera"):visible').count()) === 0) record("dialog-open-failed", stateName, width, "the camera button is missing after a name search");
+      if (!(await appears(page.locator('[role="dialog"] button:has-text("Start camera"):visible')))) record("dialog-open-failed", stateName, width, "the camera button is missing after a name search");
       if (takeShots) await page.screenshot({ path: `${prefix}-scanner-name-search.jpg`, type: "jpeg", quality: 60 });
     } catch (error) {
       const seen = await page.locator('[role="dialog"]').first().innerText({ timeout: 1000 }).catch(() => "(no dialog)");
@@ -4550,7 +4603,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== checkInBefore) await page.goto(checkInBefore, { waitUntil: "load" });
+    if (page.url() !== checkInBefore) await gotoSettled(page, checkInBefore);
   }
 
   // Retry failed (#860): the review is open (scope picker, counts, skip reasons, confirm) and fits the screen.
@@ -4569,7 +4622,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     } catch (error) {
       record("dialog-open-failed", `${spec.name} (retry failed review)`, width, (error as Error).message.split("\n")[0] ?? "failed");
     }
-    if (page.url() !== deliveriesBefore) await page.goto(deliveriesBefore, { waitUntil: "load" });
+    if (page.url() !== deliveriesBefore) await gotoSettled(page, deliveriesBefore);
   }
 
   // A draft announcement with attachments (#824): the edit dialog lists them and fits the screen.
@@ -4583,6 +4636,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
       const edit = page.locator('button:has-text("Edit draft"):visible').first();
       await edit.click({ timeout: 5000 });
       await page.waitForTimeout(250);
+      await appears(page.locator('[role="dialog"] .message-attachments-field li:visible'));
       const listed = await page.locator('[role="dialog"] .message-attachments-field li:visible').count();
       if (listed !== 2) record("dialog-open-failed", `${spec.name} (draft attachments)`, width, `the draft's dialog listed ${listed} attachments, expected 2`);
       const fit = await page.evaluate(dialogFitInPage);
@@ -4597,7 +4651,7 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
     }
     await page.keyboard.press("Escape").catch(() => undefined);
     await page.waitForTimeout(100);
-    if (page.url() !== draftBefore) await page.goto(draftBefore, { waitUntil: "load" });
+    if (page.url() !== draftBefore) await gotoSettled(page, draftBefore);
   }
 
   // The floating Honor and Class filter lists, the Orders button descriptions and Back to top (the owner's Oct 13 request).
@@ -4618,6 +4672,57 @@ async function auditPage(page: Page, spec: PageSpec, width: number, prefix: stri
   pagesVisited.push(`${spec.name}@${width}`);
 }
 
+
+/**
+ * Dense staff rows (#1775, site rule L13): the registrations list and the arrivals list keep every row control 44px with touch
+ * (at any width, including 1024 and 1280) and, with a mouse at 1024px and wider, shrink them to the 36px dense size. Each page is
+ * opened twice per width: in a touch context (hasTouch makes Chromium report (pointer: coarse), which is confirmed here rather
+ * than assumed) and in a plain mouse context. Runs outside the width loop above because that loop only emulates touch up to 768px.
+ */
+const denseRowPages: Array<{ name: string; path: string; selector: string }> = [
+  { name: "dense-rows-registrations", path: "/people", selector: ".dense-rows .record-select" },
+  { name: "dense-rows-arrivals", path: "/check-in", selector: ".dense-rows .arrival-row button" },
+];
+const denseTargetPx = 36;
+const denseWidths = [1024, 1280];
+async function denseRowsAudit(browser: Browser, cookie: { name: string; value: string; expires: number }) {
+  for (const width of denseWidths) {
+    for (const pointer of ["touch", "mouse"] as const) {
+      const context: Context = await browser.newContext({ viewport: { width, height: heightFor(width) }, hasTouch: pointer === "touch", deviceScaleFactor: 1, reducedMotion: "reduce" });
+      await context.addInitScript("window.__name = (target) => target;");
+      await context.addCookies([{ name: cookie.name, value: cookie.value, url: baseUrl, httpOnly: true, expires: cookie.expires }]);
+      const page = await context.newPage();
+      for (const spec of denseRowPages) {
+        const label = `${spec.name} ${pointer}`;
+        try {
+          await gotoSettled(page, `${baseUrl}${spec.path}`, { timeout: 60_000 });
+          await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => undefined);
+          await waitForShell(page);
+          await page.waitForTimeout(150);
+          const result: { coarse: boolean; fine: boolean; sizes: number[] } = await page.evaluate((selector: string) => ({
+            coarse: window.matchMedia("(pointer: coarse)").matches,
+            fine: window.matchMedia("(pointer: fine)").matches,
+            sizes: Array.from(document.querySelectorAll<HTMLElement>(selector)).map((el) => el.getBoundingClientRect()).filter((box) => box.width > 0 && box.height > 0).map((box) => Math.round(Math.min(box.width, box.height) * 100) / 100),
+          }), spec.selector);
+          pagesVisited.push(`${label} @${width}`);
+          if (pointer === "touch" && !result.coarse) record("dense-rows", label, width, "the touch context does not report (pointer: coarse), so the 44px check below would prove nothing");
+          if (pointer === "mouse" && !result.fine) record("dense-rows", label, width, "the mouse context does not report (pointer: fine)");
+          if (result.sizes.length === 0) { record("dense-rows", label, width, `no row control matched ${spec.selector}, so nothing was measured`); continue; }
+          const shortest = Math.min(...result.sizes);
+          const tallest = Math.max(...result.sizes);
+          if (pointer === "touch" && shortest < touchTarget - touchTolerance) record("dense-rows", label, width, `a row control is ${shortest}px with touch, under ${touchTarget}`);
+          if (pointer === "mouse") {
+            if (shortest < denseTargetPx - touchTolerance) record("dense-rows", label, width, `a row control is ${shortest}px with a mouse, under the dense ${denseTargetPx}px`);
+            if (tallest >= touchTarget - touchTolerance) record("dense-rows", label, width, `no row control is dense with a mouse (largest ${tallest}px): the dense rule did not apply`);
+          }
+        } catch (error) {
+          record("audit-failed", label, width, (error as Error).message.split("\n")[0]);
+        }
+      }
+      await context.close();
+    }
+  }
+}
 
 async function main() {
   // Hard guard first: nothing below may load Prisma or the session store
@@ -4695,6 +4800,9 @@ async function main() {
         }
         await context.close();
       }
+    }
+    if (!only || denseRowPages.some((spec) => only.split(",").some((part) => spec.name.includes(part.trim())))) {
+      await denseRowsAudit(browser, cookies["event-admin"]);
     }
   } finally {
     await browser?.close().catch(() => undefined);

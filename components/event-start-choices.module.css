@@ -1,0 +1,60 @@
+/* The three starting choices at the top of the create pages (#1570): three across on a desktop, one per row on a phone. */
+.choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.choices > li {
+  display: flex;
+  min-width: 0;
+}
+
+.choice {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target, 44px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 14px 16px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.choice:hover {
+  border-color: var(--imsda-navy);
+}
+
+/* Where you are: the gold treatment the tab row uses. */
+.choice[aria-current="page"] {
+  border-color: var(--imsda-gold);
+  background: var(--imsda-gold-soft);
+  box-shadow: inset 4px 0 0 var(--imsda-gold);
+}
+
+.title {
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.text {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .choices {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

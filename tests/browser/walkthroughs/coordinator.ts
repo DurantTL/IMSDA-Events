@@ -98,10 +98,10 @@ export const coordinatorWalkthroughActions: Record<string, WalkthroughActions> =
         await (await tab(ctx, "Monthly Records")).click();
         await ctx.page.waitForURL(/\/account\/area-clubs\/reports/, slow);
         await settle(ctx);
-        return ctx.page.getByRole("link", { name: /^October 2026/ });
+        return ctx.page.getByRole("navigation", { name: "Report month" }).getByRole("link", { name: /^October 2026/ });
       },
       "see-states": async (ctx) => {
-        await ctx.page.getByRole("link", { name: /^October 2026/ }).click();
+        await ctx.page.getByRole("navigation", { name: "Report month" }).getByRole("link", { name: /^October 2026/ }).click();
         await settle(ctx);
         return ctx.page.getByText("Submitted", { exact: true }).first();
       },

@@ -24,6 +24,7 @@ import {
   type YearEndPrefill,
 } from "@/modules/club-reports/year-end-domain";
 import type { YearEndReportInput } from "@/modules/club-reports/year-end-schemas";
+import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 import { ageOn } from "@/modules/club-rosters/domain";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 
@@ -320,10 +321,35 @@ export async function reopenYearEndReport(organizationId: string, reportYear: st
 }
 
 /**
- * The conference view: every active club, its report status for the year,
- * and (only for SUBMITTED reports, as with monthly reports) its numbers.
+ * Current director names for these clubs (the same active Director grants the area summary shows). Names only, in
+ * name order; a club with none maps to an empty list.
  */
-export async function listYearEndReportsForYear(reportYear: string) {
+async function currentDirectorNames(organizationIds: readonly string[], now: Date) {
+  const grants = organizationIds.length === 0 ? [] : await getPrisma().clubDirectorGrant.findMany({
+    where: {
+      organizationId: { in: [...organizationIds] },
+      role: "DIRECTOR",
+      revokedAt: null,
+      effectiveFrom: { lte: now },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+    },
+    orderBy: { attendeeAccount: { displayName: "asc" } },
+    select: { organizationId: true, effectiveFrom: true, effectiveTo: true, revokedAt: true, attendeeAccount: { select: { displayName: true } } },
+  });
+  const byClub = new Map<string, string[]>();
+  for (const grant of grants) {
+    if (!directorGrantIsActive(grant, now)) continue;
+    byClub.set(grant.organizationId, [...(byClub.get(grant.organizationId) ?? []), grant.attendeeAccount.displayName]);
+  }
+  return byClub;
+}
+
+/**
+ * The conference view: every active club, its report status for the year,
+ * its current directors' names, and (only for SUBMITTED reports, as with
+ * monthly reports) its numbers.
+ */
+export async function listYearEndReportsForYear(reportYear: string, now = new Date()) {
   const prisma = getPrisma();
   const [clubs, reports] = await Promise.all([
     prisma.organization.findMany({
@@ -333,6 +359,7 @@ export async function listYearEndReportsForYear(reportYear: string) {
     }),
     prisma.clubYearEndReport.findMany({ where: { reportYear }, select: reportSelect }),
   ]);
+  const directors = await currentDirectorNames(clubs.map((club) => club.id), now);
   const byClub = new Map(reports.map((report) => [report.organizationId, serializeReport(report)]));
   return clubs.map((club) => {
     const report = byClub.get(club.id) ?? null;
@@ -340,6 +367,7 @@ export async function listYearEndReportsForYear(reportYear: string) {
       id: club.id,
       name: club.name,
       church: club.parentOrganization?.name ?? "",
+      directors: directors.get(club.id) ?? [],
       status: (report?.status ?? "NONE") as "NONE" | "DRAFT" | "SUBMITTED",
       submittedAt: report?.status === "SUBMITTED" ? report.submittedAt : null,
       late: report?.status === "SUBMITTED" ? report.late : false,
@@ -349,3 +377,28 @@ export async function listYearEndReportsForYear(reportYear: string) {
 }
 
 export type YearEndClubSummary = Awaited<ReturnType<typeof listYearEndReportsForYear>>[number];
+
+/**
+ * One club's year-end detail for staff: its status, current directors, and the report itself only when it is SUBMITTED
+ * (the frozen snapshot, as the director sees it). A draft's numbers are never read into this result. Null when the
+ * organization is not a club.
+ */
+export async function getYearEndClubDetail(organizationId: string, reportYear: string, now = new Date()) {
+  const prisma = getPrisma();
+  const [club, stored] = await Promise.all([
+    prisma.organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true, parentOrganization: { select: { name: true } } } }),
+    prisma.clubYearEndReport.findUnique({ where: { organizationId_reportYear: { organizationId, reportYear } }, select: reportSelect }),
+  ]);
+  if (!club || club.type !== "CLUB") return null;
+  const directors = (await currentDirectorNames([organizationId], now)).get(organizationId) ?? [];
+  const submitted = stored?.status === "SUBMITTED" ? serializeReport(stored) : null;
+  return {
+    name: club.name,
+    church: club.parentOrganization?.name ?? "",
+    directors,
+    status: (stored?.status ?? "NONE") as "NONE" | "DRAFT" | "SUBMITTED",
+    late: submitted?.late ?? false,
+    submittedAt: submitted?.submittedAt ?? null,
+    report: submitted,
+  };
+}
