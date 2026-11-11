@@ -17,7 +17,7 @@ import {
 } from "@/modules/club-reports/domain";
 import type { ClubReportInput } from "@/modules/club-reports/schemas";
 import { calendarDateIn } from "@/modules/calendar/domain";
-import { clubYearFor, type ClubClassLevel } from "@/modules/club-rosters/domain";
+import { clubYearFor, rosterIsTltFor, type ClubClassLevel } from "@/modules/club-rosters/domain";
 import { loadClubEventPoints, noEventPoints } from "@/modules/event-points/awards";
 
 /**
@@ -96,13 +96,13 @@ export async function reportPrefill(organizationId: string, now = new Date()) {
   const clubYear = clubYearFor(now);
   const [profile, members] = await Promise.all([
     prisma.clubProfile.findUnique({ where: { organizationId }, select: { meetingPlace: true, meetingSchedule: true } }),
-    prisma.clubRosterMember.findMany({ where: { organizationId, clubYear, status: "ACTIVE" }, select: { attendeeType: true, classLevel: true } }),
+    prisma.clubRosterMember.findMany({ where: { organizationId, clubYear, status: "ACTIVE" }, select: { attendeeType: true, isTlt: true } }),
   ]);
   return {
     meetingPlace: profile?.meetingPlace ?? "",
     meetingSchedule: profile?.meetingSchedule ?? "",
     pathfinderCount: members.filter((member) => member.attendeeType === "YOUTH" || member.attendeeType === "UNDERAGE").length,
-    tltCount: members.filter((member) => member.classLevel === "TLT").length,
+    tltCount: members.filter((member) => rosterIsTltFor(member.attendeeType, member.isTlt)).length,
     staffCount: members.filter((member) => member.attendeeType === "STAFF" || member.attendeeType === "ADULT").length,
   };
 }

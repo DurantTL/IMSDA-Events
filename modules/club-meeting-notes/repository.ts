@@ -137,7 +137,7 @@ async function checkedAttendance(
   const prisma = getPrisma();
   const members = await prisma.clubRosterMember.findMany({
     where: { id: { in: ids }, organizationId, clubYear: clubYearOfDate(input.meetingDate), status: { not: "REMOVED" }, personId: { not: null } },
-    select: { id: true, attendeeType: true, classLevel: true },
+    select: { id: true, attendeeType: true, isTlt: true },
   });
   if (members.length !== ids.length) {
     throw new ClubMeetingNoteError("INVALID_ATTENDANCE", "Attendance can only list people on this club's roster for the meeting's club year.");
@@ -145,7 +145,7 @@ async function checkedAttendance(
   const kept = movedYear ? [] : existing.filter((mark) => !ids.includes(mark.rosterMemberId));
   const keptKinds = kept.length === 0 ? [] : await prisma.clubRosterMember.findMany({
     where: { id: { in: kept.map((mark) => mark.rosterMemberId) }, organizationId },
-    select: { id: true, attendeeType: true, classLevel: true },
+    select: { id: true, attendeeType: true, isTlt: true },
   });
   const kindById = new Map([...members, ...keptKinds].map((member) => [member.id, member]));
   const merged = [...kept, ...input.attendance.map((entry) => ({ rosterMemberId: entry.rosterMemberId, present: entry.present }))];
@@ -175,7 +175,7 @@ export type AttendanceRosterEntry = {
   firstName: string;
   lastName: string;
   attendeeType: string;
-  classLevel: string | null;
+  isTlt: boolean;
   group: AttendanceGroup;
 };
 
@@ -183,7 +183,7 @@ export type AttendanceRosterEntry = {
 export async function listAttendanceRoster(organizationId: string, clubYear: string): Promise<AttendanceRosterEntry[]> {
   const members = await getPrisma().clubRosterMember.findMany({
     where: { organizationId, clubYear, status: "ACTIVE", personId: { not: null } },
-    select: { id: true, attendeeType: true, classLevel: true, person: { select: { firstName: true, lastName: true } } },
+    select: { id: true, attendeeType: true, isTlt: true, person: { select: { firstName: true, lastName: true } } },
   });
   return members
     .flatMap((member) => (member.person ? [{
@@ -191,7 +191,7 @@ export async function listAttendanceRoster(organizationId: string, clubYear: str
       firstName: member.person.firstName,
       lastName: member.person.lastName,
       attendeeType: member.attendeeType,
-      classLevel: member.classLevel,
+      isTlt: member.isTlt,
       group: attendanceGroupOf(member),
     }] : []))
     .sort(compareByName);
@@ -227,7 +227,7 @@ export async function loadAttendanceExport(organizationId: string, clubYear: str
   const extraIds = [...markedIds].filter((id) => !known.has(id));
   const extra = extraIds.length === 0 ? [] : await prisma.clubRosterMember.findMany({
     where: { id: { in: extraIds }, organizationId, status: { not: "REMOVED" } },
-    select: { id: true, attendeeType: true, classLevel: true, person: { select: { firstName: true, lastName: true } } },
+    select: { id: true, attendeeType: true, isTlt: true, person: { select: { firstName: true, lastName: true } } },
   });
   const members = [
     ...active,
@@ -236,7 +236,7 @@ export async function loadAttendanceExport(organizationId: string, clubYear: str
       firstName: member.person?.firstName ?? "Unknown",
       lastName: member.person?.lastName ?? "",
       attendeeType: member.attendeeType,
-      classLevel: member.classLevel,
+      isTlt: member.isTlt,
       group: attendanceGroupOf(member),
     })),
   ];

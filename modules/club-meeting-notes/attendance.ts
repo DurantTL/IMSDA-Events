@@ -1,4 +1,5 @@
 import { monthDateBounds } from "@/modules/club-meeting-notes/domain";
+import { rosterIsTltFor } from "@/modules/club-rosters/domain";
 import { toCsv } from "@/modules/reporting/csv";
 import { slugifyFilePart } from "@/modules/reporting/export-response";
 
@@ -19,11 +20,11 @@ export const attendanceGroupLabels: Record<AttendanceGroup, string> = {
 export const attendanceGroupOrder: readonly AttendanceGroup[] = ["PATHFINDER", "TLT", "STAFF"];
 
 /** The roster fields that decide a member's group. */
-export type AttendanceMemberKind = { attendeeType: string; classLevel: string | null };
+export type AttendanceMemberKind = { attendeeType: string; isTlt: boolean };
 
 /** TLTs first, then staff and adults, then every other member (youth and underage) as a Pathfinder. */
 export function attendanceGroupOf(member: AttendanceMemberKind): AttendanceGroup {
-  if (member.classLevel === "TLT") return "TLT";
+  if (rosterIsTltFor(member.attendeeType, member.isTlt)) return "TLT";
   if (member.attendeeType === "STAFF" || member.attendeeType === "ADULT") return "STAFF";
   return "PATHFINDER";
 }
@@ -49,8 +50,8 @@ export function groupAttendanceRoster<T extends AttendanceRosterMember>(members:
  * The head counts a meeting's check-off produces, by the same rule as the
  * roster prefill in `reportPrefill` (modules/club-reports/repository.ts):
  * Pathfinders are youth and underage members, so a youth TLT counts as a
- * Pathfinder AND a TLT; TLTs are everyone whose class level is TLT; staff are
- * staff and adults (an adult with a TLT class level counts as both). The
+ * Pathfinder AND a TLT; TLTs are youth with the roster's TLT flag (#1851); staff are
+ * staff and adults. The
  * counts overlap, so they must not be added up: use `presentTotal` for the
  * number of people.
  */
@@ -58,7 +59,7 @@ export function countsFromAttendance(members: ReadonlyArray<AttendanceMemberKind
   const present = members.filter((member) => member.present);
   return {
     pathfinderCount: present.filter((member) => member.attendeeType === "YOUTH" || member.attendeeType === "UNDERAGE").length,
-    tltCount: present.filter((member) => member.classLevel === "TLT").length,
+    tltCount: present.filter((member) => rosterIsTltFor(member.attendeeType, member.isTlt)).length,
     staffCount: present.filter((member) => member.attendeeType === "STAFF" || member.attendeeType === "ADULT").length,
   };
 }

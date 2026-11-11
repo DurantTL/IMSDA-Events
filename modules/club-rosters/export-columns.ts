@@ -19,6 +19,8 @@ export const ROSTER_EXPORT_COLUMNS = {
   age: { header: "Age", sensitive: false },
   gender: { header: "Gender", sensitive: false },
   classLevel: { header: "Class", sensitive: false },
+  /** Teen Leadership Training yes/no (#1851), youth only. */
+  isTlt: { header: "TLT", sensitive: false },
   // School grade (#1664), like the class. School type and church membership (#1668) are deliberately not offered here.
   schoolGrade: { header: "Grade", sensitive: false },
   role: { header: "Role", sensitive: false },

@@ -1,6 +1,7 @@
 import {
   clubChurchMemberLabels,
   clubClassLevelLabels,
+  rosterTltCell,
   clubRosterGenderLabels,
   clubSchoolGradeLabels,
   clubSchoolTypeLabels,
@@ -22,6 +23,7 @@ export const COORDINATOR_ROSTER_EXPORT_COLUMNS = {
   type: { header: "Type" },
   role: { header: "Role" },
   classLevel: { header: "Current class" },
+  isTlt: { header: "TLT" },
   age: { header: "Age" },
   gender: { header: "Gender" },
   schoolGrade: { header: "Grade" },
@@ -102,6 +104,7 @@ function cell(row: CoordinatorRosterExportRow, key: CoordinatorRosterExportColum
     case "type": return rosterSectionOf(member.attendeeType) === "STAFF" ? "Staff" : "Youth";
     case "role": return member.role || "";
     case "classLevel": return member.classLevel ? clubClassLevelLabels[member.classLevel] : "";
+    case "isTlt": return rosterTltCell(member);
     case "age": return member.age !== null ? String(member.age) : member.reportedAge !== null ? String(member.reportedAge) : "";
     case "gender": return member.gender ? clubRosterGenderLabels[member.gender] : "";
     case "schoolGrade": return member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "";

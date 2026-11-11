@@ -96,6 +96,8 @@ export type ClassTrackingMemberRow = {
   lastName: string;
   firstName: string;
   className: string;
+  /** TLT yes/no (#1851): "Yes" or "No" for a youth, blank for anyone else. */
+  tlt: string;
   /** Class insignia items earned (open or awarded), by item name. */
   insignia: string[];
   eventPatches: string[];
@@ -106,7 +108,7 @@ export type ClassTrackingMemberRow = {
 };
 
 export const CLASS_TRACKING_EXPORT_HEADERS = [
-  "Last name", "First name", "Current class", "Class insignia", "Event patches", "Good Conduct / TLT / other items", "Master Award progress",
+  "Last name", "First name", "Current class", "TLT", "Class insignia", "Event patches", "Good Conduct / TLT / other items", "Master Award progress",
 ] as const;
 
 const join = (values: readonly string[]) => values.join("; ");
@@ -122,7 +124,7 @@ export function classTrackingExportCsv(context: ExportContext, rows: readonly Cl
   if (rows.length === 0) out.push(["No active roster members for this club year."]);
   for (const row of rows) {
     out.push([
-      row.lastName, row.firstName, row.className,
+      row.lastName, row.firstName, row.className, row.tlt,
       join(row.insignia), join(row.eventPatches), join(row.conductAndTlt), join(row.masterAwards),
     ]);
   }

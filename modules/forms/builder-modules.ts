@@ -182,7 +182,7 @@ export const rosterFieldBundleModule = {
       type: "RADIO" as const,
       scope: "ATTENDEE" as const,
       required: false,
-      options: ["Friend", "Companion", "Explorer", "Ranger", "Voyager", "Guide", "TLT", "Master Guide"],
+      options: ["Friend", "Companion", "Explorer", "Ranger", "Voyager", "Guide", "Basic Staff Training", "Master Guide"],
     },
     {
       key: "skills_in_progress",

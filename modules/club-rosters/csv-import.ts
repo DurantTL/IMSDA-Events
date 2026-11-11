@@ -1,5 +1,5 @@
-import { classLevelFrom } from "@/modules/club-imports/domain";
-import type { ClubClassLevel, ClubSchoolGrade } from "@/modules/club-rosters/domain";
+import { rosterClassFrom } from "@/modules/club-imports/domain";
+import type { RosterClassLevel, ClubSchoolGrade } from "@/modules/club-rosters/domain";
 import {
   clubRosterAttendeeTypeLabels,
   missingRosterFields,
@@ -39,7 +39,9 @@ export type RosterCsvRow = {
   /** Undefined means the cell was blank: keep what's on file. */
   birthDate?: string;
   attendeeType?: AttendeeType;
-  classLevel?: ClubClassLevel | null;
+  classLevel?: RosterClassLevel | null;
+  /** Teen Leadership Training (#1851), youth only. Undefined means the cell was blank: keep what's on file. */
+  isTlt?: boolean;
   /** School grade (#1664). Undefined means the cell was blank: keep what's on file. */
   schoolGrade?: ClubSchoolGrade;
   role?: string;
@@ -59,6 +61,8 @@ const headerKeys: Record<string, keyof Omit<RosterCsvRow, "line" | "problems">> 
   class: "classLevel",
   classlevel: "classLevel",
   currentclass: "classLevel",
+  tlt: "isTlt",
+  teenleadershiptraining: "isTlt",
   grade: "schoolGrade",
   schoolgrade: "schoolGrade",
   role: "role",
@@ -92,6 +96,8 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
 
   return body.map((cells, index) => {
     const row: RosterCsvRow = { line: index + 2, firstName: "", lastName: "", problems: [] };
+    let classTlt = false;
+    let columnTlt: boolean | undefined;
     columns.forEach((key, column) => {
       if (!key) return;
       const value = clean(cells[column]);
@@ -109,9 +115,16 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
         if (type) row.attendeeType = type;
         else row.problems.push(`Type "${value}" isn't one of Youth, Staff, Adult, or Underage.`);
       } else if (key === "classLevel") {
-        const level = value.toLowerCase() === "none" ? null : classLevelFrom(value);
-        if (level !== null || value.toLowerCase() === "none") row.classLevel = level;
-        else row.problems.push(`Class "${value}" isn't a Pathfinder class level.`);
+        const parsed = value.toLowerCase() === "none" ? { classLevel: null, isTlt: false } : rosterClassFrom(value);
+        if (parsed === null) row.problems.push(`Class "${value}" isn't a Pathfinder class level.`);
+        // "TLT" in the class column sets the TLT flag and leaves the class alone (#1851); settled after the loop.
+        else if (parsed.isTlt) classTlt = true;
+        else row.classLevel = parsed.classLevel;
+      } else if (key === "isTlt") {
+        const answer = value.toLowerCase();
+        if (["yes", "y", "true", "1", "x"].includes(answer)) columnTlt = true;
+        else if (["no", "n", "false", "0"].includes(answer)) columnTlt = false;
+        else row.problems.push(`TLT "${value}" should be Yes or No, or left blank.`);
       } else if (key === "schoolGrade") {
         const grade = schoolGradeFromText(value);
         if (grade) row.schoolGrade = grade;
@@ -125,6 +138,12 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
         else row.problems.push(`Gender "${value}" should be Female or Male, or left blank.`);
       }
     });
+    // The TLT column wins over a "TLT" class cell, whatever the column order (#1851).
+    const tlt = columnTlt ?? (classTlt ? true : undefined);
+    if (tlt !== undefined) row.isTlt = tlt;
+    if (tlt === true && row.attendeeType !== undefined && row.attendeeType !== "YOUTH") {
+      row.problems.push("TLT is only for youth. Change the type to Youth or leave TLT blank.");
+    }
     if (!row.firstName || !row.lastName) row.problems.push("First and last name are both needed.");
     return row;
   });
@@ -202,8 +221,9 @@ export function planRosterImport(rows: readonly RosterCsvRow[], existing: Readon
     const matches = byName.get(key) ?? [];
     if (matches.length > 1) return skip("More than one person on the roster has this name. Edit them by hand.");
     if (matches.length === 1) {
+      // A TLT column alone (#1851) is a change too; it is never listed as blank, since it is optional.
       const changes = csvFieldOrder.filter((field) => row[field] !== undefined);
-      if (changes.length === 0) return { line: row.line, name, action: "SKIP", memberId: matches[0], message: "Already on the roster; nothing to change.", row };
+      if (changes.length === 0 && row.isTlt === undefined) return { line: row.line, name, action: "SKIP", memberId: matches[0], message: "Already on the roster; nothing to change.", row };
       // Blank cells on an update keep what's on file (#424), so they're only noted, not called missing.
       const blank = missingRosterCsvFields(row);
       const message = blank.length > 0

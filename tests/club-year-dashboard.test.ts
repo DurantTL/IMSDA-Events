@@ -224,6 +224,7 @@ describe("the shared club overview gives staff and Area Coordinators the same re
     const props = tilesProps(tree);
     expect(props.roster).toEqual({
       active: 3, staff: 1, members: 2,
+      tlt: 0,
       byClass: [{ classLevel: "FRIEND", label: "Friend", count: 1 }, { classLevel: "RANGER", label: "Ranger", count: 1 }],
     });
     // Counts only, from the per-member compliance statuses staff already see with names — never a second query.

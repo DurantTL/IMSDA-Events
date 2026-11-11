@@ -277,7 +277,7 @@ export function ClubRegistrationWorkspace({
   // The event's team rules (#809), shown beside who is going; the server checks them again on save.
   const teamRules = workspace.teams.settings;
   const offersChild = formOffersChildRole(workspace.experience.form.definition);
-  const coachCount = selected.filter((person) => teamRoleFor({ responses: draft.attendeeResponses[person.clientId] ?? {}, rosterAttendeeType: person.attendeeType, rosterClassLevel: person.classLevel, maxMemberAge: teamRules?.maxMemberAge ?? null, age: person.ageOnEventDate }) === "COACH").length
+  const coachCount = selected.filter((person) => teamRoleFor({ responses: draft.attendeeResponses[person.clientId] ?? {}, rosterAttendeeType: person.attendeeType, rosterIsTlt: person.isTlt, maxMemberAge: teamRules?.maxMemberAge ?? null, age: person.ageOnEventDate }) === "COACH").length
     + draft.guests.filter((guest) => teamRoleFor({ responses: draft.attendeeResponses[clubGuestClientId(guest.id)] ?? {}, maxMemberAge: teamRules?.maxMemberAge ?? null, age: guest.age }) === "COACH").length;
   const teamMemberCount = goingCount - coachCount;
   // What will happen to people who are over the team-member age or 18 and over, said before the team is saved (#809).
@@ -290,7 +290,7 @@ export function ClubRegistrationWorkspace({
     };
     for (const person of selected) {
       const age = person.ageOnEventDate ?? draft.rosterAges[person.memberId] ?? person.reportedAge ?? null;
-      const role = teamRoleFor({ responses: draft.attendeeResponses[person.clientId] ?? {}, rosterAttendeeType: person.attendeeType, rosterClassLevel: person.classLevel, maxMemberAge: teamRules.maxMemberAge, age });
+      const role = teamRoleFor({ responses: draft.attendeeResponses[person.clientId] ?? {}, rosterAttendeeType: person.attendeeType, rosterIsTlt: person.isTlt, maxMemberAge: teamRules.maxMemberAge, age });
       hintFor(`${person.firstName} ${person.lastName}`.trim(), age, role);
     }
     for (const guest of draft.guests) {

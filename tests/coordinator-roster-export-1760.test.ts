@@ -142,10 +142,10 @@ describe("who may export (#1760)", () => {
 describe("the column allow-list (#1760)", () => {
   it("is exactly the approved columns, in offer order, with the minimal default", () => {
     expect(COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS).toEqual([
-      "firstName", "lastName", "club", "type", "role", "classLevel", "age", "gender", "schoolGrade", "schoolType", "churchMember", "sterling",
+      "firstName", "lastName", "club", "type", "role", "classLevel", "isTlt", "age", "gender", "schoolGrade", "schoolType", "churchMember", "sterling",
     ]);
     expect(Object.values(COORDINATOR_ROSTER_EXPORT_COLUMNS).map((column) => column.header)).toEqual([
-      "First name", "Last name", "Club", "Type", "Role", "Current class", "Age", "Gender", "Grade", "School type", "Church member", "Sterling Volunteers status",
+      "First name", "Last name", "Club", "Type", "Role", "Current class", "TLT", "Age", "Gender", "Grade", "School type", "Church member", "Sterling Volunteers status",
     ]);
     expect(DEFAULT_COORDINATOR_ROSTER_EXPORT_COLUMN_KEYS).toEqual(["club", "firstName", "lastName", "role"]);
   });

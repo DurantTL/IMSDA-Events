@@ -163,11 +163,24 @@ describe("club roster rules", () => {
     ]);
   });
 
+  it("counts active youth marked TLT beside the class counts, never staff, inactive or removed rows (#1851)", () => {
+    const summary = rosterYearSummary([
+      { status: "ACTIVE", attendeeType: "YOUTH", classLevel: "GUIDE", isTlt: true },
+      { status: "ACTIVE", attendeeType: "YOUTH", classLevel: null, isTlt: true },
+      { status: "ACTIVE", attendeeType: "YOUTH", classLevel: "GUIDE", isTlt: false },
+      { status: "ACTIVE", attendeeType: "STAFF", classLevel: null, isTlt: true },
+      { status: "INACTIVE", attendeeType: "YOUTH", classLevel: null, isTlt: true },
+      { status: "REMOVED", attendeeType: "YOUTH", classLevel: null, isTlt: true },
+    ]);
+    expect(summary.tlt).toBe(2);
+    expect(summary.byClass).toEqual([{ classLevel: "GUIDE", label: "Guide", count: 2 }]);
+  });
+
   it("gives an empty class breakdown for a roster with only staff, or nobody active", () => {
     expect(rosterYearSummary([{ status: "ACTIVE", attendeeType: "STAFF", classLevel: null }])).toEqual({
-      active: 1, staff: 1, members: 0, byClass: [],
+      active: 1, staff: 1, members: 0, byClass: [], tlt: 0,
     });
-    expect(rosterYearSummary([])).toEqual({ active: 0, staff: 0, members: 0, byClass: [] });
+    expect(rosterYearSummary([])).toEqual({ active: 0, staff: 0, members: 0, byClass: [], tlt: 0 });
   });
 
   it("never counts staff or adults in the class breakdown, even if a row somehow carries a class level (review fix)", () => {

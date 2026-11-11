@@ -15,7 +15,7 @@ import { HonorCombobox } from "@/components/honor-combobox";
 import { HonorsSummaryCell, MemberHonorsViewDialog } from "@/components/honors-summary";
 import { useAccessibleDialog } from "@/components/use-accessible-dialog";
 import { bulkScopeSummary } from "@/lib/confirmation-copy";
-import { clubClassLevelLabels } from "@/modules/club-rosters/domain";
+import { clubClassLevelLabels, rosterClassLevelLabels } from "@/modules/club-rosters/domain";
 import { cardCell } from "@/components/table-card-labels";
 import {
   type ClubHonorsRow,
@@ -384,7 +384,7 @@ export function ClubHonorsWorkspace({
             Current class
             <select onChange={(event) => setUnitFilter(event.target.value)} value={unitFilter}>
               <option value="">All classes</option>
-              {Object.entries(clubClassLevelLabels).map(([value, label]) => (
+              {Object.entries(rosterClassLevelLabels).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>

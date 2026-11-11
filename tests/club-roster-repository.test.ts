@@ -689,6 +689,48 @@ describe("club roster storage", () => {
 
     expect((await removeRosterMember("club-1", id, actor, now)).nameKept).toBe(false);
   });
+  describe("TLT flag (#1851)", () => {
+    it("stores the flag on a youth and lists it", async () => {
+      await addRosterMember("club-1", "2026-27", { ...youth, isTlt: true }, actor, { now });
+      expect(db.members[0]).toMatchObject({ attendeeType: "YOUTH", isTlt: true, classLevel: null });
+      const [member] = await listRoster("club-1", "2026-27", now);
+      expect(member!.isTlt).toBe(true);
+    });
+
+    it("defaults to not TLT, and keeps it off for anyone who is not a youth", async () => {
+      await addRosterMember("club-1", "2026-27", youth, actor, { now });
+      expect(db.members[0]).toMatchObject({ isTlt: false });
+      await addRosterMember("club-1", "2026-27", { ...youth, firstName: "Sam", attendeeType: "STAFF", role: "Counselor", isTlt: true }, actor, { now });
+      expect(db.members[1]).toMatchObject({ attendeeType: "STAFF", isTlt: false });
+    });
+
+    it("edits the flag, and an edit that does not mention it leaves it alone", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+      await updateRosterMember("club-1", memberId, { isTlt: true }, actor, now);
+      expect(db.members[0]).toMatchObject({ isTlt: true });
+      await updateRosterMember("club-1", memberId, { role: "Pathfinder", classLevel: "BASIC_STAFF_TRAINING" }, actor, now);
+      expect(db.members[0]).toMatchObject({ isTlt: true, classLevel: "BASIC_STAFF_TRAINING" });
+      await updateRosterMember("club-1", memberId, { isTlt: false }, actor, now);
+      expect(db.members[0]).toMatchObject({ isTlt: false });
+    });
+
+    it("clears the flag when a type change moves the member off Youth, and refuses to set it on a non-youth", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, isTlt: true }, actor, { now });
+      await updateRosterMember("club-1", memberId, { attendeeType: "STAFF" }, actor, now);
+      expect(db.members[0]).toMatchObject({ attendeeType: "STAFF", isTlt: false });
+      await updateRosterMember("club-1", memberId, { isTlt: true }, actor, now);
+      expect(db.members[0]).toMatchObject({ isTlt: false });
+      await updateRosterMember("club-1", memberId, { attendeeType: "YOUTH" }, actor, now);
+      expect(db.members[0]).toMatchObject({ attendeeType: "YOUTH", isTlt: false });
+    });
+
+    it("erases the flag when the member is removed", async () => {
+      const { memberId } = await addRosterMember("club-1", "2026-27", { ...youth, isTlt: true }, actor, { now });
+      await removeRosterMember("club-1", memberId, actor, now);
+      expect(db.members[0]).toMatchObject({ status: "REMOVED", isTlt: false });
+    });
+  });
+
   describe("grade, school type and church membership (#1664, #1668)", () => {
     const withSchool = { ...youth, schoolGrade: "GRADE_7" as const, schoolType: "PUBLIC_SCHOOL" as const, churchMember: "NOT_SURE" as const };
 

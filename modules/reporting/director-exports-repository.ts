@@ -2,7 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { clubClassLevelLabels } from "@/modules/club-rosters/domain";
+import { clubClassLevelLabels, rosterTltCell } from "@/modules/club-rosters/domain";
 import { originOf } from "@/modules/earned-awards/domain";
 import { loadMasterAwardProgress } from "@/modules/earned-awards/order-source";
 import { honorCategoryLabels } from "@/modules/honors/domain";
@@ -34,7 +34,7 @@ async function clubName(organizationId: string) {
 async function rosterMembers(organizationId: string, clubYear: string, memberId?: string) {
   const members = await getPrisma().clubRosterMember.findMany({
     where: { organizationId, clubYear, status: "ACTIVE", personId: { not: null }, ...(memberId ? { id: memberId } : {}) },
-    select: { id: true, classLevel: true, person: { select: { id: true, firstName: true, lastName: true } } },
+    select: { id: true, classLevel: true, attendeeType: true, isTlt: true, person: { select: { id: true, firstName: true, lastName: true } } },
   });
   return members.flatMap((member) => (member.person ? [{
     memberId: member.id,
@@ -42,6 +42,7 @@ async function rosterMembers(organizationId: string, clubYear: string, memberId?
     firstName: member.person.firstName,
     lastName: member.person.lastName,
     className: member.classLevel ? clubClassLevelLabels[member.classLevel] : "",
+    tlt: rosterTltCell(member),
   }] : []));
 }
 
@@ -131,6 +132,7 @@ export async function loadClassTrackingExport(
     lastName: member.lastName,
     firstName: member.firstName,
     className: member.className,
+    tlt: member.tlt,
     insignia: [],
     eventPatches: [],
     conductAndTlt: [],

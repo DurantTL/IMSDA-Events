@@ -23,7 +23,7 @@ import {
   type RequirementWaivers,
   type SelectableOffering,
 } from "@/modules/honors/enrollment-domain";
-import type { ClubClassLevel } from "@/modules/club-rosters/domain";
+import { effectiveClassLevel, type ClubClassLevel } from "@/modules/club-rosters/domain";
 import { completedHonorsByPerson } from "@/modules/honors/completed-honors";
 import { compareOfferingRows, offeringHonorsSelect, summarizeOfferingHonors } from "@/modules/honors/offering-honors";
 import { recordClassChanges } from "@/modules/honors/class-change-log";
@@ -79,12 +79,13 @@ export async function loadMemberRequirements(client: Prisma.TransactionClient, m
   if (memberIds.length === 0) return result;
   const members = await client.clubRosterMember.findMany({
     where: { id: { in: [...memberIds] } },
-    select: { id: true, classLevel: true, personId: true },
+    select: { id: true, attendeeType: true, classLevel: true, isTlt: true, personId: true },
   });
   const personIds = members.map((member) => member.personId).filter((id): id is string => Boolean(id));
   const completedByPerson = await completedHonorsByPerson(client, personIds, honorIds);
   for (const member of members) {
-    result.set(member.id, { classLevel: member.classLevel, completedHonorIds: member.personId ? [...(completedByPerson.get(member.personId) ?? [])] : [] });
+    // A youth flagged TLT (#1851) meets a minimum of TLT or lower even with a blank class.
+    result.set(member.id, { classLevel: effectiveClassLevel(member), completedHonorIds: member.personId ? [...(completedByPerson.get(member.personId) ?? [])] : [] });
   }
   return result;
 }

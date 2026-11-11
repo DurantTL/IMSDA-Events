@@ -63,7 +63,7 @@ describe("coordinator page content uses the club portal's pieces (#1555, rule L9
 
   it("shows the roster's per-class counts in the viewed club's Roster tile", () => {
     const html = renderToStaticMarkup(createElement(ClubYearHomeCard, {
-      clubYear: "2026-27", roster: { active: 6, staff: 1, members: 5, byClass: [{ classLevel: "FRIEND", label: "Friend", count: 4 }, { classLevel: "COMPANION", label: "Companion", count: 1 }] } as never,
+      clubYear: "2026-27", roster: { active: 6, staff: 1, members: 5, tlt: 0, byClass: [{ classLevel: "FRIEND", label: "Friend", count: 4 }, { classLevel: "COMPANION", label: "Companion", count: 1 }] } as never,
       rosterHref: "#r", honors: null, compliance: null, complianceHref: "#c", events: { open: 0, registered: 0 }, eventsHref: "#e", reports: null, reportsHref: "#m",
     }));
     expect(html).toContain("Friend 4 · Companion 1");

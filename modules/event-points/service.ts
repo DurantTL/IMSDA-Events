@@ -107,7 +107,7 @@ function ageFrom(value: unknown): number | null {
   return Number.isFinite(number) && number >= 0 && number < 120 ? Math.trunc(number) : null;
 }
 
-type RosterFacts = { attendeeType: string; role: string; classLevel: string | null };
+type RosterFacts = { attendeeType: string; role: string; isTlt: boolean };
 
 /** The registration's own "role" answer first; when the form has none, the club roster's type. */
 function resolveRole(answer: unknown, member: RosterFacts | undefined): PointsRole | null {
@@ -117,7 +117,7 @@ function resolveRole(answer: unknown, member: RosterFacts | undefined): PointsRo
   if (!member) return null;
   if (member.attendeeType === "STAFF" || member.attendeeType === "ADULT") return "Staff";
   if (member.attendeeType === "UNDERAGE") return "Child";
-  if (member.attendeeType === "YOUTH") return member.classLevel === "TLT" ? "TLT" : "Pathfinder";
+  if (member.attendeeType === "YOUTH") return member.isTlt ? "TLT" : "Pathfinder";
   return null;
 }
 
@@ -167,9 +167,9 @@ async function loadClubPeople(eventId: string): Promise<ClubPeople[]> {
   }
   const members = rosterIds.size === 0 ? [] : await prisma.clubRosterMember.findMany({
     where: { id: { in: [...rosterIds] } },
-    select: { id: true, attendeeType: true, role: true, classLevel: true },
+    select: { id: true, attendeeType: true, role: true, isTlt: true },
   });
-  const memberById = new Map<string, RosterFacts>(members.map((member) => [member.id, { attendeeType: member.attendeeType, role: member.role, classLevel: member.classLevel }]));
+  const memberById = new Map<string, RosterFacts>(members.map((member) => [member.id, { attendeeType: member.attendeeType, role: member.role, isTlt: member.isTlt }]));
   const marked = new Set(marks.map((mark) => mark.attendeeId));
   const clubs = new Map<string, ClubPeople>();
   for (const row of rows) {

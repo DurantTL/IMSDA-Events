@@ -210,7 +210,7 @@ export function ClubYearEndReportForm({
         </div>
       )}
       <div className="inline-notice" role="note">
-        Counts include roster members who were active at any point during the Pathfinder year, and TLTs (staff with the TLT class included).
+        Counts include roster members who were active at any point during the Pathfinder year, and TLTs (youth marked TLT on the roster).
         Youth are grouped by age on the roster, using the age on file.
       </div>
       {prefillMeta && (

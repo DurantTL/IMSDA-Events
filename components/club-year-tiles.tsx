@@ -59,9 +59,10 @@ export function ClubYearTiles({
         <Heading className="club-year-tile-heading"><UsersRound size={16} aria-hidden="true" /> Roster</Heading>
         <p className="club-year-tile-stat">{roster.active}</p>
         <p className="club-year-tile-detail">{`active this club year · ${roster.staff} staff · ${roster.members} members`}</p>
-        {roster.byClass.length > 0 && (
+        {(roster.byClass.length > 0 || roster.tlt > 0) && (
           <ul className="club-year-tile-list">
             {roster.byClass.map((entry) => <li key={entry.classLevel}>{entry.label} {entry.count}</li>)}
+            {roster.tlt > 0 && <li>TLT {roster.tlt}</li>}
           </ul>
         )}
         <Link className="secondary-button club-year-tile-link" href={rosterHref}>Open roster</Link>
@@ -171,8 +172,8 @@ export function ClubYearHomeCard({
           <dt className={styles.term}><UsersRound size={16} aria-hidden="true" /> Roster</dt>
           <dd className="club-home-count-value">{roster.active}</dd>
           <dd className="club-home-count-definition">{`active this club year · ${roster.staff} staff · ${roster.members} members`}</dd>
-          {roster.byClass.length > 0 && (
-            <dd className="club-home-count-definition">{roster.byClass.map((entry) => `${entry.label} ${entry.count}`).join(" · ")}</dd>
+          {(roster.byClass.length > 0 || roster.tlt > 0) && (
+            <dd className="club-home-count-definition">{[...roster.byClass.map((entry) => `${entry.label} ${entry.count}`), ...(roster.tlt > 0 ? [`TLT ${roster.tlt}`] : [])].join(" · ")}</dd>
           )}
           {open(rosterHref, "Open roster")}
         </div>

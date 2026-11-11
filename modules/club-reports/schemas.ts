@@ -2,7 +2,7 @@ import { z } from "zod";
 import { pointItems, type PointItemKey } from "@/modules/club-reports/domain";
 
 const count = z.number().int().min(0, "Counts can't be negative.").max(999).nullable();
-const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "MASTER_GUIDE"]);
+const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "BASIC_STAFF_TRAINING", "MASTER_GUIDE"]);
 
 const pointsShape = Object.fromEntries(
   pointItems.map((item) => [item.key, z.number().int().min(0).max(1000).optional()]),

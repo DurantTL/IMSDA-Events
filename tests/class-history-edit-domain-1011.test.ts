@@ -104,7 +104,7 @@ describe("insignia default and offered levels", () => {
 
   it("offers only levels not already completed, in class order", () => {
     const entries = buildClassHistory([{ classLevel: "COMPANION", completedOn: "2025-06-01" }], "EXPLORER");
-    expect(classLevelsStillToAdd(entries)).toEqual(["FRIEND", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "MASTER_GUIDE"]);
+    expect(classLevelsStillToAdd(entries)).toEqual(["FRIEND", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "BASIC_STAFF_TRAINING", "MASTER_GUIDE"]);
   });
 });
 

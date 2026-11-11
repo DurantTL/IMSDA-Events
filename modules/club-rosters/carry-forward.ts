@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/modules/audit/audit-service";
 import { openBirthDate } from "@/modules/club-rosters/birth-dates";
 import {
   carriedClassLevel,
+  carriedIsTlt,
   carriedRole,
   carriedSchoolValue,
   carryForwardYears,
@@ -198,7 +199,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
     await tx.$queryRaw`SELECT "id" FROM "ClubRosterMember" WHERE "id" = ANY(${ids}::text[]) AND "organizationId" = ${organizationId} FOR UPDATE`;
     const sources = await tx.clubRosterMember.findMany({
       where: { id: { in: ids }, organizationId, clubYear: fromClubYear, status: "ACTIVE", personId: { not: null } },
-      select: { id: true, personId: true, attendeeType: true, role: true, classLevel: true, schoolGrade: true, schoolType: true, churchMember: true, gender: true, reportedAge: true, sealedBirthDate: true },
+      select: { id: true, personId: true, attendeeType: true, role: true, classLevel: true, isTlt: true, schoolGrade: true, schoolType: true, churchMember: true, gender: true, reportedAge: true, sealedBirthDate: true },
     });
     if (sources.length !== ids.length) {
       throw new RosterOperationError("MEMBER_NOT_FOUND", "One of those people isn't on last year's roster.");
@@ -223,6 +224,7 @@ export async function carryRosterForward(organizationId: string, input: CarryFor
         attendeeType: choice.attendeeType,
         role: carriedRole(source, choice),
         classLevel: carriedClassLevel(source, choice),
+        isTlt: carriedIsTlt(source, choice),
         schoolGrade: carriedSchoolValue(source.schoolGrade, choice, choice.schoolGrade),
         schoolType: carriedSchoolValue(source.schoolType, choice, undefined),
         churchMember: carriedSchoolValue(source.churchMember, choice, undefined),

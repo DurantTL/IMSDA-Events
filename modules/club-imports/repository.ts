@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { refreshBackgroundCheckMatchesSafely } from "@/modules/background-checks/refresh-after-write";
 import { writeAuditLog } from "@/modules/audit/audit-service";
+import { rosterIsTltFor } from "@/modules/club-rosters/domain";
 import {
   churchStem,
   clubMatchNames,
@@ -365,6 +366,7 @@ async function importOne(item: ClubImportItem, actorUserId: string, now: Date): 
             attendeeType: person.attendeeType,
             role: person.role,
             classLevel: person.classLevel,
+            isTlt: rosterIsTltFor(person.attendeeType, person.isTlt),
             reportedAge: person.reportedAge,
             source: "IMPORT",
           },

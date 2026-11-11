@@ -28,6 +28,7 @@ export type PreviewDraft = {
     attendeeType: "STAFF" | "YOUTH";
     role: string;
     classLevel: ClubImportItem["people"][number]["classLevel"];
+    isTlt: boolean;
     reportedAge: number | null;
     keepBoth: boolean;
   }>;
@@ -52,6 +53,7 @@ export function confirmPayload(drafts: PreviewDraft[]) {
         attendeeType: person.attendeeType,
         role: person.role,
         classLevel: person.classLevel,
+        isTlt: person.isTlt,
         reportedAge: person.reportedAge,
         keepBoth: person.keepBoth,
       })),

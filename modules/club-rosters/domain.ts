@@ -64,12 +64,53 @@ export const clubClassLevelLabels = {
   VOYAGER: "Voyager",
   GUIDE: "Guide",
   TLT: "TLT",
+  BASIC_STAFF_TRAINING: "Basic Staff Training",
   MASTER_GUIDE: "Master Guide",
 } as const;
 
 export type ClubClassLevel = keyof typeof clubClassLevelLabels;
 
 export const clubClassLevels = Object.keys(clubClassLevelLabels) as ClubClassLevel[];
+
+/**
+ * The classes a roster member's *current class* can be (#1851). TLT is not one of them: it is a yes/no on youth
+ * members (`isTlt`). TLT stays in `clubClassLevelLabels` for class history, monthly report class lists and honor
+ * minimum levels.
+ */
+export type RosterClassLevel = Exclude<ClubClassLevel, "TLT">;
+
+export const rosterClassLevels = clubClassLevels.filter((level): level is RosterClassLevel => level !== "TLT");
+
+export const rosterClassLevelLabels = Object.fromEntries(
+  rosterClassLevels.map((level) => [level, clubClassLevelLabels[level]]),
+) as Record<RosterClassLevel, string>;
+
+/** The label for the TLT yes/no on a roster member (#1851). */
+export const rosterTltLabel = "TLT (Teen Leadership Training)";
+
+/** The TLT yes/no as an export cell (#1851): "Yes" or "No" for a youth, blank for anyone else. */
+export function rosterTltCell(member: { attendeeType: string; isTlt?: boolean | null }): string {
+  if (member.attendeeType !== "YOUTH") return "";
+  return member.isTlt === true ? "Yes" : "No";
+}
+
+/** TLT is youth only (#1851): the flag a roster write keeps for the member's (new) type. */
+export function rosterIsTltFor(attendeeType: string | null | undefined, isTlt: boolean | null | undefined): boolean {
+  return attendeeType === "YOUTH" && isTlt === true;
+}
+
+/**
+ * A member's class for comparing against a minimum class (#1851): a youth flagged TLT has at least the TLT level even
+ * when their current class is blank or lower; a higher class (Basic Staff Training, Master Guide) wins.
+ */
+export function effectiveClassLevel(
+  member: { attendeeType?: string | null; classLevel?: ClubClassLevel | null; isTlt?: boolean | null },
+): ClubClassLevel | null {
+  const current = member.classLevel ?? null;
+  if (!rosterIsTltFor(member.attendeeType ?? "YOUTH", member.isTlt)) return current;
+  if (current === null) return "TLT";
+  return clubClassLevels.indexOf(current) < clubClassLevels.indexOf("TLT") ? "TLT" : current;
+}
 
 /**
  * School grade (#1664), in school order. `NOT_IN_SCHOOL` is a real answer (a child not yet in school, or finished),
@@ -377,6 +418,8 @@ export type RosterYearSummary = {
   staff: number;
   members: number;
   byClass: Array<{ classLevel: ClubClassLevel; label: string; count: number }>;
+  /** Active youth marked TLT (#1851): shown beside the class counts, since TLT is no longer a class. */
+  tlt: number;
 };
 
 /**
@@ -388,7 +431,7 @@ export type RosterYearSummary = {
  * carries a class level.
  */
 export function rosterYearSummary(
-  members: ReadonlyArray<{ status: string; attendeeType: keyof typeof clubRosterAttendeeTypeLabels; classLevel: ClubClassLevel | null }>,
+  members: ReadonlyArray<{ status: string; attendeeType: keyof typeof clubRosterAttendeeTypeLabels; classLevel: ClubClassLevel | null; isTlt?: boolean }>,
 ): RosterYearSummary {
   const active = members.filter((member) => member.status === "ACTIVE");
   const staff = active.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF").length;
@@ -402,7 +445,9 @@ export function rosterYearSummary(
   const byClass = clubClassLevels
     .filter((level) => counts.has(level))
     .map((level) => ({ classLevel: level, label: clubClassLevelLabels[level], count: counts.get(level)! }));
-  return { active: active.length, staff, members: active.length - staff, byClass };
+  // TLT is a youth's own flag (#1851), counted from the MEMBERS section only.
+  const tlt = active.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS" && rosterIsTltFor(member.attendeeType, member.isTlt)).length;
+  return { active: active.length, staff, members: active.length - staff, byClass, tlt };
 }
 
 /** The roster's own fields, for the "Missing info" flag (#424). */

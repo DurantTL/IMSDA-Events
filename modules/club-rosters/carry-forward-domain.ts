@@ -69,7 +69,15 @@ export function carriedClassLevel(
   next: { attendeeType: string; classLevel?: ClubClassLevel | null },
 ) {
   if (next.attendeeType !== "YOUTH") return null;
-  return next.classLevel === undefined ? previous.classLevel : next.classLevel;
+  const level = next.classLevel === undefined ? previous.classLevel : next.classLevel;
+  // TLT is a flag now (#1851), not a current class.
+  return level === "TLT" ? null : level;
+}
+
+/** The TLT flag (#1851) is youth only: carried as last year's unless the director chose, and dropped for any other type. */
+export function carriedIsTlt(previous: { isTlt: boolean }, next: { attendeeType: string; isTlt?: boolean }) {
+  if (next.attendeeType !== "YOUTH") return false;
+  return next.isTlt === undefined ? previous.isTlt : next.isTlt;
 }
 
 /**
@@ -101,7 +109,7 @@ export function seniorsToReview<T>(
   });
 }
 
-const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "TLT", "MASTER_GUIDE"]).nullable();
+const classLevel = z.enum(["FRIEND", "COMPANION", "EXPLORER", "RANGER", "VOYAGER", "GUIDE", "BASIC_STAFF_TRAINING", "MASTER_GUIDE"]).nullable();
 
 /** One ticked person: omitted fields keep what last year's row had. Unticked people are simply left out. */
 export const carryForwardInputSchema = z.object({
@@ -111,6 +119,8 @@ export const carryForwardInputSchema = z.object({
     attendeeType: z.enum(["YOUTH", "STAFF", "ADULT", "UNDERAGE"]),
     role: z.string().trim().max(60).optional(),
     classLevel: classLevel.optional(),
+    /** TLT yes/no (#1851); omitted keeps last year's. Dropped for anyone not carried as youth. */
+    isTlt: z.boolean().optional(),
     /** The reviewed new grade (#1664); omitted keeps last year's. */
     schoolGrade: z.enum(["GRADE_K", "GRADE_1", "GRADE_2", "GRADE_3", "GRADE_4", "GRADE_5", "GRADE_6", "GRADE_7", "GRADE_8", "GRADE_9", "GRADE_10", "GRADE_11", "GRADE_12", "NOT_IN_SCHOOL"]).nullable().optional(),
   }).strict()).min(1, "Tick at least one person to carry forward.").max(1000),

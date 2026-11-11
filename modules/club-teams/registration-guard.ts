@@ -144,7 +144,7 @@ export async function enforceTeamRegistrationRules(
   const roster = await tx.clubRosterMember.findMany({
     where: { organizationId: team.organizationId, status: "ACTIVE", personId: { in: attendees.map((attendee) => attendee.personId) } },
     orderBy: { clubYear: "desc" },
-    select: { personId: true, attendeeType: true, classLevel: true, sealedBirthDate: true },
+    select: { personId: true, attendeeType: true, isTlt: true, sealedBirthDate: true },
   });
   const rosterByPerson = new Map<string, (typeof roster)[number]>();
   for (const member of roster) if (member.personId && !rosterByPerson.has(member.personId)) rosterByPerson.set(member.personId, member);
@@ -170,7 +170,7 @@ export async function enforceTeamRegistrationRules(
     const role = teamRoleFor({
       responses,
       rosterAttendeeType: rosterMember?.attendeeType ?? null,
-      rosterClassLevel: rosterMember?.classLevel ?? null,
+      rosterIsTlt: rosterMember?.isTlt ?? false,
       maxMemberAge: settings.maxMemberAge,
       // The form version the team was registered on decides whether a missing role answer means anything (#1044).
       formAsksRole: registeredFormAsksRole,
@@ -194,7 +194,7 @@ export async function enforceTeamRegistrationRules(
       });
     }
     const answeredRole = typeof responses[ROLE_FIELD_KEY] === "string" ? (responses[ROLE_FIELD_KEY] as string).trim().toLowerCase() : "";
-    flagCandidates.push({ attendeeId: attendee.id, personId: attendee.personId, name, age, role, tlt: rosterMember?.classLevel === "TLT" || answeredRole === "tlt" });
+    flagCandidates.push({ attendeeId: attendee.id, personId: attendee.personId, name, age, role, tlt: rosterMember?.isTlt === true || answeredRole === "tlt" });
     people.push({ name, role, alternate: isAlternateAnswer(responses[ALTERNATE_FIELD_KEY]), age });
     // Someone on the club roster is matched by person; anyone else (an extra person, or one staff typed in) by name.
     checked.push({

@@ -127,7 +127,7 @@ const stored = (data: Record<string, unknown>) => ({
 });
 
 const member = (data: Record<string, unknown>) => ({
-  attendeeType: "YOUTH", classLevel: null, gender: "MALE", reportedAge: null, sealedBirthDate: null,
+  attendeeType: "YOUTH", isTlt: false, gender: "MALE", reportedAge: null, sealedBirthDate: null,
   personId: null, status: "ACTIVE", removedAt: null, updatedAt: new Date("2026-09-01T00:00:00Z"), ...data,
 });
 
@@ -203,40 +203,39 @@ describe("roster pre-fill (sections 1 to 4)", () => {
 
   it("counts youth under 10 or over 18 as not placed, out of every membership total", () => {
     const result = prefillFromRoster([
-      { attendeeType: "YOUTH", classLevel: null, gender: "MALE", age: 9 },
-      { attendeeType: "YOUTH", classLevel: null, gender: "FEMALE", age: 19 },
-      { attendeeType: "YOUTH", classLevel: null, gender: "FEMALE", age: 10 },
-      { attendeeType: "YOUTH", classLevel: null, gender: "MALE", age: 18 },
+      { attendeeType: "YOUTH", isTlt: false, gender: "MALE", age: 9 },
+      { attendeeType: "YOUTH", isTlt: false, gender: "FEMALE", age: 19 },
+      { attendeeType: "YOUTH", isTlt: false, gender: "FEMALE", age: 10 },
+      { attendeeType: "YOUTH", isTlt: false, gender: "MALE", age: 18 },
     ]);
     expect(result.unplaced.membersAgeOutsideBands).toBe(2);
     expect(result.counts).toMatchObject({ memberFemale57: 1, memberMale1112: 1, memberMale57: 0, memberFemale1112: 0 });
     expect(yearEndTotals(result.counts).membership).toBe(2);
   });
 
-  it("counts staff with the TLT class as TLT members, in membership and the TLT reference count, not as staff", () => {
+  it("counts the TLT flag on youth only: a flagged youth is a TLT member, and staff are never TLTs (#1851)", () => {
     const result = prefillFromRoster([
-      { attendeeType: "STAFF", classLevel: "TLT", gender: "FEMALE", age: 16 },
-      { attendeeType: "STAFF", classLevel: "TLT", gender: "MALE", age: 17 },
-      { attendeeType: "STAFF", classLevel: "TLT", gender: "MALE", age: 25 },
-      { attendeeType: "STAFF", classLevel: null, gender: "MALE", age: 30 },
+      { attendeeType: "YOUTH", isTlt: true, gender: "FEMALE", age: 16 },
+      { attendeeType: "YOUTH", isTlt: true, gender: "MALE", age: 17 },
+      { attendeeType: "STAFF", isTlt: true, gender: "MALE", age: 25 },
+      { attendeeType: "STAFF", isTlt: false, gender: "MALE", age: 30 },
     ]);
-    expect(result.counts).toMatchObject({ memberFemale1112: 1, memberMale1112: 1, staffMale: 1, staffFemale: 0 });
-    expect(result.unplaced.membersAgeOutsideBands).toBe(1);
-    expect(result.tltsOnRoster).toBe(3);
-    expect(yearEndTotals(result.counts)).toMatchObject({ membership: 2, staff: 1 });
+    expect(result.counts).toMatchObject({ memberFemale1112: 1, memberMale1112: 1, staffMale: 2, staffFemale: 0 });
+    expect(result.tltsOnRoster).toBe(2);
+    expect(yearEndTotals(result.counts)).toMatchObject({ membership: 2, staff: 2 });
   });
 
   it("counts youth by gender and age band, TLTs included, and staff apart from TLTs", () => {
     const result = prefillFromRoster([
-      { attendeeType: "YOUTH", classLevel: "FRIEND", gender: "MALE", age: 10 },
-      { attendeeType: "YOUTH", classLevel: "RANGER", gender: "FEMALE", age: 14 },
-      { attendeeType: "YOUTH", classLevel: "TLT", gender: "FEMALE", age: 17 },
-      { attendeeType: "YOUTH", classLevel: "TLT", gender: "MALE", age: 16 },
-      { attendeeType: "STAFF", classLevel: null, gender: "MALE", age: 40 },
-      { attendeeType: "STAFF", classLevel: null, gender: "FEMALE", age: 41 },
-      { attendeeType: "STAFF", classLevel: "MASTER_GUIDE", gender: "FEMALE", age: 50 },
-      { attendeeType: "ADULT", classLevel: null, gender: "MALE", age: 45 },
-      { attendeeType: "UNDERAGE", classLevel: null, gender: "MALE", age: 6 },
+      { attendeeType: "YOUTH", isTlt: false, gender: "MALE", age: 10 },
+      { attendeeType: "YOUTH", isTlt: false, gender: "FEMALE", age: 14 },
+      { attendeeType: "YOUTH", isTlt: true, gender: "FEMALE", age: 17 },
+      { attendeeType: "YOUTH", isTlt: true, gender: "MALE", age: 16 },
+      { attendeeType: "STAFF", isTlt: false, gender: "MALE", age: 40 },
+      { attendeeType: "STAFF", isTlt: false, gender: "FEMALE", age: 41 },
+      { attendeeType: "STAFF", isTlt: false, gender: "FEMALE", age: 50 },
+      { attendeeType: "ADULT", isTlt: false, gender: "MALE", age: 45 },
+      { attendeeType: "UNDERAGE", isTlt: false, gender: "MALE", age: 6 },
     ]);
     expect(result.counts).toMatchObject({
       memberMale57: 1, memberFemale810: 1, memberFemale1112: 1, memberMale1112: 1, memberMale810: 0, memberFemale57: 0,
@@ -248,9 +247,9 @@ describe("roster pre-fill (sections 1 to 4)", () => {
 
   it("leaves out members it can't place, and says how many, without naming anyone", () => {
     const result = prefillFromRoster([
-      { attendeeType: "YOUTH", classLevel: null, gender: null, age: 11 },
-      { attendeeType: "YOUTH", classLevel: null, gender: "MALE", age: null },
-      { attendeeType: "STAFF", classLevel: null, gender: null, age: 33 },
+      { attendeeType: "YOUTH", isTlt: false, gender: null, age: 11 },
+      { attendeeType: "YOUTH", isTlt: false, gender: "MALE", age: null },
+      { attendeeType: "STAFF", isTlt: false, gender: null, age: 33 },
     ]);
     expect(result.unplaced).toEqual({ membersWithoutGender: 1, membersWithoutAge: 1, membersAgeOutsideBands: 0, staffWithoutGender: 1 });
     expect(yearEndTotals(result.counts).totalMembership).toBe(0);

@@ -97,6 +97,7 @@ export const INSIGNIA_SETS: Record<ClubClassLevel, readonly string[]> = {
   VOYAGER: ["Voyager Class Name Strip", "Voyager Chevron", "Voyager Pin", "Frontier Voyager Ribbon Bar"],
   GUIDE: ["Guide Class Name Strip", "Guide Chevron", "Guide Pin", "Frontier Guide Ribbon Bar"],
   TLT: [],
+  BASIC_STAFF_TRAINING: [],
   MASTER_GUIDE: ["Master Guide Class Name Strip", "Master Guide Star with Chevrons", "Master Guide Pin"],
 };
 

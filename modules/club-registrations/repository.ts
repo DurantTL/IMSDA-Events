@@ -604,6 +604,7 @@ async function activeRosterFor(client: Prisma.TransactionClient, organizationId:
       personId: true,
       attendeeType: true,
       classLevel: true,
+      isTlt: true,
       role: true,
       gender: true,
       sealedBirthDate: true,
@@ -836,6 +837,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
         reportedAge: member.sealedBirthDate ? null : member.reportedAge,
         attendeeType: member.attendeeType,
         classLevel: member.classLevel,
+        isTlt: member.isTlt,
         role: member.role,
         ownedResponses: experience ? rosterOwnedResponses(experience.form.definition, person) : {},
         prefillResponses: experience
@@ -921,7 +923,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
           // A TLT is always a team member, so "make them a coach" is not an option for them.
           const rosterId = typeof snapshot.clubRosterMemberId === "string" ? snapshot.clubRosterMemberId : null;
           const answered = recordFromJson(formResponses).attendee_type;
-          const tlt = members.find((member) => member.id === rosterId)?.classLevel === "TLT" || (typeof answered === "string" && answered.trim().toLowerCase() === "tlt");
+          const tlt = members.find((member) => member.id === rosterId)?.isTlt === true || (typeof answered === "string" && answered.trim().toLowerCase() === "tlt");
           return [{ attendeeId: id, status: flag.status, text: permissionNotice(flag.status, snapshotName(snapshot), tlt) }];
         }),
         results: clubRegistration.teamResults.map((result) => ({
@@ -1283,7 +1285,7 @@ export function clubAttendeePreparer(organizationId: string, actor?: ClubRegistr
       }
       const person = effectiveAge === undefined ? rosterOnly : { ...rosterOnly, ageOnEventDate: effectiveAge };
       if (typedAge !== undefined && typedAge !== (member.reportedAge ?? undefined) && actor && !teamSettings?.ageAsOf && !saveOff.has(member.id)) saveBack.push({ memberId: member.id, age: typedAge });
-      const memberRole = teamRoleFor({ responses: attendee.responses, rosterAttendeeType: member.attendeeType, rosterClassLevel: member.classLevel, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: person.ageOnEventDate });
+      const memberRole = teamRoleFor({ responses: attendee.responses, rosterAttendeeType: member.attendeeType, rosterIsTlt: member.isTlt, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: person.ageOnEventDate });
       teamMemberPersons.push({ personId: member.personId, name: formatPersonName(person), onRoster: true });
       resolved.set(attendee.clientId, { personId: member.personId, rosterMemberId: member.id, ageOnEventDate: person.ageOnEventDate, ...(teamSettings ? { teamRole: memberRole } : {}) });
       teamPeople.push({
@@ -1658,7 +1660,7 @@ export async function amendClubRegistration(
     if (current) assertSeminarPicksUnchanged(current, responses);
     if (betweenLevelsOnly) assertBetweenLevelsAnswers(current ? recordFromJson(current.formResponses) : null, responses, Object.keys(owned));
     amendmentAttendees.push({ attendeeId: current?.id ?? null, clientId, responses });
-    const memberRole = teamRoleFor({ responses, rosterAttendeeType: member.attendeeType, rosterClassLevel: member.classLevel, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: person.ageOnEventDate });
+    const memberRole = teamRoleFor({ responses, rosterAttendeeType: member.attendeeType, rosterIsTlt: member.isTlt, maxMemberAge: teamSettings?.maxMemberAge ?? null, formAsksRole: formAsksRole(definition), age: person.ageOnEventDate });
     serverOptions.set(clientId, {
       // A newly added roster person is that roster person, never a new or
       // name-matched one (the submit path links them the same way).

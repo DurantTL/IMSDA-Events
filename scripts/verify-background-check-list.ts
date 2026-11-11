@@ -160,10 +160,12 @@ async function seedBefore527(clubYear: string) {
   await db.organization.create({ data: { id: ids.club, type: "CLUB", name: "Verify Pathfinders", normalizedName: "verify pathfinders", parentOrganizationId: ids.church }, select: { id: true } });
   for (const person of people) {
     await db.person.create({ data: { id: ids.person(person.key), firstName: person.firstName, lastName: person.lastName, normalizedEmail: person.email ?? null }, select: { id: true } });
-    await db.clubRosterMember.create({
-      data: { id: ids.member(person.key), organizationId: ids.club, clubYear, personId: ids.person(person.key), attendeeType: "ADULT", source: "DIRECTOR" },
-      select: { id: true },
-    });
+    // Raw SQL: the client's INSERT lists every defaulted column of the current schema, and later migrations add
+    // roster columns (isTlt, #1851) that this pre-#527 database does not have yet.
+    await db.$executeRaw`
+      INSERT INTO "ClubRosterMember" ("id", "organizationId", "clubYear", "personId", "attendeeType", "source", "updatedAt")
+      VALUES (${ids.member(person.key)}, ${ids.club}, ${clubYear}, ${ids.person(person.key)}, 'ADULT'::"ClubRosterAttendeeType", 'DIRECTOR'::"ClubRosterSource", NOW())
+    `;
     if (person.check) {
       await db.$executeRaw`
         INSERT INTO "BackgroundCheck" ("id", "personId", "provider", "checkedOn", "expiresOn", "complianceStatus", "issuesNote", "createdAt", "updatedAt")
