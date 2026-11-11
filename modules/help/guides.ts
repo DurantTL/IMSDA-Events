@@ -30,15 +30,15 @@ export const helpDestinations: Record<string, HelpDestination> = {
   "event-registrations": { id: "event-registrations", label: "Registrations", path: "/people", scope: "Event", permission: "VIEW_SENSITIVE_DATA" },
   "event-imports": { id: "event-imports", label: "Imports", path: "/imports", scope: "Event", permission: "MANAGE_IMPORTS" },
   "club-import": { id: "club-import", label: "Import clubs", path: "/admin/clubs/import", scope: "System" },
-  "event-emails": { id: "event-emails", label: "Emails", path: "/communications", scope: "Event", permission: "MANAGE_COMMUNICATIONS" },
+  "event-emails": { id: "event-emails", label: "Communications", path: "/communications", scope: "Event", permission: "MANAGE_COMMUNICATIONS" },
   "system-email": { id: "system-email", label: "Email (central sender and paused events)", path: "/admin/email", scope: "System" },
   "attendee-configuration": { id: "attendee-configuration", label: "Attendee setup", path: "/more/attendee-configuration", scope: "Event", permission: "CONFIGURE_EVENT" },
-  "cancellation-policy": { id: "cancellation-policy", label: "Cancellation policy", path: "/finance/cancellation-policy", scope: "Event", permission: "MANAGE_FINANCE" },
+  "cancellation-policy": { id: "cancellation-policy", label: "Cancellation rules", path: "/finance/cancellation-policy", scope: "Event", permission: "MANAGE_FINANCE" },
   "event-meals": { id: "event-meals", label: "Meals", path: "/more/meals", scope: "Event", permission: "CONFIGURE_EVENT" },
   "event-lodging": { id: "event-lodging", label: "Lodging", path: "/more/lodging", scope: "Event", permission: "CONFIGURE_EVENT" },
   "event-reports": { id: "event-reports", label: "Reports", path: "/more/reports", scope: "Event", permission: "VIEW_REPORTS" },
   "event-check-in": { id: "event-check-in", label: "Check-in", path: "/check-in", scope: "Event", permission: "MANAGE_CHECK_IN" },
-  "event-badges": { id: "event-badges", label: "Badges", path: "/check-in/badges", scope: "Event", permission: "MANAGE_CHECK_IN" },
+  "event-badges": { id: "event-badges", label: "Name badges", path: "/check-in/badges", scope: "Event", permission: "MANAGE_CHECK_IN" },
   "system-readiness": { id: "system-readiness", label: "System readiness", path: "/admin/readiness", scope: "System" },
 };
 
