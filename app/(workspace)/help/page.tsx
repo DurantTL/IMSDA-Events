@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { StaffInstallCardRestore } from "@/components/staff-install-card";
 import { StaffSavedAppGuide } from "@/components/staff-saved-app-guide";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { helpPageTitle, withCurrentEvent } from "@/components/staff-navigation";
@@ -32,6 +33,7 @@ export default async function HelpPage({ searchParams }: { searchParams: Promise
         </div>
         <HelpSearch guides={guides} selectedEventId={viewer.selectedEventId} />
         <StaffSavedAppGuide />
+        <StaffInstallCardRestore />
         <div className={styles.glossaryLinkRow}>
           <Link className="secondary-button" href={withCurrentEvent("/help/glossary", viewer.selectedEventId)}>Open the glossary</Link>
         </div>

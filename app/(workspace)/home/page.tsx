@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { NeedsYouPage } from "@/components/home-pages";
+import { StaffInstallCard } from "@/components/staff-install-card";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import { resolveAdminRoles } from "@/modules/access/admin-roles";
 import { heldAdminRoles } from "@/modules/access/admin-roles-domain";
@@ -28,6 +29,7 @@ export default async function HomeNeedsYouPage() {
   return (
     <section className="page-stack">
       <StaffPageHeader description="What needs you, and what is coming up." />
+      <StaffInstallCard />
       <NeedsYouPage view={view} comingUp={comingUp} />
     </section>
   );
