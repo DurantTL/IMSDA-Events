@@ -194,7 +194,7 @@ const writtenPortalGuides: readonly PortalGuide[] = [
     ],
     steps: [
       "Choose Monthly Records in Club coordination (on a phone, open the Coordinator menu first). The club year is stated at the top of the page.",
-      "Choose a month, such as Oct. Under each month, 1/4 means 1 of 4 clubs filed. The counts show how many clubs are Submitted, Not submitted or Not due yet.",
+      "Choose a month. The count under each month, such as 1/4, means 1 of 4 clubs filed. The counts show how many clubs are Submitted, Not submitted or Not due yet.",
       "In the table, Submitted means the club filed that month's record. Choose Open record to read it, view only.",
       "Not submitted means the month has ended and no record is filed. Not due yet means the month has not ended. Records are due on the 10th of the next month. For these clubs, choose Open club.",
       "These are record states, not approvals. There is no approve control on this page.",
@@ -202,7 +202,7 @@ const writtenPortalGuides: readonly PortalGuide[] = [
       "The Full-year CSV link, labelled with the club year, covers every available club for the full year. It does not change with the search. More export options has the other downloads.",
     ],
     verify: ["For any club and month you can say whether the record is Submitted, Not submitted or Not due yet."],
-    next: "To read one club's record, use the Find a club and open its view-only record guide.",
+    next: "To read one club's record, see the guide Find a club and open its view-only record.",
     destinationIds: ["coordinator-records", "coordinator-overview"],
     relatedDocs: [],
     keywords: ["monthly records", "missing", "not submitted", "follow up", "export", "csv", "full year", "club year", "coordinator", "report"],

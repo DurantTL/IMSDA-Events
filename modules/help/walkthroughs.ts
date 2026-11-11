@@ -336,7 +336,7 @@ export const coordinatorWalkthroughs: readonly WalkthroughDefinition[] = [
     sourceFiles: [`${AREA}/reports/page.tsx`, "app/(public)/account/(portal)/area/[organizationId]/reports/[month]/page.tsx", "components/coordinator-monthly-records.tsx", ...COORDINATOR_SHELL, "components/club-report-charts.tsx", "components/club-report-form.tsx", "components/coordinator-monthly-records.module.css", "components/coordinator-summary-tiles.tsx", "components/table-card-labels.tsx"],
     steps: [
       { id: "open-records", text: "On Club coordination, choose Monthly Records (on a phone, open the Coordinator menu first).", alt: "The Club overview with the Monthly Records tab marked. On a phone, the open Coordinator menu with Monthly Records marked." },
-      { id: "pick-month", text: "Choose a month, such as Oct. Under each month, 1/4 means 1 of 4 clubs filed.", alt: "The Monthly Records page with the Oct month button marked." },
+      { id: "pick-month", text: "Choose a month. The count under each month, such as 1/4, means 1 of 4 clubs filed.", alt: "The Monthly Records page with the Oct month button marked." },
       { id: "see-counts", text: "The counts show how many clubs are Submitted, Not submitted or Not due yet.", alt: "The Monthly Records page for October 2026 with the Submitted, Not submitted and Not due yet counts marked." },
       { id: "find-row", text: "In the table, find the club. Submitted means it filed that month's record.", alt: "The table of clubs with one club's Submitted mark marked." },
       { id: "open-record", text: "Choose Open record to read what the club filed.", alt: "The table row for a club that filed, with the Open record button marked." },
