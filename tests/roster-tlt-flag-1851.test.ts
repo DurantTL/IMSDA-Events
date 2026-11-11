@@ -11,12 +11,12 @@ import {
   rosterIsTltFor,
   rosterTltCell,
 } from "@/modules/club-rosters/domain";
+import { matchesRosterSearch } from "@/modules/club-rosters/roster-view";
 import { rosterMemberInputSchema, rosterMemberUpdateSchema } from "@/modules/club-rosters/schemas";
 import { classLevelFrom, rosterClassFrom } from "@/modules/club-imports/domain";
 import { clubImportItemSchema } from "@/modules/club-imports/schemas";
 import { clubFormTemplateSeeds } from "@/modules/club-forms/definitions";
 import { rosterPrefillFromAnswers } from "@/modules/club-forms/roster-mapping";
-import { rosterRolePrefill } from "@/modules/club-registrations/domain";
 import { prefillFromRoster } from "@/modules/club-reports/year-end-domain";
 import { attendanceGroupOf, countsFromAttendance } from "@/modules/club-meeting-notes/attendance";
 import { teamRoleFor } from "@/modules/club-teams/rules";
@@ -108,6 +108,27 @@ describe("import", () => {
   });
 });
 
+describe("roster CSV TLT rules (#1851)", () => {
+  const header = "First name,Last name,Birth date,Type,Class,TLT\n";
+  const header2 = "First name,Last name,Birth date,Type,TLT,Class\n";
+
+  it("says so when TLT is on a row that is not Youth, instead of dropping it", () => {
+    const rows = parseRosterCsv(`${header}Sam,Sample,1980-04-17,Staff,TLT,\nSue,Sample,1980-04-17,Adult,,Yes\n`, 2026);
+    expect(rows[0]!.problems.join(" ")).toMatch(/TLT is only for youth/);
+    expect(rows[1]!.problems.join(" ")).toMatch(/TLT is only for youth/);
+  });
+
+  it("lets the TLT column win over a TLT class cell, in either column order", () => {
+    const a = parseRosterCsv(`${header}Ana,Sample,2010-04-17,Youth,TLT,No\n`, 2026);
+    expect(a[0]).toMatchObject({ isTlt: false });
+    const b = parseRosterCsv(`${header2}Ana,Sample,2010-04-17,Youth,No,TLT\n`, 2026);
+    expect(b[0]).toMatchObject({ isTlt: false });
+    const c = parseRosterCsv(`${header2}Ana,Sample,2010-04-17,Youth,Yes,TLT\n`, 2026);
+    expect(c[0]).toMatchObject({ isTlt: true });
+    expect(a[0]!.problems).toEqual([]);
+  });
+});
+
 describe("form roster mapping", () => {
   const seed = clubFormTemplateSeeds.find((candidate) => candidate.key === "pathfinder_membership_application")!;
   const spec = { definition: seed.definition, sensitiveFieldKeys: seed.sensitiveFieldKeys, birthDateFieldKeys: seed.birthDateFieldKeys, hiddenFieldKeys: [] as string[] };
@@ -172,13 +193,13 @@ describe("honor minimum class", () => {
   });
 });
 
-describe("form prefill", () => {
-  it("starts a flagged TLT as the form's TLT role when it has one, and falls back otherwise", () => {
-    const definition = (options: string[]) => ({ sections: [{ id: "s", title: "S", description: "", fields: [{ id: "f", key: "attendee_type", label: "Roster role", type: "RADIO", scope: "ATTENDEE", required: true, options }] }] }) as never;
-    const person = { firstName: "Ana", lastName: "Sample", ageOnEventDate: 15, gender: "FEMALE" as const, role: "Pathfinder", attendeeType: "YOUTH" as const };
-    expect(rosterRolePrefill(definition(["Pathfinder", "TLT", "Staff", "Child"]), { ...person, isTlt: true })).toEqual({ attendee_type: "TLT" });
-    expect(rosterRolePrefill(definition(["Pathfinder", "TLT", "Staff", "Child"]), person)).toEqual({ attendee_type: "Pathfinder" });
-    expect(rosterRolePrefill(definition(["Pathfinder", "Staff"]), { ...person, isTlt: true })).toEqual({ attendee_type: "Pathfinder" });
+describe("roster search (#1851)", () => {
+  it("finds a flagged youth by TLT, and nobody else", () => {
+    const flagged = { firstName: "Ana", lastName: "Sample", isTlt: true };
+    const plain = { firstName: "Ben", lastName: "Sample", isTlt: false };
+    expect(matchesRosterSearch(flagged, "tlt")).toBe(true);
+    expect(matchesRosterSearch(flagged, "sample tlt")).toBe(true);
+    expect(matchesRosterSearch(plain, "tlt")).toBe(false);
   });
 });
 

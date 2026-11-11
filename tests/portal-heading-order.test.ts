@@ -8,7 +8,7 @@ import type { EventInfoCards } from "@/modules/event-info-cards/domain";
 
 /** Heading order fixes from the mobile pass (#687): no skipped levels, no repeated "Fees". */
 const tileProps = {
-  roster: { active: 3, staff: 1, members: 2, byClass: [] },
+  roster: { active: 3, staff: 1, members: 2, byClass: [], tlt: 0 },
   rosterHref: "/account/clubs/club-1/roster",
   honors: null,
   honorsHref: "/account/clubs/club-1/honors",

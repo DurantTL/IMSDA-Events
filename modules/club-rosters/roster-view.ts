@@ -8,7 +8,8 @@ import { formatPersonName } from "@/lib/person-name";
  * for the signed-in role, and the server still authorizes every read and write.
  */
 
-type NamedMember = { firstName: string; lastName: string };
+/** `isTlt` (#1851) lets a search for "TLT" find the flagged youth. */
+type NamedMember = { firstName: string; lastName: string; isTlt?: boolean };
 
 /** Lower case, accents and punctuation removed, spaces collapsed: "Zoë  O'Neil," matches "zoe oneil". */
 export function normalizeRosterSearch(text: string): string {
@@ -29,7 +30,7 @@ export function normalizeRosterSearch(text: string): string {
 export function matchesRosterSearch(member: NamedMember, query: string): boolean {
   const words = normalizeRosterSearch(query).split(" ").filter(Boolean);
   if (words.length === 0) return true;
-  const haystack = normalizeRosterSearch(formatPersonName(member));
+  const haystack = normalizeRosterSearch(`${formatPersonName(member)}${member.isTlt === true ? " TLT" : ""}`);
   return words.every((word) => haystack.includes(word));
 }
 

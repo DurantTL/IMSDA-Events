@@ -408,6 +408,8 @@ export type RosterYearSummary = {
   staff: number;
   members: number;
   byClass: Array<{ classLevel: ClubClassLevel; label: string; count: number }>;
+  /** Active youth marked TLT (#1851): shown beside the class counts, since TLT is no longer a class. */
+  tlt: number;
 };
 
 /**
@@ -419,7 +421,7 @@ export type RosterYearSummary = {
  * carries a class level.
  */
 export function rosterYearSummary(
-  members: ReadonlyArray<{ status: string; attendeeType: keyof typeof clubRosterAttendeeTypeLabels; classLevel: ClubClassLevel | null }>,
+  members: ReadonlyArray<{ status: string; attendeeType: keyof typeof clubRosterAttendeeTypeLabels; classLevel: ClubClassLevel | null; isTlt?: boolean }>,
 ): RosterYearSummary {
   const active = members.filter((member) => member.status === "ACTIVE");
   const staff = active.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF").length;
@@ -433,7 +435,9 @@ export function rosterYearSummary(
   const byClass = clubClassLevels
     .filter((level) => counts.has(level))
     .map((level) => ({ classLevel: level, label: clubClassLevelLabels[level], count: counts.get(level)! }));
-  return { active: active.length, staff, members: active.length - staff, byClass };
+  // TLT is a youth's own flag (#1851), counted from the MEMBERS section only.
+  const tlt = active.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS" && rosterIsTltFor(member.attendeeType, member.isTlt)).length;
+  return { active: active.length, staff, members: active.length - staff, byClass, tlt };
 }
 
 /** The roster's own fields, for the "Missing info" flag (#424). */

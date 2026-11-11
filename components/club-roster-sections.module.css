@@ -38,6 +38,8 @@
 /* #918: the member's name is the most prominent thing in its row. */
 :global(.roster-card-name) .rosterMemberName { display: block; color: var(--ink); font-size: max(var(--type-body-floor, 0px), 1.0625rem); font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; }
 .rosterMemberRole { display: block; color: var(--muted); font-size: max(var(--type-body-floor, 0px), 0.8rem); font-weight: 500; overflow-wrap: anywhere; }
+/* The TLT chip (#1851) sits beside the class name with a gap. */
+.rosterTltChip { margin-inline-start: 8px; }
 .rosterNeedsDetails { white-space: normal; }
 .rosterRowActionSet { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .rosterRowActionSet :global(.actions-menu) { display: inline-block; width: auto; }

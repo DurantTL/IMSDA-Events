@@ -96,6 +96,8 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
 
   return body.map((cells, index) => {
     const row: RosterCsvRow = { line: index + 2, firstName: "", lastName: "", problems: [] };
+    let classTlt = false;
+    let columnTlt: boolean | undefined;
     columns.forEach((key, column) => {
       if (!key) return;
       const value = clean(cells[column]);
@@ -115,13 +117,13 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
       } else if (key === "classLevel") {
         const parsed = value.toLowerCase() === "none" ? { classLevel: null, isTlt: false } : rosterClassFrom(value);
         if (parsed === null) row.problems.push(`Class "${value}" isn't a Pathfinder class level.`);
-        // "TLT" in the class column sets the TLT flag and leaves the class alone (#1851).
-        else if (parsed.isTlt) row.isTlt = true;
+        // "TLT" in the class column sets the TLT flag and leaves the class alone (#1851); settled after the loop.
+        else if (parsed.isTlt) classTlt = true;
         else row.classLevel = parsed.classLevel;
       } else if (key === "isTlt") {
         const answer = value.toLowerCase();
-        if (["yes", "y", "true", "1", "x"].includes(answer)) row.isTlt = true;
-        else if (["no", "n", "false", "0"].includes(answer)) row.isTlt = false;
+        if (["yes", "y", "true", "1", "x"].includes(answer)) columnTlt = true;
+        else if (["no", "n", "false", "0"].includes(answer)) columnTlt = false;
         else row.problems.push(`TLT "${value}" should be Yes or No, or left blank.`);
       } else if (key === "schoolGrade") {
         const grade = schoolGradeFromText(value);
@@ -136,6 +138,12 @@ export function parseRosterCsv(text: string, currentYear = new Date().getFullYea
         else row.problems.push(`Gender "${value}" should be Female or Male, or left blank.`);
       }
     });
+    // The TLT column wins over a "TLT" class cell, whatever the column order (#1851).
+    const tlt = columnTlt ?? (classTlt ? true : undefined);
+    if (tlt !== undefined) row.isTlt = tlt;
+    if (tlt === true && row.attendeeType !== undefined && row.attendeeType !== "YOUTH") {
+      row.problems.push("TLT is only for youth. Change the type to Youth or leave TLT blank.");
+    }
     if (!row.firstName || !row.lastName) row.problems.push("First and last name are both needed.");
     return row;
   });

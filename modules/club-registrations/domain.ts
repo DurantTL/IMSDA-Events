@@ -611,8 +611,6 @@ export type RosterPerson = {
   gender: "FEMALE" | "MALE" | null;
   role?: string;
   attendeeType?: "YOUTH" | "STAFF" | "ADULT" | "UNDERAGE";
-  /** The roster's TLT flag (#1851), youth only. */
-  isTlt?: boolean;
 };
 
 /** The roster-owned answers for one attendee. Names and age always come from the roster. */
@@ -674,9 +672,6 @@ export function rosterRolePrefill(definition: RegistrationFormDefinition, person
   const field = roleField(definition);
   if (!field) return {};
   const byName = optionsByName(field);
-  // A youth flagged TLT on the roster (#1851) starts as the form's "TLT" option, ahead of their default "Pathfinder" role.
-  const flaggedTlt = person.isTlt === true && person.attendeeType === "YOUTH" ? byName.get("tlt") : undefined;
-  if (flaggedTlt) return { [field.key]: flaggedTlt };
   const role = person.role?.trim().toLowerCase();
   const fromRole = role ? byName.get(role) : undefined;
   const typeNames = person.attendeeType ? TYPE_OPTION_NAMES[person.attendeeType] ?? [] : [];

@@ -454,7 +454,8 @@ function ClubRosterWorkspaceInner({
     age: (member) => member.age ?? member.reportedAge,
     birthDate: (member) => birthDates?.[member.id],
     type: (member) => clubRosterAttendeeTypeLabels[member.attendeeType],
-    class: (member) => (member.classLevel ? clubClassLevelLabels[member.classLevel] : null),
+    // A flagged TLT with no class sorts as TLT (the class label they would have had); with a class, by that class.
+    class: (member) => (member.classLevel ? clubClassLevelLabels[member.classLevel] : member.isTlt ? clubClassLevelLabels.TLT : null),
     grade: (member) => schoolGradeOrder(member.schoolGrade),
     details: (member) => rosterDetailsNeededItems(member).length,
     gender: (member) => (member.gender ? clubRosterGenderLabels[member.gender] : null),
@@ -1082,7 +1083,7 @@ function ClubRosterWorkspaceInner({
                                 );
                                 case "birthDate": return <td {...cardCell("Birth date")} className={tableStyles.cardFact} key={column} translate="no">{birthDates?.[member.id] ?? "—"}</td>;
                                 case "type": return <td {...cardCell("Type")} className={tableStyles.cardPrimary} key={column}>{clubRosterAttendeeTypeLabels[member.attendeeType]}</td>;
-                                case "class": return <td {...cardCell("Current class")} className={tableStyles.cardPrimary} key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : member.isTlt ? null : "—"}{member.isTlt && <span className="status-chip" title={rosterTltLabel}>TLT</span>}</td>;
+                                case "class": return <td {...cardCell("Current class")} className={tableStyles.cardPrimary} key={column}>{member.classLevel ? clubClassLevelLabels[member.classLevel] : member.isTlt ? null : "—"}{member.isTlt && <span className={`status-chip ${styles.rosterTltChip}`} title={rosterTltLabel}>TLT</span>}</td>;
                                 case "grade": return <td {...cardCell("Grade")} className={tableStyles.cardFact} key={column}>{member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : "—"}</td>;
                                 case "school": return <td {...cardCell("School")} className={tableStyles.cardFact} key={column}>{member.schoolType ? clubSchoolTypeLabels[member.schoolType] : "—"}</td>;
                                 case "churchMember": return <td {...cardCell(CHURCH_MEMBER_LABEL)} className={tableStyles.cardFact} key={column}>{member.churchMember ? clubChurchMemberLabels[member.churchMember] : "—"}</td>;

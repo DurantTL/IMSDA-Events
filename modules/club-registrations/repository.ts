@@ -847,7 +847,7 @@ export async function getClubEventWorkspace(organizationId: string, eventId: str
               ? { [attendeeAgeKey(experience.form.definition)!]: String(member.reportedAge) }
               : {}),
             ...rosterGenderPrefill(experience.form.definition, person),
-            ...rosterRolePrefill(experience.form.definition, { ...person, role: member.role, attendeeType: member.attendeeType, isTlt: member.isTlt }),
+            ...rosterRolePrefill(experience.form.definition, { ...person, role: member.role, attendeeType: member.attendeeType }),
           }
           : {},
         // Carried-over values that don't match a form option, so the form can
