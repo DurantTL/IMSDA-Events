@@ -24,7 +24,6 @@ function organizationTools(healthImport: boolean): { href: string; label: string
     ...(healthImport ? [{ href: "/admin/clubs/health-import", label: "Import health records" }] : []),
     { href: "/admin/organizations/directory", label: "Organization directory" },
     { href: "/admin/organizations/import", label: "Import from eAdventist" },
-    { href: "/admin/clubs/invites", label: "Club invites" },
   ];
 }
 

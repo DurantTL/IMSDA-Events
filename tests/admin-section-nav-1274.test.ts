@@ -126,7 +126,7 @@ describe("Clubs tabs", () => {
     expect(marked(nav("clubs", "/admin/clubs/reports/year-end").tabs)).toEqual([["monthly-records", "true"]]);
     expect(marked(nav("clubs", `/admin/clubs/reports/${org}/2026-10`).tabs)).toEqual([["monthly-records", "true"]]);
     expect(marked(nav("clubs", "/admin/club-forms/club_form_key").tabs)).toEqual([["forms", "true"]]);
-    expect(marked(nav("clubs", "/admin/clubs/invites").tabs)).toEqual([["new-clubs", "true"]]);
+    expect(marked(nav("clubs", "/admin/clubs/invites").tabs)).toEqual([["people", "true"]]);
     expect(marked(nav("clubs", `/admin/organizations/${org}/club`).tabs)).toEqual([["all-clubs", "true"]]);
     expect(marked(nav("clubs", `/admin/organizations/${org}/directors`).tabs)).toEqual([["all-clubs", "true"]]);
     expect(marked(nav("clubs", "/admin/people").tabs)).toEqual([["people", "page"]]);

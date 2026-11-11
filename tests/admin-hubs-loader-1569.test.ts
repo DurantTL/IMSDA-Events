@@ -27,7 +27,7 @@ vi.mock("@/modules/forms-hub/load", () => ({ loadFormsHub: vi.fn(async () => { c
 vi.mock("@/modules/forms/form-template-library", () => ({ listFormTemplateLibrary: vi.fn(async () => [{}, {}]) }));
 vi.mock("@/modules/system-admin/attention-repository", () => ({ getAdminAttentionSummary: vi.fn(async () => { calls.push("attention"); return attentionSummary(); }) }));
 vi.mock("@/modules/system-admin/area-pause", () => ({ listAreaPauses: vi.fn(async () => [{ paused: false }, { paused: true }]) }));
-vi.mock("@/modules/system-admin/club-leaders", () => ({ listClubLeaders: vi.fn(async () => ({ total: 168 })) }));
+vi.mock("@/modules/system-admin/club-leaders", () => ({ listClubLeaders: vi.fn(async () => ({ total: 168 })), countWaitingClubInvites: vi.fn(async () => 3) }));
 vi.mock("@/modules/system-admin/pending-invites", () => ({ listPendingInvitesPage: vi.fn(async () => ({ total: 1 })) }));
 const getSystemReadiness = vi.fn();
 const attentionSummary = vi.fn();

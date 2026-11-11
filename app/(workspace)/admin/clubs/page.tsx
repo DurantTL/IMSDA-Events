@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { redirect } from "next/navigation";
-import { ArrowRight, CalendarDays, ClipboardCheck, ClipboardList, ClipboardPen, Tent } from "lucide-react";
+import { ArrowRight, CalendarDays, ClipboardCheck, ClipboardList, ClipboardPen, Tent, UserPlus } from "lucide-react";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
@@ -17,6 +17,8 @@ import {
   clubYearOptions,
   clubsAdminHrefs,
 } from "@/modules/club-reports/clubs-admin-home-model";
+import { countWaitingClubInvites } from "@/modules/system-admin/club-leaders";
+import { clubLeadersHref } from "@/modules/system-admin/club-leaders-model";
 import { ActAsButton } from "@/components/act-as-button";
 import { AdminHub } from "@/components/admin-hub";
 import { clubsAdminHrefForYear } from "@/components/staff-navigation";
@@ -51,12 +53,14 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   const viewer = user.globalRole === "SYSTEM_ADMIN" ? "SYSTEM_ADMIN" : "CLUBS_ADMIN";
 
   const hubViewer: HubViewer = { isSystemAdmin: viewer === "SYSTEM_ADMIN", clubsAdmin: true, siteContentEditor: false, healthImport: healthRecordsEnabled() };
-  const [clubs, events, applications, waitingCount, requiredForms] = await Promise.all([
+  const [clubs, events, applications, waitingCount, requiredForms, waitingInvites] = await Promise.all([
     getAreaClubsSummary(clubYear, now, { backgroundChecks: false }),
     listAreaClubEvents(clubYear),
     listNewClubApplications(viewer),
     countWaitingNewClubApplications(viewer),
     getRequiredFormsStatus(clubYear),
+    // Read on its own like the hub numbers: if it fails the card says so rather than showing a false zero.
+    countWaitingClubInvites(now).catch(() => null),
   ]);
   // The destination cards' live status, for the club year picked here: the clubs, late records and waiting applications come
   // from this page's own reads (not read twice); the rest read on their own and show "Unavailable" when they cannot be read.
@@ -68,10 +72,10 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
   }
   const hubValues = await loadHubMetrics("club-administration", hubViewer, now, {
     clubYear,
-    known: { clubs: clubs.length, lateRecords, applicationsWaiting: waitingCount },
+    known: { clubs: clubs.length, lateRecords, applicationsWaiting: waitingCount, clubInvitesWaiting: waitingInvites },
   });
   // The club pages that read ?year= keep the year the viewer picked (#1566).
-  const hubView = buildHubView("club-administration", hubViewer, hubValues, ["clubs", "applicationsWaiting"]);
+  const hubView = buildHubView("club-administration", hubViewer, hubValues, ["clubs", "applicationsWaiting", "clubInvitesWaiting"]);
   const hubViewForYear = {
     ...hubView,
     groups: hubView.groups.map((group) => ({ ...group, cards: group.cards.map((card) => ({ ...card, href: clubsAdminHrefForYear(card.href, params.year ? clubYear : null) })) })),
@@ -132,6 +136,13 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
             <p>New club applications waiting</p>
             <small>Every pending application, any year</small>
             <small><Link className={styles.cardLink} href={href.applications}>Open club applications</Link></small>
+          </article>
+          <article data-card="waiting-invites">
+            <span className={styles.cardIcon}><UserPlus aria-hidden="true" size={20} /></span>
+            <strong>{waitingInvites ?? "Unavailable"}</strong>
+            <p>Waiting invites</p>
+            <small>Sent to a club leader and not accepted or cancelled yet, across every club</small>
+            <small><Link className={styles.cardLink} href={clubLeadersHref({ clubId: null, role: null, status: "invited" })}>See who has been invited</Link></small>
           </article>
           <article data-card="monthly-records">
             <span className={styles.cardIcon}><ClipboardCheck aria-hidden="true" size={20} /></span>

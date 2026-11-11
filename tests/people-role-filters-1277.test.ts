@@ -199,8 +199,8 @@ describe("Club leaders", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("reads only current roles in CLUB organizations, narrowed by club and role", () => {
-    expect(parseLeaderFilters({ club: "org_1", role: "Deputy" })).toEqual({ clubId: "org_1", role: "DEPUTY" });
-    expect(parseLeaderFilters({ role: "owner" })).toEqual({ clubId: null, role: null });
+    expect(parseLeaderFilters({ club: "org_1", role: "Deputy" })).toEqual({ clubId: "org_1", role: "DEPUTY", status: "current" });
+    expect(parseLeaderFilters({ role: "owner" })).toEqual({ clubId: null, role: null, status: "current" });
     expect(buildLeadersWhere({ clubId: null, role: null }, now)).toEqual({
       revokedAt: null,
       effectiveFrom: { lte: now },

@@ -110,7 +110,7 @@ describe("the Clubs destination groups", () => {
       ["/admin/clubs/summary?view=records#monthly-records", "/admin/clubs/reports/year-end", "/admin/clubs/summary?view=points#points"],
       ["/admin/clubs/summary?view=events#club-events"],
       ["/admin/club-forms", "/admin/club-forms/public-page"],
-      ["/admin/clubs/applications", "/admin/clubs/invites"],
+      ["/admin/clubs/applications"],
       ["/admin/clubs/leaders", "/admin/people"],
     ]);
     for (const item of clubsAdminGroups.flatMap((group) => group.items)) {
@@ -170,7 +170,7 @@ describe("the Clubs destination groups", () => {
     // The Clubs Administrator's imports and Sterling Volunteers are views of Club administration, so none lost its home.
     for (const href of ["/admin/clubs/import", "/admin/clubs/health-import", "/admin/organizations/background-checks"]) expect(home).toContain(`href="${href}"`);
     navigation.pathname = "/admin/clubs/invites";
-    expect(currentOf(render({ user: staff, adminRoleView: view }))).toEqual(["New club applications"]);
+    expect(currentOf(render({ user: staff, adminRoleView: view }))).toEqual(["Club leaders"]);
     const off = tabsOf(render({ user: staff, adminRoleView: { ...view, healthImport: false } }));
     expect(off).not.toContain("/admin/clubs/health-import");
   });
@@ -281,7 +281,7 @@ describe("Find a page or task in the Clubs view", () => {
     expect(points?.description).toContain("Records and points");
     // The group name finds its items.
     expect(searchDestinations(buildSearchDestinations({ ...base, clubsAdmin: { healthImport: true } }), "applications").map((destination) => destination.label)).toEqual(
-      expect.arrayContaining(["New club applications", "Club invites"]),
+      expect.arrayContaining(["New club applications"]),
     );
     expect(clubDestinations(base)).toEqual([]);
     expect(clubDestinations({ ...base, isSystemAdmin: true })).toEqual([]);
