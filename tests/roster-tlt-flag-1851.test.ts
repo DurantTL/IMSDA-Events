@@ -223,3 +223,18 @@ describe("migration", () => {
     expect(schema).toMatch(/TLT\n\s+\/\/\/[^\n]*\n\s+BASIC_STAFF_TRAINING\n\s+MASTER_GUIDE/);
   });
 });
+
+describe("roster CSV update with only the TLT column (#1851)", () => {
+  it("plans an update for an existing member when only TLT is filled in", async () => {
+    const { parseRosterCsv, planRosterImport } = await import("@/modules/club-rosters/csv-import");
+    const plan = planRosterImport(parseRosterCsv("First name,Last name,TLT\nAva,Test,Yes"), [{ id: "member-1", firstName: "Ava", lastName: "Test" }]);
+    expect(plan[0].action).toBe("UPDATE");
+    expect(plan[0].row.isTlt).toBe(true);
+  });
+
+  it("still skips an existing member when no column has a value", async () => {
+    const { parseRosterCsv, planRosterImport } = await import("@/modules/club-rosters/csv-import");
+    const plan = planRosterImport(parseRosterCsv("First name,Last name,TLT\nAva,Test,"), [{ id: "member-1", firstName: "Ava", lastName: "Test" }]);
+    expect(plan[0].action).toBe("SKIP");
+  });
+});
