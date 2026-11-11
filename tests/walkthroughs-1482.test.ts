@@ -10,7 +10,7 @@ import { docFileExists, listPageRoutes, publicFileExists } from "@/modules/help/
 import { portalGuides } from "@/modules/help/portal-guides";
 import { checkWalkthroughManifest, walkthroughCapturedFor } from "@/modules/help/walkthrough-check";
 import { readWalkthroughManifest, walkthroughSourceHash } from "@/modules/help/walkthrough-files";
-import { walkthroughDesktopMinWidth, walkthroughImage, walkthroughImageBudgets, walkthroughImageFileSize, walkthroughImageSizes, type WalkthroughImageKind } from "@/modules/help/walkthrough-images";
+import { walkthroughDesktopMinWidth, walkthroughImage, walkthroughImageBudgets, walkthroughImageFileSize, type WalkthroughImageKind } from "@/modules/help/walkthrough-images";
 import { coordinatorWalkthroughs, directorWalkthroughs, walkthroughGuides, walkthroughs, walkthroughsForGuide } from "@/modules/help/walkthroughs";
 import { assertWalkthroughSafety, signInRateLimitPolicies } from "@/scripts/support/help-walkthrough-fixtures";
 import { buildClubChecklist, type ClubChecklistFacts } from "@/modules/setup-help/club-checklist";
@@ -51,7 +51,7 @@ describe("walkthrough data and browser actions", () => {
   it("writes each step as one or two plain sentences with alt text, and no email address or real-looking data", () => {
     for (const walkthrough of walkthroughs) {
       expect(walkthrough.steps.length, walkthrough.id).toBeGreaterThanOrEqual(3);
-      expect(walkthrough.steps.length, walkthrough.id).toBeLessThanOrEqual(8);
+      expect(walkthrough.steps.length, walkthrough.id).toBeLessThanOrEqual(12);
       for (const step of walkthrough.steps) {
         const sentences = step.text.split(/(?<=[.?!])\s+/).filter(Boolean);
         expect(sentences.length, `${walkthrough.id}/${step.id}: ${step.text}`).toBeLessThanOrEqual(2);

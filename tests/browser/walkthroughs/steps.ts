@@ -21,15 +21,17 @@ export type StepEvent = {
   total: number;
   /** The control to mark, or null. */
   target: WalkthroughLocator | null;
+  /** A second control the same outline covers, or null. */
+  alsoMark: WalkthroughLocator | null;
   /** Extra context the picture keeps in view around the mark, or null. */
   area: WalkthroughLocator | null;
 };
 
 /** A plain Playwright locator has `first`; the `{ target, area }` form does not. */
-function splitStepTarget(result: WalkthroughStepTarget | null): { target: WalkthroughLocator | null; area: WalkthroughLocator | null } {
-  if (!result) return { target: null, area: null };
-  if (typeof result.first === "function") return { target: result, area: null };
-  return { target: result.target ?? null, area: result.area ?? null };
+function splitStepTarget(result: WalkthroughStepTarget | null): Pick<StepEvent, "target" | "alsoMark" | "area"> {
+  if (!result) return { target: null, alsoMark: null, area: null };
+  if (typeof result.first === "function") return { target: result, alsoMark: null, area: null };
+  return { target: result.target ?? null, alsoMark: result.alsoMark ?? null, area: result.area ?? null };
 }
 
 /**
@@ -50,15 +52,15 @@ export async function runWalkthrough(
     const action = actions.steps[step.id];
     if (!action) throw new Error(`${walkthroughId}: step "${step.id}" has no browser action.`);
     let target: WalkthroughLocator | null;
+    let alsoMark: WalkthroughLocator | null;
     let area: WalkthroughLocator | null;
     try {
-      ({ target, area } = splitStepTarget(await action(context)));
-      if (target) await target.first().waitFor({ state: "visible", timeout: 15_000 });
-      if (area) await area.first().waitFor({ state: "visible", timeout: 15_000 });
+      ({ target, alsoMark, area } = splitStepTarget(await action(context)));
+      for (const locator of [target, alsoMark, area]) if (locator) await locator.first().waitFor({ state: "visible", timeout: 15_000 });
     } catch (error) {
       throw new Error(`${walkthroughId} step ${index + 1} "${step.id}": ${(error as Error).message.split("\n")[0]}`);
     }
-    await onStep?.({ walkthroughId, stepId: step.id, index, total: definition.steps.length, target, area });
+    await onStep?.({ walkthroughId, stepId: step.id, index, total: definition.steps.length, target, alsoMark, area });
   }
   return definition.steps.length;
 }

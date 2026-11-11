@@ -8,12 +8,15 @@
 export const overlayId = "help-walkthrough-overlay";
 
 export function drawMarkInPage(args: { number: number; id: string }) {
-  const target = (window as any).__walkthroughTarget as Element | undefined;
-  if (!target) return null;
+  const targets = (window as any).__walkthroughTargets as Element[] | undefined;
+  if (!targets || targets.length === 0) return null;
+  const inTarget = (node: Node) => targets.some((element) => element.contains(node));
   const root = getComputedStyle(document.documentElement);
   const purple = root.getPropertyValue("--imsda-purple").trim() || "#582c83";
   const gold = root.getPropertyValue("--imsda-gold").trim() || "#f0b323";
-  const rect = target.getBoundingClientRect();
+  const rects = targets.map((element) => element.getBoundingClientRect());
+  // One outline around the control, or around both controls of a step that marks two.
+  const rect = { left: Math.min(...rects.map((r) => r.left)), top: Math.min(...rects.map((r) => r.top)), right: Math.max(...rects.map((r) => r.right)), bottom: Math.max(...rects.map((r) => r.bottom)) };
   const pad = 4;
   const layer = document.createElement("div");
   layer.id = args.id;
@@ -35,14 +38,21 @@ export function drawMarkInPage(args: { number: number; id: string }) {
   // The badge goes where it covers no visible text: left of the box, right of it, above it, below it, and only then on
   // its top-left corner (the old place, which could hide a label next to the control).
   const textRects: DOMRect[] = [];
+  const ownRects: DOMRect[] = [];
+  const visible = (r: DOMRect) => r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    if (!node.textContent?.trim() || target.contains(node)) continue;
+    if (!node.textContent?.trim()) continue;
+    const own = inTarget(node);
     const range = document.createRange();
     range.selectNodeContents(node);
-    for (const r of Array.from(range.getClientRects())) {
-      if (r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight) textRects.push(r);
-    }
+    for (const r of Array.from(range.getClientRects())) if (visible(r)) (own ? ownRects : textRects).push(r);
+  }
+  // What people typed or picked is not a text node, so a filled box counts as text too.
+  for (const field of Array.from(document.querySelectorAll("input, textarea, select")) as HTMLInputElement[]) {
+    if (field.type === "hidden" || field.type === "checkbox" || field.type === "radio" || !(field.value || field.placeholder)) continue;
+    const r = field.getBoundingClientRect();
+    if (visible(r)) (inTarget(field) ? ownRects : textRects).push(r);
   }
   const middle = top + height / 2 - size / 2;
   const candidates = [
@@ -50,11 +60,14 @@ export function drawMarkInPage(args: { number: number; id: string }) {
     { x: left + width + gap, y: middle },
     { x: left, y: top - size - gap },
     { x: left, y: top + height + gap },
+    // Inside the box at either end, when nothing in it is there (an empty field, the empty end of a wide button).
+    { x: left + width - size - 8, y: middle },
+    { x: left + 8, y: middle },
   ];
-  const fits = (c: { x: number; y: number }) =>
+  const fits = (c: { x: number; y: number }, inside: boolean) =>
     c.x >= 2 && c.y >= 2 && c.x + size <= window.innerWidth - 2 && c.y + size <= window.innerHeight - 2 &&
-    !textRects.some((r) => c.x < r.right + 2 && c.x + size > r.left - 2 && c.y < r.bottom + 2 && c.y + size > r.top - 2);
-  const chosen = candidates.find(fits) ?? { x: left - size / 2, y: top - size / 2 };
+    !(inside ? [...textRects, ...ownRects] : textRects).some((r) => c.x < r.right + 2 && c.x + size > r.left - 2 && c.y < r.bottom + 2 && c.y + size > r.top - 2);
+  const chosen = candidates.find((c, i) => fits(c, i >= 4)) ?? { x: left - size / 2, y: top - size / 2 };
   const badgeLeft = Math.min(Math.max(2, chosen.x), window.innerWidth - size - 2);
   const badgeTop = Math.min(Math.max(2, chosen.y), window.innerHeight - size - 2);
   badge.style.cssText = `position:absolute;left:${badgeLeft}px;top:${badgeTop}px;width:${size}px;height:${size}px;border-radius:50%;background:${purple};color:#fff;border:3px solid ${gold};display:flex;align-items:center;justify-content:center;font:700 15px/1 system-ui,sans-serif;box-sizing:border-box;`;
@@ -72,5 +85,5 @@ export function drawMarkInPage(args: { number: number; id: string }) {
 
 export function removeMarkInPage(id: string) {
   document.getElementById(id)?.remove();
-  delete (window as any).__walkthroughTarget;
+  delete (window as any).__walkthroughTargets;
 }

@@ -53,7 +53,7 @@ async function main() {
     only,
     kinds: ["phone", "desktop"],
     deviceScaleFactor: captureScale,
-    onStep: async ({ walkthroughId, stepId, index, kind, page, target, area }) => {
+    onStep: async ({ walkthroughId, stepId, index, kind, page, target, alsoMark, area }) => {
       let mark: MarkArea | null = null;
       let extra: MarkArea | null = null;
       if (target) {
@@ -61,10 +61,11 @@ async function main() {
         await page.waitForLoadState("networkidle").catch(() => undefined);
         await page.waitForTimeout(400);
         // Bring the control into the middle of the screen, then mark it.
-        await target.first().evaluate((element: Element) => {
+        const second = alsoMark ? await alsoMark.first().elementHandle() : null;
+        await target.first().evaluate((element: Element, other: Element | null) => {
           element.scrollIntoView({ block: "center", inline: "nearest" });
-          (window as unknown as { __walkthroughTarget?: Element }).__walkthroughTarget = element;
-        });
+          (window as unknown as { __walkthroughTargets?: Element[] }).__walkthroughTargets = other ? [element, other] : [element];
+        }, second);
         await page.waitForTimeout(300);
         mark = (await page.evaluate(drawMarkInPage, { number: index + 1, id: overlayId })) as MarkArea | null;
         // The extra area the step wants in the picture: its box on the screen now that the mark's control is in view.
