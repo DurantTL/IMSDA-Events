@@ -41,7 +41,7 @@ import TransfersPage from "@/app/(workspace)/admin/clubs/transfers/page";
 import { ClubTransferQueue, StaffTransferCard } from "@/components/club-transfer-queue";
 import { NewClubApplicationsQueue } from "@/components/new-club-applications-queue";
 import { StaffApplicationCard, StaffApplicationRecord } from "@/components/staff-club-applications";
-import { parseStaffQueueView, staffQueueEmptyText, staffQueueFilters, staffQueueHref } from "@/modules/club-transfers/domain";
+import { parseStaffQueueView, staffQueueFilters, staffQueueHref } from "@/modules/club-transfers/domain";
 import { applicationHref, applicationsHref, parseApplicationId, parseApplicationView } from "@/modules/club-applications/queue-model";
 import type { NewClubApplicationRecord } from "@/modules/club-applications/repository";
 import type { StaffTransferRecord } from "@/modules/club-transfers/repository";
