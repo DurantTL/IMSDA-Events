@@ -1,0 +1,20 @@
+/* Staff Year-End review list (#1843). Built to hold at 360px: tabs wrap, rows become cards with the status first, 44px targets. */
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.summary li { display: grid; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); padding: 10px 12px; }
+.summary strong { font-size: max(var(--type-staff-floor, 0px), 1.25rem); line-height: 1.1; }
+.summary span { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.controls { display: grid; gap: 10px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab {
+  min-height: 44px; min-width: 44px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--ink);
+  cursor: pointer; padding: 6px 12px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700;
+}
+.tabSelected { border-color: var(--imsda-navy); background: var(--imsda-navy-soft); color: var(--imsda-navy); }
+.panel { display: grid; gap: 12px; min-width: 0; }
+.help { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+
+.open { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; font-weight: 700; }
+.action { min-height: 44px; min-width: 44px; }
+.status { order: -2; }
+.directors { overflow-wrap: anywhere; }

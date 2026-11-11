@@ -512,6 +512,7 @@ const pages: PageSpec[] = [
   staff("honor-catalog", "/admin/honors", "system-admin"),
   staff("master-award-rules", "/admin/master-award-rules", "system-admin"),
   staff("year-end-reports", "/admin/clubs/reports/year-end", "system-admin"),
+  staff("year-end-report-detail", `/admin/clubs/reports/year-end/${clubA}/2026-27`, "system-admin"),
   staff("church-import", "/admin/organizations/import", "system-admin"),
   staff("club-import", "/admin/clubs/import", "system-admin"),
   // The club-list JSON preview (#1038): new and unmatched rows, a check note, every card opened.
