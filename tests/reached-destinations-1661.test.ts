@@ -42,11 +42,11 @@ describe("the registry", () => {
       "/more/reports/clubs/team-form": `${notSearchable}: print view`,
       "/more/reports/clubs/team-form/level": `${notSearchable}: print view`,
       "/more/reports/packets": `${notSearchable}: print view`,
-      "/more/reports/clubs": `${notSearchable}: single-item or print page`,
       "/admin/event-templates/from-event": `${notSearchable}: setup step`,
       "/event-setup/from-template": `${notSearchable}: setup step`,
       "/people/matches": `${notSearchable}: identity merging stays a human decision`,
       "/help/glossary": `${notSearchable}: already in search`,
+      "/more/reports/clubs": part2,
       "/admin/clubs/health-import": part2,
       "/admin/clubs/import": part2,
       "/admin/organizations/import": part2,
@@ -84,7 +84,7 @@ describe("the registry", () => {
   it("matches the permission each page checks on the server", () => {
     for (const entry of reachedDestinations) {
       const file = join(process.cwd(), "app/(workspace)", entry.route, "page.tsx");
-      expect(readFileSync(file, "utf8"), entry.route).toContain(`permissions.includes("${entry.permission}")`);
+      expect(readFileSync(file, "utf8"), entry.route).toContain(`!permissions.includes("${entry.permission}")`);
     }
   });
 });
@@ -113,7 +113,7 @@ describe("search finds each page for a viewer who may open it", () => {
     const all = buildSearchDestinations(as(...everyPermission));
     expect(searchDestinations(all, "square payments")[0].label).toBe("Unmatched Square payments");
     expect(searchDestinations(all, "cancellation policy").map((destination) => destination.label)).toContain("Cancellation rules");
-    expect(searchDestinations(all, "refunds").map((destination) => destination.label)).toContain("Cancellation requests");
+    expect(searchDestinations(all, "cancellation requests").map((destination) => destination.label)).toContain("Refunds");
     expect(searchDestinations(all, "ledger health").map((destination) => destination.label)).toContain("Ledger check");
   });
 
