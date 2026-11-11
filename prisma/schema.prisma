@@ -684,6 +684,8 @@ enum MessageTemplateKey {
   CONFERENCE_CLUB_ORDER_CONFIRMATION
   /// The copy of a problem report (#1715) sent to the address the reporter gave, with or without an account: the reference and their own words. Not an event template.
   PROBLEM_REPORT_COPY
+  /// A reminder to a club director (and the volunteer, when an email is on file) that a Sterling Volunteers check is expiring or not current (#1844). Sent only when staff press Send after a preview. No event.
+  STERLING_REMINDER
 }
 
 enum MessageTemplateStatus {
@@ -7119,6 +7121,28 @@ model CalendarEventMatchDismissal {
 /// twice, and a sent batch is final for that due date (a deadline that moves gets
 /// its points prepared again for the new date). `title`, `dueOn` and `linkUrl` follow the entry while the
 /// batch is pending and are frozen once it is decided.
+/// One Sterling Volunteers reminder sent about one person in one club (#1844). Holds no email address (the outbox
+/// has those) and no screening detail: only the state at send time, who sent it and how many people were emailed.
+model BackgroundCheckReminder {
+  id                 String   @id @default(cuid())
+  personId           String
+  organizationId     String
+  clubYear           String
+  /// The club compliance state when it was sent: FLAGGED, NOT_COMPLIANT or NO_RECORD.
+  state              String
+  sentByUserId       String
+  sentAt             DateTime @default(now())
+  /// How many club directors were emailed about this person.
+  directorRecipients Int
+  /// Whether the volunteer was emailed too.
+  volunteerEmailed   Boolean
+  /// Every reminder written by one Send shares this id.
+  batchId            String
+
+  @@index([personId, organizationId, sentAt])
+  @@index([batchId])
+}
+
 model DeadlineReminderBatch {
   id                String                 @id @default(cuid())
   calendarEntryId   String?

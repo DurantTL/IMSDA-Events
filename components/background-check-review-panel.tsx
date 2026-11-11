@@ -7,7 +7,10 @@ import { ListPager } from "@/components/list-pager";
 import { SearchResultStatus, useDebouncedCallback } from "@/components/search-as-you-type";
 import { useTableSort, type ColumnSpec } from "@/components/use-table-sort";
 import { paginate } from "@/lib/pagination";
+import styles from "./background-check-review-panel.module.css";
 
+/** The anchor the page's "Needs a look" quick filter jumps to (#1844). */
+export const NEEDS_A_LOOK_ID = "needs-a-look";
 /** Unmatched list-wide rows shown per page (#702). */
 export const UNMATCHED_PAGE_SIZE = 50;
 /** Shown above the conference-wide unmatched rows, pointing at the name lookup. */
@@ -310,7 +313,7 @@ export function BackgroundCheckReviewPanel() {
 
   if (reviews === null && unmatched === null && manualMatches === null && nameOnlyMatches === null && !error) {
     return (
-      <section aria-busy="true" className="panel">
+      <section aria-busy="true" className="panel" id={NEEDS_A_LOOK_ID}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">Sterling Volunteers</p>
@@ -325,7 +328,7 @@ export function BackgroundCheckReviewPanel() {
   const unmatchedSlice = paginate(unmatchedSort.rows, unmatchedPage, UNMATCHED_PAGE_SIZE);
 
   return (
-    <section className="panel">
+    <section className="panel" id={NEEDS_A_LOOK_ID}>
       <div className="section-heading">
         <div>
           <p className="eyebrow">Sterling Volunteers</p>
@@ -393,6 +396,9 @@ export function BackgroundCheckReviewPanel() {
         </div>
       )}
 
+      {/* Already-matched people need no decision, so they are folded away behind a count (#1844). */}
+      <details className={styles.matched} id="matched-people">
+        <summary>Matched ({(nameOnlyMatches?.length ?? 0) + (manualMatches?.length ?? 0)})</summary>
       <h3>Matched by name, new since the last upload ({nameOnlyMatches?.length ?? 0})</h3>
       <p className="quiet-copy">These were matched by name. No action needed unless one is wrong. Each already counts, and it is remembered for the next upload, so it won&apos;t be listed again. &quot;Not the same person&quot; puts the row back to unmatched, and that person is never offered for that row again, even after a new upload (you can still match them by hand). A match remembered from an earlier upload can be undone the same way from the name lookup below.</p>
       {nameOnlyMatches && nameOnlyMatches.length === 0 && <p className="report-empty">No new matches by name since the last upload.</p>}
@@ -446,6 +452,7 @@ export function BackgroundCheckReviewPanel() {
           </table>
         </div>
       )}
+      </details>
 
       <h3>Why isn&apos;t this person matched?</h3>
       <form className="filter-bar background-check-lookup-form" onSubmit={(event) => void runLookup(event)}>
