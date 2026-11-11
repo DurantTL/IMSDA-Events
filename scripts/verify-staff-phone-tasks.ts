@@ -5,7 +5,7 @@
  * step cannot be finished. As a system administrator (who holds every workspace):
  *
  *  1. switch workspace through the account menu (labelled dialog, Close, focus in, Tab kept inside, Escape returns focus);
- *  2. find the registration form with "Find a page or task" (the header search, or the More sheet on a phone) and open it;
+ *  2. find the registration form with the header search "Search pages, clubs, events and churches" (or the More sheet on a phone) and open it;
  *  3. enter an edit page, change a field, try to leave, get the unsaved-changes guard, stay, then leave;
  *  4. open a record and come back to the list with its search kept;
  *  5. check an attendee in (and undo it, so the run can be repeated);
@@ -233,7 +233,7 @@ const tasks: Task[] = [
       } else {
         await page.locator("input.destination-search-input").first().fill("registration forms");
       }
-      const hit = page.locator('[aria-label="Matching pages"] [role="option"]:has-text("Registration forms")').first();
+      const hit = page.locator('.destination-search-list [role="option"]:has-text("Registration forms")').first();
       await hit.waitFor({ state: "visible", timeout: 8000 });
       await hit.click();
       await page.waitForURL(/\/registration-builder/, { timeout: 15000 });

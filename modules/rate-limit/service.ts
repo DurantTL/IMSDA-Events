@@ -1481,3 +1481,17 @@ export async function checkSystemCloudflarePurgeRateLimit(userId: string) {
     { policy: "system-report.cloudflare-purge.site", limit: systemCloudflarePurgeBudget.limit, windowSeconds: systemCloudflarePurgeBudget.windowSeconds, identifierHashes: [site] },
   ], configuration);
 }
+
+/** The staff header search (#1837): one account's requests per minute, a ceiling above any typing speed (the box is debounced). */
+export async function checkStaffSearchRateLimit(userId: string, limit: number) {
+  const configuration = getRateLimitConfiguration();
+  const account = hashRateLimitIdentifier("staff-search", userId, configuration);
+  return evaluate([
+    {
+      policy: "staff.search.account",
+      limit,
+      windowSeconds: 60,
+      identifierHashes: [account],
+    },
+  ], configuration);
+}

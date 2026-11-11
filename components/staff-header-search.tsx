@@ -8,7 +8,7 @@ import type { SearchDestination } from "@/components/destination-search-model";
 import styles from "./staff-shell.module.css";
 
 /**
- * The header's "Find a page or task" (#1177) and, on a phone (800px and narrower), the search icon button that opens the very
+ * The header's search (#1177, with clubs, events and churches from #1837) and, on a phone (800px and narrower), the search icon button that opens the very
  * same search on its own row under the header (#1734). Wide screens always show the box; the button is hidden there.
  */
 export function StaffHeaderSearch({ destinations, inputId }: { destinations: readonly SearchDestination[]; inputId: string }) {
@@ -48,13 +48,13 @@ export function StaffHeaderSearch({ destinations, inputId }: { destinations: rea
   return (
     <>
       <div className={styles.search} id={wrapId} data-open={open ? "true" : "false"} onKeyDownCapture={onKeyDownCapture}>
-        <DestinationSearch destinations={destinations} inputId={inputId} onNavigated={() => setOpen(false)} />
+        <DestinationSearch destinations={destinations} inputId={inputId} onNavigated={() => setOpen(false)} records />
       </div>
       <button
         type="button"
         ref={toggleRef}
         className={`secondary-button ${styles.searchToggle}`}
-        aria-label="Find a page or task"
+        aria-label="Search pages, clubs, events and churches"
         aria-expanded={open}
         aria-controls={wrapId}
         onClick={toggle}

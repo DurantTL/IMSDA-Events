@@ -10,14 +10,17 @@ import {
   destinationScopeDescription,
   destinationScopeLabels,
   actionForSurface,
+  buildResultLayout,
   destinationSearchStatus,
-  groupDestinationsByScope,
   hasSearchWords,
   listDestinations,
   listExpanded,
+  recordSearchStatus,
   selectDestination,
+  type ResultEntry,
   type SearchDestination,
 } from "@/components/destination-search-model";
+import { useStaffRecordSearch } from "@/components/use-staff-record-search";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import styles from "@/components/destination-search.module.css";
@@ -30,12 +33,18 @@ import styles from "@/components/destination-search.module.css";
  * (#647) before navigating; Cancel leaves the page and the typed words alone.
  * Nothing is sent anywhere as the person types. The key and selection rules are
  * pure functions in `destination-search-model.ts`, where they are unit tested.
+ *
+ * With `records` on (the staff header, #1837) typed words also ask the server for clubs, events and churches the viewer
+ * may open (`/api/staff/search`, debounced, one request at a time). They are listed in groups after the pages, share the
+ * one active option and the one focus ring, and open through the same unsaved-changes guard. Nothing is requested for
+ * an empty box.
  */
 export function DestinationSearch({
   destinations,
   inputId: inputIdProp,
   onNavigated,
   escapeBubbles = false,
+  records = false,
 }: {
   destinations: readonly SearchDestination[];
   /** A fixed id, so the collapsed sidebar's button can focus the field. */
@@ -44,6 +53,8 @@ export function DestinationSearch({
   onNavigated?: () => void;
   /** The More sheet: an Escape with nothing to undo reaches the sheet, which closes. */
   escapeBubbles?: boolean;
+  /** Also search clubs, events and churches on the server (the staff header). The More sheet stays pages-only. */
+  records?: boolean;
 }) {
   const router = useRouter();
   const baseId = useId();
@@ -56,12 +67,19 @@ export function DestinationSearch({
   // Where focus was before the field took it, so Escape can hand it back.
   const returnFocus = useRef<HTMLElement | null>(null);
 
-  const results = useMemo(() => listDestinations(destinations, query), [destinations, query]);
+  const pages = useMemo(() => listDestinations(destinations, query), [destinations, query]);
+  const hasQuery = hasSearchWords(query);
+  const recordSearch = useStaffRecordSearch(query, records);
+  // An empty box lists every page in the sidebar's groups; typed words are ranked pages (and, with records on, grouped records).
+  const layout = useMemo(
+    () => buildResultLayout({ pages, hasQuery, records: { enabled: records, result: recordSearch.result } }),
+    [pages, hasQuery, records, recordSearch.result],
+  );
+  const results = layout.entries;
+  const groups = layout.sections;
   const active = clampActiveIndex(activeRaw, results.length);
   const expanded = listExpanded(open, results.length);
-  const hasQuery = hasSearchWords(query);
-  // An empty box lists everything in the sidebar's groups; typed words are ranked, so they are not grouped.
-  const groups = hasQuery ? null : groupDestinationsByScope(results);
+  const waitingOnRecords = records && hasQuery && recordSearch.pending;
   const optionId = (index: number) => `${baseId}-option-${index}`;
 
   function reset() {
@@ -77,9 +95,9 @@ export function DestinationSearch({
     else inputRef.current?.focus();
   }
 
-  function choose(destination: SearchDestination) {
+  function choose(entry: ResultEntry) {
     selectDestination({
-      destination,
+      destination: entry,
       guard: guardedNavigate,
       reset,
       navigate: (href) => {
@@ -129,7 +147,7 @@ export function DestinationSearch({
     <div className="destination-search" role="search">
       <div className="search-field destination-search-field" onMouseDown={focusSearchInput}>
         <Search aria-hidden="true" size={16} />
-        <label className="sr-only" htmlFor={inputId}>Find a page or task</label>
+        <label className="sr-only" htmlFor={inputId}>{records ? recordsLabel : "Find a page or task"}</label>
         <input
           aria-activedescendant={activeDescendantId(expanded, active, optionId)}
           aria-autocomplete="list"
@@ -154,7 +172,7 @@ export function DestinationSearch({
           }}
           onClick={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder="Find a page or task"
+          placeholder={records ? recordsPlaceholder : "Find a page or task"}
           ref={inputRef}
           role="combobox"
           spellCheck={false}
@@ -164,10 +182,12 @@ export function DestinationSearch({
         <SearchClearButton onClear={() => { setQuery(""); setActive(-1); setOpen(true); }} visible={query !== ""} />
       </div>
       <p aria-live="polite" className="sr-only" role="status">
-        {destinationSearchStatus(query, results.length)}
+        {records
+          ? recordSearchStatus({ query, pageCount: pages.length, result: recordSearch.result, pending: recordSearch.pending, failed: recordSearch.failed })
+          : destinationSearchStatus(query, results.length)}
       </p>
       <ul
-        aria-label="Matching pages"
+        aria-label={records ? "Matching pages and records" : "Matching pages"}
         className="destination-search-list"
         hidden={!expanded}
         id={listId}
@@ -175,37 +195,68 @@ export function DestinationSearch({
       >
         {groups
           ? (open ? groups : []).map((group) => (
-            <li aria-labelledby={`${baseId}-group-${group.scope}`} className={styles.group} key={group.scope} role="group">
-              <span className={styles.groupHeading} id={`${baseId}-group-${group.scope}`}>{destinationScopeDescription(group.scope)}</span>
+            <li aria-labelledby={`${baseId}-group-${group.id}`} className={styles.group} key={group.id} role="group">
+              <span className={styles.groupHeading} id={`${baseId}-group-${group.id}`}>{group.heading}</span>
               <ul role="none">
-                {group.items.map((destination, offset) => (
-                  <DestinationOption
+                {group.entries.map((entry, offset) => (
+                  <ResultOption
                     active={group.start + offset === active}
-                    destination={destination}
+                    entry={entry}
                     id={optionId(group.start + offset)}
-                    key={destination.key}
-                    onChoose={() => choose(destination)}
+                    key={entry.key}
+                    onChoose={() => choose(entry)}
                     onHover={() => setActive(group.start + offset)}
                   />
                 ))}
               </ul>
             </li>
           ))
-          : results.map((destination, index) => (
-            <DestinationOption
+          : results.map((entry, index) => (
+            <ResultOption
               active={index === active}
-              destination={destination}
+              entry={entry}
               id={optionId(index)}
-              key={destination.key}
-              onChoose={() => choose(destination)}
+              key={entry.key}
+              onChoose={() => choose(entry)}
               onHover={() => setActive(index)}
             />
           ))}
       </ul>
-      {open && hasQuery && results.length === 0 && (
-        <p className="destination-search-empty">No pages match. Try a different word.</p>
+      {open && hasQuery && results.length === 0 && !waitingOnRecords && (
+        <p className="destination-search-empty">{records ? "Nothing matches. Try a different word." : "No pages match. Try a different word."}</p>
+      )}
+      {open && records && hasQuery && recordSearch.failed && results.length > 0 && (
+        <p className="destination-search-empty">Clubs, events and churches could not be searched.</p>
       )}
     </div>
+  );
+}
+
+const recordsLabel = "Search pages, clubs, events and churches";
+const recordsPlaceholder = "Search pages, clubs, events, churches";
+
+/** One row of the list: a page or task, a record, or a "See all results" link. */
+function ResultOption({ active, entry, id, onChoose, onHover }: { active: boolean; entry: ResultEntry; id: string; onChoose: () => void; onHover: () => void }) {
+  if (entry.kind === "page" && entry.destination) {
+    return <DestinationOption active={active} destination={entry.destination} id={id} onChoose={onChoose} onHover={onHover} />;
+  }
+  return (
+    <li
+      aria-selected={active}
+      className={`destination-search-option${entry.kind === "see-all" ? ` ${styles.seeAll}` : ""}`}
+      id={id}
+      onClick={onChoose}
+      onMouseDown={(event) => event.preventDefault()}
+      onMouseMove={onHover}
+      role="option"
+    >
+      <span className="destination-search-label">{entry.label}</span>
+      <span className="destination-search-scope" data-scope={entry.badge.toLowerCase()}>
+        <span className="sr-only">{entry.badgeSpoken}. </span>
+        <span aria-hidden="true">{entry.badge}</span>
+      </span>
+      <span className="destination-search-description">{entry.description}</span>
+    </li>
   );
 }
 
