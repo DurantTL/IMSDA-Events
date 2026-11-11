@@ -356,6 +356,18 @@ export function useSearchAsYouType({
   };
   const debouncer = useDebouncedCallback(() => applyNow("replace"), delayMs);
 
+  // A link the person clicks wins over typed text still waiting for its pause (#1873). Otherwise the search's address
+  // lands a moment after the click and takes them back to the list instead of the page they chose. Capture phase, so it
+  // runs before the link's own navigation.
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (link && !formRef.current?.contains(link)) debouncer.cancel();
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [debouncer]);
+
   return {
     formProps: {
       ref: formRef,

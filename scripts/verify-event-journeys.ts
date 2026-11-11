@@ -139,6 +139,7 @@ async function journey(ctx: Ctx, name: string, run: () => Promise<void>) {
   } catch (error) {
     ok = false;
     failStep(ctx, name, error);
+    await J.saveFailureEvidence(lastPage, `event-${ctx.viewport.name}-${name}`);
     // JOURNEY_DEBUG=1 shows what the person would have been looking at when a step failed.
     if (process.env.JOURNEY_DEBUG && lastPage) console.error(`    page ${lastPage.url()}:\n${(await J.bodyText(lastPage).catch(() => "")).split("\n").filter(Boolean).slice(0, 80).join("\n")}`);
   }

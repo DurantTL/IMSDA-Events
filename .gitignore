@@ -50,3 +50,6 @@ next-env.d.ts
 # Uploaded event files are written here at runtime.
 /storage/
 .neon
+
+# Journey failure screenshots (#1873)
+/test-results/
