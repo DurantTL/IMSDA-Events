@@ -124,7 +124,7 @@ export function clubSetupFor(id: ClubSetupId, base: string): RoleSetupEntry {
     case "club-settings-role":
       return { setup: howTo(["Club settings are changed by the club's director or deputy."], "You can open Club settings."), whoToAsk: askDirector("to change the club's settings"), guideId: "walkthrough-director-leaders" };
     case "next-year-role":
-      return { setup: howTo(["Starting a new year is done by the club's director or deputy."], "You can start next year's roster."), whoToAsk: askDirector("to start the new year"), guideId: "director-roster-and-forms" };
+      return { setup: howTo(["Starting a new year is done by the club's director or deputy."], "You can start next year's roster."), whoToAsk: askDirector("to start the new year"), guideId: "director-roster" };
     case "supplies-no-catalog":
       return {
         setup: howTo(["The supply catalog is loaded by the conference.", "Once it is, each item is listed here to count."], "Each catalog item is listed with a count."),
@@ -155,13 +155,13 @@ export function clubSetupFor(id: ClubSetupId, base: string): RoleSetupEntry {
       return {
         setup: howTo(["Roster health can only check health records once the conference has turned the Health Record feature on.", "Until then the health record count reads Not checked, and nobody is flagged for it."], "The health record count shows a number."),
         whoToAsk: "Only a system administrator can turn on the Health Record feature. Ask the conference office to pass this on.",
-        guideId: "director-roster-and-forms",
+        guideId: "director-roster",
       };
     case "roster-health-photo-off":
       return {
         setup: howTo(["Roster health can only check photo releases once the Pathfinder Photo and Video Release form is turned on for clubs.", "Until then the photo release count reads Not checked, and nobody is flagged for it."], "The photo release count shows a number."),
         whoToAsk: "Ask your conference Clubs Administrator to turn on the Pathfinder Photo and Video Release form.",
-        guideId: "director-roster-and-forms",
+        guideId: "director-club-forms",
       };
   }
 }

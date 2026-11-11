@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { GuideScreenshotFigure } from "@/components/guide-screenshot";
 import { WalkthroughSteps } from "@/components/walkthrough-steps";
 import { HelpBackLink } from "@/components/help-return";
 import { clubHelpReturnPath } from "@/lib/help-return";
 import { firstParam } from "@/lib/search-params";
+import { renamedPortalGuidePath } from "@/modules/help/renamed-portal-guides";
 import { docLabel, docUrl } from "@/modules/help/guides";
 import { walkthroughCapturedFor } from "@/modules/help/walkthrough-check";
 import { walkthroughManifest } from "@/modules/help/walkthrough-manifest-data";
@@ -35,6 +36,8 @@ export async function generateMetadata({ params }: { params: Promise<{ guideId: 
  */
 export default async function PortalGuidePage({ params, searchParams }: { params: Promise<{ guideId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [{ guideId }, query] = await Promise.all([params, searchParams]);
+  const renamed = renamedPortalGuidePath(guideId, query);
+  if (renamed) redirect(renamed);
   const from = clubHelpReturnPath(firstParam(query.from));
   const viewer = await loadPortalHelpViewer();
   const guide = portalGuideForViewer(guideId, viewer);
