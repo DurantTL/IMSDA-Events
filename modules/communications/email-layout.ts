@@ -104,6 +104,7 @@ export const EMAIL_HEADER_RULES: Record<MessageTemplateKey, EmailHeaderRule> = {
   CONFERENCE_CLUB_ORDER_SUBMITTED: "club",
   CONFERENCE_CLUB_ORDER_CONFIRMATION: "club",
   PROBLEM_REPORT_COPY: "general",
+  STERLING_REMINDER: "club",
 };
 
 /** The header context for a template. An unknown key (a row from a newer version) is general, never an error. */
@@ -201,6 +202,7 @@ export const EMAIL_WHY_LINES: Record<MessageTemplateKey, string> = {
   CONFERENCE_CLUB_ORDER_SUBMITTED: "You got this because you are on the list for conference club orders (patches and pins).",
   CONFERENCE_CLUB_ORDER_CONFIRMATION: "You got this because you are the director of a club that ordered patches and pins from the conference.",
   PROBLEM_REPORT_COPY: "You got this because this address was given when a problem was reported from the Forms help popup.",
+  STERLING_REMINDER: "You got this because you are a club director, or a volunteer with a club, and conference staff sent a Sterling Volunteers reminder.",
 };
 
 const GENERIC_WHY = "You got this because of something you did on IMAdventist.";

@@ -14,7 +14,7 @@ export function backgroundCheckApiError(error: unknown, action: string) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status });
   }
   if (error instanceof BackgroundCheckOperationError) {
-    return Response.json({ error: error.code, message: error.message }, { status: error.status });
+    return Response.json({ error: error.code, message: error.message, ...(error.details === undefined ? {} : { details: error.details }) }, { status: error.status });
   }
   logError(`${action} failed`, error);
   return Response.json(

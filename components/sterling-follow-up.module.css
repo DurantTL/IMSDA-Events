@@ -1,0 +1,131 @@
+/* Sterling Volunteers "People to follow up" list and its reminder preview (#1844). */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.filters a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.filters a[aria-current="true"] {
+  border-color: var(--ink);
+}
+
+.current {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+}
+
+.toolbar p {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+}
+
+.reminded {
+  display: block;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.noEmail {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.previewBody {
+  display: grid;
+  gap: 12px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.previewBody h3,
+.previewBody h4 {
+  margin: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.previewBody ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.message {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 4px 12px;
+}
+
+.message summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.message pre {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.selectPage {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.selectPage input {
+  width: 20px;
+  height: 20px;
+}
+
+/* "Send reminder" stays focusable while unavailable (L7), so it greys out like a disabled button. */
+.sendTrigger[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
