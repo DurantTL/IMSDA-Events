@@ -4064,9 +4064,9 @@ function staffTabRowInPage(): string[] {
 function phoneHeaderSearchInPage(): string[] {
   const problems: string[] = [];
   if (window.innerWidth > 800) return problems;
-  const toggle = Array.from(document.querySelectorAll<HTMLElement>("header button[aria-label='Search pages, clubs, events and churches']")).find((el) => el.getBoundingClientRect().width > 0);
+  const toggle = Array.from(document.querySelectorAll<HTMLElement>("header button[aria-label='Search pages, clubs, events, churches and people']")).find((el) => el.getBoundingClientRect().width > 0);
   if (document.getElementById("destination-search-input")) {
-    if (!toggle) problems.push("the phone header has no search icon button named \"Search pages, clubs, events and churches\"");
+    if (!toggle) problems.push("the phone header has no search icon button named \"Search pages, clubs, events, churches and people\"");
     else {
       const box = toggle.getBoundingClientRect();
       if (box.width < 43.5 || box.height < 43.5) problems.push(`the phone header search button is ${Math.round(box.width)}x${Math.round(box.height)}px`);
