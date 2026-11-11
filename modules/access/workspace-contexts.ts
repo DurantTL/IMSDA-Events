@@ -37,7 +37,8 @@ const ATTENDEE_CONTEXT: WorkspaceContext = {
 
 const STAFF_WORKSPACE_CONTEXT: WorkspaceContext = {
   kind: "staff_workspace",
-  href: "/overview",
+  // Staff Home (#1839): every staff account can open it; `/overview` sent staff with no event to "No event access".
+  href: "/home",
   label: "Staff workspace",
 };
 
@@ -111,7 +112,7 @@ export function staffWorkspaceOptions(input: {
  * only when this browser also carries a live staff session (the reverse of the
  * handoff above). An attendee with no staff session never sees either option:
  * `isSystemAdmin` is ignored without one, so it can never offer System
- * management on its own. These are links only; `/overview` and `/admin` keep
+ * management on its own. These are links only; `/home` and `/admin` keep
  * their own server-side checks.
  */
 export function otherWorkspaceContextsForAttendee(input: {

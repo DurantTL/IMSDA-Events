@@ -34,7 +34,8 @@ export default async function NewClubApplicationsAdminPage() {
         description="Directors apply from the public “Register a new club” page or a private link you send. Approving creates the club under its sponsoring church or company and emails the director the club invite. The Sterling Volunteers status is a flag to review, not a block."
         tools={[
           { href: "/clubs/register", label: "View the public form" },
-          { href: "/admin/settings", label: "Notification address" },
+          // Platform settings is for system administrators only (#1839): a Clubs Administrator would land on "no access".
+          ...(viewer === "SYSTEM_ADMIN" ? [{ href: "/admin/settings", label: "Notification address" }] : []),
         ]}
       />
       <NewClubApplicationsQueue

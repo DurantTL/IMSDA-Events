@@ -71,7 +71,7 @@ describe("public front page (#373)", () => {
     expect(html).toContain('<a href="/clubs">');
     expect(html).toContain("My registrations");
     expect(html).not.toContain('href="/login"');
-    expect(html).not.toContain('href="/overview"');
+    expect(html).not.toContain('href="/home"');
     expect(html).toContain("Find your next gathering.");
     expect(html).toContain("Nothing scheduled yet.");
   });
@@ -200,7 +200,7 @@ describe("public front page (#373)", () => {
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "user-1" } });
     mocks.headerState = { staffSignedIn: true, attendeeSignedIn: false, unifiedSignInEnabled: false };
     const html = await render();
-    expect(html).toContain('href="/overview"');
+    expect(html).toContain('href="/home"');
     expect(html).not.toContain('href="/login"');
   });
 

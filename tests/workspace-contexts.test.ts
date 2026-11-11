@@ -48,7 +48,7 @@ describe("otherWorkspaceContextsForAttendee", () => {
 
   it("offers the staff workspace only when this browser also carries a live staff session", () => {
     expect(otherWorkspaceContextsForAttendee({ hasStaffSession: true })).toEqual([
-      { kind: "staff_workspace", href: "/overview", label: "Staff workspace" },
+      { kind: "staff_workspace", href: "/home", label: "Staff workspace" },
     ]);
   });
 
@@ -58,13 +58,13 @@ describe("otherWorkspaceContextsForAttendee", () => {
 
   it("offers only the staff workspace to a staff user who is not a system administrator", () => {
     expect(otherWorkspaceContextsForAttendee({ hasStaffSession: true, isSystemAdmin: false })).toEqual([
-      { kind: "staff_workspace", href: "/overview", label: "Staff workspace" },
+      { kind: "staff_workspace", href: "/home", label: "Staff workspace" },
     ]);
   });
 
   it("offers the staff workspace and System management to a system administrator", () => {
     expect(otherWorkspaceContextsForAttendee({ hasStaffSession: true, isSystemAdmin: true })).toEqual([
-      { kind: "staff_workspace", href: "/overview", label: "Staff workspace" },
+      { kind: "staff_workspace", href: "/home", label: "Staff workspace" },
       { kind: "system_admin", href: "/admin", label: "System management" },
     ]);
   });

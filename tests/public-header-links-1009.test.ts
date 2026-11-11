@@ -51,7 +51,7 @@ describe("public header links (#1009)", () => {
 
   it("staff: Staff workspace, no Sign in", () => {
     const html = render({ staffSignedIn: true, attendeeSignedIn: false, unifiedSignInEnabled: false });
-    expect(html).toContain('href="/overview"');
+    expect(html).toContain('href="/home"');
     expect(html).toContain("Staff workspace");
     expect(html).not.toContain("Sign in");
     expect(html).not.toContain("My account");
@@ -131,14 +131,14 @@ describe("account header actions (#1009)", () => {
 
   it("staff session: Staff workspace next to Sign out, no System management", () => {
     const html = render({ hasStaffSession: true, isSystemAdmin: false }, "both");
-    expect(html).toContain('href="/overview"');
+    expect(html).toContain('href="/home"');
     expect(html).toContain("Sign out");
     expect(html).not.toContain("System management");
   });
 
   it("system administrator: Staff workspace, System management and Sign out", () => {
     const html = render({ hasStaffSession: true, isSystemAdmin: true }, "both");
-    expect(html).toContain('href="/overview"');
+    expect(html).toContain('href="/home"');
     expect(html).toContain('href="/admin"');
     expect(html).toContain("System management");
     expect(html).toContain("Sign out");
@@ -151,7 +151,7 @@ describe("account header actions (#1009)", () => {
 
   it("shows no Sign out when the mode is none, but keeps the staff links", () => {
     const html = render({ hasStaffSession: true, isSystemAdmin: false }, "none");
-    expect(html).toContain('href="/overview"');
+    expect(html).toContain('href="/home"');
     expect(html).not.toContain("Sign out");
   });
 });
