@@ -113,6 +113,14 @@ export const CLASS_TRACKING_EXPORT_HEADERS = [
 
 const join = (values: readonly string[]) => values.join("; ");
 
+/**
+ * The cells after the two name columns, in CLASS_TRACKING_EXPORT_HEADERS order.
+ * The CSV and the on-screen report both use this so every header has a cell (#1861).
+ */
+export function classTrackingDetailCells(row: ClassTrackingMemberRow): string[] {
+  return [row.className, row.tlt, join(row.insignia), join(row.eventPatches), join(row.conductAndTlt), join(row.masterAwards)];
+}
+
 export function classTrackingExportCsv(context: ExportContext, rows: readonly ClassTrackingMemberRow[]) {
   const out: Array<Array<string | number>> = [
     ["Club", context.clubName],
@@ -123,10 +131,7 @@ export function classTrackingExportCsv(context: ExportContext, rows: readonly Cl
   ];
   if (rows.length === 0) out.push(["No active roster members for this club year."]);
   for (const row of rows) {
-    out.push([
-      row.lastName, row.firstName, row.className, row.tlt,
-      join(row.insignia), join(row.eventPatches), join(row.conductAndTlt), join(row.masterAwards),
-    ]);
+    out.push([row.lastName, row.firstName, ...classTrackingDetailCells(row)]);
   }
   return toCsv(out);
 }

@@ -22,7 +22,7 @@ function block(source: string, opener: string) {
 describe("club roster on a desktop window (#1838)", () => {
   it("keeps the roster table on a desktop window with a mouse by dropping the card container", () => {
     const desktop = block(css, desktopQuery);
-    expect(desktop).toContain('.rosterTableWrap:global(.report-table-wrap):has(> :global(table.table-cards[data-cards="touch"])) { container: none; }');
+    expect(desktop).toContain('.rosterTableWrap:global(.report-table-wrap):not([data-fit="cards"]):has(> :global(table.table-cards[data-cards="touch"])) { container: none; }');
   });
 
   it("marks the roster table, and the mobile layout audit exempts only that marker on a desktop window", () => {
@@ -35,7 +35,8 @@ describe("club roster on a desktop window (#1838)", () => {
   it("gives the desktop table the same tightened columns and stacked actions as a wide box", () => {
     const desktop = block(css, desktopQuery);
     const wide = block(css, "@container table-box (min-width: 1101px)");
-    const rules = (text: string) => text.split("\n").map((line) => line.trim()).filter((line) => line.startsWith(":global(.roster-card-table)"));
+    // The desktop rules apply only while the table fits (#1861); the scope is a zero-specificity :where().
+    const rules = (text: string) => text.split("\n").map((line) => line.trim().replace(':where(.rosterTableWrap:not([data-fit="cards"])) ', "")).filter((line) => line.startsWith(":global(.roster-card-table)"));
     expect(rules(wide).length).toBeGreaterThan(0);
     expect(rules(desktop)).toEqual(rules(wide));
   });
