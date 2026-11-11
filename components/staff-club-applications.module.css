@@ -1,6 +1,11 @@
 /* Staff new club applications queue (#1589). Built to hold at 360px: cards stack, 44px targets, no sideways scroll. */
 .intro { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
 
+.introBlock { display: grid; gap: 10px; min-width: 0; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.tools :global(.secondary-button) { min-height: 44px; min-width: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+@media (max-width: 640px) { .tools > * { flex: 1 1 100%; } }
+.listHeading { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1.1rem); }
 .views { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .view {
   display: inline-flex;
@@ -26,7 +31,9 @@
 @media (max-width: 640px) { .open { justify-self: stretch; } }
 
 .record { display: grid; gap: 14px; min-width: 0; }
-.back { display: inline-flex; align-items: center; justify-self: start; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 700; }
+.record :global(.nca-head) h2 { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1.25rem); overflow-wrap: anywhere; }
+.record :global(.nca-head) p { margin: 4px 0 0; color: var(--muted); overflow-wrap: anywhere; }
+.decision h2:focus { outline: none; }
 
 .decision { display: grid; gap: 12px; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); padding: 16px; }
 .decision h2 { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1.1rem); }

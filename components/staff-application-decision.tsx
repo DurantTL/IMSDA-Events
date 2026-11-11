@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import styles from "@/components/staff-club-applications.module.css";
 import { sponsorOptionLabel } from "@/modules/organizations/domain";
@@ -23,6 +23,12 @@ export function StaffApplicationDecision({ application, churches }: { applicatio
   const [reason, setReason] = useState("");
   const [churchChoice, setChurchChoice] = useState("");
   const [message, setMessage] = useState<Result | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // After a decision the buttons are gone, so focus goes to the Decision heading instead of falling to the page.
+  useEffect(() => {
+    if (message?.tone === "success") headingRef.current?.focus();
+  }, [message]);
 
   // Typed text not yet sent: an open decline reason. The church select is a choice, not typed text, so it does not count.
   useUnsavedChangesGuard(mode === "decline" && reason.trim() !== "", "You have typed something here that has not been sent. Leave this page and discard it?");
@@ -51,10 +57,12 @@ export function StaffApplicationDecision({ application, churches }: { applicatio
   }
 
   const pending = application.status === "PENDING";
-  if (!pending && !message) return null;
+  const result = message?.tone === "success" ? message.text : "";
   return (
+    <>
+      {(pending || message) && (
     <section aria-labelledby="application-decision-heading" className={styles.decision}>
-      <h2 id="application-decision-heading">Decision</h2>
+      <h2 id="application-decision-heading" ref={headingRef} tabIndex={-1}>Decision</h2>
       {pending && (
         mode === null ? (
           <>
@@ -117,7 +125,11 @@ export function StaffApplicationDecision({ application, churches }: { applicatio
           </form>
         )
       )}
-      {message && <p className={`inline-notice ${message.tone}`} role={message.tone === "error" ? "alert" : "status"}>{message.text}</p>}
+      {message?.tone === "error" && <p className="inline-notice error" role="alert">{message.text}</p>}
     </section>
+      )}
+      {/* Always mounted, so the result is announced even though the buttons are gone after the refresh. */}
+      <p aria-live="polite" className={result ? "inline-notice success" : "sr-only"} role="status">{result}</p>
+    </>
   );
 }

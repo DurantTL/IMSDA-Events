@@ -6,6 +6,7 @@ import {
   StaffApplicationList,
   StaffApplicationMissing,
   StaffApplicationRecord,
+  applicationBackLink,
   StaffApplicationViews,
   StaffApplicationsIntro,
 } from "@/components/staff-club-applications";
@@ -18,7 +19,7 @@ import {
   listNewClubInvites,
   listPublicSponsorOptions,
 } from "@/modules/club-applications/repository";
-import { parseApplicationId, parseApplicationView } from "@/modules/club-applications/queue-model";
+import { parseApplicationId, parseApplicationView, viewOfApplication } from "@/modules/club-applications/queue-model";
 import { isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
@@ -49,10 +50,13 @@ export default async function NewClubApplicationsAdminPage({
     const requested = parseApplicationView(query.status);
     return (
       <>
-        <AdminPageHeader path="/admin/clubs/applications" />
+        <AdminPageHeader
+          back={applicationBackLink(application ? viewOfApplication(application.status) : requested === "decided" ? "decided" : "waiting")}
+          path="/admin/clubs/applications"
+        />
         {application
           ? <StaffApplicationRecord application={application} churches={churches} />
-          : <StaffApplicationMissing view={requested === "decided" ? "decided" : "waiting"} />}
+          : <StaffApplicationMissing />}
       </>
     );
   }

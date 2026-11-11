@@ -34,7 +34,9 @@ vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.ge
 vi.mock("@/modules/access/admin-roles", () => ({ hasClubsAdministration: mocks.hasClubsAdministration }));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/staff/sign-in" }));
 vi.mock("@/modules/communications/account-email", () => ({ isAccountEmailConfigured: () => true }));
-vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: () => null }));
+const header = vi.hoisted(() => ({ props: [] as Array<{ back?: { href: string; label: string } | null }> }));
+vi.mock("@/components/admin-page-header", () => ({ AdminPageHeader: (props: { back?: { href: string; label: string } | null }) => { header.props.push(props); return null; } }));
+const lastBack = () => header.props.at(-1)?.back;
 
 import ApplicationsPage from "@/app/(workspace)/admin/clubs/applications/page";
 import TransfersPage from "@/app/(workspace)/admin/clubs/transfers/page";
@@ -174,8 +176,8 @@ describe("each view reads only what it shows", () => {
   it("moves the description and the two links into the intro, and the settings link is for system administrators only", async () => {
     const admin = await render({});
     expect(admin).toContain("Directors apply from the public");
-    expect(admin).toContain('href="/clubs/register"');
-    expect(admin).toContain('href="/admin/settings"');
+    expect(admin).toMatch(/<a class="secondary-button" href="\/clubs\/register">View the public form<\/a>/);
+    expect(admin).toMatch(/<a class="secondary-button" href="\/admin\/settings">Notification address<\/a>/);
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u2", globalRole: null } });
     const clubsAdmin = await render({});
     expect(clubsAdmin).toContain('href="/clubs/register"');
@@ -270,8 +272,15 @@ describe("list cards", () => {
     expect(html).toContain('href="/admin/clubs/applications?application=row-2"');
     expect(html).not.toMatch(/>Approve<|>Decline<|Approve and send/);
     state.rows = [];
-    expect(renderToStaticMarkup(await ApplicationsPage({ searchParams: Promise.resolve({}) }))).toContain("No applications are waiting.");
-    expect(renderToStaticMarkup(await ApplicationsPage({ searchParams: Promise.resolve({ status: "decided" }) }))).toContain("No applications have been decided yet.");
+    const empty = renderToStaticMarkup(await ApplicationsPage({ searchParams: Promise.resolve({}) }));
+    expect(empty).toContain("No applications are waiting.");
+    expect(empty).toContain('href="/admin/clubs/applications?status=links">Send a private link<');
+    const decided = renderToStaticMarkup(await ApplicationsPage({ searchParams: Promise.resolve({ status: "decided" }) }));
+    expect(decided).toContain("No applications have been decided yet.");
+    expect(decided).toContain('href="/admin/clubs/applications">Back to waiting applications<');
+    // Each view has an h2 between the page's h1 and the cards' h3.
+    expect(empty).toContain(">Waiting applications</h2>");
+    expect(decided).toContain(">Decided applications</h2>");
   });
 });
 
@@ -282,11 +291,13 @@ describe("one application on its own", () => {
     state.rows = [row("PENDING", { attachmentName: "plan.pdf", attachmentContentType: "application/pdf", attachmentByteSize: 2048 })];
     const html = await page("row-PENDING");
     expect(db.newClubApplication.findMany.mock.calls.filter((call) => call[0].take !== undefined)).toHaveLength(0);
-    expect(html).toContain("Back to waiting applications");
-    expect(html).toContain('href="/admin/clubs/applications"');
+    expect(lastBack()).toEqual({ href: "/admin/clubs/applications", label: "Back to waiting applications" });
+    expect(html).not.toContain("Back to waiting applications");
+    expect(html).toMatch(/<h2[^>]*translate="no"[^>]*>Sample Valley Pathfinders<\/h2>/);
+    expect(html).not.toContain('class="sr-only">Application<');
     expect(html).toContain("Mailing address");
     expect(html).toContain("/api/admin/club-applications/row-PENDING/attachment");
-    expect(html).toContain('<h2 id="application-decision-heading">Decision</h2>');
+    expect(html).toContain('<h2 id="application-decision-heading" tabindex="-1">Decision</h2>');
     expect(html.indexOf("Mailing address")).toBeLessThan(html.indexOf("Decision</h2>"));
     expect(html).toContain(">Approve<");
     expect(html).toContain(">Decline<");
@@ -295,8 +306,7 @@ describe("one application on its own", () => {
   it("shows a declined application with its reason and who decided, and no Decision section", async () => {
     state.rows = [row("DECLINED", { declineReason: "Already has a club.", decidedAt: new Date("2026-11-05T12:00:00Z"), decidedBy: { displayName: "Alex Admin" } })];
     const html = await page("row-DECLINED");
-    expect(html).toContain("Back to decided applications");
-    expect(html).toContain('href="/admin/clubs/applications?status=decided"');
+    expect(lastBack()).toEqual({ href: "/admin/clubs/applications?status=decided", label: "Back to decided applications" });
     expect(html).toContain("Reason given");
     expect(html).toContain("Already has a club.");
     expect(html).toContain("Nov 5, 2026 by Alex Admin");
@@ -325,11 +335,12 @@ describe("one application on its own", () => {
     for (const id of ["nope", "../etc/passwd", "<script>", "x".repeat(300)]) {
       const html = await page(id);
       expect(html).toContain("That application could not be found.");
-      expect(html).toContain("Back to waiting applications");
+      expect(lastBack()?.label).toBe("Back to waiting applications");
       expect(html).not.toContain("Sample Valley Pathfinders");
       expect(html).not.toContain("<script>");
     }
-    expect(await page("nope", { status: "decided" })).toContain("Back to decided applications");
+    await page("nope", { status: "decided" });
+    expect(lastBack()?.label).toBe("Back to decided applications");
   });
 
   it("renders the record component with the church list for the decision", () => {

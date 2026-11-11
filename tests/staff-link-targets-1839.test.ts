@@ -135,7 +135,7 @@ describe("links the #1839 crawl found wrongly shown", () => {
   it("New club applications shows Platform settings (Notification address) to system administrators only", () => {
     // The link moved from the page header into the queue's intro (#1589); the page still decides who sees it.
     expect(read("app/(workspace)/admin/clubs/applications/page.tsx")).toContain('const showSettingsLink = viewer === "SYSTEM_ADMIN";');
-    expect(read("components/staff-club-applications.tsx")).toContain('{showSettingsLink && <>{" · "}<Link href="/admin/settings">Notification address</Link></>}');
+    expect(read("components/staff-club-applications.tsx")).toContain('{showSettingsLink && <Link className="secondary-button" href="/admin/settings">Notification address</Link>}');
     expect(read("app/(workspace)/admin/settings/page.tsx")).toContain("SYSTEM_ADMIN");
   });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeftRight, ChevronDown, Filter } from "lucide-react";
@@ -90,6 +91,8 @@ export function StaffTransferCard({ transfer, onAction }: { transfer: StaffTrans
 export function ClubTransferQueue({ filter = "open" }: { filter?: StaffQueueFilter }) {
   const router = useRouter();
   const [transfers, setTransfers] = useState<StaffTransferRecord[] | null>(null);
+  // The view the cards on screen belong to; while it trails `filter` the list stays put and is marked busy.
+  const [loadedFilter, setLoadedFilter] = useState<StaffQueueFilter | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [action, setAction] = useState<Action | null>(null);
@@ -110,14 +113,11 @@ export function ClubTransferQueue({ filter = "open" }: { filter?: StaffQueueFilt
       setError(caught instanceof Error ? caught.message : "The transfer queue could not be loaded.");
       setTransfers([]);
     }
+    setLoadedFilter(filter);
   }, [filter]);
 
   useEffect(() => {
-    // A new view starts from "Loading…", so the last view's cards never sit under the new view's name.
-    const timer = window.setTimeout(() => {
-      setTransfers(null);
-      void load();
-    }, 0);
+    const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
 
@@ -193,7 +193,11 @@ export function ClubTransferQueue({ filter = "open" }: { filter?: StaffQueueFilt
           <Filter aria-hidden="true" size={16} />
           <span>Show</span>
           <span className="transfer-filter-select">
-            <select onChange={(event) => router.push(staffQueueHref(parseStaffQueueView(event.target.value)))} value={filter}>
+            <select onChange={(event) => {
+              setNotice("");
+              // Keep the reader's place (B17): only the list below changes.
+              router.push(staffQueueHref(parseStaffQueueView(event.target.value)), { scroll: false });
+            }} value={filter}>
               {staffQueueFilters.map((value) => <option key={value} value={value}>{filterLabels[value]}</option>)}
             </select>
             <ChevronDown aria-hidden="true" size={15} />
@@ -202,10 +206,11 @@ export function ClubTransferQueue({ filter = "open" }: { filter?: StaffQueueFilt
       </div>
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
-      {transfers === null ? <p className="report-empty">Loading…</p> : transfers.length === 0 ? (
-        <p className="report-empty">{staffQueueEmptyText[filter]}</p>
-      ) : (
-        <ul className="transfer-list">
+      {transfers === null || (loadedFilter !== filter && transfers.length === 0) ? <p className="report-empty">Loading…</p> : transfers.length === 0 ? (error ? null : <div className="report-empty">
+          <p>{staffQueueEmptyText[filter]}</p>
+          {filter !== "open" && <p><Link href={staffQueueHref("open")} scroll={false}>Show all open transfers</Link></p>}
+        </div>) : (
+        <ul aria-busy={loadedFilter !== filter} className="transfer-list">
           {transfers.map((transfer) => <StaffTransferCard key={transfer.id} onAction={(next) => void start(next)} transfer={transfer} />)}
         </ul>
       )}

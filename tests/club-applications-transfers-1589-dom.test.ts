@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createElement } from "react";
+import { act, createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -84,6 +84,8 @@ describe("the Decision section", () => {
     expect(JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ decision: "approve" });
     const status = mounted!.container.querySelector('[role="status"]');
     expect(status?.textContent).toContain("Approved.");
+    // Focus moves to the Decision heading instead of falling to the page.
+    expect(document.activeElement?.id).toBe("application-decision-heading");
     // The page refreshes and the application is now decided: the result stays.
     await mounted!.root.render(createElement(StaffApplicationDecision, { application: application({ status: "APPROVED" }), churches }));
     await flush();
@@ -107,8 +109,8 @@ describe("the Decision section", () => {
     expect(mounted!.container.querySelector('[role="alert"]')?.textContent).toBe("That application was already decided.");
   });
 
-  it("draws nothing for an application that was already decided", () => {
-    expect(renderToStaticMarkup(createElement(StaffApplicationDecision, { application: application({ status: "APPROVED" }), churches }))).toBe("");
+  it("shows no Decision section for an application that was already decided, only the empty live region", () => {
+    expect(renderToStaticMarkup(createElement(StaffApplicationDecision, { application: application({ status: "APPROVED" }), churches }))).not.toContain("Decision");
   });
 });
 
@@ -123,11 +125,51 @@ describe("transfer queue in a DOM", () => {
     const select = mounted!.container.querySelector<HTMLSelectElement>("select")!;
     expect(select.value).toBe("declined");
     await choose(select, "overdue");
-    expect(nav.push).toHaveBeenCalledWith("/admin/clubs/transfers?view=overdue");
+    expect(nav.push).toHaveBeenCalledWith("/admin/clubs/transfers?view=overdue", { scroll: false });
     await choose(select, "open");
-    expect(nav.push).toHaveBeenLastCalledWith("/admin/clubs/transfers");
+    expect(nav.push).toHaveBeenLastCalledWith("/admin/clubs/transfers", { scroll: false });
   });
 
+
+  it("keeps the last cards on screen, marked busy, while a new view loads, and clears the completed notice on a view change", async () => {
+    let release: (() => void) | undefined;
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === "POST") return new Response(JSON.stringify({ registrationMovesQueued: 0 }), { status: 200 });
+      if (String(url).includes("filter=overdue")) await new Promise<void>((resolve) => { release = resolve; });
+      return new Response(JSON.stringify({ transfers: [transfer({ id: "t1", overdue: true })] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    mounted = await mount(createElement(ClubTransferQueue, { filter: "open" }));
+    await flush(10);
+    await click(buttonByText(mounted!.container, "Finish"));
+    await flush();
+    await click([...document.body.querySelectorAll("button")].find((button) => button.textContent?.trim() === "Finish transfer")!);
+    await flush(10);
+    expect(mounted!.container.textContent).toContain("Transfer completed.");
+    // The address changes (the page passes the new view in): the old cards stay, busy, and the notice goes.
+    await choose(mounted!.container.querySelector("select")!, "overdue");
+    await act(async () => { mounted!.root.render(createElement(ClubTransferQueue, { filter: "overdue" })); });
+    await flush(10);
+    expect(mounted!.container.querySelector("#transfer-t1")).not.toBeNull();
+    expect(mounted!.container.querySelector("ul.transfer-list")?.getAttribute("aria-busy")).toBe("true");
+    expect(mounted!.container.textContent).not.toContain("Transfer completed.");
+    expect(release).toBeDefined();
+    release?.();
+    await flush(50);
+    expect(mounted!.container.querySelector("ul.transfer-list")?.getAttribute("aria-busy")).toBe("false");
+  });
+
+  it("offers a next step from an empty view, and none on open", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ transfers: [] }), { status: 200 })));
+    mounted = await mount(createElement(ClubTransferQueue, { filter: "declined" }));
+    await flush(10);
+    expect(mounted!.container.querySelector('a[href="/admin/clubs/transfers"]')?.textContent).toBe("Show all open transfers");
+    await mounted!.unmount();
+    mounted = await mount(createElement(ClubTransferQueue, { filter: "open" }));
+    await flush(10);
+    expect(mounted!.container.textContent).toContain("No open transfers.");
+    expect(mounted!.container.querySelector("a")).toBeNull();
+  });
 
   it("says what is empty for each view, apart from loading and a failed read", async () => {
     expect(new Set(Object.values(staffQueueEmptyText)).size).toBe(staffQueueFilters.length);
