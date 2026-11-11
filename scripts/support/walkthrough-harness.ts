@@ -38,6 +38,8 @@ export type HarnessOptions = {
   /** Only walkthroughs whose id contains this text. */
   only?: string;
   kinds: readonly WalkthroughImageKind[];
+  /** Pixels per CSS pixel. The capture script uses 2 for sharp pictures; the browser check keeps 1. */
+  deviceScaleFactor?: number;
   /** Runs after each step has put the page in its state. */
   onStep?: (capture: StepCapture) => Promise<void>;
   log?: (line: string) => void;
@@ -189,7 +191,7 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
         const viewport = walkthroughViewports[kind];
         const context = await browser.newContext({
           viewport,
-          deviceScaleFactor: 1,
+          deviceScaleFactor: options.deviceScaleFactor ?? 1,
           hasTouch: kind === "phone",
           isMobile: false,
           reducedMotion: "reduce",
