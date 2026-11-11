@@ -156,6 +156,8 @@ export function AppShell({
     eventlessProfile,
   });
   const { place, viewer, eventTabs, eventPlace, rail, rowTabs, currentTab, eventQuery, carry, launcherCards, launcherSections, phoneItems, eventsLanding, moreContext } = nav;
+  // Possible duplicate people (/people/matches) is a System page outside /admin (#1886): it lights System administration.
+  const onSystemPage = isSystemRoute || place.tab === "system-administration";
   const held = viewer.held;
   const activeRole = viewer.activeRole;
   const selectedHiddenCardKeys = moreContext.hiddenCardKeys;
@@ -193,7 +195,7 @@ export function AppShell({
     isSystemAdmin,
     attendeeAccountAvailable,
     staffHref: eventTabs[0]?.href ?? withCurrentEvent(adminRoleLanding(activeRole), selectedEventId),
-    onSystemPage: isSystemAdmin && isSystemRoute,
+    onSystemPage: isSystemAdmin && onSystemPage,
   });
 
   // Which work context the page is in (#1180). A label only; it grants nothing. The Event administration badge stays.
@@ -208,7 +210,7 @@ export function AppShell({
     ? { kind: "profile" as const, kindLabel: "Home", label: "Your work", detail: "Across your events and roles" }
     : place.inEvent
     ? { kind: "event" as const, kindLabel: "Event", label: selectedEvent?.name?.trim() || "No event selected", detail: "Event workspace" }
-    : isSystemRoute && isSystemAdmin
+    : onSystemPage && isSystemAdmin
     ? { kind: "system" as const, kindLabel: "System", label: "System administration", detail: "All events" }
     : { kind: "event" as const, kindLabel: selectedEvent ? "Event" : "Staff", label: selectedEvent?.name?.trim() || "Staff workspace", detail: "" };
 
