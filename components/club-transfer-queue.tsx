@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeftRight, ChevronDown, Filter } from "lucide-react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { TransferDate, transferEventLabel } from "@/components/transfer-format";
@@ -102,14 +102,20 @@ export function ClubTransferQueue({ filter = "open" }: { filter?: StaffQueueFilt
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
 
+  // Only the newest read may draw the list: a slower answer for a view the person already left is dropped, so the
+  // cards never sit under another view's name.
+  const latestRead = useRef(0);
   const load = useCallback(async () => {
+    const read = ++latestRead.current;
     setError("");
     try {
       const response = await fetch(`${API}?filter=${encodeURIComponent(filter)}`, { cache: "no-store" });
       const result = await response.json().catch(() => ({})) as { transfers?: StaffTransferRecord[]; message?: string };
+      if (read !== latestRead.current) return;
       if (!response.ok) throw new Error(result.message ?? "The transfer queue could not be loaded.");
       setTransfers(result.transfers ?? []);
     } catch (caught) {
+      if (read !== latestRead.current) return;
       setError(caught instanceof Error ? caught.message : "The transfer queue could not be loaded.");
       setTransfers([]);
     }
@@ -210,7 +216,7 @@ export function ClubTransferQueue({ filter = "open" }: { filter?: StaffQueueFilt
           <p>{staffQueueEmptyText[filter]}</p>
           {filter !== "open" && <p><Link href={staffQueueHref("open")} scroll={false}>Show all open transfers</Link></p>}
         </div>) : (
-        <ul aria-busy={loadedFilter !== filter} className="transfer-list">
+        <ul aria-busy={loadedFilter !== filter} className="transfer-list" inert={loadedFilter !== filter}>
           {transfers.map((transfer) => <StaffTransferCard key={transfer.id} onAction={(next) => void start(next)} transfer={transfer} />)}
         </ul>
       )}

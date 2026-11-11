@@ -159,6 +159,33 @@ describe("transfer queue in a DOM", () => {
     expect(mounted!.container.querySelector("ul.transfer-list")?.getAttribute("aria-busy")).toBe("false");
   });
 
+  it("drops a slower answer for a view the person already left", async () => {
+    let releaseOverdue: (() => void) | undefined;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes("filter=overdue")) {
+        await new Promise<void>((resolve) => { releaseOverdue = resolve; });
+        return new Response(JSON.stringify({ transfers: [transfer({ id: "late-overdue", overdue: true })] }), { status: 200 });
+      }
+      const id = String(url).includes("filter=declined") ? "declined-1" : "open-1";
+      return new Response(JSON.stringify({ transfers: [transfer({ id })] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    mounted = await mount(createElement(ClubTransferQueue, { filter: "open" }));
+    await flush(10);
+    await act(async () => { mounted!.root.render(createElement(ClubTransferQueue, { filter: "overdue" })); });
+    await flush(10);
+    expect(mounted!.container.querySelector("ul.transfer-list")?.hasAttribute("inert")).toBe(true);
+    await act(async () => { mounted!.root.render(createElement(ClubTransferQueue, { filter: "declined" })); });
+    await flush(10);
+    expect(mounted!.container.querySelector("#transfer-declined-1")).not.toBeNull();
+    releaseOverdue?.();
+    await flush(50);
+    expect(mounted!.container.querySelector("#transfer-late-overdue")).toBeNull();
+    expect(mounted!.container.querySelector("#transfer-declined-1")).not.toBeNull();
+    expect(mounted!.container.querySelector("ul.transfer-list")?.getAttribute("aria-busy")).toBe("false");
+    expect(mounted!.container.querySelector("ul.transfer-list")?.hasAttribute("inert")).toBe(false);
+  });
+
   it("offers a next step from an empty view, and none on open", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ transfers: [] }), { status: 200 })));
     mounted = await mount(createElement(ClubTransferQueue, { filter: "declined" }));
