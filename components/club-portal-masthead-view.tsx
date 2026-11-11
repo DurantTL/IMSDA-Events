@@ -2,6 +2,8 @@ import { PRODUCT_NAME } from "@/lib/brand";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { BrandLink } from "@/components/brand-link";
 import { PortalMastheadActions } from "@/components/portal-masthead-actions";
+import { ClubPortalSearch } from "@/components/club-portal-search";
+import type { ClubSearchPage } from "@/components/club-search-model";
 import styles from "@/components/club-portal-masthead-view.module.css";
 import { Repeat2 } from "lucide-react";
 import type { AccountSignOutMode } from "@/modules/access/workspace-contexts";
@@ -42,12 +44,13 @@ export function clubMastheadModel(input: {
   };
 }
 
-/** The masthead markup: no staff or system links. The "Your account" drop-down (#1555) sits in this row and lists only what the portal layout allowed; it is not a role picker. */
-export function ClubPortalMastheadView({ model, role, formsHelpContact }: { model: ClubMastheadModel; role: ClubRole; formsHelpContact?: FormsHelpContact }) {
+/** The masthead markup: no staff or system links. `searchPages` are the tabs the layout shows this role (#1854); without them the search box is left out. The "Your account" drop-down (#1555) sits in this row and lists only what the portal layout allowed; it is not a role picker. */
+export function ClubPortalMastheadView({ model, role, formsHelpContact, searchPages }: { model: ClubMastheadModel; role: ClubRole; formsHelpContact?: FormsHelpContact; searchPages?: readonly ClubSearchPage[] }) {
   return (
     <header className="club-masthead">
       <div className="club-masthead-inner">
         <BrandLink label="IMAdventist Club portal, calendar" className="club-masthead-brand" wordmark={<span><small>{PRODUCT_NAME}</small><strong>Club portal</strong></span>} />
+        {searchPages && <ClubPortalSearch pages={searchPages} />}
         <PortalMastheadActions
           formsHelpContact={formsHelpContact}
           signOut={model.signOut}

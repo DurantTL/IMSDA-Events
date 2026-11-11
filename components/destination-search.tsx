@@ -18,11 +18,14 @@ import {
   listExpanded,
   recordMoreNotes,
   recordSearchStatus,
+  staffRecordSearch,
+  type RecordSearchSpec,
   selectDestination,
   type ResultEntry,
   type SearchDestination,
 } from "@/components/destination-search-model";
-import { useStaffRecordSearch } from "@/components/use-staff-record-search";
+import { useRecordSearch } from "@/components/use-staff-record-search";
+import type { StaffSearchResult } from "@/modules/staff-search/domain";
 import { guardedNavigate } from "@/components/unsaved-changes-registry";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import styles from "@/components/destination-search.module.css";
@@ -41,7 +44,7 @@ import styles from "@/components/destination-search.module.css";
  * one active option and the one focus ring, and open through the same unsaved-changes guard. Nothing is requested for
  * an empty box.
  */
-export function DestinationSearch({
+export function DestinationSearch<R extends { query: string } = StaffSearchResult>({
   destinations,
   inputId: inputIdProp,
   onNavigated,
@@ -55,9 +58,14 @@ export function DestinationSearch({
   onNavigated?: () => void;
   /** The More sheet: an Escape with nothing to undo reaches the sheet, which closes. */
   escapeBubbles?: boolean;
-  /** Also search clubs, events and churches on the server (the staff header). The More sheet stays pages-only. */
-  records?: boolean;
+  /**
+   * Also search records on the server. `true` is the staff header's clubs, events and churches; a `RecordSearchSpec` names
+   * another endpoint and its groups (the club portal's clubs and members, #1854). The More sheet stays pages-only.
+   */
+  records?: boolean | RecordSearchSpec<R>;
 }) {
+  const spec = records === true ? (staffRecordSearch as unknown as RecordSearchSpec<R>) : records || null;
+  const recordsOn = spec !== null;
   const router = useRouter();
   const baseId = useId();
   const inputId = inputIdProp ?? `${baseId}-input`;
@@ -72,11 +80,11 @@ export function DestinationSearch({
 
   const pages = useMemo(() => listDestinations(destinations, query), [destinations, query]);
   const hasQuery = hasSearchWords(query);
-  const recordSearch = useStaffRecordSearch(query, records);
+  const recordSearch = useRecordSearch<R>(query, recordsOn, spec?.endpoint ?? staffRecordSearch.endpoint);
   // An empty box lists every page in the sidebar's groups; typed words are ranked pages (and, with records on, grouped records).
   const layout = useMemo(
-    () => buildResultLayout({ pages, hasQuery, records: { enabled: records, result: recordSearch.result } }),
-    [pages, hasQuery, records, recordSearch.result],
+    () => buildResultLayout<R>({ pages, hasQuery, records: { enabled: recordsOn, result: recordSearch.result }, spec: spec ?? undefined }),
+    [pages, hasQuery, recordsOn, recordSearch.result, spec],
   );
   const results = layout.entries;
   const groups = layout.sections;
@@ -84,10 +92,10 @@ export function DestinationSearch({
   const active = clampActiveIndex(activeRaw, results.length);
   const setActive = (index: number) => setActiveKey(results[index]?.key ?? null);
   const expanded = listExpanded(open, results.length);
-  const waitingOnRecords = records && hasQuery && recordSearch.pending;
+  const waitingOnRecords = recordsOn && hasQuery && recordSearch.pending;
   // Notes under the list (not options): groups cut short with no page to see the rest on, and a failed record search.
-  const moreNotes = open && records && hasQuery && !recordSearch.pending ? recordMoreNotes(recordSearch.result) : [];
-  const showFailedNote = open && records && hasQuery && recordSearch.failed && results.length > 0;
+  const moreNotes = open && recordsOn && hasQuery && !recordSearch.pending ? recordMoreNotes<R>(recordSearch.result, spec ?? undefined) : [];
+  const showFailedNote = open && recordsOn && hasQuery && recordSearch.failed && results.length > 0;
   const hasFootNotes = moreNotes.length > 0 || showFailedNote;
   const optionId = (index: number) => `${baseId}-option-${index}`;
 
@@ -156,7 +164,7 @@ export function DestinationSearch({
     <div className="destination-search" role="search">
       <div className="search-field destination-search-field" onMouseDown={focusSearchInput}>
         <Search aria-hidden="true" size={16} />
-        <label className="sr-only" htmlFor={inputId}>{records ? recordsLabel : "Find a page or task"}</label>
+        <label className="sr-only" htmlFor={inputId}>{spec ? spec.label : "Find a page or task"}</label>
         <input
           aria-activedescendant={activeDescendantId(expanded, active, optionId)}
           aria-autocomplete="list"
@@ -181,7 +189,7 @@ export function DestinationSearch({
           }}
           onClick={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          placeholder={records ? recordsPlaceholder : "Find a page or task"}
+          placeholder={spec ? spec.placeholder : "Find a page or task"}
           ref={inputRef}
           role="combobox"
           spellCheck={false}
@@ -191,13 +199,13 @@ export function DestinationSearch({
         <SearchClearButton onClear={() => { setQuery(""); setActive(-1); setOpen(true); }} visible={query !== ""} />
       </div>
       <p aria-live="polite" className="sr-only" role="status">
-        {records
-          ? recordSearchStatus({ query, pageCount: pages.length, result: recordSearch.result, pending: recordSearch.pending, failed: recordSearch.failed })
+        {spec
+          ? recordSearchStatus<R>({ query, pageCount: pages.length, result: recordSearch.result, pending: recordSearch.pending, failed: recordSearch.failed, spec })
           : destinationSearchStatus(query, results.length)}
       </p>
       <div className="destination-search-panel" hidden={!expanded && !hasFootNotes}>
       <ul
-        aria-label={records ? "Matching pages and records" : "Matching pages"}
+        aria-label={spec ? spec.listLabel : "Matching pages"}
         className="destination-search-list"
         hidden={!expanded}
         id={listId}
@@ -235,19 +243,16 @@ export function DestinationSearch({
       {hasFootNotes && (
         <div className={styles.notes}>
           {moreNotes.map((note) => <p className={styles.note} key={note}>{note}</p>)}
-          {showFailedNote && <p className={styles.note}>Clubs, events and churches could not be searched.</p>}
+          {showFailedNote && <p className={styles.note}>{spec ? `${spec.nouns.charAt(0).toUpperCase()}${spec.nouns.slice(1)} could not be searched.` : ""}</p>}
         </div>
       )}
       </div>
       {open && hasQuery && results.length === 0 && !waitingOnRecords && (
-        <p className="destination-search-empty">{records ? "Nothing matches. Try a different word." : "No pages match. Try a different word."}</p>
+        <p className="destination-search-empty">{spec ? "Nothing matches. Try a different word." : "No pages match. Try a different word."}</p>
       )}
     </div>
   );
 }
-
-const recordsLabel = "Search pages, clubs, events and churches";
-const recordsPlaceholder = "Search pages, clubs, events, churches";
 
 /** One row of the list: a page or task, a record, or a "See all results" link. */
 function ResultOption({ active, entry, id, onChoose, onHover }: { active: boolean; entry: ResultEntry; id: string; onChoose: () => void; onHover: () => void }) {
@@ -269,7 +274,7 @@ function ResultOption({ active, entry, id, onChoose, onHover }: { active: boolea
         <span className="sr-only">{entry.badgeSpoken}. </span>
         <span aria-hidden="true">{entry.badge}</span>
       </span>
-      <span className="destination-search-description">{entry.description}</span>
+      {entry.description && <span className="destination-search-description">{entry.description}</span>}
     </li>
   );
 }

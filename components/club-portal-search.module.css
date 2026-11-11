@@ -1,0 +1,76 @@
+/* The club masthead search (#1854): a box between the brand and the account buttons; on a phone an icon button opens it on its own row. */
+.search {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 0;
+  max-width: 420px;
+}
+
+/* The header here is white, not the staff header's dark: the "nothing matches" line reads in the muted ink. */
+.search :global(.destination-search-empty) {
+  position: absolute;
+  z-index: 40;
+  top: 100%;
+  right: 0;
+  left: 0;
+  margin: 6px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--card);
+  color: var(--muted);
+  padding: 10px 12px;
+  box-shadow: var(--shadow);
+}
+
+/* The matches open over the page, not in the masthead's flow, so an open list never moves the page under the pointer. */
+.search :global(.destination-search-panel) {
+  position: absolute;
+  z-index: 40;
+  top: 100%;
+  right: 0;
+  left: 0;
+  margin-top: 6px;
+}
+
+.search :global(.destination-search-panel) :global(.destination-search-list) {
+  position: relative;
+  max-height: min(60dvh, 26rem);
+  margin-top: 0;
+  box-shadow: var(--shadow);
+}
+
+/* An icon button in the secondary-button look; hidden until the phone width. */
+.toggle {
+  display: none;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.toggle[aria-expanded="true"] {
+  box-shadow: inset 0 -4px var(--imsda-gold);
+}
+
+@media (max-width: 640px) {
+  .search {
+    display: none;
+  }
+
+  /* The open row sits right under the brand row and the icon button, full width; the account row follows it (club-portal-masthead-view.module.css). */
+  .search[data-open="true"] {
+    display: block;
+    order: 1;
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  /* The global phone rule makes buttons full width; the icon button keeps its own size, beside the brand. */
+  .toggle {
+    display: inline-flex;
+    flex: none;
+    width: 44px;
+    margin-left: auto;
+  }
+}

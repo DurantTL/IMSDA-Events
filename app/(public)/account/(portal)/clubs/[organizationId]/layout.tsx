@@ -58,7 +58,7 @@ export default async function ClubLayout({
   return (
     <div className="club-shell">
       {/* This masthead stands in for the account header on club pages (globals.css hides that one here). */}
-      <ClubPortalMasthead actingAs={access.state === "OPEN" && access.actor.kind === "STAFF_ACTING"} role={access.club.role} />
+      <ClubPortalMasthead actingAs={access.state === "OPEN" && access.actor.kind === "STAFF_ACTING"} role={access.club.role} searchPages={shellNav.map(({ href, label }) => ({ href, label }))} />
       <section aria-label="Club" className="club-banner">
         <div className="club-banner-inner">
           <div className="club-banner-identity">

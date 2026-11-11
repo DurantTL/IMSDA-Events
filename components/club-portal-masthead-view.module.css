@@ -52,6 +52,8 @@
   .account {
     justify-content: flex-start;
     width: 100%;
+    /* After the open search row (club-portal-search.module.css), which comes right under the brand and its search button. */
+    order: 2;
   }
 
   /* The name (and role) has its own line and the buttons always start on the next one, so the name getting a little
