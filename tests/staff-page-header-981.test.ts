@@ -96,7 +96,7 @@ describe("link-chip bars became one Tools menu without losing a destination", ()
     const sidebar = new Set(systemNavGroups.flatMap((group) => group.items.map((item) => item.href)));
     for (const href of ["/admin/clubs/import", "/admin/clubs/health-import", "/admin/organizations/directory", "/admin/organizations/import", "/admin/clubs/invites"]) {
       expect(source, href).toContain(href);
-      // Not a sidebar item (Club invites is reached through "New club applications and invites" only for its highlight).
+      // Not a sidebar item (Club invites is reached through "New club applications" only for its highlight).
       expect(sidebar.has(href), href).toBe(false);
     }
     for (const href of ["/admin/clubs/applications", "/admin/clubs/summary", "/admin/clubs/transfers", "/admin/organizations/background-checks"]) {

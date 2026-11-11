@@ -11,6 +11,7 @@ import {
   withCurrentEvent,
   type NavigationItem,
 } from "@/components/staff-navigation";
+import { visibleReachedDestinations } from "@/components/reached-destinations";
 import { systemNavGroups } from "@/components/system-navigation";
 import type { EventPermission } from "@/modules/access/permissions";
 import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
@@ -39,6 +40,8 @@ export type SearchDestination = {
   key: string;
   scope: DestinationScope;
   label: string;
+  /** The menu group a page with no menu entry lives under (#1661), shown before the label and searchable. */
+  parent?: string;
   description: string;
   href: string;
   /** Extra task words that find this destination but are not shown. */
@@ -247,6 +250,24 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
     }
   }
 
+  // Pages with no menu entry (#1661), each only for a viewer who passes the page's own check.
+  const reached = visibleReachedDestinations(context);
+  // System pages need no event. A page a System menu item already lists stays one result.
+  for (const entry of reached.filter((candidate) => candidate.scope === "System")) {
+    if (systemPaths.has(entry.route)) continue;
+    // A Clubs Administrator who is not a system administrator opens it as club administration, not System.
+    const scope = context.isSystemAdmin ? "System" : "Clubs";
+    add({
+      key: `${scope}:${entry.route}`,
+      scope,
+      label: entry.label,
+      parent: entry.parent,
+      description: entry.description,
+      href: withCurrentEvent(entry.route, context.selectedEventId),
+      keywords: entry.keywords,
+    });
+  }
+
   if (context.selectedEventId) {
     const eventId = context.selectedEventId;
     const eventQuery = `?event=${encodeURIComponent(eventId)}`;
@@ -284,6 +305,21 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
       const path = pathOf(card.href);
       const navItem = [eventFeaturesItem, ...navigation].find((item) => item.href === path);
       addEvent(path, navItem?.label ?? card.title, card.description, card.href);
+    }
+
+    // Event pages with no menu entry (#1661): each only for a viewer who passes the page's own check, after every menu item.
+    const listed = new Set(destinations.filter((destination) => destination.scope === "Event").map((destination) => pathOf(destination.href)));
+    for (const entry of reached.filter((candidate) => candidate.scope === "Event")) {
+      if (listed.has(entry.route) || systemPaths.has(entry.route)) continue;
+      add({
+        key: `Event:${entry.route}`,
+        scope: "Event",
+        label: entry.label,
+        parent: entry.parent,
+        description: entry.description,
+        href: withCurrentEvent(entry.route, eventId),
+        keywords: entry.keywords,
+      });
     }
   }
 
@@ -354,7 +390,7 @@ const startsAnyWord = (words: readonly string[], candidate: string) => words.som
 /** A destination's relevance to the query, or 0 when any query word finds nothing. */
 function scoreDestination(destination: SearchDestination, tokens: readonly string[]): number {
   const labelWords = wordsOf(destination.label);
-  const keywordWords = wordsOf(destination.keywords.join(" "));
+  const keywordWords = wordsOf([...destination.keywords, destination.parent ?? ""].join(" "));
   const descriptionWords = wordsOf(destination.description);
   const scopeWords = wordsOf(destination.scope);
   let total = 0;

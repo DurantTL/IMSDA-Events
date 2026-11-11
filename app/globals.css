@@ -9777,8 +9777,9 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 /* The area overview never grows wider than its container on phones (#703). */
 .area-overview-page, .area-overview-page > * { min-width: 0; max-width: 100%; }
 .public-manage-club-list small.club-meeting-note-collapsed { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden; }
-/* Honors popup, void action and bulk-record reason (#701). 44px targets on touch. */
-.roster-honors-button { margin-top: 6px; min-height: 36px; }
+/* Honors popup, void action and bulk-record reason (#701). 44px targets on touch.
+   The roster's Honors button is 44px at every width, with a mouse too (#1863); it sits in the row's action set beside Edit. */
+.roster-honors-button { min-height: 44px; min-width: 44px; }
 .member-honors-dialog { max-width: min(560px, calc(100vw - 24px)); }
 .member-honors-dialog .form-actions { align-items: center; }
 .member-honors-dialog .form-stack { margin-top: 14px; }
@@ -9796,7 +9797,7 @@ button.accent-button:hover:not(:disabled) { border-color: var(--imsda-purple); b
 @media (max-width: 640px), (pointer: coarse) {
   .member-honors-dialog .form-grid { grid-template-columns: 1fr; }
   .member-honors-dialog .modal-close-button { min-width: 44px; min-height: 44px; }
-  .roster-honors-button, .honor-void-button { min-height: 44px; min-width: 44px; }
+  .honor-void-button { min-height: 44px; min-width: 44px; }
   .member-honors-dialog select, .member-honors-dialog input, .member-honors-dialog .primary-button, .member-honors-dialog .secondary-button { min-height: 44px; }
 }
 
