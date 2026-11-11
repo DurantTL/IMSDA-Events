@@ -10,6 +10,7 @@ import type { ClubInviteRecord } from "@/modules/club-imports/invites";
 import type { StatusWord } from "@/modules/registrations/status-words";
 import { clubDirectorRoleLabels } from "@/modules/organizations/director-grants-domain";
 import styles from "./club-invites-workspace.module.css";
+import { conferenceDateFormat } from "@/modules/calendar/conference-format";
 
 type InvitesResponse = { sent?: number; message?: string; issues?: Array<{ message?: string }> };
 
@@ -17,7 +18,7 @@ const statusLabels = { PENDING: "Draft", SENT: "Sent", ACCEPTED: "Confirmed", CA
 const statusTone = { PENDING: "gold", SENT: "purple", ACCEPTED: "green", CANCELLED: "coral" } as const;
 
 function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "America/Chicago" }) : "";
+  return value ? conferenceDateFormat({ dateStyle: "medium" }).format(new Date(value)) : "";
 }
 
 /**
@@ -121,7 +122,7 @@ export function ClubInvitesWorkspace({
               onClick={() => send({ organizationId: club.id }, drafts.club ?? 0, `for ${club.name}, every role`)}
               type="button"
             >
-              <Send aria-hidden="true" size={14} /> <span translate="no">Send all unsent for {club.name}</span>, every role ({drafts.club})
+              <Send aria-hidden="true" size={14} /> Send all unsent for <span translate="no">{club.name}</span>, every role ({drafts.club})
             </button>
           )}
         </p>

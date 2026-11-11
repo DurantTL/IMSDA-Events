@@ -5,7 +5,7 @@ import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { clubLeadersHref, parseLeaderFilters } from "@/modules/system-admin/club-leaders-model";
 
-export const metadata: Metadata = { title: "Club invites" };
+export const metadata: Metadata = { title: "Club leaders" };
 export const dynamic = "force-dynamic";
 
 /**

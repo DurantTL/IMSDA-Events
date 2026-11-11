@@ -116,7 +116,7 @@ describe("the invite query", () => {
   });
 
   it("shows dates in Central time and tells staff expired invites need a Resend", () => {
-    expect(readFileSync("components/club-invites-workspace.tsx", "utf8")).toContain('timeZone: "America/Chicago"');
+    expect(readFileSync("components/club-invites-workspace.tsx", "utf8")).toContain("conferenceDateFormat({ dateStyle: \"medium\" })");
     const expired = { ...invite("old"), sentAt: "2026-11-01T12:00:00.000Z", expiresAt: "2026-11-02T12:00:00.000Z", expired: true, club: { id: "org_1", name: "Synthetic Club", isActive: true } };
     const withExpired = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: [], clubs: [], canOpenPeople: false, filters: { clubId: null, role: null, status: "invited" }, invites: [expired] } as never));
     expect(withExpired).toContain("Expired invites are not counted as waiting and need a Resend.");
@@ -171,7 +171,7 @@ describe("the list on each status", () => {
     const row = { id: "a", email: "a@example.test", name: "Person a", role: "DIRECTOR", status: "PENDING", sentAt: null, sentCount: 0, acceptedAt: null, club: { id: "org_1", name: "Synthetic Club", isActive: true } };
     const html = render({ filters: { clubId: "org_1", role: null, status: "draft" }, invites: [row], drafts: { all: 7, club: 2 } });
     expect(html).toContain("Send all unsent (7)");
-    expect(html).toContain("Send all unsent for Synthetic Club");
+    expect(html).toContain('Send all unsent for <span translate="no">Synthetic Club</span>');
     expect(html).toContain(", every role");
     expect(html).not.toContain("Resend");
     expect(html).toContain("Draft");
