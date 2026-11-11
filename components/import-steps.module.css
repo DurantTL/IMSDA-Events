@@ -1,7 +1,7 @@
 .steps {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2, 8px) var(--space-4, 16px);
+  gap: 8px 16px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -10,12 +10,12 @@
 .step {
   align-items: center;
   border: 1px solid var(--line, currentColor);
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius-sm, 8px);
   color: var(--muted, inherit);
   display: inline-flex;
   font-size: max(var(--type-staff-floor, 0px), 0.875rem);
-  gap: var(--space-2, 8px);
-  padding: var(--space-1, 4px) var(--space-3, 12px);
+  gap: 8px;
+  padding: 4px 12px;
 }
 
 .current {

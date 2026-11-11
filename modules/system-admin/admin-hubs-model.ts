@@ -232,17 +232,7 @@ const hubDefs: Record<HubKey, HubDef> = {
     stats: [],
     actions: [{ href: "/admin/clubs/applications", label: "Review applications", gate: hubGates.clubs, metric: "applicationsWaiting" }],
     groups: [
-      {
-        title: "Clubs",
-        cards: [
-          clubCards.summary,
-          { href: "/admin/clubs/import", description: "Add or update clubs from a spreadsheet.", gate: hubGates.clubs },
-          { href: "/admin/clubs/health-import", description: "Bring club members' health records in from a file.", gate: (v) => hubGates.clubs(v) && v.healthImport === true },
-          clubCards.clubsAndChurches,
-        ],
-      },
-      // Split from the directory group so no group passes MAX_GROUP_CARDS and gets a "(more)" half.
-      { title: "Applications and checks", cards: [clubCards.applications, clubCards.transfers, clubCards.sterling] },
+      { title: "Clubs", cards: [clubCards.summary, clubCards.clubsAndChurches, clubCards.applications, clubCards.transfers, clubCards.sterling] },
       {
         title: "Records and points",
         cards: [
@@ -261,11 +251,13 @@ const hubDefs: Record<HubKey, HubDef> = {
       },
       { title: "People", cards: [clubCards.leaders, { href: "/admin/people", gate: hubGates.clubs }] },
       {
-        title: "Catalogs",
+        title: "Catalogs and imports",
         cards: [
           clubCards.honors,
           clubCards.supplies,
           clubCards.conferenceOrders,
+          { href: "/admin/clubs/import", description: "Add or update clubs from a spreadsheet.", gate: hubGates.clubs },
+          { href: "/admin/clubs/health-import", description: "Bring club members' health records in from a file.", gate: (v) => hubGates.clubs(v) && v.healthImport === true },
         ],
       },
     ],

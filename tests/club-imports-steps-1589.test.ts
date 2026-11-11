@@ -44,6 +44,7 @@ vi.mock("@/components/health-import-workspace", async (importOriginal) => {
 });
 
 import HealthImportPage from "@/app/(workspace)/admin/clubs/health-import/page";
+import ClubImportPage from "@/app/(workspace)/admin/clubs/import/page";
 
 const now = new Date("2026-09-28T15:00:00Z");
 
@@ -132,14 +133,14 @@ describe("a failed import stays on the step it failed at, with the server's own 
     expect(host.textContent).not.toContain("Import results");
   });
 
-  it("club import: FAILED rows are shown unchanged in Results, with a way back to the Club directory", async () => {
+  it("club import: FAILED rows are shown unchanged in Results, with no extra link", async () => {
     const result = { sourceKey: "k1", clubName: "Fixture Hills Pathfinders", clubYear: "2026-27", status: "FAILED", kind: "CLUB_LIST", message: "Synthetic failure for this row.", organizationId: null, membersAdded: 0, membersSkipped: 0, skipped: [], invitesCreated: 0 };
     vi.stubGlobal("fetch", vi.fn(async () => reply(200, { results: [result] })));
     await act(async () => root.render(createElement(ClubImportWorkspace, { initialPreview: preview() })));
     await click(/Import 1 club/);
     expect(currentStep(host)).toContain("Results");
     expect(host.textContent).toContain("Synthetic failure for this row.");
-    expect(host.querySelector('a[href="/admin/clubs/summary"]')?.textContent).toBe("Back to the Club directory");
+    expect(host.querySelector('a[href="/admin/clubs/summary"]')).toBeNull();
   });
 
   it("health import: a failed preview stays on Preview, and a failed apply stays on Review with the preview kept", async () => {
@@ -215,6 +216,25 @@ describe("the restricted health import page", () => {
     const after = renderToStaticMarkup(await HealthImportPage());
     expect(after).not.toContain("PRIVACY-NOTICE");
     expect(after).toContain("Import steps");
+  });
+});
+
+describe("the club import page", () => {
+  beforeEach(() => {
+    mocks.user.current = { id: "u1" };
+    mocks.clubsAdmin.current = true;
+  });
+
+  it("sends a signed-out visitor to sign in and a person without Clubs administration to no access", async () => {
+    mocks.user.current = null;
+    await expect(ClubImportPage()).rejects.toThrow("REDIRECT:/login");
+    mocks.user.current = { id: "u2" };
+    mocks.clubsAdmin.current = false;
+    await expect(ClubImportPage()).rejects.toThrow("REDIRECT:/no-access");
+  });
+
+  it("shows the workspace to Clubs administration", async () => {
+    expect(renderToStaticMarkup(await ClubImportPage())).toContain("Import steps");
   });
 });
 

@@ -15,7 +15,7 @@ export function ImportSteps({ current }: { current: ImportStep }) {
         <li aria-current={index === at ? "step" : undefined} className={index === at ? `${styles.step} ${styles.current}` : styles.step} key={step}>
           <span className={styles.number} aria-hidden="true">{index + 1}</span>
           <span>{step}</span>
-          <span className={styles.state}>{index < at ? "(done)" : index === at ? "(current step)" : "(next)"}</span>
+          <span aria-hidden={index === at ? "true" : undefined} className={styles.state}>{index < at ? "(done)" : index === at ? "(current step)" : "(next)"}</span>
         </li>
       ))}
     </ol>

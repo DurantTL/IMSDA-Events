@@ -16,7 +16,6 @@ import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-
 import { clubYearOptions } from "@/modules/club-rosters/domain";
 import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
-import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { parseClubQuery, parseLeaderboardSort } from "@/modules/club-reports/area-summary-domain";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary, listAreaClubEvents } from "@/modules/club-reports/area-summary-repository";
@@ -142,10 +141,6 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
         <p className={styles.note} id="club-attention-help">Needs attention: {directory.monthLabel} records that are not submitted or are submitted and awaiting review. This filter only checks that monthly record.</p>
         <ListPager hrefFor={(page) => href({ view: "directory", page })} label="Club directory pages" part="count" noun={query || attention ? `matching clubs (${directory.totalClubs} active clubs in total)` : "active clubs"} nounOne={query || attention ? `matching club (${directory.totalClubs} active clubs in total)` : "active club"} slice={directory} />
         <p className={styles.note}>Sorted by club name.</p>
-        <p className={styles.note}>
-          Bringing clubs in from a file? <Link href="/admin/clubs/import" prefetch={false}>Import clubs</Link>
-          {healthRecordsEnabled() && <>{" "}or <Link href="/admin/clubs/health-import" prefetch={false}>Import health records</Link></>}.
-        </p>
         {directory.total > 0 ? <ClubDirectoryCards clubs={directory.items} clubYear={clubYear} monthLabel={directory.monthLabel} returnTo={clubSummaryHref({ clubYear, query, attention, page: directory.page })} /> : <div className="panel"><p>{directory.totalClubs === 0 ? "No active clubs for this club year." : "No clubs match these filters. Try another club or church name, or clear the filters."}</p></div>}
         <ListPager hrefFor={(page) => href({ view: "directory", page })} label="Club directory pages" part="pages" slice={directory} />
         {newYearStatus && newYearStatus.clubs.length > 0 && <details className={`panel ${styles.details}`}><summary>Roster carry-forward status</summary><ClubNewYearStatus clubHref={(id) => clubDirectoryClubHref(id, newYearStatus.toClubYear)} status={newYearStatus} /></details>}

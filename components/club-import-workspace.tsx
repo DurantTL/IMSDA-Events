@@ -196,7 +196,6 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
             <p className="field-help">Skipped by you, nothing created: {leftOut.map((name, index) => <span key={`${name}-${index}`}>{index ? ", " : ""}<span translate="no">{name}</span></span>)}.</p>
           )}
           {results.some((result) => result.kind !== "CLUB_LIST") && <p className="field-help club-import-next">Next: <a href="/admin/clubs/leaders?status=draft">review and send the club invites</a>.</p>}
-          <p className="field-help club-import-next"><a href="/admin/clubs/summary">Back to the Club directory</a></p>
         </section>
       )}
 
