@@ -38,7 +38,6 @@ export function ClubLeadersList({
   const rows: readonly unknown[] = showingInvites ? invites : leaders;
   const position = slice ?? sliceFromCount([...rows], 1, rows.length, CLUB_LEADERS_PAGE_SIZE);
   const filtered = Boolean(filters.clubId || filters.role);
-  const statusLabel = CLUB_LEADER_STATUS_LABELS[status].toLowerCase();
   const noun = showingInvites ? (status === "invited" ? "sent invites" : "draft invites") : "current roles";
   const nounOne = showingInvites ? (status === "invited" ? "sent invite" : "draft invite") : "current role";
   const clubName = filters.clubId ? clubs.find((club) => club.id === filters.clubId)?.name ?? null : null;
@@ -46,7 +45,7 @@ export function ClubLeadersList({
   const addHref = filters.clubId ? `/admin/organizations/${encodeURIComponent(filters.clubId)}/directors` : "/admin/clubs";
   return (
     <div className={styles.wrap}>
-      <p className={styles.count}>{introText(status)}</p>
+      <p className={styles.count}>{introText(status, invites.some((invite) => invite.expired))}</p>
       <p className={styles.addLeader}>
         <Link className="secondary-button" href={addHref}>Add a leader</Link>
       </p>
@@ -75,11 +74,12 @@ export function ClubLeadersList({
         <button className="primary-button" type="submit">Show</button>
         {filtered ? <Link className="secondary-button" href={clubLeadersHref({ clubId: null, role: null, status })}>Clear filters</Link> : null}
       </GetFilterForm>
+      {/* On an empty Invited or Draft view the invites workspace says so itself, once. */}
       {rows.length === 0
-        ? <p className={styles.count} role="status">{showingInvites ? `No ${statusLabel} club invites found.` : "No current club leaders found."}</p>
+        ? (showingInvites ? null : <p className={styles.count} role="status">No current club leaders found.</p>)
         : <ListPager hrefFor={hrefFor} label="Club leader pages" noun={noun} nounOne={nounOne} part="count" slice={position} />}
       {showingInvites ? (
-        <ClubInvitesWorkspace club={clubName && filters.clubId ? { id: filters.clubId, name: clubName } : null} drafts={drafts} emailConfigured={emailConfigured} emptyText={emptyText(status, filtered)} invites={[...invites]} status={status === "draft" ? "draft" : "invited"} />
+        <ClubInvitesWorkspace club={clubName && filters.clubId ? { id: filters.clubId, name: clubName } : null} drafts={drafts} emailConfigured={emailConfigured} draftHref={clubLeadersHref({ clubId: filters.clubId, role: filters.role, status: "draft" })} emptyText={emptyText(status, filtered)} invites={[...invites]} status={status === "draft" ? "draft" : "invited"} />
       ) : rows.length === 0 ? (
         <p className={styles.empty}>{emptyText(status, filtered)}</p>
       ) : (
@@ -122,8 +122,8 @@ function emptyText(status: "current" | "invited" | "draft", filtered: boolean): 
 const roleNames = `${clubRoleText.DIRECTOR.name}, ${clubRoleText.DEPUTY.name}, ${clubRoleText.REGISTRAR.name} or ${clubRoleText.REPORTER.name}`;
 
 /** The one line under the page's title, by the status shown. */
-function introText(status: "current" | "invited" | "draft"): string {
-  if (status === "invited") return "People invited as a club's Director, Deputy, Registrar or Reporter who have not accepted yet. Directors and deputies come from the club import; registrars and reporters are invited by their club's director.";
+function introText(status: "current" | "invited" | "draft", hasExpired = false): string {
+  if (status === "invited") return `People invited as a club's Director, Deputy, Registrar or Reporter who have not accepted yet. Directors and deputies come from the club import; registrars and reporters are invited by their club's director.${hasExpired ? " Expired invites are not counted as waiting and need a Resend." : ""}`;
   if (status === "draft") return "Invites not sent yet. Nothing is emailed until you press Send. Most come from the club import.";
   return `Everyone who currently leads a club as ${roleNames}.`;
 }

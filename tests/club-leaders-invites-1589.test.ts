@@ -101,6 +101,36 @@ describe("the invite query", () => {
     expect(db.inviteCount.mock.calls.at(-1)![0].where.OR).toEqual([{ expiresAt: null }, { expiresAt: { gt: now } }]);
   });
 
+  it("treats an expiry equal to now as expired, and never marks a draft expired", async () => {
+    const now = new Date("2026-11-11T12:00:00Z");
+    db.inviteCount.mockResolvedValue(2);
+    db.inviteFindMany.mockResolvedValue([
+      { ...invite("edge"), expiresAt: now },
+      { ...invite("draft", "PENDING"), expiresAt: new Date("2026-11-01T12:00:00Z") },
+    ]);
+    const { invites } = await listClubLeaderInvites({ clubId: null, role: null, status: "invited" }, 1, now);
+    expect(invites.map((row) => [row.id, row.expired])).toEqual([["edge", true], ["draft", false]]);
+    // The count keeps only expiresAt strictly after now, so an expiry of exactly now is not waiting.
+    await countWaitingClubInvites(now);
+    expect(db.inviteCount.mock.calls.at(-1)![0].where.OR).toEqual([{ expiresAt: null }, { expiresAt: { gt: now } }]);
+  });
+
+  it("shows dates in Central time and tells staff expired invites need a Resend", () => {
+    expect(readFileSync("components/club-invites-workspace.tsx", "utf8")).toContain('timeZone: "America/Chicago"');
+    const expired = { ...invite("old"), sentAt: "2026-11-01T12:00:00.000Z", expiresAt: "2026-11-02T12:00:00.000Z", expired: true, club: { id: "org_1", name: "Synthetic Club", isActive: true } };
+    const withExpired = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: [], clubs: [], canOpenPeople: false, filters: { clubId: null, role: null, status: "invited" }, invites: [expired] } as never));
+    expect(withExpired).toContain("Expired invites are not counted as waiting and need a Resend.");
+    const without = renderToStaticMarkup(createElement(ClubLeadersList, { leaders: [], clubs: [], canOpenPeople: false, filters: { clubId: null, role: null, status: "invited" }, invites: [{ ...expired, expired: false }] } as never));
+    expect(without).not.toContain("need a Resend");
+  });
+
+  it("carries the club and role filters into the Draft link after Change email", () => {
+    const source = readFileSync("components/club-leaders-list.tsx", "utf8");
+    expect(source).toContain('draftHref={clubLeadersHref({ clubId: filters.clubId, role: filters.role, status: "draft" })}');
+    expect(clubLeadersHref({ clubId: "org_1", role: "DEPUTY", status: "draft" })).toBe("/admin/clubs/leaders?club=org_1&role=deputy&status=draft");
+    expect(readFileSync("app/(workspace)/admin/clubs/page.tsx", "utf8")).toContain("countWaitingClubInvites(now)");
+  });
+
   it("counts waiting invites as SENT only, and drafts for everyone and for the picked club", async () => {
     db.inviteCount.mockResolvedValue(4);
     expect(await countWaitingClubInvites()).toBe(4);
@@ -148,7 +178,11 @@ describe("the list on each status", () => {
   });
 
   it("says which status is empty, and whether a club or role narrowed it", () => {
-    expect(render({ filters: { clubId: null, role: null, status: "invited" } })).toContain("No invited club invites found.");
+    // Said once: the workspace's own paragraph, not a second status line from the list.
+    const empty = render({ filters: { clubId: null, role: null, status: "invited" } });
+    expect(empty).not.toContain("club invites found.");
+    expect(empty.match(/No invites are waiting\./g)).toHaveLength(1);
+    expect(empty.match(/role="status"/g)).toHaveLength(1);
     expect(render({ filters: { clubId: null, role: null, status: "invited" } })).toContain("No invites are waiting.");
     expect(render({ filters: { clubId: "org_1", role: null, status: "draft" } })).toContain("No draft invites match that club and role.");
     expect(render({ filters: { clubId: null, role: null } })).toContain("No current club leaders found.");
@@ -209,7 +243,7 @@ describe("the Clubs dashboard count and the hub", () => {
     expect(source).toContain('data-card="waiting-invites"');
     expect(source).toContain("Waiting invites");
     expect(source).toContain('status: "invited"');
-    expect(source).toContain("countWaitingClubInvites()");
+    expect(source).toContain("countWaitingClubInvites(now)");
     expect(source).not.toMatch(/waitingInvites \|\| /);
   });
 
@@ -222,6 +256,8 @@ describe("the Clubs dashboard count and the hub", () => {
     // The Clubs dashboard draws the waiting-invites number itself, so its card shows only the leaders (#1733).
     const beside = buildHubView("club-administration", viewer, { clubLeaders: 168, clubInvitesWaiting: 4 }, ["clubInvitesWaiting"]).groups.flatMap((group) => group.cards).find((card) => card.href === "/admin/clubs/leaders")!;
     expect(beside.status?.text).toBe("168 current leaders");
+    const unreadable = buildHubView("club-administration", viewer, { clubLeaders: null, clubInvitesWaiting: 4 }, ["clubInvitesWaiting"]).groups.flatMap((group) => group.cards).find((card) => card.href === "/admin/clubs/leaders")!;
+    expect(unreadable.status?.text).toBe("Unavailable");
     expect(readFileSync("app/(workspace)/admin/clubs/page.tsx", "utf8")).toContain('"applicationsWaiting", "clubInvitesWaiting"');
     expect(leaders.description).toContain("registrars and reporters invited by directors");
     const waiting = buildHubView("club-administration", viewer, { clubLeaders: 1, clubInvitesWaiting: 1 }).groups.flatMap((group) => group.cards).find((card) => card.href === "/admin/clubs/leaders")!;

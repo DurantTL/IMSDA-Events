@@ -60,7 +60,7 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
     countWaitingNewClubApplications(viewer),
     getRequiredFormsStatus(clubYear),
     // Read on its own like the hub numbers: if it fails the card says so rather than showing a false zero.
-    countWaitingClubInvites().catch(() => null),
+    countWaitingClubInvites(now).catch(() => null),
   ]);
   // The destination cards' live status, for the club year picked here: the clubs, late records and waiting applications come
   // from this page's own reads (not read twice); the rest read on their own and show "Unavailable" when they cannot be read.

@@ -17,7 +17,7 @@ const statusLabels = { PENDING: "Draft", SENT: "Sent", ACCEPTED: "Confirmed", CA
 const statusTone = { PENDING: "gold", SENT: "purple", ACCEPTED: "green", CANCELLED: "coral" } as const;
 
 function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleDateString("en-US", { dateStyle: "medium" }) : "";
+  return value ? new Date(value).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "America/Chicago" }) : "";
 }
 
 /**
@@ -33,6 +33,7 @@ export function ClubInvitesWorkspace({
   drafts,
   club,
   emptyText,
+  draftHref = "/admin/clubs/leaders?status=draft",
 }: {
   invites: ClubInviteRecord[];
   emailConfigured: boolean;
@@ -42,6 +43,8 @@ export function ClubInvitesWorkspace({
   club: { id: string; name: string } | null;
   /** What the list says when nothing is in it. The workspace stays mounted then, so a notice about the last action still shows. */
   emptyText: string;
+  /** The Draft view with the club and role filters the list has now. */
+  draftHref?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -84,7 +87,7 @@ export function ClubInvitesWorkspace({
       input: { label: `New email for ${invite.name || "this invite"} (${invite.club.name})`, defaultValue: invite.email, type: "email", required: true },
     });
     if (!email || email.trim().toLowerCase() === invite.email) return;
-    void call(`/api/admin/club-invites/${encodeURIComponent(invite.id)}`, "PATCH", { email }, () => <>Email changed. The invite is waiting to be sent in the <Link href="/admin/clubs/leaders?status=draft">Draft view</Link>.</>);
+    void call(`/api/admin/club-invites/${encodeURIComponent(invite.id)}`, "PATCH", { email }, () => <>Email changed. The invite is waiting to be sent in the <Link href={draftHref}>Draft view</Link>.</>);
   }
 
   async function cancel(invite: ClubInviteRecord) {
@@ -134,7 +137,7 @@ export function ClubInvitesWorkspace({
 
       {invites.length === 0 && (
         <>
-          <p className={styles.empty}>{emptyText}</p>
+          <p className={styles.empty} role="status">{emptyText}</p>
           <EventSetupHelp context="club invites" id="club-invites-none" />
         </>
       )}
