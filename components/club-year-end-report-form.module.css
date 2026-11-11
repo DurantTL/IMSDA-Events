@@ -1,0 +1,16 @@
+/*
+ * Year-End Report count rows (#1879). On a wide screen each count is one row: what it counts on the left, a
+ * number box on the right. On a phone the row stacks, so the label keeps the full width and the box sits under
+ * it at the same width on every row, with the restore button beside it.
+ */
+div.count { flex-wrap: wrap; }
+.count > label { flex: 1 1 16rem; }
+.controls { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.controls > input[type="number"] { width: 7.5rem; min-height: 44px; }
+.restore { min-width: 44px; min-height: 44px; justify-content: center; }
+
+@media (max-width: 600px) {
+  div.count { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 8px; }
+  .controls { display: grid; grid-template-columns: minmax(0, 12rem) auto; justify-content: start; }
+  .controls > input[type="number"] { width: 100%; }
+}
