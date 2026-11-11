@@ -5,7 +5,7 @@ import {
   formatEventDates,
   recordAnswerFor,
   recordMoreNotes,
-  entriesSignature,
+  activeIndexForKey,
   recordSearchStatus,
   selectDestination,
   type SearchDestination,
@@ -154,11 +154,15 @@ describe("records for the words typed now", () => {
     expect(stale.entries.every((entry) => entry.kind === "page")).toBe(true);
   });
 
-  it("changes the entries signature when different rows arrive, so an arrowed index is dropped", () => {
+  it("keeps the arrowed entry when records arrive and the rows shift, and drops it only when it is gone", () => {
     const before = buildResultLayout({ pages, hasQuery: true, records: { enabled: true, result: null } }).entries;
-    const after = buildResultLayout({ pages, hasQuery: true, records: { enabled: true, result: result() } }).entries;
-    expect(entriesSignature(before)).not.toBe(entriesSignature(after));
-    expect(entriesSignature(after)).toBe(entriesSignature(after));
+    const after = buildResultLayout({ pages: [page("Brand new page"), ...pages], hasQuery: true, records: { enabled: true, result: result() } }).entries;
+    const active = before[1].key;
+    expect(activeIndexForKey(before, active)).toBe(1);
+    expect(activeIndexForKey(after, active)).toBe(2);
+    expect(after[activeIndexForKey(after, active)].label).toBe(before[1].label);
+    expect(activeIndexForKey(after, "System:Removed page")).toBe(-1);
+    expect(activeIndexForKey(after, null)).toBe(-1);
   });
 });
 

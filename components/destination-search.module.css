@@ -11,3 +11,15 @@
 
 /* "See all results" at the end of a record group (#1837): a link row, named by its text, never by colour alone. */
 .seeAll > :first-child { text-decoration: underline; }
+
+/* Notes under the list (#1837): a group cut short with no page to see the rest on, or records that could not be searched. In the panel's flow, below the list, never over it. */
+.notes { margin: 4px 0 0; }
+.note {
+  margin: 4px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--card);
+  color: var(--muted);
+  padding: 8px 12px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}

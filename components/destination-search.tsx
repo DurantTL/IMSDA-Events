@@ -12,7 +12,7 @@ import {
   actionForSurface,
   buildResultLayout,
   destinationSearchStatus,
-  entriesSignature,
+  activeIndexForKey,
   hasSearchWords,
   listDestinations,
   listExpanded,
@@ -64,8 +64,8 @@ export function DestinationSearch({
   const listId = `${baseId}-list`;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  // The active row is tied to the rows it was set on, so new rows (records arriving) never move it onto a different record.
-  const [activeState, setActiveState] = useState({ index: -1, signature: "" });
+  // The active row is kept by its stable key: when rows change (records arriving) it stays on the same entry, or on none if that entry is gone.
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Where focus was before the field took it, so Escape can hand it back.
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -80,12 +80,15 @@ export function DestinationSearch({
   );
   const results = layout.entries;
   const groups = layout.sections;
-  const signature = entriesSignature(results);
-  const activeRaw = activeState.signature === signature ? activeState.index : -1;
+  const activeRaw = activeIndexForKey(results, activeKey);
   const active = clampActiveIndex(activeRaw, results.length);
-  const setActive = (index: number) => setActiveState({ index, signature });
+  const setActive = (index: number) => setActiveKey(results[index]?.key ?? null);
   const expanded = listExpanded(open, results.length);
   const waitingOnRecords = records && hasQuery && recordSearch.pending;
+  // Notes under the list (not options): groups cut short with no page to see the rest on, and a failed record search.
+  const moreNotes = open && records && hasQuery && !recordSearch.pending ? recordMoreNotes(recordSearch.result) : [];
+  const showFailedNote = open && records && hasQuery && recordSearch.failed && results.length > 0;
+  const hasFootNotes = moreNotes.length > 0 || showFailedNote;
   const optionId = (index: number) => `${baseId}-option-${index}`;
 
   function reset() {
@@ -192,6 +195,7 @@ export function DestinationSearch({
           ? recordSearchStatus({ query, pageCount: pages.length, result: recordSearch.result, pending: recordSearch.pending, failed: recordSearch.failed })
           : destinationSearchStatus(query, results.length)}
       </p>
+      <div className="destination-search-panel" hidden={!expanded && !hasFootNotes}>
       <ul
         aria-label={records ? "Matching pages and records" : "Matching pages"}
         className="destination-search-list"
@@ -228,14 +232,15 @@ export function DestinationSearch({
             />
           ))}
       </ul>
+      {hasFootNotes && (
+        <div className={styles.notes}>
+          {moreNotes.map((note) => <p className={styles.note} key={note}>{note}</p>)}
+          {showFailedNote && <p className={styles.note}>Clubs, events and churches could not be searched.</p>}
+        </div>
+      )}
+      </div>
       {open && hasQuery && results.length === 0 && !waitingOnRecords && (
         <p className="destination-search-empty">{records ? "Nothing matches. Try a different word." : "No pages match. Try a different word."}</p>
-      )}
-      {open && records && hasQuery && !recordSearch.pending && recordMoreNotes(recordSearch.result).map((note) => (
-        <p className="destination-search-empty" key={note}>{note}</p>
-      ))}
-      {open && records && hasQuery && recordSearch.failed && results.length > 0 && (
-        <p className="destination-search-empty">Clubs, events and churches could not be searched.</p>
       )}
     </div>
   );

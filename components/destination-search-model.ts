@@ -729,7 +729,7 @@ export function recordMoreNotes(result: StaffSearchResult | null): string[] {
     .map((group) => `More ${recordGroupHeadings[group].toLowerCase()} match. Type more words to narrow.`);
 }
 
-/** The entry keys, joined: changes whenever the listed rows change, so an active index can be tied to the rows it was set on. */
-export function entriesSignature(entries: readonly ResultEntry[]): string {
-  return entries.map((entry) => entry.key).join("|");
+/** Where the active entry (kept by its stable key) sits in the current rows: its new index, or -1 when it is gone or none is active. */
+export function activeIndexForKey(entries: readonly ResultEntry[], key: string | null): number {
+  return key === null ? -1 : entries.findIndex((entry) => entry.key === key);
 }
