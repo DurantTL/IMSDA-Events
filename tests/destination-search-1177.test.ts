@@ -74,17 +74,21 @@ describe("destination registry per role", () => {
   it("gives a system administrator every System destination, with the calendar listed once", () => {
     const destinations = buildSearchDestinations(admin);
     const system = destinations.filter((destination) => destination.scope === "System");
-    // Then the review list behind Monthly Records (#1552).
-    const expected = [...systemNavGroups.flatMap((group) => group.items.map((item) => item.label)), "Review monthly records"];
+    // Then the review list behind Monthly Records (#1552), then the System pages with no menu entry (#1661).
+    const expected = [
+      ...systemNavGroups.flatMap((group) => group.items.map((item) => item.label)),
+      "Review monthly records",
+      "Import organizations", "Organization directory", "Find map locations", "Problem reports", "Event module requests", "Conference club orders",
+    ];
     expect(system.map((destination) => destination.label)).toEqual(expected);
     expect(system.filter((destination) => destination.href.startsWith("/admin/calendar")).map((destination) => destination.label))
       .toEqual(["Conference calendar"]);
   });
 
-  // Check-in staff also get the three check-in sub-pages, which they may open (#1661).
+  // Check-in staff also get the check-in sub-pages and the item closeout, which they may open (#1661).
   it("gives limited event staff only their own event destinations and their profile", () => {
     const destinations = buildSearchDestinations(limitedStaff);
-    expect(labels(destinations)).toEqual(["Event:Check-in", "Event:Printable name badges", "Event:Printable attendee passes", "Event:Issue keys and items", "Profile:Your account"]);
+    expect(labels(destinations)).toEqual(["Event:Check-in", "Event:Printable name badges", "Event:Printable attendee passes", "Event:Issue keys and items", "Event:Issued asset closeout", "Profile:Your account"]);
     // The Dashboard needs the event view, which this role lacks.
     expect(labels(buildSearchDestinations({ ...base, permissions: ["VIEW_EVENT"] }))).toEqual(["Event:Event home", "Profile:Your account"]);
     expect(destinations.some((destination) => destination.scope === "System")).toBe(false);
