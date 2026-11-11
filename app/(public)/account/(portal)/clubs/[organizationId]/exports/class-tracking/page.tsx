@@ -5,15 +5,13 @@ import { cardCell } from "@/components/table-card-labels";
 import { PrintReportButton } from "@/components/print-report-button";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { rosterYearView } from "@/modules/club-rosters/domain";
-import { CLASS_TRACKING_EXPORT_HEADERS } from "@/modules/reporting/director-exports";
+import { CLASS_TRACKING_EXPORT_HEADERS, classTrackingDetailCells } from "@/modules/reporting/director-exports";
 import { loadClassTrackingExport } from "@/modules/reporting/director-exports-repository";
 import { formatPersonName } from "@/lib/person-name";
 import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Class tracking report" };
 export const dynamic = "force-dynamic";
-
-const cell = (values: readonly string[]) => values.join("; ");
 
 /** The printable class tracking report (#655). Names, class and earned item names only. */
 export default async function ClubClassTrackingReportPage({
@@ -61,7 +59,7 @@ export default async function ClubClassTrackingReportPage({
                 {rows.map((row) => (
                   <tr key={row.personId} role="row">
                     <th role="rowheader" scope="row">{formatPersonName(row, "sorted")}</th>
-                    {[row.className, cell(row.insignia), cell(row.eventPatches), cell(row.conductAndTlt), cell(row.masterAwards)].map((value, index) => (
+                    {classTrackingDetailCells(row).map((value, index) => (
                       <td key={CLASS_TRACKING_EXPORT_HEADERS[index + 2]} {...cardCell(CLASS_TRACKING_EXPORT_HEADERS[index + 2])}>{value}</td>
                     ))}
                   </tr>

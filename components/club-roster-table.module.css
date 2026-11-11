@@ -23,22 +23,23 @@
    (table-cards-xwide), and the club portal's roster box is about 1130px only in a window 1250px or wider (1310px on the
    staff club page, beside the side rail), so a laptop window that was not full width, in any browser, showed phone cards.
    Here the wrap of a table marked data-cards="touch" stops being the `table-box` container, so the card rules never match (the
-   mobile layout audit knows the marker). The nine columns fit an 810px box (the staff page at 1024px), and the wrap still
-   scrolls sideways if extra columns (Show gender, Show school details) or a long name make the table wider. Phones and tablets
-   (a touch screen, or a window under 1024px) keep the cards. */
+   mobile layout audit knows the marker). When the table is wider than its box (extra columns such as Show gender, Show school
+   details and Show baptized, a long name, or the staff page's 812px box at 1024px), RosterTableScroll marks the wrap
+   data-fit="cards": the wrap stays the `table-box` container and shows the cards, so nothing scrolls sideways (#1861). Phones
+   and tablets (a touch screen, or a window under 1024px) keep the cards. */
 @media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
-  .rosterTableWrap:global(.report-table-wrap):has(> :global(table.table-cards[data-cards="touch"])) { container: none; }
-  :global(.roster-card-table) :global(th) { padding-inline: 8px; }
-  :global(.roster-card-table) :global(td) { padding-inline: 8px; }
-  :global(.roster-card-table) :global(th.roster-card-name) { min-width: 12.5rem; }
-  :global(.roster-card-table) :global(td.roster-card-flags) { min-width: 7rem; }
-  :global(.roster-card-table) :global(td.roster-row-actions) { min-width: 6.5rem; }
+  .rosterTableWrap:global(.report-table-wrap):not([data-fit="cards"]):has(> :global(table.table-cards[data-cards="touch"])) { container: none; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(th) { padding-inline: 8px; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(td) { padding-inline: 8px; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(th.roster-card-name) { min-width: 12.5rem; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(td.roster-card-flags) { min-width: 7rem; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(td.roster-row-actions) { min-width: 6.5rem; }
   /* Edit sits over Actions, so the last column is one narrow stack; both keep 44px targets. */
-  :global(.roster-card-table) :global(.roster-row-action-set) { flex-direction: column; align-items: stretch; gap: 6px; }
-  :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) { display: block; }
-  :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) > summary:global(.actions-menu-trigger) { justify-content: center; }
-  :global(.roster-card-table) :global(.roster-row-action-set) > button { justify-content: center; }
-  :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) > summary:global(.actions-menu-trigger) { width: 100%; box-sizing: border-box; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(.roster-row-action-set) { flex-direction: column; align-items: stretch; gap: 6px; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) { display: block; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) > summary:global(.actions-menu-trigger) { justify-content: center; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(.roster-row-action-set) > button { justify-content: center; }
+  :where(.rosterTableWrap:not([data-fit="cards"])) :global(.roster-card-table) :global(.roster-row-action-set) :global(.actions-menu) > summary:global(.actions-menu-trigger) { width: 100%; box-sizing: border-box; }
 }
 
 /* Phone and tablet roster cards (#1838). The shared table-cards rules make each row a card of "Label: value" lines; the roster
