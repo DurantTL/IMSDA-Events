@@ -128,3 +128,19 @@ describe("every staff link points at a real page (#1839)", () => {
     expect(hasRoute("/admin/events/${event.id}/nope")).toBe(false);
   });
 });
+
+describe("links the #1839 crawl found wrongly shown", () => {
+  const read = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
+
+  it("New club applications shows Platform settings (Notification address) to system administrators only", () => {
+    const page = read("app/(workspace)/admin/clubs/applications/page.tsx");
+    expect(page).toContain('...(viewer === "SYSTEM_ADMIN" ? [{ href: "/admin/settings", label: "Notification address" }] : [])');
+    expect(read("app/(workspace)/admin/settings/page.tsx")).toContain("SYSTEM_ADMIN");
+  });
+
+  it("the System report opens the events list, not the Events Administrator dashboard a system administrator is sent away from", () => {
+    const providers = read("modules/system-admin/system-report/providers.ts");
+    expect(providers).toContain('"/admin/events", "Open events")');
+    expect(providers).not.toContain('"/events-admin"');
+  });
+});

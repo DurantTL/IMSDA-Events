@@ -60,7 +60,8 @@ const actionTone = { ADD: "green", UPDATE: "purple", SKIP: "gold" } as const;
  * repeated-number warnings, every row), confirm exactly that preview, then
  * browse the catalog by section and mark items active or inactive.
  */
-export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: ClubSupplyItemRecord[] }) {
+/** `showEventLink` (#1839): only for viewers with an event, as the event's Merchandise page sends anyone without one away. */
+export function ClubSupplyCatalogWorkspace({ initialItems, showEventLink = false }: { initialItems: ClubSupplyItemRecord[]; showEventLink?: boolean }) {
   const [items, setItems] = useState(initialItems);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -254,7 +255,7 @@ export function ClubSupplyCatalogWorkspace({ initialItems }: { initialItems: Clu
         </p>
         <ul aria-label="Related pages" className={catalogStyles.links}>
           <li><span className={catalogStyles.linksLabel}>Patch and pin orders from clubs:</span> <Link href="/admin/club-supplies/conference-orders">Conference club orders</Link></li>
-          <li><span className={catalogStyles.linksLabel}>Items sold at an event are set up on</span> <Link href="/more/merchandise">{staffPageTitles.merchandise}</Link></li>
+          {showEventLink && <li><span className={catalogStyles.linksLabel}>Items sold at an event are set up on</span> <Link href="/more/merchandise">{staffPageTitles.merchandise}</Link></li>}
         </ul>
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
         {error && <div className="inline-notice error" role="alert">{error}</div>}

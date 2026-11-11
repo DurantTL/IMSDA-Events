@@ -28,7 +28,8 @@ const HONOR_CATALOG_SORT = {
 
 type CatalogResponse = { honors?: HonorRecord[]; message?: string; issues?: Array<{ message?: string }> };
 
-export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorRecord[] }) {
+/** `showEventLink` (#1839): only for viewers with an event, as the event's Classes page sends anyone without one away. */
+export function HonorCatalogWorkspace({ initialHonors, showEventLink = false }: { initialHonors: HonorRecord[]; showEventLink?: boolean }) {
   const [honors, setHonors] = useState(initialHonors);
   // The focused editor: closed until Add honor or a row's Edit opens it (#1590).
   const [editor, setEditor] = useState<HonorRecord | "new" | null>(null);
@@ -141,9 +142,11 @@ export function HonorCatalogWorkspace({ initialHonors }: { initialHonors: HonorR
           This list defines each honor.{honors.length > 0 && <> &quot;Used in classes&quot; counts the classes across all Honors Weekends, past ones included, that teach it.</>}{" "}
           Honors members have already earned stay on their records, which show the honor&apos;s current name and code.
         </p>
-        <ul aria-label="Related pages" className={styles.links}>
-          <li><span className={styles.linksLabel}>Each event chooses what it offers on</span> <Link href="/more/honors">{staffPageTitles.honors}</Link></li>
-        </ul>
+        {showEventLink && (
+          <ul aria-label="Related pages" className={styles.links}>
+            <li><span className={styles.linksLabel}>Each event chooses what it offers on</span> <Link href="/more/honors">{staffPageTitles.honors}</Link></li>
+          </ul>
+        )}
         {notice && <div className="inline-notice success" role="status">{notice}</div>}
         <div className={styles.toolbar}>
           {honors.length > 0 && (

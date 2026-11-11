@@ -79,6 +79,17 @@ describe("the catalog pages draw their own header (#1590)", () => {
     }
   });
 
+  it("links to the event's Classes and Merchandise pages only for a viewer with an event (#1839)", async () => {
+    await render(createElement(Honors, { initialHonors: [honor()] }));
+    expect(document.querySelector('a[href="/more/honors"]')).toBeNull();
+    await render(createElement(Supplies, { initialItems: [supply()] }));
+    expect(document.querySelector('a[href="/more/merchandise"]')).toBeNull();
+    expect(document.querySelector('a[href="/admin/club-supplies/conference-orders"]')).not.toBeNull();
+    for (const page of ["app/(workspace)/admin/honors/page.tsx", "app/(workspace)/admin/club-supplies/page.tsx"]) {
+      expect(read(page), page).toContain('showEventLink={(await listEventsForUser(user.id, user.globalRole === "SYSTEM_ADMIN")).length > 0}');
+    }
+  });
+
   it("keeps the page files' permission checks and section header as they were", () => {
     expect(read("app/(workspace)/admin/honors/page.tsx")).toContain("hasClubsAdministration(user)");
     expect(read("app/(workspace)/admin/club-supplies/page.tsx")).toContain("hasClubsAdministration(user)");
@@ -88,7 +99,7 @@ describe("the catalog pages draw their own header (#1590)", () => {
 
 describe("honor catalog (#1590)", () => {
   it("shows one filled button (the page header draws the one h1), the list, and no editor until Add honor is pressed", async () => {
-    await render(createElement(Honors, { initialHonors: [honor(), honor({ id: "h2", code: "AR-002", name: "Sample Birds", isActive: false, offeringCount: 0 })] }));
+    await render(createElement(Honors, { initialHonors: [honor(), honor({ id: "h2", code: "AR-002", name: "Sample Birds", isActive: false, offeringCount: 0 })], showEventLink: true }));
     expect(document.querySelectorAll("h1")).toHaveLength(0);
     expect(filled()).toHaveLength(1);
     expect(filled()[0]!.textContent).toContain("Add honor");
@@ -212,6 +223,7 @@ describe("club supply catalog (#1590)", () => {
   it("shows one filled button (the page header draws the one h1), the list, availability and supplier, and no editor until Supplier and price is pressed", async () => {
     await render(createElement(Supplies, {
       initialItems: [supply(), supply({ id: "s2", name: "Sample Conference Pin", isActive: false, supplier: "CONFERENCE", unitPriceCents: 125 })],
+      showEventLink: true,
     }));
     expect(document.querySelectorAll("h1")).toHaveLength(0);
     expect(filled()).toHaveLength(1);
