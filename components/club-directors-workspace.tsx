@@ -63,11 +63,14 @@ export function ClubDirectorsWorkspace({
   club,
   initialGrants,
   canOpenPeople = false,
+  linkCurrentOnly = false,
 }: {
   club: { id: string; name: string; isActive: boolean };
   initialGrants: DirectorGrantRecord[];
   /** Whether the viewer may open People & access (#1277): each person then links to their page. The server decides again. */
   canOpenPeople?: boolean;
+  /** Link only grants that are current or starting later: a Clubs Administrator opens club people only (#1804). */
+  linkCurrentOnly?: boolean;
 }) {
   const [grants, setGrants] = useState(initialGrants);
   const sorted = useTableSort(grants, DIRECTOR_SORT, "directors");
@@ -280,7 +283,7 @@ export function ClubDirectorsWorkspace({
                         </span>
                       </>
                     )}
-                    {canOpenPeople ? (
+                    {canOpenPeople && (!linkCurrentOnly || grant.status === "ACTIVE" || grant.status === "SCHEDULED") ? (
                       <>
                         <br />
                         <Link className="secondary-button" href={`/admin/people/account/${grant.account.id}`}>See all of this person&apos;s access<span className="sr-only"> ({grant.account.displayName})</span></Link>

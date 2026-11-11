@@ -27,8 +27,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     clubsAdministratorGrant: { findFirst: mocks.clubsGrantFindFirst },
-    user: { findUnique: mocks.userFindUnique, findMany: mocks.userFindMany },
-    attendeeAccount: { findUnique: mocks.accountFindUnique, findMany: mocks.accountFindMany },
+    user: { findUnique: mocks.userFindUnique, findMany: mocks.userFindMany, findFirst: async () => ({ id: "club-person" }) },
+    attendeeAccount: { findUnique: mocks.accountFindUnique, findMany: mocks.accountFindMany, findFirst: async () => ({ id: "club-person" }) },
     eventMembership: { findMany: mocks.membershipFindMany },
   }),
 }));

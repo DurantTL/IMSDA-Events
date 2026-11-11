@@ -67,6 +67,7 @@ describe("the registry", () => {
       "/admin/clubs/import": inClubsMenu,
       "/admin/clubs/reports/year-end": inClubsMenu,
       "/information-forms/responses": `${notSearchable}: opens one form's responses and needs a form chosen first`,
+      "/admin/people/invite-lookup": `${notSearchable}: reached from Invite a person with an email and a role chosen`,
     };
     const reachedRows = buildRouteMapping().filter((row) => row.kind === "reached").map((row) => row.route);
     // Every registry route is a reached row, and none is also excluded.
