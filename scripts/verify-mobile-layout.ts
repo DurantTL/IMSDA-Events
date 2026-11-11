@@ -84,6 +84,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase, assertLocalUrl } from "./support/local-only-guard";
 import { phoneMaxWidthPx } from "../components/more-launcher-model";
 import { clubYearChoices } from "../modules/club-rosters/domain";
+import { reportableReportYears } from "../modules/club-reports/year-end-domain";
 import { defaultPublicClubFormsSettings } from "../modules/club-forms/public-index-settings-domain";
 
 loadEnvConfig(process.cwd());
@@ -296,6 +297,8 @@ const pages: PageSpec[] = [
   club("honors-report-person", "/exports/honors?view=person"),
   club("monthly-records", "/records"),
   club("monthly-report-form", `/records?month=${reportMonth}`),
+  // The director's Year-End Report counts (#1879): each count stacks its label over a full-width box on a phone.
+  club("year-end-report", `/reports/year-end/${reportableReportYears(new Date())[0]}`),
   club("orders", "/orders"),
   // Meeting notes on the Monthly records page: the add popup is opened, saved and checked for the pinned "Saved" banner (#810).
   club("meeting-notes", "/records"),
