@@ -238,6 +238,32 @@
 
 .footer { display: contents; }
 
+/* Links on the month labels and year-strip squares (#1842). */
+.monthLinks { margin: 0; padding: 0; list-style: none; }
+.monthLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  color: var(--imsda-navy);
+  text-decoration: underline;
+}
+.stripLinks { flex-wrap: wrap; }
+.stripLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+.stripLinks { gap: 0; }
+@media (max-width: 639px) {
+  .monthLinks { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
 /* Opt-in compact layout (#1314): phones only. */
 @media (max-width: 639px) {
   .bandCompact { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
