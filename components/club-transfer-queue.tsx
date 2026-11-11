@@ -214,7 +214,7 @@ export function ClubTransferQueue({ filter = "open" }: { filter?: StaffQueueFilt
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       {transfers === null || (loadedFilter !== filter && transfers.length === 0) ? <p className="report-empty">Loading…</p> : transfers.length === 0 ? (error ? null : <div className="report-empty">
           <p>{staffQueueEmptyText[filter]}</p>
-          {filter !== "open" && <p><Link href={staffQueueHref("open")} scroll={false}>Show all open transfers</Link></p>}
+          {filter !== "open" && <p><Link className={styles.emptyLink} href={staffQueueHref("open")} scroll={false}>Show all open transfers</Link></p>}
         </div>) : (
         <ul aria-busy={loadedFilter !== filter} className="transfer-list" inert={loadedFilter !== filter}>
           {transfers.map((transfer) => <StaffTransferCard key={transfer.id} onAction={(next) => void start(next)} transfer={transfer} />)}

@@ -74,8 +74,8 @@ export function StaffApplicationList({ applications, view }: { applications: New
           <p>{view === "waiting" ? "No applications are waiting." : "No applications have been decided yet."}</p>
           <p>
             {view === "waiting"
-              ? <Link href={applicationsHref("links")}>Send a private link</Link>
-              : <Link href={applicationsHref("waiting")}>Back to waiting applications</Link>}
+              ? <Link className={styles.emptyLink} href={applicationsHref("links")}>Send a private link</Link>
+              : <Link className={styles.emptyLink} href={applicationsHref("waiting")}>Back to waiting applications</Link>}
           </p>
         </div>
       </>

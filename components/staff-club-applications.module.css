@@ -47,3 +47,5 @@
 @media (max-width: 640px) { .actions > * { flex: 1 1 100%; } }
 
 .linkList :global(.secondary-button) { min-height: 44px; min-width: 44px; }
+/* An empty view's next-step link (#1589): a 44px tap target. */
+.emptyLink { display: inline-flex; align-items: center; min-height: 44px; }
