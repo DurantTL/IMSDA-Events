@@ -99,7 +99,7 @@ describe("system navigation groups", () => {
     expect(systemNavActiveItem("/admin/organizations/org_1/profile")?.label).toBe("Clubs and churches");
     expect(systemNavActiveItem("/admin/organizations/background-checks")?.label).toBe("Sterling Volunteers");
     expect(systemNavActiveItem("/admin/clubs/reports/org_1/2026-09")?.label).toBe("Monthly Records");
-    expect(systemNavActiveItem("/admin/clubs/invites")?.label).toBe("New club applications");
+    expect(systemNavActiveItem("/admin/clubs/invites")?.label).toBe("Club leaders");
     expect(systemNavActiveItem("/admin/organizationsx")).toBeNull();
     expect(systemNavActiveItem("/admin")).toBeNull();
     expect(systemNavActiveItem("/admin/calendar")?.label).toBe("Conference calendar");

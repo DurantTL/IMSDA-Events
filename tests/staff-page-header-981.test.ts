@@ -61,7 +61,7 @@ describe("back buttons that repeat the sidebar or More are gone", () => {
 
   it("keeps a back link on admin sub-pages that have no sidebar entry, through the section header (#1274)", () => {
     for (const file of [
-      "app/(workspace)/admin/clubs/import/page.tsx", "app/(workspace)/admin/clubs/invites/page.tsx", "app/(workspace)/admin/organizations/directory/page.tsx",
+      "app/(workspace)/admin/clubs/import/page.tsx", "app/(workspace)/admin/organizations/directory/page.tsx",
       "app/(workspace)/admin/organizations/import/page.tsx", "app/(workspace)/admin/club-forms/[templateKey]/page.tsx",
     ]) {
       const source = read(file);
@@ -94,11 +94,13 @@ describe("link-chip bars became one Tools menu without losing a destination", ()
   it("/admin/organizations keeps the links the system sidebar does not list, and drops the ones it does", () => {
     const source = read("app/(workspace)/admin/organizations/page.tsx");
     const sidebar = new Set(systemNavGroups.flatMap((group) => group.items.map((item) => item.href)));
-    for (const href of ["/admin/clubs/import", "/admin/clubs/health-import", "/admin/organizations/directory", "/admin/organizations/import", "/admin/clubs/invites"]) {
+    for (const href of ["/admin/clubs/import", "/admin/clubs/health-import", "/admin/organizations/directory", "/admin/organizations/import"]) {
       expect(source, href).toContain(href);
-      // Not a sidebar item (Club invites is reached through "New club applications" only for its highlight).
       expect(sidebar.has(href), href).toBe(false);
     }
+    // Club invites is the Invited view of Club leaders (#1589), a sidebar item, so the Tools menu no longer repeats it.
+    expect(source).not.toContain("/admin/clubs/invites");
+    expect(sidebar.has("/admin/clubs/leaders")).toBe(true);
     for (const href of ["/admin/clubs/applications", "/admin/clubs/summary", "/admin/clubs/transfers", "/admin/organizations/background-checks"]) {
       expect(source, href).not.toContain(`"${href}"`);
       expect(sidebar.has(href), href).toBe(true);

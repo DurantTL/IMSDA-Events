@@ -192,7 +192,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
           {leftOut.length > 0 && (
             <p className="field-help">Skipped by you, nothing created: {leftOut.map((name, index) => <span key={`${name}-${index}`}>{index ? ", " : ""}<span translate="no">{name}</span></span>)}.</p>
           )}
-          {results.some((result) => result.kind !== "CLUB_LIST") && <p className="field-help club-import-next">Next: <a href="/admin/clubs/invites">review and send the club invites</a>.</p>}
+          {results.some((result) => result.kind !== "CLUB_LIST") && <p className="field-help club-import-next">Next: <a href="/admin/clubs/leaders?status=draft">review and send the club invites</a>.</p>}
         </section>
       )}
 
@@ -372,7 +372,7 @@ export function ClubImportWorkspace({ initialPreview }: { initialPreview?: ClubI
                 </div>
 
                 {!isList && <>
-                <h3 className="club-import-subhead">Invites (sent later, from Club invites)</h3>
+                <h3 className="club-import-subhead">Invites (sent later, from Club leaders)</h3>
                 {draft.invites.length === 0 ? (
                   <p className="field-help">The form had no leader email. Add a director from the club&apos;s Team page later.</p>
                 ) : (

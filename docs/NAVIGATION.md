@@ -159,7 +159,7 @@ follows the same pattern: `area/[organizationId]` → "All clubs";
 - `admin/organizations/[organizationId]/club` (a club as its director sees
   it) → "Back to Clubs and churches"; its own links to Club admins, Club
   profile, and each monthly report pass `from` back to itself
-- `admin/clubs/import`, `admin/clubs/invites`, `admin/clubs/reports` (back link: the Monthly Records tab),
+- `admin/clubs/import`, `admin/clubs/reports` (back link: the Monthly Records tab),
   `admin/organizations/background-checks` → "Back to Clubs and churches"
 - `more/clubs` (a Pathfinder event's club oversight) → "Back to More"
 - `more/clubs/[organizationId]` → "Back to clubs"; its links to each monthly

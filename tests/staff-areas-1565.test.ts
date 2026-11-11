@@ -161,8 +161,8 @@ describe("staff areas (#1565)", () => {
     }
     expect(staffPlaceFor("/overview")).toMatchObject({ area: "events", inEvent: true });
     const marked = markCurrentTab(areaTabs("clubs", viewers.system), staffPlaceFor("/admin/clubs/invites"));
-    expect(marked.filter((tab) => tab.current).map((tab) => tab.key)).toEqual(["applications"]);
-    expect(marked.find((tab) => tab.key === "applications")?.views?.filter((view) => view.current).map((view) => view.key)).toEqual(["/admin/clubs/invites"]);
+    // Club invites is the Invited view of Club leaders (#1589), so it lights that tab.
+    expect(marked.filter((tab) => tab.current).map((tab) => tab.key)).toEqual(["leaders"]);
   });
 
   it("gives the pages that only other pages used to reach a visible home", () => {
@@ -171,7 +171,7 @@ describe("staff areas (#1565)", () => {
       ...staffAreaOrder.flatMap((area) => areaTabs(area, system).flatMap((tab) => [tab.href, ...(tab.views ?? []).map((view) => view.href)])),
       ...hubCardHrefs(system),
     ].map((href) => href.split("#")[0].split("?")[0]);
-    for (const path of ["/admin/clubs/invites", "/admin/clubs/import", "/admin/clubs/health-import", "/admin/organizations/background-checks", "/admin/club-forms", "/admin/club-forms/public-page", "/admin/honors", "/admin/club-supplies", "/admin/email", "/admin/site-content", "/admin/settings"]) {
+    for (const path of ["/admin/clubs/leaders", "/admin/clubs/import", "/admin/clubs/health-import", "/admin/organizations/background-checks", "/admin/club-forms", "/admin/club-forms/public-page", "/admin/honors", "/admin/club-supplies", "/admin/email", "/admin/site-content", "/admin/settings"]) {
       expect(homes, path).toContain(path);
     }
     // The rest of the System destinations (Master Award rules, readiness, pauses, event module requests ...) are hub cards.

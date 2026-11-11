@@ -74,6 +74,7 @@ const unconfirmedDeleteAllowlist: Record<string, string> = {
   "components/question-library-manager.tsx": "Delete swaps the row into an inline 'Delete <name>' / 'Keep it' confirmation with the consequence stated before the request is sent.",
   // Low-stakes by design: nothing is lost and the action is trivially reversible.
   "components/registration-notes-tags-panel.tsx": "Removes one tag chip; re-adding the tag restores it, no data is lost.",
+  "components/staff-home-board.tsx": "Reset only puts the person's own Home layout back to its default (#1705); no record is lost and they can rearrange it again.",
   "components/session-manager.tsx": "Ends sessions only; no data is deleted and the devices can sign in again.",
 };
 

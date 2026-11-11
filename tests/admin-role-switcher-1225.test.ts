@@ -51,7 +51,7 @@ describe("the Clubs sidebar", () => {
     // The flat page list behind the phone bar and the active match (#1245): the grouped sidebar's pages, each once.
     expect([...clubsAdminNavigation.map((item) => item.href)].sort()).toEqual([
       "/admin/club-forms", "/admin/club-forms/public-page", "/admin/club-supplies", "/admin/clubs", "/admin/clubs/applications", "/admin/clubs/health-import",
-      "/admin/clubs/import", "/admin/clubs/invites", "/admin/clubs/leaders", "/admin/clubs/reports/year-end", "/admin/clubs/summary",
+      "/admin/clubs/import", "/admin/clubs/leaders", "/admin/clubs/reports/year-end", "/admin/clubs/summary",
       "/admin/clubs/transfers", "/admin/honors", "/admin/organizations/background-checks", "/admin/people",
     ]);
     // Never a page a Clubs Administrator cannot open.
@@ -59,7 +59,7 @@ describe("the Clubs sidebar", () => {
       expect(href).not.toMatch(/^\/admin\/(accounts|team|settings|email|organizations$|master-award-rules)/);
     }
     expect(clubsAdminNavigation.find((item) => item.href === "/admin/organizations/background-checks")?.label).toBe("Sterling Volunteers");
-    expect(clubsAdminActiveHref("/admin/clubs/invites")).toBe("/admin/clubs/invites");
+    expect(clubsAdminActiveHref("/admin/clubs/invites")).toBe("/admin/clubs/leaders");
     expect(clubsAdminActiveHref("/admin/organizations/background-checks")).toBe("/admin/organizations/background-checks");
     expect(clubsAdminActiveHref("/admin/clubs/reports/year-end")).toBe("/admin/clubs/reports/year-end");
     expect(clubsAdminActiveHref("/admin/clubs/reports/club-1/2026-10")).toBe("/admin/clubs/summary?view=records#monthly-records");
