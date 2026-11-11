@@ -266,6 +266,8 @@ const pages: PageSpec[] = [
   { name: "account-help-attendee", path: "/account/help", role: "attendee" },
   { name: "account-help-director", path: "/account/help", role: "director" },
   { name: "account-help-guide-director", path: "/account/help/director-monthly-record", role: "director" },
+  { name: "account-help-guide-director-roster", path: "/account/help/director-roster", role: "director" },
+  { name: "account-help-guide-director-club-forms", path: "/account/help/director-club-forms", role: "director" },
   // The Area Coordinator card on the account Overview: each upcoming event's name and dates on separate lines (#1753).
   { name: "account-overview-area", path: "/account", role: "area", expectText: /Upcoming club events/ },
   { name: "account-help-area", path: "/account/help", role: "area" },
