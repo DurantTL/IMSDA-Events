@@ -49,7 +49,7 @@ export function buildClubChecklist(facts: ClubChecklistFacts): Checklist {
     reference: !facts.twoStepVerified,
     href: "/account/security",
     linkable: true,
-    actionLabel: "Set up two-step sign-in",
+    actionLabel: "Open Profile",
     helpHref: portalGuideHref("walkthrough-director-two-step"),
   });
   add({

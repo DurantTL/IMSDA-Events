@@ -79,7 +79,7 @@ const writtenPortalGuides: readonly PortalGuide[] = [
     changes: ["Nothing. This guide is reading only."],
     steps: [
       "Open My club in the account tabs. It reads My clubs if you have several. With one club it opens that club. With several, you see a list with your role and the sponsoring church.",
-      "With several clubs, choose Open beside the club you want. To change clubs later, choose Switch club at the top.",
+      "If you have several clubs, choose Open beside the club you want. To change clubs later, choose Switch club at the top.",
       "Look at the banner on every club page. It shows the club, its sponsoring church, your role and the club year.",
       "Current club year is the year you can work in. A past or next year opens read-only.",
       "When you are looking at another year, Home says it is showing that year read-only and links back to the current year.",
@@ -113,7 +113,7 @@ const writtenPortalGuides: readonly PortalGuide[] = [
     ],
     steps: [
       "Open Monthly Records in your club menu. On a phone, tap Records at the bottom.",
-      "Read the list of months. Each month shows as Due, Draft, its points, or Missing.",
+      "Read the list of months. Under each month it says Due with a date, Draft, its points (such as 40 points), or Missing with the date it was due.",
       "Choose Open beside the month you need. It reads View for a closed month. The month you are on says Viewing.",
       "To add a meeting, choose Add meeting note under Meetings in that month. The record fills in from your meeting notes where it can.",
       "On a draft, Refresh from meeting notes updates the averages. It asks before it replaces anything.",
