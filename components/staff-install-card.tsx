@@ -1,7 +1,7 @@
 "use client";
 
 import { Share } from "lucide-react";
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useStandalone } from "@/components/staff-saved-app-guide";
 import { INSTALL_CARD_DISMISSED_KEY, installCardVariant } from "@/lib/staff-install-card";
 import { safeGetItem, safeRemoveItem, safeSetItem } from "@/lib/safe-storage";
@@ -54,7 +54,12 @@ function subscribeDismissed(onChange: () => void) {
   };
 }
 const notifyDismissed = () => dismissListeners.forEach((listener) => listener());
-const readDismissed = () => safeGetItem("local", INSTALL_CARD_DISMISSED_KEY) !== null;
+/*
+ * "Not now" for this page load. Storage can be blocked (a private window, "block all site data"); the click must still hide
+ * the card, so the choice is also held in memory. Only a stored choice lasts past a reload.
+ */
+let dismissedThisLoad = false;
+const readDismissed = () => dismissedThisLoad || safeGetItem("local", INSTALL_CARD_DISMISSED_KEY) !== null;
 // Nothing is shown on the server or first paint: dismissed is "true" until the browser has spoken.
 const serverDismissed = () => true;
 
@@ -64,6 +69,7 @@ export function useInstallCardDismissed(): boolean {
 }
 
 export function restoreInstallCard() {
+  dismissedThisLoad = false;
   safeRemoveItem("local", INSTALL_CARD_DISMISSED_KEY);
   notifyDismissed();
 }
@@ -95,8 +101,16 @@ export function StaffInstallCard() {
     installed,
   });
 
+  // After "Not now" the focused button is gone: a short status line takes its place and takes focus, so keyboard and
+  // screen-reader users hear what happened and keep their place (#1836).
+  const [justHidden, setJustHidden] = useState(false);
+  const hiddenRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (justHidden) hiddenRef.current?.focus(); }, [justHidden]);
+
   const notNow = useCallback(() => {
+    dismissedThisLoad = true;
     safeSetItem("local", INSTALL_CARD_DISMISSED_KEY, "1");
+    setJustHidden(true);
     notifyDismissed();
   }, []);
 
@@ -118,6 +132,13 @@ export function StaffInstallCard() {
     }
   }, []);
 
+  if (justHidden) {
+    return (
+      <p className={styles.notice} ref={hiddenRef} role="status" tabIndex={-1}>
+        Hidden. You can bring this back from Help.
+      </p>
+    );
+  }
   if (variant === "none") return null;
 
   return (
@@ -152,10 +173,21 @@ export function StaffInstallCard() {
 export function StaffInstallCardRestore() {
   const dismissed = useInstallCardDismissed();
   const hydrated = useSyncExternalStore(() => () => undefined, () => true, serverFalse);
+  // After the click the button is gone: a status line takes its place and focus, as on Home.
+  const [restored, setRestored] = useState(false);
+  const restoredRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (restored) restoredRef.current?.focus(); }, [restored]);
+  if (restored) {
+    return (
+      <p className={styles.notice} ref={restoredRef} role="status" tabIndex={-1}>
+        The card will show on Home again.
+      </p>
+    );
+  }
   if (!hydrated || !dismissed) return null;
   return (
     <div className={styles.restore}>
-      <button type="button" className="secondary-button" onClick={restoreInstallCard}>Show the Home Screen card on Home again</button>
+      <button type="button" className="secondary-button" onClick={() => { restoreInstallCard(); setRestored(true); }}>Show the Home Screen card on Home again</button>
     </div>
   );
 }
