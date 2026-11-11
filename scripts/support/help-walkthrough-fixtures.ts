@@ -561,6 +561,7 @@ export async function restorePasskeys(prisma: PrismaClient, before: string | nul
  * the emailed edit code the family "change a registration" walkthrough asks for (ten an hour from one address), and the
  * registration requests the "ask to cancel" walkthrough sends (the sample registration has one fixed id, so its budget is shared by every run).
  */
+// These clear every bucket for the policies below, which is safe only because the harness refuses non-local and non-seeded databases.
 export const signInRateLimitPolicies = ["attendee.sign-in", "attendee.roster-unlock", "attendee.passkey", "attendee.edit-step-up", "public.manage."] as const;
 
 /** Clears those local budgets, so repeated runs are not rate limited. Local database only. */

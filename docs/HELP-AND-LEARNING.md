@@ -92,7 +92,7 @@ page, and a staff viewer never gets a portal guide in staff search.
 - Add a guide the same way as a staff guide (see above), using `portalDestinations` and the audience.
 - The attendee guides are Find your registration and its next step, and the family guides (#1883) Pay a balance, Change a
   registration and Cancel a registration. They follow My registrations: each says what a card shows, the exact buttons, and
-  what happens to payments. They never state a refund amount, deadline or fee: the cancellation guide sends the reader to the
+  what happens to payments. They never state an amount, percentage, deadline or fee the page does not show: the cancellation guide sends the reader to the
   policy as the page shows it (Proposed outcome).
 
 ### Searching portal Help
