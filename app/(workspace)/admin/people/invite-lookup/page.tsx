@@ -63,7 +63,7 @@ export default async function InviteLookupPage({
           <div className={styles.inline}>
             <label className={styles.field}>
               Email
-              <EmailInput autoComplete="off" defaultValue={email} label="Email" maxLength={254} name="email" required />
+              <EmailInput autoComplete="off" defaultValue={email} key={email} label="Email" maxLength={254} name="email" required />
             </label>
             <button className="primary-button" type="submit">Look up</button>
           </div>
@@ -72,14 +72,14 @@ export default async function InviteLookupPage({
 
         {!canLookUp ? (
           <div className={styles.box}>
-            <p>Choose the club role in <Link href="/admin/people">Invite a person</Link> first, then you are sent back here to find the person.</p>
+            <p>Choose the club role in <Link className="text-link" href="/admin/people">Invite a person</Link> first, then you are sent back here to find the person.</p>
           </div>
         ) : null}
 
         {email && canLookUp && !person ? (
           <div className={styles.box}>
             <h2>No website account found</h2>
-            <p>No website account uses {email}. Choose the club role in <Link href="/admin/people">Invite a person</Link> instead; it sends them a club invite.</p>
+            <p>No website account uses {email}. Choose the club role in <Link className="text-link" href="/admin/people">Invite a person</Link> instead; it sends them a club invite.</p>
           </div>
         ) : null}
 
@@ -101,7 +101,7 @@ export default async function InviteLookupPage({
                 rows={rows}
               />
             ) : (
-              <p className={styles.note}>There is no club role to give yet. Choose the club role in <Link href="/admin/people">Invite a person</Link>, then come back here.</p>
+              <p className={styles.note}>There is no club role to give yet. Choose the club role in <Link className="text-link" href="/admin/people">Invite a person</Link>, then come back here.</p>
             )}
           </div>
         ) : null}

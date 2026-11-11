@@ -210,7 +210,7 @@ describe("the pages", () => {
   it("the lookup page uses the shared email input and filter form, and links the next steps to People & access", () => {
     expect(lookup).toContain("<EmailInput");
     expect(lookup).toContain("<GetFilterForm");
-    expect(lookup).toContain('<Link href="/admin/people">Invite a person</Link>');
+    expect(lookup).toContain('<Link className="text-link" href="/admin/people">Invite a person</Link>');
   });
 
   it("the lookup never passes staff details to the grant panel for a Clubs Administrator", () => {
