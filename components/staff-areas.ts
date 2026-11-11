@@ -306,6 +306,8 @@ export function staffPlaceFor(pathname: string, params: { get(name: string): str
   // Submitted club forms belong to the clubs, not to an event (#1573): with no `event` parameter they sit in Admin -> Forms beside
   // the definitions. With one (the person came from that event's More card) they stay in the event shell.
   if (under(pathname, "/more/club-forms") && !params.get("event")) return place("admin", "hub-forms", "/admin/club-forms");
+  // Possible duplicate people compares people across every event: system identity review, so it sits under System (#1886).
+  if (under(pathname, "/people/matches")) return place("admin", "system-administration");
   if (isEventScopedPath(pathname)) return { area: "events", tab: null, view: null, inEvent: true };
 
   if (pathname === "/admin") return place("admin", "system-administration");

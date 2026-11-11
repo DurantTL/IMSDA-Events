@@ -365,7 +365,7 @@ export function AppShell({
             </header>
           )}
           <WorkspaceContent pageKey={workspacePageKey(pathname, searchParams)}>
-            {!requestedEventId && !seenEventId && autoSelected && Boolean(defaultEvent) && place.inEvent && !pathname.startsWith("/people/matches") && !isProfileRoute && defaultEvent && (
+            {!requestedEventId && !seenEventId && autoSelected && Boolean(defaultEvent) && place.inEvent && !isProfileRoute && defaultEvent && (
               <EventAutoSelectNotice
                 eventName={defaultEvent.name}
                 switchHref={isSystemAdmin ? "/admin" : "/select-event"}

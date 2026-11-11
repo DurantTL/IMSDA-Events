@@ -61,15 +61,14 @@ describe("Registrations tab views (#1574)", () => {
     expect(place("/people/review-queues")).toEqual({ tab: "registrations", view: "review-queues" });
     expect(reviewQueuePaths).toHaveLength(6);
     for (const path of reviewQueuePaths) expect(place(path), path).toEqual({ tab: "registrations", view: "review-queues" });
-    // The cross-event identity queue is system identity review, not one of this event's queues.
-    expect(place("/people/matches")).toEqual({ tab: "registrations", view: "registrations" });
   });
 
   it("covers every page the Registrations tab lights as Review queues", () => {
     const spec = eventTabSpecs.find((entry) => entry.key === "registrations")!.views.find((view) => view.key === "review-queues")!;
     expect([...(spec.alsoOwns ?? [])].sort()).toEqual([...reviewQueuePaths].sort());
     const all = eventTabSpecs.find((entry) => entry.key === "registrations")!.views.find((view) => view.key === "registrations")!;
-    expect(all.alsoOwns).toEqual(["/people/matches"]);
+    // The cross-event identity queue is system identity review and sits under System (#1886), not in this tab.
+    expect(all.alsoOwns ?? []).not.toContain("/people/matches");
   });
 
   it("registers the page once, titled and gated like the pages it lists", () => {
