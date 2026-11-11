@@ -878,6 +878,7 @@ model User {
   attendeeAccountId String? @unique
   attendeeAccount   AttendeeAccount? @relation("UserAttendeeLink", fields: [attendeeAccountId], references: [id], onDelete: SetNull)
 
+  staffHomeLayout           StaffHomeLayout?
   memberships               EventMembership[]
   clubsAdministratorGrant   ClubsAdministratorGrant?
   siteContentEditorGrant    SiteContentEditorGrant?
@@ -11551,4 +11552,14 @@ model ClubEventPointAward {
 
   @@unique([eventId, organizationId])
   @@index([organizationId, clubYear])
+}
+
+/// One person's staff Home layout (#1705): which modules they show and in what order. A personal view preference, never
+/// shared. `modules` is a JSON list of `{ key, shown }`; the server re-checks every key against the person's current roles.
+model StaffHomeLayout {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modules   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

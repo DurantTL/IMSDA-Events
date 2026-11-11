@@ -1,0 +1,231 @@
+/* Staff Home board (#1705): toolbar, module cards, drag handles and the Customize panel (side panel on computers, bottom sheet on phones). */
+.board {
+  display: grid;
+  gap: 16px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.45;
+}
+
+.error {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 10px 14px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.cards {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-container);
+  background: var(--card);
+  padding: 16px;
+}
+
+.card[data-arranging="true"] {
+  border-style: dashed;
+}
+
+.card[data-dragging="true"] {
+  border-color: var(--imsda-navy);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTitle {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.125rem);
+  font-weight: 800;
+}
+
+.cardBody {
+  min-width: 0;
+}
+
+.handle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target, 44px);
+  min-width: var(--touch-target, 44px);
+  height: var(--touch-target, 44px);
+  min-height: var(--touch-target, 44px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--card);
+  color: var(--imsda-navy);
+  cursor: grab;
+  touch-action: none;
+}
+
+.handle:active {
+  cursor: grabbing;
+}
+
+.handle:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.loading {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: color-mix(in srgb, var(--imsda-navy-deep) 52%, transparent);
+}
+
+.panel {
+  position: fixed;
+  z-index: 91;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.panel:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+
+@media (min-width: 641px) {
+  .panel {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(420px, 100vw);
+    border-radius: var(--radius-overlay) 0 0 var(--radius-overlay);
+  }
+}
+
+@media (max-width: 640px) {
+  .panel {
+    inset: auto env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+    max-height: min(85vh, calc(100dvh - 24px));
+    border-radius: var(--radius-overlay) var(--radius-overlay) 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+.panelHead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 8px;
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.15rem);
+  font-weight: 800;
+}
+
+.panelBody {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 16px 12px;
+}
+
+.moduleList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.moduleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  padding: 4px 8px;
+}
+
+.moduleRow[data-dragging="true"] {
+  border-color: var(--imsda-navy);
+}
+
+.moduleLabel {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  min-width: 0;
+  min-height: var(--touch-target, 44px);
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.moduleLabel input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.always {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 600;
+}
+
+.panelFoot {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 12px 16px;
+}

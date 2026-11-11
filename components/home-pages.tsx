@@ -48,9 +48,10 @@ function Item({ item }: { item: NeedsItem }) {
  * the page that does the work; nothing on Home approves, sends or changes a record. "Nothing needs you right now" shows only
  * when every read worked and found nothing; a read that failed says "Unavailable".
  */
-export function NeedsYouPage({ view, comingUp = null }: { view: NeedsView; comingUp?: { events: ComingUpEvent[] | null; nextStep: { href: string; label: string } | null } | null }) {
+export function NeedsYouPage({ view, comingUp = null, headingLevel = 2 }: { view: NeedsView; headingLevel?: 2 | 3; comingUp?: { events: ComingUpEvent[] | null; nextStep: { href: string; label: string } | null } | null }) {
   // The next step from an empty Needs you (#1747): never a link the Coming up list below already holds, so it is Help.
   const nextStep = { href: "/help", label: "Open Help" };
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   return (
     <div className={styles.home} data-testid="home-needs-you">
       {view.noAdminRole ? (
@@ -68,7 +69,7 @@ export function NeedsYouPage({ view, comingUp = null }: { view: NeedsView; comin
       {view.sections.map((section) => (
         <section key={section.role} className={styles.section} aria-labelledby={`home-section-${section.role}`} data-role={section.role}>
           <div className={styles.sectionHead}>
-            <h2 id={`home-section-${section.role}`} className={styles.sectionTitle}>{section.title}</h2>
+            <Heading id={`home-section-${section.role}`} className={styles.sectionTitle}>{section.title}</Heading>
             <p className={styles.sectionStatus} data-testid="home-section-status">{sectionStatusText(section)}</p>
           </div>
           {section.items.length > 0 ? (
@@ -80,7 +81,7 @@ export function NeedsYouPage({ view, comingUp = null }: { view: NeedsView; comin
       ))}
       {comingUp && (view.allClear || view.noAdminRole) ? (
         <section className={styles.section} aria-labelledby="home-needs-coming-up" data-testid="home-needs-coming-up">
-          <h2 id="home-needs-coming-up" className={styles.sectionTitle}>Coming up</h2>
+          <Heading id="home-needs-coming-up" className={styles.sectionTitle}>Coming up</Heading>
           <ComingUpPage events={comingUp.events} nextStep={comingUp.nextStep} />
         </section>
       ) : null}
