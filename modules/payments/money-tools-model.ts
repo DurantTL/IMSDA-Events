@@ -21,7 +21,7 @@ export type MoneyMetricKey = "churchFlags" | "ledgerDifferences" | "policyVersio
 /** `null` is "could not be read"; a missing key is "not asked for". */
 export type MoneyMetricValues = Partial<Record<MoneyMetricKey, number | null>>;
 
-export type MoneyToolsViewer = { permissions: readonly EventPermission[] };
+export type MoneyToolsViewer = { permissions: readonly EventPermission[]; isSystemAdmin?: boolean };
 
 type Gate = (permissions: ReadonlySet<EventPermission>) => boolean;
 const holds = (permission: EventPermission): Gate => (permissions) => permissions.has(permission);

@@ -17,7 +17,7 @@ export default async function SquarePaymentsPage({
   searchParams: Promise<{ event?: string; days?: string }>;
 }) {
   const { event: requested, days } = await searchParams;
-  const { event, permissions } = await resolveEventContext(requested);
+  const { event, permissions, user } = await resolveEventContext(requested);
   if (!permissions.includes("MANAGE_FINANCE")) {
     return (
       <AccessRestricted
@@ -34,6 +34,8 @@ export default async function SquarePaymentsPage({
   let unavailable: string | null = null;
   try {
     unmatched = await listUnmatchedSquarePayments({
+      eventId: event.id,
+      includeUnattributed: user.globalRole === "SYSTEM_ADMIN",
       days: Number.isFinite(windowDays) ? windowDays : 90,
     });
   } catch (error) {
