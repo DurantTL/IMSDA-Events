@@ -11,6 +11,7 @@ import {
   withCurrentEvent,
   type NavigationItem,
 } from "@/components/staff-navigation";
+import { visibleReachedDestinations } from "@/components/reached-destinations";
 import { systemNavGroups } from "@/components/system-navigation";
 import type { EventPermission } from "@/modules/access/permissions";
 import { alwaysOnModuleKeys, disabledModuleCardKeys } from "@/modules/event-modules/catalog";
@@ -39,6 +40,8 @@ export type SearchDestination = {
   key: string;
   scope: DestinationScope;
   label: string;
+  /** The menu group a page with no menu entry lives under (#1661), shown before the label and searchable. */
+  parent?: string;
   description: string;
   href: string;
   /** Extra task words that find this destination but are not shown. */
@@ -285,6 +288,21 @@ export function buildSearchDestinations(context: DestinationSearchContext): Sear
       const navItem = [eventFeaturesItem, ...navigation].find((item) => item.href === path);
       addEvent(path, navItem?.label ?? card.title, card.description, card.href);
     }
+
+    // Pages with no menu entry (#1661): each only for a viewer who passes the page's own check, after every menu item.
+    const listed = new Set(destinations.filter((destination) => destination.scope === "Event").map((destination) => pathOf(destination.href)));
+    for (const entry of visibleReachedDestinations(context)) {
+      if (listed.has(entry.route) || systemPaths.has(entry.route)) continue;
+      add({
+        key: `Event:${entry.route}`,
+        scope: "Event",
+        label: entry.label,
+        parent: entry.parent,
+        description: entry.description,
+        href: withCurrentEvent(entry.route, eventId),
+        keywords: entry.keywords,
+      });
+    }
   }
 
   // Every signed-in staff member has a profile page.
@@ -354,7 +372,7 @@ const startsAnyWord = (words: readonly string[], candidate: string) => words.som
 /** A destination's relevance to the query, or 0 when any query word finds nothing. */
 function scoreDestination(destination: SearchDestination, tokens: readonly string[]): number {
   const labelWords = wordsOf(destination.label);
-  const keywordWords = wordsOf(destination.keywords.join(" "));
+  const keywordWords = wordsOf([...destination.keywords, destination.parent ?? ""].join(" "));
   const descriptionWords = wordsOf(destination.description);
   const scopeWords = wordsOf(destination.scope);
   let total = 0;

@@ -55,6 +55,7 @@ this list (see `AGENTS.md` → Checks and `.agents/skills/imsda-review/`).
 | S3 | The Sterling Volunteers name lookup also follows the empty-search rule, keeping its existing permission checks and audit logging. | `tests/background-check-routes.test.ts`, `tests/search-as-you-type-guard-1431.test.ts` (the empty lookup, its permission check, and no early return) | planned (#1439) | #1348 |
 | S4 | Every search box should search as you type, across the board. Empty shows the full list, typing narrows it, and no Enter is needed. | `tests/search-as-you-type-guard-1431.test.ts`, `tests/search-as-you-type-dom-1431.test.ts` | `npm run test:club-journeys` (club director and area coordinator pages; system administrator pages planned (#1439)); `npm run test:event-journeys` (event staff pages) | #1431 |
 | S5 | While results update, focus is kept and results are announced; Enter and no-JavaScript still work. | `tests/search-as-you-type-dom-1431.test.ts` | `npm run test:event-journeys` (attendee pages and the staff attendee list and check-in desk); no-JavaScript Enter included on the events list | #1431 |
+| S6 | Search lists the event sub-pages a viewer may open even when no menu has them, shown under their parent group (for example "Payments › Invoices"). A page is listed only for a viewer who passes that page's own check, only with an event selected, and never when its module is off. | `tests/reached-destinations-1661.test.ts` | planned (#1661 part 2) | #1661 |
 
 ## Setup help
 
