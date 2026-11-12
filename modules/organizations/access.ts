@@ -4,7 +4,7 @@ import {
   AccessDeniedError,
   requireAuthenticatedUser,
 } from "@/modules/access/authorization";
-import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
+import { isActiveClubsAdministrator, isActiveYouthAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { getPrisma } from "@/lib/prisma";
 
@@ -76,4 +76,20 @@ export async function requireClubOrganizationAdministration(
 /** The actor shape the act-as functions take: marks a Clubs Administrator so the audit entry says so (#1232). */
 export function actAsActor(user: ClubAdministrationUser): { id: string; viaClubsAdministrator?: true } {
   return user.globalRole === "SYSTEM_ADMIN" ? { id: user.id } : { id: user.id, viaClubsAdministrator: true };
+}
+
+/**
+ * The gate for starting and stopping an Area Coordinator act-as (#1685): a system administrator, an active Clubs
+ * Administrator, or an active Youth Admin. Club-director act-as keeps `requireClubOrganizationAdministration`, so a
+ * Youth Admin is refused there. Returns the actor shape the act-as functions take, marked so the audit entry says
+ * which role acted. A Clubs Administrator who is also a Youth Admin is labelled a Clubs Administrator.
+ */
+export async function requireAreaCoordinatorActAs(
+  deniedMessage = "Clubs Administrator, Youth Admin or system administrator access is required.",
+): Promise<{ id: string; viaClubsAdministrator?: true; viaYouthAdministrator?: true }> {
+  const user = requireAuthenticatedUser(await getCurrentSession());
+  if (user.globalRole === "SYSTEM_ADMIN") return { id: user.id };
+  if (await isActiveClubsAdministrator(user.id)) return { id: user.id, viaClubsAdministrator: true };
+  if (await isActiveYouthAdministrator(user.id)) return { id: user.id, viaYouthAdministrator: true };
+  throw new AccessDeniedError(deniedMessage, 403, "PERMISSION_DENIED");
 }

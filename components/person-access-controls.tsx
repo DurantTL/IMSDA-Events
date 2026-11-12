@@ -76,9 +76,9 @@ function Chip({ tone, children }: { tone?: "green" | "coral"; children: ReactNod
 
 // ---------------------------------------------------------------- System-wide
 
-type RoleKind = "system-administrator" | "clubs-administrator" | "site-content-editor" | "area-coordinator";
+type RoleKind = "system-administrator" | "clubs-administrator" | "youth-administrator" | "site-content-editor" | "area-coordinator" | "tlt-director";
 
-const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator": "CLUBS_ADMIN", "site-content-editor": "SITE_CONTENT_EDITOR", "area-coordinator": "AREA_COORDINATOR" } as const;
+const roleKeys = { "system-administrator": "SYSTEM_ADMIN", "clubs-administrator": "CLUBS_ADMIN", "youth-administrator": "YOUTH_ADMIN", "site-content-editor": "SITE_CONTENT_EDITOR", "area-coordinator": "AREA_COORDINATOR", "tlt-director": "AREA_COORDINATOR" } as const;
 
 const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string; noun: string }> = {
   "system-administrator": {
@@ -91,6 +91,11 @@ const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string;
     grantNote: "Every change is recorded under their name.",
     revokeBody: "They lose access to the club areas on their next page. Nothing they did is undone.",
   },
+  "youth-administrator": {
+    noun: systemRoleText.YOUTH_ADMIN.name,
+    grantNote: "They sign in with a second step, and every export is recorded under their name.",
+    revokeBody: "They lose the Youth directory and the Area Coordinator view on their next page. Nothing they exported is undone.",
+  },
   "site-content-editor": {
     noun: systemRoleText.SITE_CONTENT_EDITOR.name,
     grantNote: "Every change is recorded under their name.",
@@ -100,6 +105,11 @@ const roleCopy: Record<RoleKind, { grantNote: string | null; revokeBody: string;
     noun: systemRoleText.AREA_COORDINATOR.name,
     grantNote: null,
     revokeBody: "They'll no longer see other clubs.",
+  },
+  "tlt-director": {
+    noun: "TLT director",
+    grantNote: "They will see every TLT's name, club, age and grade, and can change each one's TLT year, position, status and tags. Every change and download is recorded.",
+    revokeBody: "They lose the TLT directory on their next page. They stay an Area Coordinator. Removing the Area Coordinator role also removes this.",
   },
 };
 
@@ -121,8 +131,8 @@ export function RoleToggle({ kind, on, name, userId, accountId }: {
       title: grant ? `Make ${name} a ${copy.noun}?` : `Remove ${copy.noun} from ${name}?`,
       body: grant ? (
         <>
-          <p>{systemRoleText[roleKeys[kind]].summary}{copy.grantNote ? ` ${copy.grantNote}` : ""}</p>
-          <RoleDetails role={systemRoleText[roleKeys[kind]]} />
+          <p>{kind === "tlt-director" ? "" : `${systemRoleText[roleKeys[kind]].summary} `}{copy.grantNote ?? ""}</p>
+          {kind === "tlt-director" ? null : <RoleDetails role={systemRoleText[roleKeys[kind]]} />}
         </>
       ) : <p>{copy.revokeBody}</p>,
       confirmLabel: grant ? `Make ${name} a ${copy.noun}` : `Remove ${copy.noun} from ${name}`,
@@ -137,9 +147,17 @@ export function RoleToggle({ kind, on, name, userId, accountId }: {
         await callJson(`/api/admin/users/${encodeURIComponent(userId ?? "")}/clubs-administrator`, { method: grant ? "PUT" : "DELETE" }, "That role could not be changed.");
         return grant ? `${name} is now a Clubs Administrator.` : `${name} is no longer a Clubs Administrator.`;
       }
+      if (kind === "youth-administrator") {
+        await callJson(`/api/admin/users/${encodeURIComponent(userId ?? "")}/youth-administrator`, { method: grant ? "PUT" : "DELETE" }, "That role could not be changed.");
+        return grant ? `${name} is now a Youth Admin.` : `${name} is no longer a Youth Admin.`;
+      }
       if (kind === "site-content-editor") {
         await callJson(`/api/admin/users/${encodeURIComponent(userId ?? "")}/site-content-editor`, { method: grant ? "PUT" : "DELETE" }, "That role could not be changed.");
         return grant ? `${name} is now a Site content editor.` : `${name} is no longer a Site content editor.`;
+      }
+      if (kind === "tlt-director") {
+        const result = await callJson(`/api/admin/accounts/${encodeURIComponent(accountId ?? "")}`, { method: "POST", json: { action: "tlt-director", on: grant } }, "That setting could not be changed.");
+        return result.message ?? (grant ? "Now the TLT director." : "No longer the TLT director.");
       }
       const result = await callJson(`/api/admin/accounts/${encodeURIComponent(accountId ?? "")}`, { method: "POST", json: { action: "area-coordinator", on: grant } }, "That role could not be changed.");
       return result.message ?? (grant ? "Now an Area Coordinator." : "No longer an Area Coordinator.");

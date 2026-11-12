@@ -70,7 +70,8 @@ const memberSelect = {
 
 type StoredMember = Prisma.ClubRosterMemberGetPayload<{ select: typeof memberSelect }>;
 
-function ageFrom(member: StoredMember, onDate: string) {
+/** Whole years on a date from the sealed birth date, opened here and never returned; null without one (also used by the TLT directory, #1686). */
+export function ageFrom(member: Pick<StoredMember, "sealedBirthDate">, onDate: string) {
   return member.sealedBirthDate ? ageOn(openBirthDate(member.sealedBirthDate), onDate) : null;
 }
 
@@ -554,6 +555,7 @@ export async function removeRosterMember(organizationId: string, memberId: strin
     }
     let personDeleted = false;
     let nameKept = false;
+    let tltProfileErased = false;
     let honorEntriesErased = 0;
     if (member.personId) {
       const person = await tx.person.findUnique({
@@ -623,6 +625,14 @@ export async function removeRosterMember(organizationId: string, memberId: strin
         }
         // What directors are told is unchanged by a sealed copy: the name is reported as kept only for ordered items.
         nameKept = !personDeleted && orderedNeeds > 0;
+        // The TLT director's record (#1686) is erased with the roster details unless the kept Person is still a TLT on
+        // another roster row that is not removed (an inactive row may be made active again). (When the Person itself was deleted above, the record went with it.)
+        if (!personDeleted) {
+          const stillTlt = await tx.clubRosterMember.count({
+            where: { personId: member.personId, id: { not: memberId }, status: { not: "REMOVED" }, attendeeType: "YOUTH", isTlt: true },
+          });
+          if (stillTlt === 0) tltProfileErased = (await tx.tltProfile.deleteMany({ where: { personId: member.personId } })).count > 0;
+        }
       }
     }
     await audit(tx, actor, "CLUB_ROSTER_MEMBER_REMOVED", organizationId, memberId, "Removed a person from a club roster and erased their details.", {
@@ -632,6 +642,7 @@ export async function removeRosterMember(organizationId: string, memberId: strin
       classCompletionsErased,
       guardiansErased,
       nameKept,
+      tltProfileErased,
     });
     // The person kept (still registered, on another roster…) is refreshed by the caller (#527).
     return { personId: personDeleted ? null : member.personId, nameKept };

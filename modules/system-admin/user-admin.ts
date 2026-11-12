@@ -14,6 +14,7 @@ import { queueAttendeeVerificationEmail } from "@/modules/attendee-accounts/atte
 import { checkAdminVerificationEmailRateLimit } from "@/modules/rate-limit/service";
 import { sendAccountRecoveryEmail } from "@/modules/communications/account-email-dispatch";
 import { applyClubsAdministrator } from "@/modules/access/clubs-administrator";
+import { applyYouthAdministrator } from "@/modules/access/youth-administrator";
 import { MembershipOperationError, applyGlobalRole } from "@/modules/access/membership-repository";
 import { deliverStaffActivation } from "@/modules/communications/staff-activation";
 import { sortAccounts, type AccountSort } from "@/modules/system-admin/account-sort";
@@ -208,7 +209,7 @@ export async function resendStaffInvite(userId: string, actorUserId: string) {
 
 /**
  * Cancels a pending staff invite: unused activation links are spent, the sign-in is switched off, and a system
- * administrator or Clubs Administrator role given with the invite is removed. Event assignments are kept.
+ * administrator, Clubs Administrator or Youth Admin role given with the invite is removed. Event assignments are kept.
  * "Allow sign-in" on the person's page undoes the sign-in part, not the roles.
  */
 export async function cancelStaffInvite(userId: string, actorUserId: string, now = new Date()) {
@@ -230,6 +231,7 @@ export async function cancelStaffInvite(userId: string, actorUserId: string, now
       throw error;
     }
     await applyClubsAdministrator(tx, userId, false, actorUserId);
+    await applyYouthAdministrator(tx, userId, false, actorUserId);
     await writeAuditLog({
       actorUserId,
       action: "STAFF_INVITE_CANCELLED",

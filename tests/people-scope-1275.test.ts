@@ -50,6 +50,7 @@ const person: PersonDetail = {
   accountId: "a-target",
   systemAdministrator: false,
   clubsAdministrator: false,
+  youthAdministrator: false,
     siteContentEditor: false,
   areaCoordinator: false,
   staff: { status: "ACTIVE", signInDisabled: false, displayName: "Sample Person", jobTitle: "", phone: "", bio: "", twoStep: "On", lastSignedInAt: null },
@@ -79,6 +80,7 @@ describe("the person page by viewer scope", () => {
     expect(html).toContain("System-wide");
     for (const absent of [
       "Make system administrator", "Remove system administrator", "Make Clubs Administrator", "Remove Clubs Administrator",
+      "Youth Admin", "Make Youth Admin", "Remove Youth Admin",
       ">Events<", "Add to event", "Synthetic Event One", ">Account<", "Disable sign-in", "Allow sign-in", "Sign out everywhere",
       "Change staff email", "Change website email", "Send password reset", "Edit profile", "Send verification email",
       "Reset staff two-step", "Reset website two-step", "Link a staff login", "Unlink staff login", "Act as",
@@ -88,7 +90,7 @@ describe("the person page by viewer scope", () => {
   it("gives a system administrator every box and control", () => {
     const html = render("full");
     for (const present of [
-      "Make system administrator", "Make Clubs Administrator", "Make Area Coordinator", ">Events<", "Add to event", "Synthetic Event One",
+      "Make system administrator", "Make Clubs Administrator", "Make Youth Admin", "Make Area Coordinator", ">Events<", "Add to event", "Synthetic Event One",
       ">Account<", "Disable sign-in", "Sign out everywhere", "Change staff email", "Change website email", "Send password reset",
       "Edit profile", "Send verification email", "Reset staff two-step", "Reset website two-step", "Unlink staff login", "Give club role",
     ]) expect(html, present).toContain(present);
@@ -158,12 +160,14 @@ describe("what is loaded for a Clubs Administrator", () => {
       clubDirectorGrants: [{ id: "g-1", role: "DIRECTOR", revokedAt: null, effectiveFrom: new Date("2020-01-01"), effectiveTo: null, organization: { id: "o-1", name: "Synthetic Club" } }],
     };
     mocks.userFindUnique.mockImplementation(async (args: { select: Record<string, unknown> }) => (
-      args.select.email ? { email: "sample@example.test", displayName: "Sample Person", jobTitle: "x", phone: "y", bio: "z", globalRole: "SYSTEM_ADMIN", accountStatus: "ACTIVE", credential: null, clubsAdministratorGrant: null, mfaEnrollment: null, sessions: [] } : { id: "u-target", attendeeAccountId: "a-target" }
+      args.select.email ? { email: "sample@example.test", displayName: "Sample Person", jobTitle: "x", phone: "y", bio: "z", globalRole: "SYSTEM_ADMIN", accountStatus: "ACTIVE", credential: null, clubsAdministratorGrant: null, youthAdministratorGrant: { revokedAt: null }, mfaEnrollment: null, sessions: [] } : { id: "u-target", attendeeAccountId: "a-target" }
     ));
     mocks.accountFindUnique.mockImplementation(async (args: { select: Record<string, unknown> }) => (args.select.email ? account : { id: "a-target", linkedUser: { id: "u-target" } }));
     const detail = await getPersonDetail("staff", "u-target", "clubs");
     expect(detail).not.toBeNull();
     expect(detail!.events).toBeNull();
+    // A Clubs Administrator is never told who is a Youth Admin (#1685), even when the person is one.
+    expect(detail!.youthAdministrator).toBe(false);
     expect(detail!.staff).toBeNull();
     expect(detail!.account).toBeNull();
     expect(mocks.membershipFindMany).not.toHaveBeenCalled();
@@ -173,6 +177,7 @@ describe("what is loaded for a Clubs Administrator", () => {
     // The full view loads events and details.
     const full = await getPersonDetail("staff", "u-target", "full");
     expect(full!.events).toEqual([]);
+    expect(full!.youthAdministrator).toBe(true);
     expect(full!.staff).not.toBeNull();
     expect(mocks.membershipFindMany).toHaveBeenCalledTimes(1);
   });

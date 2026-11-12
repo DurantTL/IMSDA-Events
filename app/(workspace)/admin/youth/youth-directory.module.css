@@ -1,0 +1,187 @@
+/* Youth directory (#1685): counts first, then the list. Tokens only. */
+.workspace {
+  padding-bottom: 32px;
+}
+
+.panel {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.panel > * {
+  min-width: 0;
+}
+
+.panel h2 {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.05rem);
+}
+
+.panel h3 {
+  margin: 0;
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 0.95rem);
+}
+
+.lead,
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  line-height: 1.55;
+}
+
+.toolbar {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px 12px;
+}
+
+.toolbar label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+/* A long club name in a dropdown never widens the page, at any width: the label and the select take the room they are given. */
+.toolbar label {
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1 1 12rem;
+  max-width: 22rem;
+}
+
+.toolbar select {
+  width: 100%;
+  min-height: var(--touch-target);
+  max-width: 100%;
+}
+
+.toolbar button,
+.toolbar a {
+  min-height: var(--touch-target);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.total {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+}
+
+.total strong {
+  color: var(--imsda-navy);
+  font-size: max(var(--type-staff-floor, 0px), 1.75rem);
+  line-height: 1.1;
+}
+
+.total span {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.countGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 18px;
+}
+
+.totalRow th,
+.totalRow td {
+  font-weight: 700;
+}
+
+.bars {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: minmax(96px, 9rem) minmax(0, 1fr) 3ch;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.bar > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.barTrack {
+  display: block;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--imsda-navy-soft);
+  overflow: hidden;
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--imsda-navy);
+}
+
+.barValue {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.reported {
+  color: var(--muted);
+}
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-card);
+  padding: 18px;
+  color: var(--imsda-navy);
+}
+
+.empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+@media (max-width: 600px) {
+  .panel {
+    padding: 14px;
+  }
+
+  .toolbar > * {
+    flex: 1 1 100%;
+  }
+
+  .toolbar label {
+    max-width: none;
+  }
+
+  .bar {
+    grid-template-columns: minmax(80px, 7rem) minmax(0, 1fr) 3ch;
+    gap: 8px;
+  }
+}

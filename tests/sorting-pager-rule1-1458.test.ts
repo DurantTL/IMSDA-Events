@@ -90,6 +90,7 @@ const partlyUnsortedTables: Record<string, { unsorted: number; reason: string }>
   "components/communications-workspace.tsx": { unsorted: 2, reason: "set order: recipient previews in the batch's queue order" },
   "components/background-check-review-panel.tsx": { unsorted: 3, reason: "set order: name-lookup results ranked by closeness" },
   "components/attendance-points-workspace.tsx": { unsorted: 1, reason: "short list: the people of the one club being reviewed, in registration order, beside the sortable club table" },
+  "app/(workspace)/admin/youth/page.tsx": { unsorted: 1, reason: "set order: the counts matrix, grades in school order with a totals row, beside the sortable youth list" },
   "components/area-clubs-views.tsx": { unsorted: 1, reason: "AreaPointsChart is not used by any page; coordinator-points.tsx has the sortable ranking" },
 };
 

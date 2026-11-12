@@ -4610,7 +4610,7 @@ body:has(.auth-page) { padding-bottom: 0; }
 .cancel-request-money { display: grid; gap: 6px; margin: 0; }
 .cancel-request-money > div { display: flex; justify-content: space-between; gap: 12px; }
 .cancel-request-money dt { color: var(--muted); }
-.cancel-request-money dd { margin: 0; font-weight: 700; }
+.cancel-request-money dd { margin: 0; font-weight: 700; white-space: nowrap; }
 .cancel-request-money .is-total dt, .cancel-request-money .is-total dd { color: var(--ink); font-size: 1.05rem; }
 .cancel-request-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .cancel-request-list > li { display: grid; gap: 8px; min-width: 0; border: 1px solid var(--line); border-radius: 14px; padding: 14px; }

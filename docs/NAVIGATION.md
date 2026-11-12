@@ -260,6 +260,25 @@ visibility condition is exactly what gated that destination before.
     the dashboard's Need attention total (`countEventsAdminWaiting`).
   All of this is view-only: each page and route keeps its own server gate.
 
+## TLT directory (#1686)
+
+An extra tab, **TLT directory**, in the coordinator's Club coordination menu (`/account/area-clubs/tlt`, with Manage lists
+at `/account/area-clubs/tlt/lists`). It is shown only to the TLT director: an Area Coordinator whose **TLT director
+setting** is on. Only a system administrator switches it (People & access, the coordinator's row; audited both ways).
+Removing the Area Coordinator role switches it off, and granting the role again does not bring it back.
+
+- **Gate:** `currentTltDirector()` in `modules/tlt-directory/access.ts`: active grant, setting on, second sign-in step
+  passed. A system administrator "acting as" a coordinator has no access, not even to read. Pages and the three POST routes
+  under `app/api/attendee/area-clubs/tlt-directory/` answer "not found" to anyone else.
+- **Who is listed:** youth roster members flagged TLT, active, on an active club's roster this club year, across all clubs.
+- **What she edits:** TLT year (1 to 4), position type, status and help-area tags, nothing else. The saved record hangs off
+  the person, so it follows the teen into the next club year when a roster is carried forward.
+- **Lists:** position types (seeded with the six NAD operational departments) and help-area tags (seeded from the TLT
+  Opportunities choices) can be added, renamed and retired, never deleted.
+- **Shown:** name, club, age (never a birth date), grade, and the four fields. No form answers, contact details, school
+  type or church membership. The CSV has the same columns; every save, list change and download is audited with ids and
+  counts only.
+
 ## Adding a new page below a section's top level
 
 1. Give it a `BackLink` to its parent, `variant="portal"` in the club portal

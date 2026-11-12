@@ -265,6 +265,7 @@ describe("clearing the passkey domain", () => {
           { globalRole: "SYSTEM_ADMIN" },
           { memberships: { some: { status: "ACTIVE" } } },
           { clubsAdministratorGrant: { is: { revokedAt: null } } },
+          { youthAdministratorGrant: { is: { revokedAt: null } } },
         ],
       },
     });

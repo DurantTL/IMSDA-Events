@@ -885,6 +885,7 @@ model User {
   staffHomeLayout           StaffHomeLayout?
   memberships               EventMembership[]
   clubsAdministratorGrant   ClubsAdministratorGrant?
+  youthAdministratorGrant   YouthAdministratorGrant?
   siteContentEditorGrant    SiteContentEditorGrant?
   siteContentRevisionsCreated   SiteContentRevision[] @relation("SiteContentRevisionCreatedBy")
   siteContentRevisionsPublished SiteContentRevision[] @relation("SiteContentRevisionPublishedBy")
@@ -2546,6 +2547,7 @@ model EventMembership {
 
 model Person {
   id              String   @id @default(cuid())
+  tltProfile      TltProfile?
   firstName       String
   lastName        String
   normalizedEmail String?  @unique
@@ -2945,6 +2947,11 @@ model AreaCoordinatorGrant {
   expiresAt         DateTime?
   revokedAt         DateTime?
   revokedByUserId   String?
+  /// The conference TLT director setting (#1686): only a system administrator switches it. It means nothing without an
+  /// active grant, so removing the grant removes the access whatever this says.
+  tltDirector            Boolean   @default(false)
+  tltDirectorSetAt       DateTime?
+  tltDirectorSetByUserId String?
   updatedAt         DateTime  @updatedAt
 
   attendeeAccount AttendeeAccount @relation(fields: [attendeeAccountId], references: [id], onDelete: Cascade)
@@ -2983,6 +2990,24 @@ model AreaCoordinatorInvite {
 /// staff user, kept after removal for the record. Read on every request, so a
 /// removal takes effect on the next one.
 model ClubsAdministratorGrant {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  grantedByUserId String?
+  grantedAt       DateTime  @default(now())
+  revokedAt       DateTime?
+  revokedByUserId String?
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([revokedAt])
+}
+
+/// A Youth Admin (#1685): the conference youth director. Holds the Area
+/// Coordinator view (read only) plus the youth directory. Given and taken away
+/// by system administrators; one row per staff user, kept after removal for the
+/// record. Read on every request, so a removal takes effect on the next one.
+model YouthAdministratorGrant {
   id              String    @id @default(cuid())
   userId          String    @unique
   grantedByUserId String?
@@ -11619,4 +11644,72 @@ model StaffHomeLayout {
   modules   Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// Where a TLT stands in the program (#1686). A person with no TltProfile row has no status ("Not set").
+enum TltStatus {
+  APPLIED
+  APPROVED
+  ACTIVE
+  FINISHED
+  LEFT
+}
+
+/// A position type the TLT director manages (#1686): seeded with the NAD operational departments, extras added by her.
+/// Retired, never deleted, so a TLT who holds one keeps it. `seedKey` marks the seeded rows.
+model TltPositionType {
+  id        String    @id @default(cuid())
+  seedKey   String?   @unique
+  name      String    @unique
+  sortOrder Int       @default(0)
+  retiredAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  profiles TltProfile[]
+}
+
+/// A help-area tag the TLT director manages (#1686), seeded from the TLT Opportunities choices. Retired, never deleted.
+model TltHelpTag {
+  id        String    @id @default(cuid())
+  seedKey   String?   @unique
+  name      String    @unique
+  sortOrder Int       @default(0)
+  retiredAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  profileLinks TltProfileTag[]
+}
+
+/// The four things the TLT director keeps about a TLT (#1686): TLT year (1 to 4), position type, status, help-area tags.
+/// One row per person, not per club year: carrying a roster forward keeps the same `Person` (modules/club-rosters/carry-forward.ts),
+/// so the record follows the teen from year to year. Never holds roster details, form answers or contact details.
+model TltProfile {
+  id                  String    @id @default(cuid())
+  personId            String    @unique
+  tltYear             Int?
+  positionTypeId      String?
+  status              TltStatus?
+  updatedByAccountId  String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  person       Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  positionType TltPositionType? @relation(fields: [positionTypeId], references: [id], onDelete: Restrict)
+  tags         TltProfileTag[]
+
+  @@index([positionTypeId])
+}
+
+model TltProfileTag {
+  profileId String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  profile TltProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  tag     TltHelpTag @relation(fields: [tagId], references: [id], onDelete: Restrict)
+
+  @@id([profileId, tagId])
+  @@index([tagId])
 }

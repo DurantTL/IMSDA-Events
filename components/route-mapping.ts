@@ -70,6 +70,7 @@ const menuRoutes: readonly Menu[] = [
   ["/admin/clubs/applications", "System", "System management", "Clubs", "New club applications"],
   ["/admin/clubs/leaders", "System", "System management", "Clubs", "Club leaders"],
   ["/admin/clubs/transfers", "System", "System management", "Clubs", "Club member transfers"],
+  ["/admin/youth", "System", "System management", "Clubs", "Youth directory"],
   ["/admin/people", "System", "System management", "People", "People & access"],
   ["/admin/health-access", "System", "System management", "People", "Break-glass and legal holds"],
   ["/admin/forms", "System", "System management", "Forms", "All forms"],

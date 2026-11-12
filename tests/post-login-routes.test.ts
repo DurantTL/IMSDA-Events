@@ -61,7 +61,7 @@ vi.mock("@/modules/rate-limit/service", () => ({
   checkLoginClientRateLimit: mocks.checkLoginClientRateLimit,
   checkLoginAccountRateLimit: mocks.checkLoginAccountRateLimit,
 }));
-vi.mock("@/modules/access/admin-roles", () => ({ isActiveClubsAdministrator: mocks.isActiveClubsAdministrator }));
+vi.mock("@/modules/access/admin-roles", () => ({ isActiveClubsAdministrator: mocks.isActiveClubsAdministrator, isActiveYouthAdministrator: async () => false }));
 vi.mock("@/modules/events/repository", () => ({
   listEventsForUser: mocks.listEventsForUser,
 }));

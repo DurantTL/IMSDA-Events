@@ -50,7 +50,7 @@ describe("Admin hub model (#1569)", () => {
 
   it("shows the real destination titles and descriptions from the registry", () => {
     const cards = cardsOf("clubs", system, allMetrics("clubs", system, 1));
-    expect(cards.map((card) => card.title)).toEqual(["Clubs and churches", "Club summary", "Club leaders", "Monthly Records", "New club applications", "Club member transfers"]);
+    expect(cards.map((card) => card.title)).toEqual(["Clubs and churches", "Club summary", "Club leaders", "Youth directory", "Monthly Records", "New club applications", "Club member transfers"]);
     expect(cardsOf("events", system, allMetrics("events", system, 1)).map((card) => card.title)).toContain("Event module requests");
   });
 
@@ -73,7 +73,7 @@ describe("Admin hub model (#1569)", () => {
     expect(many.stats.map((stat) => [stat.display, stat.label])).toEqual([["42", "Active clubs"], ["4", "Applications waiting"], ["3", "Late Monthly Records"], ["1", "Open member transfer"]]);
     const texts = many.groups.flatMap((group) => group.cards).map((card) => card.status?.text);
     // Only the leaders card keeps its chip: every other number is already a key figure above (#1733).
-    expect(texts).toEqual([undefined, undefined, "168 current leaders · 5 invites waiting", undefined, undefined, undefined]);
+    expect(texts).toEqual([undefined, undefined, "168 current leaders · 5 invites waiting", undefined, undefined, undefined, undefined]);
     expect(new Set(many.stats.map((stat) => stat.key)).size).toBe(many.stats.length);
   });
 
@@ -329,5 +329,16 @@ describe("Admin hub routes and tabs (#1569)", () => {
     expect(shared).toContain("staffLoginRedirectPath");
     expect(shared).toContain('redirect("/no-access")');
     expect(shared).toContain("canOpenHub(hub, viewer)");
+  });
+});
+
+describe("the Youth directory card (#1685)", () => {
+  const titles = (viewer: HubViewer) => cardsOf("clubs", viewer, allMetrics("clubs", viewer, 1)).map((card) => card.title);
+
+  it("is on the Clubs hub for a system administrator only: never for a Clubs Administrator, a site content editor or nobody", () => {
+    expect(titles(system)).toContain("Youth directory");
+    expect(titles(clubsAdmin)).not.toContain("Youth directory");
+    expect(titles(editor)).not.toContain("Youth directory");
+    expect(titles(nobody)).not.toContain("Youth directory");
   });
 });

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { actAsRoleMarks } from "@/modules/audit/act-as-actor-role";
 import { getPrisma } from "@/lib/prisma";
 import { isActiveClubsAdministrator } from "@/modules/access/admin-roles";
 import { getCurrentSession } from "@/modules/access/current-session";
@@ -63,7 +64,7 @@ export async function resolveAreaGuardianViewer(): Promise<Extract<GuardianViewe
     kind: "AREA_COORDINATOR",
     actor: viewer.actor.kind === "ATTENDEE"
       ? { kind: "ATTENDEE", accountId: viewer.actor.accountId }
-      : { kind: "STAFF_ACTING", userId: viewer.actor.userId, actAsId: viewer.actor.actAsId, ...(viewer.actor.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) },
+      : { kind: "STAFF_ACTING", userId: viewer.actor.userId, actAsId: viewer.actor.actAsId, ...actAsRoleMarks(viewer.actor) },
   };
 }
 

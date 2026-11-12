@@ -120,6 +120,19 @@ describe("every table is the shared card pattern or is allow-listed (rule B3, #1
     }
   });
 
+  // The shared card rules style `tbody > tr` only, so a totals row in a <tfoot> keeps no labels on a phone (#1685): totals go in the last body row.
+  it("has no <tfoot> in a table-cards table", () => {
+    const offenders: string[] = [];
+    for (const file of files) {
+      for (const table of tablesIn(readFileSync(path.join(root, file), "utf8")).filter((candidate) => cardsTable(candidate.tag))) {
+        if (/<tfoot\b/.test(table.body)) offenders.push(file);
+      }
+    }
+    expect(offenders).toEqual([]);
+    const sample = '<table role="table" className="report-table table-cards"><tbody></tbody><tfoot><tr></tr></tfoot></table>';
+    expect(tablesIn(sample).filter((table) => cardsTable(table.tag) && /<tfoot\b/.test(table.body))).toHaveLength(1);
+  });
+
   it("keeps the table semantics on every table-cards table: role, a row header and labelled cells", () => {
     const problems: string[] = [];
     let checked = 0;

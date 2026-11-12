@@ -508,6 +508,8 @@ const pages: PageSpec[] = [
   staff("clubs-forms-missing", "/admin/club-forms?view=missing&year=2026-27", "system-admin"),
   staff("club-leaders", "/admin/clubs/leaders", "system-admin"),
   staff("club-transfers", "/admin/clubs/transfers", "system-admin"),
+  staff("youth-directory", "/admin/youth", "system-admin"),
+  staff("youth-directory-filtered", "/admin/youth?grade=GRADE_7&schoolType=PUBLIC_SCHOOL&sort=grade", "system-admin"),
   staff("club-transfers-overdue", "/admin/clubs/transfers?view=overdue", "system-admin"),
   staff("background-checks", "/admin/organizations/background-checks", "system-admin"),
   staff("club-as-director", `/admin/organizations/${clubA}/club`, "system-admin"),
