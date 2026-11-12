@@ -67,7 +67,7 @@ function fakeDatabase() {
           }));
       }),
       create: vi.fn(async ({ data }: { data: Row }) => {
-        const row = { id: nextId("lib"), tags: [], retiredAt: null, createdAt: new Date("2026-11-12T00:00:00.000Z"), ...data } as Row;
+        const row = { tags: [], retiredAt: null, createdAt: new Date("2026-11-12T00:00:00.000Z"), ...data, id: nextId("lib") } as Row;
         library.push(row);
         return { ...row };
       }),
@@ -84,7 +84,7 @@ function fakeDatabase() {
         pick(assets.find((a) => a.eventId === where.eventId && where.OR.some((c) => (c.libraryImageId ? a.libraryImageId === c.libraryImageId : a.checksum === c.checksum))))
       )),
       create: vi.fn(async ({ data }: { data: Row }) => {
-        const row = { id: nextId("asset"), createdAt: new Date(), libraryImageId: null, ...data } as Row;
+        const row = { createdAt: new Date(), libraryImageId: null, ...data, id: nextId("asset") } as Row;
         assets.push(row);
         return { id: row.id };
       }),
