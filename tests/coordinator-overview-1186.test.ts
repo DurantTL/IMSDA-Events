@@ -305,7 +305,20 @@ describe("overview page (#1186)", () => {
   it("renders the summary for the queried year", async () => {
     const out = renderToStaticMarkup(await OverviewPage({ searchParams: Promise.resolve({ year: "2026-27" }) }));
     expect(out).toContain("Club overview");
-    expect(mocks.getAreaClubsSummary).toHaveBeenCalledWith("2026-27");
+    expect(mocks.getAreaClubsSummary).toHaveBeenCalledWith("2026-27", expect.any(Date), { kinds: ["PATHFINDER"] });
+  });
+
+  it("reads only the coordinator's ministries, and every ministry for staff acting as one (#843)", async () => {
+    mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["ADVENTURER"] });
+    renderToStaticMarkup(await OverviewPage({ searchParams: Promise.resolve({ year: "2026-27" }) }));
+    expect(mocks.getAreaClubsSummary).toHaveBeenLastCalledWith("2026-27", expect.any(Date), { kinds: ["ADVENTURER"] });
+    mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["ADVENTURER", "PATHFINDER"] });
+    renderToStaticMarkup(await OverviewPage({ searchParams: Promise.resolve({ year: "2026-27" }) }));
+    expect(mocks.getAreaClubsSummary).toHaveBeenLastCalledWith("2026-27", expect.any(Date), { kinds: ["PATHFINDER", "ADVENTURER"] });
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
+    mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", userId: "user-1", actAsId: "act-1" });
+    renderToStaticMarkup(await OverviewPage({ searchParams: Promise.resolve({ year: "2026-27" }) }));
+    expect(mocks.getAreaClubsSummary).toHaveBeenLastCalledWith("2026-27", expect.any(Date), { kinds: ["PATHFINDER", "ADVENTURER"] });
   });
 
   it("shows unavailable, never zero clubs or Submitted, when the summary read fails", async () => {
@@ -340,7 +353,7 @@ describe("export scope (#1186)", () => {
   it("exports every club for the year whatever search text is on the address", async () => {
     const response = await AREA_EXPORT(new Request("https://events.example.test/api/attendee/area-clubs/export?report=summary&year=2026-27&q=bra"));
     const csv = await response.text();
-    expect(mocks.getAreaClubsSummary).toHaveBeenCalledWith("2026-27", expect.any(Date), { backgroundChecks: false });
+    expect(mocks.getAreaClubsSummary).toHaveBeenCalledWith("2026-27", expect.any(Date), { backgroundChecks: false, kinds: ["PATHFINDER"] });
     for (const name of ["Alpha Club", "Bravo Club", "Charlie Club", "Delta Club", "Echo Club", "Foxtrot Club"]) expect(csv).toContain(name);
   });
 

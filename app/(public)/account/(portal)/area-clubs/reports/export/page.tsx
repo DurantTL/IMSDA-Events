@@ -4,7 +4,7 @@ import { CoordinatorDestinationHeading } from "@/components/coordinator-destinat
 import { RecordsExportBuilder } from "@/components/records-export-builder";
 import { resolveAreaClubYear } from "@/modules/club-reports/area-club-year";
 import { clubYearMonths, reportMonthLabel } from "@/modules/club-reports/domain";
-import { currentAreaCoordinatorViewerActive, listClubsForArea } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorClubKinds, listClubsForArea } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Export Monthly Records", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
@@ -15,10 +15,11 @@ export const dynamic = "force-dynamic";
  */
 export default async function AreaRecordsExportPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) notFound();
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
-  const clubs = (await listClubsForArea()).map((club) => ({ id: club.organizationId, name: club.name }));
+  const clubs = (await listClubsForArea(kinds)).map((club) => ({ id: club.organizationId, name: club.name }));
   const months = clubYearMonths(clubYear).map((value) => ({ value, label: reportMonthLabel(value) }));
   return (
     <>

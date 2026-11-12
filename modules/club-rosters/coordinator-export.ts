@@ -1,5 +1,7 @@
 import "server-only";
 
+import { areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { actAsActorRoleFields } from "@/modules/audit/act-as-actor-role";
@@ -35,10 +37,10 @@ const sterlingLabels = {
 
 const CLUB_READ_BATCH = 8;
 
-/** Every requested club must be an active club: all of them, or a 400 (never a partial export). */
-async function resolveClubs(clubs: "all" | string[]) {
+/** Every requested club must be an active club in the coordinator's ministries: all of them, or a 400 (never a partial export). A club outside the scope answers like one that does not exist. */
+async function resolveClubs(clubs: "all" | string[], kinds: readonly ClubKindValue[]) {
   const found = await getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true, guestEventId: null, ...(clubs === "all" ? {} : { id: { in: clubs } }) },
+    where: { ...areaClubWhere(kinds), ...(clubs === "all" ? {} : { id: { in: clubs } }) },
     select: { id: true, name: true },
   });
   if (clubs !== "all" && found.length !== clubs.length) {
@@ -60,11 +62,11 @@ async function rowsForClub(club: { id: string; name: string }, clubYear: string,
 }
 
 export async function runCoordinatorRosterExport(
-  input: { columns: CoordinatorRosterExportColumnKey[]; clubs: "all" | string[]; clubYear: string; preview: boolean },
+  input: { columns: CoordinatorRosterExportColumnKey[]; clubs: "all" | string[]; clubYear: string; preview: boolean; kinds: readonly ClubKindValue[] },
   actor: CoordinatorExportActor,
   now = new Date(),
 ) {
-  const clubs = await resolveClubs(input.clubs);
+  const clubs = await resolveClubs(input.clubs, input.kinds);
   const needsSterling = input.columns.includes("sterling");
   const rows: CoordinatorRosterExportRow[] = [];
   for (let index = 0; index < clubs.length; index += CLUB_READ_BATCH) {

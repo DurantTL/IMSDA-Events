@@ -5,15 +5,15 @@ import { ClubReportForm } from "@/components/club-report-form";
 import { getPrisma } from "@/lib/prisma";
 import { formatDueDate, noSubmittedReportMessage, isReportMonth, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
 import { getClubReport, reportPrefill } from "@/modules/club-reports/repository";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorMaySeeClub } from "@/modules/organizations/area-coordinators";
 
 export const metadata: Metadata = { title: "Monthly Record", robots: { index: false, follow: false, nocache: true } };
 export const dynamic = "force-dynamic";
 
 /** A club's submitted monthly report, view only, for an Area Coordinator (#387). */
 export default async function AreaClubReportPage({ params }: { params: Promise<{ organizationId: string; month: string }> }) {
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
   const { organizationId, month } = await params;
+  if (!(await currentAreaCoordinatorMaySeeClub(organizationId))) notFound();
   if (!isReportMonth(month)) notFound();
   const club = await getPrisma().organization.findUnique({ where: { id: organizationId }, select: { type: true, name: true, isActive: true, clubKind: true } });
   if (!club || club.type !== "CLUB" || !club.isActive) notFound();

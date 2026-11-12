@@ -1,9 +1,8 @@
 import "server-only";
 
-import { getPrisma } from "@/lib/prisma";
 import { actorAttribution, requireRosterAccess, RosterAccessError } from "@/modules/club-rosters/access";
 import type { ClubSupplyStockActor } from "@/modules/club-supplies/repository";
-import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinator, currentAreaCoordinatorMaySeeClub } from "@/modules/organizations/area-coordinators";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /**
@@ -18,21 +17,13 @@ import { currentStaffActingContext } from "@/modules/organizations/staff-act-as"
  * An Area Coordinator gets read-only access through their own mechanism, as
  * in `modules/honors/member-honor-access.ts`: tried only when the viewer has
  * no club role here at all, never to bypass a club role's own MFA or role
- * denial. The organization must be an active club, or the answer is 404.
+ * denial. The organization must be an active club in the coordinator's ministries, or the answer is 404 (#843).
  */
 export type ClubSupplyAccess =
   | { mode: "EDIT"; actor: ClubSupplyStockActor }
   | { mode: "READ"; viewer: ClubSupplyStockActor };
 
 const FALLBACK_CODES = new Set<RosterAccessError["code"]>(["NOT_FOUND", "SIGN_IN_REQUIRED"]);
-
-async function isActiveClub(organizationId: string) {
-  const organization = await getPrisma().organization.findUnique({
-    where: { id: organizationId },
-    select: { type: true, isActive: true },
-  });
-  return Boolean(organization && organization.type === "CLUB" && organization.isActive);
-}
 
 /** The Area Coordinator viewing right now (their own account, or a staff act-as), or null. */
 async function areaCoordinatorViewer(): Promise<ClubSupplyStockActor | null> {
@@ -88,7 +79,8 @@ export async function requireClubSupplyAccess(
       throw error;
     }
     if (!viewer) throw error;
-    if (!(await isActiveClub(organizationId))) {
+    // The club must be an active club in the coordinator's ministries (#843); anything else is a missing club.
+    if (!(await currentAreaCoordinatorMaySeeClub(organizationId))) {
       throw new RosterAccessError("NOT_FOUND", 404, "That club could not be found.");
     }
     return { mode: "READ", viewer };

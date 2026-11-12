@@ -31,15 +31,15 @@ const MORNING = new Date("2026-10-06T13:00:00Z"); // 8:00 AM Central
 const EARLY = new Date("2026-10-06T11:00:00Z"); // 6:00 AM Central
 
 type Change = {
-  id: string; eventId: string; locationId: string; kind: "JOINED" | "PROMOTED" | "REMOVED"; clubName: string;
+  id: string; registrationId: string; eventId: string; locationId: string; kind: "JOINED" | "PROMOTED" | "REMOVED"; clubName: string;
   locationName: string; attendeeCount: number; place: number | null; occurredAt: Date;
 };
 const change = (overrides: Partial<Change> = {}): Change => ({
-  id: "change-1", eventId: "event-1", locationId: "loc-a", kind: "JOINED", clubName: "River City Pathfinders",
+  id: "change-1", registrationId: "reg-1", eventId: "event-1", locationId: "loc-a", kind: "JOINED", clubName: "River City Pathfinders",
   locationName: "Camp Heritage 1", attendeeCount: 12, place: 1, occurredAt: new Date("2026-10-05T20:00:00Z"), ...overrides,
 });
 
-const activeGrant = { revokedAt: null, expiresAt: null };
+const activeGrant = { revokedAt: null, expiresAt: null, ministries: ["PATHFINDER"] };
 const coordinator = (overrides: Record<string, unknown> = {}) => ({
   id: "account-1", email: "Pat.Coordinator@example.test", displayName: "Pat Coordinator", disabledAt: null, areaCoordinatorGrant: activeGrant, ...overrides,
 });
@@ -50,6 +50,8 @@ function fixture(options: {
   locations?: Array<{ id: string; coordinator: ReturnType<typeof coordinator> | null }>;
   memberships?: Array<ReturnType<typeof admin>>;
   existingKeys?: string[];
+  /** The ministry of each change's club; `null` for a registration with no club. Default: every change is a Pathfinder club. */
+  clubKinds?: Record<string, string | null>;
 } = {}) {
   const changes = options.changes ?? [change()];
   const created: Array<{ data: Record<string, unknown> }> = [];
@@ -60,6 +62,12 @@ function fixture(options: {
     },
     eventLocation: { findMany: vi.fn().mockResolvedValue(options.locations ?? [{ id: "loc-a", coordinator: coordinator() }]) },
     eventMembership: { findMany: vi.fn().mockResolvedValue(options.memberships ?? [admin("user-1", "staff.admin@example.test", "Sam Admin")]) },
+    registration: {
+      findMany: vi.fn(async () => changes.map((entry) => {
+        const kind = options.clubKinds && entry.registrationId in options.clubKinds ? options.clubKinds[entry.registrationId] : "PATHFINDER";
+        return { id: entry.registrationId, clubRegistration: kind === null ? null : { organization: { clubKind: kind } } };
+      })),
+    },
     event: { findMany: vi.fn().mockResolvedValue([{ id: "event-1", name: "Honors Weekend 2027" }]) },
     adminAlertFeedItem: { createMany: vi.fn(async () => ({ count: 1 })) },
     messageOutbox: {
@@ -136,6 +144,24 @@ describe("the daily location waitlist digest", () => {
       await sendDueLocationWaitlistDigests(MORNING);
       expect(created.map(({ data }) => data.recipientEmail)).toEqual(["staff.admin@example.test"]);
     }
+  });
+
+  it("tells a coordinator only about the clubs of their ministries; the event administrator still hears about every club (#843)", async () => {
+    const run = fixture({ clubKinds: { "reg-1": "ADVENTURER" } });
+    await sendDueLocationWaitlistDigests(MORNING);
+    expect(run.created.map((entry) => entry.data.recipientEmail)).toEqual(["staff.admin@example.test"]);
+  });
+
+  it("includes an Adventurer club for a coordinator whose grant names both ministries, and a registration with no club for anyone (#843)", async () => {
+    const both = fixture({
+      locations: [{ id: "loc-a", coordinator: coordinator({ areaCoordinatorGrant: { ...activeGrant, ministries: ["PATHFINDER", "ADVENTURER"] } }) }],
+      clubKinds: { "reg-1": "ADVENTURER" },
+    });
+    await sendDueLocationWaitlistDigests(MORNING);
+    expect(both.created.map((entry) => entry.data.recipientEmail).sort()).toEqual(["pat.coordinator@example.test", "staff.admin@example.test"]);
+    const noClub = fixture({ clubKinds: { "reg-1": null } });
+    await sendDueLocationWaitlistDigests(MORNING);
+    expect(noClub.created.map((entry) => entry.data.recipientEmail).sort()).toEqual(["pat.coordinator@example.test", "staff.admin@example.test"]);
   });
 
   it("gives a disabled coordinator account, and a location with no coordinator, nothing", async () => {

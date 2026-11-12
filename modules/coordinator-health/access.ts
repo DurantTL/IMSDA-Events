@@ -5,7 +5,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { isClubFormsRole } from "@/modules/club-forms/domain";
 import type { requireRosterAccess } from "@/modules/club-rosters/access";
 import type { HealthViewer } from "@/modules/coordinator-health/domain";
-import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { coordinatorMinistriesForAccount, currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
 
 /**
  * Turns a session into a `HealthViewer` (#658). Four ways in, and nothing else:
@@ -33,7 +33,8 @@ export async function resolveStaffHealthViewer(): Promise<Extract<HealthViewer, 
 /** The signed-in Area Coordinator who passed the second step (checked inside `currentAreaCoordinator`), or null. */
 export async function resolveAreaHealthViewer(): Promise<Extract<HealthViewer, { kind: "AREA_COORDINATOR" }> | null> {
   const account = await currentAreaCoordinator();
-  return account ? { kind: "AREA_COORDINATOR", accountId: account.id } : null;
+  // The clubs this coordinator may open are their ministries' clubs, read fresh from the grant (#843).
+  return account ? { kind: "AREA_COORDINATOR", accountId: account.id, kinds: await coordinatorMinistriesForAccount(account.id) } : null;
 }
 
 type OpenRosterAccess = Awaited<ReturnType<typeof requireRosterAccess>>;

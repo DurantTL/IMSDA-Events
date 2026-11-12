@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   eventFindMany: vi.fn(),
   registrationFindMany: vi.fn(),
   rosterFindMany: vi.fn(),
+  organizationCount: vi.fn(),
   submissionFindMany: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock("@/lib/prisma", () => ({
     clubEventRegistration: { findMany: mocks.registrationFindMany },
     clubRosterMember: { findMany: mocks.rosterFindMany },
     clubFormSubmission: { findMany: mocks.submissionFindMany },
+    organization: { count: mocks.organizationCount },
     healthPrivacyAcknowledgment: { findFirst: mocks.ackFindFirst },
   }),
 }));
@@ -35,7 +37,7 @@ const now = new Date("2026-10-11T15:00:00Z");
 const event = { id: "e1", name: "Synthetic Camporee", startsAt: new Date("2026-10-09T15:00:00Z"), endsAt: new Date("2026-10-11T22:00:00Z"), timezone: "America/Chicago" };
 
 const admin: HealthViewer = { kind: "SYSTEM_ADMIN", userId: "root" };
-const coordinator: HealthViewer = { kind: "AREA_COORDINATOR", accountId: "acct-ac" };
+const coordinator: HealthViewer = { kind: "AREA_COORDINATOR", accountId: "acct-ac", kinds: ["PATHFINDER"] };
 const roleHolder: HealthViewer = { kind: "HEALTH_ROLE", userId: "u-role", eventIds: ["e1"] };
 const ownLeader: HealthViewer = { kind: "CLUB_LEADER", organizationId: "club-a", actor: { kind: "ATTENDEE", accountId: "acct-dir" } };
 
@@ -105,6 +107,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.env.HEALTH_RECORDS_ENABLED = false;
   mocks.ackFindFirst.mockResolvedValue(null);
+  mocks.organizationCount.mockResolvedValue(1);
   seed();
 });
 
@@ -196,6 +199,21 @@ describe("loadEventHealth (#658)", () => {
     await loadEventHealth(coordinator, "e1", { organizationId: "club-a" }, now);
     expect(mocks.registrationFindMany.mock.calls[0][0].where).toMatchObject({ organizationId: "club-a" });
     expect(mocks.writeAuditLog.mock.calls[0][0].metadata).toMatchObject({ organizationId: "club-a" });
+  });
+
+  it("limits a coordinator's sheet to the clubs of their ministries (#843)", async () => {
+    await loadEventHealth(coordinator, "e1", {}, now);
+    expect(mocks.registrationFindMany.mock.calls[0][0].where).toMatchObject({ organization: { clubKind: { in: ["PATHFINDER"] } } });
+    await loadEventHealth(admin, "e1", {}, now);
+    expect(mocks.registrationFindMany.mock.calls[1][0].where).not.toHaveProperty("organization");
+  });
+
+  it("answers 'not found', audited as a refusal, for a club outside the coordinator's ministries, before anything is read (#843)", async () => {
+    mocks.organizationCount.mockResolvedValue(0);
+    await expect(loadEventHealth(coordinator, "e1", { organizationId: "club-adventurer" }, now)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(mocks.organizationCount).toHaveBeenCalledWith({ where: { id: "club-adventurer", type: "CLUB", clubKind: { in: ["PATHFINDER"] } } });
+    expect(mocks.registrationFindMany).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog.mock.calls[0][0]).toMatchObject({ action: "COORDINATOR_HEALTH_DENIED", metadata: { reason: "NOT_FOUND" } });
   });
 
   it("answers 'not found' for an unknown event", async () => {
@@ -307,6 +325,9 @@ describe("listHealthEvents (#658)", () => {
     expect((await listHealthEvents({ ...roleHolder, eventIds: ["e2"] }, now)).map((row) => row.id)).toEqual(["e2"]);
     await listHealthEvents(ownLeader, now);
     expect(mocks.eventFindMany.mock.calls.at(-1)?.[0].where.clubRegistrations).toEqual({ some: { organizationId: "club-a" } });
+    // A coordinator's events are the ones with a club of their ministries (#843).
+    await listHealthEvents({ kind: "AREA_COORDINATOR", accountId: "acct-ac", kinds: ["ADVENTURER"] }, now);
+    expect(mocks.eventFindMany.mock.calls.at(-1)?.[0].where.clubRegistrations).toEqual({ some: { organization: { clubKind: { in: ["ADVENTURER"] } } } });
   });
 });
 

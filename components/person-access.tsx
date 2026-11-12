@@ -8,6 +8,7 @@ import {
   AddToEvent,
   EventMembershipControls,
   RevokeClubRole,
+  AreaCoordinatorMinistries,
   RoleToggle,
 } from "@/components/person-access-controls";
 import styles from "./people-directory.module.css";
@@ -130,7 +131,14 @@ export function PersonAccess({
           </Fact>
           <Fact label={systemRoleText.AREA_COORDINATOR.name}>
             {hasAccount
-              ? <RoleToggle accountId={person.accountId!} kind="area-coordinator" name={name} on={person.areaCoordinator} />
+              ? (
+                <>
+                  <RoleToggle accountId={person.accountId!} kind="area-coordinator" name={name} on={person.areaCoordinator} />
+                  {person.areaCoordinator ? (
+                    <AreaCoordinatorMinistries accountId={person.accountId!} key={(person.areaCoordinatorMinistries ?? []).join(",")} ministries={person.areaCoordinatorMinistries ?? ["PATHFINDER"]} name={name} />
+                  ) : null}
+                </>
+              )
               : <span className={styles.muted}>Needs a website account</span>}
           </Fact>
           {full ? (

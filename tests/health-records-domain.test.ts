@@ -105,7 +105,7 @@ describe("who may do what", () => {
   const leader: HealthViewer = { kind: "CLUB_LEADER", organizationId: "club-a", accountId: "acct-1" };
   const staff: HealthViewer = { kind: "HEALTH_ROLE", userId: "user-1", eventIds: ["event-1"] };
   const admin: HealthViewer = { kind: "SYSTEM_ADMIN", userId: "user-0" };
-  const coordinator: HealthViewer = { kind: "AREA_COORDINATOR", accountId: "acct-2" };
+  const coordinator: HealthViewer = { kind: "AREA_COORDINATOR", accountId: "acct-2", kinds: ["PATHFINDER"] };
 
   it("lets a club leader view, edit and send links for their own club only", () => {
     for (const action of ["VIEW", "EDIT", "SEND_LINK"] as const) {

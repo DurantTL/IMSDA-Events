@@ -9,6 +9,7 @@ import { logError, logInfo } from "@/lib/logger";
 import { getAccountEmailSender, isAccountEmailConfigured } from "@/modules/communications/account-email";
 import { processAccountEmailQueue } from "@/modules/communications/email-delivery";
 import { coordinatorGrantActive } from "@/modules/event-locations/domain";
+import { grantMinistries, ministriesIncludeKind } from "@/modules/organizations/area-coordinator-ministries-domain";
 import {
   buildLocationWaitlistDigest,
   digestIdempotencyKey,
@@ -25,7 +26,7 @@ import {
  * waitlists they are responsible for since the last digest.
  *
  * - Who: a location's Area Coordinator, only while their grant is active and
- *   their account enabled (revoked or expired: no email), and the event
+ *   their account enabled (revoked or expired: no email), and only for the clubs of their ministries (#843), and the event
  *   administrators of the event (an active membership with the EVENT_ADMIN role
  *   on an active staff account). One person in both roles gets one email.
  * - Idempotent: each message has the key `location-waitlist-digest:<date>:<email>`,
@@ -72,6 +73,7 @@ async function collectRecipients(
   tx: Db,
   changes: Array<{
     id: string;
+    registrationId: string;
     eventId: string;
     locationId: string;
     kind: DigestChange["kind"];
@@ -85,7 +87,8 @@ async function collectRecipients(
 ) {
   const eventIds = [...new Set(changes.map((change) => change.eventId))];
   const locationIds = [...new Set(changes.map((change) => change.locationId))];
-  const [locations, memberships] = await Promise.all([
+  const registrationIds = [...new Set(changes.map((change) => change.registrationId))];
+  const [locations, memberships, registrationKinds] = await Promise.all([
     tx.eventLocation.findMany({
       where: { id: { in: locationIds } },
       select: {
@@ -96,7 +99,7 @@ async function collectRecipients(
             email: true,
             displayName: true,
             disabledAt: true,
-            areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true } },
+            areaCoordinatorGrant: { select: { revokedAt: true, expiresAt: true, ministries: true } },
           },
         },
       },
@@ -111,7 +114,13 @@ async function collectRecipients(
       },
       select: { eventId: true, user: { select: { id: true, email: true, displayName: true } } },
     }),
+    // The club's ministry, so a coordinator only hears about their own ministry's clubs (#843).
+    tx.registration.findMany({
+      where: { id: { in: registrationIds } },
+      select: { id: true, clubRegistration: { select: { organization: { select: { clubKind: true } } } } },
+    }),
   ]);
+  const clubKindByRegistration = new Map(registrationKinds.map((row) => [row.id, row.clubRegistration?.organization.clubKind ?? null]));
   const coordinatorByLocation = new Map(locations.map((location) => [location.id, location.coordinator]));
   const staffByEvent = new Map<string, Array<{ id: string; email: string; displayName: string }>>();
   for (const membership of memberships) {
@@ -141,7 +150,10 @@ async function collectRecipients(
       occurredAt: change.occurredAt,
     };
     const coordinator = coordinatorByLocation.get(change.locationId);
-    if (coordinator && !coordinator.disabledAt && coordinatorGrantActive(coordinator.areaCoordinatorGrant, now)) {
+    // A club of another ministry is not this coordinator's to hear about (#843); a registration with no club has no ministry and is unchanged.
+    const clubKind = clubKindByRegistration.get(change.registrationId) ?? null;
+    const inMinistry = !coordinator || clubKind === null || ministriesIncludeKind(grantMinistries(coordinator.areaCoordinatorGrant?.ministries), clubKind);
+    if (coordinator && inMinistry && !coordinator.disabledAt && coordinatorGrantActive(coordinator.areaCoordinatorGrant, now)) {
       const recipient = recipientFor(coordinator.email, coordinator.displayName);
       recipient.coordinator = true;
       recipient.accountAttendeeId = coordinator.id;

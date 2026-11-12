@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   currentStaffActingContext: vi.fn(),
   getCurrentAttendee: vi.fn(async () => ({ account: null as { id: string } | null, via: "staff" as string | null, sessionId: null as string | null })),
   useRealCoordinator: false,
+  ministries: ["PATHFINDER"] as string[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -15,7 +16,10 @@ vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.ge
 // `currentAreaCoordinator` is the stub, except in the act-as test below, which runs the real one over a staff-only session.
 vi.mock("@/modules/organizations/area-coordinators", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/modules/organizations/area-coordinators")>();
-  return { currentAreaCoordinator: (...args: []) => (mocks.useRealCoordinator ? actual.currentAreaCoordinator(...args) : mocks.currentAreaCoordinator(...args)) };
+  return {
+    currentAreaCoordinator: (...args: []) => (mocks.useRealCoordinator ? actual.currentAreaCoordinator(...args) : mocks.currentAreaCoordinator(...args)),
+    coordinatorMinistriesForAccount: async () => mocks.ministries,
+  };
 });
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: mocks.currentStaffActingContext }));
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: mocks.getCurrentAttendee }));
@@ -89,7 +93,14 @@ describe("staff health access (#658)", () => {
 describe("Area Coordinator health access (#658)", () => {
   it("lets in an active Area Coordinator who passed the second step", async () => {
     mocks.currentAreaCoordinator.mockResolvedValue({ id: "acct-1" });
-    expect(await resolveAreaHealthViewer()).toEqual({ kind: "AREA_COORDINATOR", accountId: "acct-1" });
+    expect(await resolveAreaHealthViewer()).toEqual({ kind: "AREA_COORDINATOR", accountId: "acct-1", kinds: ["PATHFINDER"] });
+  });
+
+  it("carries the coordinator's ministries, so only their clubs open (#843)", async () => {
+    mocks.currentAreaCoordinator.mockResolvedValue({ id: "acct-1" });
+    mocks.ministries = ["PATHFINDER", "ADVENTURER"];
+    expect(await resolveAreaHealthViewer()).toMatchObject({ kinds: ["PATHFINDER", "ADVENTURER"] });
+    mocks.ministries = ["PATHFINDER"];
   });
 
   it("refuses anyone `currentAreaCoordinator` refuses (no grant, revoked, or second step not passed)", async () => {

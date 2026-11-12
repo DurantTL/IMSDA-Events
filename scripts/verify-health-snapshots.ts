@@ -208,7 +208,7 @@ async function main() {
   type Viewer = import("../modules/health-records/domain").HealthViewer;
   const directorA: Viewer = { kind: "CLUB_LEADER", organizationId: clubId, accountId: accounts.director };
   const directorB: Viewer = { kind: "CLUB_LEADER", organizationId: clubId2, accountId: accounts.director };
-  const coordinator: Viewer = { kind: "AREA_COORDINATOR", accountId: accounts.coordinator };
+  const coordinator: Viewer = { kind: "AREA_COORDINATOR", accountId: accounts.coordinator, kinds: ["PATHFINDER", "ADVENTURER"] };
   const healthRole: Viewer = { kind: "HEALTH_ROLE", userId: healthUserId, eventIds: [ids.eventA] };
   const admin: Viewer = { kind: "SYSTEM_ADMIN", userId: adminUserId };
   const admin2: Viewer = { kind: "SYSTEM_ADMIN", userId: admin2UserId };

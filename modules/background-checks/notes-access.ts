@@ -7,7 +7,7 @@
  * - system administrators, on any page (`canSeeIssuesText`);
  * - an Area Coordinator, for a club in their scope only
  *   (`canSeeIssuesTextForAreaClub`, the same scope as their other club views:
- *   an active club);
+ *   an active club of their ministries);
  * - nobody else. Event workspace roles (event administrators, finance,
  *   registration managers) keep the status view without the text, and a club
  *   director or deputy never sees it.
@@ -17,8 +17,8 @@ export function canSeeIssuesText(user: { globalRole?: string | null } | null | u
 }
 
 /**
- * An Area Coordinator's scope is every active club (`listClubsForArea`); the
- * Area Coordinator club pages 404 on anything else.
+ * An Area Coordinator's scope is the active clubs of their ministries (#843, `areaCoordinatorMaySeeClub`); the Area
+ * Coordinator club pages 404 on anything else before this is asked. This check only confirms the club is an active club.
  */
 export function clubInAreaCoordinatorScope(club: { type?: string | null; isActive?: boolean | null } | null | undefined) {
   return Boolean(club && club.type === "CLUB" && club.isActive === true);

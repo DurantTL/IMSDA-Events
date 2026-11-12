@@ -10,7 +10,7 @@ import { serverSort, sortRows } from "@/lib/list-sort";
 import { getPrisma } from "@/lib/prisma";
 import { AREA_CLUB_FORMS_SORT_COLUMNS, UNSORTED, sortLine } from "@/lib/staff-sort-columns";
 import { SendClubFormLink } from "@/components/club-forms-actions";
-import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
+import { resolveAreaCoordinatorViewerForClub } from "@/modules/club-forms/access";
 import { CLUB_FORM_LINK_DEFAULT_DAYS, viewerCanSendLinkForClub } from "@/modules/club-forms/domain";
 import { listSubmissionsForViewer } from "@/modules/club-forms/submissions";
 import { listEnabledClubFormTemplates } from "@/modules/club-forms/templates";
@@ -26,9 +26,10 @@ function formatDate(value: string | null) {
 
 /** Any club's submitted forms, view only, for an Area Coordinator (#610). Sensitive answers are "Restricted". */
 export default async function AreaClubFormsPage({ params, searchParams }: { params: Promise<{ organizationId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const viewer = await resolveAreaCoordinatorViewer();
-  if (!viewer) notFound();
   const [{ organizationId }, query] = await Promise.all([params, searchParams]);
+  // Out of the coordinator's ministries answers like a missing club (#843).
+  const viewer = await resolveAreaCoordinatorViewerForClub(organizationId);
+  if (!viewer) notFound();
   const club = await getPrisma().organization.findUnique({
     where: { id: organizationId },
     select: { type: true, name: true, isActive: true },

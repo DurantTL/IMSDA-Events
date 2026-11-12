@@ -9,10 +9,12 @@ import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee
 import { requireAttendeeSecondStep } from "@/modules/attendee-accounts/portal-second-step";
 import { accountNeedsSecondStep } from "@/modules/attendee-accounts/sign-in-gate";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
+import { ALL_CLUB_KINDS, areaClubWhere, grantMinistries, parseMinistriesInput } from "@/modules/organizations/area-coordinator-ministries-domain";
 
 /**
- * Area Coordinators (#387): see every club, view only, from their own account
- * (decision: all clubs). They see ages, never full birth dates, and pass the
+ * Area Coordinators (#387): see the clubs of their ministry (#843: Pathfinder, Adventurer or both, named on the
+ * grant), view only, from their own account. They see ages, never full birth dates, and pass the
  * same second sign-in step as club roles.
  *
  * A system administrator's temporary "act as" Area Coordinator or club
@@ -21,7 +23,7 @@ import { currentStaffActingContext } from "@/modules/organizations/staff-act-as"
  */
 
 export class AreaCoordinatorError extends Error {
-  constructor(public readonly code: "ACCOUNT_NOT_FOUND", message: string) {
+  constructor(public readonly code: "ACCOUNT_NOT_FOUND" | "INVALID_MINISTRIES" | "NOT_COORDINATOR", message: string) {
     super(message);
     this.name = "AreaCoordinatorError";
   }
@@ -87,10 +89,57 @@ export async function currentAreaCoordinatorViewer(): Promise<AreaCoordinatorVie
   return acting?.role === "AREA_COORDINATOR" ? { kind: "ACTING", actAsId: acting.actAsId } : null;
 }
 
-/** Every active club, for the Area Coordinator's Clubs list. */
-export async function listClubsForArea() {
+/**
+ * The ministries a coordinator account sees (#843), read fresh from the database: the active grant's list, or an
+ * empty list when there is no active grant. One rule for every coordinator path.
+ */
+export async function coordinatorMinistriesForAccount(attendeeAccountId: string, now = new Date(), client: Prisma.TransactionClient | PrismaClient = getPrisma()): Promise<ClubKindValue[]> {
+  const grant = await client.areaCoordinatorGrant.findUnique({
+    where: { attendeeAccountId },
+    select: { revokedAt: true, expiresAt: true, ministries: true },
+  });
+  return grant && areaGrantActive(grant, now) ? grantMinistries(grant.ministries) : [];
+}
+
+/** The ministries a viewer sees: their grant's list for a coordinator, every ministry for staff acting as one (#843). */
+export async function areaCoordinatorClubKinds(viewer: AreaCoordinatorViewer): Promise<ClubKindValue[]> {
+  if (viewer.kind === "ACTING") return [...ALL_CLUB_KINDS];
+  return coordinatorMinistriesForAccount(viewer.accountId);
+}
+
+/** The signed-in coordinator viewer's ministries, or null when nobody is viewing as an Area Coordinator (the pages answer notFound). */
+export async function currentAreaCoordinatorClubKinds(): Promise<ClubKindValue[] | null> {
+  const viewer = await currentAreaCoordinatorViewer();
+  return viewer ? areaCoordinatorClubKinds(viewer) : null;
+}
+
+/** Whether the viewer right now may see this club: an Area Coordinator whose ministries include the club's, or staff acting as one. */
+export async function currentAreaCoordinatorMaySeeClub(organizationId: string): Promise<boolean> {
+  const viewer = await currentAreaCoordinatorViewer();
+  return viewer ? areaCoordinatorMaySeeClub(viewer, organizationId) : false;
+}
+
+/** Whether one club is inside the viewer's ministries. A club outside answers like a missing one at every caller. */
+export async function areaCoordinatorMaySeeClub(viewer: AreaCoordinatorViewer, organizationId: string): Promise<boolean> {
+  const kinds = await areaCoordinatorClubKinds(viewer);
+  if (kinds.length === 0) return false;
+  const club = await getPrisma().organization.findFirst({ where: { id: organizationId, ...areaClubWhere(kinds) }, select: { id: true } });
+  return Boolean(club);
+}
+
+/** The ids among `organizationIds` that the viewer may see, for CSV routes that take club ids from the request. */
+export async function areaCoordinatorVisibleClubIds(viewer: AreaCoordinatorViewer, organizationIds: readonly string[]): Promise<string[]> {
+  const kinds = await areaCoordinatorClubKinds(viewer);
+  if (kinds.length === 0 || organizationIds.length === 0) return [];
+  const clubs = await getPrisma().organization.findMany({ where: { id: { in: [...organizationIds] }, ...areaClubWhere(kinds) }, select: { id: true } });
+  return clubs.map((club) => club.id);
+}
+
+/** The active clubs of the given ministries, for the Area Coordinator's Clubs list. */
+export async function listClubsForArea(kinds: readonly ClubKindValue[]) {
+  if (kinds.length === 0) return [];
   const clubs = await getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true, guestEventId: null },
+    where: areaClubWhere(kinds),
     orderBy: { name: "asc" },
     select: { id: true, name: true, city: true, parentOrganization: { select: { name: true, city: true } } },
   });
@@ -131,7 +180,9 @@ export async function applyAreaCoordinatorChange(
       where: { attendeeAccountId },
       create: { attendeeAccountId, grantedByUserId: actorUserId, grantedAt: now },
       // A new grant never brings back the TLT director setting (#1686): a system administrator switches it again.
-      update: { revokedAt: null, revokedByUserId: null, expiresAt: null, grantedByUserId: actorUserId, grantedAt: now, tltDirector: false, tltDirectorSetAt: null, tltDirectorSetByUserId: null },
+      update: { revokedAt: null, revokedByUserId: null, expiresAt: null, grantedByUserId: actorUserId, grantedAt: now, tltDirector: false, tltDirectorSetAt: null, tltDirectorSetByUserId: null,
+        // Like the TLT setting, a new grant starts as a Pathfinder coordinator until an admin names the ministries (#843).
+        ministries: ["PATHFINDER"] },
     });
   } else {
     // Removing the role removes the TLT director setting with it (#1686), and says so in the audit trail.
@@ -177,4 +228,33 @@ export async function setAreaCoordinator(attendeeAccountId: string, on: boolean,
   const prisma = getPrisma();
   const actor = await requireAreaCoordinatorActor(actorUserId, prisma);
   await prisma.$transaction((tx) => applyAreaCoordinatorChange(tx, attendeeAccountId, on, actorUserId, now, { viaClubsAdministrator: actor.viaClubsAdministrator }));
+}
+
+/**
+ * Changes the ministries on an active Area Coordinator grant (#843). Same actor rule as the role itself (a system
+ * administrator or an active Clubs Administrator, read from the database); the list must hold at least one known ministry.
+ */
+export async function setAreaCoordinatorMinistries(attendeeAccountId: string, ministries: unknown, actorUserId: string, now = new Date()) {
+  const prisma = getPrisma();
+  const actor = await requireAreaCoordinatorActor(actorUserId, prisma);
+  const next = parseMinistriesInput(ministries);
+  if (!next) throw new AreaCoordinatorError("INVALID_MINISTRIES", "Choose at least one ministry: Pathfinder, Adventurer or both.");
+  await prisma.$transaction(async (tx) => {
+    const grant = await tx.areaCoordinatorGrant.findUnique({
+      where: { attendeeAccountId },
+      select: { revokedAt: true, expiresAt: true, ministries: true },
+    });
+    if (!grant || !areaGrantActive(grant, now)) throw new AreaCoordinatorError("NOT_COORDINATOR", "That account is not an Area Coordinator.");
+    const previous = grantMinistries(grant.ministries);
+    await tx.areaCoordinatorGrant.update({ where: { attendeeAccountId }, data: { ministries: next } });
+    await writeAuditLog({
+      actorUserId,
+      action: "AREA_COORDINATOR_MINISTRIES_CHANGED",
+      entityType: "AttendeeAccount",
+      entityId: attendeeAccountId,
+      summary: "Changed the ministries an Area Coordinator sees.",
+      metadata: { attendeeAccountId, from: previous, to: next, ...(actor.viaClubsAdministrator ? { viaClubsAdministrator: true } : {}) },
+    }, tx);
+  });
+  return next;
 }

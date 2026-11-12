@@ -17,7 +17,7 @@ import { resolveAreaClubYear } from "@/modules/club-reports/area-export";
 import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-repository";
 import { POINTS_HELP } from "@/modules/club-reports/coordinator-destinations-domain";
 import { POINTS_CHART_LIMIT, pointsPageHref, pointsSummaryTiles } from "@/modules/club-reports/coordinator-points-domain";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorClubKinds } from "@/modules/organizations/area-coordinators";
 import styles from "@/components/coordinator-points.module.css";
 
 export const metadata: Metadata = { title: "Club points", robots: { index: false, follow: false, nocache: true } };
@@ -39,13 +39,14 @@ const POINTS_TILE_ICONS: Record<string, React.ReactNode> = {
  */
 export default async function AreaPointsPage({ searchParams }: { searchParams: Promise<{ year?: string; sort?: string; dir?: string; q?: string; all?: string }> }) {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) notFound();
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
   const query = parseClubQuery(params.q);
   const sort = parseLeaderboardSort(params.sort);
   const showAll = params.all === "1";
-  const allClubs = await getAreaClubsSummary(clubYear, new Date(), { backgroundChecks: false }).catch((error: unknown) => {
+  const allClubs = await getAreaClubsSummary(clubYear, new Date(), { backgroundChecks: false, kinds }).catch((error: unknown) => {
     logError("Coordinator Points read failed", error, { clubYear });
     return null;
   });

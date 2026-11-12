@@ -14,7 +14,7 @@ import { getAreaClubsSummary } from "@/modules/club-reports/area-summary-reposit
 import { buildCoordinatorOverview } from "@/modules/club-reports/coordinator-overview-domain";
 import { listClubsNewYearStatus } from "@/modules/club-rosters/carry-forward";
 import { carryForwardOversightOpen } from "@/modules/club-rosters/carry-forward-domain";
-import { currentAreaCoordinatorViewerActive } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorClubKinds } from "@/modules/organizations/area-coordinators";
 import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-club-ids";
 
 export const metadata: Metadata = { title: "Club overview", robots: { index: false, follow: false, nocache: true } };
@@ -28,20 +28,21 @@ export const dynamic = "force-dynamic";
  */
 export default async function AreaOverviewPage({ searchParams }: { searchParams: Promise<{ year?: string; q?: string; sort?: string; dir?: string }> }) {
   // Layouts do not re-run on navigation, so every page checks for itself (#657).
-  if (!(await currentAreaCoordinatorViewerActive())) notFound();
+  const kinds = await currentAreaCoordinatorClubKinds();
+  if (!kinds) notFound();
   const params = await searchParams;
   const clubYear = resolveAreaClubYear(params.year);
   const query = parseClubQuery(params.q);
   const now = new Date();
   const [clubs, deadlines, newYearStatus, ownClubIds] = await Promise.all([
-    getAreaClubsSummary(clubYear).catch((error: unknown) => {
+    getAreaClubsSummary(clubYear, now, { kinds }).catch((error: unknown) => {
       // Logged without club or person data; the page shows "unavailable" instead of any count.
       logError("Coordinator overview summary read failed", error, { clubYear });
       return null;
     }),
     listUpcomingDeadlines(),
     // Which clubs haven't started next year's roster (#414): counts only, August through October.
-    carryForwardOversightOpen(now) ? listClubsNewYearStatus(now) : Promise.resolve(null),
+    carryForwardOversightOpen(now) ? listClubsNewYearStatus(now, { kinds }) : Promise.resolve(null),
     // The clubs this coordinator also directs open normally from Clubs at a glance; every other club opens view only (#1551).
     currentOwnDirectedClubIds(),
   ]);

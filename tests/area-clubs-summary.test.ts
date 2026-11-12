@@ -194,6 +194,16 @@ describe("area club summary repository (#657)", () => {
     expect(mocks.complianceCounts).toHaveBeenCalledTimes(1);
   });
 
+  it("limits the clubs to the given ministries, and reads every ministry for staff (#843)", async () => {
+    await getAreaClubsSummary("2026-27", now, { backgroundChecks: false, kinds: ["ADVENTURER"] });
+    expect(mocks.orgFindMany.mock.calls.at(-1)![0].where).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["ADVENTURER"] } });
+    await getAreaClubsSummary("2026-27", now, { backgroundChecks: false });
+    expect(mocks.orgFindMany.mock.calls.at(-1)![0].where).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER", "ADVENTURER"] } });
+    mocks.eventFindMany.mockResolvedValue([]);
+    await listAreaClubEvents("2026-27", { kinds: ["PATHFINDER"] });
+    expect(mocks.orgFindMany.mock.calls.at(-1)![0].where).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER"] } });
+  });
+
   it("skips the background-check query when the caller does not show counts", async () => {
     const clubs = await getAreaClubsSummary("2026-27", now, { backgroundChecks: false });
     expect(mocks.complianceCounts).not.toHaveBeenCalled();

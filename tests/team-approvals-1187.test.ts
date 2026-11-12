@@ -45,6 +45,8 @@ const found = {
 function decideDatabase(first: unknown = found) {
   const tx = {
     clubDirectorGrant: { findFirst: vi.fn().mockResolvedValue(null) },
+    // The coordinator's ministries, read in the same transaction (#843).
+    areaCoordinatorGrant: { findUnique: vi.fn().mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["PATHFINDER"] }) },
     clubTeamMemberPermission: {
       findFirst: vi.fn().mockResolvedValue(first),
       update: vi.fn(),
@@ -142,10 +144,16 @@ describe("another location, or a flag that no longer applies, is denied (#1187)"
       { ...found, id: "p-other-club" },
     ]);
     const grantFindFirst = vi.fn(async ({ where }: { where: { organizationId: string } }) => (where.organizationId === "club-own" ? { id: "g" } : null));
-    mocks.getPrisma.mockReturnValue({ clubTeamMemberPermission: { findMany }, clubDirectorGrant: { findFirst: grantFindFirst } });
+    mocks.getPrisma.mockReturnValue({
+      clubTeamMemberPermission: { findMany },
+      clubDirectorGrant: { findFirst: grantFindFirst },
+      areaCoordinatorGrant: { findUnique: vi.fn().mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["ADVENTURER"] }) },
+    });
     const rows = await listCoordinatorTeamPermissions("acct-1");
     const where = findMany.mock.calls[0]![0].where;
     expect(where).toMatchObject({ active: true });
+    // Only the teams of clubs in the coordinator's ministries (#843).
+    expect(where.clubEventRegistration.organization).toEqual({ clubKind: { in: ["ADVENTURER"] } });
     // A cancelled team is not listed on this page. (The decide path refuses it too: see the #1191 tests.)
     expect(where.clubEventRegistration.registration.status).toEqual({ in: ["SUBMITTED", "CONFIRMED", "WAITLISTED"] });
     expect(where.clubEventRegistration.registration.location.is.coordinatorAccountId).toBe("acct-1");

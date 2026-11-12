@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentAttendee: vi.fn(),
   accountNeedsSecondStep: vi.fn(),
   grantFindUnique: vi.fn(),
+  orgFindFirst: vi.fn(),
   currentStaffActingContext: vi.fn(),
   createClubFormLink: vi.fn(),
   rateLimit: vi.fn(),
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("next/server", () => ({ after: vi.fn() }));
 vi.mock("@/lib/request-context", () => ({ withRequestContext: (handler: unknown) => handler }));
-vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ areaCoordinatorGrant: { findUnique: mocks.grantFindUnique } }) }));
+vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ areaCoordinatorGrant: { findUnique: mocks.grantFindUnique }, organization: { findFirst: mocks.orgFindFirst } }) }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: () => null }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: vi.fn() }));
@@ -42,7 +43,8 @@ beforeEach(() => {
   mocks.getCurrentAttendee.mockResolvedValue({ account: { id: "acct-2" }, via: "attendee", sessionId: "s-1" });
   mocks.accountNeedsSecondStep.mockResolvedValue("OK");
   mocks.currentStaffActingContext.mockResolvedValue(null);
-  mocks.grantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null });
+  mocks.grantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["PATHFINDER"] });
+  mocks.orgFindFirst.mockResolvedValue({ id: "club-b" });
   mocks.rateLimit.mockResolvedValue({ allowed: true });
   mocks.createClubFormLink.mockResolvedValue({ linkId: "link-1", messageId: "message-1", expiresAt: new Date("2026-11-09T15:00:00Z") });
 });
@@ -68,6 +70,22 @@ describe("POST /api/attendee/area-clubs/[organizationId]/forms/links (#1221)", (
       expect((await post(componentBody)).status).toBe(403);
     }
     expect(mocks.createClubFormLink).not.toHaveBeenCalled();
+  });
+
+  it("finds only a club in the coordinator's ministries: any other answers 404 and creates nothing (#843)", async () => {
+    mocks.orgFindFirst.mockResolvedValue(null);
+    const response = await post(componentBody);
+    expect(response.status).toBe(404);
+    expect(mocks.orgFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: "club-b", clubKind: { in: ["PATHFINDER"] } }) }));
+    expect(mocks.rateLimit).not.toHaveBeenCalled();
+    expect(mocks.createClubFormLink).not.toHaveBeenCalled();
+  });
+
+  it("lets staff acting as a coordinator send for a club of either ministry (#843)", async () => {
+    mocks.getCurrentAttendee.mockResolvedValue({ account: null, via: null, sessionId: null });
+    mocks.currentStaffActingContext.mockResolvedValue({ role: "AREA_COORDINATOR", userId: "user-1", actAsId: "act-1" });
+    expect((await post(componentBody)).status).toBe(201);
+    expect(mocks.orgFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ clubKind: { in: ["PATHFINDER", "ADVENTURER"] } }) }));
   });
 
   it("refuses a form that is turned off", async () => {

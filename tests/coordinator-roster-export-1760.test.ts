@@ -190,11 +190,23 @@ describe("which clubs (#1760)", () => {
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
+  it("treats a club outside the coordinator's ministries like one that does not exist, and reads no roster (#843)", async () => {
+    asCoordinator();
+    mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["ADVENTURER"] });
+    // The database applies the ministries filter, so a Pathfinder club is not among the rows.
+    mocks.orgFindMany.mockResolvedValue([]);
+    const response = await call("columns=club&clubs=club-a");
+    expect(response.status).toBe(400);
+    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ clubKind: { in: ["ADVENTURER"] } }) }));
+    expect(mocks.listRoster).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
   it("reads only the chosen clubs", async () => {
     asCoordinator();
     mocks.orgFindMany.mockResolvedValue([clubs[1]]);
     await call("columns=club,lastName&clubs=club-b");
-    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true, guestEventId: null, id: { in: ["club-b"] } } }));
+    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER"] }, id: { in: ["club-b"] } } }));
     expect(mocks.listRoster).toHaveBeenCalledTimes(1);
     expect(mocks.listRoster).toHaveBeenCalledWith("club-b", expect.any(String), expect.any(Date), { includeSchoolDetails: true });
   });

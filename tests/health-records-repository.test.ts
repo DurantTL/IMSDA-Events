@@ -192,7 +192,7 @@ const leader: HealthViewer = { kind: "CLUB_LEADER", organizationId: "club-a", ac
 const otherLeader: HealthViewer = { kind: "CLUB_LEADER", organizationId: "club-b", accountId: "acct-9" };
 const staff: HealthViewer = { kind: "HEALTH_ROLE", userId: "staff-1", eventIds: ["event-1"] };
 const admin: HealthViewer = { kind: "SYSTEM_ADMIN", userId: "admin-1" };
-const coordinator: HealthViewer = { kind: "AREA_COORDINATOR", accountId: "acct-coord" };
+const coordinator: HealthViewer = { kind: "AREA_COORDINATOR", accountId: "acct-coord", kinds: ["PATHFINDER"] };
 const TOKEN = "T".repeat(43);
 
 /** An unexpired break-glass grant (default: 24 hours from `now`) for one administrator and person. */

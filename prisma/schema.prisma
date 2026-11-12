@@ -3072,9 +3072,11 @@ model ChurchGeocodeResult {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
-/// An Area Coordinator (#387): sees every club, view only, from their own
-/// account. Given and taken away by system administrators; one row per
-/// account, kept after removal for the record.
+/// An Area Coordinator (#387): sees the clubs of their ministry (#843), view
+/// only, from their own account. Given and taken away by system administrators;
+/// one row per account, kept after removal for the record. `ministries` lists
+/// the ministries the person coordinates (at least one); every grant that
+/// existed before #843 is a Pathfinder coordinator.
 model AreaCoordinatorGrant {
   id                String    @id @default(cuid())
   attendeeAccountId String    @unique
@@ -3090,6 +3092,8 @@ model AreaCoordinatorGrant {
   tltDirector            Boolean   @default(false)
   tltDirectorSetAt       DateTime?
   tltDirectorSetByUserId String?
+  /// The ministries whose clubs this coordinator sees (#843).
+  ministries        ClubKind[] @default([PATHFINDER])
   updatedAt         DateTime  @updatedAt
 
   attendeeAccount AttendeeAccount @relation(fields: [attendeeAccountId], references: [id], onDelete: Cascade)

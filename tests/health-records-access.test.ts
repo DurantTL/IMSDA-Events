@@ -19,7 +19,7 @@ vi.mock("@/modules/club-rosters/access", () => ({ requireRosterAccess: state.ros
 vi.mock("@/modules/attendee-accounts/current-attendee", () => ({ getCurrentAttendee: state.attendee }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: state.session }));
 vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingContext: state.acting }));
-vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: state.coordinator }));
+vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: state.coordinator, coordinatorMinistriesForAccount: async () => ["PATHFINDER", "ADVENTURER"] }));
 vi.mock("@/modules/organizations/director-access", () => ({ listDirectedClubs: state.directed }));
 
 import {
@@ -149,7 +149,7 @@ describe("health access: Area Coordinator", () => {
   it("admits a coordinator whose second step was verified within 12 hours", async () => {
     state.coordinator.mockResolvedValue({ id: "acct-coord" });
     state.sessionFind.mockResolvedValue({ secondFactorVerifiedAt: new Date(now.getTime() - 11 * 3_600_000) });
-    await expect(requireAreaCoordinatorHealthViewer(now)).resolves.toEqual({ kind: "AREA_COORDINATOR", accountId: "acct-coord" });
+    await expect(requireAreaCoordinatorHealthViewer(now)).resolves.toEqual({ kind: "AREA_COORDINATOR", accountId: "acct-coord", kinds: ["PATHFINDER", "ADVENTURER"] });
   });
 
   it("asks a coordinator whose second step is older than 12 hours, or missing, to confirm again", async () => {

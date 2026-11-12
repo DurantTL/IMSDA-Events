@@ -65,8 +65,8 @@ export const systemRoleText: Record<SystemRoleKey, RoleText> = {
   },
   AREA_COORDINATOR: {
     name: "Area Coordinator",
-    summary: "Sees every club, view only.",
-    can: ["Look at every club, after a second sign-in step.", "See members' ages."],
+    summary: "Sees every club in their ministry, view only.",
+    can: ["Look at every club in their ministry (Pathfinder, Adventurer or both), after a second sign-in step.", "See members' ages."],
     cannot: ["Change anything.", "See full birth dates."],
   },
   SITE_CONTENT_EDITOR: {

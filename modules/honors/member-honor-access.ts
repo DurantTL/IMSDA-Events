@@ -1,9 +1,8 @@
 import "server-only";
 
-import { getPrisma } from "@/lib/prisma";
 import { actorAttribution, requireRosterAccess, RosterAccessError } from "@/modules/club-rosters/access";
 import type { MemberHonorActor } from "@/modules/honors/member-honor-repository";
-import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinator, currentAreaCoordinatorMaySeeClub } from "@/modules/organizations/area-coordinators";
 import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /**
@@ -31,14 +30,6 @@ export type HonorsAccess =
 
 const FALLBACK_CODES = new Set<RosterAccessError["code"]>(["NOT_FOUND", "SIGN_IN_REQUIRED"]);
 
-async function isActiveClub(organizationId: string) {
-  const organization = await getPrisma().organization.findUnique({
-    where: { id: organizationId },
-    select: { type: true, isActive: true },
-  });
-  return Boolean(organization && organization.type === "CLUB" && organization.isActive);
-}
-
 /** The Area Coordinator viewing right now (their own account, or a staff act-as), or null. */
 async function areaCoordinatorViewer(): Promise<MemberHonorActor | null> {
   const account = await currentAreaCoordinator();
@@ -55,7 +46,8 @@ export async function requireHonorsAccess(organizationId: string, now = new Date
     if (!(error instanceof RosterAccessError) || !FALLBACK_CODES.has(error.code)) throw error;
     const viewer = await areaCoordinatorViewer();
     if (!viewer) throw error;
-    if (!(await isActiveClub(organizationId))) {
+    // The club must be an active club in the coordinator's ministries (#843); anything else is a missing club.
+    if (!(await currentAreaCoordinatorMaySeeClub(organizationId))) {
       throw new RosterAccessError("NOT_FOUND", 404, "That club could not be found.");
     }
     return { mode: "READ", viewer };

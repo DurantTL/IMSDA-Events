@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import { EMAIL_FIELD_MESSAGE, PHONE_FIELD_MESSAGE, isUnchangedFromStored, storedContactPhone, normalizePhoneAnswer, validateEmail, validatePhone, validateZip, type FieldCheck } from "@/lib/field-validation";
 import { clubYearFor, parseCalendarDate } from "@/modules/club-rosters/domain";
 import { overLimitFields, tetanusNeedsCorrection } from "@/modules/health-records/field-limits";
@@ -307,7 +308,8 @@ export type HealthViewer =
   | { kind: "CLUB_LEADER"; organizationId: string; accountId: string }
   /** Write-only (#923): enters a record only when none exists, never reads one back. Own club only. */
   | { kind: "CLUB_REGISTRAR"; organizationId: string; accountId: string }
-  | { kind: "AREA_COORDINATOR"; accountId: string }
+  /** `kinds`: the ministries whose clubs this coordinator may open (#843). */
+  | { kind: "AREA_COORDINATOR"; accountId: string; kinds: readonly ClubKindValue[] }
   | { kind: "HEALTH_ROLE"; userId: string; eventIds: readonly string[] }
   /** `actAsId` is set when the administrator is acting as a club director (#442), so the audit shows it. */
   /**

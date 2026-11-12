@@ -80,7 +80,10 @@ export async function listHealthEvents(viewer: HealthViewer, now = new Date()) {
     where: {
       archivedAt: null,
       clubRegistrations: {
-        some: viewer.kind === "CLUB_LEADER" ? { organizationId: viewer.organizationId } : {},
+        some: viewer.kind === "CLUB_LEADER"
+          ? { organizationId: viewer.organizationId }
+          // A coordinator's events are the ones with a club of their ministries (#843).
+          : viewer.kind === "AREA_COORDINATOR" ? { organization: { clubKind: { in: [...viewer.kinds] } } } : {},
       },
       // Two days of slack past the window; the exact window is applied below in the event's time zone.
       endsAt: { gte: new Date(now.getTime() - (HEALTH_WINDOW_DAYS + 2) * 86_400_000) },
@@ -155,6 +158,11 @@ export async function loadEventHealth(
   if (options.organizationId && !viewerCanSeeClub(viewer, options.organizationId)) {
     return deny("NOT_FOUND", "That club could not be found.");
   }
+  // A club outside the coordinator's ministries answers like a missing club (#843).
+  if (viewer.kind === "AREA_COORDINATOR" && options.organizationId) {
+    const inMinistry = await prisma.organization.count({ where: { id: options.organizationId, type: "CLUB", clubKind: { in: [...viewer.kinds] } } });
+    if (inMinistry === 0) return deny("NOT_FOUND", "That club could not be found.");
+  }
   if (!event) return deny("NOT_FOUND", "That event could not be found.");
   if (!healthWindowOpen(event, now)) return deny("WINDOW_CLOSED", WINDOW_CLOSED_MESSAGE);
   // Before anything is read, counted or audited as a view: a prompt, not a refusal, so it is not audited.
@@ -164,6 +172,7 @@ export async function loadEventHealth(
     where: {
       eventId,
       ...(requestedClub ? { organizationId: requestedClub } : {}),
+      ...(viewer.kind === "AREA_COORDINATOR" ? { organization: { clubKind: { in: [...viewer.kinds] } } } : {}),
       registration: { status: { in: [...activeRegistrationStatuses] } },
     },
     orderBy: [{ organization: { name: "asc" } }, { teamKey: "asc" }],

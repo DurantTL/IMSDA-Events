@@ -4,6 +4,7 @@ import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { TLT_FORM_TEMPLATE_KEYS, isTltFormTemplateKey, type ClubFormsViewer, type TltFormTemplateKey } from "@/modules/club-forms/domain";
 import { pageSubmissionsForViewer } from "@/modules/club-forms/submissions";
+import { ALL_CLUB_KINDS } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { listClubsForArea } from "@/modules/organizations/area-coordinators";
 import { TLT_FORMS_PAGE_SIZE, tltFormsFilterKeys, type TltFormsFilters } from "@/modules/tlt-directory/forms-domain";
 
@@ -26,7 +27,7 @@ export async function readTltFormsInbox(viewer: ClubFormsViewer, filters: TltFor
   assertTltViewer(viewer);
   const [templates, clubs, list] = await Promise.all([
     getPrisma().clubFormTemplate.findMany({ where: { key: { in: [...TLT_FORM_TEMPLATE_KEYS] } }, select: { key: true, name: true }, orderBy: { sortOrder: "asc" } }),
-    listClubsForArea(),
+    listClubsForArea(ALL_CLUB_KINDS), // conference-wide: the TLT director sees every ministry (#843)
     pageSubmissionsForViewer(
       viewer,
       { templateKey: filters.form || undefined, organizationId: filters.clubId || undefined, subjectSearch: filters.q || undefined, personId: filters.personId || undefined },
