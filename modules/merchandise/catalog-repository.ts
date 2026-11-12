@@ -113,13 +113,16 @@ function projectProduct(eventId: string, product: CatalogProduct) {
  * of rows the transaction hasn't committed yet.
  */
 export async function getMerchandiseCatalog(eventId: string, client: Prisma.TransactionClient = getPrisma()) {
-  const catalog = await client.merchandiseCatalog.findUnique({ where: { eventId } });
+  const catalog = await client.merchandiseCatalog.findUnique({ where: { eventId }, include: { approvedBy: { select: { displayName: true } } } });
   const products = await client.merchandiseProduct.findMany({ where: { eventId }, orderBy: [{ position: "asc" }, { createdAt: "asc" }], include: productInclude });
   return {
     eventId,
     isEnabled: catalog?.isEnabled ?? false,
     status: catalog?.status ?? ("DRAFT" as const),
     updatedAt: catalog?.updatedAt.toISOString() ?? null,
+    approvedAt: catalog?.approvedAt?.toISOString() ?? null,
+    /** Name only; the approver's email is never returned. */
+    approvedByName: catalog?.approvedBy?.displayName ?? null,
     products: products.map((p) => projectProduct(eventId, p)),
   };
 }

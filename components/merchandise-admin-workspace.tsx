@@ -28,6 +28,7 @@ import { EditorDialog } from "@/components/editor-dialog";
 import { PageHeader } from "@/components/page-header";
 import styles from "./merchandise-admin-workspace.module.css";
 import { EmptyState } from "@/components/empty-state";
+import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 
 type Artwork = { id: string; url?: string; altText?: string | null; filename?: string };
 type TaxTreatment = "TAXABLE" | "TAX_EXEMPT";
@@ -66,7 +67,15 @@ type Product = {
   artwork?: Artwork | null;
   variants: Variant[];
 };
-type Catalog = { eventId: string; isEnabled: boolean; products: Product[] };
+type Catalog = { eventId: string; isEnabled: boolean; status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED"; approvedAt: string | null; approvedByName: string | null; products: Product[] };
+
+/** "Sales open · approved by Pat Example on Nov 12, 2026, 3:04 PM CST", from the stored approval. */
+export function merchandiseSalesStatusLine(catalog: Pick<Catalog, "isEnabled" | "status" | "approvedAt" | "approvedByName">) {
+  if (catalog.status !== "APPROVED" || !catalog.approvedAt) return "Sales closed · not approved";
+  const when = formatInConferenceTime(catalog.approvedAt, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const who = catalog.approvedByName ? `approved by ${catalog.approvedByName} on ${when}` : `approved on ${when}`;
+  return catalog.isEnabled ? `Sales open · ${who}` : `Sales paused (catalog disabled) · ${who}`;
+}
 
 /** The exact safe DTO an anonymous attendee would receive, fetched from
  * /merchandise/preview rather than re-derived from admin state so the
@@ -125,7 +134,21 @@ function variantPayload(variant: Variant, position: number) {
   };
 }
 
-export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
+export function MerchandiseSalesStatus({ canApproveSales, catalog, onApprove, onClose, saving = false }: { canApproveSales: boolean; catalog: Pick<Catalog, "isEnabled" | "status" | "approvedAt" | "approvedByName">; onApprove: () => void; onClose: () => void; saving?: boolean }) {
+  return (
+    <div className={styles.salesStatus}>
+      <p className={styles.salesStatusLine}><strong>{merchandiseSalesStatusLine(catalog)}</strong></p>
+      {canApproveSales ? (
+        <div className={styles.salesStatusActions}>
+          {!(catalog.status === "APPROVED" && catalog.isEnabled) && <button className="primary-button" type="button" onClick={onApprove} disabled={saving}>Approve and open sales</button>}
+          {catalog.status === "APPROVED" && <button className="secondary-button" type="button" onClick={onClose} disabled={saving}>Close sales</button>}
+        </div>
+      ) : <p className={styles.salesStatusHelp}>A system administrator approves and opens sales.</p>}
+    </div>
+  );
+}
+
+export function MerchandiseAdminWorkspace({ eventId, canApproveSales = false }: { eventId: string; canApproveSales?: boolean }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [assets, setAssets] = useState<Artwork[]>([]);
   // The preview that was successfully evaluated, tied to the audience it was
@@ -143,6 +166,7 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [approvalTarget, setApprovalTarget] = useState<"approve" | "close" | null>(null);
   const [variantEditing, setVariantEditing] = useState<Variant | "new" | null>(null);
   // Closing asks its own discard question; this adds the warning for links, Back and reload while an editor is open and changed (#1452).
   useUnsavedChangesGuard(editorDirty && (editing !== null || variantEditing !== null), "You have unsaved changes to this catalog item. Leave this page and discard them?");
@@ -168,7 +192,7 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
       throw new Error("Merchandise management is restricted for your event role.");
     }
     if (!catalogResponse.ok) throw new Error(errorMessage(catalogResult, "The merchandise catalog could not be loaded."));
-    setCatalog({ eventId, isEnabled: Boolean(catalogResult.isEnabled), products: catalogResult.products ?? [] });
+    setCatalog({ eventId, isEnabled: Boolean(catalogResult.isEnabled), status: catalogResult.status ?? "DRAFT", approvedAt: catalogResult.approvedAt ?? null, approvedByName: catalogResult.approvedByName ?? null, products: catalogResult.products ?? [] });
     if (assetResponse.ok) setAssets(assetResult.assets ?? []);
     await previewLoad;
   }
@@ -346,6 +370,22 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
     if (ok) setArchiveTarget(null);
   }
 
+  function openApproval(target: "approve" | "close") {
+    setError("");
+    setApprovalTarget(target);
+  }
+
+  async function confirmApproval() {
+    if (!approvalTarget) return;
+    const ok = await mutate(
+      merchandiseEndpoint(eventId, "/approval"),
+      approvalTarget === "approve" ? "POST" : "DELETE",
+      undefined,
+      approvalTarget === "approve" ? "Merchandise approved. Sales are open." : "Merchandise sales closed. Existing orders are unchanged.",
+    );
+    if (ok) setApprovalTarget(null);
+  }
+
   async function archiveVariantAction(variant: Variant) {
     if (!selected) return false;
     return mutate(
@@ -428,7 +468,8 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
       />
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {/* While the archive dialog is open, its own alert shows the error; one announcement, not two. */}
-      {error && !archiveTarget && !editing && !variantEditing && <div className="inline-notice error" role="alert">{error}</div>}
+      {error && !archiveTarget && !approvalTarget && !editing && !variantEditing && <div className="inline-notice error" role="alert">{error}</div>}
+      <MerchandiseSalesStatus canApproveSales={canApproveSales} catalog={catalog} onApprove={() => openApproval("approve")} onClose={() => openApproval("close")} saving={saving} />
       {!catalog.isEnabled && <div className="inline-notice warning"><PackageOpen size={17} aria-hidden="true" /><span><strong>Catalog disabled.</strong> Attendees will not see merchandise until you enable it.</span></div>}
 
       <div className={styles.layout}>
@@ -504,6 +545,24 @@ export function MerchandiseAdminWorkspace({ eventId }: { eventId: string }) {
         title="Discard your changes?"
       >
         <p>You have unsaved edits. If you close now they are lost. Keep editing to save them first.</p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        busy={saving}
+        busyLabel={approvalTarget === "close" ? "Closing…" : "Approving…"}
+        confirmLabel={approvalTarget === "close" ? "Close sales" : "Approve and open sales"}
+        destructive={approvalTarget === "close"}
+        error={error}
+        onCancel={() => setApprovalTarget(null)}
+        onConfirm={() => void confirmApproval()}
+        open={approvalTarget !== null}
+        title={approvalTarget === "close" ? "Close merchandise sales?" : "Approve and open merchandise sales?"}
+      >
+        <p>
+          {approvalTarget === "close"
+            ? "Attendees stop seeing merchandise right away. Existing orders stay as they are."
+            : "Prices go live for attendees exactly as shown on this page. Check the products, sizes and prices before you approve."}
+        </p>
       </ConfirmDialog>
 
       <ConfirmDialog
