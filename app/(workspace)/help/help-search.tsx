@@ -14,10 +14,11 @@ import {
 import styles from "./help.module.css";
 
 /** What the hub needs about one guide the server already decided this viewer may see. */
-export type HubGuide = { id: string; title: string; summary: string; workspace: "System" | "Event"; keywords: readonly string[] };
+export type HubGuide = { id: string; title: string; summary: string; workspace: "System" | "Clubs" | "Event"; keywords: readonly string[] };
 
 const groups: readonly { workspace: HubGuide["workspace"]; title: string }[] = [
   { workspace: "System", title: "System administration" },
+  { workspace: "Clubs", title: "Clubs administration" },
   { workspace: "Event", title: "Event workspace" },
 ];
 

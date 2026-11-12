@@ -456,7 +456,7 @@ const EVENT_SITES: Array<[file: string, id: (typeof EVENT_SETUP_IDS)[number]]> =
 
 describe("event admin states have a next step (round B: H3, H4)", () => {
   const guideIds = new Set(helpGuides.map((guide) => guide.id));
-  const viewerWith = (permissions: EventPermission[], isSystemAdmin = false): HelpViewer => ({ isSystemAdmin, selectedEventId: "event_1", permissions });
+  const viewerWith = (permissions: EventPermission[], isSystemAdmin = false): HelpViewer => ({ isSystemAdmin, isClubsAdministrator: isSystemAdmin, selectedEventId: "event_1", permissions });
   const full = { eventId: "event_1", can: () => true, systemAdmin: true };
   const none = { eventId: "event_1", can: () => false };
 
@@ -614,7 +614,7 @@ describe("round A review fixes", () => {
     const views = read("components/area-clubs-views.tsx");
     expect(views).not.toContain("CoordinatorSetupHelp");
     expect(views).not.toContain("/account/help");
-    const html = renderToStaticMarkup(createElement(EventSetupHelp, { id: "staff-no-clubs", systemAdmin: true, viewer: { isSystemAdmin: true, selectedEventId: "", permissions: [...eventPermissions] } }));
+    const html = renderToStaticMarkup(createElement(EventSetupHelp, { id: "staff-no-clubs", systemAdmin: true, viewer: { isSystemAdmin: true, isClubsAdministrator: true, selectedEventId: "", permissions: [...eventPermissions] } }));
     expect(html).toContain("/admin/clubs/import");
     expect(html).toContain("/help/review-new-club-application");
     expect(html).not.toContain("/account/help");
@@ -639,7 +639,7 @@ describe("round A review fixes", () => {
 });
 
 describe("round B review fixes", () => {
-  const viewer = (permissions: EventPermission[], isSystemAdmin = false): HelpViewer => ({ isSystemAdmin, selectedEventId: "event_1", permissions });
+  const viewer = (permissions: EventPermission[], isSystemAdmin = false): HelpViewer => ({ isSystemAdmin, isClubsAdministrator: isSystemAdmin, selectedEventId: "event_1", permissions });
   const render = (id: (typeof EVENT_SETUP_IDS)[number], who: HelpViewer | null, extra: Record<string, unknown> = {}) =>
     renderToStaticMarkup(createElement(EventSetupHelp, { id, viewer: who, ...extra }));
   const guideLinks = (html: string) => [...html.matchAll(/href="(\/help\/[^"?]+)/g)].map((match) => match[1]!.replace("/help/", ""));
@@ -748,8 +748,8 @@ describe("round B review fixes", () => {
 });
 
 describe("round B re-review fixes", () => {
-  const clubsAdmin: HelpViewer = { isSystemAdmin: false, selectedEventId: "", permissions: [] };
-  const sysAdmin: HelpViewer = { isSystemAdmin: true, selectedEventId: "", permissions: [...eventPermissions] };
+  const clubsAdmin: HelpViewer = { isSystemAdmin: false, isClubsAdministrator: true, selectedEventId: "", permissions: [] };
+  const sysAdmin: HelpViewer = { isSystemAdmin: true, isClubsAdministrator: true, selectedEventId: "", permissions: [...eventPermissions] };
   const html = (id: (typeof EVENT_SETUP_IDS)[number], viewer: HelpViewer, extra: Record<string, unknown> = {}) => renderToStaticMarkup(createElement(EventSetupHelp, { id, viewer, ...extra }));
 
   it("sends a Clubs administrator to a system administrator, not to a page that refuses them", () => {
@@ -765,7 +765,7 @@ describe("round B re-review fixes", () => {
   });
 
   it("prefers the page's own event over the shell's selection", () => {
-    const shell: HelpViewer = { isSystemAdmin: false, selectedEventId: "event_shell", permissions: ["MANAGE_CHECK_IN", "CONFIGURE_EVENT"] };
+    const shell: HelpViewer = { isSystemAdmin: false, isClubsAdministrator: false, selectedEventId: "event_shell", permissions: ["MANAGE_CHECK_IN", "CONFIGURE_EVENT"] };
     const out = html("check-in-no-arrivals", shell, { eventId: "event_page" });
     expect(out).toContain("/more/event-settings?event=event_page");
     expect(out).not.toContain("event_shell");

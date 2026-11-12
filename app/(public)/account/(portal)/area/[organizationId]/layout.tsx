@@ -5,6 +5,9 @@ import { ClubPortalNav } from "@/components/club-portal-nav";
 import { AreaClubSwitcher } from "@/components/area-club-switcher";
 import styles from "@/components/area-club-switcher.module.css";
 import { BackLink } from "@/components/back-link";
+import { ClubBannerTools } from "@/components/club-portal-search";
+import searchStyles from "@/components/club-portal-search.module.css";
+import { CoordinatorBannerSearch } from "@/components/coordinator-banner-search";
 import { CoordinatorShellHeader } from "@/components/coordinator-shell-header";
 import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-club-ids";
 import { getPrisma } from "@/lib/prisma";
@@ -48,7 +51,7 @@ export default async function AreaClubLayout({
       <CoordinatorShellHeader nav={<ClubPortalNav items={areaViewedClubNavItems({ organizationId })} label="Club" menuLabel="Club menu" />}>
         {/* The club home's navy band (club-banner in globals.css): the club's name and parent organization, the coordinator's view-only role and the club year. */}
         <section aria-label={`${club.name}, view only`} className="club-banner">
-          <div className="club-banner-inner">
+          <div className={`club-banner-inner ${searchStyles.bannerInner}`}>
             <div className="club-banner-identity">
               <h1 title={club.name} translate="no">{club.name}</h1>
               <p>
@@ -56,7 +59,10 @@ export default async function AreaClubLayout({
                 Area Coordinator · view only
               </p>
             </div>
-            <YearBox label="Current club year" value={clubYearFor(new Date()).replace("-", "\u2013")} />
+            <ClubBannerTools>
+              <YearBox label="Current club year" value={clubYearFor(new Date()).replace("-", "\u2013")} />
+              <CoordinatorBannerSearch />
+            </ClubBannerTools>
           </div>
         </section>
       </CoordinatorShellHeader>

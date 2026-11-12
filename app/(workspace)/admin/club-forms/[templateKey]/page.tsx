@@ -11,6 +11,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { getClubFormBuilderView } from "@/modules/club-forms/builder";
 import { STALE_DRAFT_MESSAGE } from "@/modules/club-forms/builder-messages";
 import { ClubFormError } from "@/modules/club-forms/errors";
+import { parseFormsHubReturn } from "@/modules/forms-hub/return";
 import { AdminPageHeader } from "@/components/admin-page-header";
 import { DetailPage } from "@/components/page-templates/detail-page";
 
@@ -22,11 +23,14 @@ export const dynamic = "force-dynamic";
  * again on every route the builder calls. It shows the form's definition and
  * never a submission or an answer.
  */
-export default async function ClubFormBuilderPage({ params }: { params: Promise<{ templateKey: string }> }) {
+export default async function ClubFormBuilderPage({ params, searchParams }: { params: Promise<{ templateKey: string }>; searchParams?: Promise<{ returnTo?: string }> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
   const { templateKey } = await params;
+  // "Back to All forms" only when the address came from the All forms list; it grants nothing (#1571).
+  // Only a system administrator can open All forms, so only they get the link back to it (#1571).
+  const hubBack = user.globalRole === "SYSTEM_ADMIN" ? parseFormsHubReturn((await searchParams)?.returnTo) : null;
   const view = await getClubFormBuilderView(templateKey).catch((error: unknown) => {
     if (error instanceof ClubFormError && error.code === "TEMPLATE_NOT_FOUND") return null;
     throw error;
@@ -43,7 +47,7 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
 
   return (
     <>
-    <AdminPageHeader path={`/admin/club-forms/${templateKey}`} />
+    <AdminPageHeader back={hubBack ?? undefined} path={`/admin/club-forms/${templateKey}`} />
     <DetailPage
       header={{ title: view.published.name }}
       notices={(
@@ -74,7 +78,7 @@ export default async function ClubFormBuilderPage({ params }: { params: Promise<
       {user.globalRole === "SYSTEM_ADMIN"
         ? <ClubFormAlertRecipients initialEmails={view.alertRecipients} key={`${view.key}-${view.alertRecipients.join(",")}`} templateKey={view.key} />
         : <p className="inline-notice" role="status">Who is emailed when this form is submitted is set by a system administrator.</p>}
-      <BuilderPhoneNotice backHref="/admin/club-forms" backLabel="Back to club forms" builderName="club form builder" />
+      <BuilderPhoneNotice backHref={hubBack?.href ?? "/admin/club-forms"} backLabel={hubBack?.label ?? "Back to club forms"} builderName="club form builder" />
       <div className="builder-phone-hidden">
         {view.draftUnreadable ? (
           <ClubFormDraftDiscard templateKey={view.key} />

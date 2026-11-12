@@ -229,6 +229,9 @@ export function CoordinatorClubEvents({
               <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/scoring`}>
                 Camporee scoring<span className="sr-only">: {event.name}</span>
               </Link>
+              <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/inspections`}>
+                Inspections<span className="sr-only">: {event.name}</span>
+              </Link>
               <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/attendance-points`}>
                 Attendance points<span className="sr-only">: {event.name}</span>
               </Link>
@@ -237,6 +240,9 @@ export function CoordinatorClubEvents({
               </Link>
               <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/budget`}>
                 Budget sheet<span className="sr-only">: {event.name}</span>
+              </Link>
+              <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/staffing`}>
+                Event staffing<span className="sr-only">: {event.name}</span>
               </Link>
               <Link className="secondary-button" href={`/account/area-clubs/events/${encodeURIComponent(event.id)}/report`}>
                 Attendee report<span className="sr-only">: {event.name}</span>

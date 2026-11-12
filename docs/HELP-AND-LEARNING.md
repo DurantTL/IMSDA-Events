@@ -32,13 +32,17 @@ Visibility is decided on the server from what the shell already knows: whether t
 their permissions for the selected event.
 
 - System guides: system administrators only.
+- Clubs guides (#1882): system administrators and active Clubs Administrators (`hasClubsAdministration`, the check every `/admin/clubs`
+  page uses). `loadHelpViewer` sets `isClubsAdministrator` from it. In Find a page the Clubs guides are listed while the Clubs
+  Administrator view shows (the shell's `clubsAdmin`) and for a system administrator.
 - Event guides: staff who hold the permission the guide's working page needs (for example Invite staff needs
   `MANAGE_STAFF`, the same permission `/staff` checks). System administrators hold every permission.
 - "Choose System or Event workspace" and the glossary: every staff member, including staff with no event.
 
 A guide the viewer may not see is not listed, not searched and not opened. Asking for its id gives the same "not found"
 page as an id that does not exist, and the tab title does not name it. A guide's links to working pages show only when the
-viewer can open them (system pages need a system administrator; event pages need a selected event and the page's
+viewer can open them (system pages need a system administrator; Clubs pages, destinations with scope `Clubs`, need a system
+administrator or a Clubs Administrator and no event, so their links carry none; event pages need a selected event and the page's
 permission). Otherwise the guide says "Ask an administrator for this event if you need this." and never names the page's
 route. Nothing here grants access: every page keeps its own authorization.
 
@@ -46,6 +50,16 @@ route. Nothing here grants access: every page keeps its own authorization.
 
 Reading or practising a guide is not a production completion, an approval, verified attendance, a readiness sign-off or
 a permission grant. The hub and every guide say so. Do not add anything that records a guide as "done".
+
+## Clubs guides (#1882)
+
+The Clubs guides (workspace Clubs, owner "Communication office") are in `modules/help/clubs-admin-guides.ts`: Find a club, Check club
+leaders and invites, Send draft club invites, Give someone a club role, Review a new club application (id `review-new-club-application`, moved here), Handle club
+member transfers, Import clubs from a file, Follow Monthly Records, Review Year-End Reports, Follow up Sterling Volunteers checks and
+Download club reports. Each says what saves or sends email and what does not, with one action per step and the page's own labels.
+Their destinations have scope `Clubs` and use the labels of the tabs and views a Clubs Administrator really sees (`areaTabs("clubs", viewer)` in `components/staff-areas.ts`): Club summary, Monthly Records,
+Review monthly records, Club Year-End Reports, Club member transfers, Sterling Volunteers, Club leaders, Import clubs, New club
+applications and People & access. A destination path may carry a `?view=` or `#section`; `help:check` only needs the page.
 
 ## Adding or changing a guide
 
@@ -67,9 +81,9 @@ When a menu label or route changes, search `helpDestinations` and the guide text
 
 ## Hub filters
 
-The staff hub has a text search and a "Show guides for" choice: All, System administration or Event workspace. They work
-together and run in the browser over the guides the server already chose to list. The System choice appears only when the
-viewer has a System guide, so staff who cannot open System guides never see it. When nothing matches, the hub says so and
+The staff hub has a text search and a "Show guides for" choice: All, System administration, Clubs administration or Event
+workspace. They work together and run in the browser over the guides the server already chose to list. The System and Clubs
+choices appear only when the viewer has a guide of that workspace, so staff who cannot open those guides never see them. When nothing matches, the hub says so and
 offers "Show all guides".
 
 ## Portal help
@@ -133,7 +147,7 @@ change, and after you re-check a guide, update its `lastReviewed`.
 
 Step-by-step guides with a picture of the real screen for every step (#1482, site rule H6). Each walkthrough is its own portal
 guide (ids start `walkthrough-`, titles start "Step by step: "), so the hub, Help search and the Getting started links reach it
-like any other guide. Today: the 10 club director walkthroughs, the 6 area coordinator walkthroughs (sign-in; their clubs
+like any other guide. Two more are staff guides for Clubs Administrators (see "Clubs Administrator walkthroughs"). Today: the 10 club director walkthroughs, the 6 area coordinator walkthroughs (sign-in; their clubs
 and Who's missing what; Monthly Records; Points; following up with a club that is behind; a club with no director) and the 3
 family walkthroughs (#1883: pay a balance, change a registration, ask to cancel one; audience `attendee`). A written guide that has a step-by-step version shows
 "See it step by step" links near its Steps (`walkthroughsForGuide` in `modules/help/walkthroughs.ts`), and the Getting started
@@ -159,9 +173,9 @@ checklists and the setup-help "Help guide" links point at the walkthrough where 
 **Adding or changing a walkthrough**
 
 1. Add the entry to `directorWalkthroughs`, `coordinatorWalkthroughs` or `familyWalkthroughs` in `modules/help/walkthroughs.ts`,
-   and list its `sourceFiles`. Add a fixture to `help-walkthrough-fixtures.ts` if the screen needs sample data. A walkthrough starts
+   (`clubsAdminWalkthroughs` for a staff guide for Clubs Administrators), and list its `sourceFiles`. Add a fixture to `help-walkthrough-fixtures.ts` if the screen needs sample data. A walkthrough starts
    `signed-out`, `signed-in` (the sample club director, two-step sign-in done), `signed-in-coordinator` (the sample area
-   coordinator) or `signed-in-family` (the sample family account, two-step sign-in done).
+   coordinator) or `signed-in-family` (the sample family account, two-step sign-in done) or `signed-in-clubs-admin` (the sample Clubs Administrator, #1882).
 2. Add one action per step id in `tests/browser/walkthroughs/` (`club-director.ts`, `coordinator.ts` or `family.ts`). Use roles and the exact labels.
 3. `HELP_SHOTS_ONLY=<walkthrough id> npm run help:screenshots`, then open the pictures and check that nothing looks like a real
    person and that each mark sits on the right control.
@@ -174,6 +188,21 @@ playwright-core@1.56.1` unless Playwright is already installed; `HELP_SHOTS_BROW
   contains the text. `HELP_SHOTS_BASE_URL` defaults to `http://localhost:3000`.
 - `npm run test:walkthroughs` runs every step at phone and desktop width and fails when an action or the control it marks is
   missing. It saves nothing. CI runs it in `.github/workflows/help-walkthroughs.yml`.
+
+**Clubs Administrator walkthroughs (#1882).** `clubsAdminWalkthroughs` in `walkthroughs.ts` holds two short ones, Find a club
+(`walkthrough-clubs-find-club`: header search, the result, the club's page, its Monthly Records card) and Check club leaders and
+invites (`walkthrough-clubs-leaders`: Status Current, Invited, Resend, Draft and Send all unsent). Their audience is `clubs`. They are
+staff guides (workspace Clubs, audience `{ kind: "clubs" }`, ids start `walkthrough-clubs-`), added to `helpGuides` by
+`clubsAdminWalkthroughGuide`; `walkthroughGuides`, the portal registry, leaves them out. The staff guide page renders
+`WalkthroughSteps` and the "See it step by step" links exactly like the portal page. They start `signed-in-clubs-admin`: the sample
+staff user "Jules Sample" (`walkthrough_user_clubsadmin`, `walkthrough.clubsadmin@example.test`) with an active
+`ClubsAdministratorGrant`, no system administrator role and no event membership. Staff two-step sign-in is checked when someone signs
+in, so no code is typed: the harness adds a placeholder `UserMfaEnrollment` (as the director gets one), mints the session with
+`createDatabaseSession` and the staff cookie, and revokes it at the end. `deleteWalkthroughFixtures` removes the user (its credential,
+enrolment, grant and sessions cascade). Like the coordinator walkthroughs, a run hides the other active clubs, so the pictures show
+only the sample clubs. Two sample club leader invites (one Sent, one Draft) feed the leaders pictures. The local site sends no email, so
+Resend and Send all unsent are greyed out in the pictures and the page says account email is not set up; the alt text says so. The two
+written guides they cover, Find a club and Check club leaders and invites (Send draft club invites links to the same walkthrough), have example pictures (`guide-example-pictures.ts`).
 
 **The family walkthroughs (#1883)** start as a sample family account (`walkthrough_account_family`, "Taylor Sample",
 `walkthrough.family@example.test`) with one registration for "Sample Family Retreat" (a general event with a synthetic
@@ -227,7 +256,7 @@ control gets the numbered outline, the rest of the screen a light shade, and the
 shadow. The number sits beside the outline where it hides nothing, otherwise on a corner of it. A step can return
 `{ target, area, alsoMark }` from its browser action to keep other context in the phone crop or outline two controls
 together; the mark always stays in view. Target at most 60 KB (phone) and 90 KB (desktop); over 150 KB fails the test, and all
-walkthroughs together should stay under about 8 MB (now about 6.7 MB; the family walkthroughs raised the limit from 6 MB).
+walkthroughs together should stay under about 8 MB (test limit 8 MiB; about 7.5 MB with the two Clubs Administrator walkthroughs, 0.48 MB of it).
 
 ## Contextual help
 

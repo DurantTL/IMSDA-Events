@@ -12,11 +12,15 @@ import {
   filterTltRows,
   sameListName,
   sortTltRows,
+  summarizeOpportunityAnswers,
   tltExportTable,
   type TltDirectoryRow,
   type TltFilters,
   type TltListAction,
+  type OpportunityAnswerRow,
+  type TltAnswerSummary,
   type TltProfileUpdate,
+  type TltSuggestionAccept,
 } from "@/modules/tlt-directory/domain";
 import type { TltDirectorActor } from "@/modules/tlt-directory/access";
 import { toCsv } from "@/modules/reporting/csv";
@@ -25,11 +29,46 @@ import { toCsv } from "@/modules/reporting/csv";
  * The TLT directory's data (#1686). A TLT is a youth roster member flagged `isTlt`, ACTIVE, on an active club's roster
  * for the current club year. The saved record (`TltProfile`) hangs off the `Person`, not the roster row: carrying a
  * roster forward keeps the same Person, so year, position, status and tags follow the teen into the next club year.
- * Nothing here reads form answers, contact details, school type, church membership or a birth date (the sealed date is
+ * The only form answers read are the four TLT Opportunities answers `readOpportunityAnswers` pulls out (suggested tags,
+ * shirt). Nothing here reads contact details, school type, church membership or a birth date (the sealed date is
  * opened only to compute an age and is never returned).
  */
 
 type Db = Prisma.TransactionClient;
+
+/** The registration forms made from the TLT Opportunities template (`tlt_opportunities`). */
+const TLT_OPPORTUNITIES_TEMPLATE_KEY = "tlt_opportunities";
+
+/**
+ * One batched read of the TLT Opportunities answers for a set of people, newest first. A raw query on purpose: it pulls
+ * out only the four answers the directory uses (`leadership_opportunities`, `need_tlt_shirt`, `shirt_type`,
+ * `shirt_size`), so no other answer on those registrations (health, contact, anything) is ever loaded. Only
+ * registrations of a form made from the TLT Opportunities template count, and not drafts or cancelled ones.
+ */
+async function readOpportunityAnswers(db: Pick<Db, "$queryRaw">, personIds: string[]): Promise<Map<string, TltAnswerSummary>> {
+  if (personIds.length === 0) return new Map();
+  const rows = await db.$queryRaw<Array<{ personId: string; opportunities: unknown; attendeeCount: number | bigint; needShirt: string | null; shirtType: string | null; shirtSize: string | null }>>(Prisma.sql`
+    SELECT a."personId" AS "personId",
+           s."responses" -> 'leadership_opportunities' AS "opportunities",
+           (SELECT COUNT(*) FROM "RegistrationAttendee" x WHERE x."registrationId" = r."id") AS "attendeeCount",
+           a."formResponses" ->> 'need_tlt_shirt' AS "needShirt",
+           a."formResponses" ->> 'shirt_type' AS "shirtType",
+           a."formResponses" ->> 'shirt_size' AS "shirtSize"
+    FROM "RegistrationAttendee" a
+    JOIN "Registration" r ON r."id" = a."registrationId"
+    JOIN "PublicRegistrationSubmission" s ON s."registrationId" = r."id"
+    JOIN "RegistrationFormVersion" v ON v."id" = s."formVersionId"
+    JOIN "RegistrationForm" f ON f."id" = v."formId"
+    JOIN "SeededFormTemplateVersion" tv ON tv."id" = f."sourceTemplateVersionId"
+    JOIN "SeededFormTemplate" t ON t."id" = tv."templateId"
+    WHERE t."key" = ${TLT_OPPORTUNITIES_TEMPLATE_KEY}
+      AND r."status" IN ('SUBMITTED', 'CONFIRMED', 'WAITLISTED')
+      AND a."personId" = ANY(${personIds}::text[])
+    ORDER BY r."createdAt" DESC, a."createdAt" DESC
+  `);
+  const answers: OpportunityAnswerRow[] = rows.map((row) => ({ ...row, attendeeCount: Number(row.attendeeCount) }));
+  return summarizeOpportunityAnswers(answers);
+}
 
 export async function listTltDirectoryRows(now = new Date()): Promise<TltDirectoryRow[]> {
   const prisma = getPrisma();
@@ -66,6 +105,14 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
     },
   });
   const profileByPerson = new Map(profiles.map((profile) => [profile.personId, profile]));
+  // Two more reads for the whole list, never one per row: the TLT Opportunities answers, then the seeded tags they map to.
+  const answers = await readOpportunityAnswers(prisma, personIds);
+  const wantedSeedKeys = [...new Set([...answers.values()].flatMap((answer) => answer.seedKeys))];
+  const seededTags = wantedSeedKeys.length === 0 ? [] : await prisma.tltHelpTag.findMany({
+    where: { seedKey: { in: wantedSeedKeys }, retiredAt: null },
+    select: { id: true, name: true, seedKey: true },
+  });
+  const tagBySeedKey = new Map(seededTags.flatMap((tag) => (tag.seedKey ? [[tag.seedKey, { id: tag.id, name: tag.name }] as const] : [])));
   const today = calendarDateOf(now);
   // One row per person even if two clubs briefly both list them: the most recently updated roster row wins.
   const latest = new Map<string, (typeof members)[number]>();
@@ -78,6 +125,12 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
   for (const member of latest.values()) {
     const profile = profileByPerson.get(member.personId!);
     const name = formatPersonName({ firstName: member.person?.firstName ?? "", lastName: member.person?.lastName ?? "" });
+    const answer = answers.get(member.personId!);
+    const haveTagIds = new Set((profile?.tags ?? []).map((link) => link.tag.id));
+    const suggestedTags = (answer?.seedKeys ?? []).flatMap((key) => {
+      const tag = tagBySeedKey.get(key);
+      return tag && !haveTagIds.has(tag.id) ? [tag] : [];
+    });
     rows.push({
       personId: member.personId!,
       rosterMemberId: member.id,
@@ -96,6 +149,8 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
         .map((link) => link.tag)
         .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "en-US"))
         .map((tag) => ({ id: tag.id, name: tag.name })),
+      suggestedTags,
+      shirt: answer?.shirt ?? null,
     });
   }
   return rows;
@@ -197,6 +252,59 @@ export async function updateTltProfile(input: TltProfileUpdate, actor: TltDirect
         status: input.status,
         tagIds: input.tagIds,
       },
+    }, tx);
+  });
+}
+
+/**
+ * One click on a suggested tag (#1686). The server works out again which tags this person's answers suggest and refuses
+ * anything else, so the request can't add an arbitrary tag under the "suggestion" name. A retired tag is never
+ * suggested. Creates the TLT's record if there isn't one (year, position and status stay "Not set"). Audit: ids only.
+ */
+export async function acceptTltTagSuggestion(input: TltSuggestionAccept, actor: TltDirectorActor, now = new Date()) {
+  try {
+    await acceptSuggestionOnce(input, actor, now);
+  } catch (error) {
+    // Two accepts at once for a TLT with no record: both try to create it and the second hits the unique person index.
+    // That transaction is void, so run it again once: the record now exists and the tag is added (or already there).
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") await acceptSuggestionOnce(input, actor, now);
+    else throw error;
+  }
+}
+
+async function acceptSuggestionOnce(input: TltSuggestionAccept, actor: TltDirectorActor, now: Date) {
+  const prisma = getPrisma();
+  await prisma.$transaction(async (tx) => {
+    const isTlt = await tx.clubRosterMember.findFirst({
+      where: {
+        personId: input.personId,
+        clubYear: clubYearFor(now),
+        attendeeType: "YOUTH",
+        isTlt: true,
+        status: "ACTIVE",
+        organization: { type: "CLUB", isActive: true },
+      },
+      select: { id: true },
+    });
+    if (!isTlt) throw new TltDirectoryError("NOT_A_TLT", "That person isn't a TLT on a current club roster.");
+    const tag = await tx.tltHelpTag.findUnique({ where: { id: input.tagId }, select: { id: true, seedKey: true, retiredAt: true } });
+    const answers = await readOpportunityAnswers(tx, [input.personId]);
+    if (!tag || tag.retiredAt || !tag.seedKey || !answers.get(input.personId)?.seedKeys.includes(tag.seedKey)) {
+      throw new TltDirectoryError("NOT_SUGGESTED", "That tag isn't suggested for this TLT.");
+    }
+    const profile = await tx.tltProfile.upsert({
+      where: { personId: input.personId },
+      create: { personId: input.personId, tltYear: null, positionTypeId: null, status: null, updatedByAccountId: actor.accountId },
+      update: { updatedByAccountId: actor.accountId },
+      select: { id: true },
+    });
+    await tx.tltProfileTag.createMany({ data: [{ profileId: profile.id, tagId: tag.id }], skipDuplicates: true });
+    await writeAuditLog({
+      action: "TLT_DIRECTORY_TAG_SUGGESTION_ACCEPTED",
+      entityType: "TltProfile",
+      entityId: profile.id,
+      summary: "Accepted a suggested help-area tag for a TLT.",
+      metadata: { actorAttendeeAccountId: actor.accountId, personId: input.personId, tagId: tag.id },
     }, tx);
   });
 }

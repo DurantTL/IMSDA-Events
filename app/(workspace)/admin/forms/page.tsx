@@ -16,7 +16,8 @@ import { logError } from "@/lib/logger";
 import { listEventsForUser } from "@/modules/events/repository";
 import { buildFormCreateEvents } from "@/modules/forms-hub/create-choices";
 import { FormsCreateSection } from "@/components/forms-create/forms-create-section";
-import { filterFormsHubRows, type FormsHubRow, formsHubKindLabels, parseFormsHubFilters } from "@/modules/forms-hub/rows";
+import { filterFormsHubRows, formsHubEventOwners, type FormsHubRow, formsHubKindLabels, parseFormsHubFilters } from "@/modules/forms-hub/rows";
+import { FORMS_HUB_SORT_COLUMNS, formsHubAddress, withFormsHubReturn } from "@/modules/forms-hub/return";
 import { EmptyState } from "@/components/empty-state";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { SearchAsYouTypeForm } from "@/components/search-as-you-type";
@@ -31,7 +32,7 @@ function formatDate(value: string | null) {
 }
 
 const FORMS_PAGE_SIZE = 50;
-const FORM_SORT_COLUMNS = ["form", "kind", "event", "status", "responses", "last"] as const;
+const FORM_SORT_COLUMNS = FORMS_HUB_SORT_COLUMNS;
 type FormSortColumn = typeof FORM_SORT_COLUMNS[number];
 const formAccessors: Record<FormSortColumn, (row: FormsHubRow) => SortValue> = {
   form: (row) => row.name,
@@ -56,7 +57,7 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const params = await searchParams;
   const one = (value: string | string[] | undefined) => (typeof value === "string" ? value : undefined);
-  const filters = parseFormsHubFilters({ kind: one(params.kind), status: one(params.status), q: one(params.q) });
+  const filters = parseFormsHubFilters({ kind: one(params.kind), status: one(params.status), owner: one(params.owner), q: one(params.q) });
   // The same events (archived left out) the workspace switcher lists; a system administrator sees all of them.
   const eventOptions = buildFormCreateEvents(await listEventsForUser(user.id, user.globalRole === "SYSTEM_ADMIN").catch((error: unknown) => {
     logError("Forms page: events for the create picker could not load", error);
@@ -64,12 +65,16 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
   }));
   const all = await loadFormsHub();
   const filtered = filterFormsHubRows(all, filters);
-  const filtering = Boolean(filters.kind || filters.status || filters.q);
+  const filtering = Boolean(filters.kind || filters.status || filters.owner || filters.q);
   // The hub is loaded whole, so the whole filtered list is sorted before it is paged (#1458); the default is the hub's own order.
   const sorting = serverSort<FormSortColumn>("/admin/forms", params, FORM_SORT_COLUMNS, { key: null, dir: "asc" });
   const sorted = sorting.order.key ? sortRows(filtered, sorting.order.key, sorting.order.dir, formAccessors) : filtered;
   const slice = paginate(sorted, parsePageParam(one(params.page)), FORMS_PAGE_SIZE);
   const rows = slice.items;
+  const eventOwners = formsHubEventOwners(all);
+  const staleOwner = filters.owner?.startsWith("event:") && !eventOwners.some((owner) => owner.value === filters.owner) ? filters.owner : null;
+  // This address, rebuilt, rides on each row's Edit and Responses links so those pages can offer "Back to All forms".
+  const hubAddress = formsHubAddress({ ...filters, sort: sorting.order.key, dir: sorting.order.dir, page: slice.page });
 
   return (
     <section className="page-stack">
@@ -86,11 +91,20 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
               <option value="EVENT">Event information form</option>
             </select>
           </label>
+          <label>Owner
+            <select defaultValue={filters.owner ?? ""} name="owner">
+              <option value="">All owners</option>
+              <option value="CLUB">Clubs (club forms)</option>
+              <option value="GENERAL">Conference (general information forms)</option>
+              {eventOwners.map((owner) => <option key={owner.value} value={owner.value}>{owner.label}</option>)}
+              {staleOwner && <option value={staleOwner}>Event not found</option>}
+            </select>
+          </label>
           <label>Status
             <select defaultValue={filters.status ?? ""} name="status">
               <option value="">Any status</option>
-              <option value="OPEN">On or open</option>
-              <option value="NOT_OPEN">Off or not open yet</option>
+              <option value="OPEN">Open</option>
+              <option value="NOT_OPEN">Not open yet</option>
               <option value="CLOSED">Closed</option>
             </select>
           </label>
@@ -104,7 +118,7 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
         <ListPager hrefFor={(page) => searchPageHref("/admin/forms", params, page)} label="Form pages" noun={filtered.length === all.length ? "forms" : `matching forms (${all.length} in total)`} nounOne={filtered.length === all.length ? "form" : `matching form (${all.length} in total)`} part="count" slice={slice} />
         {filtered.length === 0 ? (
           <EmptyState announce={false} title={filtering ? "No forms match" : "No forms yet"} action={{ label: "Clear filters", href: "/admin/forms" }} actionClass="secondary-button" canCreate={filtering}>
-            {!filtering ? "There are no club, general information or event information forms yet. Use Create a form above to start one." : "No form matches this kind, status or name. Clear the filters to see every form."}
+            {!filtering ? "There are no club, general information or event information forms yet. Use Create a form above to start one." : "No form matches this kind, owner, status or name. Clear the filters to see every form."}
           </EmptyState>
         ) : (
           <div className="report-table-wrap">
@@ -125,8 +139,8 @@ export default async function AdminFormsPage({ searchParams }: { searchParams: P
                     <td {...cardCell("Last response")}>{formatDate(row.lastResponseAt)}</td>
                     <td {...cardCell(null)}>
                       <div className="button-pair">
-                        <Link className="secondary-button forms-hub-link" href={row.editHref}>Edit<span className="sr-only"> {row.name}</span></Link>
-                        <Link className="secondary-button forms-hub-link" href={row.responsesHref}>Responses<span className="sr-only"> for {row.name}</span></Link>
+                        <Link className="secondary-button forms-hub-link" href={withFormsHubReturn(row.editHref, hubAddress)}>Edit<span className="sr-only"> {row.name}</span></Link>
+                        <Link className="secondary-button forms-hub-link" href={withFormsHubReturn(row.responsesHref, hubAddress)}>Responses<span className="sr-only"> for {row.name}</span></Link>
                       </div>
                     </td>
                   </tr>

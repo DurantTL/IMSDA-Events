@@ -21,6 +21,7 @@ import { requireHealthViewerForClub } from "@/modules/health-records/access";
 import { healthRecordsEnabled } from "@/modules/health-records/flag";
 import { HealthRecordError } from "@/modules/health-records/errors";
 import { healthEntryStatusesForMembers, healthRecordFlagsForRoster, healthSummariesForMembers } from "@/modules/health-records/repository";
+import { clubTltDetailsVisible, listClubTltDetails } from "@/modules/tlt-directory/club-view";
 import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Roster" };
@@ -80,6 +81,10 @@ export default async function ClubRosterPage({
   // Anyone who can see these rows, with no health access, still sees a neutral
   // "Has a health record" marker: one boolean saying a record exists, no text (#611).
   const healthRecordFlags = readOnly ? undefined : await healthRecordFlagsForRoster(organizationId, members.map((member) => member.id)).catch(() => undefined);
+  // Each TLT's year and help-area tags, read-only, for this club's own director and deputy only (#1686).
+  const tltDetails = clubTltDetailsVisible(access, readOnly)
+    ? await listClubTltDetails(organizationId, members.filter((member) => member.isTlt).map((member) => member.id))
+    : undefined;
   const registrationHref = registrationReturnTo(organizationId, returnToParam);
   const nextYearOffer = access.capabilities.manageTeam && !readOnly && carryForwardOversightOpen(new Date())
     ? await getCarryForwardOffer(organizationId)
@@ -130,6 +135,7 @@ export default async function ClubRosterPage({
         readOnly={readOnly}
         sectionsStartClosed={rosterSectionsStartClosed(access.club.role)}
         schoolDetails={schoolDetails}
+        tltDetails={tltDetails}
       />
       {canTransfer && <ClubTransfersPanel organizationId={organizationId} />}
     </>

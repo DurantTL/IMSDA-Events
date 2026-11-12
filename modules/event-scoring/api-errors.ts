@@ -14,6 +14,7 @@ export function eventScoringApiError(error: unknown, action: string) {
   if (error instanceof AccessDeniedError) return Response.json({ error: error.code, message: error.message }, { status: error.status, headers: noStore });
   if (error instanceof EventScoringError) {
     if (error.code === "NOT_PERMITTED") return Response.json({ error: error.code, message: error.message }, { status: 403, headers: noStore });
+    if (error.code === "CONFLICT") return Response.json({ error: error.code, message: error.message, field: error.field, current: error.current ?? "" }, { status: 409, headers: noStore });
     const status = error.code === "INVALID" ? 422 : 404;
     return Response.json({ error: error.code, message: error.message, ...(error.field ? { field: error.field } : {}) }, { status, headers: noStore });
   }

@@ -163,7 +163,7 @@ export function eventSetupFor(id: EventSetupId, ctx: EventSetupContext = {}): Ro
         guideScope: staff,
       };
     case "club-invites-none":
-      return { setup: { href: "/admin/clubs/import", label: "Import clubs" }, guideId: "review-new-club-application", guideScope: staff };
+      return { setup: { href: "/admin/clubs/import", label: "Import clubs" }, guideId: "clubs-leaders-and-invites", guideScope: staff };
     case "staff-no-clubs":
       return {
         setup: ctx.systemAdmin
