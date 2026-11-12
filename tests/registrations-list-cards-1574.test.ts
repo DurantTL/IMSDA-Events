@@ -52,34 +52,35 @@ const records = [registration(1), registration(2, { submittedAt: null, status: "
 const render = (props: Record<string, unknown> = {}) => renderToStaticMarkup(createElement(PeopleWorkspace, { ...base, initialRegistrations: records, ...props } as never));
 
 describe("Registrations header (#1574)", () => {
-  it("draws exactly one h1, titled Registrations, and the route is listed as owning its header", () => {
+  // The titled header is drawn by the page, because the page-title guard reads the title from the page file.
+  const page = readFileSync("app/(workspace)/people/page.tsx", "utf8");
+  const header = page.slice(page.indexOf("<PageHeader"), page.indexOf("<PeopleWorkspace"));
+
+  it("draws one titled header above the list, and the list draws no h1 or duplicate title", () => {
+    expect(page).toContain("title={staffPageTitles.registrations}");
+    expect(page.match(/<PageHeader\b/g)).toHaveLength(1);
     const html = render();
-    expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toMatch(/<h1[^>]*>Registrations<\/h1>/);
+    expect(html).not.toContain("<h1");
     expect(html).not.toContain("duplicate-page-title");
     expect(pageOwnsHeader("/people")).toBe(true);
     expect(pageOwnsHeader("/people/attendees")).toBe(false);
   });
 
   it("says what a registration is and links to the Attendee list for the event", () => {
-    const html = render();
-    expect(html).toContain("A registration is one sign-up with everyone it covers.");
-    expect(html).toContain('href="/people/attendees?event=event-1">Attendee list</a>.');
+    expect(header).toContain("A registration is one sign-up with everyone it covers.");
+    expect(header).toContain("href={`/people/attendees?event=${encodeURIComponent(event.id)}`}>Attendee list</a>");
   });
 
-  it("shows Start registration only to someone who can edit, and keeps the Actions gates", () => {
-    const edit = render();
-    expect(edit).toContain('href="/events/synthetic-event"');
-    expect(edit).toContain("Start registration");
-    expect(edit).toContain("Email selected");
-    const view = render({ canEdit: false, canEmail: false, canImport: false });
-    expect(view).not.toContain("Start registration");
-    expect(view).not.toContain("Email selected");
-    expect(view).not.toContain("/imports?event=");
-    expect(view).toContain("Download CSV");
-    expect(render({ canImport: true })).toContain("/imports?event=event-1");
-    expect(render({ canReviewPeopleMatches: true })).toContain("/people/matches");
-    expect(render()).not.toContain("/people/matches");
+  it("shows Start registration only to someone who can manage registrations, in a new tab, and keeps the Actions gates", () => {
+    expect(header).toMatch(/primary=\{canEdit \? <a className="primary-button" href=\{`\/events\/\$\{event\.slug\}`\} target="_blank" rel="noreferrer">/);
+    expect(page).toContain('const canEdit = permissions.includes("MANAGE_REGISTRATION")');
+    expect(header).toContain('permissions.includes("MANAGE_IMPORTS") && ');
+    expect(header).toContain("canReviewPeopleMatches && ");
+    expect(header).toContain("Download CSV");
+    // Bulk email needs the ticked rows, so it lives in the list's selection bar only.
+    expect(header).not.toContain("Email selected");
+    expect(readFileSync("components/people-workspace.tsx", "utf8")).toContain("Email selected");
+    expect(render({ canEdit: false, canEmail: false })).not.toContain("Start registration");
   });
 });
 

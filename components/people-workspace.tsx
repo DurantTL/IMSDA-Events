@@ -1,15 +1,12 @@
 "use client";
 
-import { ExportLink } from "@/components/export-link";
 import { ListPager } from "@/components/list-pager";
 import { ExactValue, Money } from "@/components/exact-value";
 import { formatCents } from "@/modules/payments/format-cents";
-import { PageHeader } from "@/components/page-header";
 import { EmptyState, NoMatchesState } from "@/components/empty-state";
 import { PendingTeamsNotice, pendingTeamsLabel } from "@/components/pending-teams-notice";
 import { SortOrderNote } from "@/components/list-sort";
 import { sortOrderText } from "@/lib/list-sort";
-import { staffPageTitles } from "@/components/staff-navigation";
 import { BackgroundCheckBadge } from "@/components/background-check-flags";
 import { suppressionExplanation, suppressionLabel } from "@/modules/communications/suppression-labels";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -22,14 +19,9 @@ import {
   Banknote,
   Ban,
   ChevronRight,
-  ClipboardCheck,
-  CopyCheck,
   Download,
   MailPlus,
-  ExternalLink,
-  FileUp,
   Filter,
-  ListChecks,
   ListPlus,
   Mail,
   PencilLine,
@@ -290,8 +282,6 @@ export function PeopleWorkspace({
   initialRegistrations,
   canEdit,
   canEmail,
-  canImport = false,
-  canReviewPeopleMatches = false,
   initialFilter = "ALL",
   initialRegistrationId,
   backgroundFlaggedAttendeeIds = [],
@@ -299,7 +289,6 @@ export function PeopleWorkspace({
   emailSuppressions = { registrations: {}, attendees: {} },
   responsibleAdults = {},
   filtersAfterSearch,
-  helpSlot,
   locationId = null,
   matchingPersonFilter = false,
   pageScoped = false,
@@ -317,9 +306,7 @@ export function PeopleWorkspace({
   canEdit: boolean;
   canEmail: boolean;
   /** MANAGE_IMPORTS: shows the Imports link, which left the sidebar (#964). */
-  canImport?: boolean;
   /** System administrators only: the cross-event queue of possible duplicate people (#126). */
-  canReviewPeopleMatches?: boolean;
   initialFilter?: string;
   initialRegistrationId?: string;
   /** Adults at a youth or children's event without a current check (#388). */
@@ -333,7 +320,6 @@ export function PeopleWorkspace({
   /** Advanced search and the other filters, shown right after the simple search box (#1747). */
   filtersAfterSearch?: ReactNode;
   /** The page's Help button, shown beside Start registration so it takes no row of its own (#1747). */
-  helpSlot?: ReactNode;
   /** The location filter (#413) the CSV export follows; null exports every location. */
   locationId?: string | null;
   /** The list was narrowed by a choice answer (#739): each row holds at least one matching person. */
@@ -861,25 +847,8 @@ export function PeopleWorkspace({
 
   return (
     <section className="page-stack">
-      <PageHeader
-        title={staffPageTitles.registrations}
-        description={<>A registration is one sign-up with everyone it covers. For one row per person, open the <a className={listStyles.descLink} href={`/people/attendees?event=${encodeURIComponent(eventId)}`}>Attendee list</a>.</>}
-        primary={canEdit ? <a className="primary-button" href={`/events/${eventSlug}`} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true" size={17} /> Start registration</a> : undefined}
-        extra={helpSlot ? <div className={listStyles.helpSlot}>{helpSlot}</div> : undefined}
-        actions={<>
-          {/* Attendee list and Imports left the sidebar (#964); this page reaches them. The list needs the same permission as this page. */}
-          <li><a href={`/people/attendees?event=${encodeURIComponent(eventId)}`}><ListChecks aria-hidden="true" size={16} /> Attendee list</a></li>
-          {canImport && <li><a href={`/imports?event=${encodeURIComponent(eventId)}`}><FileUp aria-hidden="true" size={16} /> Imports</a></li>}
-          {/* Find duplicates, Directory review, Teams waiting for a club, Staff invitations and Responsible adults are cards on one page now (#1574). */}
-          <li><a href={`/people/review-queues?event=${encodeURIComponent(eventId)}`}><ClipboardCheck aria-hidden="true" size={16} /> Review queues</a></li>
-          {/* The cross-event identity queue lives beside the event's own review queues, not in the sidebar; the page checks the role again. */}
-          {canReviewPeopleMatches && <li><a href="/people/matches"><CopyCheck aria-hidden="true" size={16} /> Possible duplicate people (all events)</a></li>}
-          <li><ExportLink href={`/api/events/${eventId}/exports/registrations${locationId ? `?location=${encodeURIComponent(locationId)}` : ""}`}><Download aria-hidden="true" size={16} /> Download CSV</ExportLink></li>
-          {canEmail && <li><button disabled={selectedIds.size === 0} onClick={() => setEmailingSelection(true)} title={selectedIds.size === 0 ? "Tick registrations in the list first" : undefined} type="button"><MailPlus aria-hidden="true" size={16} /> Email selected{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}</button></li>}
-        </>}
-      />
       <PendingTeamsNotice canManage={canEdit} count={pendingTeamCount} eventId={eventId} />
-      {/* The header (title, Start registration, Actions) comes first, then the search (#1574). */}
+      {/* The titled header (Start registration, Actions) is drawn by the page above this list (#1574). */}
       <div className="toolbar panel">
         <label className="search-field"><Search aria-hidden="true" size={18} /><span className="sr-only">Search people</span><input {...search.inputProps} placeholder={pageScoped ? "Search this page by name, email, or code" : "Search name, email, or confirmation code"} /></label>
         <label className="filter-field"><Filter aria-hidden="true" size={17} /><span className="sr-only">{pageScoped ? "Filter this page" : "Filter registrations"}</span><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All records</option><option value="BALANCE">Balance due</option><option value="PAID">Paid in full</option><option value="DRAFT">Draft</option><option value="WAITING_APPROVAL">Pending approval</option><option value="WAITLISTED">Waitlisted</option><option value="CANCELLED">Cancelled</option></select></label>
