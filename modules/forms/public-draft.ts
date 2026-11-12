@@ -121,6 +121,8 @@ export function isDraftExcludedField(
   definition: Pick<RegistrationFormDefinition, "payment">,
 ) {
   if (field.type === "CALCULATED" || field.type === "LONG_TEXT" || field.type === "ADDRESS") return true;
+  // An Information block (#284) has no answer to carry over.
+  if (field.type === "INFORMATION") return true;
   // A recorded acknowledgment (#150) is given at submission, never carried over from an earlier visit.
   if (field.type === "ACKNOWLEDGMENT" || field.type === "SIGNATURE") return true;
   if (definition.payment?.paymentMethodFieldKey === field.key) return true;

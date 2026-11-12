@@ -40,6 +40,8 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "events/[eventId]/staffing/assignments/route.ts": { gate: "requireAreaCoordinatorStaffingActor", actingStaff: "refused" },
   "events/[eventId]/club-teachers/route.ts": { gate: "requireAreaCoordinatorTeacherActor", actingStaff: "refused" },
   "events/[eventId]/event-scoring/route.ts": { gate: "requireAreaCoordinatorScoringActor", actingStaff: "refused" },
+  "events/[eventId]/inspections/route.ts": { gate: "requireAreaCoordinatorScoringActor", actingStaff: "refused" },
+  "events/[eventId]/inspections/import/route.ts": { gate: "requireAreaCoordinatorScoringActor", actingStaff: "refused" },
   "team-permissions/[permissionId]/route.ts": { gate: "currentAreaCoordinator", actingStaff: "refused" },
   // Exports (#1760, #1761): POST only for the cross-site check; they write only the audit log, never club data.
   "roster-export/route.ts": { gate: "resolveAreaCoordinatorViewer", actingStaff: "allowed" },

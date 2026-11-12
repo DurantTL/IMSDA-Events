@@ -7,6 +7,7 @@ import {
   type EventArchiveActor,
   type EventArchiveAuditMetadata,
 } from "@/modules/events/archive";
+import { keepPublishedHeaderImagesForEvent } from "@/modules/events/image-library";
 import { effectiveLifecycleState } from "@/modules/events/lifecycle-state";
 import { EventOperationError, eventAccessFilter } from "@/modules/events/repository";
 
@@ -29,7 +30,8 @@ type ArchiveActor = EventArchiveActor & { userId: string };
  * nothing and writes no second audit row.
  */
 async function setEventArchived(input: { eventId: string; actor: ArchiveActor; archive: boolean }) {
-  return getPrisma().$transaction(async (tx) => {
+  let publishedAfter = false;
+  const result = await getPrisma().$transaction(async (tx) => {
     const current = await tx.event.findUnique({ where: { id: input.eventId }, select: { id: true, isBillingContainer: true } });
     if (!current) throw new EventOperationError("EVENT_NOT_FOUND", "That event no longer exists.");
     // The hidden Conference club orders billing event (#1688) stays archived, so no picker, calendar or public page ever lists it.
@@ -48,6 +50,7 @@ async function setEventArchived(input: { eventId: string; actor: ArchiveActor; a
     // The lifecycle history (#156) records the archive overlay too: the state it left and the state it returns to.
     // Written only because the row changed, so a repeated request adds nothing.
     const state = await tx.event.findUnique({ where: { id: input.eventId }, select: { lifecycleState: true, isPublished: true } });
+    publishedAfter = state?.isPublished === true;
     if (state) {
       const underlying = effectiveLifecycleState({ ...state, archivedAt: null });
       await tx.eventLifecycleTransition.create({
@@ -72,6 +75,9 @@ async function setEventArchived(input: { eventId: string; actor: ArchiveActor; a
     }, tx);
     return { archived: input.archive, changed: true };
   });
+  // An unarchived event that is published again lets its published banner into the shared image library (#1913).
+  if (!input.archive && result.changed && publishedAfter) await keepPublishedHeaderImagesForEvent(input.eventId);
+  return result;
 }
 
 export function archiveEvent(input: { eventId: string; actor: ArchiveActor }) {

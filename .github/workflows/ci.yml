@@ -187,6 +187,10 @@ jobs:
       # owed line per redemption, cancellation dropping it, parallel redemptions,
       # and no double billing on church-billed events (#545).
       - run: npm run test:church-promo-codes
+      # Real-database check of promo codes restricted to attendee types: the real
+      # submission and staff routines, the eligible subtotal, per-person and staff
+      # use, unrestricted codes unchanged, and the last use going to one submission (#102).
+      - run: npm run test:promo-attendee-types
       # Real-database check of locations inside one event: the required pick on a
       # real club submit, per-location capacity under the location row lock (two
       # clubs racing for the last seats, exactly one wins), per-location closing
