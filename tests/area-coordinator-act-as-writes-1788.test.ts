@@ -52,6 +52,7 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "tlt-directory/lists/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/export/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/suggestion/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
+  "tlt-directory/move-up/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   // TLT staffing (#1678): the TLT director's own account only.
   "tlt-staffing/[eventId]/assignments/route.ts": { gate: "requireTltDirectorStaffingActor", actingStaff: "refused" },
 };

@@ -8,6 +8,7 @@ import { StaffApprovalsFinance } from "@/components/staff-approvals-finance";
 import { listStaffApprovalsForFinance } from "@/modules/staff-invitations/finance-approvals";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { LivePageRefresh } from "@/components/live-page-refresh";
 
 export const metadata: Metadata = { title: staffPageTitles.payments };
 
@@ -21,6 +22,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   return (
     <>
       <AdminPageHeader path="/finance" eventId={event.id} />
+      <LivePageRefresh />
     {openChurchFlags > 0 ? (
       <p role="note" className="form-error" data-testid="church-sponsor-flag-notice">
         {openChurchFlags} church-sponsored lodging {openChurchFlags === 1 ? "change was" : "changes were"} made after the church&apos;s invoice was finalized and need the finance office. <a href={`/finance/church-owed?event=${encodeURIComponent(event.id)}`}>Review them under Owed by churches</a>.

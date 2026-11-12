@@ -222,8 +222,14 @@ export async function checkInAttendee(
  * reports as "nothing to undo". Undo racing a fresh check-in is settled by the
  * one-active-row unique index: whichever commits second sees the other.
  */
-export async function undoCheckIn(eventId: string, attendeeId: string, actorUserId: string) {
+export async function undoCheckIn(
+  eventId: string,
+  attendeeId: string,
+  actorUserId: string,
+  options: { auditContext?: StationAuditContext; expectedCheckInId?: string } = {},
+) {
   const prisma = getPrisma();
+  const stationMetadata = stationAuditMetadata(options.auditContext);
   for (let attempt = 0; attempt < CHECK_IN_MAX_ATTEMPTS; attempt += 1) {
     try {
       return await prisma.$transaction(async (tx) => {
@@ -232,9 +238,14 @@ export async function undoCheckIn(eventId: string, attendeeId: string, actorUser
           orderBy: { checkedInAt: "desc" },
         });
         if (!active) return null;
+        // A station checked which check-in it was undoing; if a newer one has taken its place, leave it alone.
+        if (options.expectedCheckInId && active.id !== options.expectedCheckInId) return null;
         const claimed = await tx.checkIn.updateMany({
           where: { id: active.id, undoneAt: null },
-          data: { undoneAt: new Date(), undoReason: "Corrected by event staff" },
+          data: {
+            undoneAt: new Date(),
+            undoReason: options.auditContext ? "Corrected at check-in station" : "Corrected by event staff",
+          },
         });
         if (claimed.count !== 1) return null;
         await tx.auditLog.create({
@@ -245,7 +256,8 @@ export async function undoCheckIn(eventId: string, attendeeId: string, actorUser
             entityType: "RegistrationAttendee",
             entityId: attendeeId,
             correlationId: crypto.randomUUID(),
-            summary: "Undid an attendee check-in.",
+            summary: options.auditContext ? `Undid an attendee check-in${stationSummarySuffix(options.auditContext.station.label)}.` : "Undid an attendee check-in.",
+            ...(stationMetadata ? { metadata: stationMetadata } : {}),
           },
         });
         return tx.checkIn.findUniqueOrThrow({ where: { id: active.id } });

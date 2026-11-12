@@ -119,6 +119,7 @@ export function TltDirectory({ slice, total, clubs, filters, positions, tags, fo
         <TltPrintButton />
         <Link className="secondary-button" href="/account/area-clubs/tlt/lists">Position types and tags</Link>
         <Link className="secondary-button" href="/account/area-clubs/tlt/forms">TLT forms</Link>
+        <Link className="secondary-button" href="/account/area-clubs/tlt/move-up">Year move-up</Link>
         <Link className="secondary-button" href="/account/area-clubs/tlt/staffing">TLT staffing</Link>
       </div>
 

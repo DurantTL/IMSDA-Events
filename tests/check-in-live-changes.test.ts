@@ -50,7 +50,7 @@ describe("live check-in changes (#825)", () => {
 
   it("parses answers defensively", () => {
     expect(parseLiveCheckInChanges({ now: "2026-10-09T14:00:00.000Z", changes: [["a", null], ["b", "x"], [1, null], "z"] }))
-      .toEqual({ now: "2026-10-09T14:00:00.000Z", changes: [["a", null]] });
+      .toEqual({ now: "2026-10-09T14:00:00.000Z", changes: [["a", null]], balances: [] });
     expect(parseLiveCheckInChanges({ now: "nope", changes: [] })).toBeNull();
     expect(parseLiveCheckInChanges(null)).toBeNull();
   });
@@ -71,7 +71,7 @@ describe("live check-in changes (#825)", () => {
   });
 
   it("keeps a quiet poll answer small", () => {
-    const quiet = JSON.stringify({ now: "2026-10-09T14:00:00.000Z", changes: [] });
+    const quiet = JSON.stringify({ now: "2026-10-09T14:00:00.000Z", changes: [], balances: [] });
     expect(quiet.length).toBeLessThan(80);
     const busy = JSON.stringify({
       now: "2026-10-09T14:00:00.000Z",

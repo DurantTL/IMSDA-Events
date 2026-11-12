@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { EmptyState } from "@/components/empty-state";
 import { useConfirm } from "@/components/use-confirm";
 import { AlertTriangle, Link2, Unlink } from "lucide-react";
 import styles from "@/components/club-supplies.module.css";
@@ -16,7 +18,7 @@ type ApiResult = Partial<Payload> & { message?: string; issues?: Array<{ message
  * Linking orders nothing. Camporee patches are conference-made and may have no
  * AdventSource number; they link the same and are flagged on the order screen.
  */
-export function EventPatchesWorkspace({ eventId, eventName, initial }: { eventId: string; eventName: string; initial: Payload }) {
+export function EventPatchesWorkspace({ eventId, canOpenCatalog = false, initial }: { eventId: string; canOpenCatalog?: boolean; initial: Payload }) {
   const [data, setData] = useState(initial);
   const [itemId, setItemId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,19 +50,14 @@ export function EventPatchesWorkspace({ eventId, eventName, initial }: { eventId
   const available = data.choices.filter((item) => !linkedIds.has(item.itemId));
   const sections = [...new Set(available.map((item) => item.section))];
 
+  const catalogLink = canOpenCatalog ? <Link href="/admin/club-supplies">Club supply catalog</Link> : "Club supply catalog";
+
   return (
-    <section className="page-stack">
+    <section className={`page-stack ${styles.patchesWorkspace}`}>
       {confirmDialog}
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">Club ministries</p>
-          <h2>Event patches</h2>
-          <p>
-            Link the patch or pin for <span translate="no">{eventName}</span>. Club directors are then suggested it for every
-            member who attended, and confirm before anything is ordered.
-          </p>
-        </div>
-      </div>
+      <p className={styles.ownershipNote}>
+        Items come from the {catalogLink}. Directors are suggested a linked item for each attendee and confirm before anything is ordered.
+      </p>
       {notice && <div className="inline-notice success" role="status">{notice}</div>}
       {error && <div className="inline-notice error" role="alert">{error}</div>}
       {!data.isClubEvent && (
@@ -69,7 +66,7 @@ export function EventPatchesWorkspace({ eventId, eventName, initial }: { eventId
 
       <section className="panel">
         <div className="section-heading"><div><p className="eyebrow">Link</p><h2>Add a patch or pin</h2></div></div>
-        <div className={styles.filters}>
+        <div className={`${styles.filters} ${styles.patchFilters}`}>
           <label htmlFor="event-patch-item">
             Catalog item
             <select disabled={!data.isClubEvent} id="event-patch-item" onChange={(event) => setItemId(event.target.value)} value={itemId}>
@@ -84,7 +81,7 @@ export function EventPatchesWorkspace({ eventId, eventName, initial }: { eventId
             </select>
           </label>
         </div>
-        <div className={styles.actions}>
+        <div className={`${styles.actions} ${styles.patchActions}`}>
           <button
             className="primary-button"
             disabled={busy || !itemId || !data.isClubEvent}
@@ -99,7 +96,13 @@ export function EventPatchesWorkspace({ eventId, eventName, initial }: { eventId
       <section className="panel">
         <div className="section-heading"><div><p className="eyebrow">Linked</p><h2>Patches and pins for this event ({data.linked.length})</h2></div></div>
         {data.linked.length === 0 ? (
-          <p className="quiet-copy">Nothing is linked yet.</p>
+          <EmptyState announce={false} headingLevel={3} title="No patch or pin linked yet">
+            {available.length > 0
+              ? "Choose an item above and link it to this event."
+              : canOpenCatalog
+                ? <>No patches or pins are in the catalog to link. Add them in the {catalogLink}.</>
+                : "Ask a system administrator or the Clubs Administrator to add patches and pins to the Club supply catalog."}
+          </EmptyState>
         ) : (
           <ul className={styles.itemList}>
             {data.linked.map((item) => (
@@ -115,7 +118,7 @@ export function EventPatchesWorkspace({ eventId, eventName, initial }: { eventId
                   </small>
                 </span>
                 <span className={styles.itemControls}>
-                  <button className="secondary-button" disabled={busy} onClick={async () => {
+                  <button className={`secondary-button ${styles.unlinkButton}`} disabled={busy} onClick={async () => {
                     if (!(await confirm({
                       title: `Unlink ${item.name}?`,
                       body: <p>It is no longer suggested for this event. Items clubs already added stay on their order lists.</p>,
