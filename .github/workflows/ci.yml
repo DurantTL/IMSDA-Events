@@ -254,6 +254,8 @@ jobs:
       - run: npm run test:attendance-points
       # Real-database check of the optional Event debrief (#1679): off by default, who may switch it, the form and the two scheduled emails made on switching on, one invitation per person however often it runs, the reminder only to people who have not answered, non-recipients refused, one answer each, switching off, moved dates, and the copy for next year.
       - run: npm run test:event-debrief
+      # Real-database check of the optional Budget sheet (#1682): off by default, who may switch it, who reads and who changes cost lines, each change audited with amounts only, the auto-filled figures equal to the source functions' output, and last year's sheet on a copied event.
+      - run: npm run test:event-budget
       - run: npm run test:honor-class-requirements
       # Real-database check of the Honors Weekend class waitlist (#831): join order, offers to the
       # next in line (one director emailed per offer), accept once, an unaccepted offer passing on

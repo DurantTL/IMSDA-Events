@@ -63,17 +63,10 @@
   outline-offset: -3px;
 }
 
-/* On a phone the trigger can sit anywhere in the header row, so the panel hangs from the row (its .account wrapper is
-   positioned) and spans its width, which keeps it on screen at 360 and 390 px. */
+/* On a phone the masthead row is the positioned box (#1894: the icon buttons sit at its right end), so the panel hangs
+   from the row's right edge at its own width, which keeps it on screen at 360 and 390 px. */
 @media (max-width: 640px) {
   .menu {
     position: static;
-  }
-
-  .panel {
-    right: 0;
-    left: 0;
-    width: auto;
-    max-width: none;
   }
 }

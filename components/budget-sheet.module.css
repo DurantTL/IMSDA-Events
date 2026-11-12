@@ -1,0 +1,36 @@
+.sheet { display: grid; gap: 20px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.block { display: grid; gap: 10px; break-inside: avoid; }
+.heading { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.note { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.facts { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; margin: 0; }
+.facts dt { font-weight: 600; overflow-wrap: anywhere; }
+.facts dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.facts .hint { display: block; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.total { border-top: 1px solid var(--line); padding-top: 6px; font-weight: 700; }
+.lines { list-style: none; margin: 0; padding: 0; display: grid; }
+.line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; border-bottom: 1px solid var(--line); padding: 10px 0; break-inside: avoid; }
+.lineLabel { font-weight: 700; overflow-wrap: anywhere; }
+.lineAmount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lineDetails { grid-column: 1 / -1; color: var(--muted); overflow-wrap: anywhere; }
+.line .actions { grid-column: 1 / -1; margin-top: 6px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; white-space: nowrap; }
+.actions button, .toolbar button, .toolbar a, .form button { min-height: 44px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.form { display: grid; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius-card); padding: 14px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 12px; }
+.field { display: grid; gap: 4px; font-weight: 600; }
+.field input, .field select { min-height: 44px; font: inherit; font-weight: 400; }
+.field .help { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.empty { margin: 0; color: var(--muted); }
+.lastYear { display: grid; gap: 14px; border-top: 2px solid var(--line); padding-top: 16px; }
+.printTitle { display: none; margin: 0; font-size: max(var(--type-staff-floor, 0px), 16pt); }
+
+@media print {
+  .noPrint { display: none !important; }
+  .printTitle { display: block; }
+  .sheet { gap: 10px; font-size: max(var(--type-staff-floor, 0px), 10pt); }
+  .block { gap: 4px; }
+  .facts { gap: 2px 12px; }
+  .line { padding: 3px 0; }
+  .lastYear { break-before: auto; border-top: 1px solid var(--line); padding-top: 8px; }
+}

@@ -322,6 +322,8 @@ const pages: PageSpec[] = [
   area("event-report", `/account/area-clubs/events/${clubEventId}/report`),
   // The optional Event debrief (#1679): the coordinator's switch page.
   { ...area("debrief", `/account/area-clubs/events/${clubEventId}/debrief`), expectText: /Event debrief/ },
+  // The optional Budget sheet (#1682): the coordinator's switch, the sheet and its cost lines (switched on in seedBudgetSheet).
+  { ...area("budget", `/account/area-clubs/events/${clubEventId}/budget`), expectText: /Budget sheet/ },
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
   area("points", "/account/area-clubs/points"),
@@ -455,6 +457,8 @@ const pages: PageSpec[] = [
   { ...staff("information-forms", "/information-forms"), expectText: /Information forms/ },
   // The optional Event debrief (#1679): the switch, the evaluation switch and the answers.
   { ...staff("debrief", `/more/debrief?event=${clubEventId}`, "system-admin"), expectText: /Event debrief/ },
+  // The optional Budget sheet (#1682): the switch, the figures, the cost lines and the totals.
+  { ...staff("budget", `/more/budget?event=${clubEventId}`, "system-admin"), expectText: /Budget sheet/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
@@ -638,6 +642,7 @@ const dialogOpeners = [
   "[data-meeting-note-add]",
   'button:has-text("Add to roster")',
   'button:has-text("Upload CSV")',
+  "[data-roster-sheet-trigger]",
   'button:has-text("Add club admin")',
   'button:has-text("New announcement")',
   'button[aria-label^="Add or view honors"]',
@@ -1241,6 +1246,17 @@ async function seedDebriefPages(prisma: PrismaClient): Promise<PageSpec[]> {
     await onDebriefEnabled(tx, { eventId: clubEventId, actor: { kind: "staff", userId: admin.id } });
   });
   return [{ name: "area-debrief-fill", path: `/events/${clubEventSlug}/forms/debrief`, role: "area" }];
+}
+
+/** The Budget sheet (#1682) switched on for the club weekend, with two synthetic cost lines, so the audited pages show a sheet and not only the switch. */
+async function seedBudgetSheet(prisma: PrismaClient): Promise<void> {
+  await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "event-budget" }], skipDuplicates: true });
+  if (await prisma.eventBudgetCostLine.count({ where: { eventId: clubEventId } }) === 0) {
+    await prisma.eventBudgetCostLine.createMany({ data: [
+      { eventId: clubEventId, label: "Trophies", description: "Sample first, second and third place trophies", quantity: 12, amountCents: 30_000 },
+      { eventId: clubEventId, label: "Wristbands", description: "", quantity: null, amountCents: 12_550 },
+    ] });
+  }
 }
 
 /** A System deeper page with a back link (#1274): the editor of a seeded event template. Reads only; nothing is created. */
@@ -4821,6 +4837,7 @@ async function main() {
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     pages.push(...await seedInformationForm(prisma));
     pages.push(...await seedDebriefPages(prisma));
+    await seedBudgetSheet(prisma);
     pages.push(...await seedEventTemplatePages(prisma));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);

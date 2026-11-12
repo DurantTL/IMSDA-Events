@@ -15,11 +15,14 @@ export function AttendeeSignOutButton({
   className = "text-button",
   label = "Sign out",
   endStaffSession = false,
+  labelClassName,
 }: {
   className?: string;
   label?: string;
   /** The browser also has a staff session (#1009): end it too and land on the home page. */
   endStaffSession?: boolean;
+  /** Wraps the words in a span with this class (and names the button with aria-label), so a phone header can show the icon alone (#1894). */
+  labelClassName?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -36,9 +39,10 @@ export function AttendeeSignOutButton({
     }
   }
 
+  const text = busy ? "Signing out…" : label;
   return (
-    <button className={className} data-sign-out={endStaffSession ? "both" : "attendee"} type="button" onClick={signOut} disabled={busy}>
-      <LogOut aria-hidden="true" size={16} /> {busy ? "Signing out…" : label}
+    <button aria-label={labelClassName ? text : undefined} className={className} data-sign-out={endStaffSession ? "both" : "attendee"} type="button" onClick={signOut} disabled={busy}>
+      <LogOut aria-hidden="true" size={16} /> {labelClassName ? <span className={labelClassName}>{text}</span> : text}
     </button>
   );
 }

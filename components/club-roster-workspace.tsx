@@ -8,7 +8,7 @@ import Link from "next/link";
 import { type ComponentProps, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { focusSearchInput, SearchClearButton } from "@/components/search-clear-button";
 import { useAddressParam, useClientSearch, writeAddressParams } from "@/components/search-as-you-type";
-import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, Trash2, UsersRound, X } from "lucide-react";
+import { Award, ChevronDown, Eye, Pencil, Plus, Power, Save, Search, SlidersHorizontal, Trash2, UsersRound, X } from "lucide-react";
 import { ActionsMenu } from "@/components/actions-menu";
 import { EmptyState } from "@/components/empty-state";
 import { cardCell } from "@/components/table-card-labels";
@@ -138,6 +138,35 @@ function subscribeSectionChoices(listener: () => void) {
     window.removeEventListener("storage", listener);
   };
 }
+
+/** The phone sheet follows the viewport (#1894): false on the server and for the first client render, so the markup is the same everywhere. */
+const PHONE_SHEET_QUERY = "(max-width: 640px)";
+/** Where there is no window or no matchMedia (a server render, a test DOM) this is not a phone. */
+const phoneQuery = () => (typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia(PHONE_SHEET_QUERY) : null);
+function subscribePhoneSheet(listener: () => void) {
+  const list = phoneQuery();
+  if (!list) return () => undefined;
+  list.addEventListener("change", listener);
+  return () => list.removeEventListener("change", listener);
+}
+const phoneSheetNow = () => phoneQuery()?.matches ?? false;
+const phoneSheetServer = () => false;
+
+/** The column names the sheet's Sort by menu uses; the same words as the table headers. */
+const rosterSortMenuLabels: Record<RosterSortColumn, string> = {
+  name: "Name",
+  age: "Age",
+  birthDate: "Birth date",
+  type: "Type",
+  class: "Current class",
+  grade: "Grade",
+  details: "Details",
+  gender: "Gender",
+  school: "School",
+  churchMember: "SDA member",
+  baptized: BAPTIZED_LABEL,
+  screening: "Sterling Volunteers",
+};
 
 const rosterFieldLabels: Record<RosterFormField, string> = { firstName: "First name", lastName: "Last name", birthDate: "Birth date", gender: "Gender" };
 
@@ -474,6 +503,21 @@ function ClubRosterWorkspaceInner({
     return activeSort.key === "name" ? byName : sortRows(byName, activeSort.key, activeSort.dir, sortAccessors);
   };
   const sortedBy = rosterSortLabels[activeSort.key];
+  // Search and filters (#1894): on a phone the one block of controls below is a bottom sheet; on a computer it stays in the page.
+  const isPhone = useSyncExternalStore(subscribePhoneSheet, phoneSheetNow, phoneSheetServer);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const sheetModal = sheetOpen && isPhone;
+  const sheetTrigger = useRef<HTMLButtonElement>(null);
+  const closeSheet = useCallback(() => setSheetOpen(false), []);
+  const sheetRef = useAccessibleDialog<HTMLDivElement>(sheetModal, closeSheet, {
+    initialFocus: "dialog",
+    returnFocus: () => sheetTrigger.current,
+  });
+  const sheetCount = [
+    query.trim() !== "", detailsOnly, complianceFilterOn, gradeFilter !== "", showInactive, showGender,
+    schoolDetails && showSchool, showBaptized, Boolean(birthDates),
+  ].filter(Boolean).length;
+  const sortMenuColumns = columns.filter((column): column is RosterSortColumn => (ROSTER_SORT_COLUMNS as readonly string[]).includes(column));
   const sections = [
     { key: "STAFF", title: "Staff", empty: filtersActive ? "No one in Staff matches." : "No staff on the roster yet.", people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "STAFF")) },
     { key: "MEMBERS", title: "Members", empty: filtersActive ? "No one in Members matches." : "No Pathfinders on the roster yet.", people: sortPeople(visible.filter((member) => rosterSectionOf(member.attendeeType) === "MEMBERS")) },
@@ -842,9 +886,31 @@ function ClubRosterWorkspaceInner({
                 <Plus aria-hidden="true" size={16} /> Add to roster
               </button>
             )}
+            <button
+              aria-haspopup="dialog"
+              className={`secondary-button ${styles.sheetTrigger}`}
+              data-roster-sheet-trigger=""
+              onClick={() => setSheetOpen(true)}
+              ref={sheetTrigger}
+              type="button"
+            >
+              <SlidersHorizontal aria-hidden="true" size={16} />
+              {sheetCount > 0 ? `Search and filters · ${sheetCount}` : "Search and filters"}
+            </button>
             {!readOnly && headingActions}
           </div>
         </div>
+        <div className={styles.phoneSummary}>
+          <p id={isPhone ? "roster-result-text" : undefined} tabIndex={isPhone ? -1 : undefined}>
+            {countText}
+            {detailsOnly ? " · Details needed" : ""}{query.trim() ? ` · Name contains "${query.trim()}"` : ""}
+          </p>
+          {filtersActive && (
+            <button className="text-button" onClick={clearFilters} type="button">Clear filters</button>
+          )}
+        </div>
+        {/* The same result for screen readers; it follows the search term, which settles once typing pauses. */}
+        <p aria-live="polite" className="sr-only" role="status">{resultText}</p>
         {needBirthDates > 0 && (
           <p className="inline-notice roster-birth-date-notice" role="status">
             {needBirthDates === 1 ? "1 person needs" : `${needBirthDates} people need`} a birth date. The age from the
@@ -863,6 +929,29 @@ function ClubRosterWorkspaceInner({
             <button className="text-button" onClick={clearFilters} type="button">Clear filters</button>
           </p>
         )}
+        {/*
+          One set of controls (#1894). On a computer the two wrappers vanish (display: contents) and the panel and tools sit in the page;
+          on a phone the same elements become a bottom sheet that the "Search and filters" button opens, using the shared dialog classes.
+        */}
+        <div
+          className={sheetModal ? `modal-backdrop ${styles.sheetBackdrop}` : styles.sheetInline}
+          onMouseDown={sheetModal ? (event) => { if (event.target === event.currentTarget) closeSheet(); } : undefined}
+          role={sheetModal ? "presentation" : undefined}
+        >
+        <div
+          aria-labelledby={sheetModal ? "roster-sheet-title" : undefined}
+          aria-modal={sheetModal ? true : undefined}
+          className={sheetModal ? `modal-card ${styles.sheetCard}` : styles.sheetInlineCard}
+          ref={sheetRef}
+          role={sheetModal ? "dialog" : undefined}
+          tabIndex={sheetModal ? -1 : undefined}
+        >
+        <div className={styles.sheetHead}>
+          <h2 id="roster-sheet-title">Search and filters</h2>
+          <button aria-label="Close" className={`icon-button modal-close-button ${styles.sheetClose}`} onClick={closeSheet} type="button">
+            <X aria-hidden="true" size={18} />
+          </button>
+        </div>
         <div className={styles.rosterSearchPanel}>
           <div className={styles.rosterSearchRow}>
             <div className={styles.rosterSearchField}>
@@ -929,12 +1018,10 @@ function ClubRosterWorkspaceInner({
             </select>
           </div>
           <div className={styles.rosterResultLine}>
-            <p id="roster-result-text" tabIndex={-1}>
+            <p id={isPhone ? undefined : "roster-result-text"} tabIndex={isPhone ? undefined : -1}>
               {countText}
               {detailsOnly ? " · Details needed" : ""}{query.trim() ? ` · Name contains "${query.trim()}"` : ""}
             </p>
-            {/* The same result for screen readers; it follows the search term, which settles once typing pauses. */}
-            <p aria-live="polite" className="sr-only" role="status">{resultText}</p>
             {filtersActive && (
               <button className="text-button" onClick={clearFilters} type="button">Clear filters</button>
             )}
@@ -945,6 +1032,23 @@ function ClubRosterWorkspaceInner({
             <input checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} type="checkbox" />
             Show inactive people
           </label>
+          <div className={styles.sheetSort}>
+            <label htmlFor="roster-sort-menu">Sort by</label>
+            <select
+              id="roster-sort-menu"
+              onChange={(event) => { if (event.target.value !== activeSort.key) rosterSort.toggle(event.target.value as RosterSortColumn); }}
+              value={activeSort.key}
+            >
+              {sortMenuColumns.map((column) => <option key={column} value={column}>{rosterSortMenuLabels[column]}</option>)}
+            </select>
+            <button
+              className={`secondary-button ${styles.sheetSortOrder}`}
+              onClick={() => rosterSort.toggle(activeSort.key, activeSort.dir === "asc" ? "desc" : "asc")}
+              type="button"
+            >
+              {activeSort.dir === "asc" ? "Ascending" : "Descending"}
+            </button>
+          </div>
           {!readOnly && (
             <span className="roster-csv-actions">
               <RosterCsvImport
@@ -966,6 +1070,11 @@ function ClubRosterWorkspaceInner({
               <Eye aria-hidden="true" size={14} /> Show birth dates
             </button>
           )}
+          <button className={`primary-button ${styles.sheetDone}`} onClick={closeSheet} type="button">
+            {`Show ${visible.length} ${visible.length === 1 ? "person" : "people"}`}
+          </button>
+        </div>
+        </div>
         </div>
         {population.length === 0 ? (
           <EmptyState

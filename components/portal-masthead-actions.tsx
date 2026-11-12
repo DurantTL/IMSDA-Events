@@ -24,8 +24,8 @@ export function PortalMastheadActions({ identity, leading, formsHelpContact, sig
       {identity}
       {leading}
       {accountMenu && <AccountWorkspaceMenu />}
-      {formsHelpContact && <FormsHelp className={styles.action} contact={formsHelpContact} />}
-      {signOut !== "none" && <AttendeeSignOutButton className={styles.action} endStaffSession={signOut === "both"} />}
+      {formsHelpContact && <FormsHelp className={styles.action} contact={formsHelpContact} labelClassName={styles.label} />}
+      {signOut !== "none" && <AttendeeSignOutButton className={styles.action} endStaffSession={signOut === "both"} labelClassName={styles.label} />}
     </div>
   );
 }
