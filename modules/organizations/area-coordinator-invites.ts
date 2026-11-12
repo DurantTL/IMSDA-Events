@@ -17,6 +17,8 @@ import {
 } from "@/modules/club-imports/invites";
 import { neutralizePlaceholders } from "@/modules/club-applications/email";
 import { applyAreaCoordinatorChange, requireAreaCoordinatorActor } from "@/modules/organizations/area-coordinators";
+import { DEFAULT_COORDINATOR_MINISTRIES, grantMinistries, parseMinistriesInput } from "@/modules/organizations/area-coordinator-ministries-domain";
+import type { ClubKindValue } from "@/modules/organizations/club-kind";
 
 /**
  * Area Coordinator invites (#1276): for an email with no website account yet. The same pattern as a club invite
@@ -33,6 +35,7 @@ export type AreaCoordinatorInviteErrorCode =
   | "INVITE_ALREADY_OPEN"
   | "INVITE_RESEND_TOO_SOON"
   | "EMAIL_NOT_CONFIGURED"
+  | "INVALID_MINISTRIES"
   | "NOTHING_TO_SEND"
   | "LIST_CHANGED";
 
@@ -44,6 +47,14 @@ export class AreaCoordinatorInviteError extends Error {
 }
 
 const OPEN_STATUSES = ["PENDING", "SENT"] as const;
+
+/** The ministries an invite is made with (#843): at least one, known, no repeats; Pathfinder when none are given. */
+export function inviteMinistries(values: readonly string[] | undefined): ClubKindValue[] {
+  if (values === undefined) return [...DEFAULT_COORDINATOR_MINISTRIES];
+  const parsed = parseMinistriesInput(values);
+  if (!parsed) throw new AreaCoordinatorInviteError("INVALID_MINISTRIES", "Choose at least one ministry: Pathfinder, Adventurer or both.");
+  return parsed;
+}
 
 export function areaCoordinatorInviteEmailContent(rawInput: { name: string; email: string }) {
   const name = neutralizePlaceholders(rawInput.name.trim());
@@ -110,11 +121,12 @@ export function findOpenAreaCoordinatorInvite(client: Prisma.TransactionClient |
  */
 export async function createAreaCoordinatorInvite(
   tx: Prisma.TransactionClient,
-  input: { email: string; name: string; actorUserId: string },
+  input: { email: string; name: string; actorUserId: string; ministries?: readonly string[] },
   now = new Date(),
 ) {
   const email = input.email.trim().toLowerCase();
   const name = input.name.trim();
+  const ministries = inviteMinistries(input.ministries);
   if (await findOpenAreaCoordinatorInvite(tx, email)) {
     throw new AreaCoordinatorInviteError("INVITE_ALREADY_OPEN", `There's already a pending Area Coordinator invite for ${email}. Resend or cancel it from People & access.`);
   }
@@ -125,6 +137,7 @@ export async function createAreaCoordinatorInvite(
       name,
       status: "SENT",
       createdByUserId: input.actorUserId,
+      ministries,
       sentAt: now,
       sentCount: canSend ? 1 : 0,
       expiresAt: clubInviteExpiry(now),
@@ -142,7 +155,7 @@ export async function createAreaCoordinatorInvite(
     entityType: "AreaCoordinatorInvite",
     entityId: invite.id,
     summary: "Invited someone as an Area Coordinator from People & access.",
-    metadata: { emailQueued: canSend },
+    metadata: { emailQueued: canSend, ministries },
   }, tx);
   return { inviteId: invite.id, messageId };
 }
@@ -154,13 +167,14 @@ export async function createAreaCoordinatorInvite(
  */
 export async function createPendingAreaCoordinatorInvite(
   client: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
-  input: { email: string; name: string; actorUserId: string },
+  input: { email: string; name: string; actorUserId: string; ministries?: readonly string[] },
 ): Promise<{ created: boolean; inviteId?: string }> {
   const email = input.email.trim().toLowerCase();
+  const ministries = inviteMinistries(input.ministries);
   if (await findOpenAreaCoordinatorInvite(client, email)) return { created: false };
   try {
     const invite = await client.areaCoordinatorInvite.create({
-      data: { email, name: input.name.trim(), status: "PENDING", createdByUserId: input.actorUserId },
+      data: { email, name: input.name.trim(), status: "PENDING", createdByUserId: input.actorUserId, ministries },
       select: { id: true },
     });
     return { created: true, inviteId: invite.id };
@@ -258,7 +272,7 @@ export async function acceptAreaCoordinatorInvite(inviteId: string, account: { i
   return getPrisma().$transaction(async (tx) => {
     const invite = await tx.areaCoordinatorInvite.findUnique({
       where: { id: inviteId },
-      select: { id: true, email: true, status: true, expiresAt: true, createdByUserId: true },
+      select: { id: true, email: true, status: true, expiresAt: true, createdByUserId: true, ministries: true },
     });
     if (!invite || invite.email !== account.verifiedEmail.trim().toLowerCase()) {
       throw new AreaCoordinatorInviteError("INVITE_NOT_FOUND", "That invite could not be found for this account.");
@@ -279,16 +293,19 @@ export async function acceptAreaCoordinatorInvite(inviteId: string, account: { i
     });
     if (guarded.count === 0) throw new AreaCoordinatorInviteError("INVITE_NOT_OPEN", "That invite is no longer open.");
 
-    await applyAreaCoordinatorChange(tx, account.id, true, invite.createdByUserId, now, {
+    // An already active coordinator keeps their own ministries (applyAreaCoordinatorChange); a new grant takes the invite's.
+    const ministries = grantMinistries(invite.ministries);
+    const applied = await applyAreaCoordinatorChange(tx, account.id, true, invite.createdByUserId, now, {
       viaClubsAdministrator: inviter.viaClubsAdministrator,
       viaInviteId: invite.id,
+      ministries,
     });
     await writeAuditLog({
       action: "AREA_COORDINATOR_INVITE_ACCEPTED",
       entityType: "AreaCoordinatorInvite",
       entityId: invite.id,
       summary: "Accepted an Area Coordinator invite.",
-      metadata: { actorAttendeeAccountId: account.id },
+      metadata: { actorAttendeeAccountId: account.id, inviteMinistries: ministries, appliedMinistries: applied.ministries },
     }, tx);
   });
 }

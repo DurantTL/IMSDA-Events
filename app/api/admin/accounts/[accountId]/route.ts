@@ -24,12 +24,15 @@ const handLinkReason = z.object({
   note: z.string().trim().max(HAND_LINK_NOTE_MAX, `Keep the note to ${HAND_LINK_NOTE_MAX} characters.`).optional(),
 }).strict();
 
+const ministriesField = z.array(z.enum(CLUB_KINDS)).min(1, "Choose at least one ministry.").refine((list) => new Set(list).size === list.length, "Choose each ministry once.");
+
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("reset-two-step") }).strict(),
   z.object({ action: z.literal("sign-out") }).strict(),
-  z.object({ action: z.literal("area-coordinator"), on: z.boolean() }).strict(),
+  // `ministries` (#843) is for a new or revived grant, from the "Chosen in the invite" panel; an active grant keeps its own.
+  z.object({ action: z.literal("area-coordinator"), on: z.boolean(), ministries: ministriesField.optional() }).strict(),
   // The ministries an Area Coordinator sees (#843): at least one, no repeats. Admitted like the role itself.
-  z.object({ action: z.literal("area-coordinator-ministries"), ministries: z.array(z.enum(CLUB_KINDS)).min(1, "Choose at least one ministry.").refine((list) => new Set(list).size === list.length, "Choose each ministry once.") }).strict(),
+  z.object({ action: z.literal("area-coordinator-ministries"), ministries: ministriesField }).strict(),
   // The TLT director setting on an Area Coordinator's role (#1686): system administrators only.
   z.object({ action: z.literal("tlt-director"), on: z.boolean() }).strict(),
   // Hand-linking a person's team sign-in and this account when their emails differ (#554).
@@ -58,7 +61,7 @@ async function postHandler(request: Request, context: { params: Promise<{ accoun
       return Response.json({ message: "Two-step sign-in reset and signed out everywhere. Club roles will set it up again at their next sign-in." });
     }
     if (input.action === "area-coordinator") {
-      await setAreaCoordinator(accountId, input.on, actor.id);
+      await setAreaCoordinator(accountId, input.on, actor.id, new Date(), input.ministries);
       return Response.json({
         message: input.on
           ? `Now an ${systemRoleText.AREA_COORDINATOR.name}. ${systemRoleText.AREA_COORDINATOR.summary}`

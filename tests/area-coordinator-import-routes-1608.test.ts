@@ -125,6 +125,29 @@ describe("Area Coordinator import and send routes (#1608)", () => {
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
+  it("saves every invite of the file with the chosen ministry (#843)", async () => {
+    const response = await importRoute(post("/api/admin/area-coordinator-invites/import", { csv, confirm: true, ministries: ["ADVENTURER", "PATHFINDER"] }));
+    expect(response.status).toBe(200);
+    expect(mocks.inviteCreate.mock.calls.map((call) => call[0].data.ministries)).toEqual([["PATHFINDER", "ADVENTURER"], ["PATHFINDER", "ADVENTURER"]]);
+    expect(mocks.writeAuditLog.mock.calls[0][0].metadata).toMatchObject({ ministries: ["PATHFINDER", "ADVENTURER"] });
+  });
+
+  it("refuses an empty, unknown or repeated ministry choice with 400 and saves nothing (#843)", async () => {
+    for (const ministries of [[], ["DISTRICT"], ["ADVENTURER", "ADVENTURER"]]) {
+      const response = await importRoute(post("/api/admin/area-coordinator-invites/import", { csv, confirm: true, ministries }));
+      expect(response.status).toBe(400);
+    }
+    expect(mocks.inviteCreate).not.toHaveBeenCalled();
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled();
+  });
+
+  it("refuses a bad ministry choice on the preview too (#843)", async () => {
+    for (const ministries of [[], ["DISTRICT"], ["ADVENTURER", "ADVENTURER"]]) {
+      expect((await importRoute(post("/api/admin/area-coordinator-invites/import", { csv, confirm: false, ministries }))).status).toBe(400);
+    }
+    expect((await importRoute(post("/api/admin/area-coordinator-invites/import", { csv, confirm: false, ministries: ["ADVENTURER"] }))).status).toBe(200);
+  });
+
   it("skips active coordinators and open invites in the preview", async () => {
     mocks.accountFindMany.mockResolvedValue([{ id: "a-1", email: "pat@example.test", areaCoordinatorGrant: { revokedAt: null, expiresAt: null } }]);
     mocks.inviteFindMany.mockResolvedValue([{ email: "sam@example.test" }]);
@@ -147,7 +170,8 @@ describe("Area Coordinator import and send routes (#1608)", () => {
     expect(mocks.deliverAfter).not.toHaveBeenCalled();
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1);
     const audit = mocks.writeAuditLog.mock.calls[0][0];
-    expect(audit.metadata).toEqual({ count: 2, rows: 2 });
+    expect(audit.metadata).toEqual({ count: 2, rows: 2, ministries: ["PATHFINDER"] });
+    expect(mocks.inviteCreate.mock.calls[0][0].data.ministries).toEqual(["PATHFINDER"]);
     expect(JSON.stringify(audit)).not.toMatch(/example\.test|Pat|Sam/);
   });
 

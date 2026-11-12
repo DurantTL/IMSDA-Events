@@ -2,7 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { createPendingAreaCoordinatorInvite } from "@/modules/organizations/area-coordinator-invites";
+import { createPendingAreaCoordinatorInvite, inviteMinistries } from "@/modules/organizations/area-coordinator-invites";
 import { areaGrantActive } from "@/modules/organizations/area-coordinators";
 import {
   areaCoordinatorPublicStep,
@@ -38,7 +38,9 @@ export async function previewAreaCoordinatorImport(csv: string, now = new Date()
 }
 
 /** Creates one PENDING invite per Add row (a row that lost a race becomes a skip) and writes one audit entry: the count only. */
-export async function confirmAreaCoordinatorImport(csv: string, actorUserId: string, now = new Date()) {
+export async function confirmAreaCoordinatorImport(csv: string, actorUserId: string, now = new Date(), ministries?: readonly string[]) {
+  // One choice for the whole file (#843); refused before anything is written.
+  const chosen = inviteMinistries(ministries);
   const plan = await planFor(csv, now);
   const prisma = getPrisma();
   const steps = [];
@@ -48,7 +50,7 @@ export async function confirmAreaCoordinatorImport(csv: string, actorUserId: str
       steps.push(areaCoordinatorPublicStep(step));
       continue;
     }
-    const { created } = await createPendingAreaCoordinatorInvite(prisma, { email: step.email, name: step.inviteName, actorUserId });
+    const { created } = await createPendingAreaCoordinatorInvite(prisma, { email: step.email, name: step.inviteName, actorUserId, ministries: chosen });
     if (created) {
       added += 1;
       steps.push({ ...areaCoordinatorPublicStep(step), message: "Added as a pending invite. Not emailed yet." });
@@ -62,7 +64,7 @@ export async function confirmAreaCoordinatorImport(csv: string, actorUserId: str
       action: "AREA_COORDINATOR_INVITES_IMPORTED",
       entityType: "AreaCoordinatorInvite",
       summary: `Imported ${added} Area Coordinator invite${added === 1 ? "" : "s"} from a CSV.`,
-      metadata: { count: added, rows: plan.length },
+      metadata: { count: added, rows: plan.length, ministries: chosen },
     });
   }
   return { steps, added };

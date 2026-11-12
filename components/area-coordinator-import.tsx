@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Send } from "lucide-react";
 import { CsvImportDialog } from "@/components/csv-import-dialog";
 import { useConfirm } from "@/components/use-confirm";
+import { CLUB_KINDS, type ClubKindValue } from "@/modules/organizations/club-kind";
+import styles from "./people-directory.module.css";
 
 const BASE = "/api/admin/area-coordinator-invites";
 
@@ -20,6 +22,8 @@ export function AreaCoordinatorImport({ pendingCount }: { pendingCount: number }
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [notConfigured, setNotConfigured] = useState(false);
+  const [chosen, setChosen] = useState<ClubKindValue[]>(["PATHFINDER"]);
+  const ministries = CLUB_KINDS.filter((kind) => chosen.includes(kind));
 
   async function send() {
     const noun = `Area Coordinator invite${pendingCount === 1 ? "" : "s"}`;
@@ -61,7 +65,29 @@ export function AreaCoordinatorImport({ pendingCount }: { pendingCount: number }
             have an open invite are skipped.
           </p>
         )}
+        extraBody={{ ministries }}
+        onOpen={() => setChosen(["PATHFINDER"])}
+        summary={ministries.length > 0 ? `These invites see: ${ministries.map((kind) => (kind === "ADVENTURER" ? "Adventurer clubs" : "Pathfinder clubs")).join(" and ")}.` : null}
+        uploadDisabled={ministries.length === 0}
         importUrl={`${BASE}/import`}
+        options={(
+          <div className={styles.inviteForm}>
+          <fieldset>
+            <legend>Ministries these Area Coordinators see</legend>
+            {CLUB_KINDS.map((kind) => (
+              <label className={styles.check} key={kind}>
+                <input
+                  checked={chosen.includes(kind)}
+                  onChange={(event) => setChosen((current) => (event.target.checked ? [...current, kind] : current.filter((value) => value !== kind)))}
+                  type="checkbox"
+                />
+                <span>{kind === "ADVENTURER" ? "Adventurer clubs" : "Pathfinder clubs"}</span>
+              </label>
+            ))}
+            {ministries.length === 0 ? <p className={styles.statusError} role="alert">Choose at least one ministry.</p> : null}
+          </fieldset>
+          </div>
+        )}
         onImported={() => router.refresh()}
         templateLabel="Area Coordinator CSV template"
         templateHref={`${BASE}/template`}

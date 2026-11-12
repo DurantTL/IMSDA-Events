@@ -236,6 +236,35 @@ describe("each kind of access alone", () => {
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_CREATED" }), expect.anything());
   });
 
+  it("records the chosen ministries on the Area Coordinator invite and in its audit entry (#843)", async () => {
+    await invite({ areaCoordinator: true, areaCoordinatorMinistries: ["ADVENTURER"] });
+    expect(mocks.acCreate.mock.calls[0]![0].data).toMatchObject({ ministries: ["ADVENTURER"] });
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_CREATED", metadata: { emailQueued: true, ministries: ["ADVENTURER"] } }), expect.anything());
+  });
+
+  it("stores both ministries in a fixed order, and Pathfinder when an older client sends none (#843)", async () => {
+    await invite({ areaCoordinator: true, areaCoordinatorMinistries: ["ADVENTURER", "PATHFINDER"] });
+    expect(mocks.acCreate.mock.calls[0]![0].data).toMatchObject({ ministries: ["PATHFINDER", "ADVENTURER"] });
+    mocks.acCreate.mockClear();
+    await invite({ areaCoordinator: true });
+    expect(mocks.acCreate.mock.calls[0]![0].data).toMatchObject({ ministries: ["PATHFINDER"] });
+  });
+
+  it("refuses an empty, unknown or repeated ministry list with 400, writing nothing (#843)", async () => {
+    for (const ministries of [[], ["DISTRICT"], ["PATHFINDER", "PATHFINDER"]]) {
+      const response = await invite({ areaCoordinator: true, areaCoordinatorMinistries: ministries });
+      expect(response.status).toBe(400);
+    }
+    expect(mocks.acCreate).not.toHaveBeenCalled();
+    expect(mocks.outboxCreate).not.toHaveBeenCalled();
+  });
+
+  it("ignores the ministry list when Area Coordinator is not ticked (#843)", async () => {
+    const response = await invite({ systemAdmin: true, areaCoordinator: false, areaCoordinatorMinistries: [] });
+    expect(response.status).toBe(201);
+    expect(mocks.acCreate).not.toHaveBeenCalled();
+  });
+
   it("does a mix: staff login with roles, a club invite and an Area Coordinator invite", async () => {
     const body = await (await invite({ systemAdmin: true, areaCoordinator: true, events: [{ eventId: "evt_1", role: "EVENT_ADMIN" }], clubs: [{ organizationId: "club_1", role: "DIRECTOR" }] })).json();
     expect(body.created).toMatchObject({ staffLogin: true, invitationEmailed: true, clubInviteIds: ["ci-1"], areaCoordinatorInviteId: "ac-1" });
@@ -252,7 +281,7 @@ describe("an email that already has an account (no duplicates, no linking)", () 
     accounts.push({ id: "acct-pat", email: "pat@example.test", linkedUser: { id: "u-pat" } });
     const body = await (await invite({ systemAdmin: true, areaCoordinator: true, events: [{ eventId: "evt_1", role: "EVENT_ADMIN" }], clubs: [{ organizationId: "club_1", role: "DIRECTOR" }] })).json();
     expect(body.created).toMatchObject({ staffLogin: false, clubInviteIds: [] });
-    expect(body.deferred.personHref).toBe("/admin/people/staff/u-pat?grant=" + encodeURIComponent("sa,e:evt_1:EVENT_ADMIN,ac,c:club_1:DIRECTOR"));
+    expect(body.deferred.personHref).toBe("/admin/people/staff/u-pat?grant=" + encodeURIComponent("sa,e:evt_1:EVENT_ADMIN,ac:PATHFINDER,c:club_1:DIRECTOR"));
     expect(mocks.userCreate).not.toHaveBeenCalled();
     expect(mocks.clubInviteCreate).not.toHaveBeenCalled();
     expect(mocks.acCreate).not.toHaveBeenCalled();
@@ -263,7 +292,7 @@ describe("an email that already has an account (no duplicates, no linking)", () 
   it("defers family-side items to the account page for an existing website account, with no invite", async () => {
     accounts.push({ id: "acct-pat", email: "pat@example.test", linkedUser: null });
     const body = await (await invite({ areaCoordinator: true, clubs: [{ organizationId: "club_1", role: "REPORTER" }] })).json();
-    expect(body.deferred.personHref).toBe("/admin/people/account/acct-pat?grant=" + encodeURIComponent("ac,c:club_1:REPORTER"));
+    expect(body.deferred.personHref).toBe("/admin/people/account/acct-pat?grant=" + encodeURIComponent("ac:PATHFINDER,c:club_1:REPORTER"));
     expect(mocks.clubInviteCreate).not.toHaveBeenCalled();
     expect(mocks.acCreate).not.toHaveBeenCalled();
   });
@@ -292,7 +321,7 @@ describe("an email that already has an account (no duplicates, no linking)", () 
     accounts.push({ id: "acct-pat", email: "pat@example.test", linkedUser: null });
     const body = await (await invite({ clubsAdministrator: true, areaCoordinator: true })).json();
     expect(body.created.staffLogin).toBe(true);
-    expect(body.deferred.personHref).toBe("/admin/people/account/acct-pat?grant=ac");
+    expect(body.deferred.personHref).toBe("/admin/people/account/acct-pat?grant=" + encodeURIComponent("ac:PATHFINDER"));
     expect(mocks.userCreate).toHaveBeenCalledTimes(1);
     expect(mocks.acCreate).not.toHaveBeenCalled();
   });
@@ -528,6 +557,24 @@ describe("accepting an Area Coordinator invite", () => {
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_ACCEPTED", entityId: "aci-1" }), expect.anything());
   });
 
+  it("gives the new grant the invite's ministries: an Adventurer-only invite makes an Adventurer grant (#843)", async () => {
+    mocks.acFindUnique.mockResolvedValue({ ...open, ministries: ["ADVENTURER"] });
+    await acceptAreaCoordinatorInvite("aci-1", account, now);
+    expect(mocks.areaUpsert.mock.calls[0]![0].create).toMatchObject({ ministries: ["ADVENTURER"] });
+    expect(mocks.areaUpsert.mock.calls[0]![0].update).toMatchObject({ ministries: ["ADVENTURER"] });
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_GRANTED", metadata: expect.objectContaining({ ministries: ["ADVENTURER"] }) }), expect.anything());
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_ACCEPTED", metadata: { actorAttendeeAccountId: "acct-acc", inviteMinistries: ["ADVENTURER"], appliedMinistries: ["ADVENTURER"] } }), expect.anything());
+  });
+
+  it("keeps the existing ministries when an already active coordinator accepts an invite for others (#843)", async () => {
+    mocks.acFindUnique.mockResolvedValue({ ...open, ministries: ["ADVENTURER"] });
+    mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["PATHFINDER"] });
+    await acceptAreaCoordinatorInvite("aci-1", account, now);
+    expect(mocks.areaUpsert.mock.calls[0]![0].update).not.toHaveProperty("ministries");
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_GRANTED", metadata: expect.objectContaining({ ministries: ["PATHFINDER"] }) }), expect.anything());
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_ACCEPTED", metadata: { actorAttendeeAccountId: "acct-acc", inviteMinistries: ["ADVENTURER"], appliedMinistries: ["PATHFINDER"] } }), expect.anything());
+  });
+
   it("keeps the ministries of an already active grant when an invite is accepted again (#843)", async () => {
     mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["ADVENTURER"] });
     await acceptAreaCoordinatorInvite("aci-1", account, now);
@@ -707,7 +754,7 @@ describe("the pending invites list", () => {
     const { invites } = await listPendingInvites({ scope: "full" }, now);
     expect(invites.map((entry) => [entry.kind, entry.what, entry.expired])).toEqual([
       ["staff", "Staff login, not activated yet", false],
-      ["area", "Area Coordinator", false],
+      ["area", "Area Coordinator (Pathfinder)", false],
       ["club", "Director of Example Pathfinders", true],
     ]);
     expect(invites.find((entry) => entry.kind === "club")!.signUpUrl).toBe("https://events.imsda.test/account/sign-up?invite=club#email=pat%40example.test");

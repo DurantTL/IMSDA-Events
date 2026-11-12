@@ -31,7 +31,7 @@ export function userAdminApiError(error: unknown, action: string) {
     );
   }
   if (error instanceof AreaCoordinatorInviteError) {
-    const status = error.code === "INVITE_NOT_FOUND" ? 404 : error.code === "EMAIL_NOT_CONFIGURED" ? 503 : error.code === "INVITE_RESEND_TOO_SOON" ? 429 : 409;
+    const status = error.code === "INVALID_MINISTRIES" ? 400 : error.code === "INVITE_NOT_FOUND" ? 404 : error.code === "EMAIL_NOT_CONFIGURED" ? 503 : error.code === "INVITE_RESEND_TOO_SOON" ? 429 : 409;
     return Response.json({ error: error.code, message: error.message }, { status });
   }
   if (error instanceof MembershipOperationError) {
