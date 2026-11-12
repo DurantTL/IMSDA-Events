@@ -141,12 +141,15 @@ function subscribeSectionChoices(listener: () => void) {
 
 /** The phone sheet follows the viewport (#1894): false on the server and for the first client render, so the markup is the same everywhere. */
 const PHONE_SHEET_QUERY = "(max-width: 640px)";
+/** Where there is no window or no matchMedia (a server render, a test DOM) this is not a phone. */
+const phoneQuery = () => (typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia(PHONE_SHEET_QUERY) : null);
 function subscribePhoneSheet(listener: () => void) {
-  const list = window.matchMedia(PHONE_SHEET_QUERY);
+  const list = phoneQuery();
+  if (!list) return () => undefined;
   list.addEventListener("change", listener);
   return () => list.removeEventListener("change", listener);
 }
-const phoneSheetNow = () => window.matchMedia(PHONE_SHEET_QUERY).matches;
+const phoneSheetNow = () => phoneQuery()?.matches ?? false;
 const phoneSheetServer = () => false;
 
 /** The column names the sheet's Sort by menu uses; the same words as the table headers. */
