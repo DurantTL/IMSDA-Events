@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { opensWithoutEvent } from "@/components/no-event-paths";
-import { PRODUCT_NAME } from "@/lib/brand";
-import { STAFF_APP_COLOR, STAFF_MANIFEST_PATH } from "@/lib/staff-web-app";
+import { STAFF_APP_COLOR, STAFF_APP_NAME, STAFF_MANIFEST_PATH } from "@/lib/staff-web-app";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { StaffInstallPromptCapture } from "@/components/staff-install-card";
 import { REQUEST_TARGET_HEADER } from "@/modules/access/login-routing";
@@ -22,7 +21,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   // The staff saved app (#1567): staff pages link this manifest instead of the site one (#1713), so a staff install keeps its own identity.
   manifest: STAFF_MANIFEST_PATH,
-  appleWebApp: { capable: true, title: PRODUCT_NAME, statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: STAFF_APP_NAME, statusBarStyle: "default" },
 };
 
 // Merges with the root viewport (width, scale, viewport-fit=cover stay).

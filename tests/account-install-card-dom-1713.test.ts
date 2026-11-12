@@ -44,9 +44,9 @@ describe("account install card (#1713)", () => {
   });
 
   it.each([
-    ["account", "@/components/account-install-card", "AccountInstallCard"],
-    ["staff", "@/components/staff-install-card", "StaffInstallCard"],
-  ])("moves focus to a status line after a successful install (%s)", async (_audience, modulePath, exportName) => {
+    ["account", "@/components/account-install-card", "AccountInstallCard", "IMAdventist"],
+    ["staff", "@/components/staff-install-card", "StaffInstallCard", "IMAdventist Staff"],
+  ])("moves focus to a status line after a successful install (%s)", async (_audience, modulePath, exportName, iconName) => {
     setUserAgent(ANDROID_CHROME);
     (Navigator.prototype as { install?: unknown }).install = vi.fn(() => Promise.resolve());
     const loaded = (await import(/* @vite-ignore */ modulePath)) as Record<string, ComponentType>;
@@ -57,7 +57,7 @@ describe("account install card (#1713)", () => {
     await click(button);
     await flush();
     const status = mounted.container.querySelector('[role="status"]');
-    expect(status?.textContent).toBe("Saved. Look for the IMAdventist icon on your Home Screen.");
+    expect(status?.textContent).toBe(`Saved. Look for the ${iconName} icon on your Home Screen.`);
     expect(document.activeElement).toBe(status);
     expect(mounted.container.querySelector("#install-card-heading")).toBeNull();
   });
