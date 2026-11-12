@@ -1,0 +1,22 @@
+/* Recognitions (#1683): search, mark and undo from a phone, then the totals and the hand-out lists. Every control is 44px. */
+.stack { display: grid; gap: 16px; }
+.field { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.field input, .field select { min-height: 44px; padding: 8px 12px; font: inherit; font-weight: 400; max-width: 100%; }
+.help { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
+.heading { margin: 0 0 8px; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.card { border: 1px solid var(--line); border-radius: var(--radius-card); padding: 10px 12px; display: grid; gap: 8px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.cardHead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; }
+.club { color: var(--muted); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button, .form button { min-height: 44px; min-width: 44px; padding: 8px 14px; }
+.form { display: grid; gap: 12px; max-width: 560px; }
+.muted { color: var(--muted); margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.tableWrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.table th, .table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.names { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+
+@media (max-width: 639px) {
+  .actions > button, .form button { flex: 1 1 100%; }
+}

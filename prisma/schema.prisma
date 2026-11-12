@@ -2445,6 +2445,13 @@ enum NoteVisibility {
   RESTRICTED
 }
 
+/// What an event recognition earns (#1683): a memory verse pin, a Bible-reading patch, or a star for reading it through again.
+enum RecognitionItem {
+  PIN
+  PATCH
+  STAR
+}
+
 /// Configured event vocabulary staff apply to registrations and attendees.
 /// Never free text: `normalizedName` enforces one spelling per event, so
 /// filters and exports do not fracture across near-duplicate tag names.
@@ -2456,6 +2463,9 @@ model EventTag {
   color          String
   description    String   @default("")
   isActive       Boolean  @default(true)
+  /// Set when the tag is an event recognition (#1683): what marking it earns. Null for an ordinary tag. Recognition tags are
+  /// applied and removed through the same audited attendee tag path and are kept out of the general tag lists.
+  recognitionItem RecognitionItem?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

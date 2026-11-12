@@ -205,6 +205,8 @@ const moreOnlyPages: Record<string, (scenario: Scenario) => boolean> = {
   "/more/debrief": (scenario) => scenario.clubEvent && (scenario.clubOversight || has(scenario, "MANAGE_FORMS")),
   // app/(workspace)/more/baptism-follow-up/page.tsx (`resolveClubOversight().allowed`, #1680)
   "/more/baptism-follow-up": (scenario) => scenario.clubOversight && scenario.clubEvent,
+  // app/(workspace)/more/recognitions/page.tsx (MANAGE_REGISTRATION on a club event, #1683)
+  "/more/recognitions": (scenario) => scenario.clubEvent && scenario.permissions.includes("MANAGE_REGISTRATION"),
   // app/(workspace)/more/budget/page.tsx (reading: MANAGE_FINANCE or VIEW_REPORTS, or system administrator; switching: system administrator or Event Admin; #1682)
   "/more/budget": (scenario) => scenario.clubEvent && (scenario.clubOversight || has(scenario, "MANAGE_FINANCE") || has(scenario, "VIEW_REPORTS")),
   // app/(workspace)/more/event-staffing/page.tsx (reading: VIEW_EVENT or system administrator; changing: CONFIGURE_EVENT; switching: system administrator or Event Admin; #1678)

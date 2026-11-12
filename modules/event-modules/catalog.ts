@@ -24,6 +24,7 @@ export const eventModuleKeys = [
   "event-budget",
   "event-staffing",
   "baptism-follow-up",
+  "recognitions",
 ] as const;
 
 export type EventModuleKey = (typeof eventModuleKeys)[number];
@@ -243,6 +244,18 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
     offByDefault: true,
     routes: ["/more/baptism-follow-up"],
     features: ["baptism-follow-up-notice"],
+  },
+  {
+    key: "recognitions",
+    cardKey: "recognitions",
+    title: "Recognitions",
+    description: "List the pins, patches and stars a club event gives, mark who earned each from a phone by searching a name, undo a mark, and see totals and a hand-out list for each club. Off until a system administrator turns it on.",
+    appliesTo: "club-audience",
+    launcherGroup: "people-access",
+    alwaysOn: false,
+    offByDefault: true,
+    routes: ["/more/recognitions"],
+    features: ["recognition-marking"],
   },
 ];
 

@@ -32,13 +32,14 @@ function serializeTag(tag: { id: string; name: string; color: string; descriptio
   return { id: tag.id, name: tag.name, color: tag.color, description: tag.description, isActive: tag.isActive };
 }
 
+/** The event's ordinary tags. Recognition tags (#1683) have their own list and are left out here. */
 export async function listTags(eventId: string) {
-  const tags = await getPrisma().eventTag.findMany({ where: { eventId }, orderBy: tagOrder });
+  const tags = await getPrisma().eventTag.findMany({ where: { eventId, recognitionItem: null }, orderBy: tagOrder });
   return tags.map(serializeTag);
 }
 
 export async function listActiveTags(eventId: string) {
-  const tags = await getPrisma().eventTag.findMany({ where: { eventId, isActive: true }, orderBy: tagOrder });
+  const tags = await getPrisma().eventTag.findMany({ where: { eventId, isActive: true, recognitionItem: null }, orderBy: tagOrder });
   return tags.map(serializeTag);
 }
 
@@ -62,7 +63,7 @@ export async function createTag(eventId: string, actorUserId: string, rawInput: 
 
 export async function updateTag(eventId: string, tagId: string, actorUserId: string, rawInput: unknown) {
   const input = tagUpdateSchema.parse(rawInput);
-  const existing = await getPrisma().eventTag.findFirst({ where: { id: tagId, eventId } });
+  const existing = await getPrisma().eventTag.findFirst({ where: { id: tagId, eventId, recognitionItem: null } });
   if (!existing) throw new TagConfigurationError("NOT_FOUND", "That tag was not found for this event.");
   try {
     return await getPrisma().$transaction(async (tx) => {
