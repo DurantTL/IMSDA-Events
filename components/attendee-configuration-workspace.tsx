@@ -37,7 +37,6 @@ export function AttendeeConfigurationWorkspace({
   canManageForms = false,
 }: {
   eventId: string;
-  eventName?: string;
   initialTypes: AttendeeTypeRow[];
   initialClassifications: ClassificationRow[];
   /** Whether the viewer may add types and groupings: the forms and the empty-state action show only then (#743). */
@@ -123,11 +122,12 @@ export function AttendeeConfigurationWorkspace({
   }
 
   return <div className="settings-stack">
-    <p className="usage-note"><Info aria-hidden="true" size={16} /><span>Where this shows up: attendee types fill the attendee-type field in the {canManageForms ? <Link href={`/registration-builder?event=${eventId}`}>registration form</Link> : "registration form"}, and appear throughout <Link href={`/more/reports?event=${eventId}`}>reports</Link> and <Link href={`/check-in?event=${eventId}`}>check-in</Link>.</span></p>
+    <p className="usage-note"><Info aria-hidden="true" size={16} /><span>Where this shows up: attendee types fill the attendee-type field in the {canManageForms ? <Link href={`/registration-builder?event=${eventId}`}>registration form</Link> : "registration form"}, and appear throughout <Link href={`/more/reports?event=${eventId}`}>reports</Link> and <Link href={`/check-in?event=${eventId}`}>check-in</Link>. Prices are set in the registration form, not here.</span></p>
     {error && <p className="form-error" role="alert">{error}</p>}
-    <section className="panel" id="attendee-types"><div className="section-heading"><div><h2>Attendee types</h2><p>Codes are permanent identities. Labels, descriptions, sort order, age bands, and active status may be edited; prior registration snapshots remain unchanged.</p><p className={styles.ownership}>{"Types here set who can register. Prices are set in the "}{canManageForms ? <Link href={`/registration-builder?event=${eventId}`}>registration form</Link> : "registration form"}{"."}</p></div></div>
+    <section className="panel" id="attendee-types"><div className="section-heading"><div><h2>Attendee types</h2><p>Codes are permanent identities. Labels, descriptions, sort order, age bands, and active status may be edited; prior registration snapshots remain unchanged.</p></div></div>
       {types.length === 0 ? (
         <EmptyState
+          announce={false}
           canCreate={canCreate}
           hint={canCreate ? undefined : "Ask an event administrator to add attendee types."}
           title="No attendee types yet"
@@ -148,6 +148,7 @@ export function AttendeeConfigurationWorkspace({
     <section className="panel" id="attendee-groupings"><div className="section-heading"><div><h2>Categories, tracks, and departments</h2><p>Categories, tracks, and departments are independent of attendee type, and an attendee can have several of each. Codes and dimension are permanent once created.</p></div></div>
       {classifications.length === 0 ? (
         <EmptyState
+          announce={false}
           canCreate={canCreate}
           hint={canCreate ? undefined : "Ask an event administrator to add groupings."}
           title="No categories, tracks, or departments yet"

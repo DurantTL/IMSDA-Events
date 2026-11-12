@@ -27,9 +27,9 @@ export default async function AttendeeConfigurationPage({ searchParams }: { sear
   const header = (
     <PageHeader
       below={<nav aria-label="On this page" className={headerStyles.anchors}><a href="#attendee-types">Attendee types</a><a href="#attendee-groupings">Categories, tracks, and departments</a></nav>}
-      description={`Choose who can register for ${event.name} and how attendees are grouped.`}
+      description="Choose who can register and how attendees are grouped."
       title={staffPageTitles.attendeeSetup}
     />
   );
-  return <div className="settings-stack">{header}<AttendeeConfigurationWorkspace eventId={event.id} eventName={event.name} initialTypes={types} initialClassifications={classifications} canCreate={permissions.includes("CONFIGURE_EVENT")} canManageForms={permissions.includes("MANAGE_FORMS")} /></div>;
+  return <div className="settings-stack">{header}<AttendeeConfigurationWorkspace eventId={event.id} initialTypes={types} initialClassifications={classifications} canCreate={permissions.includes("CONFIGURE_EVENT")} canManageForms={permissions.includes("MANAGE_FORMS")} /></div>;
 }

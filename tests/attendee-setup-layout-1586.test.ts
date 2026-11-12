@@ -12,7 +12,7 @@ import { pageTitleExpressions } from "./helpers/page-sources-1772";
 const type = { id: "t1", code: "ADULT", label: "Adult", description: "", sortOrder: 0, isActive: true, minimumAge: null, maximumAge: null };
 const grouping = { id: "c1", kind: "TRACK" as const, code: "WORSHIP", label: "Worship", description: "", sortOrder: 0, isActive: true };
 const render = (props: Record<string, unknown> = {}) => renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
-  eventId: "event_7", eventName: "Synthetic Retreat", initialTypes: [type], initialClassifications: [grouping], canCreate: true, ...props,
+  eventId: "event_7", initialTypes: [type], initialClassifications: [grouping], canCreate: true, ...props,
 }));
 
 describe("Attendee setup layout (#1586)", () => {
@@ -48,10 +48,10 @@ describe("Attendee setup layout (#1586)", () => {
 
   it("says prices live in the registration form, linking only for a viewer who can open it", () => {
     const withLink = render({ canManageForms: true });
-    expect(withLink).toContain("Prices are set in the");
+    expect(withLink).toContain("Prices are set in the registration form, not here.");
     expect(withLink).toContain('href="/registration-builder?event=event_7"');
     const without = render();
-    expect(without).toContain("Prices are set in the");
+    expect(without).toContain("Prices are set in the registration form, not here.");
     expect(without).not.toContain("/registration-builder");
   });
 

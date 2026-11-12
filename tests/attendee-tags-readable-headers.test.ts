@@ -22,7 +22,7 @@ const tag = { id: "tag_1", name: "VIP", color: "#4F46E5", description: "Priority
 describe("attendee configuration: readable table headers and where-this-shows-up (#474)", () => {
   it("renders a real header cell per column, not a single run-together string", () => {
     const markup = renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
-      eventId: "event_1", eventName: "Fall Retreat", initialTypes: [attendeeType], initialClassifications: [classification],
+      eventId: "event_1", initialTypes: [attendeeType], initialClassifications: [classification],
     }));
     for (const heading of ["Code", "Label", "Description", "Sort order", "Age band", "Status", "Actions"]) {
       expect(markup).toContain(`<th role="columnheader" scope="col">${heading}</th>`);
@@ -36,7 +36,7 @@ describe("attendee configuration: readable table headers and where-this-shows-up
 
   it("renders a per-field data-label on every record card cell, for the narrow-screen card layout", () => {
     const markup = renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
-      eventId: "event_1", eventName: "Fall Retreat", initialTypes: [attendeeType], initialClassifications: [classification],
+      eventId: "event_1", initialTypes: [attendeeType], initialClassifications: [classification],
     }));
     for (const label of ["Label", "Description", "Sort order", "Age band", "Status"]) {
       expect(markup).toContain(`data-label="${label}"`);
@@ -49,7 +49,7 @@ describe("attendee configuration: readable table headers and where-this-shows-up
 
   it("shows a visible Min and Max label tied to each age input (#1457)", () => {
     const markup = renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
-      eventId: "event_1", eventName: "Fall Retreat", initialTypes: [attendeeType], initialClassifications: [classification],
+      eventId: "event_1", initialTypes: [attendeeType], initialClassifications: [classification],
     }));
     expect(markup).toMatch(/<label[^>]*><span>Min<\/span><input aria-label="Minimum age for ADULT"/);
     expect(markup).toMatch(/<label[^>]*><span>Max<\/span><input aria-label="Maximum age for ADULT"/);
@@ -57,7 +57,7 @@ describe("attendee configuration: readable table headers and where-this-shows-up
 
   it("shows an empty state, not a headers-only table, when a section has no rows yet (#1586)", () => {
     const markup = renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
-      eventId: "event_1", eventName: "Fall Retreat", initialTypes: [], initialClassifications: [],
+      eventId: "event_1", initialTypes: [], initialClassifications: [],
     }));
     expect(markup).toContain("No attendee types yet");
     expect(markup).toContain("No categories, tracks, or departments yet");
@@ -66,7 +66,7 @@ describe("attendee configuration: readable table headers and where-this-shows-up
 
   it("gives the editable table real desktop header styling and the shared table-cards layout (#1457)", () => {
     const markup = renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
-      eventId: "event_1", eventName: "Fall Retreat", initialTypes: [attendeeType], initialClassifications: [classification],
+      eventId: "event_1", initialTypes: [attendeeType], initialClassifications: [classification],
     }));
     expect(markup.match(/class="editable-settings-table table-cards table-cards-xwide"/g)).toHaveLength(2);
     expect(markup).not.toContain("scroll-cue");
@@ -79,7 +79,7 @@ describe("attendee configuration: readable table headers and where-this-shows-up
 
   it("tells staff in plain language where attendee types and groupings show up, with links", () => {
     const markup = renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
-      eventId: "event_42", eventName: "Fall Retreat", initialTypes: [attendeeType], initialClassifications: [classification], canManageForms: true,
+      eventId: "event_42", initialTypes: [attendeeType], initialClassifications: [classification], canManageForms: true,
     }));
     expect(markup).toContain("Where this shows up");
     expect(markup).toContain('href="/registration-builder?event=event_42"');
@@ -89,7 +89,7 @@ describe("attendee configuration: readable table headers and where-this-shows-up
 
   it("replaces system wording ('orthogonal categories') with plain language", () => {
     const markup = renderToStaticMarkup(createElement(AttendeeConfigurationWorkspace, {
-      eventId: "event_1", eventName: "Fall Retreat", initialTypes: [attendeeType], initialClassifications: [classification],
+      eventId: "event_1", initialTypes: [attendeeType], initialClassifications: [classification],
     }));
     expect(markup.toLowerCase()).not.toContain("orthogonal");
     expect(markup).toContain("an attendee can have several of each");
