@@ -12,10 +12,11 @@ export type WalkthroughLocator = any;
 
 /**
  * Where a walkthrough starts: a visitor who is not signed in, the sample club director signed in with two-step sign-in done,
- * the sample area coordinator signed in with two-step sign-in done, or the sample family account (one registration)
- * signed in with two-step sign-in done.
+ * the sample area coordinator signed in with two-step sign-in done, the sample family account (one registration)
+ * signed in with two-step sign-in done, or (#1882) the sample Clubs Administrator, a staff user who is not a system administrator,
+ * signed in to the staff workspace with a placeholder two-step enrolment (the session is minted; no code is ever typed).
  */
-export type WalkthroughStart = "signed-out" | "signed-in" | "signed-in-coordinator" | "signed-in-family";
+export type WalkthroughStart = "signed-out" | "signed-in" | "signed-in-coordinator" | "signed-in-family" | "signed-in-clubs-admin";
 
 export type WalkthroughContext = {
   page: WalkthroughPage;
@@ -27,6 +28,8 @@ export type WalkthroughContext = {
   coordinator: { email: string; password: string; displayName: string };
   /** The sample family account, signed in for the family walkthroughs. `newPhone` is the number the change walkthrough types. */
   family: { email: string; password: string; displayName: string; phone: string; newPhone: string };
+  /** The sample Clubs Administrator (#1882). `searchWord` finds the sample club `clubName` in the header search. */
+  clubsAdmin: { displayName: string; searchWord: string; clubName: string };
   /** The six-digit code the coordinator's authenticator app shows right now. */
   authenticatorCode: () => string;
   /** The sample person the roster walkthrough adds, edits and removes. */

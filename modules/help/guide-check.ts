@@ -45,8 +45,8 @@ export type GuideCheckInput = {
 
 /** Whether `path` is served by a page route. A `[param]` segment in a route matches any one segment. */
 export function routeHasPage(path: string, routes: readonly string[]): boolean {
-  // A destination may point at a section of a page (`/page#section`); only the page itself needs a route.
-  const parts = path.split("#")[0]!.split("/").filter(Boolean);
+  // A destination may point at a view or a section of a page (`/page?view=x#section`); only the page itself needs a route.
+  const parts = path.split("#")[0]!.split("?")[0]!.split("/").filter(Boolean);
   return routes.some((route) => {
     const routeParts = route.split("/").filter(Boolean);
     return routeParts.length === parts.length && routeParts.every((part, index) => /^\[.+\]$/.test(part) || part === parts[index]);

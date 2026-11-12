@@ -10,6 +10,7 @@ import {
   deadlineReminderFields,
   healthSnapshotFields,
   honorWatchSummaryFields,
+  monthlyRecordReminderFields,
   instructorClassEmailFields,
   locationWaitlistDigestFields,
   retentionCleanupFields,
@@ -41,6 +42,7 @@ const cases: Array<{ name: string; map: Mapper; good: JobRun["summary"]; goodTex
   { name: "class waitlists", map: classWaitlistFields, good: { classes: 5, offered: 2, lapsed: 1, failed: 0, budgetExhausted: false }, goodText: "5 classes checked, 2 offered, 1 lapsed, 0 failed." },
   { name: "instructor class emails", map: instructorClassEmailFields, good: { status: "RAN", queued: 4, failed: 0, delivered: 3 }, goodText: "4 queued, 3 delivered, 0 failed." },
   { name: "honor watch summaries", map: honorWatchSummaryFields, good: { status: "RAN", watches: 4, queued: 3, failed: 0, delivered: 3 }, goodText: "4 watches, 3 queued, 3 delivered, 0 failed." },
+  { name: "monthly record reminders", map: monthlyRecordReminderFields, good: { status: "RAN", reminded: 3, noRecipient: 1, failed: 0, summaries: 2, delivered: 8 }, goodText: "3 clubs reminded, 1 with nobody to email, 2 coordinator summaries, 8 delivered, 0 failed." },
   { name: "retention clean-ups", map: retentionCleanupFields, good: { community: 5, alertFeed: 6, analytics: 7 }, goodText: "Deleted 5 community posts, 6 alert feed items and 7 daily analytics rows past their keep time." },
   { name: "sealed health copies (on)", map: (k, r, a) => healthSnapshotFields(k, r, a, true), good: { enabled: true, taken: 6, sealFailed: 0, deleted: 4, heldSkipped: 2 }, goodText: "6 sealed, 0 failed to seal, 4 expired copies deleted, 2 kept for a legal hold." },
 ];
@@ -64,6 +66,23 @@ describe.each(cases)("$name", ({ map, good, goodText }) => {
   it("is watch, not OK, when it ran but recorded no counts", () => {
     expect(map("k", run({ summary: null }), now)).toMatchObject({ state: "watch", resultText: "It ran, but its counts were not recorded." });
     expect(map("k", run({ summary: { status: "RAN", enabled: true } }), now).state).toBe("watch");
+  });
+});
+
+describe("monthly record reminders: the readings that are not a plain count", () => {
+  const summary = (status: string) => run({ summary: { status, reminded: 0, noRecipient: 0, failed: 0, summaries: 0, delivered: 0 } });
+  it("says email is not set up, needing attention, with setup help", () => {
+    expect(monthlyRecordReminderFields("k", summary("EMAIL_NOT_CONFIGURED"), now)).toMatchObject({ state: "attention", needsSetup: true, resultText: "Email isn't set up, so reminders can't go out. Ask a system administrator." });
+  });
+  it("is info, not a failure and not needing attention, when reminders have not been started yet", () => {
+    const row = monthlyRecordReminderFields("k", summary("NOT_STARTED"), now);
+    expect(row).toMatchObject({ state: "info", resultText: "Off: not started yet. Nothing is sent until a Clubs Administrator turns the reminders on." });
+    expect(row.needsSetup).toBeUndefined();
+  });
+  it("is info when switched off, OK when not due, and watch when a club failed", () => {
+    expect(monthlyRecordReminderFields("k", summary("SWITCHED_OFF"), now).state).toBe("info");
+    expect(monthlyRecordReminderFields("k", summary("NOT_DUE"), now).state).toBe("ok");
+    expect(monthlyRecordReminderFields("k", run({ summary: { status: "RAN", reminded: 1, noRecipient: 0, failed: 1, summaries: 0, delivered: 1 } }), now).state).toBe("watch");
   });
 });
 

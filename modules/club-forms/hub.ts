@@ -22,8 +22,10 @@ export async function listClubFormsForHub(): Promise<FormsHubRow[]> {
       kind: "CLUB" as const,
       name: template.name,
       eventName: null,
-      status: template.enabled ? "OPEN" as const : "NOT_OPEN" as const,
-      statusLabel: template.enabled ? "On" : "Off",
+      eventId: null,
+      // The hub uses one set of status words; the club forms pages keep On and Off.
+      status: template.enabled ? "OPEN" as const : "CLOSED" as const,
+      statusLabel: template.enabled ? "Open" : "Closed",
       responseCount: group?._count._all ?? 0,
       lastResponseAt: group?._max.submittedAt?.toISOString() ?? null,
       editHref: `/admin/club-forms/${key}`,

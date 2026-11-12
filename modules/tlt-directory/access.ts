@@ -5,6 +5,7 @@ import { resolveClubsActor } from "@/modules/access/admin-roles";
 import { AccessDeniedError } from "@/modules/access/authorization";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import { areaGrantActive, currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import type { ClubFormsViewer } from "@/modules/club-forms/domain";
 import { TltDirectoryError } from "@/modules/tlt-directory/domain";
 
 /**
@@ -31,6 +32,17 @@ export async function currentTltDirector(now = new Date()): Promise<TltDirectorA
   if (!account) return null;
   if (!(await accountIsTltDirector(account.id, now))) return null;
   return { accountId: account.id };
+}
+
+/**
+ * The same person as a club forms viewer (#1686): the TLT director reads the three TLT forms from every club, sensitive
+ * answers included, every view audited. Null for everyone else, so a route or page gets "not found" and no form is read:
+ * an ordinary Area Coordinator (her own views stay Restricted), an account without the second step or without an active
+ * account, staff acting as a coordinator, club directors, a Clubs Administrator and a system administrator.
+ */
+export async function currentTltFormsViewer(now = new Date()): Promise<Extract<ClubFormsViewer, { kind: "TLT_DIRECTOR" }> | null> {
+  const actor = await currentTltDirector(now);
+  return actor ? { kind: "TLT_DIRECTOR", accountId: actor.accountId } : null;
 }
 
 /**

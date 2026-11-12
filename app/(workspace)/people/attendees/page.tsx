@@ -1,4 +1,5 @@
 import { ExportLink } from "@/components/export-link";
+import { PageHeader } from "@/components/page-header";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
@@ -32,6 +33,7 @@ import {
   type AttendeeListingQuery,
 } from "@/modules/registrations/attendee-listing";
 import { firstParam } from "@/lib/search-params";
+import styles from "./attendee-list.module.css";
 import { registrationStatusWordOrRaw } from "@/modules/registrations/status-words";
 
 export const metadata: Metadata = { title: staffPageTitles.attendeeList };
@@ -75,16 +77,9 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
 
   return (
     <section className="page-stack">
-      <div className="page-intro">
-        <div>
-          <p className="eyebrow">{event.name}</p>
-          <h2>{staffPageTitles.attendeeList}</h2>
-          <p>One row per attendee{query.view === DEFAULT_LISTING_VIEW ? ", with meal, dietary, childcare and volunteer answers" : ""}.{query.view !== DEFAULT_LISTING_VIEW ? <> This is the {activeView.label} view.</> : null}</p>
-        </div>
-        <div className="intro-actions">
-          {canExport && <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV (all columns)</ExportLink>}
-        </div>
-      </div>
+      <PageHeader title={staffPageTitles.attendeeList}
+        description={<>One row per person on a registration{query.view === DEFAULT_LISTING_VIEW ? ", with meal, dietary, childcare and volunteer answers" : ""}.{query.view !== DEFAULT_LISTING_VIEW ? <> This is the {activeView.label} view.</> : null} For whole sign-ups, see <Link className={styles.registrationsLink} href={`/people?event=${encodeURIComponent(event.id)}`}>Registrations</Link>.</>}
+        secondary={canExport ? <ExportLink className="secondary-button" href={exportHref}><Download aria-hidden="true" size={16} /> Download CSV (all columns)</ExportLink> : undefined} />
 
       {!showDietaryDetails && <p className="choice-filter-note" role="note">Dietary details are limited to staff with health access. This list shows only whether an attendee has dietary needs.</p>}
 
@@ -99,7 +94,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
       {/* Never keyed (#1431): a header sort link or Reset keeps this form mounted, and SearchAsYouTypeForm
           refreshes its text, selects (`data-default-value` when left out of the URL) and checkboxes from the URL, so
           typing and select changes keep their focus. */}
-      <SearchAsYouTypeForm action="/people/attendees" className="panel choice-filter-form filter-bar" aria-label="Filter attendees">
+      <SearchAsYouTypeForm action="/people/attendees" className={`panel choice-filter-form filter-bar ${styles.form}`} aria-label="Filter attendees">
         <input type="hidden" name="event" value={event.id} />
         {/* Sort and Direction: on a phone the card list has no header row to click (docs/RESPONSIVE.md),
             so these are shown at 600px and under. They always submit, which also keeps the current sort
@@ -118,13 +113,13 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
             </select>
           </label>
         </div>
-        <label>View
+        <label className={styles.viewField}>View
           <select name="view" data-default-value={DEFAULT_LISTING_VIEW} defaultValue={query.view}>
             {LISTING_VIEWS.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}
           </select>
         </label>
-        <label>Search<input type="search" name="q" defaultValue={query.search} placeholder="Name or confirmation code" /></label>
-        <label>Meal preference
+        <label className={styles.searchField}>Search<input type="search" name="q" defaultValue={query.search} placeholder="Name or confirmation code" /></label>
+        <label className={styles.mealField}>Meal preference
           <select name="meal" defaultValue={query.meal ?? ""}>
             <option value="">All meals</option>
             {MEAL_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
@@ -145,7 +140,7 @@ export default async function AttendeeListingPage({ searchParams }: { searchPara
 
       <div className="table-scroll">
         {query.sort && <SortOrderNote>{sortOrderText(LISTING_COLUMNS.find((column) => column.key === query.sort)?.label.toLowerCase() ?? "default order", query.direction)}</SortOrderNote>}
-        <table role="table" className="report-table table-cards table-cards-max attendee-listing-table">
+        <table role="table" className={`report-table table-cards table-cards-max attendee-listing-table ${styles.list}`}>
           <caption className="sr-only">Attendees</caption>
           <thead role="rowgroup">
             <tr role="row">

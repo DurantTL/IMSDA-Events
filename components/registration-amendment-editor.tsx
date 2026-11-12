@@ -429,6 +429,7 @@ export function RegistrationAmendmentEditor({
   const registrationFields = allFields.filter((field) => (
     field.scope === "REGISTRATION"
     && field.type !== "CALCULATED"
+    && field.type !== "INFORMATION"
     && isFieldVisible(field, responses)
   ));
 

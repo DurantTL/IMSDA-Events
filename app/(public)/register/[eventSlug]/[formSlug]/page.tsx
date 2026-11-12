@@ -10,6 +10,7 @@ import { EventContentBlocks, publicEventAssetUrl } from "@/components/event-cont
 import { PublicRegistrationForm } from "@/components/public-registration-form";
 import { getFormsHelpContact } from "@/modules/system-admin/platform-settings";
 import { listPublishedRegistrationInfoCards } from "@/modules/events/content-repository";
+import { passkeyOfferForPage } from "@/modules/attendee-accounts/passkey-offer-eligibility";
 import { getCurrentAttendee } from "@/modules/attendee-accounts/current-attendee";
 import {
   attendeeProfilePrefill,
@@ -129,6 +130,7 @@ export default async function PublicRegistrationPage({
       initialAttendeeResponses={scopedPrefill("ATTENDEE")}
       securityCheck={await securityCheckConfigForPage()}
       disableDrafts={Boolean(account)}
+      passkeyOffer={await passkeyOfferForPage()}
       topContent={
         editableCards.length > 0 || autoCards || clubNotice ? (
           <>
