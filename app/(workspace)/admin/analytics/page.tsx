@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
 import { PageHeader } from "@/components/page-header";
@@ -10,6 +11,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { formatDateRange } from "@/modules/calendar/domain";
 import { conferenceToday } from "@/modules/calendar/repository";
+import { analyticsPeriods, funnelRate, parseAnalyticsPeriod, type AnalyticsPeriod } from "@/modules/public-metrics/domain";
 import { getAnalyticsSummary, type MetricRow } from "@/modules/public-metrics/repository";
 import styles from "./analytics.module.css";
 
@@ -18,11 +20,14 @@ export const dynamic = "force-dynamic";
 
 const pct = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : "No data");
 
+const periodLabels: Record<AnalyticsPeriod, string> = { 30: "Last 30 days", 90: "Last 90 days", 365: "Last 12 months" };
+const periodText: Record<AnalyticsPeriod, string> = { 30: "30 days", 90: "90 days", 365: "12 months" };
+
 /** A table row: what shows, and the plain value each column sorts by (the same numbers the page already shows). */
 type TableRow = { cells: string[]; values?: SortValue[] };
 
 /** Sort keys are the column's position, named in code: a table never reads a column name from the address. */
-const COLUMN_KEYS = ["c0", "c1", "c2", "c3"] as const;
+const COLUMN_KEYS = ["c0", "c1", "c2", "c3", "c4", "c5"] as const;
 type ColumnKey = typeof COLUMN_KEYS[number];
 
 function Table({ caption, head, rows, empty = "Nothing counted yet.", sortBy, search }: { caption: string; head: string[]; rows: TableRow[]; empty?: string; sortBy?: string; search?: Record<string, string | string[] | undefined> }) {
@@ -52,15 +57,16 @@ function Table({ caption, head, rows, empty = "Nothing counted yet.", sortBy, se
 }
 
 const rowsOf = (items: MetricRow[], label = (dimension: string) => dimension || "(none)"): TableRow[] => items.map((row) => ({ cells: [label(row.dimension), String(row.count)], values: [label(row.dimension), row.count] }));
-const rate = (part: number, whole: number) => (whole > 0 ? part / whole : null);
+const rate = funnelRate;
 
-/** Aggregate public-site counts for the last 30 days (#111). System administrators only. Counts only: nobody's activity is shown. */
+/** Aggregate public-site counts for the last 30 days, 90 days or 12 months (#111, #1560). System administrators only. Counts only: nobody's activity is shown. */
 export default async function PublicAnalyticsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (user.globalRole !== "SYSTEM_ADMIN") redirect("/no-access?from=system");
   const search = await searchParams;
-  const summary = await getAnalyticsSummary(conferenceToday());
+  const days = parseAnalyticsPeriod(search.days);
+  const summary = await getAnalyticsSummary(conferenceToday(), days);
   const { totals } = summary;
   const attempts = totals.LOGIN_SUCCESS + totals.LOGIN_FAILURE;
 
@@ -69,11 +75,16 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
       <AdminSectionHeaderFor path="/admin/analytics" section="system" />
       <div className={styles.page}>
         <PageHeader
-          description="Daily counts of public site activity for the last 30 days. Nothing here identifies a person."
+          description={`Daily counts of public site activity for the last ${periodText[days]}. Nothing here identifies a person.`}
           title="Public analytics"
         />
         <section aria-labelledby="analytics-intro" className="panel">
           <div className="section-heading"><div><p className="eyebrow">{formatDateRange(summary.from, summary.to)}</p><h2 id="analytics-intro">What is counted</h2></div></div>
+          <nav aria-label="Time period" className={styles.periods}>
+            {analyticsPeriods.map((period) => (
+              <Link aria-current={period === days ? "page" : undefined} className={styles.period} href={period === 30 ? "/admin/analytics" : `/admin/analytics?days=${period}`} key={period}>{periodLabels[period]}</Link>
+            ))}
+          </nav>
           <p className={`field-help ${styles.help}`}>
             Daily counts only. Nothing here identifies a person, a device, a search or a private event.
             Visitors who send a Global Privacy Control or Do Not Track signal are not counted, and the staff workspace is never measured. Rows older than 400 days are deleted.
@@ -101,14 +112,20 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
 
         <section aria-labelledby="analytics-events" className="panel">
           <div className="section-heading"><div><h2 id="analytics-events">Events</h2></div></div>
-          <Table caption="Most viewed public event pages" head={["Event", "Views"]} rows={rowsOf(summary.topEventPages)} search={search} sortBy="top" />
           <Table
-            caption="Registration started to completed, per public event"
-            head={["Event", "Started", "Completed", "Completed of started"]}
-            rows={summary.funnel.map((row) => ({ cells: [row.slug, String(row.started), String(row.completed), pct(row.completed, row.started)], values: [row.slug, row.started, row.completed, rate(row.completed, row.started)] }))}
+            caption="Which event pages lead to registrations"
+            head={["Event", "Page views", "Started", "Completed", "Completed of views", "Completed of started"]}
+            rows={summary.funnel.map((row) => ({
+              cells: [row.title, String(row.views), String(row.started), String(row.completed), pct(row.completed, row.views), pct(row.completed, row.started)],
+              values: [row.title, row.views, row.started, row.completed, rate(row.completed, row.views), rate(row.completed, row.started)],
+            }))}
             search={search}
             sortBy="funnel"
           />
+          <p className={`field-help ${styles.help}`}>
+            Counts come from separate days&apos; totals, and people can arrive by a direct link, so a rate can pass 100%.
+            Private or unpublished events are never counted.
+          </p>
           <Table caption="How the events list was searched or filtered (which filter, never what was typed)" head={["Used", "Count"]} rows={rowsOf(summary.directory, (dimension) => dimension || "search")} search={search} sortBy="used" />
         </section>
 

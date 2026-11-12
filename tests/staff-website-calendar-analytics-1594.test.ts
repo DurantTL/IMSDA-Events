@@ -112,4 +112,12 @@ describe("the analytics page (#1594)", () => {
     expect(source).toContain('user.globalRole !== "SYSTEM_ADMIN"');
     expect(source).not.toContain("style={{");
   });
+
+  it("offers three periods and one event funnel table (#1560)", () => {
+    const source = read("app/(workspace)/admin/analytics/page.tsx");
+    expect(source).toContain("parseAnalyticsPeriod(search.days)");
+    expect(source).toContain("Last 12 months");
+    expect(source).toContain("Which event pages lead to registrations");
+    expect(source).toContain("a rate can pass 100%");
+  });
 });

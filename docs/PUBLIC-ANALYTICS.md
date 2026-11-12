@@ -42,4 +42,6 @@ Rows are daily aggregates. The outbox sweep deletes rows older than 400 days on 
 
 ## Viewing
 
-System administrators only: Public analytics (`/admin/analytics`), the last 30 days as tables of counts.
+System administrators only: Public analytics (`/admin/analytics`), as tables of counts. Links at the top pick the period: last 30 days (the default), last 90 days or last 12 months (`?days=30|90|365`; any other value shows 30 days). Retention is 400 days, so 12 months is always available.
+
+The Events table, "Which event pages lead to registrations" (#1560), has one row per event with the event's name, page views, registrations started, registrations completed, completed as a share of views and completed as a share of started. It is built only from the `EVENT_PAGE_VIEW`, `REGISTRATION_START` and `REGISTRATION_COMPLETE` counts above; nothing new is recorded. Rows start in order of completed registrations, then views, and every column can be sorted. The counts are separate days' totals and people can arrive by a direct link, so a rate can pass 100% (it is shown as computed, not capped). Private or unpublished events are never counted.
