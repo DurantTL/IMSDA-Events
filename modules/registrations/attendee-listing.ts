@@ -396,8 +396,11 @@ export function mealTotals(rows: readonly AttendeeListingRow[]): Array<{ value: 
 export const ATTENDEE_LISTING_BOM = "﻿";
 
 /** The CSV for exactly the rows shown, UTF-8 with a BOM so Excel opens it correctly. Cells are formula-escaped by `toCsv`. */
-export function attendeeListingCsv(rows: readonly AttendeeListingRow[]): string {
-  const table: Array<Array<string | number>> = [LISTING_COLUMNS.map((column) => column.label)];
-  for (const row of rows) table.push(LISTING_COLUMNS.map((column) => (column.key === "status" ? row.statusLabel : row[column.key])));
+export function attendeeListingCsv(rows: readonly AttendeeListingRow[], options: { omitDietaryColumns?: boolean } = {}): string {
+  // The event archive (#175) carries no dietary data at all: both the Dietary needs column and the Meal preference
+  // column (which can be filled from diet choices) are left out.
+  const columns = options.omitDietaryColumns ? LISTING_COLUMNS.filter((column) => column.key !== "dietaryNeeds" && column.key !== "mealPreference") : LISTING_COLUMNS;
+  const table: Array<Array<string | number>> = [columns.map((column) => column.label)];
+  for (const row of rows) table.push(columns.map((column) => (column.key === "status" ? row.statusLabel : row[column.key])));
   return ATTENDEE_LISTING_BOM + toCsv(table);
 }

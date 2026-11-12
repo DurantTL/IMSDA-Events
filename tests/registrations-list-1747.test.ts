@@ -21,7 +21,6 @@ describe("Registrations list order (#1747)", () => {
     canEdit: false,
     canEmail: false,
     filtersAfterSearch: createElement("p", null, "ADVANCED-FILTERS-MARKER"),
-    helpSlot: createElement("p", null, "HELP-MARKER"),
   }));
 
   it("puts the simple search first and the filters after it", () => {
@@ -29,9 +28,11 @@ describe("Registrations list order (#1747)", () => {
     expect(markup.indexOf("Search people")).toBeLessThan(markup.indexOf("ADVANCED-FILTERS-MARKER"));
   });
 
-  it("keeps Help in the actions row and the expected count on the count line", () => {
+  it("keeps Help in the page header's extra slot and the expected count on the count line", () => {
     const counts = markup.indexOf("expected");
-    expect(markup.indexOf("HELP-MARKER")).toBeGreaterThan(markup.indexOf("intro-actions"));
+    const page = readFileSync("app/(workspace)/people/page.tsx", "utf8");
+    expect(page).toMatch(/extra=\{<div className=\{listStyles\.helpSlot\}><StaffContextualHelp guideId="find-a-registration"/);
+    expect(page.indexOf("<PageHeader")).toBeLessThan(page.indexOf("<PeopleWorkspace"));
     expect(markup.indexOf("HELP-MARKER")).toBeLessThan(counts);
     expect(markup.slice(markup.lastIndexOf('<div class="', counts), counts)).toContain("countLine");
   });

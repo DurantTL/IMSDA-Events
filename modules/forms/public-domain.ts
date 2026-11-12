@@ -9,6 +9,7 @@ import {
   getAvailabilityMode,
   isChoiceFieldType,
   isFieldVisible,
+  isInformationField,
   summarizeChoiceUsage,
   validateTestResponses,
   type ChoiceUsage,
@@ -190,7 +191,8 @@ function normalizeResponsesForScope(
       }, attendeeIndex));
       continue;
     }
-    if (field.type === "CALCULATED") continue;
+    // A calculated total and an Information block (#284) carry no answer: anything sent under their keys is dropped.
+    if (field.type === "CALCULATED" || isInformationField(field)) continue;
     responses[key] = field.type === "ADDRESS" ? sanitizeAddressInput(value) : field.type === "PHONE" ? normalizePhoneAnswer(normalizeResponseValue(value)) : normalizeResponseValue(value);
   }
 

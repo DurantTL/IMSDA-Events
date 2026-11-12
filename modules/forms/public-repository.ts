@@ -72,6 +72,7 @@ import {
   type ClaimedPromoCode,
 } from "@/modules/promo-codes/repository";
 import { attendeeTypeSelector } from "@/modules/attendee-types/form-options";
+import { pricingAttendeeTypeCode } from "@/modules/attendee-types/pricing-type-code";
 import { matchLegacyAttendeeTypeAnswer } from "@/modules/attendee-types/legacy-answer";
 import { hydrateFormOptions } from "@/modules/forms/form-options-repository";
 import { recordRegistrationDeclarations } from "@/modules/guardian-authority/repository";
@@ -1144,6 +1145,15 @@ async function createPublicRegistrationTransaction(
         prepared.registrationResponses[configuredPromoField.key],
       ).trim()
     : "";
+  // Each attendee's type as they will be saved (#102), so a promo code restricted to attendee types is judged on the same
+  // answer the attendee row gets. Computed on the server from the validated answers, never taken from the browser.
+  const promoAttendeeTypeCodes = prepared.attendees.map((attendee) => pricingAttendeeTypeCode({
+    definition,
+    registrationResponses: prepared.registrationResponses,
+    attendeeResponses: attendee.responses,
+    types: form.event.attendeeTypes,
+    legacyAnswerAllowed: !clubAttendees && form.event.audience === "GENERAL",
+  }));
   let claimedPromo: ClaimedPromoCode | null = null;
   let pricedCalculation: FormCalculation & {
     preDiscountSubtotalCents?: number;
@@ -1159,6 +1169,7 @@ async function createPublicRegistrationTransaction(
         pricingDate: prepared.pricingDate,
         fieldId: configuredPromoField.id,
         hideAmounts: churchBilledDisplay,
+        attendeeScope: { kind: "REGISTRATION", calculation: lodgingCalculation, attendeeTypeCodes: promoAttendeeTypeCodes },
       });
       pricedCalculation = applyPromoCodeToCalculation(
         definition,
@@ -1193,6 +1204,7 @@ async function createPublicRegistrationTransaction(
       eventId: form.eventId,
       field: configuredAttendeePromoField,
       attendees: prepared.attendees,
+      attendeeTypeCodes: promoAttendeeTypeCodes,
       calculation: lodgingCalculation,
       pricingDate: prepared.pricingDate,
       claim: true,

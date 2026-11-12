@@ -112,6 +112,8 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
   const sessionStore = await import("../../modules/attendee-accounts/session-store");
   const { attendeeSessionCookie } = await import("../../modules/security/session-cookies");
   const tokens: string[] = [];
+  /** Staff sessions minted for the Clubs Administrator walkthroughs (#1882), revoked at the end. */
+  const staffTokens: string[] = [];
   let seeded = false;
   let restoreState: RestoreState | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,6 +131,8 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
     if (!seeded) return;
     const { revokeAttendeeSession } = await import("../../modules/attendee-accounts/session-store");
     for (const token of tokens) await revokeAttendeeSession(token).catch(() => undefined);
+    const { revokeDatabaseSession } = await import("../../modules/access/session-store");
+    for (const token of staffTokens) await revokeDatabaseSession(token).catch(() => undefined);
     await fixtures.deleteWalkthroughFixtures(prisma).catch((error: Error) => console.error(`Could not remove the walkthrough fixtures: ${error.message}`));
     if (lastRunStartedAt) await fixtures.deleteSamplePeopleCreatedSince(prisma, lastRunStartedAt).catch((error: Error) => console.error(`Could not remove the sample people: ${error.message}`));
     if (restoreState) {
@@ -157,7 +161,8 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
     const database = databaseNameOf(process.env.DATABASE_URL);
     // A run that was killed left its marker: repair that first, so the "before" below is the real one.
     await recoverFromLeftoverMarker(prisma, markerFile, database, log);
-    const needsCoordinatorArea = selected.some((walkthrough) => walkthrough.audience === "coordinator");
+    // A coordinator and a Clubs Administrator both see every active club, so the clubs already in the database are hidden for their pictures.
+    const needsCoordinatorArea = selected.some((walkthrough) => walkthrough.audience === "coordinator" || walkthrough.audience === "clubs");
     const hiddenClubs = needsCoordinatorArea ? await fixtures.listOtherClubIds(prisma) : [];
     const hiddenEvents = await fixtures.listOtherClubEventIds(prisma);
     const before = { database, hiddenClubs, hiddenEvents, templates: await fixtures.readTemplateStates(prisma), passkeyRpId: await fixtures.readPasskeyRpId(prisma) };
@@ -221,6 +226,16 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
         };
         const begin = async (start: WalkthroughStart) => {
           if (start === "signed-out") return;
+          if (start === "signed-in-clubs-admin") {
+            // A staff session, minted directly (staff two-step sign-in is checked when someone signs in, and none is typed here).
+            await fixtures.enrolPlaceholderStaffTwoStep(prisma);
+            const { createDatabaseSession } = await import("../../modules/access/session-store");
+            const { staffSessionCookie } = await import("../../modules/security/session-cookies");
+            const staffSession = await createDatabaseSession(fixtures.walkthroughClubsAdmin.id, null);
+            staffTokens.push(staffSession.token);
+            await context.addCookies([{ name: staffSessionCookie.legacyName, value: staffSession.token, url: baseUrl, httpOnly: true, expires: Math.floor(staffSession.expiresAt.getTime() / 1000) }]);
+            return;
+          }
           const accountId = start === "signed-in" ? fixtures.walkthroughIds.director : start === "signed-in-family" ? fixtures.walkthroughFamily.id : fixtures.walkthroughCoordinator.id;
           if (start === "signed-in") await fixtures.enrolPlaceholderTwoStep(prisma);
           if (start === "signed-in-family") await fixtures.enrolPlaceholderTwoStep(prisma, fixtures.walkthroughFamily.id);
@@ -235,6 +250,7 @@ export async function runWalkthroughHarness(options: HarnessOptions): Promise<Ha
           director: { email: fixtures.walkthroughDirector.email, password: fixtures.walkthroughDirector.password, displayName: fixtures.walkthroughDirector.displayName },
           family: { email: fixtures.walkthroughFamily.email, password: fixtures.walkthroughFamily.password, displayName: fixtures.walkthroughFamily.displayName, phone: fixtures.walkthroughFamily.phone, newPhone: fixtures.walkthroughFamily.newPhone },
           coordinator: { email: fixtures.walkthroughCoordinator.email, password: fixtures.walkthroughCoordinator.password, displayName: fixtures.walkthroughCoordinator.displayName },
+          clubsAdmin: { displayName: fixtures.walkthroughClubsAdmin.displayName, searchWord: fixtures.walkthroughClubsAdmin.searchWord, clubName: fixtures.walkthroughAreaClubs[0]!.name },
           authenticatorCode: () => totpCode(authenticatorSecret, new Date()),
           rosterPerson: fixtures.walkthroughRosterPerson,
           invitee: { email: fixtures.walkthroughInvitee.email },

@@ -3,7 +3,7 @@ import { AccessRestricted } from "@/components/access-restricted";
 import { PromoCodeWorkspace } from "@/components/promo-code-workspace";
 import { resolveEventContext } from "@/modules/events/selection";
 import { eventBillsSponsoredPromoCodes } from "@/modules/promo-codes/church-sponsored";
-import { listPromoCodes, listSponsorChurchOptions } from "@/modules/promo-codes/repository";
+import { listPromoAttendeeTypeOptions, listPromoCodes, listSponsorChurchOptions } from "@/modules/promo-codes/repository";
 import { staffPageTitles } from "@/components/staff-navigation";
 
 export const metadata: Metadata = { title: staffPageTitles.promoCodes };
@@ -25,8 +25,9 @@ export default async function PromoCodesPage({
     );
   }
   const canSponsorByChurch = eventBillsSponsoredPromoCodes(event);
-  const [promoCodes, sponsorChurches] = await Promise.all([
+  const [promoCodes, attendeeTypeOptions, sponsorChurches] = await Promise.all([
     listPromoCodes(event.id),
+    listPromoAttendeeTypeOptions(event.id),
     canSponsorByChurch ? listSponsorChurchOptions() : Promise.resolve([]),
   ]);
   return (
@@ -37,6 +38,7 @@ export default async function PromoCodesPage({
         canCreate={permissions.includes("MANAGE_FINANCE")}
         canSponsorByChurch={canSponsorByChurch}
         sponsorChurches={sponsorChurches}
+        attendeeTypeOptions={attendeeTypeOptions}
       />
     </>
   );

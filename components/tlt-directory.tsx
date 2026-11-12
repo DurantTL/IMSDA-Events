@@ -6,10 +6,12 @@ import type { PageSlice } from "@/lib/pagination";
 import { TltPrintButton } from "@/components/tlt-print-button";
 import { TltExportButton } from "@/components/tlt-export-button";
 import { TltRowEditor } from "@/components/tlt-row-editor";
+import { TltTagSuggestions } from "@/components/tlt-tag-suggestions";
 import {
   TLT_STATUSES,
   TLT_YEARS,
   tltAgeLabel,
+  tltShirtLabel,
   tltStatusLabel,
   tltStatusLabels,
   tltYearLabel,
@@ -17,6 +19,7 @@ import {
   type TltFilters,
   type TltSort,
 } from "@/modules/tlt-directory/domain";
+import type { TltFormLinks } from "@/modules/tlt-directory/forms";
 import type { TltListEntry } from "@/modules/tlt-directory/repository";
 import styles from "./tlt-directory.module.css";
 
@@ -41,13 +44,15 @@ function hrefFor(filters: TltFilters, sort: TltSort, page = 1) {
  * the facts and a four-field editor, the CSV button and print. Presentation only: the page already checked access, and
  * every save and download is checked again on the server.
  */
-export function TltDirectory({ slice, total, clubs, filters, positions, tags }: {
+export function TltDirectory({ slice, total, clubs, filters, positions, tags, formLinks }: {
   slice: PageSlice<TltDirectoryRow>;
   total: number;
   clubs: Array<{ id: string; name: string }>;
   filters: TltFilters;
   positions: TltListEntry[];
   tags: TltListEntry[];
+  /** TLT forms tied to each row by id, by person (#1686). A row with none shows no link. */
+  formLinks: ReadonlyMap<string, TltFormLinks>;
 }) {
   const exportFilters = { q: filters.q, club: filters.clubId, year: filters.year, position: filters.position, status: filters.status, tag: filters.tag, sort: filters.sort };
   const rows = slice.items;
@@ -113,6 +118,7 @@ export function TltDirectory({ slice, total, clubs, filters, positions, tags }: 
         <TltExportButton filters={exportFilters} />
         <TltPrintButton />
         <Link className="secondary-button" href="/account/area-clubs/tlt/lists">Position types and tags</Link>
+        <Link className="secondary-button" href="/account/area-clubs/tlt/forms">TLT forms</Link>
       </div>
 
       <SearchResultStatus message={`${slice.total} ${slice.total === 1 ? "TLT" : "TLTs"} found`} />
@@ -135,9 +141,12 @@ export function TltDirectory({ slice, total, clubs, filters, positions, tags }: 
                 <div><dt>Status</dt><dd>{tltStatusLabel(row.status)}</dd></div>
                 <div>
                   <dt>Help-area tags</dt>
-                  <dd>{row.tags.length === 0 ? "None" : <ul className={styles.tags}>{row.tags.map((tag) => <li className={styles.tag} key={tag.id}>{tag.name}</li>)}</ul>}</dd>
+                  <dd id={`tlt-tags-${row.personId}`} tabIndex={-1}>{row.tags.length === 0 ? "None" : <ul className={styles.tags}>{row.tags.map((tag) => <li className={styles.tag} key={tag.id}>{tag.name}</li>)}</ul>}</dd>
                 </div>
+                <div><dt>TLT shirt</dt><dd>{tltShirtLabel(row.shirt)}</dd></div>
               </dl>
+              {formLinks.get(row.personId) ? <TltFormLinksRow links={formLinks.get(row.personId)!} personId={row.personId} /> : null}
+              <TltTagSuggestions personId={row.personId} suggestions={row.suggestedTags} />
               <TltRowEditor
                 personId={row.personId}
                 positionTypeId={row.positionTypeId}
@@ -153,5 +162,23 @@ export function TltDirectory({ slice, total, clubs, filters, positions, tags }: 
       )}
       <ListPager hrefFor={pagerHref} label="TLT pages" noun="TLTs" nounOne="TLT" part="pages" slice={slice} />
     </>
+  );
+}
+
+/**
+ * Links to this TLT's submitted forms (#1686), shown only where a form is tied to the person by an id. Each opens the
+ * TLT forms inbox filtered to that person; the inbox and each form check access again.
+ */
+function TltFormLinksRow({ links, personId }: { links: TltFormLinks; personId: string }) {
+  const parts = [
+    links.application ? `${links.application} ${links.application === 1 ? "application" : "applications"}` : null,
+    links.recommendation ? `${links.recommendation} ${links.recommendation === 1 ? "recommendation" : "recommendations"}` : null,
+    links.ofTheYear ? `${links.ofTheYear} TLT of the Year ${links.ofTheYear === 1 ? "nomination" : "nominations"}` : null,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return (
+    <p className={`${styles.entryNote} ${styles.noPrint}`}>
+      <Link className="secondary-button" href={`/account/area-clubs/tlt/forms?person=${encodeURIComponent(personId)}`}>TLT forms: {parts.join(", ")}</Link>
+    </p>
   );
 }

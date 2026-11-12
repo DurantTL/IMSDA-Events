@@ -1,7 +1,10 @@
 import { eventRoles } from "@/modules/access/permissions";
 import { eventExtraText, systemRoleText } from "@/modules/access/role-descriptions";
 import { roleDetails } from "@/modules/access/role-display";
+import { clubsAdminGuides } from "@/modules/help/clubs-admin-guides";
 import { eventSetupGuides } from "@/modules/help/event-setup-guides";
+import { clubsAdminWalkthroughGuides, walkthroughsForGuide } from "@/modules/help/walkthroughs";
+import { clubsAdminRecordsHref } from "@/components/system-navigation";
 import type { HelpDestination, HelpGuide } from "@/modules/help/types";
 
 /**
@@ -21,15 +24,23 @@ export const helpDestinations: Record<string, HelpDestination> = {
   "event-settings": { id: "event-settings", label: "Event settings", path: "/more/event-settings", scope: "Event", permission: "CONFIGURE_EVENT" },
   "event-team": { id: "event-team", label: "Team", path: "/staff", scope: "Event", permission: "MANAGE_STAFF" },
   "system-team": { id: "system-team", label: "People & access", path: "/admin/people", scope: "System" },
-  "club-applications": { id: "club-applications", label: "New club applications", path: "/admin/clubs/applications", scope: "System" },
-  "club-invites": { id: "club-invites", label: "Club leaders", path: "/admin/clubs/leaders", scope: "System" },
+  "club-applications": { id: "club-applications", label: "New club applications", path: "/admin/clubs/applications", scope: "Clubs" },
+  "club-invites": { id: "club-invites", label: "Club leaders", path: "/admin/clubs/leaders", scope: "Clubs" },
   "registration-forms": { id: "registration-forms", label: "Registration forms", path: "/registration-builder", scope: "Event", permission: "MANAGE_FORMS" },
   "information-forms": { id: "information-forms", label: "Information forms", path: "/information-forms", scope: "Event", permission: "MANAGE_FORMS" },
   "form-templates": { id: "form-templates", label: "Form templates", path: "/admin/form-templates", scope: "System" },
   "club-forms": { id: "club-forms", label: "Club forms", path: "/admin/club-forms", scope: "System" },
   "event-registrations": { id: "event-registrations", label: "Registrations", path: "/people", scope: "Event", permission: "VIEW_SENSITIVE_DATA" },
   "event-imports": { id: "event-imports", label: "Imports", path: "/imports", scope: "Event", permission: "MANAGE_IMPORTS" },
-  "club-import": { id: "club-import", label: "Import clubs", path: "/admin/clubs/import", scope: "System" },
+  "club-import": { id: "club-import", label: "Import clubs", path: "/admin/clubs/import", scope: "Clubs" },
+  // The Clubs Administrator's pages (#1882). Labels are the Clubs sidebar's own (`clubsAdminGroups`); every page is guarded by `hasClubsAdministration`.
+  "club-summary": { id: "club-summary", label: "Club summary", path: "/admin/clubs/summary", scope: "Clubs" },
+  "club-transfers": { id: "club-transfers", label: "Club member transfers", path: "/admin/clubs/transfers", scope: "Clubs" },
+  "club-sterling": { id: "club-sterling", label: "Sterling Volunteers", path: "/admin/organizations/background-checks", scope: "Clubs" },
+  "club-monthly-records": { id: "club-monthly-records", label: "Monthly Records", path: clubsAdminRecordsHref, scope: "Clubs" },
+  "club-review-records": { id: "club-review-records", label: "Review monthly records", path: "/admin/clubs/reports", scope: "Clubs" },
+  "club-year-end": { id: "club-year-end", label: "Club Year-End Reports", path: "/admin/clubs/reports/year-end", scope: "Clubs" },
+  "club-people-access": { id: "club-people-access", label: "People & access", path: "/admin/people", scope: "Clubs" },
   "event-emails": { id: "event-emails", label: "Communications", path: "/communications", scope: "Event", permission: "MANAGE_COMMUNICATIONS" },
   "system-email": { id: "system-email", label: "Email (central sender and paused events)", path: "/admin/email", scope: "System" },
   "attendee-configuration": { id: "attendee-configuration", label: "Attendee setup", path: "/more/attendee-configuration", scope: "Event", permission: "CONFIGURE_EVENT" },
@@ -44,7 +55,7 @@ export const helpDestinations: Record<string, HelpDestination> = {
 
 const roleLines = eventRoles.map((role) => `${roleDetails[role].label}: ${roleDetails[role].description}`);
 
-export const helpGuides: readonly HelpGuide[] = [
+const writtenHelpGuides: readonly HelpGuide[] = [
   {
     id: "choose-workspace",
     title: "Choose System or Event workspace",
@@ -342,44 +353,6 @@ export const helpGuides: readonly HelpGuide[] = [
     lastReviewed: "2026-11-11",
   },
   {
-    id: "review-new-club-application",
-    title: "Review a new club application",
-    summary: "Read an application to start a new club, check the flags, then approve or decline it.",
-    workspace: "System",
-    audience: { kind: "system" },
-    needs: [
-      "The New club applications page (Clubs in the left bar, then New club applications).",
-      "The application waiting under Pending approval.",
-    ],
-    changes: [
-      "Nothing while you read. Approve creates the club under its sponsoring church or company and emails the director the club director invite. It can't be undone from the page.",
-      "Decline emails the applicant. The reason is optional, and the applicant is emailed it.",
-    ],
-    steps: [
-      "Choose Clubs in the left bar, then New club applications. Applications wait under Pending approval. Decided ones are under Recently decided.",
-      "Read the card: the club, its sponsoring church, the director's details, the typed signatures, any note and any attachment.",
-      "Check the flags under the club name. Sterling Volunteers is a flag to review, not a block.",
-      "Also read any Possible duplicate lines, and any note that the director email differs from the invited address. They are there to be checked, not decided for you.",
-      "If the applicant typed a church that is not in the directory, you must choose a Sponsoring church or company from the directory before you can approve.",
-      "To decline, choose Decline.",
-      "Add a reason if you want one. The applicant is emailed it.",
-      "Choose Decline application.",
-      "To approve, choose Approve and read what it says it will do.",
-      "Choose Approve and send invite.",
-      "To invite a prospective director first, open Tools, type the Director's email, and choose Send link. The link opens the same form, works once, and creates nothing until you approve the application. Withdraw cancels a link already sent.",
-    ],
-    verify: [
-      "The card moves out of Pending approval and shows Approved or Declined, with when it was decided.",
-      "An approved card shows an Open the new club link.",
-    ],
-    next: "The director accepts the club invite from the email and lands in the new club. If account email is not set up, the invite waits on the Club leaders page (choose Draft under Status to send it).",
-    destinationIds: ["club-applications", "club-invites", "system-email"],
-    relatedDocs: ["docs/NEW-CLUB-APPLICATIONS.md"],
-    keywords: ["new club", "application", "applications", "approve", "decline", "start a club", "club invite", "private link", "sterling", "sponsoring church"],
-    owner: "Communication office",
-    lastReviewed: "2026-11-11",
-  },
-  {
     id: "inspect-system-health",
     title: "Inspect System health",
     summary: "Read the live System health panel: what was measured, when, and what could not be read.",
@@ -407,6 +380,16 @@ export const helpGuides: readonly HelpGuide[] = [
     lastReviewed: "2026-11-11",
   },
   ...eventSetupGuides,
+  ...clubsAdminGuides,
+];
+
+/**
+ * Every staff guide: the written ones (each with a "See it step by step" link where a walkthrough covers the same task), then the
+ * Clubs Administrator walkthroughs (#1882), which carry the pictures.
+ */
+export const helpGuides: readonly HelpGuide[] = [
+  ...writtenHelpGuides.map((guide) => (walkthroughsForGuide[guide.id] ? { ...guide, walkthroughIds: walkthroughsForGuide[guide.id] } : guide)),
+  ...clubsAdminWalkthroughGuides,
 ];
 
 export function findGuide(id: string): HelpGuide | undefined {

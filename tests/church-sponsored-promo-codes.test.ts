@@ -64,6 +64,7 @@ function txFor(options: {
       findUnique: vi.fn().mockResolvedValue(options.church === undefined ? { type: "CHURCH", isActive: true } : options.church),
     },
     promoCode,
+    eventAttendeeType: { findMany: vi.fn().mockResolvedValue([]) },
     auditLog,
     $queryRaw: vi.fn().mockResolvedValue([]),
     $executeRawUnsafe: vi.fn().mockResolvedValue(0),
@@ -81,6 +82,7 @@ const existingPromo = (overrides: Record<string, unknown> = {}) => ({
   isActive: true,
   redeemedCount: 0,
   sponsoringOrganizationId: null,
+  attendeeTypeCodes: [] as string[],
   ...overrides,
 });
 

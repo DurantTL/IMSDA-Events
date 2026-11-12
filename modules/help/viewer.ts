@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { hasClubsAdministration } from "@/modules/access/admin-roles";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { getCurrentSession } from "@/modules/access/current-session";
 import { listActiveEventPermissionsForUser } from "@/modules/access/membership-repository";
@@ -21,6 +22,7 @@ export const loadHelpViewer = cache(async (requestedEventId?: string): Promise<H
   const user = (await getCurrentSession()).user;
   if (!user) redirect(await staffLoginRedirectPath());
   const isSystemAdmin = user.globalRole === "SYSTEM_ADMIN";
+  const isClubsAdministrator = await hasClubsAdministration(user);
   const events = await listEventsForUser(user.id, isSystemAdmin, { archived: "include" });
   const selection = selectEventContext({
     events,
@@ -28,9 +30,9 @@ export const loadHelpViewer = cache(async (requestedEventId?: string): Promise<H
     lastUsedEventId: requestedEventId ? null : await readLastUsedEventId(),
   });
   const event = selection.kind === "picker" || selection.kind === "unavailable" ? null : selection.event;
-  if (!event) return { isSystemAdmin, selectedEventId: "", permissions: [] };
+  if (!event) return { isSystemAdmin, isClubsAdministrator, selectedEventId: "", permissions: [] };
   const permissions = isSystemAdmin
     ? [...eventPermissions]
     : (await listActiveEventPermissionsForUser(user.id, [event.id])).get(event.id) ?? [];
-  return { isSystemAdmin, selectedEventId: event.id, permissions };
+  return { isSystemAdmin, isClubsAdministrator, selectedEventId: event.id, permissions };
 });

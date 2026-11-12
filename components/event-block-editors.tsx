@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { EventImageLibraryPicker } from "@/components/event-image-library-picker";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { EmailInput } from "@/components/email-input";
 import { PhoneInput } from "@/components/phone-input";
@@ -414,6 +415,7 @@ export function BlockEditor({
   assets,
   isSystemAdmin,
   updateSection,
+  onAssetsChange,
 }: {
   eventId: string;
   eventSlug: string;
@@ -424,9 +426,12 @@ export function BlockEditor({
   assets: EventAssetRecord[];
   isSystemAdmin: boolean;
   updateSection: UpdateSection;
+  /** The event's file list changed (a library image was copied in). */
+  onAssetsChange?: (assets: EventAssetRecord[]) => void;
 }) {
   const data: Data = isRecord(section.data) ? section.data : {};
   const set = (patch: Data) => updateSection(index, { data: { ...data, ...patch } });
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   switch (section.kind) {
     case "HERO": {
@@ -435,6 +440,23 @@ export function BlockEditor({
         <div className="form-stack">
           <p className="field-help">The heading above is the large title on the banner. One banner per page, shown first.</p>
           <AssetImagePicker label="Banner image" assets={assets} value={text(data.assetId)} onChange={(assetId) => set({ assetId })} />
+          <div>
+            <button type="button" className="secondary-button" onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen}>
+              Choose from library
+            </button>
+          </div>
+          {libraryOpen && (
+            <EventImageLibraryPicker
+              eventId={eventId}
+              onClose={() => setLibraryOpen(false)}
+              onChoose={({ assets: nextAssets, asset, altText }) => {
+                onAssetsChange?.(nextAssets);
+                // The library's suggested description only fills an empty field; alt text stays required.
+                set({ assetId: asset.id, ...(text(data.alt).trim() === "" && altText ? { alt: altText } : {}) });
+                setLibraryOpen(false);
+              }}
+            />
+          )}
           <TextField label="Image description (alt text)" value={text(data.alt)} max={200} required onChange={(alt) => set({ alt })} help="Describe the photo for people who cannot see it." />
           <TextField label="Subtitle" value={text(data.subtitle)} max={200} onChange={(subtitle) => set({ subtitle })} />
           <label className="message-enabled-toggle">
