@@ -17,7 +17,7 @@ import type { HelpViewer } from "@/modules/help/visibility";
 /** Contextual help and guide screenshots (#1259). Synthetic viewers only. */
 
 const root = process.cwd();
-const staff = (permissions: HelpViewer["permissions"], isSystemAdmin = false): HelpViewer => ({ isSystemAdmin, selectedEventId: "evt_synthetic", permissions });
+const staff = (permissions: HelpViewer["permissions"], isSystemAdmin = false): HelpViewer => ({ isSystemAdmin, isClubsAdministrator: isSystemAdmin, selectedEventId: "evt_synthetic", permissions });
 const director: PortalHelpViewer = { hasAccount: true, directedClubs: [{ organizationId: "org_a", role: "DIRECTOR" }], isAreaCoordinator: false, acting: null };
 
 describe("the server's choice of contextual guide", () => {
