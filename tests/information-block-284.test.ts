@@ -178,6 +178,24 @@ describe("show and hide rules match questions", () => {
   });
 });
 
+describe("a block in the review step", () => {
+  it("is part of the review step's fields, so the form draws it above the review summary", () => {
+    const reviewForm = registrationFormDefinitionSchema.parse({
+      title: "Synthetic", confirmationMessage: "Received.",
+      sections: [
+        { id: "sec_a", title: "Contact", description: "", fields: [{ id: "f_e", key: "email", label: "Email", type: "EMAIL", scope: "REGISTRATION", required: true, options: [], helpText: "" }] },
+        { id: "sec_r", title: "Check and send", description: "", isReviewStep: true, fields: [info({ conditional: { fieldKey: "email", operator: "NOT_EMPTY", value: "" } })] },
+      ],
+    });
+    const plan = getPublicRegistrationStepPlan(reviewForm, new Set(["email", "info_one"]));
+    const review = plan.find((step) => step.isReview)!;
+    expect(review.sectionId).toBe("sec_r");
+    expect(review.fieldKeys).toEqual(["info_one"]);
+    // Hidden until its rule matches, like a question: the step then keeps only the review summary.
+    expect(getPublicRegistrationStepPlan(reviewForm, new Set(["email"])).find((step) => step.isReview)?.fieldKeys).toEqual([]);
+  });
+});
+
 describe("what people see", () => {
   const field = formFieldSchema.parse(info({ information: { text: "## Packing\n\nBring **a coat** and [a map](https://example.org/map).\n\n- Water\n- Snacks", note: "Doors open at *8 am*." } }));
 

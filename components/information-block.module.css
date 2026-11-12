@@ -38,8 +38,16 @@
   font-size: max(var(--type-staff-floor, 0px), 0.9375rem);
 }
 
-.text :is(ul, ol) {
+.text ul,
+.note ul {
   padding-left: 22px;
+  list-style: disc;
+}
+
+.text ol,
+.note ol {
+  padding-left: 22px;
+  list-style: decimal;
 }
 
 .text a {

@@ -2,6 +2,7 @@
 // highlighted note. Both are written in the site's safe formatting (bold, italic, links, lists); there is no image or video.
 import { INFORMATION_NOTE_MAX, INFORMATION_TEXT_MAX, type InformationConfig, type RegistrationFormField } from "@/modules/forms/definition";
 import { useLoadedBuilder } from "./builder-context";
+import styles from "./builder-information-block.module.css";
 
 type FieldTarget = { field: RegistrationFormField; sectionIndex: number; fieldIndex: number };
 
@@ -41,26 +42,23 @@ export function BuilderInformationSettings({ field, sectionIndex, fieldIndex }: 
   const config: InformationConfig = field.information ?? { text: "" };
   const textId = `information_text_${field.id}`;
   const noteId = `information_note_${field.id}`;
-  // An empty note is dropped, not stored as an empty string.
+  const textHelpId = `${textId}_help`;
+  const noteHelpId = `${noteId}_help`;
+  // An empty or all-space note is dropped, not stored (the schema trims it and needs a character).
   const change = (patch: Partial<InformationConfig>) => {
     const next = { ...config, ...patch };
-    updateField(sectionIndex, fieldIndex, { information: { text: next.text, ...(next.note ? { note: next.note } : {}) } });
+    const note = next.note?.trim();
+    updateField(sectionIndex, fieldIndex, { information: { text: next.text, ...(note ? { note: next.note } : {}) } });
   };
   return (
     <section className="field-full" data-testid={`information-settings-${field.key}`}>
-      <div className="field-settings">
-        <label className="field-full" htmlFor={textId}>
-          Text
-          <textarea id={textId} disabled={!canEdit} rows={5} maxLength={INFORMATION_TEXT_MAX} value={config.text} onChange={(event) => change({ text: event.target.value })} />
-          <small>{config.text.length.toLocaleString("en-US")} of {INFORMATION_TEXT_MAX.toLocaleString("en-US")} characters. You can use **bold**, *italic*, [links](https://example.org) and lists.</small>
-        </label>
-        <label className="field-full" htmlFor={noteId}>
-          Highlighted note (optional)
-          <textarea id={noteId} disabled={!canEdit} rows={3} maxLength={INFORMATION_NOTE_MAX} value={config.note ?? ""} onChange={(event) => change({ note: event.target.value })} />
-          <small>Shown in a highlighted box under the text, for the one thing people must not miss.</small>
-        </label>
-      </div>
-      <small>An information block is only shown. It is never answered, priced, counted or exported, and it follows the same show-when rules as a question.</small>
+      <label htmlFor={textId}>Text</label>
+      <textarea id={textId} disabled={!canEdit} rows={5} maxLength={INFORMATION_TEXT_MAX} value={config.text} aria-describedby={textHelpId} onChange={(event) => change({ text: event.target.value })} />
+      <p className={`field-help ${styles.help}`} id={textHelpId}>{config.text.length.toLocaleString("en-US")} of {INFORMATION_TEXT_MAX.toLocaleString("en-US")} characters. You can use **bold**, *italic*, [links](https://example.org) and lists.</p>
+      <label htmlFor={noteId}>Highlighted note (optional)</label>
+      <textarea id={noteId} disabled={!canEdit} rows={3} maxLength={INFORMATION_NOTE_MAX} value={config.note ?? ""} aria-describedby={noteHelpId} onChange={(event) => change({ note: event.target.value })} />
+      <p className={`field-help ${styles.help}`} id={noteHelpId}>Shown in a highlighted box under the text, for the one thing people must not miss.</p>
+      <p className={`field-help ${styles.help}`}>An information block is only shown. It is never answered, priced, counted or exported, and it follows the same show-when rules as a question.</p>
     </section>
   );
 }

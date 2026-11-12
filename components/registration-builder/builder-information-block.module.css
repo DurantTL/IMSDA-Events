@@ -1,0 +1,4 @@
+/* .field-help has a negative top margin; the information settings stack plain labels, so it is reset here. */
+.help {
+  margin: 4px 0 0;
+}
