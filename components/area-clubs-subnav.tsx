@@ -24,7 +24,7 @@ export function coordinatorNavItems({ showWaitlists = false, showTlt = false, sh
     // The TLT directory (#1686): only the Area Coordinator the TLT director setting is on for; the pages and routes check on the server.
     ...(showTlt ? [{ href: "/account/area-clubs/tlt", label: "TLT directory", alsoMatchPrefix: "/account/area-clubs/tlt/" }] : []),
     // Master Guide approvals (#1698): for a real Area Coordinator, once any club uses the optional feature; the page checks on the server.
-    ...(showMasterGuide ? [{ href: "/account/area-clubs/master-guide", label: "Master Guide" }] : []),
+    ...(showMasterGuide ? [{ href: "/account/area-clubs/master-guide", label: "Master Guide approvals" }] : []),
   ];
 }
 

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Prisma } from "@prisma/client";
+import { logError } from "@/lib/logger";
 import { formatPersonName } from "@/lib/person-name";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
@@ -22,6 +23,9 @@ import {
   type MasterGuideStatus,
   type MasterGuideWindow,
   BIRTH_DATE_NEEDED,
+  BIRTH_DATE_UNREADABLE,
+  BIRTH_DATE_UNREADABLE_MESSAGE,
+  type RosterBirthDate,
 } from "@/modules/master-guide/domain";
 
 /**
@@ -55,6 +59,8 @@ export type MasterGuideList = {
   eligible: MasterGuideEligible[];
   /** Active people with no birth date on the roster, who cannot be added until it is there. */
   needBirthDate: string[];
+  /** Active people whose roster birth date could not be read, so no age can be worked out. */
+  unreadableBirthDate: string[];
 };
 
 export type AreaApprovalRow = {
@@ -68,13 +74,22 @@ export type AreaApprovalRow = {
   window: MasterGuideWindow | null;
 };
 
-function openSafely(sealed: string | null): string | null {
+/** Opens a sealed birth date. A sealed value that cannot be opened (a key or setup problem) is "unreadable", not "missing"; the error is logged, never the value. */
+function openBirthDateOrFlag(sealed: string | null): RosterBirthDate {
   if (!sealed) return null;
   try {
     return openBirthDate(sealed);
-  } catch {
-    return null;
+  } catch (error) {
+    logError("A roster birth date could not be opened for Master Guide tracking", error);
+    return BIRTH_DATE_UNREADABLE;
   }
+}
+
+function birthDateProblemCode(problem: string, otherwise: "TOO_YOUNG_TO_START" | "TOO_YOUNG_TO_APPROVE") {
+  if (problem === BIRTH_DATE_NEEDED) return "BIRTH_DATE_NEEDED" as const;
+  if (problem === BIRTH_DATE_UNREADABLE_MESSAGE) return "BIRTH_DATE_UNREADABLE" as const;
+  if (problem.startsWith("Enter")) return "INVALID_DATE" as const;
+  return otherwise;
 }
 
 function attributionData(actor: MasterGuideClubActor) {
@@ -101,17 +116,19 @@ async function assertClubAndFeature(db: Db, organizationId: string) {
 }
 
 /** The birth date the roster holds for a person in this club: the newest active row that has one. Never returned to a caller outside this module. */
-async function rosterBirthDate(db: Db, organizationId: string, personId: string): Promise<string | null> {
+async function rosterBirthDate(db: Db, organizationId: string, personId: string): Promise<RosterBirthDate> {
   const rows = await db.clubRosterMember.findMany({
     where: { organizationId, personId, status: "ACTIVE" },
     orderBy: { clubYear: "desc" },
     select: { sealedBirthDate: true },
   });
+  let unreadable = false;
   for (const row of rows) {
-    const opened = openSafely(row.sealedBirthDate);
-    if (opened) return opened;
+    const opened = openBirthDateOrFlag(row.sealedBirthDate);
+    if (opened === BIRTH_DATE_UNREADABLE) unreadable = true;
+    else if (opened) return opened;
   }
-  return null;
+  return unreadable ? BIRTH_DATE_UNREADABLE : null;
 }
 
 /** Whether the feature is on for this club: the one check the pages share. */
@@ -147,10 +164,12 @@ export async function loadMasterGuide(organizationId: string, now = new Date()):
   ]);
   // One birth date per person: the newest active row that has one. The sealed value is opened here and dropped.
   const birthByPerson = new Map<string, string>();
+  const unreadable = new Set<string>();
   for (const member of members) {
     if (!member.personId || birthByPerson.has(member.personId)) continue;
-    const opened = openSafely(member.sealedBirthDate);
-    if (opened) birthByPerson.set(member.personId, opened);
+    const opened = openBirthDateOrFlag(member.sealedBirthDate);
+    if (opened === BIRTH_DATE_UNREADABLE) unreadable.add(member.personId);
+    else if (opened) birthByPerson.set(member.personId, opened);
   }
   const rows: MasterGuideRow[] = candidates
     .map((candidate): MasterGuideRow => {
@@ -167,7 +186,7 @@ export async function loadMasterGuide(organizationId: string, now = new Date()):
         window: masterGuideWindow(startedOn, today, clubApprovedOn),
         clubApprovedOn,
         areaApprovedOn: candidate.areaApprovedAt ? calendarDateOf(candidate.areaApprovedAt) : null,
-        approvalProblem: status === "IN_PROGRESS" ? clubApprovalProblem(birthByPerson.get(candidate.personId) ?? null, today) : null,
+        approvalProblem: status === "IN_PROGRESS" ? clubApprovalProblem(birthByPerson.get(candidate.personId) ?? (unreadable.has(candidate.personId) ? BIRTH_DATE_UNREADABLE : null), today) : null,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -176,12 +195,17 @@ export async function loadMasterGuide(organizationId: string, now = new Date()):
   const seen = new Set<string>();
   const eligible: MasterGuideEligible[] = [];
   const needBirthDate: string[] = [];
+  const unreadableBirthDate: string[] = [];
   for (const member of thisYear) {
     const personId = member.personId!;
     if (seen.has(personId)) continue;
     seen.add(personId);
     const name = formatPersonName(member.person ?? {});
     const birth = birthByPerson.get(personId);
+    if (!birth && unreadable.has(personId)) {
+      unreadableBirthDate.push(name);
+      continue;
+    }
     if (!birth) {
       needBirthDate.push(name);
       continue;
@@ -191,7 +215,8 @@ export async function loadMasterGuide(organizationId: string, now = new Date()):
   }
   eligible.sort((a, b) => a.name.localeCompare(b.name));
   needBirthDate.sort((a, b) => a.localeCompare(b));
-  return { clubYear, rows, eligible, needBirthDate };
+  unreadableBirthDate.sort((a, b) => a.localeCompare(b));
+  return { clubYear, rows, eligible, needBirthDate, unreadableBirthDate };
 }
 
 export async function addCandidate(
@@ -213,7 +238,7 @@ export async function addCandidate(
       const problem = addProblem(birthDate, input.startedOn);
       if (problem) {
         throw new MasterGuideError(
-          problem === BIRTH_DATE_NEEDED ? "BIRTH_DATE_NEEDED" : problem.startsWith("Enter") ? "INVALID_DATE" : "TOO_YOUNG_TO_START",
+          birthDateProblemCode(problem, "TOO_YOUNG_TO_START"),
           problem,
         );
       }
@@ -272,7 +297,7 @@ export async function updateCandidate(
     const problem = addProblem(birthDate, input.startedOn);
     if (problem) {
       throw new MasterGuideError(
-        problem === BIRTH_DATE_NEEDED ? "BIRTH_DATE_NEEDED" : problem.startsWith("Enter") ? "INVALID_DATE" : "TOO_YOUNG_TO_START",
+        birthDateProblemCode(problem, "TOO_YOUNG_TO_START"),
         problem,
       );
     }
@@ -328,9 +353,14 @@ export async function approveForClub(organizationId: string, candidateId: string
     await assertClubAndFeature(tx, organizationId);
     const candidate = await loadOwnCandidate(tx, organizationId, candidateId);
     if (!canTransition(candidate.status, "CLUB_APPROVED")) throw new MasterGuideError("WRONG_STATUS", "Only a candidate still in progress can be approved by the club.");
+    const onRoster = await tx.clubRosterMember.findFirst({
+      where: { organizationId, personId: candidate.personId, status: "ACTIVE", clubYear: clubYearFor(now) },
+      select: { id: true },
+    });
+    if (!onRoster) throw new MasterGuideError("NOT_ON_ROSTER", "This person is no longer on this club year's active roster, so the club cannot approve them.");
     const today = calendarDateOf(now);
     const problem = clubApprovalProblem(await rosterBirthDate(tx, organizationId, candidate.personId), today);
-    if (problem) throw new MasterGuideError(problem === BIRTH_DATE_NEEDED ? "BIRTH_DATE_NEEDED" : "TOO_YOUNG_TO_APPROVE", problem);
+    if (problem) throw new MasterGuideError(birthDateProblemCode(problem, "TOO_YOUNG_TO_APPROVE"), problem);
     const result = await tx.masterGuideCandidate.updateMany({
       where: { id: candidateId, organizationId, status: "IN_PROGRESS" },
       data: {

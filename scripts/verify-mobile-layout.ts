@@ -1757,9 +1757,12 @@ async function seedSynthetic(prisma: PrismaClient) {
     create: { organizationId: clubA, featureKey: "master-guide-tracking" },
   });
   {
+    // Birth dates are sealed only when a key is configured (the local default has none); without one they stay unset and the page still renders.
+    const { isSecretEncryptionConfigured } = await import("../lib/secret-box");
     const { sealBirthDate } = await import("../modules/club-rosters/birth-dates");
+    const sealing = isSecretEncryptionConfigured();
     for (const [personId, birthDate, status] of [[`${P}_person_a_07`, "1990-03-15", "CLUB_APPROVED"], [`${P}_person_a_14`, "1988-07-02", "IN_PROGRESS"]] as const) {
-      await prisma.clubRosterMember.updateMany({ where: { organizationId: clubA, personId }, data: { sealedBirthDate: sealBirthDate(birthDate) } });
+      if (sealing) await prisma.clubRosterMember.updateMany({ where: { organizationId: clubA, personId }, data: { sealedBirthDate: sealBirthDate(birthDate) } });
       await prisma.masterGuideCandidate.upsert({
         where: { organizationId_personId: { organizationId: clubA, personId } },
         update: {},

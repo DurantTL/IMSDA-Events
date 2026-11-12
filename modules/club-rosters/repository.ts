@@ -540,6 +540,7 @@ export async function removeRosterMember(organizationId: string, memberId: strin
     // membership (#566). ORDERED, RECEIVED and AWARDED needs are history and stay.
     let ordersCancelled = 0;
     let classCompletionsErased = 0;
+    let masterGuideCandidatesErased = 0;
     if (member.personId) {
       ordersCancelled = (await tx.clubOrderNeed.deleteMany({
         where: { organizationId, personId: member.personId, status: "NEEDED" },
@@ -550,6 +551,10 @@ export async function removeRosterMember(organizationId: string, memberId: strin
           { needCount: ordersCancelled });
       }
       classCompletionsErased = (await tx.memberClassCompletion.deleteMany({
+        where: { organizationId, personId: member.personId },
+      })).count;
+      // The club's Master Guide candidate row (#1698) belongs to the membership too, so it goes with it.
+      masterGuideCandidatesErased = (await tx.masterGuideCandidate.deleteMany({
         where: { organizationId, personId: member.personId },
       })).count;
     }
@@ -640,6 +645,7 @@ export async function removeRosterMember(organizationId: string, memberId: strin
       honorEntriesErased,
       ordersCancelled,
       classCompletionsErased,
+      masterGuideCandidatesErased,
       guardiansErased,
       nameKept,
       tltProfileErased,

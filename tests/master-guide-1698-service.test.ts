@@ -13,13 +13,19 @@ const mocks = vi.hoisted(() => {
     clubRosterMember: { findFirst: vi.fn(), findMany: vi.fn() },
     masterGuideCandidate: { create: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
   };
-  return { prisma, writeAuditLog: vi.fn() };
+  return { prisma, writeAuditLog: vi.fn(), logError: vi.fn() };
 });
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => mocks.prisma }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: mocks.writeAuditLog }));
-vi.mock("@/modules/club-rosters/birth-dates", () => ({ openBirthDate: (sealed: string) => sealed.replace("sealed:", "") }));
+vi.mock("@/lib/logger", () => ({ logError: mocks.logError }));
+vi.mock("@/modules/club-rosters/birth-dates", () => ({
+  openBirthDate: (sealed: string) => {
+    if (!sealed.startsWith("sealed:")) throw new Error("cannot open");
+    return sealed.replace("sealed:", "");
+  },
+}));
 
 import { setClubFeature } from "@/modules/club-features/repository";
 import { MasterGuideError } from "@/modules/master-guide/domain";
@@ -235,6 +241,25 @@ describe("approval by the club", () => {
     expect(mocks.prisma.masterGuideCandidate.updateMany).not.toHaveBeenCalled();
   });
 
+  it("refuses a candidate who is no longer on this club year's active roster", async () => {
+    mocks.prisma.masterGuideCandidate.findFirst.mockResolvedValue(candidate("IN_PROGRESS"));
+    mocks.prisma.clubRosterMember.findFirst.mockResolvedValue(null);
+    expect((await thrown(approveForClub("club-1", "cand-1", director, now))).code).toBe("NOT_ON_ROSTER");
+    expect(mocks.prisma.clubRosterMember.findFirst.mock.calls[0]![0].where).toMatchObject({ organizationId: "club-1", personId: "person-1", status: "ACTIVE", clubYear: "2026-27" });
+    expect(mocks.prisma.masterGuideCandidate.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("says a birth date could not be read, not that it is missing, when it cannot be opened", async () => {
+    mocks.prisma.masterGuideCandidate.findFirst.mockResolvedValue(candidate("IN_PROGRESS"));
+    mocks.prisma.clubRosterMember.findMany.mockResolvedValue([{ sealedBirthDate: "unopenable" }]);
+    const error = await thrown(approveForClub("club-1", "cand-1", director, now));
+    expect(error.code).toBe("BIRTH_DATE_UNREADABLE");
+    expect(error.message).toContain("could not be read");
+    expect(error.message).toContain("conference office");
+    expect(mocks.logError).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(mocks.logError.mock.calls)).not.toContain("unopenable");
+  });
+
   it("refuses a candidate with no birth date on the roster", async () => {
     mocks.prisma.masterGuideCandidate.findFirst.mockResolvedValue(candidate("IN_PROGRESS"));
     rosterBirthDate(null);
@@ -323,6 +348,7 @@ describe("the club's list", () => {
     expect(list!.rows[0]).toMatchObject({ name: "Casey Sample", startedOn: "2025-11-01", window: { earliestFinish: "2026-11-01", latestFinish: "2028-11-01", pastWindow: false }, approvalProblem: null });
     expect(list!.eligible).toEqual([{ personId: "person-2", name: "Adult Roster" }]);
     expect(list!.needBirthDate).toEqual(["Nodate Roster"]);
+    expect(list!.unreadableBirthDate).toEqual([]);
     expect(JSON.stringify(list)).not.toContain("1990-01-01");
   });
 });

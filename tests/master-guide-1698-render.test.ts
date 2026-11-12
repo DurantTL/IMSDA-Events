@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -14,7 +15,7 @@ const row = (over: Partial<MasterGuideRow>): MasterGuideRow => ({
   id: "cand-1", personId: "person-1", name: "Casey Sample", startedOn: "2025-11-01", mentorName: "Sam Sample", status: "IN_PROGRESS",
   window: window(false), clubApprovedOn: null, areaApprovedOn: null, approvalProblem: null, ...over,
 });
-const list = (rows: MasterGuideRow[], over: Partial<MasterGuideList> = {}): MasterGuideList => ({ clubYear: "2026-27", rows, eligible: [{ personId: "person-2", name: "Adult Roster" }], needBirthDate: [], ...over });
+const list = (rows: MasterGuideRow[], over: Partial<MasterGuideList> = {}): MasterGuideList => ({ clubYear: "2026-27", rows, eligible: [{ personId: "person-2", name: "Adult Roster" }], needBirthDate: [], unreadableBirthDate: [], ...over });
 const html = (value: MasterGuideList) => renderToStaticMarkup(createElement(MasterGuideCandidates, { list: value, organizationId: "club-1" }));
 
 describe("the club's candidate list", () => {
@@ -51,10 +52,26 @@ describe("the club's candidate list", () => {
     expect(out).not.toContain("Approve for the club");
   });
 
+  it("says a birth date could not be read, and to ask the conference office, apart from one that is missing", () => {
+    const out = html(list([], { unreadableBirthDate: ["Locked Roster"] }));
+    expect(out).toContain("could not be read for: Locked Roster. Ask the conference office.");
+  });
+
+  it("links the birth-date note on a candidate to the roster", () => {
+    expect(html(list([row({ approvalProblem: "Birth date needed on the roster." })]))).toContain("/account/clubs/club-1/roster");
+  });
+
+  it("removes through the shared confirm dialog, not inline buttons", () => {
+    const out = html(list([row({})]));
+    expect(out).not.toContain("Yes, remove");
+    expect(out).not.toContain(">Keep<");
+  });
+
   it("lists people who need a birth date and offers the roster people who can be added", () => {
     const out = html(list([], { needBirthDate: ["Nodate Roster"] }));
     expect(out).toContain("Adult Roster");
     expect(out).toContain("Birth date needed on the roster before they can be added: Nodate Roster.");
+    expect(out).toContain("/account/clubs/club-1/roster");
     expect(out).toContain("No Master Guide candidates yet.");
   });
 });
@@ -71,5 +88,14 @@ describe("the Area Coordinator's list", () => {
 
   it("says when nothing is waiting", () => {
     expect(renderToStaticMarkup(createElement(MasterGuideAreaApprovals, { rows: [] }))).toContain("No Master Guide candidates are waiting for your approval.");
+  });
+});
+
+describe("shared patterns", () => {
+  const source = readFileSync("components/master-guide.tsx", "utf8");
+  it("uses the shared ConfirmDialog and the unsaved-changes guard on both forms", () => {
+    expect(source).toContain("<ConfirmDialog");
+    expect((source.match(/useUnsavedChangesGuard\(/g) ?? []).length).toBe(2);
+    expect(source).not.toMatch(/window\.confirm\(/);
   });
 });

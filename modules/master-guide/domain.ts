@@ -36,6 +36,11 @@ export function isMasterGuideStatus(value: unknown): value is MasterGuideStatus 
 
 export const BIRTH_DATE_NEEDED = "Birth date needed on the roster.";
 
+/** The roster holds a birth date that could not be opened (a key or setup problem), so no age can be worked out. */
+export const BIRTH_DATE_UNREADABLE = "unreadable" as const;
+export const BIRTH_DATE_UNREADABLE_MESSAGE = "The birth date on the roster could not be read. Ask the conference office.";
+export type RosterBirthDate = string | null | typeof BIRTH_DATE_UNREADABLE;
+
 export class MasterGuideError extends Error {
   constructor(
     public readonly code:
@@ -44,6 +49,7 @@ export class MasterGuideError extends Error {
       | "NOT_ON_ROSTER"
       | "ALREADY_A_CANDIDATE"
       | "BIRTH_DATE_NEEDED"
+      | "BIRTH_DATE_UNREADABLE"
       | "TOO_YOUNG_TO_START"
       | "TOO_YOUNG_TO_APPROVE"
       | "INVALID_DATE"
@@ -84,8 +90,9 @@ export function addYears(date: string, years: number): string | null {
 }
 
 /** Why this person cannot be added with this start date, or null. `birthDate` is the roster's, opened by the caller. */
-export function addProblem(birthDate: string | null, startedOn: string): string | null {
+export function addProblem(birthDate: RosterBirthDate, startedOn: string): string | null {
   if (!parseCalendarDate(startedOn)) return "Enter a real start date.";
+  if (birthDate === BIRTH_DATE_UNREADABLE) return BIRTH_DATE_UNREADABLE_MESSAGE;
   if (!birthDate) return BIRTH_DATE_NEEDED;
   const age = ageOn(birthDate, startedOn);
   if (age === null) return BIRTH_DATE_NEEDED;
@@ -94,7 +101,8 @@ export function addProblem(birthDate: string | null, startedOn: string): string 
 }
 
 /** Why the club cannot approve this person on this date, or null. */
-export function clubApprovalProblem(birthDate: string | null, approvalDate: string): string | null {
+export function clubApprovalProblem(birthDate: RosterBirthDate, approvalDate: string): string | null {
+  if (birthDate === BIRTH_DATE_UNREADABLE) return BIRTH_DATE_UNREADABLE_MESSAGE;
   if (!birthDate) return BIRTH_DATE_NEEDED;
   const age = ageOn(birthDate, approvalDate);
   if (age === null) return BIRTH_DATE_NEEDED;

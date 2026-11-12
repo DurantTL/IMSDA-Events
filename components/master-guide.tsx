@@ -2,9 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { NavigationLink as Link } from "@/components/navigation-link";
 import { SubmitButton } from "@/components/submit-button";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
+  BIRTH_DATE_NEEDED,
   formatMasterGuideDate,
   masterGuideStatusLabels,
   MASTER_GUIDE_MENTOR_MAX_LENGTH,
@@ -55,12 +59,16 @@ function CandidateCard({ organizationId, row }: { organizationId: string; row: M
   const [mentor, setMentor] = useState(row.mentorName ?? "");
   const [busy, setBusy] = useState<"" | "save" | "approve" | "remove">("");
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removeError, setRemoveError] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const dirty = row.status === "IN_PROGRESS" && (startedOn !== row.startedOn || mentor !== (row.mentorName ?? ""));
+  useUnsavedChangesGuard(dirty, "You have unsaved changes to this candidate. Leave this page and discard them?");
 
   async function run(kind: "save" | "approve" | "remove", action: () => Promise<void>, done: string) {
     setBusy(kind);
     setError("");
+    setRemoveError("");
     setNotice("");
     try {
       await action();
@@ -68,7 +76,9 @@ function CandidateCard({ organizationId, row }: { organizationId: string; row: M
       setConfirmRemove(false);
       router.refresh();
     } catch (caught) {
-      setError(notSavedMessage(caught instanceof Error ? caught.message : "That could not be saved."));
+      const message = caught instanceof Error ? caught.message : "That could not be saved.";
+      if (kind === "remove") setRemoveError(message);
+      else setError(notSavedMessage(message));
     } finally {
       setBusy("");
     }
@@ -93,23 +103,19 @@ function CandidateCard({ organizationId, row }: { organizationId: string; row: M
       <PastWindow window={row.window} />
       {row.status === "IN_PROGRESS" && (
         <>
-          {row.approvalProblem && <p className={styles.note}>{row.approvalProblem}</p>}
+          {row.approvalProblem && (
+            <p className={styles.note}>
+              {row.approvalProblem}
+              {row.approvalProblem === BIRTH_DATE_NEEDED && <> <Link href={`/account/clubs/${organizationId}/roster`}>Open the roster</Link> to add it.</>}
+            </p>
+          )}
           <div className={styles.actions}>
             {!row.approvalProblem && (
               <button className="primary-button" disabled={busy !== ""} onClick={() => void run("approve", () => send(`${base}/approve`, "POST"), "Approved for the club.")} type="button">
                 {busy === "approve" ? "Approving…" : "Approve for the club"}
               </button>
             )}
-            {confirmRemove ? (
-              <>
-                <button className="secondary-button" disabled={busy !== ""} onClick={() => void run("remove", () => send(base, "DELETE"), "Removed.")} type="button">
-                  {busy === "remove" ? "Removing…" : `Yes, remove ${row.name}`}
-                </button>
-                <button className="secondary-button" disabled={busy !== ""} onClick={() => setConfirmRemove(false)} type="button">Keep</button>
-              </>
-            ) : (
-              <button className="secondary-button" disabled={busy !== ""} onClick={() => setConfirmRemove(true)} type="button">Remove</button>
-            )}
+            <button className="secondary-button" disabled={busy !== ""} onClick={() => { setRemoveError(""); setConfirmRemove(true); }} type="button">Remove</button>
           </div>
           <details className={styles.edit}>
             <summary>Edit start date and mentor</summary>
@@ -126,6 +132,19 @@ function CandidateCard({ organizationId, row }: { organizationId: string; row: M
         </>
       )}
       {(error || notice) && <FormMessage message={error || notice} tone={error ? "error" : "success"} />}
+      <ConfirmDialog
+        busy={busy === "remove"}
+        busyLabel="Removing…"
+        confirmLabel={`Remove ${row.name}`}
+        destructive
+        error={removeError}
+        onCancel={() => setConfirmRemove(false)}
+        onConfirm={() => void run("remove", () => send(base, "DELETE"), "Removed.")}
+        open={confirmRemove}
+        title={`Remove ${row.name} as a Master Guide candidate?`}
+      >
+        <p>They come off this list. Their roster entry is not changed. You can add them again later.</p>
+      </ConfirmDialog>
     </li>
   );
 }
@@ -139,6 +158,8 @@ export function MasterGuideCandidates({ organizationId, list }: { organizationId
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const dirty = personId !== "" || startedOn !== "" || mentor !== "";
+  useUnsavedChangesGuard(dirty, "You have an unsaved candidate. Leave this page and discard it?");
 
   async function add(event: FormEvent) {
     event.preventDefault();
@@ -183,7 +204,13 @@ export function MasterGuideCandidates({ organizationId, list }: { organizationId
       <FormMessage message={error || notice} tone={error ? "error" : "success"} />
       {list.needBirthDate.length > 0 && (
         <p className={styles.note}>
-          Birth date needed on the roster before they can be added: {list.needBirthDate.join(", ")}.
+          Birth date needed on the roster before they can be added: {list.needBirthDate.join(", ")}.{" "}
+          <Link href={`/account/clubs/${organizationId}/roster`}>Open the roster</Link> to add it.
+        </p>
+      )}
+      {list.unreadableBirthDate.length > 0 && (
+        <p className={styles.note}>
+          The birth date on the roster could not be read for: {list.unreadableBirthDate.join(", ")}. Ask the conference office.
         </p>
       )}
       {list.rows.length === 0 ? (

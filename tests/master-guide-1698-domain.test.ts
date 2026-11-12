@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BIRTH_DATE_NEEDED,
+  BIRTH_DATE_UNREADABLE,
   addProblem,
   addYears,
   canManageMasterGuide,
@@ -37,6 +38,13 @@ describe("adding a candidate (16 or older on the start date)", () => {
 
   it("refuses a start date that is not a real date", () => {
     expect(addProblem("1990-01-01", "2025-02-30")).toMatch(/real start date/);
+  });
+});
+
+describe("a birth date that cannot be read", () => {
+  it("says so instead of that it is missing, for adding and approving", () => {
+    expect(addProblem(BIRTH_DATE_UNREADABLE, "2025-11-12")).toMatch(/could not be read.*conference office/);
+    expect(clubApprovalProblem(BIRTH_DATE_UNREADABLE, "2026-11-12")).toMatch(/could not be read/);
   });
 });
 
