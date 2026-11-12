@@ -1,6 +1,6 @@
-import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {

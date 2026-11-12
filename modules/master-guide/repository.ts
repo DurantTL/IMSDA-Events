@@ -1,6 +1,6 @@
-import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { Prisma } from "@prisma/client";
 import { logError } from "@/lib/logger";
 import { formatPersonName } from "@/lib/person-name";

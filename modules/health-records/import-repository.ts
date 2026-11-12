@@ -1,6 +1,6 @@
-import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import "server-only";
 
+import { conferenceClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { randomUUID } from "node:crypto";
 import { logError } from "@/lib/logger";
 import { getPrisma } from "@/lib/prisma";
