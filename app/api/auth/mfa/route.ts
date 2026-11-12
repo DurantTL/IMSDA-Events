@@ -1,3 +1,4 @@
+import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
 import { z } from "zod";
 import { logError } from "@/lib/logger";
 import {
@@ -14,6 +15,8 @@ import {
   regenerateRecoveryCodes,
 } from "@/modules/access/mfa-service";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
+import { PasskeySessionError, changeProofSchema, requireOwnStaffSession } from "@/modules/access/passkey-api";
+import { PasskeyError, requireRecentVerification } from "@/modules/access/passkeys";
 import { withRequestContext } from "@/lib/request-context";
 
 /**
@@ -37,13 +40,22 @@ const mfaCodeSchema = z.string()
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("begin") }),
   z.object({ action: z.literal("confirm"), code: mfaCodeSchema }),
-  z.object({ action: z.literal("regenerate-recovery-codes") }),
+  z.object({ action: z.literal("regenerate-recovery-codes"), proof: changeProofSchema.optional() }),
   z.object({ action: z.literal("disable"), code: mfaCodeSchema }),
 ]);
 
 function apiError(error: unknown) {
   if (error instanceof AccessDeniedError) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status });
+  }
+  if (error instanceof PasskeySessionError) {
+    return Response.json(
+      { error: "AUTHENTICATION_REQUIRED", message: "Sign in to manage two-step sign-in." },
+      { status: 401 },
+    );
+  }
+  if (error instanceof PasskeyError) {
+    return Response.json({ error: error.code, message: error.message }, { status: 403 });
   }
   if (error instanceof MfaError) {
     return Response.json({ error: error.code, message: error.message }, { status: 400 });
@@ -89,6 +101,18 @@ async function postHandler(request: Request) {
       });
     }
     if (input.action === "regenerate-recovery-codes") {
+      // New codes retire the old set, so they need a fresh proof, the same as changing a passkey.
+      const { account, sessionId } = await requireOwnStaffSession();
+      await requireRecentVerification(
+        account,
+        sessionId,
+        request.headers.get("origin"),
+        input.proof && {
+          code: input.proof.code,
+          password: input.proof.password,
+          passkey: input.proof.passkey as unknown as AuthenticationResponseJSON | undefined,
+        },
+      );
       return Response.json(await regenerateRecoveryCodes(user.id));
     }
 

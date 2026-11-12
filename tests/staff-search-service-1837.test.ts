@@ -48,9 +48,16 @@ const event = (id: string, name: string, extra: Row = {}): Row => ({
   id, name, startsAt: long("2027-07-14T15:00:00Z"), endsAt: long("2027-07-17T15:00:00Z"), timezone: "America/Chicago",
   audience: "GENERAL", archivedAt: null, isBillingContainer: false, memberships: [], ...extra,
 });
+const user = (id: string, displayName: string, email: string, extra: Row = {}): Row => ({
+  id, displayName, email, attendeeAccountId: null, clubsAdministratorGrant: null, attendeeAccount: null, phone: "(515) 555-0100", birthDate: "2001-01-01", ...extra,
+});
+const account = (id: string, displayName: string, email: string, extra: Row = {}): Row => ({
+  id, displayName, email, linkedUser: null, clubDirectorGrants: [], areaCoordinatorGrant: null, phone: "(515) 555-0100", ...extra,
+});
+const clubGrant = (type: string): Row => ({ revokedAt: null, effectiveTo: null, organization: { type } });
 const member = (userId: string, role: string, extra: Row = {}) => ({ userId, role, status: "ACTIVE", permissions: [], ...extra });
 
-const database = vi.hoisted(() => ({ organizations: [] as Row[], events: [] as Row[], clubsAdministratorGrants: [] as { userId: string; revokedAt: Date | null }[], siteContentEditorGrants: [] as { userId: string; revokedAt: Date | null }[], organizationCalls: [] as Row[], eventCalls: [] as Row[] }));
+const database = vi.hoisted(() => ({ users: [] as Row[], accounts: [] as Row[], userCalls: [] as Row[], accountCalls: [] as Row[], organizations: [] as Row[], events: [] as Row[], clubsAdministratorGrants: [] as { userId: string; revokedAt: Date | null }[], siteContentEditorGrants: [] as { userId: string; revokedAt: Date | null }[], organizationCalls: [] as Row[], eventCalls: [] as Row[] }));
 
 const prisma = {
   organization: {
@@ -69,6 +76,18 @@ const prisma = {
         .map((row) => ({ ...row, memberships: (row.memberships as { userId: string }[]).filter((m) => m.userId === userId) }));
     }),
   },
+  user: {
+    findMany: vi.fn(async (args: { where: Row; take: number; select: Row }) => {
+      database.userCalls.push(args);
+      return database.users.filter((row) => matches(args.where, row)).slice(0, args.take);
+    }),
+  },
+  attendeeAccount: {
+    findMany: vi.fn(async (args: { where: Row; take: number; select: Row }) => {
+      database.accountCalls.push(args);
+      return database.accounts.filter((row) => matches(args.where, row)).slice(0, args.take);
+    }),
+  },
   clubsAdministratorGrant: {
     findFirst: vi.fn(async (args: { where: Row }) => (database.clubsAdministratorGrants.find((grant) => matches(args.where, grant)) ? { id: "grant" } : null)),
   },
@@ -80,6 +99,7 @@ const prisma = {
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => prisma }));
 
+import { clubPeopleWhere } from "@/modules/system-admin/people-directory-model";
 import { STAFF_SEARCH_GROUP_LIMIT } from "@/modules/staff-search/domain";
 import { searchStaffRecords } from "@/modules/staff-search/service";
 
@@ -95,6 +115,22 @@ beforeEach(() => {
   vi.clearAllMocks();
   database.organizationCalls.length = 0;
   database.eventCalls.length = 0;
+  database.userCalls.length = 0;
+  database.accountCalls.length = 0;
+  database.users = [
+    user("u_sys", "Sam Sysadmin", "sam.sys@example.test"),
+    user("u_linked", "Lena Linked", "lena.staff@example.test", { attendeeAccountId: "a_linked" }),
+    user("u_clubadmin_person", "Cora Clubadmin", "cora@example.test", { clubsAdministratorGrant: { revokedAt: null } }),
+    user("u_plain", "Pat Plain", "pat.plain@example.test"),
+    user("u_noname", "", "noname@example.test"),
+  ];
+  database.accounts = [
+    account("a_linked", "Lena Linked", "lena.site@example.test", { linkedUser: { id: "u_linked" } }),
+    account("a_director", "Dina Director", "dina@example.test", { clubDirectorGrants: [clubGrant("CLUB")] }),
+    account("a_coord", "Alex Coordinator", "alex@example.test", { areaCoordinatorGrant: { revokedAt: null, expiresAt: null } }),
+    account("a_church_role", "Chad Churchrole", "chad@example.test", { clubDirectorGrants: [clubGrant("CHURCH")] }),
+    account("a_family", "Fran Family", "fran@example.test"),
+  ];
   database.clubsAdministratorGrants = [{ userId: clubsAdmin.id, revokedAt: null }, { userId: revokedClubsAdmin.id, revokedAt: long("2026-12-01T00:00:00Z") }];
   database.siteContentEditorGrants = [{ userId: siteEditor.id, revokedAt: null }];
   database.organizations = [
@@ -116,6 +152,22 @@ beforeEach(() => {
 const ids = (group: { items: { id: string }[] }) => group.items.map((item) => item.id).sort();
 
 describe("the per-group limit", () => {
+  it("is pinned at five for people too: reads one more, offers See all People & access only then", async () => {
+    database.users = Array.from({ length: 8 }, (_, index) => user(`u_p${index}`, `Pine Person ${index}`, `pine${index}@example.test`));
+    database.accounts = [];
+    const many = await searchStaffRecords(sysadmin, "pine", now);
+    expect(many.people.items).toHaveLength(5);
+    expect(many.people.more).toBe(true);
+    expect(many.people.seeAllHref).toBe("/admin/people?q=pine");
+    expect(database.userCalls[0].take).toBe(6);
+    expect(database.accountCalls[0].take).toBe(6);
+    database.users = database.users.slice(0, 5);
+    const exact = await searchStaffRecords(sysadmin, "pine", now);
+    expect(exact.people.items).toHaveLength(5);
+    expect(exact.people.more).toBe(false);
+    expect(exact.people.seeAllHref).toBeNull();
+  });
+
   it("is pinned at five, reads one more to know there is more, and offers See all only then", async () => {
     expect(STAFF_SEARCH_GROUP_LIMIT).toBe(5);
     database.organizations = Array.from({ length: 9 }, (_, index) => org(`club_${index}`, "CLUB", `Synth Club ${index}`));
@@ -241,5 +293,71 @@ describe("matching", () => {
     expect(prisma.event.findMany).not.toHaveBeenCalled();
     const result = await searchStaffRecords(sysadmin, `synth ${"x".repeat(500)}`, now);
     expect(result.query.length).toBeLessThanOrEqual(80);
+  });
+});
+
+describe("people (#1854)", () => {
+  const noPeopleQuery = () => {
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
+    expect(prisma.attendeeAccount.findMany).not.toHaveBeenCalled();
+  };
+
+  it("system administrator: staff and website people, a linked pair as one row, name and kind only", async () => {
+    const result = await searchStaffRecords(sysadmin, "lena", now);
+    expect(result.people.items).toEqual([{ id: "u_linked", name: "Lena Linked", kind: "Staff login and website account", href: "/admin/people/staff/u_linked" }]);
+    const both = await searchStaffRecords(sysadmin, "example.test", now);
+    expect(both.people.items).toHaveLength(5);
+    expect(both.people.more).toBe(true);
+    expect(both.people.seeAllHref).toBe("/admin/people?q=example.test");
+    const website = await searchStaffRecords(sysadmin, "fran", now);
+    expect(website.people.items).toEqual([{ id: "a_family", name: "Fran Family", kind: "Website account", href: "/admin/people/account/a_family" }]);
+    const staffOnly = await searchStaffRecords(sysadmin, "pat plain", now);
+    expect(staffOnly.people.items).toEqual([{ id: "u_plain", name: "Pat Plain", kind: "Staff login", href: "/admin/people/staff/u_plain" }]);
+    expect(result.people.seeAllHref).toBeNull();
+    for (const call of [...database.userCalls, ...database.accountCalls]) expect(Object.keys(call.select as Row)).not.toContain("phone");
+    expect(JSON.stringify([result, website, staffOnly])).not.toMatch(/555|2001|phone|birth/i);
+  });
+
+  it("falls back to the email when there is no name, and requires every word to match", async () => {
+    const noName = await searchStaffRecords(sysadmin, "noname@example", now);
+    expect(noName.people.items).toEqual([{ id: "u_noname", name: "noname@example.test", kind: "Staff login", href: "/admin/people/staff/u_noname" }]);
+    expect((await searchStaffRecords(sysadmin, "lena plain", now)).people.items).toEqual([]);
+    expect((await searchStaffRecords(sysadmin, "pat example.test", now)).people.items.map((item) => item.id)).toEqual(["u_plain"]);
+  });
+
+  it("Clubs Administrator: club people only, with the club-people filter sent to both tables", async () => {
+    const result = await searchStaffRecords(clubsAdmin, "example.test", now);
+    expect(result.people.items.map((item) => item.id).sort()).toEqual(["a_coord", "a_director", "u_clubadmin_person"]);
+    // Website people who are not in a club (a family account, a role in a church) and plain staff are never returned.
+    const nonClub = await searchStaffRecords(clubsAdmin, "fran", now);
+    expect(nonClub.people.items).toEqual([]);
+    expect((await searchStaffRecords(clubsAdmin, "chad", now)).people.items).toEqual([]);
+    expect((await searchStaffRecords(clubsAdmin, "pat", now)).people.items).toEqual([]);
+    const expected = clubPeopleWhere(now);
+    expect(JSON.stringify((database.userCalls[0].where as { AND: Row[] }).AND[0])).toBe(JSON.stringify(expected.staff));
+    expect(JSON.stringify((database.accountCalls[0].where as { AND: Row[] }).AND[0])).toBe(JSON.stringify(expected.account));
+    expect(result.people.seeAllHref).toBeNull();
+  });
+
+  it("Clubs Administrator: See all goes to People & access with the same words when more match", async () => {
+    database.accounts = Array.from({ length: 7 }, (_, index) => account(`a_d${index}`, `Dir Person ${index}`, `dir${index}@example.test`, { clubDirectorGrants: [clubGrant("CLUB")] }));
+    database.users = [];
+    const result = await searchStaffRecords(clubsAdmin, "dir person", now);
+    expect(result.people.items).toHaveLength(5);
+    expect(result.people.more).toBe(true);
+    expect(result.people.seeAllHref).toBe("/admin/people?q=dir+person");
+  });
+
+  it.each([
+    ["event administrator", eventAdmin],
+    ["registrar", registrar],
+    ["kitchen staff", kitchen],
+    ["site content editor", siteEditor],
+    ["revoked Clubs Administrator", revokedClubsAdmin],
+    ["staff user with no role", { id: "u_norole", globalRole: null }],
+  ])("%s: an empty people group and no people query", async (_name, viewer) => {
+    const result = await searchStaffRecords(viewer, "example.test", now);
+    expect(result.people).toEqual({ items: [], more: false, seeAllHref: null });
+    noPeopleQuery();
   });
 });

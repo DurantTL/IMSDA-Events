@@ -276,6 +276,11 @@ const pages: PageSpec[] = [
   // Walkthrough guides (#1482): each step is an instruction and a picture, so the picture must fit the column at every width.
   { name: "account-help-walkthrough-director", path: "/account/help/walkthrough-director-roster", role: "director", expectText: /Step by step: Add, edit and remove a roster member/ },
   { name: "account-help-walkthrough-area", path: "/account/help/walkthrough-coordinator-clubs", role: "area", expectText: /Step by step: Your clubs and Who's missing what/ },
+  // The family guides (#1883): the written guides and a walkthrough, read by an ordinary attendee account.
+  { name: "account-help-guide-family-pay", path: "/account/help/family-pay-balance", role: "attendee", expectText: /Pay a balance/ },
+  { name: "account-help-guide-family-change", path: "/account/help/family-change-registration", role: "attendee", expectText: /Change a registration/ },
+  { name: "account-help-guide-family-cancel", path: "/account/help/family-cancel-registration", role: "attendee", expectText: /Cancel a registration/ },
+  { name: "account-help-walkthrough-family-cancel", path: "/account/help/walkthrough-family-cancel", role: "attendee", expectText: /Step by step: Ask to cancel a registration/ },
   { ...club("home", ""), flow: "portal-navigation" },
   { ...club("roster", "/roster"), prepare: openRosterSections },
   // A director on a past club year: the read-only banner, with the year carried between Home and Roster (#1112).
@@ -315,6 +320,8 @@ const pages: PageSpec[] = [
   area("events", "/account/area-clubs/events"),
   // The coordinator attendee report with its club, role and location filters (#1762).
   area("event-report", `/account/area-clubs/events/${clubEventId}/report`),
+  // The optional Event debrief (#1679): the coordinator's switch page.
+  { ...area("debrief", `/account/area-clubs/events/${clubEventId}/debrief`), expectText: /Event debrief/ },
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
   area("points", "/account/area-clubs/points"),
@@ -446,6 +453,8 @@ const pages: PageSpec[] = [
   staff("registration-builder", "/registration-builder"),
   // The event's information forms list (#1572): the titled list page with its description and the form cards.
   { ...staff("information-forms", "/information-forms"), expectText: /Information forms/ },
+  // The optional Event debrief (#1679): the switch, the evaluation switch and the answers.
+  { ...staff("debrief", `/more/debrief?event=${clubEventId}`, "system-admin"), expectText: /Event debrief/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
@@ -482,6 +491,10 @@ const pages: PageSpec[] = [
   staff("club-leaders-invited", "/admin/clubs/leaders?status=invited", "system-admin"),
   staff("club-leaders-draft", "/admin/clubs/leaders?status=draft", "system-admin"),
   staff("club-applications", "/admin/clubs/applications", "system-admin"),
+  // The queue's other views and one application on its own, with its Decision section (#1589 part B): the seeded waiting application at a church that already has a club.
+  staff("club-applications-decided", "/admin/clubs/applications?status=decided", "system-admin"),
+  staff("club-applications-links", "/admin/clubs/applications?status=links", "system-admin"),
+  staff("club-application-record", `/admin/clubs/applications?application=${P}_application_0`, "system-admin"),
   staff("club-reports-summary", "/admin/clubs/summary", "system-admin"),
   staff("club-reports-summary-monthly", "/admin/clubs/summary?view=records", "system-admin"),
   staff("club-reports-summary-points", "/admin/clubs/summary?view=points", "system-admin"),
@@ -491,6 +504,7 @@ const pages: PageSpec[] = [
   staff("clubs-forms-missing", "/admin/club-forms?view=missing&year=2026-27", "system-admin"),
   staff("club-leaders", "/admin/clubs/leaders", "system-admin"),
   staff("club-transfers", "/admin/clubs/transfers", "system-admin"),
+  staff("club-transfers-overdue", "/admin/clubs/transfers?view=overdue", "system-admin"),
   staff("background-checks", "/admin/organizations/background-checks", "system-admin"),
   staff("club-as-director", `/admin/organizations/${clubA}/club`, "system-admin"),
   staff("club-as-director-honors", `/admin/organizations/${clubA}/club/honors`, "system-admin"),
@@ -1216,6 +1230,17 @@ async function seedInformationForm(prisma: PrismaClient): Promise<PageSpec[]> {
       await page.getByRole("button", { name: /Add another member/i }).click();
     },
   }];
+}
+
+/** The Event debrief (#1679) switched on for the club weekend, so its fill page exists: the signed-in coordinator's view of the form. */
+async function seedDebriefPages(prisma: PrismaClient): Promise<PageSpec[]> {
+  const { onDebriefEnabled } = await import("../modules/event-debriefs/lifecycle");
+  const admin = await prisma.user.findUniqueOrThrow({ where: { email: "admin@imsda-events.test" }, select: { id: true } });
+  await prisma.$transaction(async (tx) => {
+    await tx.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "debrief" }], skipDuplicates: true });
+    await onDebriefEnabled(tx, { eventId: clubEventId, actor: { kind: "staff", userId: admin.id } });
+  });
+  return [{ name: "area-debrief-fill", path: `/events/${clubEventSlug}/forms/debrief`, role: "area" }];
 }
 
 /** A System deeper page with a back link (#1274): the editor of a seeded event template. Reads only; nothing is created. */
@@ -4058,15 +4083,15 @@ function staffTabRowInPage(): string[] {
 
 /**
  * The phone header's search (#1734), at 800px and narrower: a search icon button of at least 44px with the name "Search pages, clubs,
- * events and churches" opens the same search, and on Check-in at 390px the page's own search box is in the first screen (its top above the
+ * events, churches and people" opens the same search, and on Check-in at 390px the page's own search box is in the first screen (its top above the
  * 844px viewport's bottom, and above the phone bar). Runs in the page.
  */
 function phoneHeaderSearchInPage(): string[] {
   const problems: string[] = [];
   if (window.innerWidth > 800) return problems;
-  const toggle = Array.from(document.querySelectorAll<HTMLElement>("header button[aria-label='Search pages, clubs, events and churches']")).find((el) => el.getBoundingClientRect().width > 0);
+  const toggle = Array.from(document.querySelectorAll<HTMLElement>("header button[aria-label='Search pages, clubs, events, churches and people']")).find((el) => el.getBoundingClientRect().width > 0);
   if (document.getElementById("destination-search-input")) {
-    if (!toggle) problems.push("the phone header has no search icon button named \"Search pages, clubs, events and churches\"");
+    if (!toggle) problems.push("the phone header has no search icon button named \"Search pages, clubs, events, churches and people\"");
     else {
       const box = toggle.getBoundingClientRect();
       if (box.width < 43.5 || box.height < 43.5) problems.push(`the phone header search button is ${Math.round(box.width)}x${Math.round(box.height)}px`);
@@ -4795,6 +4820,7 @@ async function main() {
     await seedStationEvent(prisma);
     pages.push(...staffInvitePages(await seedStaffInviteEvent(prisma)));
     pages.push(...await seedInformationForm(prisma));
+    pages.push(...await seedDebriefPages(prisma));
     pages.push(...await seedEventTemplatePages(prisma));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);

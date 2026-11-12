@@ -11,6 +11,7 @@ import {
   type DateDecision,
   type DatePreview,
 } from "@/modules/calendar/event-dates";
+import { reprojectDebriefBatches } from "@/modules/event-debriefs/lifecycle";
 import { entryCanBeLinked } from "@/modules/calendar/event-match";
 import { CalendarError } from "@/modules/calendar/errors";
 import { feedLockKey } from "@/modules/calendar/feed-plan";
@@ -369,6 +370,8 @@ export async function resolveCalendarDateChange(
     const preview = buildDatePreview(event, { startsOn: entry.startsOn, endsOn: entry.endsOn });
     if (preview.blockedReason) throw new CalendarError("DATES_CONFLICT", preview.blockedReason);
     await tx.event.update({ where: { id: eventId }, data: { startsAt: eventDate(entry.startsOn), endsAt: eventDate(entry.endsOn) } });
+    // The debrief's emails follow the event's end date (#1679), in this same transaction.
+    await reprojectDebriefBatches(tx, eventId);
     await tx.calendarEntry.update({ where: { id: entry.id }, data: { baselineStartsOn: entry.startsOn, baselineEndsOn: entry.endsOn } });
     await writeAuditLog({
       eventId,

@@ -159,7 +159,7 @@ export default async function OperationalReportsPage({
   const { user } = await getCurrentSession();
   const [report, backgroundFlags] = await Promise.all([
     getOperationalReport(event.id),
-    listEventBackgroundFlags(event.id, { includeNotes: canSeeIssuesText(user), includeContact: true }),
+    listEventBackgroundFlags(event.id, { includeNotes: canSeeIssuesText(user), includeContact: permissions.includes("VIEW_SENSITIVE_DATA") }),
   ]);
   // Each kind of table sorts from its own column headers (its own address pair), from a fixed list of columns; the order stays as is until one is chosen (#1458).
   const path = "/more/reports";
@@ -271,7 +271,9 @@ export default async function OperationalReportsPage({
                 </p>
               </div>
             </div>
-            <ExportLink className="secondary-button report-download" href={`/api/events/${encodeURIComponent(event.id)}/background-checks`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
+            {permissions.includes("VIEW_SENSITIVE_DATA") && (
+              <ExportLink className="secondary-button report-download" href={`/api/events/${encodeURIComponent(event.id)}/background-checks`}><Download aria-hidden="true" size={15} /> Download CSV</ExportLink>
+            )}
           </div>
           <BackgroundCheckList people={backgroundFlags.people} registrationHref={{ base: "/people", query: `event=${encodeURIComponent(event.id)}` }} />
         </section>

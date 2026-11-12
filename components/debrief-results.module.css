@@ -1,0 +1,12 @@
+.results { display: grid; gap: 18px; }
+.heading { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.counts { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.card { border: 1px solid var(--line); border-radius: var(--radius-card); padding: 12px 14px; display: grid; gap: 8px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.who { margin: 0; font-weight: 700; }
+.when { margin: 0; color: var(--muted); }
+.answers { margin: 0; display: grid; gap: 8px; }
+.answers dt { font-weight: 700; }
+.answers dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.muted { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.link { display: inline-flex; align-items: center; min-height: 44px; }

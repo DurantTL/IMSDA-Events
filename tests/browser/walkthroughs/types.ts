@@ -12,9 +12,10 @@ export type WalkthroughLocator = any;
 
 /**
  * Where a walkthrough starts: a visitor who is not signed in, the sample club director signed in with two-step sign-in done,
- * or the sample area coordinator signed in with two-step sign-in done.
+ * the sample area coordinator signed in with two-step sign-in done, or the sample family account (one registration)
+ * signed in with two-step sign-in done.
  */
-export type WalkthroughStart = "signed-out" | "signed-in" | "signed-in-coordinator";
+export type WalkthroughStart = "signed-out" | "signed-in" | "signed-in-coordinator" | "signed-in-family";
 
 export type WalkthroughContext = {
   page: WalkthroughPage;
@@ -24,6 +25,8 @@ export type WalkthroughContext = {
   director: { email: string; password: string; displayName: string };
   /** The sample area coordinator, who has an authenticator app set up. */
   coordinator: { email: string; password: string; displayName: string };
+  /** The sample family account, signed in for the family walkthroughs. `newPhone` is the number the change walkthrough types. */
+  family: { email: string; password: string; displayName: string; phone: string; newPhone: string };
   /** The six-digit code the coordinator's authenticator app shows right now. */
   authenticatorCode: () => string;
   /** The sample person the roster walkthrough adds, edits and removes. */

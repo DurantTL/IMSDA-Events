@@ -39,7 +39,7 @@ import styles from "@/components/destination-search.module.css";
  * Nothing is sent anywhere as the person types. The key and selection rules are
  * pure functions in `destination-search-model.ts`, where they are unit tested.
  *
- * With `records` on (the staff header, #1837) typed words also ask the server for clubs, events and churches the viewer
+ * With `records` on (the staff header, #1837) typed words also ask the server for clubs, events, churches and people the viewer
  * may open (`/api/staff/search`, debounced, one request at a time). They are listed in groups after the pages, share the
  * one active option and the one focus ring, and open through the same unsaved-changes guard. Nothing is requested for
  * an empty box.
@@ -59,7 +59,7 @@ export function DestinationSearch<R extends { query: string } = StaffSearchResul
   /** The More sheet: an Escape with nothing to undo reaches the sheet, which closes. */
   escapeBubbles?: boolean;
   /**
-   * Also search records on the server. `true` is the staff header's clubs, events and churches; a `RecordSearchSpec` names
+   * Also search records on the server. `true` is the staff header's clubs, events, churches and people; a `RecordSearchSpec` names
    * another endpoint and its groups (the club portal's clubs and members, #1854). The More sheet stays pages-only.
    */
   records?: boolean | RecordSearchSpec<R>;

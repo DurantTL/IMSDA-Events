@@ -19,6 +19,7 @@ export const eventModuleKeys = [
   "club-teachers",
   "event-scoring",
   "attendance-points",
+  "debrief",
 ] as const;
 
 export type EventModuleKey = (typeof eventModuleKeys)[number];
@@ -179,6 +180,18 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
     routes: ["/more/attendance-points", "/account/area-clubs/events"],
     features: ["attendance-points-step"],
   },
+  {
+    key: "debrief",
+    cardKey: "debrief",
+    title: "Event debrief",
+    description: "Ask the event's staff and the Area Coordinators a few questions the morning after the event, with one reminder, and keep the answers with the event for next year's planners.",
+    appliesTo: "club-audience",
+    launcherGroup: "people-access",
+    alwaysOn: false,
+    offByDefault: true,
+    routes: ["/more/debrief", "/account/area-clubs/events"],
+    features: ["event-debrief"],
+  },
 ];
 
 /**
@@ -187,7 +200,7 @@ export const eventModuleCatalog: readonly EventModuleDefinition[] = [
  * one place the narrower, scoped path (`modules/event-modules/scoped-toggle.ts`, used by Club teachers, Camporee scoring and Attendance points) is allowed to act, so adding a module to it
  * is a deliberate decision, never a side effect of adding it to the catalog.
  */
-export const scopedToggleModuleKeys: readonly EventModuleKey[] = ["club-teachers", "event-scoring", "attendance-points"];
+export const scopedToggleModuleKeys: readonly EventModuleKey[] = ["club-teachers", "event-scoring", "attendance-points", "debrief"];
 
 const definitionsByKey = new Map<string, EventModuleDefinition>(
   eventModuleCatalog.map((definition) => [definition.key, definition]),

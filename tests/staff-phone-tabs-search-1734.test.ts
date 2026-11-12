@@ -68,11 +68,11 @@ describe("the tab row component", () => {
 });
 
 describe("the phone header search", () => {
-  it("is a 44px icon button named Search pages, clubs, events and churches that opens the same search", () => {
+  it("is a 44px icon button named Search pages, clubs, events, churches and people that opens the same search", () => {
     const markup = renderToStaticMarkup(createElement(StaffHeaderSearch, { destinations: [], inputId: "destination-search-input" }));
     expect(markup).toMatch(/aria-controls="destination-search-input-wrap"/);
     expect(markup).toContain(`id="destination-search-input-wrap"`);
-    expect(markup).toMatch(/<button[^>]*aria-label="Search pages, clubs, events and churches"[^>]*aria-expanded="false"/);
+    expect(markup).toMatch(/<button[^>]*aria-label="Search pages, clubs, events, churches and people"[^>]*aria-expanded="false"/);
     expect(markup).toContain('id="destination-search-input"');
     // The listbox scrolls, so it must not take Tab focus from the field (that would blur it and close the list).
     expect(markup).toMatch(/<ul[^>]*role="listbox"[^>]*tabindex="-1"|<ul[^>]*tabindex="-1"[^>]*role="listbox"/);

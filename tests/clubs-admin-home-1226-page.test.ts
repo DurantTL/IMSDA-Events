@@ -145,10 +145,10 @@ describe("what it shows", () => {
     const first = html.slice(html.indexOf('data-application-id="app-1"'), html.indexOf('data-application-id="app-2"'));
     const second = html.slice(html.indexOf('data-application-id="app-2"'));
     expect(first).toContain(">Approve<");
-    expect(first).toContain("/admin/clubs/applications#application-app-1");
+    expect(first).toContain("/admin/clubs/applications?application=app-1");
     expect(second).not.toContain(">Approve<");
     expect(second).toContain("Review first: choose a church.");
-    expect(second).toContain("/admin/clubs/applications#application-app-2");
+    expect(second).toContain("/admin/clubs/applications?application=app-2");
   });
 
   it.each([
@@ -163,7 +163,7 @@ describe("what it shows", () => {
     const html = await render();
     expect(html).not.toContain(">Approve<");
     expect(html).toContain(`Review first: ${reason}.`);
-    expect(html).toContain("/admin/clubs/applications#application-app-1");
+    expect(html).toContain("/admin/clubs/applications?application=app-1");
   });
 
   it("shows Approve for a clean application and keeps focus and status targets", async () => {

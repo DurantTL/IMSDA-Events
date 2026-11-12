@@ -18,7 +18,7 @@ export async function resolveClubOversight(requestedEventId?: string) {
   });
   const clubEvent = event?.audience === "CLUB";
   const manager = context.user.globalRole === "SYSTEM_ADMIN" || context.membership?.role === "EVENT_ADMIN";
-  return { ...context, allowed: Boolean(event && clubEvent && manager), clubEvent };
+  return { ...context, allowed: Boolean(event && clubEvent && manager), clubEvent, systemAdmin: context.user.globalRole === "SYSTEM_ADMIN" };
 }
 
 /** Clubs with an active registration for this event. */
@@ -51,4 +51,23 @@ export async function isClubRegisteredForEvent(eventId: string, organizationId: 
     select: { id: true },
   });
   return Boolean(row);
+}
+
+type OversightScope = { eventId: string; systemAdmin: boolean };
+
+/**
+ * Whether this viewer may open one club's submitted records through event oversight. An event
+ * administrator's role is for this event only, so the club must be registered for it; system
+ * administrators keep their wider access.
+ */
+export async function canOpenClubRecords(scope: OversightScope, organizationId: string) {
+  if (scope.systemAdmin) return true;
+  return isClubRegisteredForEvent(scope.eventId, organizationId);
+}
+
+/** The clubs this viewer may open records for: every club for a system administrator, otherwise those registered for the event. */
+export async function restrictToOverseenClubs<T extends { id: string }>(scope: OversightScope, clubs: readonly T[]): Promise<T[]> {
+  if (scope.systemAdmin) return [...clubs];
+  const registered = new Set((await listRegisteredClubs(scope.eventId)).map((club) => club.organizationId));
+  return clubs.filter((club) => registered.has(club.id));
 }

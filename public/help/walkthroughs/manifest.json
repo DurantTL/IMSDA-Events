@@ -62,5 +62,17 @@
   "walkthrough-director-year-end": {
     "capturedFor": "2026-11-11",
     "sourceHash": "618a03e6213918491bae6e690cc5cd9be0fa8c0d261b292ccab9caf507cf4fd8"
+  },
+  "walkthrough-family-cancel": {
+    "capturedFor": "2026-11-11",
+    "sourceHash": "6034e693d9a775e4d537105a978d6c1bd076790a0128082bb896479a93b38ecb"
+  },
+  "walkthrough-family-change": {
+    "capturedFor": "2026-11-11",
+    "sourceHash": "20b1030d979f4e51ee2e3da9b9819924066161c1e15bb4d1b867051b3326c22f"
+  },
+  "walkthrough-family-pay": {
+    "capturedFor": "2026-11-11",
+    "sourceHash": "015eb63d942d1e46d24db3f3bb0af71e918df46a473346e23fa2f8e143412d16"
   }
 }

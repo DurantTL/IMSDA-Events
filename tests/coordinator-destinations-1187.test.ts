@@ -360,11 +360,9 @@ describe("New clubs page (#1187)", () => {
 
   it("links a decided application's new club to the coordinator's own view, not an admin page", () => {
     const decided = { ...application, status: "APPROVED", createdOrganizationId: "club-9" } as NewClubApplicationRecord;
-    const html = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [decided], canDecide: false, churches: [] }));
+    const html = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [decided] }));
     expect(html).toContain('href="/account/area/club-9"');
     expect(html).not.toContain("/admin/");
-    const admin = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [decided], canDecide: true, churches: [] }));
-    expect(admin).toContain('href="/admin/organizations/club-9/profile"');
   });
 
   it("shows a cancelled application as one collapsed line to coordinators and drops it after 30 days (#1554)", async () => {
@@ -382,9 +380,9 @@ describe("New clubs page (#1187)", () => {
     expect(html).toMatch(/<details[^>]*data-application-collapsed="app-2"[^>]*><summary/);
     expect(html).toContain("Recent Cancelled Club");
     expect(html).not.toContain("Old Cancelled Club");
-    // Staff view is unchanged: no collapsing.
-    const staff = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [cancelled("app-2", "Recent Cancelled Club", "2026-10-06T12:00:00Z")], canDecide: true, churches: [] }));
-    expect(staff).not.toContain("<details");
+    // The list itself collapses only when asked to: the staff queue no longer uses it (#1589).
+    const open = renderToStaticMarkup(createElement(NewClubApplicationsQueue, { applications: [cancelled("app-2", "Recent Cancelled Club", "2026-10-06T12:00:00Z")] }));
+    expect(open).not.toContain("<details");
   });
 
   it("shows the empty state when every application has aged off (#1554)", async () => {

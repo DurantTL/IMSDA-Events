@@ -4,6 +4,8 @@ import { FinanceWorkspace } from "@/components/finance-workspace";
 import { resolveEventContext } from "@/modules/events/selection";
 import { countOpenChurchSponsorFlags } from "@/modules/promo-codes/church-sponsor-lodging";
 import { listRegistrations } from "@/modules/registrations/repository";
+import { StaffApprovalsFinance } from "@/components/staff-approvals-finance";
+import { listStaffApprovalsForFinance } from "@/modules/staff-invitations/finance-approvals";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { AdminPageHeader } from "@/components/admin-page-header";
 
@@ -15,7 +17,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   if (!permissions.includes("MANAGE_FINANCE")) {
     return <AccessRestricted title="Finance is restricted" detail="Only event administrators and finance managers can view payment, refund, and balance details." whoToAsk="your event administrator" />;
   }
-  const [registrations, openChurchFlags] = await Promise.all([listRegistrations(event.id), countOpenChurchSponsorFlags(event.id)]);
+  const [registrations, openChurchFlags, staffApprovals] = await Promise.all([listRegistrations(event.id), countOpenChurchSponsorFlags(event.id), listStaffApprovalsForFinance(event.id)]);
   return (
     <>
       <AdminPageHeader path="/finance" eventId={event.id} />
@@ -32,6 +34,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       initialFilter={filter}
       initialRegistrationId={registration}
     />
+    <StaffApprovalsFinance eventId={event.id} rows={staffApprovals.rows} totals={staffApprovals.totals} />
     </>
   );
 }

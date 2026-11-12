@@ -12,6 +12,7 @@ import { isAccountEmailConfigured } from "@/modules/communications/account-email
 import { queueAccountInviteMessage } from "@/modules/communications/account-invite-message";
 import {
   clubAssignableRoles,
+  clubCapabilities,
   clubDirectorRoleLabels,
   clubRoleIsAssignableByClub,
   type ClubRole,
@@ -629,6 +630,49 @@ export async function listInvitesForAccount(verifiedEmail: string, now = new Dat
   return invites.map((invite) => ({ id: invite.id, role: invite.role, clubId: invite.organization.id, clubName: invite.organization.name }));
 }
 
+const teamManagerRoles = (["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] as const satisfies readonly ClubRole[])
+  .filter((role) => clubCapabilities(role).manageTeam);
+
+/** A staff sender whose account has since been deactivated no longer vouches for an invite. */
+async function staffSenderIsActive(tx: Prisma.TransactionClient, userId: string) {
+  const found = await tx.user.findFirst({
+    where: { id: userId, accountStatus: "ACTIVE", NOT: { credential: { is: { disabledAt: { not: null } } } } },
+    select: { id: true },
+  });
+  return found !== null;
+}
+
+async function clubSenderStillAllowed(
+  tx: Prisma.TransactionClient,
+  invite: { organizationId: string; createdByUserId: string | null; createdByAccountId: string | null },
+  now: Date,
+) {
+  if (invite.createdByAccountId) {
+    const account = await tx.attendeeAccount.findFirst({
+      where: { id: invite.createdByAccountId, status: "ACTIVE", disabledAt: null },
+      select: { id: true },
+    });
+    if (!account) return false;
+    const grant = await tx.clubDirectorGrant.findFirst({
+      where: {
+        organizationId: invite.organizationId,
+        attendeeAccountId: invite.createdByAccountId,
+        revokedAt: null,
+        effectiveFrom: { lte: now },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+        role: { in: [...teamManagerRoles] },
+      },
+      select: { id: true },
+    });
+    return grant !== null;
+  }
+  if (invite.createdByUserId) {
+    return (await staffSenderIsActive(tx, invite.createdByUserId))
+      && (await resolveClubsActor(invite.createdByUserId, tx)) !== null;
+  }
+  return false;
+}
+
 /**
  * The invited person accepts (#376, #425). The guarded status write happens
  * before the grant is created, in the same transaction as the overlap check
@@ -663,7 +707,14 @@ export async function acceptClubInvite(inviteId: string, account: { id: string; 
 
     // A People & access invite is only as good as the person who sent it (#1276): if they have since lost the role,
     // it is no longer open.
-    if (invite.source === "PEOPLE" && !(invite.createdByUserId && await resolveClubsActor(invite.createdByUserId, tx))) {
+    if (invite.source === "PEOPLE" && !(invite.createdByUserId && await staffSenderIsActive(tx, invite.createdByUserId) && await resolveClubsActor(invite.createdByUserId, tx))) {
+      throw new ClubInviteError("INVITE_NOT_OPEN", "That invite is no longer open.");
+    }
+
+    // A club-sent invite is only as good as the person who sent it: they must still hold a current role in that club
+    // that lets them manage its team (the rule the send path applies). A staff member who sent it while acting as the
+    // club's director must still be a system administrator or active Clubs Administrator.
+    if (invite.source === "CLUB" && !(await clubSenderStillAllowed(tx, invite, now))) {
       throw new ClubInviteError("INVITE_NOT_OPEN", "That invite is no longer open.");
     }
 

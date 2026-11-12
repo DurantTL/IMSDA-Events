@@ -140,7 +140,7 @@ describe("More money tools model (#1575)", () => {
     expect(statusOf(staffPageTitles.squarePayments, allMetrics(finance, 1))).toEqual({ tone: "warn", text: "Needs attention" });
     expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: 4 })).toEqual({ tone: "warn", text: "Needs attention" });
     expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: 0 })).toEqual({ tone: "ok", text: "OK" });
-    expect(cards({}).find((card) => card.title === staffPageTitles.squarePayments)?.description).toContain("across all events");
+    expect(cards({}).find((card) => card.title === staffPageTitles.squarePayments)?.description).toContain("this event's payments only");
     expect(statusOf(staffPageTitles.squarePayments, { unmatchedSquare: null })).toEqual(UNAVAILABLE_STATUS);
     const billing = (extra: MoneyMetricValues) => statusOf(staffPageTitles.billingResponsibility, { ...zero, ...extra });
     expect(billing({})).toEqual({ tone: "ok", text: "All recorded" });

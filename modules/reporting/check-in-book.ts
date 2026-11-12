@@ -34,6 +34,16 @@ export function parseCheckInBookStatuses(raw: string | string[] | undefined): Ch
   return picked.length > 0 ? picked : [...defaultCheckInBookStatuses];
 }
 
+/**
+ * A viewer limited to registered clubs keeps only the chosen statuses that are submitted or confirmed (both when none
+ * remain), so the checkboxes, the download link, the printed header and the data all agree.
+ */
+export function narrowCheckInBookStatuses(statuses: readonly CheckInBookStatus[], registeredClubsOnly: boolean): CheckInBookStatus[] {
+  if (!registeredClubsOnly) return [...statuses];
+  const kept = statuses.filter((status) => defaultCheckInBookStatuses.includes(status));
+  return kept.length > 0 ? kept : [...defaultCheckInBookStatuses];
+}
+
 /* ---------------------------------------------------------------------- */
 /* Extra column: which answers may be chosen                              */
 /* ---------------------------------------------------------------------- */

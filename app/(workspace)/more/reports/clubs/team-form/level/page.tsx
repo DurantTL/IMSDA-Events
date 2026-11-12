@@ -21,14 +21,14 @@ export const dynamic = "force-dynamic";
  */
 export default async function StaffLevelTeamFormsPage({ searchParams }: { searchParams: Promise<{ event?: string; level?: string | string[] }> }) {
   const { event: requested, level: requestedLevel } = await searchParams;
-  const { event, allowed } = await resolveClubReportsAccess(requested);
+  const { event, allowed, registeredClubsOnly } = await resolveClubReportsAccess(requested);
   if (!allowed) {
     return <AccessRestricted title="Team forms are restricted" detail="Team results and forms for this club event need report access." whoToAsk="your event administrator" />;
   }
   const level = levelFromParam(typeof requestedLevel === "string" ? requestedLevel : undefined);
   const [rows, settings] = await Promise.all([listTeamResults(event.id), getTeamSettings(event.id)]);
   const teams = teamsAtLevel(rows, level);
-  const forms = (await Promise.all(teams.map((team) => loadFilledTeamForm({ eventId: event.id, clubEventRegistrationId: team.clubEventRegistrationId }))))
+  const forms = (await Promise.all(teams.map((team) => loadFilledTeamForm({ eventId: event.id, clubEventRegistrationId: team.clubEventRegistrationId }, { registeredOnly: registeredClubsOnly }))))
     .flatMap((form, index) => (form ? [{ id: teams[index]!.clubEventRegistrationId, form }] : []));
   const whenWhere = level === "AREA" ? "" : levelWhenWhere(levelInfoFor(settings?.levelInfo ?? [], level));
   const query = `event=${encodeURIComponent(event.id)}`;

@@ -69,7 +69,7 @@ type Which = { eventId: string; clubEventRegistrationId: string } | { eventId: s
  * the team up under the director's own verified club, the staff route under report access. Birth dates, health answers and
  * every other private answer are never read: the form holds names, the coordinator's contact details and the confirmation.
  */
-export async function loadFilledTeamForm(which: Which): Promise<TeamFormPage | null> {
+export async function loadFilledTeamForm(which: Which, options: { registeredOnly?: boolean } = {}): Promise<TeamFormPage | null> {
   const context = await eventContext(which.eventId);
   if (!context) return null;
   const row = await getPrisma().clubEventRegistration.findFirst({
@@ -92,7 +92,9 @@ export async function loadFilledTeamForm(which: Which): Promise<TeamFormPage | n
       },
     },
   });
-  if (!row || !["SUBMITTED", "CONFIRMED", "WAITLISTED"].includes(row.registration.status)) return null;
+  // A viewer limited to registered clubs (an event administrator) opens only submitted or confirmed teams.
+  const openStatuses = options.registeredOnly ? ["SUBMITTED", "CONFIRMED"] : ["SUBMITTED", "CONFIRMED", "WAITLISTED"];
+  if (!row || !openStatuses.includes(row.registration.status)) return null;
   const answers = await currentRegistrationAnswers(which.eventId, row.registrationId);
   const responses = answers?.responses ?? {};
 

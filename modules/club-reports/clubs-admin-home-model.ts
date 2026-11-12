@@ -221,7 +221,7 @@ export function buildClubsAdminHome(input: {
       directorEmail: application.director.email,
       needsChurchChoice: application.church.needsChoice,
       reviewReasons: applicationReviewReasons(application),
-      reviewHref: `/admin/clubs/applications#application-${application.id}`,
+      reviewHref: `/admin/clubs/applications?application=${encodeURIComponent(application.id)}`,
     })),
     moreNewClubs: waiting > NEW_CLUBS_LIMIT,
     registeredClubs: {

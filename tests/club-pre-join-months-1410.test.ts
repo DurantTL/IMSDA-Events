@@ -82,7 +82,7 @@ describe("the conference grid and its CSV", () => {
     expect(render(JOINED)).not.toContain("Missing</a>");
     expect(render(JOINED)).toContain("0 missing reports so far");
     expect(render(null)).toContain("Missing");
-    expect(render(null)).toContain("1 missing reports so far");
+    expect(render(null)).toContain("1 missing report so far");
   });
 
   it("the CSV agrees", () => {

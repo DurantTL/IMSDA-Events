@@ -535,16 +535,29 @@ async function toRecords(rows: Row[], now: Date): Promise<NewClubApplicationReco
  * The queue: waiting applications first (oldest first), then the most recent
  * decisions. System administrators and Area Coordinators only; the director's
  * contact details and the attachment are in these records, so nobody else may
- * call this.
+ * call this. `status` narrows the read to the waiting or the decided applications
+ * (the staff queue's views, #1589); the default reads both, as the coordinator page does.
+ * Duplicate flags come from their own queries against the database, so a view that
+ * leaves the waiting applications out loses no flag on the ones it shows.
  */
-export async function listNewClubApplications(viewer: ApplicationViewer | null | undefined, now = new Date()) {
+export async function listNewClubApplications(viewer: ApplicationViewer | null | undefined, now = new Date(), status: "waiting" | "decided" | "all" = "all") {
   requireViewer(viewer);
   const prisma = getPrisma();
   const [waiting, decided] = await Promise.all([
-    prisma.newClubApplication.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" }, take: 200, select: recordSelect }),
-    prisma.newClubApplication.findMany({ where: { status: { not: "PENDING" } }, orderBy: { decidedAt: "desc" }, take: 50, select: recordSelect }),
+    status === "decided" ? [] : prisma.newClubApplication.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" }, take: 200, select: recordSelect }),
+    status === "waiting" ? [] : prisma.newClubApplication.findMany({ where: { status: { not: "PENDING" } }, orderBy: { decidedAt: "desc" }, take: 50, select: recordSelect }),
   ]);
   return toRecords([...waiting, ...decided], now);
+}
+
+/** One application by id, for its own page (#1589). Same viewers and same mapping as the queue; null when there is none. */
+export async function getNewClubApplication(viewer: ApplicationViewer | null | undefined, applicationId: string, now = new Date()) {
+  requireViewer(viewer);
+  if (!applicationId || applicationId.length > 100) return null;
+  const row = await getPrisma().newClubApplication.findUnique({ where: { id: applicationId }, select: recordSelect });
+  if (!row) return null;
+  const [record] = await toRecords([row], now);
+  return record ?? null;
 }
 
 export async function countWaitingNewClubApplications(viewer: ApplicationViewer | null | undefined) {

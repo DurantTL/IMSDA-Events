@@ -580,7 +580,7 @@ export function actionForSurface(
   return { action, handled: true, returnsFocus: !escapeBubbles && (action.type === "clear" || action.type === "restore-focus") };
 }
 
-/* ---- Records in the header search (#1837): clubs, events and churches beside the pages ---- */
+/* ---- Records in the header search (#1837): clubs, events, churches and people beside the pages ---- */
 
 /**
  * One row of the combobox, whatever it is: a page or task, a record the server found, or a "See all results" link. The
@@ -592,7 +592,7 @@ export type ResultEntry = {
   label: string;
   description: string;
   href: string;
-  /** The short word beside the label (the scope, or Club, Event, Church). Never colour alone. */
+  /** The short word beside the label (the scope, or Club, Event, Church, Person). Never colour alone. */
   badge: string;
   /** What a screen reader hears for the badge. */
   badgeSpoken: string;
@@ -603,17 +603,18 @@ export type ResultEntry = {
 export type ResultSection = { id: string; heading: string; start: number; entries: ResultEntry[] };
 
 export const pagesSectionHeading = "Pages and tasks";
-export const recordGroupHeadings: Record<RecordGroupKey, string> = { clubs: "Clubs", events: "Events", churches: "Churches" };
-const recordGroupOrder: readonly RecordGroupKey[] = ["clubs", "events", "churches"];
-const recordSingular: Record<RecordGroupKey, string> = { clubs: "club", events: "event", churches: "church" };
-const recordPlural: Record<RecordGroupKey, string> = { clubs: "clubs", events: "events", churches: "churches" };
+export const recordGroupHeadings: Record<RecordGroupKey, string> = { clubs: "Clubs", events: "Events", churches: "Churches", people: "People" };
+const recordGroupOrder: readonly RecordGroupKey[] = ["clubs", "events", "churches", "people"];
+const recordSingular: Record<RecordGroupKey, string> = { clubs: "club", events: "event", churches: "church", people: "person" };
+const recordPlural: Record<RecordGroupKey, string> = { clubs: "clubs", events: "events", churches: "churches", people: "people" };
 const recordBadges: Record<RecordGroupKey, { badge: string; spoken: string }> = {
   clubs: { badge: "Club", spoken: "Club" },
   events: { badge: "Event", spoken: "Event" },
   churches: { badge: "Church", spoken: "Church" },
+  people: { badge: "Person", spoken: "Person" },
 };
 
-export type RecordGroupKey = "clubs" | "events" | "churches";
+export type RecordGroupKey = "clubs" | "events" | "churches" | "people";
 
 /** "Jul 14, 2027" or "Jul 14, 2027 to Jul 17, 2027", in the event's own time zone (UTC if the zone is not valid). */
 export function formatEventDates(startsAt: string, endsAt: string, timezone: string): string {
@@ -678,7 +679,8 @@ function staffRecordGroups(result: StaffSearchResult): RecordGroupView[] {
         badge,
         badgeSpoken: spoken,
       }))
-      : result.churches.items.map((church) => ({
+      : group === "churches"
+      ? result.churches.items.map((church) => ({
         key: `church:${church.id}`,
         kind: "record" as const,
         label: church.name,
@@ -686,17 +688,27 @@ function staffRecordGroups(result: StaffSearchResult): RecordGroupView[] {
         href: church.href,
         badge,
         badgeSpoken: spoken,
+      }))
+      : result.people.items.map((person) => ({
+        key: `person:${person.id}`,
+        kind: "record" as const,
+        label: person.name,
+        description: person.kind,
+        href: person.href,
+        badge,
+        badgeSpoken: spoken,
       }));
     return { key: group, heading: recordGroupHeadings[group], singular: recordSingular[group], plural: recordPlural[group], entries, more: source.more, seeAllHref: source.seeAllHref };
   });
 }
 
-/** The staff header's records: clubs, events and churches (#1837). */
+/** The staff header's records: clubs, events and churches (#1837), and people (#1854). */
 export const staffRecordSearch: RecordSearchSpec<StaffSearchResult> = {
   endpoint: "/api/staff/search",
-  nouns: "clubs, events and churches",
-  label: "Search pages, clubs, events and churches",
-  placeholder: "Search pages, clubs, events, churches",
+  nouns: "clubs, events, churches and people",
+  label: "Search pages, clubs, events, churches and people",
+  // Short enough for the 390px header; the label names every group.
+  placeholder: "Search pages, clubs, events, people",
   listLabel: "Matching pages and records",
   groups: staffRecordGroups,
 };

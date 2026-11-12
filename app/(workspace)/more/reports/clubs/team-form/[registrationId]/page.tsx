@@ -21,11 +21,11 @@ export default async function StaffTeamFormPage({
 }) {
   const { registrationId } = await params;
   const { event: requested } = await searchParams;
-  const { event, allowed } = await resolveClubReportsAccess(requested);
+  const { event, allowed, registeredClubsOnly } = await resolveClubReportsAccess(requested);
   if (!allowed) {
     return <AccessRestricted title="Team forms are restricted" detail="Team results and forms for this club event need report access." whoToAsk="your event administrator" />;
   }
-  const form = await loadFilledTeamForm({ eventId: event.id, clubEventRegistrationId: registrationId });
+  const form = await loadFilledTeamForm({ eventId: event.id, clubEventRegistrationId: registrationId }, { registeredOnly: registeredClubsOnly });
   if (!form) notFound();
   const query = `event=${encodeURIComponent(event.id)}`;
   return (
