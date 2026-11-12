@@ -80,7 +80,7 @@ const COPY: Record<InstallCardAudience, { install: string; hidden: string; insta
   staff: {
     install: "Add an icon that opens your staff Home. The website works fine without it.",
     hidden: "Hidden. You can bring this back from Help.",
-    installed: "Saved. Look for the IMAdventist icon on your Home Screen.",
+    installed: "Saved. Look for the IMAdventist Staff icon on your Home Screen.",
     notSaved: "Not saved. Help explains how to save it from your browser menu.",
     restoreButton: "Show the Home Screen card on Home again",
     restored: "The card will show on Home again.",

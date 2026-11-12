@@ -21,7 +21,8 @@ export function buildStaffManifest() {
   return {
     id: STAFF_LAUNCH_PATH,
     name: STAFF_APP_NAME,
-    short_name: PRODUCT_NAME,
+    // Its own label, so someone who also saves the site app (#1713) can tell the two icons apart.
+    short_name: STAFF_APP_NAME,
     description: "Staff workspace for events and club ministry.",
     start_url: STAFF_LAUNCH_PATH,
     scope: "/",

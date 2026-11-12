@@ -18,6 +18,7 @@ describe("staff saved app (#1567)", () => {
 
   it("has a stable identity, scope and a fixed launch address", () => {
     expect(manifest).toMatchObject({ id: "/home", start_url: "/home", scope: "/", display: "standalone" });
+    expect(manifest).toMatchObject({ name: "IMAdventist Staff", short_name: "IMAdventist Staff" });
     for (const value of [manifest.id, manifest.start_url]) expect(value).toMatch(/^\/[a-z-]*$/);
     expect(JSON.stringify({ id: manifest.id, start_url: manifest.start_url, scope: manifest.scope })).not.toMatch(/[?#=]|token|session/i);
   });
@@ -39,7 +40,7 @@ describe("staff saved app (#1567)", () => {
 
   it("links the manifest from the staff workspace only", () => {
     expect(workspaceMetadata.manifest).toBe(STAFF_MANIFEST_PATH);
-    expect(workspaceMetadata.appleWebApp).toMatchObject({ capable: true, title: "IMAdventist" });
+    expect(workspaceMetadata.appleWebApp).toMatchObject({ capable: true, title: "IMAdventist Staff" });
     expect(workspaceViewport.themeColor).toBeTruthy();
     // Public and account pages link the site manifest instead (#1713); the staff layout's own value wins for staff pages.
     expect(rootMetadata.manifest).toBe("/site.webmanifest");
