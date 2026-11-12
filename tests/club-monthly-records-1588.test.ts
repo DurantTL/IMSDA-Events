@@ -217,4 +217,9 @@ describe("Monthly records pages (#1588)", () => {
     expect(read("app/(workspace)/admin/clubs/reports/year-end/page.tsx")).toContain('back={{ href: `/admin/clubs/reports?year=${reportYear}`, label: "Back to Review monthly records" }}');
     expect(read("app/(workspace)/admin/clubs/reports/page.tsx")).toContain('back={{ href: clubsAdminHrefs(clubYear).records, label: "Back to Monthly Records" }}');
   });
+
+  it("the Year-End search box is a 44px tap target", () => {
+    expect(read("components/club-year-end-conference.tsx")).toContain("className={styles.search}");
+    expect(read("components/club-year-end-conference.module.css")).toMatch(/input\.search \{\s*min-height: 44px;/);
+  });
 });
