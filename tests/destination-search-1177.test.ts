@@ -373,7 +373,7 @@ describe("shell wiring", () => {
     expect(markup.indexOf('role="search"')).toBeLessThan(markup.indexOf('id="primary-navigation"'));
     expect(markup.slice(markup.indexOf('id="workspace-content"'))).not.toContain("destination-search");
     expect(markup).toContain('id="destination-search-input"');
-    expect(markup).toContain("Search pages, clubs, events and churches");
+    expect(markup).toContain("Search pages, clubs, events, churches and people");
   });
 
   it("puts the search in the phone More sheet only, not in the desktop popover", () => {

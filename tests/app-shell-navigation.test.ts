@@ -59,7 +59,7 @@ describe("application shell navigation (#1565)", () => {
     expect(markup).not.toContain("Global administration");
     expect(markup).not.toContain("nav-group-toggle");
     expect(markup).toContain('aria-label="IMAdventist calendar"');
-    expect(markup).toContain("Search pages, clubs, events and churches");
+    expect(markup).toContain("Search pages, clubs, events, churches and people");
     expect(markup).toContain("Help &amp; learning");
     expect(markup.indexOf("<header")).toBeLessThan(markup.indexOf('id="primary-navigation"'));
     expect(markup.indexOf('id="primary-navigation"')).toBeLessThan(markup.indexOf('data-staff-tabs="true"'));
