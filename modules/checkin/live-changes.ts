@@ -23,10 +23,15 @@ export const LIVE_CHANGES_LIMIT = 500;
 
 export type LiveCheckInChange = readonly [attendeeId: string, checkedInAt: string | null];
 
+/** A registration whose money changed: its confirmation code and the balance the desk shows for it (0 when a church is billed). */
+export type LiveBalanceChange = readonly [confirmationCode: string, balanceCents: number];
+
 export type LiveCheckInChanges = {
   /** The server's clock when the answer was read; the next poll starts from here. */
   now: string;
   changes: LiveCheckInChange[];
+  /** Balances changed by a payment or refund since `since` (#1577). Additive: an older answer without it means none. */
+  balances: LiveBalanceChange[];
   /** More rows changed than one answer carries; the client reloads the roster instead of trusting a partial list. */
   truncated?: boolean;
 };
@@ -64,7 +69,7 @@ export function nextLiveSince(serverNow: string) {
 /** Parses a server answer defensively; anything unexpected is ignored rather than trusted. */
 export function parseLiveCheckInChanges(value: unknown): LiveCheckInChanges | null {
   if (!value || typeof value !== "object") return null;
-  const { now, changes, truncated } = value as { now?: unknown; changes?: unknown; truncated?: unknown };
+  const { now, changes, truncated, balances } = value as { now?: unknown; changes?: unknown; truncated?: unknown; balances?: unknown };
   if (typeof now !== "string" || Number.isNaN(Date.parse(now)) || !Array.isArray(changes)) return null;
   const parsed: LiveCheckInChange[] = [];
   for (const change of changes) {
@@ -77,7 +82,44 @@ export function parseLiveCheckInChanges(value: unknown): LiveCheckInChanges | nu
       parsed.push([change[0], change[1]] as const);
     }
   }
-  return truncated === true ? { now, changes: parsed, truncated: true } : { now, changes: parsed };
+  const parsedBalances: LiveBalanceChange[] = [];
+  if (Array.isArray(balances)) {
+    for (const balance of balances) {
+      if (
+        Array.isArray(balance)
+        && balance.length === 2
+        && typeof balance[0] === "string"
+        && typeof balance[1] === "number"
+        && Number.isInteger(balance[1])
+        && balance[1] >= 0
+      ) {
+        parsedBalances.push([balance[0], balance[1]] as const);
+      }
+    }
+  }
+  return truncated === true
+    ? { now, changes: parsed, balances: parsedBalances, truncated: true }
+    : { now, changes: parsed, balances: parsedBalances };
+}
+
+/**
+ * Applies balance changes to the roster, keyed by confirmation code. Returns the same array when nothing differs.
+ * A balance is the registration's, so it applies to everyone on it.
+ */
+export function applyLiveBalanceChanges<T extends { confirmationCode: string; balanceCents: number }>(
+  arrivals: readonly T[],
+  balances: readonly LiveBalanceChange[],
+): readonly T[] {
+  if (balances.length === 0) return arrivals;
+  const byCode = new Map(balances);
+  let changed = false;
+  const next = arrivals.map((arrival) => {
+    const balanceCents = byCode.get(arrival.confirmationCode);
+    if (balanceCents === undefined || balanceCents === arrival.balanceCents) return arrival;
+    changed = true;
+    return { ...arrival, balanceCents };
+  });
+  return changed ? next : arrivals;
 }
 
 /**

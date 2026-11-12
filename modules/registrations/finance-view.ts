@@ -136,3 +136,16 @@ export function adjustmentWording(churchBilled: boolean, group = false) {
         error: "Unable to adjust the amount owed.",
       };
 }
+
+/**
+ * Whether a refreshed list from the server may replace the one on screen (#1577). Never while a dialog is open, a
+ * form holds typed work, or a save or refund review is under way; the newer list is then applied once that ends.
+ */
+export function canApplyRefreshedRegistrations(state: {
+  dialogOpen: boolean;
+  typedWork: boolean;
+  saving: boolean;
+  reviewingRefund: boolean;
+}) {
+  return !state.dialogOpen && !state.typedWork && !state.saving && !state.reviewingRefund;
+}

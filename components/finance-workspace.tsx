@@ -19,6 +19,7 @@ import {
   activeFinancialStatuses,
   adjustmentWording,
   attendeeBalanceCents,
+  canApplyRefreshedRegistrations,
   churchBillingFinalNote,
   groupBillingFinalNote,
   financeDetailFacts,
@@ -86,6 +87,24 @@ export function FinanceWorkspace({
   // Both dialogs listen for Escape on the document; while the refund confirm
   // is open, Escape belongs to it alone and must not also close this modal.
   const dialogRef = useAccessibleDialog<HTMLElement>(Boolean(modal), () => { if (!pendingRefund) closeModal(); });
+
+  // The page refreshes itself every 30 seconds (#1577), so a payment taken at a check-in station shows here. New rows
+  // replace the list only while nothing is open or being typed; otherwise they wait until it closes. The selected
+  // registration, filter and search are separate state and stay as they are.
+  const [seenRegistrations, setSeenRegistrations] = useState(initialRegistrations);
+  if (
+    seenRegistrations !== initialRegistrations
+    && canApplyRefreshedRegistrations({
+      dialogOpen: modal !== null,
+      typedWork: formEdited || fundEdited || (modal === "adjust" && adjustKind !== "SCHOLARSHIP"),
+      saving,
+      reviewingRefund: pendingRefund !== null,
+    })
+  ) {
+    setSeenRegistrations(initialRegistrations);
+    setRegistrations(initialRegistrations);
+    setSelected((current) => (current ? initialRegistrations.find((row) => row.id === current.id) ?? current : current));
+  }
 
   const totals = useMemo(() => summarizeFinanceTotals(registrations), [registrations]);
   const wording = adjustmentWording(Boolean(selected?.isDeferredOrganizationBilling), Boolean(selected?.isGroup));
