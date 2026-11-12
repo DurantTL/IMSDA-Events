@@ -137,11 +137,11 @@ export function TltDirectory({ slice, total, clubs, filters, positions, tags }: 
                 <div><dt>Status</dt><dd>{tltStatusLabel(row.status)}</dd></div>
                 <div>
                   <dt>Help-area tags</dt>
-                  <dd>{row.tags.length === 0 ? "None" : <ul className={styles.tags}>{row.tags.map((tag) => <li className={styles.tag} key={tag.id}>{tag.name}</li>)}</ul>}</dd>
+                  <dd id={`tlt-tags-${row.personId}`} tabIndex={-1}>{row.tags.length === 0 ? "None" : <ul className={styles.tags}>{row.tags.map((tag) => <li className={styles.tag} key={tag.id}>{tag.name}</li>)}</ul>}</dd>
                 </div>
                 <div><dt>TLT shirt</dt><dd>{tltShirtLabel(row.shirt)}</dd></div>
               </dl>
-              {row.suggestedTags.length > 0 ? <TltTagSuggestions personId={row.personId} suggestions={row.suggestedTags} /> : null}
+              <TltTagSuggestions personId={row.personId} suggestions={row.suggestedTags} />
               <TltRowEditor
                 personId={row.personId}
                 positionTypeId={row.positionTypeId}

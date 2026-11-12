@@ -56,7 +56,7 @@ const open = (role: ClubRole) => ({
   state: "OPEN",
   club: { organizationId: "club-1", name: "Sample Pathfinders", role, sponsoringChurch: null },
   capabilities: clubCapabilities(role),
-  actor: { kind: "ATTENDEE", accountId: "account-1", sessionId: "session-1" },
+  actor: { kind: "ATTENDEE" as const, accountId: "account-1", sessionId: "session-1" },
 });
 
 beforeEach(() => {
@@ -82,11 +82,21 @@ describe("who sees a TLT's year and tags on the club roster (#1686)", () => {
     ["REGISTRAR", false],
     ["REPORTER", false],
   ] as const)("the club's %s: %s", (role, sees) => {
-    expect(clubTltDetailsVisible(clubCapabilities(role), false)).toBe(sees);
+    expect(clubTltDetailsVisible(open(role), false)).toBe(sees);
+  });
+
+  it("is not shown to staff acting as director through Clubs Administration, but is to the club's own people", () => {
+    const acting = (viaClubsAdministrator: boolean) => ({
+      ...open("DIRECTOR"),
+      actor: { kind: "STAFF_ACTING" as const, ...(viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) },
+    });
+    expect(clubTltDetailsVisible(acting(true), false)).toBe(false);
+    expect(clubTltDetailsVisible(acting(false), false)).toBe(true);
+    expect(clubTltDetailsVisible(open("DEPUTY"), false)).toBe(true);
   });
 
   it("is not shown on a read-only year", () => {
-    expect(clubTltDetailsVisible(clubCapabilities("DIRECTOR"), true)).toBe(false);
+    expect(clubTltDetailsVisible(open("DIRECTOR"), true)).toBe(false);
   });
 
   it("gives the own-club director and deputy the year and tags, read-only, for the TLTs only", async () => {

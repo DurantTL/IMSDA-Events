@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { clubYearFor } from "@/modules/club-rosters/domain";
+import { rosterSchoolDetailsVisible } from "@/modules/club-rosters/school-details-access";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 
 /**
@@ -10,9 +11,16 @@ import type { ClubCapabilities } from "@/modules/organizations/director-grants-d
  */
 export type ClubTltDetail = { tltYear: number | null; tags: string[] };
 
-/** Director and deputy only (the roster's `manageTeam` capability). A registrar, a reporter, an Area Coordinator or anyone else gets nothing. */
-export function clubTltDetailsVisible(capabilities: Pick<ClubCapabilities, "manageTeam">, readOnlyYear: boolean) {
-  return capabilities.manageTeam === true && !readOnlyYear;
+/**
+ * Director and deputy only (the roster's `manageTeam` capability), on the current year. A registrar, a reporter, an Area
+ * Coordinator or anyone else gets nothing, and neither does a Clubs Administrator acting as director: the same act-as
+ * exclusion as school type and church membership (`rosterSchoolDetailsVisible`).
+ */
+export function clubTltDetailsVisible(
+  access: { capabilities: Pick<ClubCapabilities, "manageTeam">; actor: Parameters<typeof rosterSchoolDetailsVisible>[0]["actor"] },
+  readOnlyYear: boolean,
+) {
+  return access.capabilities.manageTeam === true && !readOnlyYear && rosterSchoolDetailsVisible(access);
 }
 
 /**

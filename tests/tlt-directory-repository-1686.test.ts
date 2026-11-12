@@ -64,6 +64,7 @@ vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ SECRET_ENCRYPTION_KEY: "a-s
 vi.mock("@/lib/prisma", () => ({ getPrisma: () => client }));
 vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: state.audit }));
 
+import { Prisma } from "@prisma/client";
 import { sealBirthDate } from "@/modules/club-rosters/birth-dates";
 import { TltDirectoryError, parseTltFilters } from "@/modules/tlt-directory/domain";
 import { acceptTltTagSuggestion, listTltDirectoryRows, recordTltDirectoryView, runTltExport, updateTltProfile } from "@/modules/tlt-directory/repository";
@@ -270,6 +271,24 @@ describe("accepting a suggested tag (#1686)", () => {
     await expect(acceptTltTagSuggestion({ personId: "p1", tagId }, actor)).rejects.toMatchObject({ code: "NOT_SUGGESTED" });
     expect(state.profileTagCreate).not.toHaveBeenCalled();
     expect(state.audit).not.toHaveBeenCalled();
+  });
+
+  it("runs again once when two accepts race to create the record (unique index), and then succeeds", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    state.answers = [answerRow({ opportunities: ["Help with games Saturday night"] })];
+    state.profileUpsert.mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError("Unique constraint", { code: "P2002", clientVersion: "test" }));
+    await acceptTltTagSuggestion({ personId: "p1", tagId: "tag-games" }, actor);
+    expect(state.profileUpsert).toHaveBeenCalledTimes(2);
+    expect(state.profileTagCreate).toHaveBeenCalledTimes(1);
+    expect(state.audit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry other failures, or a second unique failure", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    state.answers = [answerRow({ opportunities: ["Help with games Saturday night"] })];
+    state.profileUpsert.mockRejectedValue(new Error("down"));
+    await expect(acceptTltTagSuggestion({ personId: "p1", tagId: "tag-games" }, actor)).rejects.toThrow("down");
+    expect(state.profileUpsert).toHaveBeenCalledTimes(1);
   });
 
   it("refuses someone who is not a current TLT", async () => {

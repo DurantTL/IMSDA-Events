@@ -262,6 +262,17 @@ export async function updateTltProfile(input: TltProfileUpdate, actor: TltDirect
  * suggested. Creates the TLT's record if there isn't one (year, position and status stay "Not set"). Audit: ids only.
  */
 export async function acceptTltTagSuggestion(input: TltSuggestionAccept, actor: TltDirectorActor, now = new Date()) {
+  try {
+    await acceptSuggestionOnce(input, actor, now);
+  } catch (error) {
+    // Two accepts at once for a TLT with no record: both try to create it and the second hits the unique person index.
+    // That transaction is void, so run it again once: the record now exists and the tag is added (or already there).
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") await acceptSuggestionOnce(input, actor, now);
+    else throw error;
+  }
+}
+
+async function acceptSuggestionOnce(input: TltSuggestionAccept, actor: TltDirectorActor, now: Date) {
   const prisma = getPrisma();
   await prisma.$transaction(async (tx) => {
     const isTlt = await tx.clubRosterMember.findFirst({

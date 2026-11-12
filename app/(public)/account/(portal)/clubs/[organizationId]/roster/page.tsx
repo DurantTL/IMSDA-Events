@@ -82,7 +82,7 @@ export default async function ClubRosterPage({
   // "Has a health record" marker: one boolean saying a record exists, no text (#611).
   const healthRecordFlags = readOnly ? undefined : await healthRecordFlagsForRoster(organizationId, members.map((member) => member.id)).catch(() => undefined);
   // Each TLT's year and help-area tags, read-only, for this club's own director and deputy only (#1686).
-  const tltDetails = clubTltDetailsVisible(access.capabilities, readOnly)
+  const tltDetails = clubTltDetailsVisible(access, readOnly)
     ? await listClubTltDetails(organizationId, members.filter((member) => member.isTlt).map((member) => member.id))
     : undefined;
   const registrationHref = registrationReturnTo(organizationId, returnToParam);
