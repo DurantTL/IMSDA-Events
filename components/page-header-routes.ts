@@ -53,6 +53,7 @@ export const pagesWithOwnHeader: readonly PageOwnsHeaderRoute[] = [
   { pattern: "/people" },
   { pattern: "/people/matches" },
   { pattern: "/admin/pauses" },
+  { pattern: "/more/event-content" },
   { pattern: "/admin/readiness" },
   { pattern: "/admin/settings" },
   { pattern: "/admin/system-report" },

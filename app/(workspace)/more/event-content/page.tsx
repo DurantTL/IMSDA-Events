@@ -7,6 +7,10 @@ import { listEventContentSections } from "@/modules/events/content-repository";
 import { resolveEventContext } from "@/modules/events/selection";
 import { staffPageTitles } from "@/components/staff-navigation";
 import { AdminPageHeader } from "@/components/admin-page-header";
+import { PageHeader } from "@/components/page-header";
+import { EventContentStarterButton } from "@/components/event-content-starter-button";
+import { publicEventPath } from "@/modules/events/share-links";
+import styles from "@/components/event-content-workspace.module.css";
 
 export const metadata: Metadata = { title: staffPageTitles.eventContent };
 
@@ -32,6 +36,24 @@ export default async function EventContentPage({
   return (
     <>
       <AdminPageHeader path="/more/event-content" eventId={event.id} />
+      <PageHeader
+        title={staffPageTitles.eventContent}
+        description="What the public event page says: speaker bios, schedules, lodging and downloads."
+        secondary={<EventContentStarterButton />}
+        actions={
+          <li>
+            <a href={publicEventPath({ slug: event.slug })} target="_blank" rel="noreferrer">View public page</a>
+          </li>
+        }
+        below={
+          <nav aria-label="On this page">
+            <ul className={styles.anchors}>
+              <li><a href="#event-content-uploads">Uploads</a></li>
+              <li><a href="#event-content-sections">Sections</a></li>
+            </ul>
+          </nav>
+        }
+      />
       <EventContentWorkspace
         key={event.id}
         eventId={event.id}
