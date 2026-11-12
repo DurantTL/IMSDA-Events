@@ -177,3 +177,35 @@ ticked as covered; the rest pay for themselves.
 - **Not built here:** a separate non-billing church (pastor) contact in the directory.
   It is tracked in #977.
 
+
+## Attendee-type restrictions (#102)
+
+A code can be limited to one or more of the event's attendee types (first slice of #102; personalized single-use
+codes, automatic discounts, item scopes, per-household or per-email caps and stacking are not built).
+
+- **Stored as codes, not links.** `PromoCode.attendeeTypeCodes` holds `EventAttendeeType.code` values of the same
+  event. Empty (the default, and every code made before this) means every attendee type, and such a code prices exactly
+  as it always did. A type that is deactivated or removed simply matches nobody, so a restriction only narrows.
+  `PromoCodeRedemption.attendeeTypeCodesSnapshot` keeps the restriction that was promised.
+- **Who is eligible.** Judged on the server in `evaluatePromoCode` (`domain.ts`), in every path that claims or quotes a
+  code, never only in the form:
+  - *Per-person code* (#397) and a staff per-person adjustment: valid only for an attendee of a listed type, otherwise
+    "<CODE> doesn't apply to this attendee type." The eligible subtotal is still that person's share.
+  - *Registration-level code* (public quote and the claim at submission): the eligible subtotal is the sum of the line
+    items of attendees of a listed type. Lines with no attendee (lodging, registration-level fees) are left out. The
+    minimum is checked against that eligible subtotal and the discount is capped at it. If nobody on the registration is
+    of a listed type the code is refused ("doesn't apply to anyone on this registration").
+  - *Staff applying a code to the whole registration* is refused for a restricted code (apply it to a person).
+  - *Amendments* price the saved code from the redemption's snapshot: an empty snapshot keeps the whole-subtotal
+    behavior, a restricted one discounts only the (amended) attendees of a listed type. Lodging screens treat a
+    restricted code as not touching the lodging line.
+- **Attendee type at pricing time** is worked out by `pricingAttendeeTypeCode` (`modules/attendee-types/`) the same way
+  the submission saves it (the form's attendee-type selector, else the older Adult/Teen/Child answer on a general
+  event). An attendee with no type never matches a restricted code.
+- **Staff.** The editor offers "All attendee types" (the default) or a choice of the event's active types; the server
+  checks every code against that event's types (a type the code already lists may stay when deactivated, a new choice
+  must be active). An edit that leaves the field out keeps the restriction. A restricted code cannot also have a
+  church sponsor (the church's share is worked out on the whole subtotal). Copying an event copies the restriction with
+  the code.
+- **Pricing is a human gate.** Creating or changing a restricted code changes what people pay. The treasurer must OK a
+  restricted code before it is used on a live event.

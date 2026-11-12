@@ -144,7 +144,7 @@ async function loadRegistration(tx: Client, eventId: string, registrationId: str
       event: { select: { billingMode: true } },
       attendees: {
         orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-        select: { id: true, profileSnapshot: true, person: { select: { firstName: true, lastName: true } } },
+        select: { id: true, profileSnapshot: true, person: { select: { firstName: true, lastName: true } }, attendeeTypeDefinition: { select: { code: true } } },
       },
       publicFormSubmission: { select: { pricingSnapshot: true } },
       operations: {
@@ -281,6 +281,9 @@ export async function createRegistrationAdjustment(
           eligibleSubtotalCents: pricedCents,
           pricingDate,
           fieldId: "promo_code",
+          // A code restricted to attendee types (#102) is only valid for a person of that type; whole-registration
+          // staff use of a restricted code is refused (no scope).
+          ...(attendee ? { attendeeScope: { kind: "ATTENDEE" as const, attendeeTypeCode: attendee.attendeeTypeDefinition?.code ?? null } } : {}),
         });
         // A church-sponsored code is the registration's only code (#961). The claim above is rolled back with this
         // transaction when the new code conflicts with one already on a person here.

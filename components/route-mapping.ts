@@ -125,6 +125,7 @@ const menuRoutes: readonly Menu[] = [
   ["/more/club-assignments", "Event", "More directory", "People & clubs", "Club assignments"],
   ["/more/club-teachers", "Event", "More directory", "People & clubs", "Club teachers"],
   ["/more/event-scoring", "Event", "More directory", "People & clubs", "Camporee scoring"],
+  ["/more/inspections", "Event", "More directory", "People & clubs", "Inspections"],
   ["/more/attendance-points", "Event", "More directory", "People & clubs", "Attendance points"],
   ["/more/debrief", "Event", "More directory", "People & clubs", "Event debrief"],
   ["/more/budget", "Event", "More directory", "Reports", "Budget sheet"],

@@ -10,6 +10,7 @@ import { BuilderHelpTextInput, BuilderPlaceholderInput } from "./builder-field-a
 import { useLoadedBuilder } from "./builder-context";
 import { BuilderShowWhen } from "./builder-show-when";
 import { InformationFieldIssues } from "./builder-information-issues";
+import { BuilderInformationSettings } from "./builder-information-block";
 import type { RegistrationFormField } from "@/modules/forms/definition";
 
 export type QuestionSelection = { sectionIndex: number; fieldIndex: number; field: RegistrationFormField };
@@ -28,15 +29,17 @@ export function BuilderQuestionSettings({ selection, onAction }: { selection: Qu
   }
   const { field, sectionIndex, fieldIndex } = selection;
   const section = definition.sections[sectionIndex]!;
+  const isInformationBlock = field.type === "INFORMATION";
   return (
     <div className="fb-question-settings builder-section" key={field.id}>
       <p className="fb-selected-heading"><strong>{field.label || "Untitled question"}</strong><span className="fb-chip">{fieldTypeLabels[field.type]}</span></p>
       <InformationFieldIssues fieldId={field.id} />
       <div className="fb-basic-settings">
-        <BuilderLabelInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} inputId={LABEL_INPUT_ID} />
-        <BuilderPlaceholderInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} className="" />
-        <BuilderHelpTextInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} className="" />
-        <div className="fb-option-row">
+        <BuilderLabelInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} inputId={LABEL_INPUT_ID} labelText={isInformationBlock ? "Heading" : "Label"} />
+        {isInformationBlock && <BuilderInformationSettings field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
+        {!isInformationBlock && <BuilderPlaceholderInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} className="" />}
+        {!isInformationBlock && <BuilderHelpTextInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} className="" />}
+        {!isInformationBlock && <div className="fb-option-row">
           <BuilderRequiredToggle field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} className="fb-option" />
           {!information && <fieldset className="fb-scope" disabled={!canEdit}>
             <legend>Who answers it</legend>
@@ -52,7 +55,7 @@ export function BuilderQuestionSettings({ selection, onAction }: { selection: Qu
               </label>
             ))}
           </fieldset>}
-        </div>
+        </div>}
       </div>
       {canEdit && onAction && (
         <div className="fb-inspector-actions" role="group" aria-label={`Question actions for ${field.label || "Untitled question"}`}>
@@ -63,12 +66,12 @@ export function BuilderQuestionSettings({ selection, onAction }: { selection: Qu
         </div>
       )}
       <BuilderShowWhen field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />
-      <details className="fb-advanced">
+      {!isInformationBlock && <details className="fb-advanced">
         <summary>Advanced</summary>
         <div className="fb-advanced-body">
           <BuilderFieldSettings section={section} field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} variant="panel" />
         </div>
-      </details>
+      </details>}
     </div>
   );
 }

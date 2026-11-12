@@ -138,7 +138,11 @@ export async function attachSquarePaymentToRegistration(
      */
     acknowledgeDuplicate?: boolean;
   },
-  options: { configuration?: SquareRuntimeConfiguration } = {},
+  options: {
+    configuration?: SquareRuntimeConfiguration;
+    /** Set by a check-in station: the audit entry then names the station. */
+    auditContext?: { station: { id: string; label: string } };
+  } = {},
 ) {
   const configuration = options.configuration ?? getSquareConfiguration();
   if (!configuration.paymentConfigured) {
@@ -305,6 +309,12 @@ export async function attachSquarePaymentToRegistration(
           acknowledgedOverExistingPaymentIds: input.acknowledgeDuplicate
             ? registration.payments.map((existing) => existing.id)
             : [],
+          ...(options.auditContext
+            ? {
+                channel: "CHECK_IN_STATION",
+                station: { id: options.auditContext.station.id, label: options.auditContext.station.label },
+              }
+            : {}),
         },
       },
     });
