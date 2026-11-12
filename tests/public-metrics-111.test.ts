@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
   eventFindFirst: vi.fn(),
+  eventFindMany: vi.fn(),
   executeRaw: vi.fn(),
   groupBy: vi.fn(),
   deleteMany: vi.fn(),
@@ -19,7 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
-    event: { findFirst: mocks.eventFindFirst },
+    event: { findFirst: mocks.eventFindFirst, findMany: mocks.eventFindMany },
     $executeRaw: mocks.executeRaw,
     publicMetricDaily: { groupBy: mocks.groupBy, deleteMany: mocks.deleteMany },
   }),
@@ -31,14 +32,18 @@ vi.mock("@/modules/access/request-security", () => ({
 }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/login-redirect", () => ({ staffLoginRedirectPath: async () => "/login" }));
-vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+vi.mock("next/navigation", () => ({ redirect: mocks.redirect, usePathname: () => "/admin/analytics", useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/modules/calendar/repository", () => ({ conferenceToday: () => "2026-10-28" }));
 vi.mock("@/components/admin-section-header", () => ({ AdminSectionHeaderFor: () => null }));
 
+import { resolveLinkScroll } from "@/components/link-guard";
 import { POST as beacon } from "@/app/api/public-metrics/route";
 import PublicAnalyticsPage from "@/app/(workspace)/admin/analytics/page";
 import {
   beaconBodySchema,
+  buildEventFunnel,
+  funnelRate,
+  parseAnalyticsPeriod,
   decideDimension,
   directoryFiltersInUse,
   firstPathSegment,
@@ -61,6 +66,7 @@ beforeEach(() => {
   mocks.originOk.value = true;
   mocks.eventFindFirst.mockImplementation(async ({ where }: any) => (where.slug === "public-camp" && where.isPublished === true && where.archivedAt === null && where.showOnCalendar === true ? { id: "e1" } : null));
   mocks.executeRaw.mockResolvedValue(1);
+  mocks.eventFindMany.mockResolvedValue([{ slug: "public-camp", name: "Public Camp" }]);
 });
 
 describe("the allowlists", () => {
@@ -208,9 +214,51 @@ describe("the summary and who can see it", () => {
     const summary = await getAnalyticsSummary("2026-10-28");
     expect(summary.from).toBe("2026-09-29");
     expect(summary.totals).toMatchObject({ EVENT_PAGE_VIEW: 9, LOGIN_SUCCESS: 8, LOGIN_FAILURE: 2, WEB_VITAL: 6 });
-    expect(summary.funnel).toEqual([{ slug: "public-camp", started: 4, completed: 3 }]);
+    expect(summary.funnel).toEqual([{ slug: "public-camp", title: "Public Camp", views: 9, started: 4, completed: 3 }]);
+    expect(summary.days).toBe(30);
+    expect(mocks.eventFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.eventFindMany.mock.calls[0][0].select).toEqual({ slug: true, name: true });
     expect(summary.logins).toEqual([{ surface: "staff-password", success: 8, failure: 2 }]);
     expect(summary.vitals).toEqual([{ name: "LCP", good: 5, needsImprovement: 0, poor: 1 }]);
+  });
+
+  it("reads 90 days and 12 months back, and falls back to the slug for an unknown event", async () => {
+    mocks.groupBy.mockResolvedValue([{ metric: "EVENT_PAGE_VIEW", dimension: "gone-event", _sum: { count: 2 } }]);
+    const summary = await getAnalyticsSummary("2026-10-28", 90);
+    expect(summary.from).toBe("2026-07-31");
+    expect(summary.funnel).toEqual([{ slug: "gone-event", title: "gone-event", views: 2, started: 0, completed: 0 }]);
+    expect((await getAnalyticsSummary("2026-10-28", 365)).from).toBe("2025-10-29");
+  });
+
+  it("shows the period links and the one funnel table", async () => {
+    mocks.groupBy.mockResolvedValue([{ metric: "EVENT_PAGE_VIEW", dimension: "public-camp", _sum: { count: 2 } }]);
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
+    const html = renderToStaticMarkup(createElement("div", null, await PublicAnalyticsPage({ searchParams: Promise.resolve({ days: "90", funnelSort: "c1", funnelDir: "desc" }) })));
+    expect(html).toContain("last 90 days");
+    // The section tab is the one "page"; the chosen period is marked "true".
+    expect(html.match(/aria-current="true"/g)).toHaveLength(1);
+    expect(html).not.toContain('aria-current="page"');
+    expect(html).toContain("Last 12 months");
+    // Period links keep the table sort and change only `days`; 30 days drops it.
+    expect(html).toContain('href="/admin/analytics?funnelSort=c1&amp;funnelDir=desc"');
+    expect(html).toContain('href="/admin/analytics?funnelSort=c1&amp;funnelDir=desc&amp;days=365"');
+    expect(html).toContain("Events are counted only while they are public");
+    expect(html).toContain("Which event pages lead to registrations");
+    expect(html).toContain("Public Camp");
+    expect(html).not.toContain("Most viewed public event pages");
+  });
+
+  it("keeps the reader's place when a period link is used", () => {
+    // The strip's links are GuardedLink, which keeps scroll on a same-page address change (#1557).
+    expect(readFileSync("components/staff-view-strip.tsx", "utf8")).toContain("<GuardedLink");
+    expect(resolveLinkScroll("/admin/analytics?days=90", "/admin/analytics", undefined)).toBe(false);
+  });
+
+  it("skips the event name lookup when asked", async () => {
+    mocks.groupBy.mockResolvedValue([{ metric: "EVENT_PAGE_VIEW", dimension: "public-camp", _sum: { count: 2 } }]);
+    const summary = await getAnalyticsSummary("2026-10-28", 30, { eventNames: false });
+    expect(mocks.eventFindMany).not.toHaveBeenCalled();
+    expect(summary.funnel[0].title).toBe("public-camp");
   });
 
   it("is for system administrators only", async () => {
@@ -223,5 +271,34 @@ describe("the summary and who can see it", () => {
     const html = renderToStaticMarkup(createElement("div", null, await PublicAnalyticsPage({ searchParams: Promise.resolve({}) })));
     expect(html).toContain("Public analytics");
     expect(html).toContain("Nothing counted yet.");
+  });
+});
+
+describe("the event funnel join (#1560)", () => {
+  it("keeps events with views but no starts, and orders by completed then views", () => {
+    const rows = buildEventFunnel(
+      new Map([["a-camp", 10], ["b-camp", 50], ["c-camp", 7]]),
+      new Map([["a-camp", 4], ["d-camp", 1]]),
+      new Map([["a-camp", 3], ["d-camp", 3]]),
+    );
+    expect(rows).toEqual([
+      { slug: "a-camp", views: 10, started: 4, completed: 3 },
+      { slug: "d-camp", views: 0, started: 1, completed: 3 },
+      { slug: "b-camp", views: 50, started: 0, completed: 0 },
+      { slug: "c-camp", views: 7, started: 0, completed: 0 },
+    ]);
+  });
+
+  it("does not cap a rate and has none without a denominator", () => {
+    expect(funnelRate(3, 2)).toBe(1.5);
+    expect(funnelRate(0, 0)).toBeNull();
+  });
+
+  it("accepts only 30, 90 or 365 days", () => {
+    expect(parseAnalyticsPeriod(undefined)).toBe(30);
+    expect(parseAnalyticsPeriod("90")).toBe(90);
+    expect(parseAnalyticsPeriod("365")).toBe(365);
+    expect(parseAnalyticsPeriod(["90", "365"])).toBe(90);
+    for (const bad of ["", "0", "7", "400", "-30", "30.0", "abc", "90 "]) expect(parseAnalyticsPeriod(bad), bad).toBe(30);
   });
 });

@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { logWarn } from "@/lib/logger";
 import { calendarDateIn, addDays } from "@/modules/calendar/domain";
-import { decideDimension, retentionDays, type PublicMetricName } from "@/modules/public-metrics/domain";
+import { buildEventFunnel, decideDimension, defaultAnalyticsPeriod, retentionDays, type AnalyticsPeriod, type EventFunnelRow, type PublicMetricName } from "@/modules/public-metrics/domain";
 
 /**
  * Counts one public event (#111). Aggregate only: one row per day, metric and allowlisted dimension, incremented
@@ -52,8 +52,9 @@ export type AnalyticsSummary = {
   from: string;
   to: string;
   totals: Record<PublicMetricName, number>;
-  topEventPages: MetricRow[];
-  funnel: Array<{ slug: string; started: number; completed: number }>;
+  days: AnalyticsPeriod;
+  /** One row per event with any counted views, starts or completions; `title` falls back to the slug. */
+  funnel: Array<EventFunnelRow & { title: string }>;
   logins: Array<{ surface: string; success: number; failure: number }>;
   notFound: MetricRow[];
   imageErrors: MetricRow[];
@@ -61,9 +62,9 @@ export type AnalyticsSummary = {
   directory: MetricRow[];
 };
 
-/** The last 30 days, counts only (system administrators' view). `today` is a conference-calendar date. */
-export async function getAnalyticsSummary(today: string): Promise<AnalyticsSummary> {
-  const from = addDays(today, -29);
+/** The last 30, 90 or 365 days, counts only (system administrators' view). `today` is a conference-calendar date. */
+export async function getAnalyticsSummary(today: string, days: AnalyticsPeriod = defaultAnalyticsPeriod, options: { eventNames?: boolean } = {}): Promise<AnalyticsSummary> {
+  const from = addDays(today, -(days - 1));
   const rows = await getPrisma().publicMetricDaily.groupBy({
     by: ["metric", "dimension"],
     where: { day: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${today}T00:00:00Z`) } },
@@ -74,9 +75,11 @@ export async function getAnalyticsSummary(today: string): Promise<AnalyticsSumma
   const total = (metric: PublicMetricName) => by(metric).reduce((sum, row) => sum + row.count, 0);
   const metricNames = ["EVENT_PAGE_VIEW", "DIRECTORY_SEARCH", "DIRECTORY_FILTER", "REGISTRATION_START", "REGISTRATION_COMPLETE", "LOGIN_SUCCESS", "LOGIN_FAILURE", "NOT_FOUND", "IMAGE_ERROR", "WEB_VITAL"] as const;
   const totals = Object.fromEntries(metricNames.map((metric) => [metric, total(metric)])) as Record<PublicMetricName, number>;
-  const started = new Map(by("REGISTRATION_START").map((row) => [row.dimension, row.count]));
-  const completed = new Map(by("REGISTRATION_COMPLETE").map((row) => [row.dimension, row.count]));
-  const slugs = [...new Set([...started.keys(), ...completed.keys()])].sort();
+  const counts = (metric: PublicMetricName) => new Map(by(metric).map((row) => [row.dimension, row.count]));
+  const funnelRows = buildEventFunnel(counts("EVENT_PAGE_VIEW"), counts("REGISTRATION_START"), counts("REGISTRATION_COMPLETE"));
+  // One lookup for every title (slug and name only; skipped with `eventNames: false`); an event that no longer matches shows its slug.
+  const events = options.eventNames !== false && funnelRows.length > 0 ? await getPrisma().event.findMany({ where: { slug: { in: funnelRows.map((row) => row.slug) } }, select: { slug: true, name: true } }) : [];
+  const titles = new Map(events.map((event) => [event.slug, event.name]));
   const success = new Map(by("LOGIN_SUCCESS").map((row) => [row.dimension, row.count]));
   const failure = new Map(by("LOGIN_FAILURE").map((row) => [row.dimension, row.count]));
   const surfaces = [...new Set([...success.keys(), ...failure.keys()])].sort();
@@ -86,8 +89,8 @@ export async function getAnalyticsSummary(today: string): Promise<AnalyticsSumma
     from,
     to: today,
     totals,
-    topEventPages: by("EVENT_PAGE_VIEW").slice(0, 10),
-    funnel: slugs.map((slug) => ({ slug, started: started.get(slug) ?? 0, completed: completed.get(slug) ?? 0 })),
+    days,
+    funnel: funnelRows.map((row) => ({ ...row, title: titles.get(row.slug) || row.slug })),
     logins: surfaces.map((surface) => ({ surface, success: success.get(surface) ?? 0, failure: failure.get(surface) ?? 0 })),
     notFound: by("NOT_FOUND"),
     imageErrors: by("IMAGE_ERROR"),

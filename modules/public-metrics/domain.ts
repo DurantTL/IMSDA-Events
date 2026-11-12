@@ -110,3 +110,30 @@ export function directoryFiltersInUse(filters: { q: string; from: string; to: st
 }
 
 export const retentionDays = 400;
+
+/** The periods the analytics page can show, in days. Retention is 400 days, so 12 months is always covered. */
+export const analyticsPeriods = [30, 90, 365] as const;
+export type AnalyticsPeriod = (typeof analyticsPeriods)[number];
+export const defaultAnalyticsPeriod: AnalyticsPeriod = 30;
+
+/** Reads the `days` address value: only 30, 90 or 365 are accepted; anything else is the default. */
+export function parseAnalyticsPeriod(raw: string | string[] | undefined): AnalyticsPeriod {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return analyticsPeriods.find((period) => String(period) === value) ?? defaultAnalyticsPeriod;
+}
+
+export type EventFunnelRow = { slug: string; views: number; started: number; completed: number };
+
+/**
+ * Joins views, starts and completions per event slug. An event with views but no starts still gets a row. Ordered by
+ * completed registrations (most first), then views, then slug, so the order is the same every time.
+ */
+export function buildEventFunnel(views: ReadonlyMap<string, number>, started: ReadonlyMap<string, number>, completed: ReadonlyMap<string, number>): EventFunnelRow[] {
+  const slugs = new Set([...views.keys(), ...started.keys(), ...completed.keys()]);
+  return [...slugs]
+    .map((slug) => ({ slug, views: views.get(slug) ?? 0, started: started.get(slug) ?? 0, completed: completed.get(slug) ?? 0 }))
+    .sort((a, b) => b.completed - a.completed || b.views - a.views || a.slug.localeCompare(b.slug));
+}
+
+/** part / whole, or null when there is nothing to divide by. Not capped: separate days and direct links can pass 1. */
+export const funnelRate = (part: number, whole: number): number | null => (whole > 0 ? part / whole : null);

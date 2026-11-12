@@ -651,7 +651,7 @@ export const systemReportProviders: readonly SignalProvider[] = [
     m("page-speed", "Page speed", "How public pages loaded for visitors, last 30 days.", "/admin/analytics", "Open analytics"),
     m("calendar-feed-reachable", "Calendar feed", "A read-only test that our own public calendar feed builds. No network is used and nothing is changed.", null, "Press Test connections"),
   ], async (ctx) => {
-    const read = await ctx.once("analytics", () => getAnalyticsSummary(conferenceToday()));
+    const read = await ctx.once("analytics", () => getAnalyticsSummary(conferenceToday(), 30, { eventNames: false }));
     const calendarFeed = await reachabilityRow(ctx, "calendar-feed", "calendar-feed-reachable", CALENDAR_FEED_REACHABILITY_JOB, () => true);
     if (!read.ok) return [{ key: "broken-links", ...tried(read) }, { key: "page-speed", ...tried(read) }, calendarFeed];
     const { totals, vitals } = read.value;
