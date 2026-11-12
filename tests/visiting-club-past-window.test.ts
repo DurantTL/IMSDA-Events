@@ -132,10 +132,10 @@ describe("every way to add a role or invite refuses a visiting club past its win
     mocks.prisma.clubInvite.create = vi.fn();
     mocks.prisma.messageOutbox = { create: vi.fn() };
     const { createClubTeamInvite, resendClubTeamInvite } = await import("@/modules/club-imports/invites");
-    await expect(createClubTeamInvite("g1", { email: "new@example.test", role: "REGISTRAR" }, actor, NOW)).rejects.toMatchObject({ message: VISITING_CLUB_PAST_WINDOW_MESSAGE });
+    await expect(createClubTeamInvite("g1", { email: "new@example.test", role: "REGISTRAR" }, actor, NOW)).rejects.toMatchObject({ code: "INVITE_NOT_OPEN", message: VISITING_CLUB_PAST_WINDOW_MESSAGE });
 
     mocks.prisma.clubInvite.findFirst.mockResolvedValue({ id: "i1", email: "new@example.test", name: "", role: "REGISTRAR", status: "SENT", sentAt: null, organization: { name: "Synthetic Guests", isActive: true, ...guest(45) } });
-    await expect(resendClubTeamInvite("g1", "i1", actor, NOW)).rejects.toMatchObject({ message: VISITING_CLUB_PAST_WINDOW_MESSAGE });
+    await expect(resendClubTeamInvite("g1", "i1", actor, NOW)).rejects.toMatchObject({ code: "INVITE_NOT_OPEN", message: VISITING_CLUB_PAST_WINDOW_MESSAGE });
     expect(mocks.prisma.clubInvite.create).not.toHaveBeenCalled();
     expect(mocks.prisma.messageOutbox.create).not.toHaveBeenCalled();
   });
