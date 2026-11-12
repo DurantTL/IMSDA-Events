@@ -86,6 +86,7 @@
     "test:event-budget": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-budget.ts",
     "test:baptism-follow-up": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-baptism-follow-up.ts",
     "test:event-staffing": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-event-staffing.ts",
+    "test:tlt-move-up": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-tlt-move-up.ts",
     "test:pbe-registration": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-pbe-registration.ts",
     "test:pbe-advancement": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-pbe-advancement.ts",
     "test:general-link-registration": "tsx --require ./scripts/support/allow-server-only.cjs scripts/verify-general-link-registration.ts",

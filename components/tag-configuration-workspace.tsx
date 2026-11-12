@@ -2,12 +2,12 @@
 
 import { cardCell } from "@/components/table-card-labels";
 import { EmptyState } from "@/components/empty-state";
-import { staffPageTitles } from "@/components/staff-navigation";
 import { useState } from "react";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import Link from "next/link";
 import { Info } from "lucide-react";
+import styles from "@/components/tag-configuration-workspace.module.css";
 
 type TagRow = { id: string; name: string; color: string; description: string; isActive: boolean };
 
@@ -19,12 +19,12 @@ async function responseJson(response: Response) {
 
 export function TagConfigurationWorkspace({
   eventId,
-  eventName,
   initialTags,
   canCreate = false,
 }: {
   eventId: string;
-  eventName: string;
+  /** Not shown: the event bar names the event. Kept so existing callers still type-check. */
+  eventName?: string;
   initialTags: TagRow[];
   /** Whether the viewer may add tags: the form and the empty-state action show only then (#743). */
   canCreate?: boolean;
@@ -89,15 +89,15 @@ export function TagConfigurationWorkspace({
   }
 
   return <div className="settings-stack">
-    <div className="page-intro"><div><p className="eyebrow">Event configuration</p><h2 className="duplicate-page-title">{staffPageTitles.tags}</h2><p>Configure the tag vocabulary staff can apply to registrations for {eventName}. Free-text tags are not supported — every tag is defined here first, so tagging stays consistent.</p></div></div>
-    <p className="usage-note"><Info aria-hidden="true" size={16} /><span>Where this shows up: staff add or remove these tags from a registration&rsquo;s notes &amp; tags panel in <Link href={`/people?event=${eventId}`}>Registrations</Link>.</span></p>
+    <p className={`usage-note ${styles.usageNote}`}><Info aria-hidden="true" size={16} /><span>Where this shows up: staff add or remove these tags from a registration&rsquo;s notes &amp; tags panel in <Link href={`/people?event=${eventId}`}>Registrations</Link>.</span></p>
     {/* While the deactivate dialog is open, its own alert shows the error; one announcement, not two. */}
     {error && !deactivateTarget && <p className="form-error" role="alert">{error}</p>}
     {notice && <p className="inline-notice success" role="status">{notice}</p>}
     <section className="panel">
-      <div className="section-heading"><div><h2>Configured tags</h2><p>Deactivating a tag hides it from new assignments; it stays visible on anything already tagged.</p></div></div>
+      <div className="section-heading"><div><h2>Configured tags</h2><p>Staff can only apply tags defined here. Deactivating a tag hides it from new assignments; it stays visible on anything already tagged.</p></div></div>
       {tags.length === 0 ? (
         <EmptyState
+          announce={false}
           canCreate={canCreate}
           hint={canCreate ? undefined : "Ask an event administrator to add tags."}
           title="No tags yet"
@@ -106,18 +106,21 @@ export function TagConfigurationWorkspace({
         </EmptyState>
       ) : <div className="table-wrap"><table className="editable-settings-table table-cards table-cards-xwide" role="table"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Tag</th><th role="columnheader" scope="col">Color</th><th role="columnheader" scope="col">Name</th><th role="columnheader" scope="col">Description</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Actions</th></tr></thead><tbody role="rowgroup">{tags.map((row) => <tr key={row.id} role="row">
         <th role="rowheader" scope="row"><strong translate="no">{row.name}</strong></th>
-        <td {...cardCell("Color")}><input aria-label={`Color for ${row.name}`} type="color" value={row.color} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, color: event.target.value } : candidate))} /></td>
-        <td {...cardCell("Name")}><input aria-label={`Name for ${row.name}`} value={row.name} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, name: event.target.value } : candidate))} /></td>
-        <td {...cardCell("Description")}><input aria-label={`Description for ${row.name}`} value={row.description} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, description: event.target.value } : candidate))} /></td>
+        <td {...cardCell("Color")}><input className={styles.colorInput} aria-label={`Color for ${row.name}`} type="color" value={row.color} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, color: event.target.value } : candidate))} /></td>
+        <td {...cardCell("Name")}><input className={styles.rowInput} aria-label={`Name for ${row.name}`} value={row.name} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, name: event.target.value } : candidate))} /></td>
+        <td {...cardCell("Description")}><input className={styles.rowInput} aria-label={`Description for ${row.name}`} value={row.description} onChange={(event) => setTags((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, description: event.target.value } : candidate))} /></td>
         <td {...cardCell("Status")}>{row.isActive ? "Active" : "Inactive"}</td>
-        <td {...cardCell(null)}><span className="form-actions"><button className="secondary-button" disabled={saving} type="button" onClick={() => updateTag(row, {})}>Save</button><button className="secondary-button" disabled={saving} type="button" onClick={() => row.isActive ? openDeactivate(row) : updateTag(row, { isActive: true })}>{row.isActive ? "Deactivate" : "Activate"}</button></span></td>
+        <td {...cardCell(null)}><span className={`form-actions ${styles.rowActions}`}><button className="secondary-button" disabled={saving} type="button" onClick={() => updateTag(row, {})}>Save</button><button className="secondary-button" disabled={saving} type="button" onClick={() => row.isActive ? openDeactivate(row) : updateTag(row, { isActive: true })}>{row.isActive ? "Deactivate" : "Activate"}</button></span></td>
       </tr>)}</tbody></table></div>}
-      {canCreate && <form className="form-stack inset-form" action={addTag} onChange={(event) => { const data = new FormData(event.currentTarget); setAddTyped(String(data.get("name") ?? "").trim() !== "" || String(data.get("description") ?? "").trim() !== ""); }}>
-        <div className="form-grid two-column color-field-row"><label>Name<input id="tag-name-input" name="name" required placeholder="VIP" /></label><label>Color<input name="color" type="color" defaultValue="#4F46E5" /></label></div>
+    </section>
+    {canCreate && <section className="panel" aria-labelledby="add-tag-heading">
+      <div className="section-heading"><div><h2 id="add-tag-heading">Add a tag</h2><p>Name it and pick a color. It is available to staff right away.</p></div></div>
+      <form className={`form-stack ${styles.addForm}`} action={addTag} onChange={(event) => { const data = new FormData(event.currentTarget); setAddTyped(String(data.get("name") ?? "").trim() !== "" || String(data.get("description") ?? "").trim() !== ""); }}>
+        <div className={`form-grid two-column color-field-row ${styles.colorRow}`}><label>Name<input id="tag-name-input" name="name" required placeholder="VIP" /></label><label>Color<input className={styles.colorInput} name="color" type="color" defaultValue="#4F46E5" /></label></div>
         <label>Description<input name="description" /></label>
         <button className="primary-button" disabled={saving} type="submit">Add tag</button>
-      </form>}
-    </section>
+      </form>
+    </section>}
 
     <ConfirmDialog
       busy={saving}

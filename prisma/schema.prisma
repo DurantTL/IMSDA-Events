@@ -11892,6 +11892,9 @@ model TltProfile {
   id                  String    @id @default(cuid())
   personId            String    @unique
   tltYear             Int?
+  /// The club year ("2026-27") the current `tltYear` applies to, set whenever the year is saved or moved up. The
+  /// club-year move-up offers a move only when this is null or earlier than the current club year (#1686).
+  tltYearClubYear     String?
   positionTypeId      String?
   status              TltStatus?
   updatedByAccountId  String?

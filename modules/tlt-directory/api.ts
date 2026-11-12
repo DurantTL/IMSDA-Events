@@ -33,7 +33,7 @@ export function tltApiError(error: unknown, action: string) {
     return Response.json({ error: error.code, message: error.message }, { status: 400, headers: noStore });
   }
   if (error instanceof TltDirectoryError) {
-    const status = error.code === "NOT_A_TLT" || error.code === "ENTRY_NOT_FOUND" ? 404 : error.code === "NAME_TAKEN" ? 409 : 400;
+    const status = error.code === "NOT_A_TLT" || error.code === "ENTRY_NOT_FOUND" ? 404 : error.code === "NAME_TAKEN" || error.code === "STALE_CLUB_YEAR" || error.code === "YEAR_CHANGED" ? 409 : 400;
     return Response.json({ error: error.code, message: error.message }, { status, headers: noStore });
   }
   logError(`${action} failed`, error);

@@ -1,0 +1,15 @@
+/* Tags page (#1586): the usage note, the color field and the row actions stay reachable at 44px on a phone. */
+.usageNote { margin-top: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.addForm { margin-top: 0; }
+.colorInput { min-width: 44px; min-height: 44px; padding: 2px; cursor: pointer; }
+.rowActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.rowActions :global(.secondary-button) { min-height: 44px; min-width: 44px; }
+.addForm :global(.primary-button) { min-height: 44px; }
+.addForm input:not([type="color"]) { min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.rowInput { min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+
+@media (max-width: 639px) {
+  .colorRow { grid-template-columns: minmax(0, 1fr); }
+  .colorInput { width: 100%; }
+  .rowActions > :global(.secondary-button), .addForm :global(.primary-button) { flex: 1 1 100%; }
+}

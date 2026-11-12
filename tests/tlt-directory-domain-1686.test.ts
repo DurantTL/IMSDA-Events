@@ -22,7 +22,7 @@ import {
 
 const row = (overrides: Partial<TltDirectoryRow>): TltDirectoryRow => ({
   personId: "p1", rosterMemberId: "m1", name: "Casey Sample", clubId: "c1", clubName: "Test Pathfinders", church: "Sample Church", age: 15, reportedAge: null,
-  grade: "10th grade", tltYear: 2, positionTypeId: "pos1", positionName: "Outreach", status: "ACTIVE", tags: [{ id: "t1", name: "Setup" }], suggestedTags: [], shirt: null, ...overrides,
+  grade: "10th grade", tltYear: 2, tltYearClubYear: "2026-27", positionTypeId: "pos1", positionName: "Outreach", status: "ACTIVE", tags: [{ id: "t1", name: "Setup" }], suggestedTags: [], shirt: null, ...overrides,
 } as TltDirectoryRow);
 
 const rows = [
@@ -60,7 +60,7 @@ describe("TLT directory seeds (#1686)", () => {
 });
 
 describe("TLT directory validation (#1686)", () => {
-  const ok = { personId: "p1", tltYear: 3, positionTypeId: "pos1", status: "APPROVED", tagIds: ["a", "a", "b"] } as const;
+  const ok = { personId: "p1", tltYear: 3, expectedTltYear: 3, positionTypeId: "pos1", status: "APPROVED", tagIds: ["a", "a", "b"] } as const;
 
   it("accepts the four fields and removes duplicate tags", () => {
     expect(profileUpdateSchema.parse(ok).tagIds).toEqual(["a", "b"]);
