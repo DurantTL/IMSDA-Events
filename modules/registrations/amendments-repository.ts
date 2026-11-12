@@ -32,6 +32,8 @@ import {
   summarizeChoiceUsage,
   type FormCalculation,
   type RegistrationFormDefinition,
+  isNotAttendingAnswer,
+  realChoiceValues,
 } from "@/modules/forms/definition";
 import {
   preparePublicRegistration,
@@ -628,11 +630,8 @@ function selectedCapacityChoices(
     for (const participant of participants) {
       if (!isFieldVisible(field, participant.responses)) continue;
       const value = participant.responses[field.key];
-      const options = Array.isArray(value)
-        ? value.map(String)
-        : typeof value === "string" && value
-          ? [value]
-          : [];
+      // "Not attending" (#893) is never a selection, so it takes no seat or interest row.
+      const options = realChoiceValues(value);
       options.forEach((optionValue, rank) => selections.push({
         fieldId: field.id,
         fieldKey: field.key,
@@ -2028,6 +2027,7 @@ async function amendRegistrationInner(
                       const value = attendee.responses[field.key];
                       return {
                         label: field.label,
+                        notAttending: isNotAttendingAnswer(value),
                         choices: Array.isArray(value)
                           ? value.flatMap((label) => (
                               typeof label === "string" && field.options.includes(label)

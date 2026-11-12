@@ -24,6 +24,7 @@ import {
   isFieldVisible,
   registrationFormDefinitionSchema,
   type RegistrationFormDefinition,
+  realChoiceValues,
 } from "@/modules/forms/definition";
 import {
   activeRegistrationStatuses,
@@ -181,8 +182,8 @@ function parsedDefinition(registration: LifecycleRegistration) {
 }
 
 function selectedValues(value: unknown) {
-  if (Array.isArray(value)) return value.map(String);
-  return typeof value === "string" && value ? [value] : [];
+  // "Not attending" (#893) is never a selection, so it takes no seat or interest row.
+  return realChoiceValues(value);
 }
 
 function claimsFromPublicSubmission(

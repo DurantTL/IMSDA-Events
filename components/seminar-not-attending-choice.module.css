@@ -1,0 +1,39 @@
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface, transparent);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.choice input {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+}
+
+.selected {
+  border-color: var(--imsda-purple);
+  background: var(--imsda-purple-soft);
+}
+
+.text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.text small {
+  margin: 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}

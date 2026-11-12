@@ -111,7 +111,7 @@ function SeminarFields({ fields, sorting }: { fields: OperationalSeminarField[];
               <h3>{field.label}</h3>
               <p>{scopeLabel(field.scope)} · highest total interest first</p>
             </div>
-            <span>{displayCount(field.totalInterest)} choices</span>
+            <span>{displayCount(field.totalInterest)} choices · {field.notAttending} not attending</span>
           </div>
           <div className="report-table-wrap card-box">
             <table role="table" className="report-table seminar-table table-cards table-cards-compact">

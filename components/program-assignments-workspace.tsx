@@ -387,6 +387,7 @@ export function ProgramAssignmentsWorkspace({
                 <article><strong>{preview.summary.secondChoiceAssigned}</strong><span>2nd choice</span></article>
                 <article><strong>{preview.summary.lowerChoiceAssigned}</strong><span>lower choice</span></article>
                 <article className={preview.summary.unassigned > 0 ? "warning" : ""}><strong>{preview.summary.unassigned}</strong><span>unassigned</span></article>
+                <article><strong>{preview.summary.notAttending}</strong><span>not attending</span></article>
               </div>
 
               {preview.summary.unlimitedOptions > 0 && (
@@ -493,7 +494,7 @@ export function ProgramAssignmentsWorkspace({
                     <div>
                       <h3>{run.fieldLabel}</h3>
                       <p>{run.formName} · version {run.formVersionNumber} · {localDate(run.appliedAt)}</p>
-                      <small>{run.summary.assigned} assigned · {run.summary.firstChoiceAssigned} first choice · {run.summary.secondChoiceAssigned} second choice · {run.summary.unassigned} unassigned · by {run.appliedByName}</small>
+                      <small>{run.summary.assigned} assigned · {run.summary.firstChoiceAssigned} first choice · {run.summary.secondChoiceAssigned} second choice · {run.summary.unassigned} unassigned · {run.summary.notAttending} not attending · by {run.appliedByName}</small>
                     </div>
                   </div>
                   <div className="assignment-run-actions">

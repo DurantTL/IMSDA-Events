@@ -8,6 +8,7 @@ import {
   isSeminarPreferenceField,
   prepareTieredAttendeeAnswerUpdate,
 } from "@/modules/attendee-accounts/registration-answer-policy";
+import { isNotAttendingAnswer } from "@/modules/forms/definition";
 import { enqueueRegistrationUpdatedMessage } from "@/modules/communications/transactional-messages";
 import { calendarDateInEventTimeZone } from "@/modules/events/lifecycle";
 import { ClubTeamError } from "@/modules/club-teams/errors";
@@ -345,6 +346,7 @@ export async function updateTieredRegistrationAnswersWithClient(
               const value = update.responses[field.key];
               return {
                 label: field.label,
+                notAttending: isNotAttendingAnswer(value),
                 choices: Array.isArray(value)
                   ? value.flatMap((label) => (
                       typeof label === "string" && field.options.includes(label)

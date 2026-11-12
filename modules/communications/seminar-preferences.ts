@@ -5,6 +5,7 @@ import {
   type SeminarAttendee,
 } from "@/modules/communications/message-blocks";
 import {
+  isNotAttendingAnswer,
   registrationFormDefinitionSchema,
   type RegistrationFormDefinition,
   type RegistrationFormField,
@@ -53,6 +54,7 @@ function assembleSeminarAttendees(
         const value = responses[field.key];
         return {
           label: field.label,
+          notAttending: isNotAttendingAnswer(value),
           // Ranked order is the stored order; labels no longer on the form are dropped.
           choices: Array.isArray(value)
             ? value
@@ -259,6 +261,7 @@ export function buildSubmittedSeminarPreferences(input: {
       const value = responses[field.key];
       return {
         label: field.label,
+        notAttending: isNotAttendingAnswer(value),
         choices: Array.isArray(value)
           ? value
               .filter((choice): choice is string => (
