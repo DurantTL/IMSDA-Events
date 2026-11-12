@@ -69,11 +69,11 @@ describe("check-in book statuses for a limited viewer", () => {
 describe("a Clubs Administrator who is also a real event administrator", () => {
   it("is not narrowed (the grant is read directly)", async () => {
     mocks.grantFindFirst.mockResolvedValue({ id: "g1" });
-    await expect(limitedToRegisteredClubs({ id: "u1", globalRole: "STAFF" }, { role: "EVENT_ADMIN" })).resolves.toBe(false);
+    await expect(limitedToRegisteredClubs({ id: "u1", globalRole: "STAFF" }, { role: "EVENT_ADMIN" }, "event-1")).resolves.toBe(false);
   });
   it("is narrowed without a grant", async () => {
     mocks.grantFindFirst.mockResolvedValue(null);
-    await expect(limitedToRegisteredClubs({ id: "u1", globalRole: "STAFF" }, { role: "EVENT_ADMIN" })).resolves.toBe(true);
+    await expect(limitedToRegisteredClubs({ id: "u1", globalRole: "STAFF" }, { role: "EVENT_ADMIN" }, "event-1")).resolves.toBe(true);
   });
 });
 

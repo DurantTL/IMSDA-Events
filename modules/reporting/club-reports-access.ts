@@ -21,7 +21,7 @@ import { hasActiveClubsAdministratorGrant } from "@/modules/access/club-event-ac
  */
 export async function resolveClubReportsAccess(requestedEventId?: string) {
   const context = await resolveEventContext(requestedEventId);
-  const registeredClubsOnly = await limitedToRegisteredClubs(context.user, context.membership);
+  const registeredClubsOnly = await limitedToRegisteredClubs(context.user, context.membership, context.event.id);
   if (context.permissions.includes("VIEW_REPORTS")) {
     return { ...context, allowed: true as const, readOnly: false as const, registeredClubsOnly };
   }
@@ -30,15 +30,19 @@ export async function resolveClubReportsAccess(requestedEventId?: string) {
 }
 
 /**
- * An event administrator's role is for this event only, so their club exports cover the clubs registered for it
+ * An event administrator's role is for this event only, so on a club event their club exports cover the clubs registered for it
  * (submitted or confirmed). System administrators, Clubs Administrators (who hold the role through their grant, #1643) and
  * staff who hold report access through another role are not narrowed.
  */
 export async function limitedToRegisteredClubs(
   user: { id?: string; globalRole?: string | null },
   membership: { role: string; viaClubsAdministrator?: true } | null | undefined,
+  eventId: string,
 ) {
   if (user.globalRole === "SYSTEM_ADMIN" || membership?.role !== "EVENT_ADMIN" || membership.viaClubsAdministrator) return false;
+  // Only a club event's exports are about clubs; an event administrator keeps every registration status elsewhere.
+  const event = await getPrisma().event.findUnique({ where: { id: eventId }, select: { audience: true } });
+  if (event?.audience !== "CLUB") return false;
   // A real event administrator who also holds an active Clubs Administrator grant keeps the wider access (checked directly,
   // since a real EVENT_ADMIN membership is returned as it is, without the grant marker).
   return !(user.id && (await hasActiveClubsAdministratorGrant(user.id)));
@@ -69,7 +73,7 @@ export async function requireClubReportsAccess(
 ) {
   const access = await requireEventMembership(session, eventId, lookup);
   const permissions = effectivePermissions(access.user, access.membership);
-  const registeredClubsOnly = await limitedToRegisteredClubs(access.user, access.membership);
+  const registeredClubsOnly = await limitedToRegisteredClubs(access.user, access.membership, eventId);
   if (permissions.includes("VIEW_REPORTS")) return { ...access, permissions, registeredClubsOnly };
 
   const isEventAdmin = access.user.globalRole === "SYSTEM_ADMIN" || access.membership?.role === "EVENT_ADMIN";

@@ -34,6 +34,7 @@ vi.mock("@/modules/event-locations/filter", () => ({ resolveLocationFilter: asyn
 vi.mock("@/lib/prisma", () => ({
   getPrisma: () => ({
     event: { findFirst: mocks.eventFindFirst, findUnique: mocks.eventFindUnique },
+    clubsAdministratorGrant: { findFirst: async () => null },
     eventTemplateApplication: { findUnique: mocks.applicationFindUnique },
     eventLocation: { findFirst: mocks.locationFindFirst },
     clubReportColumnLayout: {
