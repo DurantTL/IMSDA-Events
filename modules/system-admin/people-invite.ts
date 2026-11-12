@@ -18,6 +18,8 @@ import { isAccountEmailConfigured } from "@/modules/communications/account-email
 import { deliverStaffActivation, type StaffActivationDelivery } from "@/modules/communications/staff-activation";
 import { clubInviteSignUpUrl, createPeopleClubInvite, findOpenClubInvite } from "@/modules/club-imports/invites";
 import { createAreaCoordinatorInvite, findOpenAreaCoordinatorInvite } from "@/modules/organizations/area-coordinator-invites";
+import { parseMinistriesInput } from "@/modules/organizations/area-coordinator-ministries-domain";
+import { CLUB_KINDS } from "@/modules/organizations/club-kind";
 import { clubDirectorRoleLabels, type ClubRole } from "@/modules/organizations/director-grants-domain";
 import type { GrantItem } from "@/modules/system-admin/people-directory-model";
 import { deferredPersonHref, inviteLookupHref } from "@/modules/system-admin/people-invite-href";
@@ -55,6 +57,8 @@ const staffAccessShape = {
 };
 const familyAccessShape = {
   areaCoordinator: z.boolean().default(false),
+  /** The ministries a new Area Coordinator sees (#843); read only when `areaCoordinator` is ticked. Left out (an older client): Pathfinder. */
+  areaCoordinatorMinistries: z.array(z.enum(CLUB_KINDS)).max(CLUB_KINDS.length).optional(),
   clubs: z.array(z.object({ organizationId: idText, role: z.enum(clubRoleValues) }).strict()).max(20).default([]),
 };
 
@@ -65,11 +69,12 @@ function uniqueBy<T>(values: readonly T[], key: (value: T) => string) {
 const staffAccessSchema = z.object(staffAccessShape).strict();
 const accessSchema = z.object({ ...staffAccessShape, ...familyAccessShape }).strict();
 
-function refineAccess<T extends { systemAdmin: boolean; clubsAdministrator: boolean; events: Array<{ eventId: string }>; areaCoordinator?: boolean; clubs?: Array<{ organizationId: string; role: string }> }>(
+function refineAccess<T extends { systemAdmin: boolean; clubsAdministrator: boolean; events: Array<{ eventId: string }>; areaCoordinator?: boolean; areaCoordinatorMinistries?: string[]; clubs?: Array<{ organizationId: string; role: string }> }>(
   schema: z.ZodType<T>,
 ) {
   return schema
     .refine((access) => access.systemAdmin || access.clubsAdministrator || access.areaCoordinator || access.events.length > 0 || (access.clubs?.length ?? 0) > 0, { message: "Choose at least one kind of access." })
+    .refine((access) => !access.areaCoordinator || access.areaCoordinatorMinistries === undefined || parseMinistriesInput(access.areaCoordinatorMinistries) !== null, { message: "Choose at least one ministry: Pathfinder, Adventurer or both." })
     .refine((access) => uniqueBy(access.events, (event) => event.eventId), { message: "Each event can be chosen once." })
     .refine((access) => uniqueBy(access.clubs ?? [], (club) => `${club.organizationId}:${club.role}`), { message: "Each club role can be chosen once." });
 }
@@ -282,7 +287,7 @@ export async function invitePerson(actorUserId: string, input: PeopleInviteInput
           if (invite.messageId) result.messageIds.push(invite.messageId);
         }
         if (access.areaCoordinator) {
-          const invite = await createAreaCoordinatorInvite(tx, { email, name, actorUserId }, now);
+          const invite = await createAreaCoordinatorInvite(tx, { email, name, actorUserId, ministries: access.areaCoordinatorMinistries }, now);
           result.created.areaCoordinatorInviteId = invite.inviteId;
           if (invite.messageId) result.messageIds.push(invite.messageId);
         }

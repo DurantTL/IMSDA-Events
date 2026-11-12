@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CLUB_KINDS } from "@/modules/organizations/club-kind";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { requireSystemAdministrator } from "@/modules/organizations/access";
 import { confirmAreaCoordinatorImport, previewAreaCoordinatorImport } from "@/modules/organizations/area-coordinator-import";
@@ -9,6 +10,8 @@ import { withRequestContext } from "@/lib/request-context";
 const importSchema = z.object({
   csv: z.string().max(MAX_AREA_COORDINATOR_CSV_BYTES, "That file is too large. Upload up to 500 people at a time."),
   confirm: z.boolean().default(false),
+  /** One ministry choice for the whole file (#843); Pathfinder when left out. */
+  ministries: z.array(z.enum(CLUB_KINDS)).max(CLUB_KINDS.length).optional(),
 }).strict();
 
 /**
@@ -20,9 +23,9 @@ async function postHandler(request: Request) {
   if (originError) return originError;
   try {
     const actor = await requireSystemAdministrator("System administrator access is required to import Area Coordinators.");
-    const { csv, confirm } = importSchema.parse(await request.json());
+    const { csv, confirm, ministries } = importSchema.parse(await request.json());
     if (!confirm) return Response.json(await previewAreaCoordinatorImport(csv), { headers: { "Cache-Control": "no-store" } });
-    const { steps, added } = await confirmAreaCoordinatorImport(csv, actor.id);
+    const { steps, added } = await confirmAreaCoordinatorImport(csv, actor.id, new Date(), ministries);
     return Response.json({ steps, added }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof AreaCoordinatorCsvError) {

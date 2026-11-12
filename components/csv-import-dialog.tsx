@@ -39,6 +39,8 @@ export function CsvImportDialog({
   templateLabel = "CSV template",
   uploadLabel = "Upload CSV",
   variant = "account",
+  options,
+  extraBody,
 }: {
   eyebrow: string;
   help: React.ReactNode;
@@ -51,6 +53,10 @@ export function CsvImportDialog({
   /** The button that opens the dialog. */
   uploadLabel?: string;
   variant?: "account" | "staff";
+  /** Choices shown above the upload box, before a file is read (#843: the ministries for an Area Coordinator file). */
+  options?: React.ReactNode;
+  /** Extra JSON fields sent with the file, read when the file is sent or saved. */
+  extraBody?: Record<string, unknown>;
 }) {
   const [open, setOpen] = useState(false);
   const [csv, setCsv] = useState<string | null>(null);
@@ -80,7 +86,7 @@ export function CsvImportDialog({
       const response = await fetch(importUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csv: text, confirm }),
+        body: JSON.stringify({ ...extraBody, csv: text, confirm }),
       });
       const result = await response.json().catch(() => ({})) as ImportResponse;
       if (!response.ok || !result.steps) throw new Error(result.message ?? result.issues?.[0]?.message ?? "That file couldn't be read.");
@@ -167,6 +173,7 @@ export function CsvImportDialog({
             {!steps && (
               <>
                 <div className="field-help">{help}</div>
+                {options}
                 <label
                   className={`club-import-upload${dragging ? " club-import-upload-dragging" : ""}`}
                   onDragEnter={onDragEnter}

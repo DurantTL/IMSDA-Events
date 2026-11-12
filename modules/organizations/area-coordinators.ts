@@ -171,23 +171,25 @@ export async function applyAreaCoordinatorChange(
   on: boolean,
   actorUserId: string,
   now: Date,
-  options: { viaClubsAdministrator?: boolean; viaInviteId?: string } = {},
+  options: { viaClubsAdministrator?: boolean; viaInviteId?: string; ministries?: readonly ClubKindValue[] } = {},
 ) {
   const account = await tx.attendeeAccount.findUnique({ where: { id: attendeeAccountId }, select: { id: true } });
   if (!account) throw new AreaCoordinatorError("ACCOUNT_NOT_FOUND", "That account could not be found.");
-  let ministries: ClubKindValue[] = ["PATHFINDER"];
+  // A new or revived grant starts with the ministries the caller names (an accepted invite's choice), else Pathfinder.
+  const starting = options.ministries ? grantMinistries(options.ministries) : ["PATHFINDER" as ClubKindValue];
+  let ministries: ClubKindValue[] = starting;
   if (on) {
     // An already active grant keeps its ministries (a repeated toggle or an invite accepted again changes nothing about them);
-    // a new or revived grant starts as a Pathfinder coordinator until an admin names the ministries (#843).
+    // a new or revived grant starts with the invite's ministries, or as a Pathfinder coordinator until an admin names them (#843).
     const existing = await tx.areaCoordinatorGrant.findUnique({ where: { attendeeAccountId }, select: { revokedAt: true, expiresAt: true, ministries: true } });
     const keep = Boolean(existing && areaGrantActive(existing, now));
     if (keep && existing) ministries = grantMinistries(existing.ministries);
     await tx.areaCoordinatorGrant.upsert({
       where: { attendeeAccountId },
-      create: { attendeeAccountId, grantedByUserId: actorUserId, grantedAt: now },
+      create: { attendeeAccountId, grantedByUserId: actorUserId, grantedAt: now, ...(options.ministries ? { ministries: starting } : {}) },
       // A new grant never brings back the TLT director setting (#1686): a system administrator switches it again.
       update: { revokedAt: null, revokedByUserId: null, expiresAt: null, grantedByUserId: actorUserId, grantedAt: now, tltDirector: false, tltDirectorSetAt: null, tltDirectorSetByUserId: null,
-        ...(keep ? {} : { ministries: ["PATHFINDER"] }) },
+        ...(keep ? {} : { ministries: starting }) },
     });
   } else {
     // Removing the role removes the TLT director setting with it (#1686), and says so in the audit trail.

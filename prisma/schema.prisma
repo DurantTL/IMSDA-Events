@@ -3174,6 +3174,9 @@ model AreaCoordinatorInvite {
   acceptedAt        DateTime?
   acceptedAccountId String?
   cancelledAt       DateTime?
+  /// The ministries the grant gets when this invite is accepted (#843): Pathfinder, Adventurer or both.
+  /// Invites made before ministries existed stay Pathfinder.
+  ministries        ClubKind[]       @default([PATHFINDER])
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
