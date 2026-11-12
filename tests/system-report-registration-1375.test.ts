@@ -50,8 +50,8 @@ afterEach(() => vi.useRealTimers());
 
 describe("pricing self-test", () => {
   it("matches every hard-coded figure", () => {
-    expect(runPricingSelfTest()).toEqual({ checked: 9, differed: [] });
-    expect(pricingSelfTestFields("k", runPricingSelfTest(), at)).toMatchObject({ state: "ok", resultText: "9 of 9 fixed calculations matched." });
+    expect(runPricingSelfTest()).toEqual({ checked: 10, differed: [] });
+    expect(pricingSelfTestFields("k", runPricingSelfTest(), at)).toMatchObject({ state: "ok", resultText: "10 of 10 fixed calculations matched." });
   });
 
   it("turns a wrong expected answer into attention that names the calculation and shows no amount", () => {

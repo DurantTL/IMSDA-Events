@@ -1,3 +1,4 @@
+import { rejectGuestClubOtherEvent } from "@/modules/club-registrations/event-gate";
 import { singleQueryParam } from "@/modules/club-teams/domain";
 import QRCode from "qrcode";
 import { requireRosterAccess } from "@/modules/club-rosters/access";
@@ -36,6 +37,8 @@ async function getHandler(request: Request, context: Context) {
   try {
     const { organizationId, eventId } = await context.params;
     await requireRosterAccess(organizationId);
+    const guestBlock = await rejectGuestClubOtherEvent(organizationId, eventId);
+    if (guestBlock) return guestBlock;
 
     // Which of the club's teams (#809); omitted on an event without teams.
     // A repeated ?team= names no team.

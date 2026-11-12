@@ -24,7 +24,7 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: () => ({ clubRosterMember: { findMan
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.getRosterAccessStateForPage }));
 vi.mock("@/modules/background-checks/repository", () => ({ clubPortalComplianceStatuses: mocks.clubPortalComplianceStatuses }));
 vi.mock("@/modules/club-rosters/repository", () => ({ listRoster: mocks.listRoster }));
-vi.mock("@/modules/club-transfers/repository", () => ({ listTransferClubOptions: mocks.listTransferClubOptions }));
+vi.mock("@/modules/club-transfers/repository", () => ({ isGuestClub: async () => false, listTransferClubOptions: mocks.listTransferClubOptions }));
 vi.mock("@/modules/club-rosters/guardians-access", () => ({ rosterGuardiansForAccess: async () => ({}) }));
 vi.mock("@/modules/club-features/roster-health", () => ({ rosterHealthAvailable: async () => false }));
 vi.mock("@/modules/club-rosters/carry-forward", () => ({ getCarryForwardOffer: async () => ({ state: "NOTHING_TO_CARRY" }) }));

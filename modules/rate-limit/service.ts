@@ -1371,6 +1371,35 @@ export async function checkNewClubApplicationLinkRateLimit(request: Request, tok
   ], configuration);
 }
 
+/**
+ * A visiting director's request (#835). Submitting writes a row staff must review, so it is held tight like the public
+ * new club form: six an hour from one address and six an hour for one signed-in account, charged once per submit.
+ */
+export async function checkVisitingClubSubmitRateLimit(request: Request, accountId: string) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  return evaluate([
+    { policy: "visiting-club.submit.client", limit: 6, windowSeconds: oneHour, identifierHashes: [client] },
+    {
+      policy: "visiting-club.submit.account",
+      limit: 6,
+      windowSeconds: oneHour,
+      identifierHashes: [hashRateLimitIdentifier("visiting-club-account", accountId, configuration)],
+    },
+  ], configuration);
+}
+
+/** Opening a visiting club private link (#835): the token is a 256-bit secret, so this only stops scripted guessing. */
+export async function checkVisitingClubLinkRateLimit(request: Request, token: string) {
+  const configuration = getRateLimitConfiguration();
+  const { client } = requestIdentities(request, configuration);
+  const tokenHash = hashRateLimitIdentifier("visiting-club-link-token", token, configuration);
+  return evaluate([
+    { policy: "visiting-club.link.client", limit: 60, windowSeconds: fifteenMinutes, identifierHashes: [client] },
+    { policy: "visiting-club.link.token", limit: 60, windowSeconds: fifteenMinutes, identifierHashes: [tokenHash] },
+  ], configuration);
+}
+
 /** An administrator's "Send verification email": a few per account per hour, and a ceiling per administrator. */
 export async function checkAdminVerificationEmailRateLimit(actorUserId: string, accountId: string) {
   const configuration = getRateLimitConfiguration();

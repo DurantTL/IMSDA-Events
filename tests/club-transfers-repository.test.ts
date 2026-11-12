@@ -111,6 +111,13 @@ beforeEach(() => {
 const request = { fromOrganizationId: "club-a", firstName: "Ada", lastName: "Testperson", reason: "Family moved closer to Club B." };
 
 describe("requesting a transfer", () => {
+  it("refuses a visiting guest club (#835) and never names one as the sending club", async () => {
+    db.organization.findUniqueOrThrow.mockResolvedValue({ name: "Visiting Club", guestEventId: "event-guest" });
+    await expect(requestTransfer("club-b", request, directorB, now)).rejects.toMatchObject({ code: "GUEST_CLUB", status: 403 });
+    expect(db.memberTransfer.create).not.toHaveBeenCalled();
+    expect(db.organization.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ guestEventId: null }) }));
+  });
+
   it("routes a director who also leads the sending club to staff (no self-acknowledgment)", async () => {
     db.clubDirectorGrant.findMany.mockResolvedValue([leaderGrant("account-b", "b@example.test")]);
     await requestTransfer("club-b", request, directorB, now);

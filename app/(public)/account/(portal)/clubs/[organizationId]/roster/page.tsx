@@ -14,7 +14,7 @@ import { rosterYearView } from "@/modules/club-rosters/domain";
 import { rosterGuardiansForAccess } from "@/modules/club-rosters/guardians-access";
 import { ROSTER_DETAILS_NEEDED_FILTER, rosterSectionsStartClosed } from "@/modules/club-rosters/roster-view";
 import { listRoster } from "@/modules/club-rosters/repository";
-import { listTransferClubOptions } from "@/modules/club-transfers/repository";
+import { isGuestClub, listTransferClubOptions } from "@/modules/club-transfers/repository";
 import { personIdsMovedToOtherClubs } from "@/modules/earned-awards/order-source";
 import { rosterHealthAvailable } from "@/modules/club-features/roster-health";
 import { requireHealthViewerForClub } from "@/modules/health-records/access";
@@ -47,7 +47,8 @@ export default async function ClubRosterPage({
   const { clubYear, currentClubYear, readOnly, contactsEditable } = rosterYearView(yearParam);
   // Status only, never the note, and only for a director or deputy: this is the club's own page (#427).
   // Transfers (#489) are the same leader-only capability that manages the club's team.
-  const canTransfer = access.capabilities.manageTeam && !readOnly;
+  // A visiting guest club (#835) takes no part in member transfers.
+  const canTransfer = access.capabilities.manageTeam && !readOnly && !(await isGuestClub(organizationId));
   // School type and church membership (#1668): not for a Clubs Administrator acting as director.
   const schoolDetails = rosterSchoolDetailsVisible(access);
   const [members, complianceStatuses, clubOptions, guardians] = await Promise.all([

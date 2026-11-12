@@ -159,12 +159,13 @@ export function CopyFromPastEvent({ sources, intro }: CopyFromPastEventProps) {
   const promoItems = plan && include.promoCodes ? plan.review.promoCodes : [];
   const honorItems = plan && include.honors ? plan.review.honorOfferings : [];
   const privateLinks = plan ? plan.review.privateLinks.filter((finding) => include[finding.domain]) : [];
+  const lateKey = (item: { formId: string; fieldKey: string; windowIndex: number }) => `${item.formId}:${item.fieldKey}:${item.windowIndex}`;
   const limitKey = (item: { formId: string; fieldKey: string; choice: string }) => JSON.stringify([item.formId, item.fieldKey, item.choice]);
 
   const complete = Boolean(plan)
     && name.trim().length >= 3 && slug.trim().length >= 3 && Boolean(startsOn) && Boolean(endsOn)
     && wholeNumberAnswer(capacity) && answered(opensOn) && answered(closesOn)
-    && lateItems.every((item) => Boolean(lateDates[`${item.formId}:${item.fieldKey}`]))
+    && lateItems.every((item) => Boolean(lateDates[lateKey(item)]))
     && limitItems.every((item) => wholeNumberAnswer(choiceLimits[limitKey(item)]))
     && promoItems.every((promo) => answered(promoWindows[promo.promoCodeId]?.startsOn) && answered(promoWindows[promo.promoCodeId]?.endsOn))
     && honorItems.every((offering) => wholeNumberAnswer({ value: capacities[offering.offeringId] ?? "", none: false }) && wholeNumberAnswer(perClubLimits[offering.offeringId]));
@@ -183,7 +184,7 @@ export function CopyFromPastEvent({ sources, intro }: CopyFromPastEventProps) {
           registrationOpensOn: reviewedBody(opensOn),
           registrationClosesOn: reviewedBody(closesOn),
           include: Object.fromEntries(plan.domains.map((domain) => [domain.key, Boolean(include[domain.key])])),
-          formLatePricingDates: lateItems.map((item) => ({ formId: item.formId, fieldKey: item.fieldKey, startsOn: lateDates[`${item.formId}:${item.fieldKey}`] })),
+          formLatePricingDates: lateItems.map((item) => ({ formId: item.formId, fieldKey: item.fieldKey, windowIndex: item.windowIndex, startsOn: lateDates[lateKey(item)] })),
           formChoiceLimits: limitItems.map((item) => {
             const entry = choiceLimits[limitKey(item)]!;
             return { formId: item.formId, fieldKey: item.fieldKey, choice: item.choice, limit: entry.none ? null : Number(entry.value) };
@@ -360,9 +361,9 @@ export function CopyFromPastEvent({ sources, intro }: CopyFromPastEventProps) {
               <h2>Dates, capacities, and limits to review</h2>
               <p className="clone-hint">Nothing here is filled in from {plan.source.name}. The old value is shown as a hint.</p>
               {lateItems.map((item) => {
-                const key = `${item.formId}:${item.fieldKey}`;
+                const key = lateKey(item);
                 return (
-                  <label key={key}>Late pricing starts: {item.fieldLabel} ({item.formName})
+                  <label key={key}>{item.windowCount > 1 ? `Price window starts: ${item.fieldLabel}, ${item.windowLabel}` : `Late pricing starts: ${item.fieldLabel}`} ({item.formName})
                     <input type="date" value={lateDates[key] ?? ""} onChange={(event) => setLateDates((current) => ({ ...current, [key]: event.target.value }))} />
                     <small>Last time: {item.sourceStartsOn}.</small>
                   </label>

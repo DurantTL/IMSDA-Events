@@ -38,6 +38,7 @@ function priced(field: RegistrationFormField) {
     || field.priceCents !== undefined
     || field.choicePricesCents !== undefined
     || field.latePricing !== undefined
+    || field.pricingWindows !== undefined
     || field.creditCentsPerUnit !== undefined;
 }
 

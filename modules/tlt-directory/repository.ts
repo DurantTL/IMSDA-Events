@@ -80,7 +80,7 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
       isTlt: true,
       status: "ACTIVE",
       personId: { not: null },
-      organization: { type: "CLUB", isActive: true },
+      organization: { type: "CLUB", isActive: true, guestEventId: null },
     },
     select: {
       id: true,

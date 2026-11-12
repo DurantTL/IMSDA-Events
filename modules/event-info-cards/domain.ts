@@ -1,5 +1,5 @@
 import { formatCents } from "@/modules/payments/format-cents";
-import { resolveFieldPrices, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { fieldPriceWindows, resolveFieldPrices, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { effectiveLocationDates } from "@/modules/event-locations/domain";
 import { getPublicRegistrationStepPlan } from "@/modules/forms/public-registration-steps";
 
@@ -373,28 +373,39 @@ function unitFor(scope: "REGISTRATION" | "ATTENDEE", type: string) {
   return scope === "ATTENDEE" ? "per person" : "per registration";
 }
 
+type PriceState = { startsOn: string | null; cents: number | null };
+
 /**
- * Tiers from what the engine charges before and after the late date. `null`
- * means nothing is priced in that state (the engine charges $0 there), which is
- * never shown as a price.
+ * Tiers from what the engine charges in each pricing state, oldest first (the
+ * starting price, then each dated window). `null` means nothing is priced in
+ * that state (the engine charges $0 there), which is never shown as a price:
+ * a leading one shows as $0 up to the first price, a trailing one is dropped.
+ * Neighbouring states with the same price merge into one tier.
  */
-function tiersFor(regular: number | null, late: { startsOn: string; cents: number | null } | null): FeeTier[] {
-  if (!late) return regular === null ? [] : [{ amountCents: regular, note: null }];
-  const through = `through ${formatCardDate(dayBefore(late.startsOn))}`;
-  const from = `from ${formatCardDate(late.startsOn)}`;
-  if (regular === null && late.cents === null) return [];
-  if (regular !== null && late.cents === null) return [{ amountCents: regular, note: through }];
-  if (regular === null && late.cents !== null) {
-    // Priced only from the late date: the engine charges nothing before it.
-    return [{ amountCents: 0, note: through }, { amountCents: late.cents, note: from }];
+function tiersFromStates(states: PriceState[]): FeeTier[] {
+  const merged: PriceState[] = [];
+  for (const state of states) {
+    if (merged.length > 0 && merged[merged.length - 1]!.cents === state.cents) continue;
+    merged.push(state);
   }
-  if (regular === late.cents) return [{ amountCents: regular!, note: null }];
-  return [{ amountCents: regular!, note: through }, { amountCents: late.cents!, note: from }];
+  if (merged.every((state) => state.cents === null)) return [];
+  const tiers = merged.map((state, index) => {
+    const next = merged[index + 1];
+    const from = state.startsOn ? `from ${formatCardDate(state.startsOn)}` : null;
+    const through = next?.startsOn ? `through ${formatCardDate(dayBefore(next.startsOn))}` : null;
+    const note = from && through ? `${from} ${through}` : from ?? through;
+    return { cents: state.cents, note };
+  });
+  return tiers
+    .filter((tier, index) => tier.cents !== null || tiers.slice(0, index).every((earlier) => earlier.cents === null))
+    .map((tier) => ({ amountCents: tier.cents ?? 0, note: tier.note }));
 }
 
-/** What one option (or the field itself, for null) is charged in a pricing state; null when nothing is priced. */
-function chargedIn(field: RegistrationFormField, active: boolean, option: string | null): number | null {
-  const { priceCents, choicePricesCents } = resolveFieldPrices(field, active);
+const BEFORE_ALL_WINDOWS = "0000-01-01";
+
+/** What one option (or the field itself, for null) is charged on a date (before every window when null); null when nothing is priced. */
+function chargedIn(field: RegistrationFormField, pricingDate: string | null, option: string | null): number | null {
+  const { priceCents, choicePricesCents } = resolveFieldPrices(field, pricingDate ?? BEFORE_ALL_WINDOWS);
   if (choicePricesCents) return option === null ? null : choicePricesCents[option] ?? null;
   return priceCents ?? null;
 }
@@ -407,33 +418,36 @@ function feeGroupsFor(form: InfoCardForm): FeeGroup[] {
     for (const field of section.fields) {
       if (field.creditCentsPerUnit !== undefined) continue;
       const unit = unitFor(field.scope, field.type);
-      const latePricing = field.latePricing ?? null;
-      const tiersForOption = (option: string | null) => tiersFor(
-        chargedIn(field, false, option),
-        latePricing ? { startsOn: latePricing.startsOn, cents: chargedIn(field, true, option) } : null,
-      );
+      const windows = fieldPriceWindows(field);
+      const priceStates = (option: string | null): PriceState[] => [
+        { startsOn: null, cents: chargedIn(field, null, option) },
+        ...windows.map((window) => ({ startsOn: window.startsOn, cents: chargedIn(field, window.startsOn, option) })),
+      ];
+      const tiersForOption = (option: string | null) => tiersFromStates(priceStates(option));
 
       const priced = new Set([
         ...Object.keys(field.choicePricesCents ?? {}),
-        ...Object.keys(latePricing?.choicePricesCents ?? {}),
+        ...windows.flatMap((window) => Object.keys(window.choicePricesCents ?? {})),
       ]);
-      // When only the late map has prices, the engine charges the field-level price for every
-      // choice before the late date, so unpriced choices are listed too (#680); a choice with no
-      // price in either state yields no tiers and is dropped below.
+      // When only a window map has prices, the engine charges the field-level price for every
+      // choice before that date, so unpriced choices are listed too (#680); a choice with no
+      // price in any state yields no tiers and is dropped below.
       const choices = field.options.some((option) => priced.has(option)) ? field.options : [];
+      const choiceWindowIndex = windows.findIndex((window) => Object.keys(window.choicePricesCents ?? {}).length > 0);
       const singleCharge = (field.type === "MULTISELECT" || field.type === "RANKED_CHOICE")
-        && latePricing !== null
+        && choiceWindowIndex >= 0
         && field.priceCents !== undefined
         && Object.keys(field.choicePricesCents ?? {}).length === 0;
       if (choices.length > 0 && singleCharge) {
-        // Before the late date the engine charges the field price once, however many
-        // choices are picked; from the late date each priced choice is charged (#680).
+        // Until the first window that prices choices the engine charges the field price once,
+        // however many choices are picked; from that date each priced choice is charged (#680).
+        const choiceStart = windows[choiceWindowIndex]!.startsOn;
         const lines: FeeLine[] = [
-          { label: `${field.label} (one charge, however many are chosen)`, unit: unitFor(field.scope, field.type), tiers: tiersFor(field.priceCents!, { startsOn: latePricing.startsOn, cents: null }) },
+          { label: `${field.label} (one charge, however many are chosen)`, unit: unitFor(field.scope, field.type), tiers: tiersFromStates([...priceStates(null).slice(0, choiceWindowIndex + 1), { startsOn: choiceStart, cents: null }]) },
           ...choices.flatMap((option): FeeLine[] => {
-            const cents = chargedIn(field, true, option);
-            // A choice with no late price is charged nothing from the late date, as the engine does.
-            return [{ label: field.optionLabels?.[option] ?? option, unit: null, tiers: [{ amountCents: cents ?? 0, note: `from ${formatCardDate(latePricing.startsOn)}` }] }];
+            // A choice with no price is charged nothing from that date, as the engine does.
+            const states = windows.slice(choiceWindowIndex).map((window): PriceState => ({ startsOn: window.startsOn, cents: chargedIn(field, window.startsOn, option) ?? 0 }));
+            return [{ label: field.optionLabels?.[option] ?? option, unit: null, tiers: tiersFromStates(states) }];
           }),
         ];
         const key = `choice:${field.label}:${JSON.stringify(lines)}`;

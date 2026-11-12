@@ -17,7 +17,7 @@ function currentTltWhere(now: Date): Prisma.ClubRosterMemberWhereInput {
     attendeeType: "YOUTH",
     isTlt: true,
     status: "ACTIVE",
-    organization: { type: "CLUB", isActive: true },
+    organization: { type: "CLUB", isActive: true, guestEventId: null },
   };
 }
 

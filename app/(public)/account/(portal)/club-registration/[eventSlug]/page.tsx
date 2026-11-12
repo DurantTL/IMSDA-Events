@@ -53,7 +53,18 @@ export default async function ClubRegistrationEntryPage({
   }
   if (!account) redirect(await attendeeSignInRedirectPath());
 
-  const clubs = (await listDirectedClubs(account.id)).filter((club) => clubCapabilities(club.role).registerForEvents);
+  const directed = (await listDirectedClubs(account.id)).filter((club) => clubCapabilities(club.role).registerForEvents);
+  // A visiting guest club (#835) may register only for its own event: leave out one that belongs to another event.
+  const guestEvents = new Map(
+    (await getPrisma().organization.findMany({
+      where: { id: { in: directed.map((club) => club.organizationId) }, guestEventId: { not: null } },
+      select: { id: true, guestEventId: true },
+    })).map((row) => [row.id, row.guestEventId]),
+  );
+  const clubs = directed.filter((club) => {
+    const guestEventId = guestEvents.get(club.organizationId);
+    return !guestEventId || guestEventId === event.id;
+  });
   if (clubs.length === 1) {
     redirect(`/account/clubs/${clubs[0]!.organizationId}/events/${event.id}`);
   }

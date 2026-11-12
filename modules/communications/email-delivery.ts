@@ -61,6 +61,11 @@ import {
   retireNewClubInviteForMessage,
 } from "@/modules/club-applications/email";
 import {
+  VISITING_CLUB_INVITE_TEMPLATE_KEY,
+  prepareVisitingInviteBodyForDelivery,
+  retireVisitingInviteForMessage,
+} from "@/modules/visiting-clubs/email";
+import {
   HEALTH_RECORD_LINK_TEMPLATE_KEY,
   prepareHealthRecordLinkBodyForDelivery,
   retireHealthRecordLinkForMessage,
@@ -1176,6 +1181,13 @@ async function retireUndeliveredLinks(prisma: DeliveryPrisma, message: ClaimedMe
       logError("Unable to withdraw a new club application link after its email finally failed.", retireError);
     }
   }
+  if (message.templateKey === VISITING_CLUB_INVITE_TEMPLATE_KEY) {
+    try {
+      await retireVisitingInviteForMessage(prisma as unknown as PrismaClient, message.id, at);
+    } catch (retireError) {
+      logError("Unable to withdraw a visiting club link after its email finally failed.", retireError);
+    }
+  }
   if (message.templateKey === HEALTH_RECORD_LINK_TEMPLATE_KEY) {
     try {
       await retireHealthRecordLinkForMessage(prisma as unknown as PrismaClient, message.id, at);
@@ -1643,6 +1655,17 @@ async function prepareAccountEmailBody(
       bodyText: input.bodyText,
       now: input.now,
     });
+  }
+  // Visiting club email (#835): only the invite carries a sentinel; the approval and decline carry free text and must never be rewritten.
+  if (input.templateKey === VISITING_CLUB_INVITE_TEMPLATE_KEY) {
+    return prepareVisitingInviteBodyForDelivery({
+      messageId: input.messageId,
+      bodyText: input.bodyText,
+      now: input.now,
+    });
+  }
+  if (input.templateKey === "VISITING_CLUB_APPROVED" || input.templateKey === "VISITING_CLUB_DECLINED") {
+    return { bodyText: input.bodyText };
   }
   // Club form submitted alert (#1017): names only, no sentinel; never rewrite anything in it.
   if (input.templateKey === "CLUB_FORM_SUBMITTED") {

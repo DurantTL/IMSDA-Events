@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   toString: vi.fn(),
 }));
 
+// The guest club rule (#835) reads the club's `guestEventId`; these routes are about the conference club's own event.
+vi.mock("@/modules/club-registrations/event-gate", async (importOriginal) => ({ ...(await importOriginal<object>()), rejectGuestClubOtherEvent: async () => null, clubMayUseEvent: async () => true }));
 vi.mock("server-only", () => ({}));
 // The attendee second step is covered in tests/club-second-step.test.ts; here it has been passed.
 vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondStep: async () => "OK" }));

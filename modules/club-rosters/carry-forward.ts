@@ -314,7 +314,7 @@ export async function listClubsNewYearStatus(now = new Date()) {
   const { fromClubYear, toClubYear } = carryForwardYears(now);
   const prisma = getPrisma();
   const clubs = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: { type: "CLUB", isActive: true, guestEventId: null },
     orderBy: { name: "asc" },
     select: { id: true, name: true, parentOrganization: { select: { name: true } } },
   });

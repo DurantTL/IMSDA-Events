@@ -114,6 +114,7 @@ export function isTieredAttendeeFieldEditable(field: RegistrationFormField) {
     field.priceCents !== undefined
     || field.choicePricesCents !== undefined
     || field.latePricing !== undefined
+    || field.pricingWindows !== undefined
     || getAvailabilityMode(field) === "CAPACITY"
   ) {
     return false;

@@ -1,3 +1,4 @@
+import { rejectGuestClubOtherEvent } from "@/modules/club-registrations/event-gate";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
 import { clubTeacherApiError } from "@/modules/club-teachers/api-errors";
@@ -12,6 +13,8 @@ async function putHandler(request: Request, context: { params: Promise<{ organiz
   try {
     const { organizationId, eventId } = await context.params;
     const access = await requireRosterAccess(organizationId, new Date(), "registerForEvents");
+    const guestBlock = await rejectGuestClubOtherEvent(organizationId, eventId);
+    if (guestBlock) return guestBlock;
     const input = teacherEntriesSchema.parse(await request.json());
     const step = await setClubTeachers(organizationId, eventId, actorAttribution(access.actor), input);
     return Response.json({ step }, { headers: { "Cache-Control": "private, no-store" } });
