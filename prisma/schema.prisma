@@ -1919,6 +1919,7 @@ model Event {
   informationForms                    InformationForm[]
   debrief                             EventDebrief?                    @relation("EventDebrief")
   debriefsCarriedHere                 EventDebrief[]                   @relation("EventDebriefCarriedFrom")
+  budgetCostLines                     EventBudgetCostLine[]            @relation("EventBudgetCostLines")
   formTestSubmissions                 FormTestSubmission[]
   publicFormSubmissions               PublicRegistrationSubmission[]
   capacityReservations                RegistrationCapacityReservation[]
@@ -2077,6 +2078,24 @@ model EventDebrief {
   carriedFromEvent Event? @relation("EventDebriefCarriedFrom", fields: [carriedFromEventId], references: [id], onDelete: SetNull)
 
   @@index([carriedFromEventId])
+}
+
+/// One cost line on an event's simple budget sheet (#1682): a label chosen from suggestions, a free description, an optional
+/// quantity and an amount in cents. A planning sheet only; nothing here is a payment, invoice or ledger entry. Plain table name so
+/// the full event budgeting (#88) can absorb it later. Kept when the Budget sheet module is switched off.
+model EventBudgetCostLine {
+  id          String   @id @default(cuid())
+  eventId     String
+  label       String
+  description String   @default("")
+  quantity    Int?
+  amountCents Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  event Event @relation("EventBudgetCostLines", fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, createdAt])
 }
 
 enum ModuleRequestStatus {
