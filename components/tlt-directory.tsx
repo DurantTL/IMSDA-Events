@@ -98,14 +98,14 @@ export function TltDirectory({ slice, total, clubs, filters, positions, tags }: 
         {filters.sort !== "name" ? <input name="sort" type="hidden" value={filters.sort} /> : null}
         <div className={styles.actions}>
           <button className="primary-button" type="submit">Apply</button>
-          {filtered ? <Link className="secondary-button" href={hrefFor({ ...filters, q: "", clubId: "", year: "", position: "", status: "", tag: "" }, filters.sort)}>Clear filters</Link> : null}
+          {filtered ? <Link className="secondary-button" scroll={false} href={hrefFor({ ...filters, q: "", clubId: "", year: "", position: "", status: "", tag: "" }, filters.sort)}>Clear filters</Link> : null}
         </div>
       </SearchAsYouTypeForm>
 
       <nav aria-label="Sort the list" className={`${styles.sortRow} ${styles.noPrint}`}>
         <span>Sort by</span>
         {(Object.keys(sortLabels) as TltSort[]).map((sort) => (
-          <Link aria-current={filters.sort === sort ? "true" : undefined} className={styles.sortLink} href={hrefFor(filters, sort)} key={sort}>{sortLabels[sort]}</Link>
+          <Link aria-current={filters.sort === sort ? "true" : undefined} className={styles.sortLink} scroll={false} href={hrefFor(filters, sort)} key={sort}>{sortLabels[sort]}</Link>
         ))}
       </nav>
 

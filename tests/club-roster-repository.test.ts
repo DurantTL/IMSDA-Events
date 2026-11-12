@@ -658,6 +658,17 @@ describe("club roster storage", () => {
     expect(db.tltProfilesErased).toEqual([]);
   });
 
+  it("keeps the TLT director's record while the kept person has a paused (inactive) TLT roster row (#1686)", async () => {
+    const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    const personId = db.members[0].personId as string;
+    db.classCompletions.push({ id: "c5", organizationId: "club-2", personId });
+    db.members.push({ id: "paused-row", organizationId: "club-2", clubYear: "2026-27", personId, attendeeType: "YOUTH", isTlt: true, status: "INACTIVE" });
+
+    await removeRosterMember("club-1", id, actor, now);
+
+    expect(db.tltProfilesErased).toEqual([]);
+  });
+
   it("keeps only the name when an ordered need remains: email and phone erased (#566)", async () => {
     const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
     const personId = db.members[0].personId as string;
