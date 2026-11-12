@@ -246,6 +246,8 @@ export type SourceConfiguration = {
     minimumSubtotalCents: number | null;
     maximumUses: number | null;
     maximumDiscountCents: number | null;
+    /** Attendee-type restriction (#102), copied with the code. A type the new event does not have matches nobody. Optional so older fixtures still type. */
+    attendeeTypeCodes?: string[];
   }>;
   /** Meal services and plans (#210), definitions only: never selections, orders or the ledger. Optional so older fixtures still type. */
   meals?: MealDefinitions;

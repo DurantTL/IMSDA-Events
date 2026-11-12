@@ -3682,6 +3682,11 @@ model PromoCode {
   /// per redemption — what the church owes is computed on demand from
   /// PromoCodeRedemption, like church-billed club registrations (#409).
   sponsoringOrganizationId String?
+  /// Attendee-type restriction (#102): `EventAttendeeType.code` values of this event the code applies to. Empty means
+  /// every attendee type (all codes made before this existed). Codes, not foreign keys, on purpose: deactivating or
+  /// removing a type never blocks, and a type that no longer exists simply matches nobody, so a restriction can only
+  /// narrow, never silently widen to everyone.
+  attendeeTypeCodes    String[]          @default([])
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
@@ -3714,6 +3719,9 @@ model PromoCodeRedemption {
   /// edits, and never touched by an amendment (which rewrites `discountAmountCents` from the form). The church owes
   /// `discountAmountCents + sponsorLodgingChangeCents`; the registrant's own discount stays `discountAmountCents`.
   sponsorLodgingChangeCents    Int               @default(0)
+  /// The code's attendee-type restriction when it was used (#102); empty means it applied to every attendee type.
+  /// An amendment prices the saved code against this, not against the code's later edits.
+  attendeeTypeCodesSnapshot    String[]          @default([])
   pricingDate                  String
   createdAt                    DateTime          @default(now())
 

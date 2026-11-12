@@ -41,6 +41,8 @@ import {
 } from "@/modules/forms/public-domain";
 import {
   applyPromoCodeToCalculation,
+  isAttendeeTypeRestricted,
+  restrictedEligibleSubtotalCents,
   type PromoCodeEvaluation,
 } from "@/modules/promo-codes/domain";
 import { storedPromoDiscount } from "@/modules/promo-codes/stored-discount";
@@ -649,9 +651,18 @@ export function applyStoredPromo(
   registrationResponses: Record<string, unknown>,
   calculation: FormCalculation,
   redemption: AmendmentRegistration["promoCodeRedemption"],
+  /**
+   * Each attendee's type code after the amendment (index-matched to the calculation's attendees). Only used when the saved
+   * code was restricted to attendee types (#102): the code then discounts only those attendees' lines.
+   */
+  attendeeTypeCodes?: ReadonlyArray<string | null>,
 ) {
   if (!redemption) return calculation;
-  const eligibleSubtotalCents = calculation.subtotalCents;
+  // An empty snapshot is the whole-subtotal behavior every earlier code has.
+  const restrictedTo = redemption.attendeeTypeCodesSnapshot ?? [];
+  const eligibleSubtotalCents = isAttendeeTypeRestricted(restrictedTo)
+    ? restrictedEligibleSubtotalCents(calculation, restrictedTo, attendeeTypeCodes ?? [])
+    : calculation.subtotalCents;
   const stored = storedPromoDiscount({
     discountType: redemption.discountTypeSnapshot,
     discountValue: redemption.discountValueSnapshot,
@@ -701,11 +712,13 @@ export function priceAmendedRegistration(input: {
    * earlier, whose total already holds the fee.
    */
   cardFeeDeferred?: boolean;
+  /** Each attendee's type code after the amendment, for a saved code restricted to attendee types (#102). */
+  attendeeTypeCodes?: ReadonlyArray<string | null>;
 }) {
-  const { definition, responses, calculation, storedLine, redemption } = input;
+  const { definition, responses, calculation, storedLine, redemption, attendeeTypeCodes } = input;
   const priced = storedLine && !input.coversLodging
-    ? addUndiscountedLine(definition, responses, applyStoredPromo(definition, responses, calculation, redemption), storedLine)
-    : applyStoredPromo(definition, responses, storedLine ? calculationWithLine(definition, responses, calculation, LODGING_LINE_KEY, storedLine) : calculation, redemption);
+    ? addUndiscountedLine(definition, responses, applyStoredPromo(definition, responses, calculation, redemption, attendeeTypeCodes), storedLine)
+    : applyStoredPromo(definition, responses, storedLine ? calculationWithLine(definition, responses, calculation, LODGING_LINE_KEY, storedLine) : calculation, redemption, attendeeTypeCodes);
   return input.cardFeeDeferred ? withoutDeferredCardFee(priced) : priced;
 }
 
@@ -1385,6 +1398,21 @@ async function prepareAmendment(
   // A registration submitted before promo codes covered lodging (its snapshot has no `promoCoversLodging`) keeps the old
   // math: the code was decided on the form's own lines and the lodging line joined afterwards, undiscounted, so an unrelated
   // answer change never lowers its total.
+  // The attendee types the amended registration will have (#102), only needed when the saved code is restricted to some.
+  const promoAttendeeTypeCodes = isAttendeeTypeRestricted(registration.promoCodeRedemption?.attendeeTypeCodesSnapshot)
+    ? prepared.attendees.map((attendee, index) => {
+        const attendeeId = input.attendees[index]?.attendeeId;
+        const current = attendeeId ? currentById.get(attendeeId) ?? null : null;
+        const resolved = resolveAmendmentAttendeeType(
+          definition,
+          { ...prepared.registrationResponses, ...attendee.responses },
+          configuredTypes.filter((type) => type.isActive),
+          current,
+          registration.event.audience ?? null,
+        );
+        return configuredTypes.find((type) => type.id === resolved.attendeeTypeDefinitionId)?.code ?? null;
+      })
+    : undefined;
   const pricedCalculation = priceAmendedRegistration({
     definition,
     responses: prepared.registrationResponses,
@@ -1393,6 +1421,7 @@ async function prepareAmendment(
     redemption: registration.promoCodeRedemption,
     coversLodging: pricingSnapshot.promoCoversLodging === true,
     cardFeeDeferred: isCardFeeDeferred(pricingSnapshot),
+    attendeeTypeCodes: promoAttendeeTypeCodes,
   });
   const netPaidCents = paidCents(registration);
   // Staff adjustments (#396) stay on top of whatever the new answers cost.
@@ -1464,6 +1493,7 @@ async function prepareAmendment(
     definition,
     prepared,
     pricedCalculation,
+    promoAttendeeTypeCodes,
     currentRegistrationResponses,
     pricingSnapshot,
     nextPricingSnapshot,
@@ -1900,8 +1930,13 @@ async function amendRegistrationInner(
           await tx.promoCodeRedemption.update({
             where: { registrationId },
             data: {
-              eligibleSubtotalCents: prepared.pricedCalculation.subtotalCents
-                + discountAmountCents,
+              eligibleSubtotalCents: isAttendeeTypeRestricted(prepared.registration.promoCodeRedemption.attendeeTypeCodesSnapshot)
+                ? restrictedEligibleSubtotalCents(
+                  prepared.pricedCalculation,
+                  prepared.registration.promoCodeRedemption.attendeeTypeCodesSnapshot,
+                  prepared.promoAttendeeTypeCodes ?? [],
+                )
+                : prepared.pricedCalculation.subtotalCents + discountAmountCents,
               discountAmountCents,
             },
           });
