@@ -56,7 +56,7 @@ export function ClubPortalSearch({ pages }: { pages: readonly ClubSearchPage[] }
       <button
         type="button"
         ref={toggleRef}
-        className={styles.toggle}
+        className={`icon-button ${styles.toggle}`}
         aria-label="Search this club's pages, your clubs and members"
         aria-expanded={open}
         aria-controls={wrapId}

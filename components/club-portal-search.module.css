@@ -16,19 +16,15 @@
 }
 
 .toggle {
-  display: inline-flex;
   flex: none;
   width: var(--touch-target);
   min-width: var(--touch-target);
   height: var(--touch-target);
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--imsda-navy-soft);
+  border-color: var(--imsda-navy-soft);
   border-radius: var(--radius-element);
   background: var(--imsda-navy-deep);
   color: var(--paper);
   padding: 0;
-  cursor: pointer;
 }
 
 .toggle:hover {
