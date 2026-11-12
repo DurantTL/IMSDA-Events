@@ -17,11 +17,11 @@ import { toCsv } from "@/modules/reporting/csv";
 
 export const STAFFING_MODULE_KEY = "event-staffing" as const;
 
-/** Every role the table can hold. TLT is reserved for the TLT-by-tag slice; `ASSIGNABLE_ROLES` is what may be written today. */
+/** Every role the table can hold. TLT rows are written only by the TLT director's own path (`tltAssignmentInputSchema`); `ASSIGNABLE_ROLES` is what an ordinary editor may write. */
 export const STAFFING_ROLES = ["LEAD", "HELPER", "LIFEGUARD", "TLT"] as const;
 export type StaffingRole = (typeof STAFFING_ROLES)[number];
 
-/** What a person can be put in this slice. TLTs are counted as a needed number only, with none assigned. */
+/** What an Area Coordinator or event administrator can put a person in. TLTs are assigned by the TLT director only. */
 export const ASSIGNABLE_ROLES = ["LEAD", "HELPER", "LIFEGUARD"] as const satisfies readonly StaffingRole[];
 
 export const ROLE_LABELS: Record<StaffingRole, string> = { LEAD: "Lead", HELPER: "Adult helper", LIFEGUARD: "Lifeguard", TLT: "TLT" };
@@ -76,6 +76,18 @@ export const assignmentInputSchema = z.object({
   assignee: assigneeSchema,
 }).strict().refine((input) => input.assignee.kind !== "account" || input.role === "LEAD", { message: "An Area Coordinator can be an activity's lead, not a helper or lifeguard.", path: ["role"] });
 export type AssignmentInput = z.infer<typeof assignmentInputSchema>;
+
+/**
+ * What the TLT director sends to assign a TLT (#1678): the role is fixed and the assignee is a person, so a body asking for any
+ * other role or kind is refused before the server looks at the event. The server then checks the person is registered for the
+ * event and is a current TLT.
+ */
+export const tltAssignmentInputSchema = z.object({
+  activityId: z.string().min(1).max(64),
+  role: z.literal("TLT", { error: "The TLT director assigns TLTs only." }),
+  assignee: z.object({ kind: z.literal("person", { error: "A TLT is chosen from the registered TLTs." }), id: z.string().min(1).max(64) }).strict(),
+}).strict();
+export type TltAssignmentInput = z.infer<typeof tltAssignmentInputSchema>;
 
 export const assignmentDeleteSchema = z.object({ id: z.string().min(1).max(64) }).strict();
 

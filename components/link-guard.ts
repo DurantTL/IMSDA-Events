@@ -93,6 +93,8 @@ export function createLinkNavigationListener(options: {
     if (!link || link.target === "_blank" || link.hasAttribute("download") || link.hasAttribute("aria-haspopup")) return;
     // A link that saves first and warns itself if that fails (the club registration's roster links) is not asked about here.
     if (link.hasAttribute("data-saves-first")) return;
+    // A link that only changes this page's own filters (same page, same unsaved choices) is not leaving it.
+    if (link.hasAttribute("data-same-page")) return;
     const href = link.getAttribute("href");
     if (!href || href.startsWith("#")) return;
     const destination = new URL(link.href, options.currentHref());

@@ -2,6 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { ACTIVE_REGISTRATION_STATUSES, ROLE_LABELS, STAFFING_MODULE_KEY, type StaffingRole } from "@/modules/event-staffing/domain";
+import { currentTltPersonIds } from "@/modules/tlt-directory/current-tlt";
 
 /**
  * What one signed-in person is assigned to (#1678): their own activities, on their own account page, and nothing else.
@@ -13,7 +14,7 @@ import { ACTIVE_REGISTRATION_STATUSES, ROLE_LABELS, STAFFING_MODULE_KEY, type St
  *   - an event staff user linked to the account (`User.attendeeAccountId`);
  *   - the account itself, when an Area Coordinator was chosen as an activity's lead (while the grant is active).
  * An assignment shows only while the event is a published club event with Event staffing on, and the person is still registered
- * (submitted or confirmed) or still on the staff. Nothing else on the account changes.
+ * (submitted or confirmed) or still on the staff (a TLT assignment also needs the person to be a current TLT, as on the sheet). Nothing else on the account changes.
  */
 
 export type OwnAssignment = {
@@ -59,7 +60,8 @@ export async function listOwnAssignments(account: { id: string; verifiedEmail: s
   const userKeys = rows.flatMap((row) => (row.userId ? [{ eventId: row.eventId, userId: row.userId }] : []));
   const hasAccountRows = rows.some((row) => row.attendeeAccountId);
   const now = new Date();
-  const [registered, staff, grant] = await Promise.all([
+  const tltIds = [...new Set(rows.flatMap((row) => (row.role === "TLT" && row.personId ? [row.personId] : [])))];
+  const [registered, staff, grant, currentTlts] = await Promise.all([
     personKeys.length === 0 ? [] : prisma.registrationAttendee.findMany({
       where: { registration: { status: { in: [...ACTIVE_REGISTRATION_STATUSES] } }, OR: personKeys },
       select: { eventId: true, personId: true },
@@ -68,11 +70,13 @@ export async function listOwnAssignments(account: { id: string; verifiedEmail: s
     hasAccountRows
       ? prisma.areaCoordinatorGrant.findFirst({ where: { attendeeAccountId: account.id, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }], attendeeAccount: { status: "ACTIVE" } }, select: { id: true } })
       : null,
+    // A TLT job shows only while the person is still a current TLT, as on the sheet.
+    currentTltPersonIds(prisma, tltIds, now),
   ]);
   const registeredKeys = new Set(registered.map((row) => `${row.eventId}:${row.personId}`));
   const staffKeys = new Set(staff.map((row) => `${row.eventId}:${row.userId}`));
   return rows
-    .filter((row) => (row.attendeeAccountId ? grant !== null : row.personId ? registeredKeys.has(`${row.eventId}:${row.personId}`) : staffKeys.has(`${row.eventId}:${row.userId}`)))
+    .filter((row) => (row.attendeeAccountId ? grant !== null : row.personId ? registeredKeys.has(`${row.eventId}:${row.personId}`) && (row.role !== "TLT" || currentTlts.has(row.personId)) : staffKeys.has(`${row.eventId}:${row.userId}`)))
     .map((row) => ({
       id: row.id,
       eventName: row.event.name,

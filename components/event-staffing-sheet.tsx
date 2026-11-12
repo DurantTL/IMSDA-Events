@@ -34,7 +34,7 @@ type Message = { tone: "success" | "error"; text: string };
 /**
  * The event staffing sheet (#1678): the activities, who leads each, which people help, the gaps, and the print and CSV buttons.
  * Names show only to people who may already see the sheet (the page is not rendered for anyone else). The server decides who may
- * change anything and who may be put on an activity; this only shows or hides the controls. TLTs are a number needed for now.
+ * change anything and who may be put on an activity; this only shows or hides the controls. TLTs are assigned by the TLT director (any editor can take one off).
  */
 export function EventStaffingSheet({ endpoint, eventName, initialActivities, people, pickerTruncated, canEdit }: {
   /** The staffing route for this event, without a trailing part (`.../staffing`). */
@@ -261,7 +261,7 @@ export function EventStaffingSheet({ endpoint, eventName, initialActivities, peo
                               </optgroup>
                             )}
                           </select>
-                          <span className={styles.help}>People registered for this event and its staff; Area Coordinators can be chosen as the lead. TLTs are counted as a number needed for now.</span>
+                          <span className={styles.help}>People registered for this event and its staff; Area Coordinators can be chosen as the lead. The TLT director assigns TLTs.</span>
                           {pickerTruncated && <span className={styles.help}>This event has more people than fit in this list.</span>}
                         </label>
                       </div>

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   attendeeFindMany: vi.fn(),
   membershipFindMany: vi.fn(),
   grantFindFirst: vi.fn(),
+  rosterFindMany: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -14,6 +15,7 @@ vi.mock("@/lib/prisma", () => ({
     registrationAttendee: { findMany: mocks.attendeeFindMany },
     eventMembership: { findMany: mocks.membershipFindMany },
     areaCoordinatorGrant: { findFirst: mocks.grantFindFirst },
+    clubRosterMember: { findMany: mocks.rosterFindMany },
   }),
 }));
 
@@ -38,6 +40,7 @@ beforeEach(() => {
   mocks.attendeeFindMany.mockResolvedValue([{ eventId: "event-1", personId: "person-1" }]);
   mocks.membershipFindMany.mockResolvedValue([]);
   mocks.grantFindFirst.mockResolvedValue({ id: "grant-1" });
+  mocks.rosterFindMany.mockResolvedValue([{ personId: "person-1" }]);
 });
 
 describe("an assigned person sees their own assignment (#1678)", () => {
@@ -62,6 +65,20 @@ describe("an assigned person sees their own assignment (#1678)", () => {
     expect(select).not.toHaveProperty("person");
     expect(select).not.toHaveProperty("user");
     expect(JSON.stringify(select.activity)).not.toContain("assignments");
+  });
+
+  it("shows a TLT their own TLT assignment while they are registered and still a current TLT", async () => {
+    mocks.assignmentFindMany.mockResolvedValue([row({ id: "asg-tlt", role: "TLT" })]);
+    expect(await listOwnAssignments(sam)).toEqual([expect.objectContaining({ id: "asg-tlt", role: "TLT", roleLabel: "TLT", activityName: "Canoe" })]);
+    expect(mocks.rosterFindMany.mock.calls[0]![0].where).toMatchObject({ personId: { in: ["person-1"] }, attendeeType: "YOUTH", isTlt: true, status: "ACTIVE" });
+    mocks.attendeeFindMany.mockResolvedValue([]);
+    expect(await listOwnAssignments(sam)).toEqual([]);
+  });
+
+  it("hides a TLT job once the person is no longer a current TLT, but keeps a lifeguard job for a registered person", async () => {
+    mocks.assignmentFindMany.mockResolvedValue([row({ id: "asg-tlt", role: "TLT" }), row({ id: "asg-lg", role: "LIFEGUARD" })]);
+    mocks.rosterFindMany.mockResolvedValue([]);
+    expect((await listOwnAssignments(sam)).map((own) => own.id)).toEqual(["asg-lg"]);
   });
 
   it("shows nothing for an account with no assignment, such as an unassigned attendee or a club director", async () => {

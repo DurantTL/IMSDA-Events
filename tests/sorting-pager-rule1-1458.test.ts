@@ -77,6 +77,7 @@ const shownWording: Record<string, string> = {
   "components/check-in-workspace.tsx": "screen-reader search status (SearchResultStatus)",
   "components/honor-catalog-workspace.tsx": "screen-reader search status (SearchResultStatus)",
   "components/club-earned-awards-workspace.tsx": "selection summary beside the bulk actions, not a list count",
+  "components/tlt-staffing.tsx": "filter result status for the short unpaged list of an event's registered TLTs (#1678)",
 };
 
 /** Files with a sorted table and one more table that is not (the exact number), and why. */
