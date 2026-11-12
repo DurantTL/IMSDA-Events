@@ -172,7 +172,7 @@ const upperLabelFloorPx = staffTextFloorPx;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
-type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "registrar" | "reporter" | "area" | "attendee" | "attendee-history" | "station" | "visitor";
+type Role = "event-admin" | "system-admin" | "clubs-admin" | "kitchen" | "director" | "registrar" | "reporter" | "area" | "attendee" | "attendee-history" | "station" | "visitor";
 type SignedInRole = Exclude<Role, "visitor">;
 
 type PageSpec = {
@@ -326,6 +326,8 @@ const pages: PageSpec[] = [
   { ...area("budget", `/account/area-clubs/events/${clubEventId}/budget`), expectText: /Budget sheet/ },
   // The optional Event staffing sheet (#1678): the coordinator's switch, the activities, the gaps and the people (switched on in seedEventStaffing).
   { ...area("event-staffing", `/account/area-clubs/events/${clubEventId}/staffing`), expectText: /Event staffing/ },
+  // The optional Inspections tool (#1896): the switch, the phone score entry and the CSV import (switched on in seedInspections).
+  { ...area("inspections", `/account/area-clubs/events/${clubEventId}/inspections`), expectText: /Inspections/ },
   area("team-permissions", "/account/area-clubs/team-permissions"),
   area("new-club-applications", "/account/area-clubs/applications"),
   area("points", "/account/area-clubs/points"),
@@ -398,6 +400,11 @@ const pages: PageSpec[] = [
   staff("help-guide-admin", "/help/create-or-copy-event", "system-admin"),
   staff("help-glossary", "/help/glossary"),
   staff("help-hub-event-staff", "/help", "kitchen"),
+  // Help for a Clubs Administrator (#1882), a staff user with no event: the hub with its Clubs group, a written Clubs guide with its
+  // example picture, and a Clubs walkthrough with its step pictures. No event in the address: this account has none.
+  { name: "staff-help-hub-clubs-admin", path: "/help", role: "clubs-admin", expectText: /Clubs administration/ },
+  { name: "staff-help-guide-clubs-admin", path: "/help/clubs-find-a-club", role: "clubs-admin", expectText: /Find a club/ },
+  { name: "staff-help-walkthrough-clubs-admin", path: "/help/walkthrough-clubs-find-club", role: "clubs-admin", expectText: /Step by step: Find a club/ },
   staff("reports", "/more/reports"),
   staff("reports-clubs", "/more/reports/clubs"),
   staff("clubs-oversight", "/more/clubs"),
@@ -463,6 +470,8 @@ const pages: PageSpec[] = [
   { ...staff("budget", `/more/budget?event=${clubEventId}`, "system-admin"), expectText: /Budget sheet/ },
   // The optional Event staffing sheet (#1678): the switch, the gaps, the activities and the add forms.
   { ...staff("event-staffing", `/more/event-staffing?event=${clubEventId}`, "system-admin"), expectText: /Event staffing/ },
+  // The optional Inspections tool (#1896): the switch, the score rows and the import.
+  { ...staff("inspections", `/more/inspections?event=${clubEventId}`, "system-admin"), expectText: /Inspections/ },
   // Home (#1568): the work waiting for this person, and the upcoming events they can open.
   { ...staff("home-needs-you", "/home", "system-admin"), expectText: /Needs you/ },
   { ...staff("home-coming-up", "/home/coming-up", "system-admin"), expectText: /Coming up/ },
@@ -1254,6 +1263,18 @@ async function seedDebriefPages(prisma: PrismaClient): Promise<PageSpec[]> {
   return [{ name: "area-debrief-fill", path: `/events/${clubEventSlug}/forms/debrief`, role: "area" }];
 }
 
+/** Inspections (#1896) switched on for the club weekend, on top of Camporee scoring, with its two inspection events, so the audited pages show the score rows and not only the switch. */
+async function seedInspections(prisma: PrismaClient): Promise<void> {
+  await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "event-scoring" }, { eventId: clubEventId, moduleKey: "inspection-scoring" }], skipDuplicates: true });
+  for (const [index, [inspectionKind, name]] of ([["campsite", "Campsite inspection"], ["uniform", "Uniform inspection"]] as const).entries()) {
+    await prisma.scoredActivity.upsert({
+      where: { eventId_inspectionKind: { eventId: clubEventId, inspectionKind } },
+      create: { eventId: clubEventId, name, normalizedName: name.toLowerCase(), kind: "CLUB", unit: "POINTS", higherWins: true, ribbonMode: "PLACES", ribbonPlaces: 3, ribbonBands: [], inspectionKind, sortOrder: 900 + index },
+      update: {},
+    });
+  }
+}
+
 /** The Budget sheet (#1682) switched on for the club weekend, with two synthetic cost lines, so the audited pages show a sheet and not only the switch. */
 async function seedBudgetSheet(prisma: PrismaClient): Promise<void> {
   await prisma.eventModule.createMany({ data: [{ eventId: clubEventId, moduleKey: "event-budget" }], skipDuplicates: true });
@@ -1952,6 +1973,14 @@ async function seedClubsAdministrator(prisma: PrismaClient) {
   const user = await prisma.user.findUnique({ where: { email: "system@imsda-events.test" }, select: { id: true } });
   if (!user) return;
   await prisma.clubsAdministratorGrant.upsert({ where: { userId: user.id }, update: { revokedAt: null, revokedByUserId: null }, create: { userId: user.id, grantedByUserId: user.id } });
+  // A Clubs Administrator who is not a system administrator and has no event (#1882), for the Help pages only that role sees.
+  const clubsAdmin = await prisma.user.upsert({
+    where: { email: `${P}.clubsadmin@example.test` }, update: {},
+    create: { id: `${P}_user_clubsadmin`, email: `${P}.clubsadmin@example.test`, displayName: "Jules Mobilecheck-Clubs", accountStatus: "ACTIVE" },
+  });
+  await prisma.clubsAdministratorGrant.upsert({ where: { userId: clubsAdmin.id }, update: { revokedAt: null, revokedByUserId: null }, create: { userId: clubsAdmin.id, grantedByUserId: user.id } });
+  // A session is only valid for an account with a credential row; this one can never sign in with a password.
+  await prisma.authCredential.upsert({ where: { userId: clubsAdmin.id }, update: {}, create: { userId: clubsAdmin.id, passwordHash: "mobilecheck-never-a-real-hash" } });
 }
 
 /** Kitchen counts (#1029): two services with entries, one corrected, and a long note, so the entry cards and the table have content. */
@@ -2202,7 +2231,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
       tokens.attendee.push(session.token);
       return { name: attendeeSessionCookie.legacyName, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
     }
-    const email = role === "system-admin" ? "system@imsda-events.test" : role === "kitchen" ? `${P}.kitchen@example.test` : "admin@imsda-events.test";
+    const email = role === "system-admin" ? "system@imsda-events.test" : role === "clubs-admin" ? `${P}.clubsadmin@example.test` : role === "kitchen" ? `${P}.kitchen@example.test` : "admin@imsda-events.test";
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) throw new Error(`The seeded account ${email} is missing. Run \`npm run db:seed\` first.`);
     const session = await staffSession.createDatabaseSession(user.id, null);
@@ -2212,6 +2241,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
   const cookies: Record<SignedInRole, { name: string; value: string; expires: number }> = {
     "event-admin": await cookie("event-admin"),
     "system-admin": await cookie("system-admin"),
+    "clubs-admin": await cookie("clubs-admin"),
     kitchen: await cookie("kitchen"),
     director: await cookie("director"),
     registrar: await cookie("registrar"),
@@ -4860,6 +4890,7 @@ async function main() {
     pages.push(...await seedDebriefPages(prisma));
     await seedBudgetSheet(prisma);
     await seedEventStaffing(prisma);
+    await seedInspections(prisma);
     pages.push(...await seedEventTemplatePages(prisma));
     const cookies = await mintSessions(prisma, tokens);
     console.log(`Auditing ${pages.length} pages at ${widths.join(", ")} px; output in ${outDir}`);
@@ -4869,7 +4900,7 @@ async function main() {
     });
     for (const width of widths) {
       const height = heightFor(width);
-      for (const role of ["visitor", "director", "registrar", "reporter", "area", "attendee", "attendee-history", "event-admin", "system-admin", "kitchen", "station"] as Role[]) {
+      for (const role of ["visitor", "director", "registrar", "reporter", "area", "attendee", "attendee-history", "event-admin", "system-admin", "clubs-admin", "kitchen", "station"] as Role[]) {
         const specs = pages.filter((spec) => spec.role === role && (!only || only.split(",").some((part) => spec.name.includes(part.trim()))));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({

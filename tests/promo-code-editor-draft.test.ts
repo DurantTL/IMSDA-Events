@@ -96,3 +96,24 @@ describe("promo-code editor draft comparison", () => {
     })).toBe(true);
   });
 });
+
+describe("attendee-type restriction in the editor draft (#102)", () => {
+  const raw = {
+    code: "teens10", isActive: true, discountType: "FIXED_CENTS", discountValue: "5", startsOn: "", endsOn: "",
+    minimumSubtotal: "", maximumUses: "", maximumDiscount: "",
+  };
+
+  it("sorts and dedupes the chosen types so tick order is not a change", () => {
+    const first = normalizePromoCodeEditorDraft({ ...raw, attendeeTypeCodes: ["teen", "adult", "teen"] });
+    const second = normalizePromoCodeEditorDraft({ ...raw, attendeeTypeCodes: ["adult", "teen"] });
+    expect(first.attendeeTypeCodes).toEqual(["adult", "teen"]);
+    expect(isPromoCodeEditorDraftDirty(first, second)).toBe(false);
+  });
+
+  it("is dirty when the restriction changes, and a saved code with none is clean", () => {
+    const saved = savedPromoCodeEditorDraft(null);
+    expect(saved.attendeeTypeCodes).toEqual([]);
+    expect(isPromoCodeEditorDraftDirty(saved, normalizePromoCodeEditorDraft({ ...raw, code: "", discountValue: "" }))).toBe(false);
+    expect(isPromoCodeEditorDraftDirty(saved, normalizePromoCodeEditorDraft({ ...raw, code: "", discountValue: "", attendeeTypeCodes: ["teen"] }))).toBe(true);
+  });
+});

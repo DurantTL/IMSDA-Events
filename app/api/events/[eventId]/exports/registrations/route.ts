@@ -3,8 +3,7 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { findActiveMembership } from "@/modules/events/repository";
 import { locationParam, resolveLocationFilter } from "@/modules/event-locations/filter";
 import { listRegistrations } from "@/modules/registrations/repository";
-import { computeRegistrationFlags } from "@/modules/registrations/flags";
-import { listNotesForRegistration } from "@/modules/notes/repository";
+import { registrationsExportRows } from "@/modules/registrations/registrations-export-rows";
 import { toCsv } from "@/modules/reporting/csv";
 import {
   CHOICE_FILTER_QUESTION_PARAM,
@@ -16,7 +15,6 @@ import { logError } from "@/lib/logger";
 import { withRequestContext } from "@/lib/request-context";
 import { csvDownloadResponse, exportFileName } from "@/modules/reporting/export-response";
 import { eventFileScope } from "@/modules/reporting/export-scope";
-import { formatPersonName } from "@/lib/person-name";
 
 async function getHandler(
   request: Request,
@@ -50,38 +48,7 @@ async function getHandler(
       return csvDownloadResponse(toCsv(choiceExportRows(registrations, { ...choice, value: choice.value })), exportFileName({ scope: await eventFileScope(eventId), kind: "registrations-by-answer" }));
     }
     const showLocation = locations.length > 0;
-    const rows: Array<Array<string | number>> = [[
-      "Confirmation code",
-      "Account holder",
-      "Email",
-      ...(showLocation ? ["Location"] : []),
-      "Status",
-      "Submitted at (ISO 8601)",
-      "Attendees",
-      "Total",
-      "Net received",
-      "Balance",
-      "Flags",
-      "Visible staff notes",
-    ]];
-    for (const registration of registrations) {
-      const flags = computeRegistrationFlags(registration);
-      const visibleNotes = await listNotesForRegistration(eventId, registration.id, actorPermissions);
-      rows.push([
-        registration.confirmationCode,
-        formatPersonName(registration.accountHolder),
-        registration.accountHolder.email,
-        ...(showLocation ? [registration.location?.name ?? ""] : []),
-        registration.status,
-        registration.submittedAt ?? "",
-        registration.attendeeCount,
-        (registration.totalAmountCents / 100).toFixed(2),
-        (registration.paidCents / 100).toFixed(2),
-        (registration.balanceCents / 100).toFixed(2),
-        flags.map((flag) => flag.label).join("; "),
-        visibleNotes.map((note) => note.body).join(" | "),
-      ]);
-    }
+    const rows = await registrationsExportRows(eventId, registrations, { showLocation, staffNotes: actorPermissions });
     return csvDownloadResponse(toCsv(rows), exportFileName({ scope: await eventFileScope(eventId), kind: "registrations" }));
   } catch (error) {
     if (error instanceof AccessDeniedError) {

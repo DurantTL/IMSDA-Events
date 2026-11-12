@@ -20,7 +20,21 @@ export type PromoCodeRule = {
   maximumUses: number | null;
   maximumDiscountCents: number | null;
   redeemedCount: number;
+  /**
+   * Attendee-type restriction (#102): `EventAttendeeType.code` values the code applies to. Absent or empty means every
+   * attendee type (the code works exactly as it did before restrictions existed).
+   */
+  attendeeTypeCodes?: readonly string[];
 };
+
+/**
+ * Whom a code is being tried for, so a restricted code can be judged. A per-person code (#397, a staff per-person
+ * adjustment) is tried for one attendee; a registration-level code is tried against the whole calculation and the type
+ * of each attendee on it (index-matched to the calculation's `attendeeIndex`). `null` is an attendee with no type.
+ */
+export type PromoAttendeeScope =
+  | { kind: "ATTENDEE"; attendeeTypeCode: string | null }
+  | { kind: "REGISTRATION"; calculation: FormCalculation; attendeeTypeCodes: ReadonlyArray<string | null> };
 
 export type PromoCodeFailureReason =
   | "INVALID_FORMAT"
@@ -30,6 +44,7 @@ export type PromoCodeFailureReason =
   | "ENDED"
   | "MINIMUM_NOT_MET"
   | "USE_LIMIT_REACHED"
+  | "ATTENDEE_TYPE_NOT_ELIGIBLE"
   | "NO_ELIGIBLE_SUBTOTAL";
 
 export type PromoCodeEvaluation =
@@ -74,6 +89,87 @@ export function promoCodeField(
     )) ?? null;
 }
 
+/** A code with a non-empty list is restricted to those attendee types; an empty or missing list applies to everyone. */
+export function isAttendeeTypeRestricted(codes: readonly string[] | null | undefined): codes is readonly string[] {
+  return Boolean(codes && codes.length > 0);
+}
+
+/**
+ * Whether a code with this restriction applies to an attendee of this type. Unrestricted codes apply to everyone; a
+ * restricted code applies only to an attendee whose type code is listed. An attendee with no type never matches, and a
+ * listed code whose type was removed matches nobody (a restriction narrows, it never widens).
+ */
+export function promoAppliesToAttendeeType(
+  allowedCodes: readonly string[] | null | undefined,
+  attendeeTypeCode: string | null | undefined,
+) {
+  if (!isAttendeeTypeRestricted(allowedCodes)) return true;
+  return typeof attendeeTypeCode === "string" && attendeeTypeCode !== "" && allowedCodes.includes(attendeeTypeCode);
+}
+
+/**
+ * The attendees (by index, as in `FormCalculation.lineItems[].attendeeIndex`) a restricted code applies to. Attendees
+ * beyond the typed list have no type and never match.
+ */
+export function eligibleAttendeeIndexes(
+  allowedCodes: readonly string[],
+  attendeeTypeCodes: ReadonlyArray<string | null>,
+  attendeeCount = attendeeTypeCodes.length,
+) {
+  const indexes = new Set<number>();
+  for (let index = 0; index < attendeeCount; index += 1) {
+    if (promoAppliesToAttendeeType(allowedCodes, attendeeTypeCodes[index] ?? null)) indexes.add(index);
+  }
+  return indexes;
+}
+
+/**
+ * The subtotal a restricted registration-level code may discount: the sum of the line items that belong to an attendee of
+ * an allowed type. Lines with no attendee (lodging, registration-level fees) are left out. Never negative. For an unrestricted code this is not used: the whole subtotal is eligible, as before.
+ */
+export function restrictedEligibleSubtotalCents(
+  calculation: FormCalculation,
+  allowedCodes: readonly string[],
+  attendeeTypeCodes: ReadonlyArray<string | null>,
+) {
+  const eligible = eligibleAttendeeIndexes(allowedCodes, attendeeTypeCodes);
+  const total = calculation.lineItems
+    .filter((line) => typeof line.attendeeIndex === "number" && eligible.has(line.attendeeIndex))
+    .reduce((sum, line) => sum + line.amountCents, 0);
+  return Math.max(0, Math.round(total));
+}
+
+type AttendeeScopeResolution =
+  | { ok: true; eligibleSubtotalCents: number }
+  | { ok: false; message: string };
+
+/** The subtotal a code is judged on once its attendee-type restriction is applied, or why it does not apply. */
+function resolveAttendeeScope(
+  rule: PromoCodeRule,
+  eligibleSubtotalCents: number,
+  scope: PromoAttendeeScope | undefined,
+): AttendeeScopeResolution {
+  const allowed = rule.attendeeTypeCodes;
+  if (!isAttendeeTypeRestricted(allowed)) return { ok: true, eligibleSubtotalCents };
+  if (!scope) {
+    // Fail closed: a restricted code is never judged without knowing who it is for.
+    return { ok: false, message: `${rule.code} applies only to specific attendee types.` };
+  }
+  if (scope.kind === "ATTENDEE") {
+    return promoAppliesToAttendeeType(allowed, scope.attendeeTypeCode)
+      ? { ok: true, eligibleSubtotalCents }
+      : { ok: false, message: `${rule.code} doesn't apply to this attendee type.` };
+  }
+  const anyone = eligibleAttendeeIndexes(allowed, scope.attendeeTypeCodes);
+  if (anyone.size === 0) {
+    return { ok: false, message: `${rule.code} doesn't apply to anyone on this registration.` };
+  }
+  return {
+    ok: true,
+    eligibleSubtotalCents: restrictedEligibleSubtotalCents(scope.calculation, allowed, scope.attendeeTypeCodes),
+  };
+}
+
 export function evaluatePromoCode(
   rule: PromoCodeRule | null,
   input: {
@@ -82,6 +178,8 @@ export function evaluatePromoCode(
     pricingDate: string;
     /** Church-billed events never show a registrant an amount (#621). */
     hideAmounts?: boolean;
+    /** Whom the code is for; required to use a code that is restricted to attendee types (#102). */
+    attendeeScope?: PromoAttendeeScope;
   },
 ): PromoCodeEvaluation {
   const normalizedCode = normalizePromoCode(input.submittedCode);
@@ -131,9 +229,17 @@ export function evaluatePromoCode(
     };
   }
 
+  const scoped = resolveAttendeeScope(rule, input.eligibleSubtotalCents, input.attendeeScope);
+  if (!scoped.ok) {
+    return {
+      valid: false,
+      reason: "ATTENDEE_TYPE_NOT_ELIGIBLE",
+      message: scoped.message,
+    };
+  }
   const eligibleSubtotalCents = Math.max(
     0,
-    Math.round(input.eligibleSubtotalCents),
+    Math.round(scoped.eligibleSubtotalCents),
   );
   if (
     rule.minimumSubtotalCents !== null
@@ -144,7 +250,9 @@ export function evaluatePromoCode(
       reason: "MINIMUM_NOT_MET",
       message: input.hideAmounts
         ? "This promo code's minimum isn't met for this registration."
-        : `That promo code requires a subtotal of at least ${formatCents(rule.minimumSubtotalCents)}. Your current subtotal is ${formatCents(eligibleSubtotalCents)}.`,
+        : isAttendeeTypeRestricted(rule.attendeeTypeCodes) && input.attendeeScope?.kind === "REGISTRATION"
+          ? `That promo code requires at least ${formatCents(rule.minimumSubtotalCents)} for the attendees it applies to. Their subtotal is ${formatCents(eligibleSubtotalCents)}.`
+          : `That promo code requires a subtotal of at least ${formatCents(rule.minimumSubtotalCents)}. Your current subtotal is ${formatCents(eligibleSubtotalCents)}.`,
     };
   }
   if (eligibleSubtotalCents === 0) {

@@ -1,0 +1,31 @@
+.root { display: grid; gap: 20px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.block { display: grid; gap: 12px; }
+.heading { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.state { margin: 0; font-weight: 700; }
+.picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 8px; }
+.picker button { min-height: 44px; }
+.picker button[aria-pressed="true"] { border: 2px solid var(--imsda-navy); background: var(--imsda-navy-soft); }
+.clubs { list-style: none; margin: 0; padding: 0; display: grid; }
+.club { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.clubForm { display: grid; gap: 6px; }
+.clubName { font-weight: 700; overflow-wrap: anywhere; }
+.entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.entry input { width: 100%; min-width: 0; min-height: 44px; font: inherit; font-size: max(var(--type-staff-floor, 0px), 1.125rem); font-variant-numeric: tabular-nums; }
+.entry button { min-height: 44px; min-width: 44px; }
+.status { margin: 0; min-height: 1.25em; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.saved { color: var(--green); font-weight: 700; }
+.failed { color: var(--danger); font-weight: 700; }
+.pending { color: var(--muted); }
+.import { display: grid; gap: 12px; border-top: 2px solid var(--line); padding-top: 16px; }
+.file { display: grid; gap: 4px; font-weight: 600; }
+.file input { min-height: 44px; font: inherit; font-weight: 400; max-width: 100%; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button, .actions a { min-height: 44px; }
+.counts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; }
+.preview { list-style: none; margin: 0; padding: 0; display: grid; }
+.previewRow { display: grid; gap: 2px; border-bottom: 1px solid var(--line); padding: 10px 0; overflow-wrap: anywhere; }
+.previewRow[data-status="matched"] .previewStatus { color: var(--green); }
+.previewRow:not([data-status="matched"]) .previewStatus { color: var(--danger); }
+.previewStatus { font-weight: 700; }
