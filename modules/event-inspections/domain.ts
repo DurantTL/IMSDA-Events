@@ -78,6 +78,9 @@ export type ImportPreviewRow = {
   clubName: string | null;
   inspection: InspectionKey | null;
   hundredths: number | null;
+  /** Matched rows only: the score the club has now (null when none), and whether this row adds one, changes it or repeats it. */
+  existingText: string | null;
+  change: "new" | "changed" | "same" | null;
   /** The plain-words problem for a row that cannot be applied. */
   message: string | null;
 };

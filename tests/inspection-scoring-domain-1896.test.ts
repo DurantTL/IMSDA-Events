@@ -85,6 +85,13 @@ describe("planning an import", () => {
     expect(same).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("marks each matched row as new, changed or the same as the score on file", () => {
+    const existing = new Map([["club-eagles|campsite", 8800], ["club-falcons|uniform", 9000]]);
+    const preview = planInspectionImport("club,inspection,score\nSample Eagles,campsite,88\nSample Falcons,uniform,91\nSample Eagles,uniform,70\nNobody,uniform,1", clubs, existing);
+    expect(preview.rows.map((row) => [row.change, row.existingText])).toEqual([["same", "88"], ["changed", "90"], ["new", null], [null, null]]);
+    expect(planInspectionImport("club,inspection,score\nSample Eagles,campsite,88", clubs, new Map([["club-eagles|campsite", 1]])).digest).not.toBe(planInspectionImport("club,inspection,score\nSample Eagles,campsite,88", clubs).digest);
+  });
+
   it("counts every status", () => {
     expect(Object.keys(plan("club,inspection,score\nSample Eagles,campsite,80").counts).sort()).toEqual([...importStatuses].sort());
   });

@@ -14,11 +14,14 @@ Camporee scoring (#1676; rule B19 in `docs/SITE-RULES.md`, inspections are B23).
 - **Entering scores:** pick the inspection, then type a number for each registered club and tap Save on that row. Each save
   is its own small request, so on a weak connection only that row can fail; it shows "Not saved" with a Retry button and
   keeps what was typed. Nothing large is loaded.
+- **Made however it is switched on:** the two events are made by the coordinator or staff switch, the system administrator's
+  module switch (and a module request approved there), the new-event features step and an event copy that carries the module
+  on. If the module is on and an event is missing for any reason, opening the screen or saving a score makes it.
 - **CSV import** for events that score on paper: columns `club`, `inspection` (campsite or uniform) and `score`; an optional
   `club id` or `club code` column picks the club exactly (the club's id or its organization code). Clubs match by name among the
   registered clubs, ignoring case, spacing and punctuation. The preview lists every row as matched, unknown club, more than one
   club with the name, bad inspection, bad score or duplicate. Duplicate rows (the same club and inspection twice) are not
-  applied. Applying sends the digest the preview returned; a changed file or club list asks for a new preview. Only matched rows
+  applied. The preview also shows the score each row replaces (new, changed or same); the scores on file are part of the digest. Applying sends the digest the preview returned; a changed file or club list asks for a new preview. Only matched rows
   are written.
 
 ## Who may do what
@@ -30,8 +33,9 @@ administrators may correct a score, and each correction is audited (ids and numb
 
 ## Points
 
-Camporee scoring does not feed club points: `modules/event-points` reads registrations and check-in, not scored events. This
-tool adds no points rule. Inspection scores feed ranks, ribbons, trophy counts and the published results only.
+Inspection scores feed Camporee scoring (ranks, ribbons, trophy counts and the published results); they are not added to
+Attendance points or the club points board. `modules/event-points` reads registrations and check-in, not scored events, and
+Camporee scoring does not change club points today. Caleb to confirm.
 
 ## Where the code is
 

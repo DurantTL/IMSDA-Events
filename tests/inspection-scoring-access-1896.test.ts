@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   modules: new Set<string>(),
   published: false,
-  activities: new Map<string, { id: string; name: string; inspectionKind: string | null }>(),
+  activities: new Map<string, { id: string; name: string; inspectionKind: string | null; kind?: string; unit?: string; higherWins?: boolean }>(),
   scores: [] as Array<{ scoredEventId: string; subjectId: string; valueHundredths: number }>,
   clubs: [{ organizationId: "club-1", organization: { name: "Sample Eagles", orgCode: "SE1" } }, { organizationId: "club-2", organization: { name: "Sample Falcons", orgCode: null } }],
   audits: [] as Array<{ action: string; metadata: Record<string, unknown> }>,
@@ -48,9 +48,13 @@ const makeDb = () => {
       findUnique: vi.fn(async ({ where }: { where: { eventId_inspectionKind?: { inspectionKind: string }; eventId_normalizedName?: { normalizedName: string } } }) => {
         const kind = where.eventId_inspectionKind?.inspectionKind;
         if (kind) return [...state.activities.values()].find((row) => row.inspectionKind === kind) ?? null;
-        return null;
+        const name = where.eventId_normalizedName?.normalizedName;
+        const row = name ? [...state.activities.values()].find((candidate) => candidate.name.toLowerCase() === name) : undefined;
+        return row ? { kind: "CLUB", unit: "POINTS", higherWins: true, ...row } : null;
       }),
-      findFirst: vi.fn(async ({ where }: { where: { id: string } }) => {
+      count: vi.fn(async () => [...state.activities.values()].filter((row) => row.inspectionKind !== null).length),
+      findFirst: vi.fn(async ({ where }: { where: { id?: string; normalizedName?: string } }) => {
+        if (!where.id) return null;
         const row = state.activities.get(where.id);
         return row ? { ...row, kind: "CLUB", unit: "POINTS", higherWins: true, ribbonMode: "PLACES", ribbonPlaces: 3, ribbonBands: [] } : null;
       }),
@@ -61,7 +65,7 @@ const makeDb = () => {
         state.activities.set(row.id, row);
         return { id: row.id };
       }),
-      update: vi.fn(),
+      update: vi.fn(async ({ where, data }: { where: { id: string }; data: { inspectionKind: string } }) => { const row = state.activities.get(where.id); if (row) row.inspectionKind = data.inspectionKind; }),
     },
     activityScore: {
       findUnique: vi.fn(async ({ where }: { where: { scoredEventId_subjectId: { scoredEventId: string; subjectId: string } } }) => {
@@ -87,6 +91,9 @@ vi.mock("@/lib/prisma", () => ({ getPrisma: () => db }));
 import { PUT as acPut } from "@/app/api/attendee/area-clubs/events/[eventId]/inspections/route";
 import { PUT as acImportPut } from "@/app/api/attendee/area-clubs/events/[eventId]/inspections/import/route";
 import { PUT as staffPut } from "@/app/api/events/[eventId]/inspections/route";
+import { PUT as staffImportPut } from "@/app/api/events/[eventId]/inspections/import/route";
+import { ensureInspectionEventsIfOn } from "@/modules/event-inspections/setup";
+import { applyEventScoringAction } from "@/modules/event-scoring/service";
 import { applyInspectionAction, applyInspectionImport, inspectionCapabilities, loadInspectionView, previewInspectionImport } from "@/modules/event-inspections/service";
 import { EventScoringError, requireStaffScoringAccess, type EventScoringActor } from "@/modules/event-scoring/service";
 import { AccessDeniedError } from "@/modules/access/authorization";
@@ -268,12 +275,33 @@ describe("the CSV import (#1896)", () => {
     const { digest } = await previewInspectionImport(coordinator, "event-1", csv);
     await expect(applyInspectionImport(coordinator, "event-1", csv.replace("88", "89"), digest)).rejects.toMatchObject({ code: "INVALID", field: "csv" });
     expect(state.scores).toEqual([]);
-    expect(await applyInspectionImport(coordinator, "event-1", csv, digest)).toEqual({ applied: 2, failed: [], skipped: 2 });
+    expect(await applyInspectionImport(coordinator, "event-1", csv, digest)).toEqual({ applied: 2, unchanged: 0, failed: [], skipped: 2 });
     expect(state.scores).toEqual([
       { scoredEventId: "act-campsite", subjectId: "club-1", valueHundredths: 8800 },
       { scoredEventId: "act-uniform", subjectId: "club-2", valueHundredths: 9150 },
     ]);
     expect(state.audits.at(-1)).toMatchObject({ action: "EVENT_INSPECTION_IMPORT_APPLIED", metadata: { applied: 2, failed: 0, skipped: 2 } });
+  });
+
+  it("shows the score each row replaces and skips rows that repeat the score on file", async () => {
+    state.scores = [{ scoredEventId: "act-campsite", subjectId: "club-1", valueHundredths: 8800 }, { scoredEventId: "act-uniform", subjectId: "club-2", valueHundredths: 9000 }];
+    const preview = await previewInspectionImport(adminActor, "event-1", csv);
+    expect(preview.rows.slice(0, 2).map((row) => [row.change, row.existingText])).toEqual([["same", "88"], ["changed", "90"]]);
+    const result = await applyInspectionImport(adminActor, "event-1", csv, preview.digest);
+    expect(result).toEqual({ applied: 1, unchanged: 1, failed: [], skipped: 2 });
+    // A score that changed after the preview asks for a new preview.
+    state.scores[0].valueHundredths = 7000;
+    await expect(applyInspectionImport(adminActor, "event-1", csv, preview.digest)).rejects.toMatchObject({ code: "INVALID", field: "csv" });
+  });
+
+  it("reads the published state before each row, so rows after a publish follow the after-publish rule", async () => {
+    const { digest } = await previewInspectionImport(coordinator, "event-1", csv);
+    let reads = 0;
+    db.eventScoringState.findUnique.mockImplementation(async () => (++reads >= 3 ? { publishedAt: new Date("2026-11-01T00:00:00Z") } : null));
+    const result = await applyInspectionImport(coordinator, "event-1", csv, digest);
+    expect(result.applied).toBe(1);
+    expect(result.failed).toHaveLength(1);
+    expect(state.scores).toHaveLength(1);
   });
 
   it("is refused for a coordinator who is no longer one, and after publishing for anyone who cannot correct", async () => {
@@ -289,6 +317,111 @@ describe("the CSV import (#1896)", () => {
   it("is refused while Inspections is off", async () => {
     state.modules = new Set(["event-scoring"]);
     await expect(previewInspectionImport(adminActor, "event-1", csv)).rejects.toMatchObject({ code: "NOT_AVAILABLE" });
+  });
+});
+
+describe("routes and the staff import (#1896)", () => {
+  const staffSession = (role: string) => {
+    mocks.getCurrentSession.mockResolvedValue({ user: { id: "u-x", email: "x@example.test", displayName: "X", globalRole: null } });
+    mocks.findActiveMembership.mockResolvedValue({ eventId: "event-1", userId: "u-x", role, status: "ACTIVE", permissions: [] });
+  };
+  const preview = { action: "preview", csv: "club,inspection,score\nSample Eagles,campsite,80" };
+
+  it("refuses the staff import to staff without the scoring permission, for preview and apply", async () => {
+    staffSession("CHECK_IN_STAFF");
+    expect((await staffImportPut(put("/x", preview), ctx)).status).toBe(403);
+    expect((await staffImportPut(put("/x", { action: "apply", csv: preview.csv, digest: "0".repeat(64) }), ctx)).status).toBe(403);
+    expect(state.scores).toEqual([]);
+  });
+
+  it("lets a Registration Manager preview and import", async () => {
+    staffSession("REGISTRATION_MANAGER");
+    const first = await (await staffImportPut(put("/x", preview), ctx)).json() as { preview: { digest: string } };
+    expect((await staffImportPut(put("/x", { action: "apply", csv: preview.csv, digest: first.preview.digest }), ctx)).status).toBe(200);
+    expect(state.scores).toHaveLength(1);
+  });
+
+  it("answers not found for an archived or general event on every new route", async () => {
+    db.event.findFirst.mockResolvedValue(null as never);
+    mocks.currentAreaCoordinator.mockResolvedValue({ id: "acct-ac" });
+    expect((await acPut(put("/x", score("80")), ctx)).status).toBe(404);
+    expect((await acImportPut(put("/x", preview), ctx)).status).toBe(404);
+    staffSession("EVENT_ADMIN");
+    expect((await staffPut(put("/x", score("80")), ctx)).status).toBe(404);
+    expect((await staffImportPut(put("/x", preview), ctx)).status).toBe(404);
+  });
+});
+
+describe("the two events exist however the tool was switched on (#1896)", () => {
+  it("makes them when the screen opens on a tool that is on without them, once", async () => {
+    state.activities = new Map();
+    const view = await loadInspectionView("event-1", adminActor);
+    expect(db.scoredActivity.create).toHaveBeenCalledTimes(2);
+    expect(view.inspections.map((row) => row.key)).toEqual(["campsite", "uniform"]);
+    await loadInspectionView("event-1", adminActor);
+    expect(db.scoredActivity.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("makes the missing event when a score is saved", async () => {
+    state.activities = new Map();
+    await applyInspectionAction(coordinator, "event-1", score("80"));
+    expect(db.scoredActivity.create).toHaveBeenCalledTimes(2);
+    expect(state.scores).toHaveLength(1);
+  });
+
+  it("makes them from the shared helper only when the module is on", async () => {
+    state.activities = new Map();
+    state.modules = new Set(["event-scoring"]);
+    await ensureInspectionEventsIfOn(db as never, "event-1", "u-admin");
+    expect(db.scoredActivity.create).not.toHaveBeenCalled();
+    state.modules.add("inspection-scoring");
+    await ensureInspectionEventsIfOn(db as never, "event-1", "u-admin");
+    expect(db.scoredActivity.create).toHaveBeenCalledTimes(2);
+    expect(state.audits.filter((entry) => entry.action === "EVENT_INSPECTION_ACTIVITY_ADDED")).toHaveLength(2);
+  });
+
+  it("is called from every path that can switch the module on", () => {
+    const read = (path: string) => readFileSync(path, "utf8");
+    expect(read("modules/event-modules/service.ts")).toContain('key === "inspection-scoring") await ensureInspectionEventsIfOn');
+    expect(read("modules/event-debriefs/lifecycle.ts")).toContain('includes("inspection-scoring")) await ensureInspectionEventsIfOn');
+    expect(read("modules/event-clones/repository.ts")).toContain("await ensureInspectionEventsIfOn(tx, event.id, actorUserId)");
+    expect(read("modules/event-modules/requests.ts")).toContain("enableModuleInTransaction");
+  });
+
+  it("adopts a same-named plain scored event, but never one that is already an inspection or has other settings", async () => {
+    state.activities = new Map([["old-1", { id: "old-1", name: "Campsite inspection", inspectionKind: null }]]);
+    await applyInspectionAction(adminActor, "event-1", { action: "switch", enabled: true });
+    expect(state.activities.get("old-1")!.inspectionKind).toBe("campsite");
+    expect(state.audits.some((entry) => entry.action === "EVENT_INSPECTION_ACTIVITY_ADOPTED")).toBe(true);
+    expect(db.scoredActivity.create).toHaveBeenCalledTimes(1);
+
+    state.activities = new Map([["odd-1", { id: "odd-1", name: "Campsite inspection", inspectionKind: null, unit: "FEET" }]]);
+    await expect(applyInspectionAction(adminActor, "event-1", { action: "switch", enabled: true })).rejects.toMatchObject({ code: "INVALID" });
+    expect(state.activities.get("odd-1")!.inspectionKind).toBeNull();
+
+    state.activities = new Map([["odd-2", { id: "odd-2", name: "Campsite inspection", inspectionKind: "uniform" }]]);
+    await expect(applyInspectionAction(adminActor, "event-1", { action: "switch", enabled: true })).rejects.toMatchObject({ code: "INVALID" });
+    expect(state.activities.get("odd-2")!.inspectionKind).toBe("uniform");
+  });
+
+  it("re-reads the switch when two switches collide", async () => {
+    state.modules = new Set(["event-scoring"]);
+    db.$transaction.mockRejectedValueOnce(Object.assign(new Error("unique"), { code: "P2002" }));
+    expect(await applyInspectionAction(adminActor, "event-1", { action: "switch", enabled: true })).toEqual({ enabled: false });
+  });
+});
+
+describe("an inspection event keeps its shape in Camporee scoring (#1896)", () => {
+  it("refuses to change an inspection's kind, unit or direction from the scored-event editor", async () => {
+    db.scoredActivity.findFirst.mockImplementation((async ({ where }: { where: { id?: string; normalizedName?: string } }) =>
+      where.id === "act-campsite" ? { id: "act-campsite", kind: "CLUB", unit: "POINTS", higherWins: true, inspectionKind: "campsite", _count: { scores: 0 } } : null) as never);
+    const base = { id: "act-campsite", name: "Campsite inspection", kind: "CLUB" as const, unit: "POINTS" as const, higherWins: true, ribbonMode: "PLACES" as const, ribbonPlaces: 3, ribbonBands: [] };
+    await expect(applyEventScoringAction(adminActor, "event-1", { action: "saveScoredEvent", scoredEvent: { ...base, unit: "FEET" } })).rejects.toMatchObject({ code: "INVALID", field: "kind" });
+    await expect(applyEventScoringAction(adminActor, "event-1", { action: "saveScoredEvent", scoredEvent: { ...base, higherWins: false } })).rejects.toMatchObject({ code: "INVALID" });
+    expect(db.scoredActivity.update).not.toHaveBeenCalled();
+    // The same shape (a ribbon change) is still fine.
+    await applyEventScoringAction(adminActor, "event-1", { action: "saveScoredEvent", scoredEvent: { ...base, ribbonPlaces: 2 } }).catch(() => undefined);
+    expect(db.scoredActivity.update).toHaveBeenCalledTimes(1);
   });
 });
 

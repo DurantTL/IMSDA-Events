@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { parseScoreText } from "@/modules/event-scoring/domain";
+import { parseScoreText, scoreInputText } from "@/modules/event-scoring/domain";
 import { parseCsvMatrix } from "@/modules/imports/csv-parser";
 import {
   importStatuses,
@@ -27,7 +27,10 @@ export type RegisteredClub = { organizationId: string; name: string; orgCode: st
 const clean = (value: string | undefined) => (value ?? "").normalize("NFKC").replace(/\s+/g, " ").trim();
 const headerKey = (header: string) => header.normalize("NFKC").toLowerCase().replace(/[^a-z]/g, "");
 
-export function planInspectionImport(csv: string, clubs: readonly RegisteredClub[]): ImportPreview {
+/** The scores already entered, by `${organizationId}|${inspection}`, in hundredths. */
+export type ExistingInspectionScores = ReadonlyMap<string, number>;
+
+export function planInspectionImport(csv: string, clubs: readonly RegisteredClub[], existing: ExistingInspectionScores = new Map()): ImportPreview {
   if (csv.length > maxImportBytes) throw new InspectionImportError("That file is too large. Import up to 1,000 rows at a time.");
   let matrix: string[][];
   try {
@@ -68,6 +71,8 @@ export function planInspectionImport(csv: string, clubs: readonly RegisteredClub
       clubName: null,
       inspection: null,
       hundredths: null,
+      existingText: null,
+      change: null,
       message: null,
     };
     const fail = (status: ImportStatus, message: string) => {
@@ -96,6 +101,9 @@ export function planInspectionImport(csv: string, clubs: readonly RegisteredClub
     row.clubName = found.name;
     row.inspection = key;
     row.hundredths = parsed.hundredths;
+    const current = existing.get(`${found.organizationId}|${key}`);
+    row.existingText = current === undefined ? null : scoreInputText("POINTS", current);
+    row.change = current === undefined ? "new" : current === parsed.hundredths ? "same" : "changed";
     return row;
   });
 
@@ -110,6 +118,7 @@ export function planInspectionImport(csv: string, clubs: readonly RegisteredClub
     if (group.length < 2) continue;
     for (const row of group) {
       row.status = "duplicate";
+      row.change = null;
       row.message = `This club and inspection appear on ${group.length} rows (lines ${group.map((member) => member.line).join(", ")}). Keep one.`;
     }
   }
@@ -118,7 +127,8 @@ export function planInspectionImport(csv: string, clubs: readonly RegisteredClub
   for (const row of rows) counts[row.status] += 1;
   const digest = createHash("sha256").update(JSON.stringify({
     v: 1,
-    rows: rows.map((row) => [row.line, row.status, row.organizationId, row.inspection, row.hundredths]),
+    // The scores on file are part of the preview: if one changes before the apply, the file is previewed again.
+    rows: rows.map((row) => [row.line, row.status, row.organizationId, row.inspection, row.hundredths, row.existingText]),
   })).digest("hex");
   return { rows, counts, digest };
 }

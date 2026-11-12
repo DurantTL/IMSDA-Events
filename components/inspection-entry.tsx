@@ -1,11 +1,17 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { settingsSaveState } from "@/components/settings-save-state";
+import { useConfirm } from "@/components/use-confirm";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import {
   importStatusLabels,
   importStatuses,
   inspectionCsvTemplate,
+  inspectionNames,
   type ImportPreview,
 } from "@/modules/event-inspections/domain";
 import type { InspectionKey } from "@/modules/event-inspections/domain";
@@ -16,22 +22,48 @@ type RowState = { text: string; saved: string; status: "idle" | "saving" | "save
 type Message = { tone: "success" | "error"; text: string };
 
 const rowKey = (inspection: InspectionKey, subjectId: string) => `${inspection}:${subjectId}`;
+const blankRow: RowState = { text: "", saved: "", status: "idle", error: "" };
+/** A save that has not answered after this long is given up on, so a weak connection ends in Retry and not an endless wait. */
+export const saveTimeoutMs = 15_000;
 
 /**
  * Inspection scores (#1896) for an Area Coordinator and for staff, one component for both: the server decides who may do
  * what at each endpoint. Built for a phone on a weak connection: one small request for each club's score, a saved or failed
- * mark on each row with a retry, 44px controls, and nothing heavy loaded. The CSV import previews first and applies only
- * the file that was previewed.
+ * mark on each row with a retry, 44px controls, and nothing heavy loaded. A row can only have one save in flight; an answer
+ * that arrives late never overwrites what was typed since; a save that does not answer in 15 seconds becomes Retry. The CSV
+ * import previews first and applies only the file that was previewed.
  */
-export function InspectionEntry({ endpoint, initial }: { endpoint: string; initial: InspectionView }) {
+export function InspectionEntry({ endpoint, initial, scoringHref }: { endpoint: string; initial: InspectionView; scoringHref: string }) {
+  const router = useRouter();
+  const { confirm, confirmDialog } = useConfirm();
   const [enabled, setEnabled] = useState(initial.enabled);
   const [switching, setSwitching] = useState(false);
   const [switchMessage, setSwitchMessage] = useState<Message | null>(null);
   const [selected, setSelected] = useState<InspectionKey>(initial.inspections[0]?.key ?? "campsite");
-  const [rows, setRows] = useState<Record<string, RowState>>(() => Object.fromEntries(initial.entries.map((entry) => [rowKey(entry.inspection, entry.subjectId), { text: entry.text, saved: entry.text, status: "idle", error: "" } satisfies RowState])));
+  const [rows, setRows] = useState<Record<string, RowState>>(() => Object.fromEntries(initial.entries.map((entry) => [rowKey(entry.inspection, entry.subjectId), { ...blankRow, text: entry.text, saved: entry.text }])));
+  const inflight = useRef(new Set<string>());
+  const sequence = useRef(new Map<string, number>());
   const caps = initial.capabilities;
   const locked = initial.published && !caps.canCorrectAfterPublish;
   const ready = enabled && initial.scoringEnabled && initial.inspections.length > 0;
+  const anyChanged = Object.values(rows).some((row) => row.text.trim() !== row.saved);
+  useUnsavedChangesGuard(anyChanged, "You have inspection scores that are not saved. Leave this page and discard them?");
+
+  // After a refresh (switching on, an import) the server's scores replace every box that has nothing unsaved in it. Done while
+  // rendering, as React advises for state that follows a prop.
+  const [seen, setSeen] = useState(initial);
+  if (seen !== initial) {
+    setSeen(initial);
+    setEnabled(initial.enabled);
+    const next = { ...rows };
+    for (const entry of initial.entries) {
+      const key = rowKey(entry.inspection, entry.subjectId);
+      const row = next[key] ?? blankRow;
+      if (row.status === "saving" || row.text.trim() !== row.saved) continue;
+      next[key] = { ...row, text: entry.text, saved: entry.text };
+    }
+    setRows(next);
+  }
 
   async function toggle() {
     setSwitching(true);
@@ -44,8 +76,8 @@ export function InspectionEntry({ endpoint, initial }: { endpoint: string; initi
         return;
       }
       setEnabled(result.enabled);
-      setSwitchMessage({ tone: "success", text: savedMessage(result.enabled ? "Reload the page to see the clubs." : "Turned off. The scores you entered are kept.") });
-      if (result.enabled && initial.inspections.length === 0) window.location.reload();
+      setSwitchMessage({ tone: "success", text: savedMessage(result.enabled ? "The clubs are listed below." : "Turned off. The scores you entered are kept.") });
+      router.refresh();
     } catch {
       setSwitchMessage({ tone: "error", text: notSavedMessage("Check your connection and try again.") });
     } finally {
@@ -53,33 +85,63 @@ export function InspectionEntry({ endpoint, initial }: { endpoint: string; initi
     }
   }
 
-  function patchRow(key: string, patch: Partial<RowState>) {
-    setRows((current) => ({ ...current, [key]: { ...(current[key] ?? { text: "", saved: "", status: "idle", error: "" }), ...patch } }));
+  function patchRow(key: string, patch: (row: RowState) => Partial<RowState>) {
+    setRows((current) => {
+      const row = current[key] ?? blankRow;
+      return { ...current, [key]: { ...row, ...patch(row) } };
+    });
   }
 
-  async function saveRow(inspection: InspectionKey, subjectId: string) {
+  async function saveRow(inspection: InspectionKey, subjectId: string, clubName: string, current: RowState) {
     const key = rowKey(inspection, subjectId);
-    const text = (rows[key]?.text ?? "").trim();
-    patchRow(key, { status: "saving", error: "" });
+    if (inflight.current.has(key)) return;
+    const sent = current.text.trim();
+    if (sent === "" && current.saved !== "") {
+      const ok = await confirm({
+        title: `Remove ${inspectionNames[inspection].toLowerCase()} score`,
+        body: <>This removes the saved score of {current.saved} for <span translate="no">{clubName}</span>. You can enter a new one afterwards.</>,
+        confirmLabel: "Remove score",
+        destructive: true,
+      });
+      if (!ok) return;
+      if (inflight.current.has(key)) return;
+    }
+    const id = (sequence.current.get(key) ?? 0) + 1;
+    sequence.current.set(key, id);
+    inflight.current.add(key);
+    patchRow(key, () => ({ status: "saving", error: "" }));
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), saveTimeoutMs);
     try {
       const response = await fetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "saveScore", entry: { inspection, subjectId, value: text === "" ? null : text } }),
+        body: JSON.stringify({ action: "saveScore", entry: { inspection, subjectId, value: sent === "" ? null : sent } }),
+        signal: controller.signal,
       });
       const result = await response.json().catch(() => ({})) as Partial<InspectionActionResult> & { message?: string };
+      if (sequence.current.get(key) !== id) return;
       if (!response.ok || !result.saved) {
-        patchRow(key, { status: "failed", error: result.message ?? "Try again." });
+        patchRow(key, () => ({ status: "failed", error: result.message ?? "Try again." }));
         return;
       }
-      patchRow(key, { status: "saved", text: result.saved.text, saved: result.saved.text, error: "" });
-    } catch {
-      patchRow(key, { status: "failed", error: "No connection. Your score is still in the box. Tap Retry." });
+      const savedText = result.saved.text;
+      // What was typed while this saved stays as typed (and shows as not saved yet); only an untouched box takes the saved form.
+      patchRow(key, (row) => (row.text.trim() === sent ? { text: savedText, saved: savedText, status: "saved", error: "" } : { saved: savedText, status: "idle", error: "" }));
+    } catch (error) {
+      if (sequence.current.get(key) !== id) return;
+      const timedOut = (error as { name?: string }).name === "AbortError";
+      patchRow(key, () => ({ status: "failed", error: timedOut ? "The connection is too slow and the save timed out. Your score is still in the box. Tap Retry." : "No connection. Your score is still in the box. Tap Retry." }));
+    } finally {
+      clearTimeout(timer);
+      inflight.current.delete(key);
     }
   }
 
+  const inspectionName = inspectionNames[selected];
   return (
     <div className={styles.root} data-testid="inspection-entry">
+      {confirmDialog}
       {caps.canSwitch ? (
         <div className={styles.block}>
           <div className={styles.row}>
@@ -88,11 +150,19 @@ export function InspectionEntry({ endpoint, initial }: { endpoint: string; initi
               {switching ? "Saving…" : enabled ? "Turn off" : "Turn on"}
             </button>
           </div>
-          {!initial.scoringEnabled && <p className={styles.note}>Inspections adds its two scored events to Camporee scoring, so turn Camporee scoring on first.</p>}
           {switchMessage && <FormMessage message={switchMessage.text} tone={switchMessage.tone} />}
         </div>
       ) : (
         <p className={styles.note}>Inspections is {enabled ? "on" : "off"}. Event administrators, the Clubs Administrator and Area Coordinators turn it on or off.</p>
+      )}
+      {!initial.scoringEnabled && (
+        <p className={styles.note} data-testid="inspection-scoring-off">
+          Inspections adds its two scored events to Camporee scoring, which is off for this event. Event administrators, the Clubs Administrator and Area Coordinators can turn it on:{" "}
+          <Link href={scoringHref}>open Camporee scoring</Link>. Scores already entered are kept.
+        </p>
+      )}
+      {enabled && initial.scoringEnabled && initial.inspections.length < 2 && (
+        <p className={styles.note}>The two inspections are not both set up. Turn Inspections off and on again. If that does not fix it, a scored event in Camporee scoring is named Campsite inspection or Uniform inspection with other settings; rename it first.</p>
       )}
 
       {ready && (
@@ -108,40 +178,47 @@ export function InspectionEntry({ endpoint, initial }: { endpoint: string; initi
             </div>
             {locked && <p className={styles.note}>Results are published. Only the Clubs Administrator or event administrators can correct a score now.</p>}
             {initial.clubs.length === 0 ? (
-              <p className={styles.note}>No clubs are registered for this event yet.</p>
+              <p className={styles.note}>No clubs are registered for this event yet, so there is nobody to score. Clubs appear here as soon as they register; check back then, or ask the Clubs Administrator if a club should already be listed.</p>
             ) : (
               <ul className={styles.clubs}>
                 {initial.clubs.map((club) => {
                   const key = rowKey(selected, club.organizationId);
-                  const row = rows[key] ?? { text: "", saved: "", status: "idle" as const, error: "" };
+                  const row = rows[key] ?? blankRow;
                   const inputId = `inspection-${selected}-${club.organizationId}`;
+                  const statusId = `${inputId}-status`;
                   const changed = row.text.trim() !== row.saved;
+                  const saveState = settingsSaveState({ saving: row.status === "saving", dirty: changed, outcome: row.status === "saved" ? "saved" : row.status === "failed" ? "failed" : null });
                   return (
                     <li className={styles.club} key={key}>
                       <form
                         className={styles.clubForm}
                         onSubmit={(event) => {
                           event.preventDefault();
-                          if (!locked && row.status !== "saving") void saveRow(selected, club.organizationId);
+                          if (!locked) void saveRow(selected, club.organizationId, club.name, row);
                         }}
                       >
-                        <label className={styles.clubName} htmlFor={inputId}>{club.name}</label>
+                        <label className={styles.clubName} htmlFor={inputId}>
+                          <span className="sr-only">{inspectionName} score for </span>
+                          <span translate="no">{club.name}</span>
+                        </label>
                         <div className={styles.entry}>
                           <input
+                            aria-describedby={statusId}
+                            aria-invalid={row.status === "failed"}
                             autoComplete="off"
                             disabled={locked}
                             id={inputId}
                             inputMode="decimal"
-                            onChange={(event) => patchRow(key, { text: event.target.value, status: "idle", error: "" })}
+                            onChange={(event) => patchRow(key, (current) => ({ text: event.target.value, status: current.status === "saving" ? "saving" : "idle", error: "" }))}
                             value={row.text}
                           />
                           <button className="primary-button" disabled={locked || row.status === "saving" || (!changed && row.status !== "failed")} type="submit">
                             {row.status === "saving" ? "Saving…" : row.status === "failed" ? "Retry" : "Save"}
-                            <span className="sr-only">: {club.name}</span>
+                            <span className="sr-only">: <span translate="no">{club.name}</span></span>
                           </button>
                         </div>
-                        <p aria-live="polite" className={`${styles.status} ${row.status === "saved" ? styles.saved : row.status === "failed" ? styles.failed : styles.pending}`} role="status">
-                          {row.status === "saved" ? "Saved." : row.status === "failed" ? `Not saved: ${row.error}` : row.status === "saving" ? "Saving…" : changed ? "Not saved yet." : row.saved !== "" ? "Saved earlier." : ""}
+                        <p aria-live="polite" className={`${styles.status} ${saveState.state === "saved" ? styles.saved : saveState.state === "failed" ? styles.failed : styles.pending}`} id={statusId} role="status">
+                          {row.status === "failed" ? notSavedMessage(row.error) : saveState.label}
                         </p>
                       </form>
                     </li>
@@ -150,15 +227,14 @@ export function InspectionEntry({ endpoint, initial }: { endpoint: string; initi
               </ul>
             )}
           </div>
-          <ImportSection endpoint={`${endpoint}/import`} locked={locked} />
+          <ImportSection endpoint={`${endpoint}/import`} locked={locked} onImported={() => router.refresh()} />
         </>
       )}
-      {enabled && !initial.scoringEnabled && <p className={styles.note}>Camporee scoring is off, so inspection scores cannot be entered. Turn Camporee scoring on again; your scores are kept.</p>}
     </div>
   );
 }
 
-function ImportSection({ endpoint, locked }: { endpoint: string; locked: boolean }) {
+function ImportSection({ endpoint, locked, onImported }: { endpoint: string; locked: boolean; onImported: () => void }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [csv, setCsv] = useState<string | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -209,12 +285,13 @@ function ImportSection({ endpoint, locked }: { endpoint: string; locked: boolean
         setMessage({ tone: "error", text: notSavedMessage(result.message ?? "Try again.") });
         return;
       }
-      const { applied, failed } = result.result;
+      const { applied, unchanged, failed } = result.result;
+      onImported();
       setPreview(null);
       setCsv(null);
       if (fileInput.current) fileInput.current.value = "";
       setMessage(failed.length === 0
-        ? { tone: "success", text: savedMessage(`${applied} score${applied === 1 ? "" : "s"} imported. Reload the page to see them in the boxes.`) }
+        ? { tone: "success", text: savedMessage(`${applied} score${applied === 1 ? "" : "s"} imported${unchanged > 0 ? `, ${unchanged} already the same` : ""}. They are in the boxes above.`) }
         : { tone: "error", text: `${applied} imported, ${failed.length} not saved: ${failed.slice(0, 3).map((item) => `line ${item.line} (${item.message})`).join("; ")}` });
     } catch {
       setMessage({ tone: "error", text: notSavedMessage("Check your connection and try again. Importing the same file again is safe.") });
@@ -223,7 +300,7 @@ function ImportSection({ endpoint, locked }: { endpoint: string; locked: boolean
     }
   }
 
-  const applicable = preview?.counts.matched ?? 0;
+  const applicable = preview?.rows.filter((row) => row.status === "matched" && row.change !== "same").length ?? 0;
   return (
     <div className={styles.import}>
       <h3 className={styles.heading}>Import from a CSV</h3>
@@ -252,7 +329,8 @@ function ImportSection({ endpoint, locked }: { endpoint: string; locked: boolean
             {preview.rows.map((row) => (
               <li className={styles.previewRow} data-status={row.status} key={row.line}>
                 <span className={styles.previewStatus}>Line {row.line}: {importStatusLabels[row.status]}</span>
-                <span>{row.clubName ?? (row.clubText || "(no club)")} · {row.inspection ?? (row.inspectionText || "(no inspection)")} · {row.scoreText || "(no score)"}</span>
+                <span><span translate="no">{row.clubName ?? (row.clubText || "(no club)")}</span> · {row.inspection ?? (row.inspectionText || "(no inspection)")} · {row.scoreText || "(no score)"}</span>
+                {row.change && <span className={styles.note}>{row.change === "new" ? "Adds a score." : row.change === "same" ? `Same as the score on file (${row.existingText}); nothing changes.` : `Replaces the score on file (${row.existingText}).`}</span>}
                 {row.message && <span className={styles.note}>{row.message}</span>}
               </li>
             ))}

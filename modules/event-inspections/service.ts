@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
 import {
@@ -12,6 +11,7 @@ import {
   type InspectionKey,
 } from "@/modules/event-inspections/domain";
 import { InspectionImportError, matchedRows, planInspectionImport } from "@/modules/event-inspections/import-plan";
+import { ensureInspectionEvents } from "@/modules/event-inspections/setup";
 import { eventModuleDefinition } from "@/modules/event-modules/catalog";
 import {
   ScopedToggleError,
@@ -22,7 +22,7 @@ import {
   writeScopedModuleSwitch,
   type ScopedToggleActor,
 } from "@/modules/event-modules/scoped-toggle";
-import { normalizeScoredEventName, parseScoreText, scoreInputText } from "@/modules/event-scoring/domain";
+import { parseScoreText, scoreInputText } from "@/modules/event-scoring/domain";
 import {
   EventScoringError,
   enterScore,
@@ -86,6 +86,11 @@ export async function loadInspectionView(eventId: string, actor: InspectionActor
   const capabilities = inspectionCapabilities(actor);
   if (!capabilities.canEnter) throw new EventScoringError("NOT_PERMITTED", "Your role doesn't include entering inspection scores.");
   const prisma = getPrisma();
+  if (await scopedModuleIsOn(eventId, moduleKey)) {
+    // Switched on by a path that did not make the two events (a copy, say): make them now, so there is no dead end.
+    const present = await prisma.scoredActivity.count({ where: { eventId, inspectionKind: { not: null } } });
+    if (present < inspectionKeys.length) await repairInspectionEvents(actor, eventId).catch((error: unknown) => { if (!(error instanceof EventScoringError)) throw error; });
+  }
   const [enabled, scoringEnabled, published, activities, clubs] = await Promise.all([
     scopedModuleIsOn(eventId, moduleKey),
     scopedModuleIsOn(eventId, scoringKey),
@@ -128,28 +133,20 @@ function auditRow(actor: InspectionActor, eventId: string, action: string, entit
   };
 }
 
-/** Makes the two inspection events when they are missing. A scored event the staff already named the same and set up the same way is adopted. */
-async function ensureInspectionEvents(tx: Prisma.TransactionClient, actor: InspectionActor, eventId: string) {
-  for (const key of inspectionKeys) {
-    if (await tx.scoredActivity.findUnique({ where: { eventId_inspectionKind: { eventId, inspectionKind: key } }, select: { id: true } })) continue;
-    const name = inspectionNames[key];
-    const normalizedName = normalizeScoredEventName(name);
-    const sameName = await tx.scoredActivity.findUnique({ where: { eventId_normalizedName: { eventId, normalizedName } }, select: { id: true, kind: true, unit: true, higherWins: true } });
-    if (sameName) {
-      if (sameName.kind !== "CLUB" || sameName.unit !== "POINTS" || !sameName.higherWins) {
-        throw new EventScoringError("INVALID", `A scored event named "${name}" already exists with other settings. Rename it in Camporee scoring, then turn Inspections on.`);
-      }
-      await tx.scoredActivity.update({ where: { id: sameName.id }, data: { inspectionKind: key } });
-      await writeAuditLog(auditRow(actor, eventId, "EVENT_INSPECTION_ACTIVITY_ADOPTED", "ScoredActivity", sameName.id, "Marked an existing scored event as an inspection.", { inspection: key }), tx);
-      continue;
-    }
-    const last = await tx.scoredActivity.aggregate({ where: { eventId }, _max: { sortOrder: true } });
-    const created = await tx.scoredActivity.create({
-      data: { eventId, name, normalizedName, kind: "CLUB", unit: "POINTS", higherWins: true, ribbonMode: "PLACES", ribbonPlaces: 3, ribbonBands: [], inspectionKind: key, sortOrder: (last._max.sortOrder ?? 0) + 1 },
-      select: { id: true },
-    });
-    await writeAuditLog(auditRow(actor, eventId, "EVENT_INSPECTION_ACTIVITY_ADDED", "ScoredActivity", created.id, "Added an inspection scored event.", { inspection: key }), tx);
+/** Makes the inspection events if they are missing, in their own transaction, for a tool that is on but was switched on by a path that did not make them. */
+async function repairInspectionEvents(actor: InspectionActor, eventId: string) {
+  const who = scopedActorAudit(toggleActor(actor));
+  try {
+    const { conflicts } = await getPrisma().$transaction((tx) => ensureInspectionEvents(tx, eventId, who));
+    if (conflicts.length > 0) throw conflictError(conflicts);
+  } catch (error) {
+    // Two requests at once: the unique index answers and the other one made the events.
+    if ((error as { code?: string }).code !== "P2002") throw error;
   }
+}
+
+function conflictError(conflicts: readonly InspectionKey[]) {
+  return new EventScoringError("INVALID", `A scored event named "${conflicts.map((key) => inspectionNames[key]).join('" and "')}" already exists with other settings. Rename it in Camporee scoring, then turn Inspections on.`);
 }
 
 export type InspectionActionResult = { enabled: boolean; saved?: { inspection: InspectionKey; subjectId: string; text: string } };
@@ -166,19 +163,27 @@ export async function applyInspectionAction(actor: InspectionActor, eventId: str
     try {
       await getPrisma().$transaction(async (tx) => {
         await writeScopedModuleSwitch(tx, { actor: toggleActor(actor), eventId, moduleKey, enabled: action.enabled });
-        if (action.enabled) await ensureInspectionEvents(tx, actor, eventId);
+        if (action.enabled) {
+          const { conflicts } = await ensureInspectionEvents(tx, eventId, scopedActorAudit(toggleActor(actor)));
+          if (conflicts.length > 0) throw conflictError(conflicts);
+        }
       });
     } catch (error) {
       // Two switches at once: the unique index answers and the second one finds the events already made.
-      if ((error as { code?: string }).code === "P2002") return { enabled: action.enabled };
+      if ((error as { code?: string }).code === "P2002") return { enabled: await scopedModuleIsOn(eventId, moduleKey) };
       throw error;
     }
     return { enabled: action.enabled };
   }
   if (!capabilities.canEnter) throw new EventScoringError("NOT_PERMITTED", "Your role doesn't include entering inspection scores.");
   await requireOn(eventId);
-  const activity = await getPrisma().scoredActivity.findUnique({ where: { eventId_inspectionKind: { eventId, inspectionKind: action.entry.inspection } }, select: { id: true } });
-  if (!activity) throw new EventScoringError("NOT_FOUND", "This inspection is not set up. Turn Inspections off and on again.");
+  const findActivity = () => getPrisma().scoredActivity.findUnique({ where: { eventId_inspectionKind: { eventId, inspectionKind: action.entry.inspection } }, select: { id: true } });
+  let activity = await findActivity();
+  if (!activity) {
+    await repairInspectionEvents(actor, eventId);
+    activity = await findActivity();
+  }
+  if (!activity) throw new EventScoringError("NOT_FOUND", "This inspection could not be set up. Turn Inspections off and on again.");
   let text = "";
   if (action.entry.value !== null) {
     const parsed = parseScoreText("POINTS", action.entry.value);
@@ -193,15 +198,26 @@ async function requireOn(eventId: string) {
   if (!(await scopedModuleIsOn(eventId, moduleKey))) throw new EventScoringError("NOT_AVAILABLE", "Inspections is off for this event. Turn it on first.");
 }
 
-async function planFor(actor: InspectionActor, eventId: string, csv: string): Promise<{ preview: ImportPreview; clubIds: Set<string> }> {
+async function planFor(actor: InspectionActor, eventId: string, csv: string): Promise<{ preview: ImportPreview; clubIds: Set<string>; activityIds: Map<string, string> }> {
   await guard(actor, eventId);
   if (!inspectionCapabilities(actor).canEnter) throw new EventScoringError("NOT_PERMITTED", "Your role doesn't include entering inspection scores.");
   await requireOn(eventId);
+  const prisma = getPrisma();
   // The registered clubs are Camporee scoring's own list; the code and id column only picks among them.
-  const registered = await loadRegisteredClubs(eventId);
+  const [registered, activities] = await Promise.all([
+    loadRegisteredClubs(eventId),
+    prisma.scoredActivity.findMany({ where: { eventId, inspectionKind: { not: null } }, select: { id: true, inspectionKind: true } }),
+  ]);
+  const activityIds = new Map(activities.map((activity) => [activity.inspectionKind as string, activity.id]));
+  const keyById = new Map(activities.map((activity) => [activity.id, activity.inspectionKind as string]));
+  const scores = activities.length === 0 ? [] : await prisma.activityScore.findMany({
+    where: { eventId, scoredEventId: { in: [...keyById.keys()] } },
+    select: { scoredEventId: true, subjectId: true, valueHundredths: true },
+  });
+  const existing = new Map(scores.map((score) => [`${score.subjectId}|${keyById.get(score.scoredEventId)}`, score.valueHundredths]));
   try {
-    const preview = planInspectionImport(csv, registered);
-    return { preview, clubIds: new Set(registered.map((club) => club.organizationId)) };
+    const preview = planInspectionImport(csv, registered, existing);
+    return { preview, clubIds: new Set(registered.map((club) => club.organizationId)), activityIds };
   } catch (error) {
     if (error instanceof InspectionImportError) throw new EventScoringError("INVALID", error.message, "csv");
     throw error;
@@ -213,31 +229,34 @@ export async function previewInspectionImport(actor: InspectionActor, eventId: s
   return (await planFor(actor, eventId, csv)).preview;
 }
 
-export type InspectionImportResult = { applied: number; failed: Array<{ line: number; message: string }>; skipped: number };
+export type InspectionImportResult = { applied: number; unchanged: number; failed: Array<{ line: number; message: string }>; skipped: number };
 
 /**
- * Applies a file only if it is the file that was previewed (the digest is of the rows as previewed, clubs included): a
- * changed file or a changed list of registered clubs asks for a new preview. Only matched rows are written; every other row
- * is left out. One audit row records the counts.
+ * Applies a file only if it is the file that was previewed (the digest is of the rows as previewed, clubs and the scores they
+ * replace included): a changed file, club list or score asks for a new preview. Only matched rows that add or change a score
+ * are written; every other row is left out. Whether results are published is read again before each row, so rows after a
+ * publish follow the rule for after publishing (and are audited by it). One audit row records the counts.
  */
 export async function applyInspectionImport(actor: InspectionActor, eventId: string, csv: string, digest: string): Promise<InspectionImportResult> {
-  const { preview, clubIds } = await planFor(actor, eventId, csv);
-  if (preview.digest !== digest) throw new EventScoringError("INVALID", "The file or the list of registered clubs changed since the preview. Preview the file again.", "csv");
-  const published = await isScoringPublished(eventId);
-  if (published && !inspectionCapabilities(actor).canCorrectAfterPublish) {
+  const { preview, clubIds, activityIds } = await planFor(actor, eventId, csv);
+  if (preview.digest !== digest) throw new EventScoringError("INVALID", "The file, the list of registered clubs or the scores on file changed since the preview. Preview the file again.", "csv");
+  const canCorrect = inspectionCapabilities(actor).canCorrectAfterPublish;
+  if ((await isScoringPublished(eventId)) && !canCorrect) {
     throw new EventScoringError("NOT_PERMITTED", "Results are published. Only the Clubs Administrator or event administrators can correct a score now.");
   }
-  const activities = await getPrisma().scoredActivity.findMany({ where: { eventId, inspectionKind: { not: null } }, select: { id: true, inspectionKind: true } });
-  const idByKey = new Map(activities.map((activity) => [activity.inspectionKind as string, activity.id]));
   const rows = matchedRows(preview);
+  const toWrite = rows.filter((row) => row.change !== "same");
   const failed: InspectionImportResult["failed"] = [];
   let applied = 0;
-  for (const row of rows) {
-    const scoredEventId = idByKey.get(row.inspection);
+  let afterPublish = false;
+  for (const row of toWrite) {
+    const scoredEventId = activityIds.get(row.inspection);
     if (!scoredEventId) {
-      failed.push({ line: row.line, message: "This inspection is not set up. Turn Inspections off and on again." });
+      failed.push({ line: row.line, message: "This inspection could not be set up. Turn Inspections off and on again." });
       continue;
     }
+    const published = await isScoringPublished(eventId);
+    afterPublish ||= published;
     try {
       await enterScore(actor, eventId, { scoredEventId, subjectId: row.organizationId, value: scoreInputText("POINTS", row.hundredths) }, { clubIds, published });
       applied += 1;
@@ -246,11 +265,14 @@ export async function applyInspectionImport(actor: InspectionActor, eventId: str
       failed.push({ line: row.line, message: error.message });
     }
   }
+  const unchanged = rows.length - toWrite.length;
+  const skipped = preview.rows.length - rows.length;
   await writeAuditLog(auditRow(actor, eventId, "EVENT_INSPECTION_IMPORT_APPLIED", "EventModule", moduleKey, `Applied an inspection score import for the ${eventModuleDefinition(moduleKey).title} tool.`, {
     applied,
+    unchanged,
     failed: failed.length,
-    skipped: preview.rows.length - rows.length,
-    afterPublish: published,
+    skipped,
+    afterPublish,
   }));
-  return { applied, failed, skipped: preview.rows.length - rows.length };
+  return { applied, unchanged, failed, skipped };
 }

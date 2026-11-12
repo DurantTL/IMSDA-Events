@@ -50,7 +50,7 @@ export default async function AreaInspectionsPage({ params }: { params: Promise<
           <p className="field-help">
             An optional tool for campsite and uniform inspections. Scores go into Camporee scoring, which you turn on first. Turning Inspections off hides this screen and keeps every score.
           </p>
-          <InspectionEntry endpoint={`/api/attendee/area-clubs/events/${encodeURIComponent(eventId)}/inspections`} initial={loaded} />
+          <InspectionEntry endpoint={`/api/attendee/area-clubs/events/${encodeURIComponent(eventId)}/inspections`} initial={loaded} scoringHref={`/account/area-clubs/events/${encodeURIComponent(eventId)}/scoring`} />
         </>
       )}
     </section>

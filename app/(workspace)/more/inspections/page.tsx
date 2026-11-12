@@ -50,7 +50,7 @@ export default async function InspectionsPage({ searchParams }: { searchParams: 
           An optional tool for campsite and uniform inspections. Scores go into Camporee scoring, so they rank and earn ribbons with the other scored events.
           Area Coordinators can turn it on and enter scores too. Turning it off hides this screen and keeps every score.
         </p>
-        <InspectionEntry endpoint={`/api/events/${encodeURIComponent(event.id)}/inspections`} initial={state} />
+        <InspectionEntry endpoint={`/api/events/${encodeURIComponent(event.id)}/inspections`} initial={state} scoringHref={`/more/event-scoring?event=${encodeURIComponent(event.id)}`} />
       </div>
     </section>
   );
