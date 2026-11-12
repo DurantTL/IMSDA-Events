@@ -73,7 +73,7 @@ describe("staff club directory page", () => {
     expect(records).toContain("Sterling Volunteers counts"); expect(records).not.toContain('id="points"');
     const events = await render({ year: clubYear, view: "events" });
     expect(events).toContain("No club events this club year"); expect(events).not.toContain('id="points"');
-    expect(mocks.events).toHaveBeenCalledWith(clubYear);
+    expect(mocks.events).toHaveBeenCalledWith(clubYear, { kinds: ["PATHFINDER", "ADVENTURER"] });
   });
 
   it("keeps one link per club card and the club name as a plain heading (#1304)", async () => {

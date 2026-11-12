@@ -1,4 +1,5 @@
 import navStyles from "@/components/staff-records-nav.module.css";
+import { ALL_CLUB_KINDS } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { StaffPageHeader } from "@/components/staff-page-header";
 import type { Metadata } from "next";
@@ -48,7 +49,7 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
   // "To review" (#1246): the same rows the dashboard card counts, for the same club year and month.
   const reviewMonth = monthParam && clubYearMonths(clubYear).includes(monthParam) ? monthParam : chooseReportMonth(clubYear, now);
   const toReviewRows = review === REVIEW_FILTER
-    ? recordsToReview(await getAreaClubsSummary(clubYear, now, { backgroundChecks: false }), reviewMonth)
+    ? recordsToReview(await getAreaClubsSummary(clubYear, now, { backgroundChecks: false, kinds: ALL_CLUB_KINDS }), reviewMonth)
     : null;
   const reminderSorting = serverSort("/admin/clubs/reports", search, REMINDER_LOG_SORT_COLUMNS, REMINDER_LOG_DEFAULT_SORT, {
     prefix: REMINDER_LOG_PREFIX,

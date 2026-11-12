@@ -121,7 +121,7 @@ describe("Admin hub loaders (#1569)", () => {
       { id: "c3", months: [{ month, status: "SUBMITTED", points: 1 }] },
     ]);
     const picked = await loadHubMetrics("club-administration", clubsAdmin, now, { clubYear: pastYear });
-    expect(getAreaClubsSummary).toHaveBeenCalledWith(pastYear, now, { backgroundChecks: false });
+    expect(getAreaClubsSummary).toHaveBeenCalledWith(pastYear, now, { backgroundChecks: false, kinds: ["PATHFINDER", "ADVENTURER"] });
     expect(picked).toMatchObject({ lateRecords: 2 });
     expect(lateRecordCount(await getAreaClubsSummary(pastYear), pastYear, now)).toBe(2);
 

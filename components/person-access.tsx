@@ -135,7 +135,7 @@ export function PersonAccess({
                 <>
                   <RoleToggle accountId={person.accountId!} kind="area-coordinator" name={name} on={person.areaCoordinator} />
                   {person.areaCoordinator ? (
-                    <AreaCoordinatorMinistries accountId={person.accountId!} key={(person.areaCoordinatorMinistries ?? []).join(",")} ministries={person.areaCoordinatorMinistries ?? ["PATHFINDER"]} name={name} />
+                    <AreaCoordinatorMinistries accountId={person.accountId!} ministries={person.areaCoordinatorMinistries ?? ["PATHFINDER"]} name={name} />
                   ) : null}
                 </>
               )

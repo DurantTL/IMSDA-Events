@@ -39,7 +39,7 @@ const client = {
   user: { findUnique: mocks.userFindUnique },
   clubsAdministratorGrant: { findFirst: mocks.clubsGrantFindFirst },
   attendeeAccount: { findUnique: mocks.accountFindUnique },
-  areaCoordinatorGrant: { upsert: mocks.areaUpsert, updateMany: mocks.areaUpdateMany },
+  areaCoordinatorGrant: { findUnique: async () => null, upsert: mocks.areaUpsert, updateMany: mocks.areaUpdateMany },
   $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(client),
 };
 
@@ -176,7 +176,7 @@ describe("the Area Coordinator gate (decision A)", () => {
     signInAs("systemAdmin");
     await setAreaCoordinator("acct-1", true, "u-sys");
     await setAreaCoordinator("acct-1", false, "u-sys");
-    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ action: "AREA_COORDINATOR_GRANTED", actorUserId: "u-sys", entityId: "acct-1", metadata: { attendeeAccountId: "acct-1" } });
+    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ action: "AREA_COORDINATOR_GRANTED", actorUserId: "u-sys", entityId: "acct-1", metadata: { attendeeAccountId: "acct-1", ministries: ["PATHFINDER"] } });
     expect(mocks.writeAuditLog.mock.calls[1]![0]).toMatchObject({ action: "AREA_COORDINATOR_REVOKED" });
     expect(mocks.writeAuditLog.mock.calls[0]![0].metadata).not.toHaveProperty("viaClubsAdministrator");
 
@@ -184,7 +184,7 @@ describe("the Area Coordinator gate (decision A)", () => {
     signInAs("clubsAdmin");
     await setAreaCoordinator("acct-1", true, "u-clubs");
     await setAreaCoordinator("acct-1", false, "u-clubs");
-    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ action: "AREA_COORDINATOR_GRANTED", actorUserId: "u-clubs", metadata: { attendeeAccountId: "acct-1", viaClubsAdministrator: true } });
+    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ action: "AREA_COORDINATOR_GRANTED", actorUserId: "u-clubs", metadata: { attendeeAccountId: "acct-1", ministries: ["PATHFINDER"], viaClubsAdministrator: true } });
     expect(mocks.writeAuditLog.mock.calls[1]![0]).toMatchObject({ action: "AREA_COORDINATOR_REVOKED", metadata: { viaClubsAdministrator: true } });
   });
 });

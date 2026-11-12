@@ -117,7 +117,24 @@ describe("Area Coordinators (#387)", () => {
     await expect(currentAreaCoordinator()).resolves.toBeNull();
   });
 
+  it("keeps the ministries of an active grant when the role is granted again, and says so in the audit (#843)", async () => {
+    mocks.grantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["ADVENTURER"] });
+    await setAreaCoordinator("account-1", true, "admin-1");
+    expect(mocks.grantUpsert.mock.calls[0]![0].update).not.toHaveProperty("ministries");
+    expect(mocks.writeAuditLog.mock.calls[0]![0]).toMatchObject({ action: "AREA_COORDINATOR_GRANTED", metadata: { ministries: ["ADVENTURER"] } });
+  });
+
+  it("resets a revoked or expired grant to Pathfinder when it is granted again (#843)", async () => {
+    for (const existing of [{ revokedAt: new Date("2026-01-01"), expiresAt: null }, { revokedAt: null, expiresAt: new Date("2026-01-01") }, null]) {
+      mocks.grantUpsert.mockClear();
+      mocks.grantFindUnique.mockResolvedValue(existing && { ...existing, ministries: ["ADVENTURER"] });
+      await setAreaCoordinator("account-1", true, "admin-1");
+      expect(mocks.grantUpsert.mock.calls[0]![0].update).toMatchObject({ ministries: ["PATHFINDER"] });
+    }
+  });
+
   it("starts a fresh grant as a Pathfinder coordinator (#843)", async () => {
+    mocks.grantFindUnique.mockResolvedValue(null);
     await setAreaCoordinator("account-1", true, "admin-1");
     expect(mocks.grantUpsert).toHaveBeenCalledWith(expect.objectContaining({
       create: expect.not.objectContaining({ ministries: expect.anything() }),

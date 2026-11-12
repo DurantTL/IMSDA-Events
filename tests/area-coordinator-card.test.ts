@@ -112,7 +112,7 @@ describe("getAreaCoordinatorCard", () => {
     });
     expect(mocks.eventFindMany.mock.calls[0]![0].where).toEqual({ isPublished: true, archivedAt: null, audience: "CLUB", endsAt: { gte: now } });
     expect(mocks.eventFindMany.mock.calls[0]![0].select.clubRegistrations.where).toEqual({ organization: { isActive: true, clubKind: { in: ["PATHFINDER"] } } });
-    expect(mocks.orgFindMany.mock.calls[0]![0].where).toEqual({ type: "CLUB", isActive: true, clubKind: { in: ["PATHFINDER"] } });
+    expect(mocks.orgFindMany.mock.calls[0]![0].where).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER"] } });
   });
 
   it("counts the clubs of the coordinator's ministries only, whatever they are (#843)", async () => {
@@ -120,7 +120,7 @@ describe("getAreaCoordinatorCard", () => {
     await getAreaCoordinatorCard({ id: "acct-1" }, now);
     expect(mocks.ministries).toHaveBeenCalledWith("acct-1", now);
     expect(mocks.eventFindMany.mock.calls[0]![0].select.clubRegistrations.where).toEqual({ organization: { isActive: true, clubKind: { in: ["ADVENTURER", "PATHFINDER"] } } });
-    expect(mocks.orgFindMany.mock.calls[0]![0].where).toEqual({ type: "CLUB", isActive: true, clubKind: { in: ["ADVENTURER", "PATHFINDER"] } });
+    expect(mocks.orgFindMany.mock.calls[0]![0].where).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["ADVENTURER", "PATHFINDER"] } });
   });
 
   it("excludes locations of unpublished and GENERAL events", async () => {

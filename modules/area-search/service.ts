@@ -10,6 +10,7 @@ import {
 } from "@/modules/area-search/domain";
 import { filterClubsByNameChurchCityOrDirector } from "@/modules/club-reports/area-summary-domain";
 import { coordinatorClubHref } from "@/modules/club-rosters/area-club-switch";
+import { areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { areaCoordinatorClubKinds, currentAreaCoordinatorViewer, type AreaCoordinatorViewer } from "@/modules/organizations/area-coordinators";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-club-ids";
@@ -47,7 +48,7 @@ type ClubRow = { id: string; name: string; sponsoringChurch: string | null; city
 async function listClubRows(viewer: AreaSearchViewer, now: Date): Promise<ClubRow[]> {
   const prisma = getPrisma();
   const clubs = await prisma.organization.findMany({
-    where: { type: "CLUB", isActive: true, clubKind: { in: await areaCoordinatorClubKinds(viewer) } },
+    where: areaClubWhere(await areaCoordinatorClubKinds(viewer)),
     orderBy: [{ name: "asc" }, { id: "asc" }],
     select: { id: true, name: true, city: true, parentOrganization: { select: { name: true, city: true } } },
   });

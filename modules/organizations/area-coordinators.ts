@@ -175,14 +175,19 @@ export async function applyAreaCoordinatorChange(
 ) {
   const account = await tx.attendeeAccount.findUnique({ where: { id: attendeeAccountId }, select: { id: true } });
   if (!account) throw new AreaCoordinatorError("ACCOUNT_NOT_FOUND", "That account could not be found.");
+  let ministries: ClubKindValue[] = ["PATHFINDER"];
   if (on) {
+    // An already active grant keeps its ministries (a repeated toggle or an invite accepted again changes nothing about them);
+    // a new or revived grant starts as a Pathfinder coordinator until an admin names the ministries (#843).
+    const existing = await tx.areaCoordinatorGrant.findUnique({ where: { attendeeAccountId }, select: { revokedAt: true, expiresAt: true, ministries: true } });
+    const keep = Boolean(existing && areaGrantActive(existing, now));
+    if (keep && existing) ministries = grantMinistries(existing.ministries);
     await tx.areaCoordinatorGrant.upsert({
       where: { attendeeAccountId },
       create: { attendeeAccountId, grantedByUserId: actorUserId, grantedAt: now },
       // A new grant never brings back the TLT director setting (#1686): a system administrator switches it again.
       update: { revokedAt: null, revokedByUserId: null, expiresAt: null, grantedByUserId: actorUserId, grantedAt: now, tltDirector: false, tltDirectorSetAt: null, tltDirectorSetByUserId: null,
-        // Like the TLT setting, a new grant starts as a Pathfinder coordinator until an admin names the ministries (#843).
-        ministries: ["PATHFINDER"] },
+        ...(keep ? {} : { ministries: ["PATHFINDER"] }) },
     });
   } else {
     // Removing the role removes the TLT director setting with it (#1686), and says so in the audit trail.
@@ -213,6 +218,7 @@ export async function applyAreaCoordinatorChange(
     summary: on ? "Made an account an Area Coordinator." : "Removed an Area Coordinator.",
     metadata: {
       attendeeAccountId,
+      ...(on ? { ministries } : {}),
       ...(options.viaClubsAdministrator ? { viaClubsAdministrator: true } : {}),
       ...(options.viaInviteId ? { viaInviteId: options.viaInviteId } : {}),
     },

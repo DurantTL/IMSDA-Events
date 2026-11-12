@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ALL_CLUB_KINDS, areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
+import { areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import type { ClubKindValue } from "@/modules/organizations/club-kind";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
@@ -313,11 +313,11 @@ export type ClubNewYearStatus = {
  * roster. Counts only, never a person. The caller has already authorized the
  * viewer for the all-clubs view. `kinds` limits it to an Area Coordinator's ministries (#843); staff leave it out.
  */
-export async function listClubsNewYearStatus(now = new Date(), options: { kinds?: readonly ClubKindValue[] } = {}) {
+export async function listClubsNewYearStatus(now = new Date(), options: { kinds: readonly ClubKindValue[] }) {
   const { fromClubYear, toClubYear } = carryForwardYears(now);
   const prisma = getPrisma();
   const clubs = await prisma.organization.findMany({
-    where: areaClubWhere(options.kinds ?? ALL_CLUB_KINDS),
+    where: areaClubWhere(options.kinds),
     orderBy: { name: "asc" },
     select: { id: true, name: true, parentOrganization: { select: { name: true } } },
   });

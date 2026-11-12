@@ -190,6 +190,7 @@ export function AreaCoordinatorMinistries({ accountId, ministries, name }: { acc
   const [chosen, setChosen] = useState<ClubKindValue[]>(saved);
   const next = CLUB_KINDS.filter((kind) => chosen.includes(kind));
   const changed = next.join(",") !== saved.join(",");
+  useUnsavedChangesGuard(changed);
 
   function toggle(kind: ClubKindValue, on: boolean) {
     setChosen((current) => (on ? [...current, kind] : current.filter((value) => value !== kind)));
@@ -217,7 +218,7 @@ export function AreaCoordinatorMinistries({ accountId, ministries, name }: { acc
       </fieldset>
       {next.length === 0 ? <p className={styles.statusError} role="alert">Choose at least one ministry.</p> : null}
       <div className={styles.inline}>
-        <button className="secondary-button" disabled={busy || next.length === 0 || !changed} type="submit">Save ministries</button>
+        <SubmitButton className="secondary-button" disabled={next.length === 0 || !changed} label="Save ministries" submitting={busy} submittingLabel="Saving…" />
       </div>
       {status}
     </form>

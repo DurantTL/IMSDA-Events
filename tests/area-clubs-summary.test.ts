@@ -37,6 +37,7 @@ vi.mock("@/modules/organizations/staff-act-as", () => ({ currentStaffActingConte
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/background-checks/repository", () => ({ clubsComplianceReminderCounts: mocks.complianceCounts }));
 
+import { ALL_CLUB_KINDS } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { GET as ADMIN_EXPORT } from "@/app/api/admin/club-reports/area-export/route";
 import { GET as AREA_EXPORT } from "@/app/api/attendee/area-clubs/export/route";
 import {
@@ -175,14 +176,14 @@ describe("area club summary repository (#657)", () => {
     mocks.rosterGroupBy
       .mockResolvedValueOnce([{ organizationId: "club-a", _count: { _all: 12 } }])
       .mockResolvedValueOnce([{ organizationId: "club-a", _count: { _all: 4 } }]);
-    const [alpha, bravo] = await getAreaClubsSummary("2026-27", now);
+    const [alpha, bravo] = await getAreaClubsSummary("2026-27", now, { kinds: ALL_CLUB_KINDS });
     expect(alpha).toMatchObject({ rosterSize: 12, adultCount: 4 });
     expect(bravo).toMatchObject({ rosterSize: 0, adultCount: 0 });
     expect(mocks.rosterGroupBy.mock.calls[1]![0].where).toMatchObject({ clubYear: "2026-27", status: "ACTIVE", attendeeType: { in: ["ADULT", "STAFF"] } });
   });
 
   it("builds one row per active club from the stored reports, with counts-only Sterling Volunteers", async () => {
-    const clubs = await getAreaClubsSummary("2026-27", now);
+    const clubs = await getAreaClubsSummary("2026-27", now, { kinds: ALL_CLUB_KINDS });
     expect(clubs.map((club) => club.name)).toEqual(["Alpha Pathfinders", "Bravo Adventurers"]);
     const [alpha, bravo] = clubs;
     expect(alpha).toMatchObject({ directors: ["Dana Director"], rosterSize: 12, church: "First Church", totalPoints: 1800, submitted: 1 });
@@ -197,7 +198,7 @@ describe("area club summary repository (#657)", () => {
   it("limits the clubs to the given ministries, and reads every ministry for staff (#843)", async () => {
     await getAreaClubsSummary("2026-27", now, { backgroundChecks: false, kinds: ["ADVENTURER"] });
     expect(mocks.orgFindMany.mock.calls.at(-1)![0].where).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["ADVENTURER"] } });
-    await getAreaClubsSummary("2026-27", now, { backgroundChecks: false });
+    await getAreaClubsSummary("2026-27", now, { backgroundChecks: false, kinds: ALL_CLUB_KINDS });
     expect(mocks.orgFindMany.mock.calls.at(-1)![0].where).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER", "ADVENTURER"] } });
     mocks.eventFindMany.mockResolvedValue([]);
     await listAreaClubEvents("2026-27", { kinds: ["PATHFINDER"] });
@@ -205,14 +206,14 @@ describe("area club summary repository (#657)", () => {
   });
 
   it("skips the background-check query when the caller does not show counts", async () => {
-    const clubs = await getAreaClubsSummary("2026-27", now, { backgroundChecks: false });
+    const clubs = await getAreaClubsSummary("2026-27", now, { backgroundChecks: false, kinds: ALL_CLUB_KINDS });
     expect(mocks.complianceCounts).not.toHaveBeenCalled();
     expect(clubs[0]!.backgroundChecks).toEqual({ missing: 0, notInCompliance: 0, expiringSoon: 0 });
   });
 
   it("limits events to the club year on both ends", async () => {
     mocks.eventFindMany.mockResolvedValue([]);
-    await listAreaClubEvents("2025-26");
+    await listAreaClubEvents("2025-26", { kinds: ALL_CLUB_KINDS });
     const where = mocks.eventFindMany.mock.calls[0]![0].where;
     expect(where.endsAt).toEqual({ gte: new Date("2025-09-01T00:00:00Z") });
     expect(where.startsAt).toEqual({ lt: new Date("2026-09-01T00:00:00Z") });
@@ -228,7 +229,7 @@ describe("area club summary repository (#657)", () => {
         clubRegistrationDrafts: [{ organizationId: "club-b" }],
       },
     ]);
-    const [event] = await listAreaClubEvents("2026-27");
+    const [event] = await listAreaClubEvents("2026-27", { kinds: ALL_CLUB_KINDS });
     expect(event!.clubs).toEqual([
       { organizationId: "club-a", name: "Alpha Pathfinders", status: "REGISTERED", headcount: 22 },
       { organizationId: "club-b", name: "Bravo Adventurers", status: "DRAFT", headcount: null },

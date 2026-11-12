@@ -146,15 +146,15 @@ describe("searchAreaClubs ministry scope (#843)", () => {
   it("reads only the clubs of the coordinator's ministries", async () => {
     database.coordinatorGrant = { revokedAt: null, expiresAt: null, ministries: ["ADVENTURER"] };
     await searchAreaClubs(coordinator, "alpha", NOW);
-    expect(database.clubWhere).toEqual({ type: "CLUB", isActive: true, clubKind: { in: ["ADVENTURER"] } });
+    expect(database.clubWhere).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["ADVENTURER"] } });
     database.coordinatorGrant = { revokedAt: null, expiresAt: null, ministries: ["PATHFINDER", "ADVENTURER"] };
     await searchAreaClubs(coordinator, "alpha", NOW);
-    expect(database.clubWhere).toEqual({ type: "CLUB", isActive: true, clubKind: { in: ["PATHFINDER", "ADVENTURER"] } });
+    expect(database.clubWhere).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER", "ADVENTURER"] } });
   });
 
   it("reads every ministry for staff acting as a coordinator", async () => {
     await searchAreaClubs({ kind: "ACTING", actAsId: "act_1" }, "alpha", NOW);
-    expect(database.clubWhere).toEqual({ type: "CLUB", isActive: true, clubKind: { in: ["PATHFINDER", "ADVENTURER"] } });
+    expect(database.clubWhere).toEqual({ type: "CLUB", isActive: true, guestEventId: null, clubKind: { in: ["PATHFINDER", "ADVENTURER"] } });
   });
 });
 

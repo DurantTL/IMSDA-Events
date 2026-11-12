@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ALL_CLUB_KINDS } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { redirect } from "next/navigation";
 import { ArrowRight, CalendarDays, ClipboardCheck, ClipboardList, ClipboardPen, Tent, UserPlus } from "lucide-react";
@@ -54,8 +55,8 @@ export default async function ClubsAdminPage({ searchParams }: { searchParams: P
 
   const hubViewer: HubViewer = { isSystemAdmin: viewer === "SYSTEM_ADMIN", clubsAdmin: true, siteContentEditor: false, healthImport: healthRecordsEnabled() };
   const [clubs, events, applications, waitingCount, requiredForms, waitingInvites] = await Promise.all([
-    getAreaClubsSummary(clubYear, now, { backgroundChecks: false }),
-    listAreaClubEvents(clubYear),
+    getAreaClubsSummary(clubYear, now, { backgroundChecks: false, kinds: ALL_CLUB_KINDS }),
+    listAreaClubEvents(clubYear, { kinds: ALL_CLUB_KINDS }),
     listNewClubApplications(viewer),
     countWaitingNewClubApplications(viewer),
     getRequiredFormsStatus(clubYear),

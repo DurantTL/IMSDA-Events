@@ -389,7 +389,7 @@ describe("deciding a request (#835)", () => {
     expect(result.status).toBe("APPROVED");
     expect(db.organizations).toHaveLength(1);
     expect(db.organizations[0]).toMatchObject({
-      type: "CLUB", name: "Synthetic Out-of-State Eagles", parentOrganizationId: null, guestEventId: "event-1", isActive: true, sourceOrgType: "Visiting Pathfinder Club",
+      type: "CLUB", name: "Synthetic Out-of-State Eagles", parentOrganizationId: null, guestEventId: "event-1", isActive: true, sourceOrgType: "Visiting Pathfinder Club", clubKind: "PATHFINDER",
     });
     expect(db.requests[0]).toMatchObject({ status: "APPROVED", createdOrganizationId: result.organizationId, decidedByUserId: "user-admin" });
     expect(db.grants).toEqual([expect.objectContaining({ organizationId: result.organizationId, attendeeAccountId: "acct-1", role: "DIRECTOR", reason: "Approved visiting club request.", grantedByUserId: "user-admin" })]);
@@ -407,6 +407,8 @@ describe("deciding a request (#835)", () => {
     const { id } = await submitVisitingClubRequest(account, "token-adv", answers({ clubType: "ADVENTURER" }), NOW);
     await decideVisitingClubRequest(clubsAdmin, id, { decision: "approve" }, NOW);
     expect(db.organizations[0].sourceOrgType).toBe("Visiting Adventurer Club");
+    // The ministry follows the request (#843).
+    expect(db.organizations[0].clubKind).toBe("ADVENTURER");
   });
 
   it("a second approval, or a decline after an approval, gets ALREADY_DECIDED and creates nothing twice", async () => {

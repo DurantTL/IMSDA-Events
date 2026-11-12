@@ -39,6 +39,7 @@ const mocks = vi.hoisted(() => ({
   acUpdate: vi.fn(),
   acUpdateMany: vi.fn(),
   areaUpsert: vi.fn(),
+  areaGrantFindUnique: vi.fn(),
   outboxCreate: vi.fn(),
   tokenUpdateMany: vi.fn(),
   credentialUpdateMany: vi.fn(),
@@ -68,7 +69,7 @@ const client = {
   eventMembership: { findUnique: mocks.membershipFindUnique, create: mocks.membershipCreate },
   clubInvite: { findFirst: mocks.clubInviteFindFirst, findMany: mocks.clubInviteFindMany, create: mocks.clubInviteCreate, update: mocks.clubInviteUpdate },
   areaCoordinatorInvite: { findFirst: mocks.acFindFirst, findMany: mocks.acFindMany, findUnique: mocks.acFindUnique, create: mocks.acCreate, update: mocks.acUpdate, updateMany: mocks.acUpdateMany },
-  areaCoordinatorGrant: { upsert: mocks.areaUpsert, updateMany: vi.fn() },
+  areaCoordinatorGrant: { findUnique: mocks.areaGrantFindUnique, upsert: mocks.areaUpsert, updateMany: vi.fn() },
   messageOutbox: { create: mocks.outboxCreate },
   $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(client),
 };
@@ -145,6 +146,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(now);
   vi.clearAllMocks();
+  mocks.areaGrantFindUnique.mockResolvedValue(null);
   users = [];
   accounts = [];
   signInAs("systemAdmin");
@@ -522,8 +524,15 @@ describe("accepting an Area Coordinator invite", () => {
     await acceptAreaCoordinatorInvite("aci-1", account, now);
     expect(mocks.acUpdateMany).toHaveBeenCalledWith({ where: { id: "aci-1", status: "SENT" }, data: expect.objectContaining({ status: "ACCEPTED", acceptedAccountId: "acct-acc" }) });
     expect(mocks.areaUpsert).toHaveBeenCalledWith(expect.objectContaining({ where: { attendeeAccountId: "acct-acc" } }));
-    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_GRANTED", actorUserId: "u-sys", metadata: { attendeeAccountId: "acct-acc", viaInviteId: "aci-1" } }), expect.anything());
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_GRANTED", actorUserId: "u-sys", metadata: { attendeeAccountId: "acct-acc", ministries: ["PATHFINDER"], viaInviteId: "aci-1" } }), expect.anything());
     expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_INVITE_ACCEPTED", entityId: "aci-1" }), expect.anything());
+  });
+
+  it("keeps the ministries of an already active grant when an invite is accepted again (#843)", async () => {
+    mocks.areaGrantFindUnique.mockResolvedValue({ revokedAt: null, expiresAt: null, ministries: ["ADVENTURER"] });
+    await acceptAreaCoordinatorInvite("aci-1", account, now);
+    expect(mocks.areaUpsert.mock.calls[0]![0].update).not.toHaveProperty("ministries");
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(expect.objectContaining({ action: "AREA_COORDINATOR_GRANTED", metadata: expect.objectContaining({ ministries: ["ADVENTURER"] }) }), expect.anything());
   });
 
   it("answers the wrong email exactly like a missing invite, and grants nothing", async () => {

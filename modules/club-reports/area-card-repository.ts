@@ -11,6 +11,7 @@ import {
 import { registrationStatusFor } from "@/modules/club-reports/area-summary-domain";
 import { clubYearFor } from "@/modules/club-rosters/domain";
 import { coordinatorMinistriesForAccount } from "@/modules/organizations/area-coordinators";
+import { areaClubWhere } from "@/modules/organizations/area-coordinator-ministries-domain";
 import type { ClubKindValue } from "@/modules/organizations/club-kind";
 
 export type AreaCardEvent = {
@@ -36,7 +37,7 @@ export type AreaCoordinatorCard = {
 /** Counts of active clubs needing attention, without building the full per-club summary. */
 async function loadClubsNeedingAttention(clubYear: string, now: Date, kinds: readonly ClubKindValue[]) {
   const prisma = getPrisma();
-  const clubs = await prisma.organization.findMany({ where: { type: "CLUB", isActive: true, clubKind: { in: [...kinds] } }, select: { id: true, ...clubJoinSelect } });
+  const clubs = await prisma.organization.findMany({ where: areaClubWhere(kinds), select: { id: true, ...clubJoinSelect } });
   const clubIds = clubs.map((club) => club.id);
   const [reports, checks] = await Promise.all([
     prisma.clubMonthlyReport.findMany({

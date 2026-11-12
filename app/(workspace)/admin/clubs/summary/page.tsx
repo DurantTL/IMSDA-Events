@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ALL_CLUB_KINDS } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { NavigationLink as Link } from "@/components/navigation-link";
 import { redirect } from "next/navigation";
 import { LayoutGrid, ClipboardList, ChartNoAxesColumn, CalendarDays } from "lucide-react";
@@ -61,9 +62,9 @@ export default async function ClubSummaryAdminPage({ searchParams }: { searchPar
   const attention = params.attention === "needs-attention";
   const sort = parseLeaderboardSort(params.sort);
   const [clubs, events, newYearStatus] = await Promise.all([
-    getAreaClubsSummary(clubYear, now),
-    view === "events" ? listAreaClubEvents(clubYear) : Promise.resolve([]),
-    view === "directory" && carryForwardOversightOpen(now) ? listClubsNewYearStatus(now) : Promise.resolve(null),
+    getAreaClubsSummary(clubYear, now, { kinds: ALL_CLUB_KINDS }),
+    view === "events" ? listAreaClubEvents(clubYear, { kinds: ALL_CLUB_KINDS }) : Promise.resolve([]),
+    view === "directory" && carryForwardOversightOpen(now) ? listClubsNewYearStatus(now, { kinds: ALL_CLUB_KINDS }) : Promise.resolve(null),
   ]);
   const points = view === "points" ? buildStaffPoints({ clubs, clubYear, q: params.q, all: params.all }) : null;
   const directory = buildClubDirectory({ clubs, clubYear, now, query, attention, page: Number(params.page ?? 1) });

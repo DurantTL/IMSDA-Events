@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ALL_CLUB_KINDS } from "@/modules/organizations/area-coordinator-ministries-domain";
 import { cache } from "react";
 import { getPrisma } from "@/lib/prisma";
 import { calendarDateIn } from "@/modules/calendar/domain";
@@ -47,7 +48,7 @@ export function clubsSummaryOnce(clubYear: string, now: Date): Promise<AreaClubS
   const key = `${clubYear}|${calendarDateIn(now)}`;
   let read = store.get(key);
   if (!read) {
-    read = getAreaClubsSummary(clubYear, now, { backgroundChecks: false });
+    read = getAreaClubsSummary(clubYear, now, { backgroundChecks: false, kinds: ALL_CLUB_KINDS });
     store.set(key, read);
   }
   return read;

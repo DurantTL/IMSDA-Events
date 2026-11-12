@@ -13,7 +13,7 @@ export function CoordinatorFindClub({ clubYear }: { clubYear: string }) {
       <Link className="secondary-button" href={`/account/area-clubs/clubs?year=${encodeURIComponent(clubYear)}`}>
         <Search aria-hidden="true" size={16} /> Find a club
       </Link>
-      <span className={styles.hint}>Search every club by club, church, city or director.</span>
+      <span className={styles.hint}>Search your ministry&apos;s clubs by club, church, city or director.</span>
     </p>
   );
 }
