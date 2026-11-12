@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
   getCurrentSession: vi.fn(),
   grantFindFirst: vi.fn(),
+  youthGrantFindFirst: vi.fn(),
 }));
 
 const client = {
@@ -17,6 +18,7 @@ const client = {
   organization: { findUnique: mocks.orgFindUnique },
   userSession: { findUnique: mocks.sessionFindUnique },
   clubsAdministratorGrant: { findFirst: mocks.grantFindFirst },
+  youthAdministratorGrant: { findFirst: mocks.youthGrantFindFirst },
   $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(client),
 };
 
@@ -49,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.findFirst.mockResolvedValue(null);
   mocks.grantFindFirst.mockResolvedValue(null);
+  mocks.youthGrantFindFirst.mockResolvedValue(null);
   mocks.updateMany.mockResolvedValue({ count: 0 });
   mocks.create.mockResolvedValue({ id: "act-1" });
   mocks.orgFindUnique.mockResolvedValue({ type: "CLUB", isActive: true, name: "Test Pathfinders" });
