@@ -2,6 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { SubmitButton } from "@/components/submit-button";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import { TLT_STATUSES, TLT_YEARS, tltStatusLabels } from "@/modules/tlt-directory/domain";
 import styles from "./tlt-directory.module.css";
 
@@ -29,6 +32,12 @@ export function TltRowEditor({ personId, tltYear, positionTypeId, status, tagIds
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const base = `${personId}`;
+  const dirty = year !== (tltYear === null ? "" : String(tltYear))
+    || position !== (positionTypeId ?? "")
+    || state !== (status ?? "")
+    || picked.size !== tagIds.length
+    || tagIds.some((id) => !picked.has(id));
+  useUnsavedChangesGuard(dirty);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -43,10 +52,10 @@ export function TltRowEditor({ personId, tltYear, positionTypeId, status, tagIds
       });
       const result = await response.json().catch(() => ({})) as { message?: string };
       if (!response.ok) throw new Error(result.message ?? "That could not be saved.");
-      setMessage("Saved.");
+      setMessage(savedMessage());
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That could not be saved.");
+      setError(notSavedMessage(caught instanceof Error ? caught.message : "That could not be saved."));
     } finally {
       setBusy(false);
     }
@@ -94,10 +103,9 @@ export function TltRowEditor({ personId, tltYear, positionTypeId, status, tagIds
           ))}
         </fieldset>
         <div>
-          <button className="primary-button" disabled={busy} type="submit">{busy ? "Saving…" : "Save"}</button>
+          <SubmitButton label="Save" submitting={busy} submittingLabel="Saving…" />
         </div>
-        <p aria-live="polite" className={styles.status} role="status">{message}</p>
-        {error ? <p className={styles.error} role="alert">{error}</p> : null}
+        <FormMessage message={error || message} tone={error ? "error" : "success"} />
       </form>
     </details>
   );

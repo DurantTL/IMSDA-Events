@@ -1,4 +1,8 @@
+import { Search } from "lucide-react";
+import { ListPager } from "@/components/list-pager";
 import { NavigationLink as Link } from "@/components/navigation-link";
+import { SearchAsYouTypeForm, SearchResultStatus } from "@/components/search-as-you-type";
+import type { PageSlice } from "@/lib/pagination";
 import { TltPrintButton } from "@/components/tlt-print-button";
 import { TltExportButton } from "@/components/tlt-export-button";
 import { TltRowEditor } from "@/components/tlt-row-editor";
@@ -18,7 +22,7 @@ import styles from "./tlt-directory.module.css";
 
 const sortLabels: Record<TltSort, string> = { name: "Name", club: "Club", year: "TLT year" };
 
-function hrefFor(filters: TltFilters, sort: TltSort) {
+function hrefFor(filters: TltFilters, sort: TltSort, page = 1) {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
   if (filters.clubId) params.set("club", filters.clubId);
@@ -27,6 +31,7 @@ function hrefFor(filters: TltFilters, sort: TltSort) {
   if (filters.status) params.set("status", filters.status);
   if (filters.tag) params.set("tag", filters.tag);
   if (sort !== "name") params.set("sort", sort);
+  if (page > 1) params.set("page", String(page));
   const query = params.toString();
   return `/account/area-clubs/tlt${query ? `?${query}` : ""}`;
 }
@@ -36,8 +41,8 @@ function hrefFor(filters: TltFilters, sort: TltSort) {
  * the facts and a four-field editor, the CSV button and print. Presentation only: the page already checked access, and
  * every save and download is checked again on the server.
  */
-export function TltDirectory({ rows, total, clubs, filters, positions, tags }: {
-  rows: TltDirectoryRow[];
+export function TltDirectory({ slice, total, clubs, filters, positions, tags }: {
+  slice: PageSlice<TltDirectoryRow>;
   total: number;
   clubs: Array<{ id: string; name: string }>;
   filters: TltFilters;
@@ -45,12 +50,17 @@ export function TltDirectory({ rows, total, clubs, filters, positions, tags }: {
   tags: TltListEntry[];
 }) {
   const exportFilters = { q: filters.q, club: filters.clubId, year: filters.year, position: filters.position, status: filters.status, tag: filters.tag, sort: filters.sort };
+  const rows = slice.items;
+  const pagerHref = (page: number) => hrefFor(filters, filters.sort, page);
   const filtered = Boolean(filters.q || filters.clubId || filters.year || filters.position || filters.status || filters.tag);
   return (
     <>
-      <form action="/account/area-clubs/tlt" className={`${styles.filters} ${styles.noPrint}`} method="get" role="search">
+      <SearchAsYouTypeForm action="/account/area-clubs/tlt" className={`${styles.filters} ${styles.noPrint}`} role="search">
         <label className={styles.field}>Name
-          <input defaultValue={filters.q} maxLength={80} name="q" type="search" />
+          <span className={`search-field ${styles.searchBox}`}>
+            <Search aria-hidden="true" size={16} />
+            <input autoComplete="off" defaultValue={filters.q} maxLength={80} name="q" type="search" />
+          </span>
         </label>
         <label className={styles.field}>Club
           <select defaultValue={filters.clubId} name="club">
@@ -88,9 +98,9 @@ export function TltDirectory({ rows, total, clubs, filters, positions, tags }: {
         {filters.sort !== "name" ? <input name="sort" type="hidden" value={filters.sort} /> : null}
         <div className={styles.actions}>
           <button className="primary-button" type="submit">Apply</button>
-          {filtered ? <Link className="secondary-button" href={hrefFor({ ...filters, q: "", clubId: "", year: "", position: "", status: "", tag: "" }, filters.sort)}>Clear</Link> : null}
+          {filtered ? <Link className="secondary-button" href={hrefFor({ ...filters, q: "", clubId: "", year: "", position: "", status: "", tag: "" }, filters.sort)}>Clear filters</Link> : null}
         </div>
-      </form>
+      </SearchAsYouTypeForm>
 
       <nav aria-label="Sort the list" className={`${styles.sortRow} ${styles.noPrint}`}>
         <span>Sort by</span>
@@ -102,12 +112,11 @@ export function TltDirectory({ rows, total, clubs, filters, positions, tags }: {
       <div className={`${styles.actions} ${styles.noPrint}`}>
         <TltExportButton filters={exportFilters} />
         <TltPrintButton />
-        <Link className="secondary-button" href="/account/area-clubs/tlt/lists">Manage lists</Link>
+        <Link className="secondary-button" href="/account/area-clubs/tlt/lists">Position types and tags</Link>
       </div>
 
-      <p aria-live="polite" className={styles.count}>
-        {rows.length === total ? `${total} ${total === 1 ? "TLT" : "TLTs"}` : `${rows.length} of ${total} TLTs`}
-      </p>
+      <SearchResultStatus message={`${slice.total} of ${total} TLTs shown`} />
+      <ListPager hrefFor={pagerHref} label="TLT pages" noun="TLTs" nounOne="TLT" part="count" slice={slice} />
 
       {rows.length === 0 ? (
         <p>{total === 0 ? "No TLTs are on a club roster this club year yet. A club director marks a youth member as TLT on the roster." : "No TLTs match these filters."}</p>
@@ -141,6 +150,7 @@ export function TltDirectory({ rows, total, clubs, filters, positions, tags }: {
           ))}
         </ul>
       )}
+      <ListPager hrefFor={pagerHref} label="TLT pages" noun="TLTs" nounOne="TLT" part="pages" slice={slice} />
     </>
   );
 }

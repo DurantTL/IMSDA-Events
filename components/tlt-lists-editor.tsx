@@ -2,10 +2,21 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { FieldError, fieldErrorProps } from "@/components/field-error";
+import { FormErrorSummary, summaryMessage, useFormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
+import { FormMessage, notSavedMessage, savedMessage } from "@/components/form-message";
+import { SubmitButton, submitButtonState } from "@/components/submit-button";
+import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
 import type { TltListEntry } from "@/modules/tlt-directory/repository";
 import styles from "./tlt-directory.module.css";
 
 type ListKey = "position" | "tag";
+
+class SendError extends Error {
+  constructor(message: string, readonly code: string) {
+    super(message);
+  }
+}
 
 async function send(body: Record<string, string>) {
   const response = await fetch("/api/attendee/area-clubs/tlt-directory/lists", {
@@ -13,41 +24,66 @@ async function send(body: Record<string, string>) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const result = await response.json().catch(() => ({})) as { message?: string };
-  if (!response.ok) throw new Error(result.message ?? "That could not be saved.");
+  const result = await response.json().catch(() => ({})) as { message?: string; error?: string };
+  if (!response.ok) throw new SendError(result.message ?? "That could not be saved.", result.error ?? "");
 }
 
-function Entry({ list, entry }: { list: ListKey; entry: TltListEntry }) {
+const errorText = (caught: unknown) => (caught instanceof Error ? caught.message : "That could not be saved.");
+
+function Entry({ list, entry, onProblem, onClear }: {
+  list: ListKey;
+  entry: TltListEntry;
+  onProblem: (item: ErrorSummaryItem) => void;
+  onClear: () => void;
+}) {
   const router = useRouter();
   const [name, setName] = useState(entry.name);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  async function run(body: Record<string, string>) {
-    setBusy(true);
-    setError("");
+  const [busy, setBusy] = useState<"rename" | "retire" | null>(null);
+  const [fieldError, setFieldError] = useState("");
+  const [saved, setSaved] = useState("");
+  const [failed, setFailed] = useState("");
+  const inputId = `tlt-${list}-${entry.id}-name`;
+  const errorId = `${inputId}-error`;
+  useUnsavedChangesGuard(name !== entry.name);
+
+  async function run(kind: "rename" | "retire", body: Record<string, string>) {
+    setBusy(kind);
+    setFieldError("");
+    setFailed("");
+    setSaved("");
+    onClear();
     try {
       await send(body);
+      setSaved(savedMessage());
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That could not be saved.");
+      if (caught instanceof SendError && (caught.code === "NAME_TAKEN" || caught.code === "INVALID_TLT_REQUEST")) {
+        setFieldError(caught.message);
+        onProblem({ targetId: inputId, message: summaryMessage(`Name of ${entry.name}`, caught.message) });
+      } else {
+        setFailed(notSavedMessage(errorText(caught)));
+      }
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
+  const retire = submitButtonState({ submitting: busy === "retire", disabled: busy === "rename", label: entry.retired ? "Restore" : "Retire", submittingLabel: "Saving…" });
   return (
     <li className={styles.entry}>
-      <form className={styles.entryRow} onSubmit={(event: FormEvent) => { event.preventDefault(); void run({ action: "rename", list, id: entry.id, name }); }}>
-        <input aria-label={`Name of ${entry.name}`} maxLength={60} onChange={(event) => setName(event.target.value)} value={name} />
-        <button className="secondary-button" disabled={busy || name.trim() === entry.name} type="submit">Rename</button>
-        <button className="secondary-button" disabled={busy} onClick={() => void run({ action: entry.retired ? "restore" : "retire", list, id: entry.id })} type="button">
-          {entry.retired ? "Restore" : "Retire"}
+      <form className={styles.entryRow} onSubmit={(event: FormEvent) => { event.preventDefault(); void run("rename", { action: "rename", list, id: entry.id, name }); }}>
+        <label className="sr-only" htmlFor={inputId}>Name of {entry.name}</label>
+        <input {...fieldErrorProps(errorId, fieldError)} id={inputId} maxLength={60} onChange={(event) => { setName(event.target.value); setFieldError(""); }} value={name} />
+        <SubmitButton className="secondary-button" disabled={busy === "retire" || name.trim() === entry.name} label="Rename" submitting={busy === "rename"} submittingLabel="Saving…" />
+        <button aria-busy={retire.ariaBusy || undefined} className="secondary-button" disabled={retire.disabled} onClick={() => void run("retire", { action: entry.retired ? "restore" : "retire", list, id: entry.id })} type="button">
+          {retire.label}
         </button>
       </form>
+      <FieldError id={errorId}>{fieldError}</FieldError>
       <p className={styles.entryNote}>
         {entry.retired ? "Retired: not offered for new choices. " : ""}
         {entry.inUse === 0 ? "Not used yet." : `Used by ${entry.inUse} ${entry.inUse === 1 ? "TLT" : "TLTs"}; kept either way.`}
       </p>
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      <FormMessage message={failed || saved} tone={failed ? "error" : "success"} />
     </li>
   );
 }
@@ -56,17 +92,33 @@ function ListSection({ list, title, entries, addLabel }: { list: ListKey; title:
   const router = useRouter();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [fieldError, setFieldError] = useState("");
+  const [saved, setSaved] = useState("");
+  const [failed, setFailed] = useState("");
+  const { ref: summaryRef, items: summaryItems, show: showSummary, clear: clearSummary, clearField: clearSummaryField } = useFormErrorSummary();
+  const inputId = `tlt-${list}-new-name`;
+  const errorId = `${inputId}-error`;
+  useUnsavedChangesGuard(name.trim() !== "");
+
   async function add(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
-    setError("");
+    setFieldError("");
+    setFailed("");
+    setSaved("");
+    clearSummary();
     try {
       await send({ action: "add", list, name });
       setName("");
+      setSaved(savedMessage());
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "That could not be saved.");
+      if (caught instanceof SendError && (caught.code === "NAME_TAKEN" || caught.code === "INVALID_TLT_REQUEST")) {
+        setFieldError(caught.message);
+        showSummary([{ targetId: inputId, message: summaryMessage(addLabel, caught.message) }]);
+      } else {
+        setFailed(notSavedMessage(errorText(caught)));
+      }
     } finally {
       setBusy(false);
     }
@@ -74,13 +126,18 @@ function ListSection({ list, title, entries, addLabel }: { list: ListKey; title:
   return (
     <section aria-labelledby={`tlt-list-${list}`}>
       <h3 id={`tlt-list-${list}`}>{title}</h3>
+      {summaryItems.length > 0 ? <FormErrorSummary items={summaryItems} ref={summaryRef} /> : null}
       <form className={styles.entryRow} onSubmit={(event) => void add(event)}>
-        <input aria-label={addLabel} maxLength={60} onChange={(event) => setName(event.target.value)} placeholder={addLabel} value={name} />
-        <button className="primary-button" disabled={busy || !name.trim()} type="submit">Add</button>
+        <label className="sr-only" htmlFor={inputId}>{addLabel}</label>
+        <input {...fieldErrorProps(errorId, fieldError)} id={inputId} maxLength={60} onChange={(event) => { setName(event.target.value); setFieldError(""); clearSummaryField(inputId); }} placeholder={addLabel} value={name} />
+        <SubmitButton disabled={!name.trim()} label="Add" submitting={busy} submittingLabel="Saving…" />
       </form>
-      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      <FieldError id={errorId}>{fieldError}</FieldError>
+      <FormMessage message={failed || saved} tone={failed ? "error" : "success"} />
       <ul className={styles.plain}>
-        {entries.map((entry) => <Entry entry={entry} key={entry.id} list={list} />)}
+        {entries.map((entry) => (
+          <Entry entry={entry} key={entry.id} list={list} onClear={clearSummary} onProblem={(item) => showSummary([item])} />
+        ))}
       </ul>
     </section>
   );

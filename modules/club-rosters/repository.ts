@@ -624,6 +624,14 @@ export async function removeRosterMember(organizationId: string, memberId: strin
         }
         // What directors are told is unchanged by a sealed copy: the name is reported as kept only for ordered items.
         nameKept = !personDeleted && orderedNeeds > 0;
+        // The TLT director's record (#1686) is erased with the roster details unless the kept Person still has another
+        // active TLT roster row. (When the Person itself was deleted above, the record went with it.)
+        if (!personDeleted) {
+          const stillTlt = await tx.clubRosterMember.count({
+            where: { personId: member.personId, id: { not: memberId }, status: "ACTIVE", attendeeType: "YOUTH", isTlt: true },
+          });
+          if (stillTlt === 0) await tx.tltProfile.deleteMany({ where: { personId: member.personId } });
+        }
       }
     }
     await audit(tx, actor, "CLUB_ROSTER_MEMBER_REMOVED", organizationId, memberId, "Removed a person from a club roster and erased their details.", {

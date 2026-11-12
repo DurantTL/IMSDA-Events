@@ -33,7 +33,7 @@ const youth = {
 
 function fakeDatabase() {
   let sequence = 0;
-  const db = { guardians: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[] };
+  const db = { guardians: [] as Row[], people: [] as Row[], members: [] as Row[], otherReferences: new Set<string>(), guardianReferences: new Set<string>(), snapshotReferences: new Set<string>(), mergeReferences: new Set<string>(), anonymizedReferences: new Set<string>(), honorEntries: [] as Row[], needs: [] as Row[], blankedTransferWhere: [] as unknown[], classCompletions: [] as Row[], attendanceErased: [] as string[], calls: [] as string[], transferBlanks: [] as unknown[], tltProfilesErased: [] as string[] };
   const matches = (row: Row, where: Record<string, unknown> = {}) => Object.entries(where).every(([key, value]) => {
     if (value === undefined) return true;
     if (value && typeof value === "object" && "not" in value) return row[key] !== (value as { not: unknown }).not;
@@ -146,6 +146,10 @@ function fakeDatabase() {
         return member ? withPerson(member) : null;
       },
       findMany: async ({ where }: { where: Record<string, unknown> }) => db.members.filter((row) => matches(row, where)).map(withPerson),
+      count: async ({ where }: { where: Record<string, unknown> }) => db.members.filter((row) => matches(row, where)).length,
+    },
+    tltProfile: {
+      deleteMany: async ({ where }: { where: { personId: string } }) => { db.tltProfilesErased.push(where.personId); return { count: 1 }; },
     },
   };
   mocks.getPrisma.mockReturnValue({ ...client, $transaction: async (work: (tx: typeof client) => unknown) => work(client) });
@@ -630,6 +634,28 @@ describe("club roster storage", () => {
 
     expect(db.people.some((person) => person.id === personId)).toBe(true);
     expect(db.classCompletions).toHaveLength(1);
+  });
+
+  it("erases the TLT director's record with a kept person unless they are still an active TLT elsewhere (#1686)", async () => {
+    const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    const personId = db.members[0].personId as string;
+    db.classCompletions.push({ id: "c3", organizationId: "club-2", personId });
+
+    await removeRosterMember("club-1", id, actor, now);
+
+    expect(db.people.some((person) => person.id === personId)).toBe(true);
+    expect(db.tltProfilesErased).toEqual([personId]);
+  });
+
+  it("keeps the TLT director's record while the kept person has another active TLT roster row (#1686)", async () => {
+    const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    const personId = db.members[0].personId as string;
+    db.classCompletions.push({ id: "c4", organizationId: "club-2", personId });
+    db.members.push({ id: "other-row", organizationId: "club-2", clubYear: "2025-26", personId, attendeeType: "YOUTH", isTlt: true, status: "ACTIVE" });
+
+    await removeRosterMember("club-1", id, actor, now);
+
+    expect(db.tltProfilesErased).toEqual([]);
   });
 
   it("keeps only the name when an ordered need remains: email and phone erased (#566)", async () => {

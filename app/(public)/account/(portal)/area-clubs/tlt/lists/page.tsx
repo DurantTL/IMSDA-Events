@@ -15,7 +15,7 @@ export default async function TltListsPage() {
   const lists = await listTltLists();
   return (
     <section className="public-manage-card page-stack">
-      <CoordinatorSectionHeading eyebrow="TLT directory" title="Position types and help-area tags">
+      <CoordinatorSectionHeading eyebrow="TLT directory" title="Position types and tags">
         <p>Add, rename or retire. A retired entry stays on the TLTs who have it and is no longer offered for new choices. Nothing is deleted.</p>
       </CoordinatorSectionHeading>
       <p><Link className="secondary-button" href="/account/area-clubs/tlt">Back to the directory</Link></p>
