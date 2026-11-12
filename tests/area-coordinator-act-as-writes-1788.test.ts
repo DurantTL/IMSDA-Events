@@ -22,6 +22,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
 import { requireAreaCoordinatorToggleActor } from "@/modules/event-modules/scoped-toggle";
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { currentTltDirector } from "@/modules/tlt-directory/access";
 import { resolveCoordinatorReportActor } from "@/modules/reporting/club-report-api";
 
 const API_ROOT = join(process.cwd(), "app/api/attendee/area-clubs");
@@ -40,6 +41,10 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   // Exports (#1760, #1761): POST only for the cross-site check; they write only the audit log, never club data.
   "roster-export/route.ts": { gate: "resolveAreaCoordinatorViewer", actingStaff: "allowed" },
   "records-export/route.ts": { gate: "resolveAreaCoordinatorViewer", actingStaff: "allowed" },
+  // The TLT directory (#1686): the TLT director's own account only; acting staff have no access at all, not even to read.
+  "tlt-directory/profile/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
+  "tlt-directory/lists/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
+  "tlt-directory/export/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
 };
 
 function routeFiles(dir: string): string[] {
@@ -95,6 +100,10 @@ describe("what staff acting as an Area Coordinator may change", () => {
     // Club teachers, camporee scoring and attendance points all go through this one check.
     await expect(requireAreaCoordinatorToggleActor()).rejects.toMatchObject({ code: "NOT_AVAILABLE" });
     expect(await currentAreaCoordinator()).toBeNull();
+  });
+
+  it("gives acting staff no access to the TLT directory", async () => {
+    expect(await currentTltDirector()).toBeNull();
   });
 
   it("allows nothing when the act-as is for a club director or has ended", async () => {

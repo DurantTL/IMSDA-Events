@@ -117,6 +117,18 @@ export function PersonAccess({
               ? <RoleToggle accountId={person.accountId!} kind="area-coordinator" name={name} on={person.areaCoordinator} />
               : <span className={styles.muted}>Needs a website account</span>}
           </Fact>
+          {full ? (
+            <Fact label="TLT director setting">
+              {hasAccount && person.areaCoordinator
+                ? (
+                  <>
+                    <RoleToggle accountId={person.accountId!} kind="tlt-director" name={name} on={person.tltDirector === true} />
+                    <span className={styles.note}>Lets this Area Coordinator see and keep the list of every TLT. Needs their second sign-in step.</span>
+                  </>
+                )
+                : <span className={styles.muted}>Needs the Area Coordinator role first</span>}
+            </Fact>
+          ) : null}
         </ul>
       </section>
 
