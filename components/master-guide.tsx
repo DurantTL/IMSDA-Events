@@ -92,7 +92,7 @@ function CandidateCard({ organizationId, row }: { organizationId: string; row: M
   return (
     <li className={styles.card}>
       <h3 className={styles.name}>{row.name}</h3>
-      <span className={styles.status}>{masterGuideStatusLabels[row.status]}</span>
+      <p className={styles.statusText}>{masterGuideStatusLabels[row.status]}</p>
       <dl className={styles.facts}>
         <div><dt>Started</dt><dd>{formatMasterGuideDate(row.startedOn)}</dd></div>
         <div><dt>Mentor</dt><dd>{row.mentorName ?? "Not set"}</dd></div>

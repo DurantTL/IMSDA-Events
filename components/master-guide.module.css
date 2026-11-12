@@ -11,7 +11,7 @@
 .facts dt { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .facts dt::after { content: ":"; }
 .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.status { justify-self: start; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--imsda-purple-soft); color: var(--imsda-purple); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
+.statusText { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; color: var(--imsda-navy); }
 .flag { margin: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; color: var(--coral); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .edit summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--imsda-purple); font-weight: 600; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

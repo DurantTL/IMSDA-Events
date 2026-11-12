@@ -26,7 +26,8 @@ describe("the club's candidate list", () => {
     expect(out).toContain("Sam Sample");
     expect(out).toContain("Nov 1, 2026");
     expect(out).toContain("Nov 1, 2028");
-    expect(out).toContain("In progress");
+    expect(out).toContain("Working on the requirements");
+    expect(out).not.toContain("status-chip");
     expect(out).not.toContain("Past the 3-year window");
   });
 
@@ -43,7 +44,7 @@ describe("the club's candidate list", () => {
     expect(approved).not.toContain("Approve for the club");
     expect(approved).not.toContain("Edit start date and mentor");
     expect(approved).not.toContain(">Remove<");
-    expect(approved).toContain("Approved by the club");
+    expect(approved).toContain("Approved by the club. Waiting for the Area Coordinator.");
   });
 
   it("explains instead of offering approval when the candidate is under 18 or has no birth date", () => {

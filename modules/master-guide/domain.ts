@@ -25,9 +25,9 @@ export const MASTER_GUIDE_STATUSES = ["IN_PROGRESS", "CLUB_APPROVED", "AREA_APPR
 export type MasterGuideStatus = (typeof MASTER_GUIDE_STATUSES)[number];
 
 export const masterGuideStatusLabels: Record<MasterGuideStatus, string> = {
-  IN_PROGRESS: "In progress",
-  CLUB_APPROVED: "Approved by the club",
-  AREA_APPROVED: "Approved by the Area Coordinator",
+  IN_PROGRESS: "Working on the requirements",
+  CLUB_APPROVED: "Approved by the club. Waiting for the Area Coordinator.",
+  AREA_APPROVED: "Approved by the Area Coordinator.",
 };
 
 export function isMasterGuideStatus(value: unknown): value is MasterGuideStatus {
