@@ -925,6 +925,7 @@ function visibleResponses(
       .flatMap((section) => section.fields)
       .filter((field) => (
         field.scope === scope
+        && field.type !== "INFORMATION"
         && !ignoredKeys.has(field.key)
         && isFieldVisible(field, { ...registrationResponses, ...responses })
         && Object.hasOwn(responses, field.key)

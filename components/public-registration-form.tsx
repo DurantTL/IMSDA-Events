@@ -145,6 +145,7 @@ import { accountPromptVisible } from "@/modules/forms/account-prompt";
 import { FieldError } from "@/components/field-error";
 import { labelledFieldMessage } from "@/lib/field-validation";
 import { FormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
+import { InformationBlock } from "@/components/information-block";
 import { summarizeRosterAttendees } from "@/modules/forms/roster-summary";
 import {
   draftsAllowed,
@@ -1999,6 +2000,9 @@ export function PublicRegistrationForm({
       }
     }
 
+    // An Information block (#284) is shown where it is placed and has no input, answer, price or issue.
+    if (field.type === "INFORMATION") return <InformationBlock field={field} key={field.id} />;
+
     if (field.type === "CALCULATED") {
       const lineItemKey = context.attendeeIndex === null
         ? field.key
@@ -2814,6 +2818,7 @@ export function PublicRegistrationForm({
         || field.type === "CHECKBOX"
         || field.type === "ACKNOWLEDGMENT"
         || field.type === "SIGNATURE"
+        || field.type === "INFORMATION"
         || !isFieldVisible(field, { ...shared, ...values })
       ) {
         return [];

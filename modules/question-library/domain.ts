@@ -32,6 +32,10 @@ export const questionLibraryFragmentSchema = z.object({
     if (field.type === "MEMBER_LIST") {
       context.addIssue({ code: "custom", path: ["fields", index, "type"], message: `"${field.label}" is a member list, which only an information form can use, so it cannot be saved to the library.` });
     }
+    // An Information block (#284) is text on one form, not a question: it is never saved to the library.
+    if (field.type === "INFORMATION") {
+      context.addIssue({ code: "custom", path: ["fields", index, "type"], message: `"${field.label}" is an information block, which is not a question, so it cannot be saved to the library.` });
+    }
   });
 });
 
