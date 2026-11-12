@@ -12,7 +12,7 @@ const noStore = { "Cache-Control": "private, no-store" };
 
 /**
  * Staff set who is emailed about baptism follow-up for an event (#1680): a system administrator, an Event Admin of the event or
- * the Clubs Administrator. Checked on the server; the page only decides what to show. Audited with counts, never an address.
+ * the Clubs Administrator. Checked on the server; the page only decides what to show. Audited with the counts and the lead addresses added and removed, never an attendee name.
  */
 async function putHandler(request: Request, context: { params: Promise<{ eventId: string }> }) {
   const originError = rejectCrossOriginRequest(request);

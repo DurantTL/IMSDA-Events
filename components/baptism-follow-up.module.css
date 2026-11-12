@@ -2,7 +2,6 @@
 .field { display: grid; gap: 4px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; }
 .field textarea { min-height: 110px; padding: 10px 12px; font: inherit; font-weight: 400; }
 .help { margin: 4px 0 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 400; }
-.error { color: var(--coral); font-weight: 600; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .panel button { min-height: 44px; }
 .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }

@@ -15,7 +15,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { loadEnvConfig } from "@next/env";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { assertLocalDatabase } from "./support/local-only-guard";
 import { fillBlankSyntheticEnv } from "./support/synthetic-env";
 import { queueBaptismFollowUpNotices } from "@/modules/baptism-follow-up/notice";
@@ -44,7 +44,11 @@ async function cleanup() {
   await prisma.messageOutbox.deleteMany({ where: { idempotencyKey: { startsWith: keyPrefix } } });
   await prisma.auditLog.deleteMany({ where: { eventId: ids.event } });
   await prisma.event.deleteMany({ where: { id: ids.event } });
-  await prisma.organizationContact.deleteMany({ where: { organizationId: { in: [ids.church, ids.churchNoPastor] } } });
+  // A pastor contact is never deleted by the product (a trigger refuses it); the superuser setting lets this check clear its own rows.
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SET LOCAL session_replication_role = replica`;
+    await tx.$executeRaw`DELETE FROM "OrganizationContact" WHERE "organizationId" IN (${Prisma.join([ids.church, ids.churchNoPastor])})`;
+  });
   await prisma.organization.deleteMany({ where: { id: { in: [ids.club, ids.clubNoPastor] } } });
   await prisma.organization.deleteMany({ where: { id: { in: [ids.church, ids.churchNoPastor] } } });
   await prisma.person.deleteMany({ where: { id: ids.holder } });
@@ -169,6 +173,10 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    await cleanup().catch(() => undefined);
+    // A failed cleanup fails the run: leftovers must never be hidden.
+    await cleanup().catch((error) => {
+      console.error("cleanup failed", error);
+      process.exitCode = 1;
+    });
     await prisma.$disconnect();
   });
