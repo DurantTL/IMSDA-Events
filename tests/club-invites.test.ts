@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   outboxCreate: vi.fn(),
   organizationFindUnique: vi.fn(),
   userFindUnique: vi.fn(),
+  userFindFirst: vi.fn(),
+  attendeeFindFirst: vi.fn(),
   clubsGrantFindFirst: vi.fn(),
   grantFindFirst: vi.fn(),
   grantCreate: vi.fn(),
@@ -30,7 +32,8 @@ const client = {
     updateMany: mocks.inviteUpdateMany,
   },
   organization: { findUnique: mocks.organizationFindUnique },
-  user: { findUnique: mocks.userFindUnique },
+  user: { findUnique: mocks.userFindUnique, findFirst: mocks.userFindFirst },
+  attendeeAccount: { findFirst: mocks.attendeeFindFirst },
   clubsAdministratorGrant: { findFirst: mocks.clubsGrantFindFirst },
   messageOutbox: { create: mocks.outboxCreate },
   clubDirectorGrant: { findFirst: mocks.grantFindFirst, create: mocks.grantCreate },
@@ -86,6 +89,8 @@ beforeEach(() => {
   ]);
   mocks.outboxCreate.mockResolvedValue({ id: "message-1" });
   mocks.inviteFindUnique.mockResolvedValue(sentInvite);
+  mocks.userFindFirst.mockResolvedValue({ id: "admin-1" });
+  mocks.attendeeFindFirst.mockResolvedValue({ id: "account-9" });
   mocks.grantFindFirst.mockResolvedValue(null);
   mocks.grantCreate.mockResolvedValue({ id: "grant-1" });
   mocks.rejectCrossOriginRequest.mockReturnValue(null);
@@ -490,6 +495,22 @@ describe("People & access club invites (#1276)", () => {
     mocks.grantFindFirst.mockResolvedValueOnce({ id: "sender-grant" }).mockResolvedValueOnce(null);
     await expect(acceptClubInvite("invite-1", account, now)).resolves.toEqual({ organizationId: "club-1" });
     expect(mocks.grantCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a club-sent invite whose sender account has been disabled", async () => {
+    mocks.inviteFindUnique.mockResolvedValue({ ...sentInvite, role: "REGISTRAR", source: "CLUB", createdByUserId: null, createdByAccountId: "account-9" });
+    mocks.attendeeFindFirst.mockResolvedValue(null);
+    mocks.grantFindFirst.mockResolvedValue({ id: "sender-grant" });
+    await expect(acceptClubInvite("invite-1", account, now)).rejects.toMatchObject({ code: "INVITE_NOT_OPEN" });
+    expect(mocks.grantCreate).not.toHaveBeenCalled();
+  });
+
+  it("refuses a PEOPLE invite whose staff sender has been deactivated", async () => {
+    mocks.inviteFindUnique.mockResolvedValue({ ...sentInvite, source: "PEOPLE" });
+    mocks.userFindUnique.mockResolvedValue({ globalRole: "SYSTEM_ADMIN" });
+    mocks.userFindFirst.mockResolvedValue(null);
+    await expect(acceptClubInvite("invite-1", account, now)).rejects.toMatchObject({ code: "INVITE_NOT_OPEN" });
+    expect(mocks.grantCreate).not.toHaveBeenCalled();
   });
 
   it("re-checks a staff member who sent a club invite while acting as director", async () => {

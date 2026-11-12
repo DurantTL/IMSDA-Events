@@ -54,6 +54,7 @@ export default async function SquarePaymentsPage({
       windowDays={Number.isFinite(windowDays) ? windowDays : 90}
       squareUnreachable={unmatched?.unreachableSquare ?? false}
       unavailable={unavailable}
+      canMatchUnattributed={user.globalRole === "SYSTEM_ADMIN"}
     />
   );
 }

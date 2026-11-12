@@ -633,12 +633,26 @@ export async function listInvitesForAccount(verifiedEmail: string, now = new Dat
 const teamManagerRoles = (["DIRECTOR", "DEPUTY", "REGISTRAR", "REPORTER"] as const satisfies readonly ClubRole[])
   .filter((role) => clubCapabilities(role).manageTeam);
 
+/** A staff sender whose account has since been deactivated no longer vouches for an invite. */
+async function staffSenderIsActive(tx: Prisma.TransactionClient, userId: string) {
+  const found = await tx.user.findFirst({
+    where: { id: userId, accountStatus: "ACTIVE", NOT: { credential: { is: { disabledAt: { not: null } } } } },
+    select: { id: true },
+  });
+  return found !== null;
+}
+
 async function clubSenderStillAllowed(
   tx: Prisma.TransactionClient,
   invite: { organizationId: string; createdByUserId: string | null; createdByAccountId: string | null },
   now: Date,
 ) {
   if (invite.createdByAccountId) {
+    const account = await tx.attendeeAccount.findFirst({
+      where: { id: invite.createdByAccountId, status: "ACTIVE", disabledAt: null },
+      select: { id: true },
+    });
+    if (!account) return false;
     const grant = await tx.clubDirectorGrant.findFirst({
       where: {
         organizationId: invite.organizationId,
@@ -652,7 +666,10 @@ async function clubSenderStillAllowed(
     });
     return grant !== null;
   }
-  if (invite.createdByUserId) return (await resolveClubsActor(invite.createdByUserId, tx)) !== null;
+  if (invite.createdByUserId) {
+    return (await staffSenderIsActive(tx, invite.createdByUserId))
+      && (await resolveClubsActor(invite.createdByUserId, tx)) !== null;
+  }
   return false;
 }
 
@@ -690,7 +707,7 @@ export async function acceptClubInvite(inviteId: string, account: { id: string; 
 
     // A People & access invite is only as good as the person who sent it (#1276): if they have since lost the role,
     // it is no longer open.
-    if (invite.source === "PEOPLE" && !(invite.createdByUserId && await resolveClubsActor(invite.createdByUserId, tx))) {
+    if (invite.source === "PEOPLE" && !(invite.createdByUserId && await staffSenderIsActive(tx, invite.createdByUserId) && await resolveClubsActor(invite.createdByUserId, tx))) {
       throw new ClubInviteError("INVITE_NOT_OPEN", "That invite is no longer open.");
     }
 

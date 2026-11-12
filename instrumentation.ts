@@ -28,7 +28,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
   context,
 ) => {
   const { logError } = await import("@/lib/logger");
-  const { redactTokenPath } = await import("@/lib/request-context");
+  const { redactTokenPath } = await import("@/lib/token-path");
   const correlationId = request.headers["x-correlation-id"];
 
   logError("Unhandled server error", error, {

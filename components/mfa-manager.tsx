@@ -65,6 +65,10 @@ export function MfaManager({
       const result = await response.json();
       if (!response.ok) {
         if (result.error === "RECENT_VERIFICATION_REQUIRED") setNeedsCodeToRegenerate(true);
+        // The shared refusal also names passkeys and passwords; this form only takes a code.
+        if (result.error === "RECENT_VERIFICATION_REQUIRED" && !attendee) {
+          throw new Error("Enter a code from your authenticator, or one of your recovery codes.");
+        }
         throw new Error(result.message ?? "That could not be completed.");
       }
       return result;

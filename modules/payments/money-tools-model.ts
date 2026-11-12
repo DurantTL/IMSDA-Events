@@ -106,10 +106,10 @@ const groupDefs: ReadonlyArray<{ title: string; cards: readonly CardDef[] }> = [
         status: (read) => ({ tone: "draft", text: `Balance ${formatCents(read("scholarshipBalanceCents")!)}` }),
       },
       {
-        // A live Square read over the page's default window, not scoped to one event (#1747): the count waiting to be matched.
+        // A live Square read over the page's default window, for this event (#1747): the count waiting to be matched.
         href: "/finance/square-payments",
         title: staffPageTitles.squarePayments,
-        description: "Square payments that no registration has claimed yet, ready to match by hand. The status counts payments across all events, not only this one.",
+        description: "Square payments that no registration has claimed yet, ready to match by hand. The status counts this event's payments only; payments that name no registration are counted for system administrators only.",
         gate: finance,
         metrics: ["unmatchedSquare"],
         // Health words only (site rule B12): the count is in the card text on the page itself.

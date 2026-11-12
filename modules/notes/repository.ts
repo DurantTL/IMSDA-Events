@@ -120,7 +120,7 @@ export async function addNoteRevision(
   noteId: string,
   actorUserId: string,
   rawInput: unknown,
-  access: { subject: NoteSubject; actorPermissions: ReadonlySet<string> },
+  access: { subject: NoteSubject; actorPermissions: ReadonlySet<string>; /** For an attendee note: the registration in the URL the attendee must belong to. */ attendeeRegistrationId?: string },
 ) {
   const input = noteRevisionInputSchema.parse(rawInput);
   const existing = await getPrisma().staffNote.findFirst({
@@ -129,6 +129,13 @@ export async function addNoteRevision(
   });
   if (!existing || !noteBelongsToSubject(existing, access.subject)) {
     throw new NoteError("NOT_FOUND", "That note was not found for this event.");
+  }
+  if (access.subject.attendeeId && access.attendeeRegistrationId) {
+    const belongs = await getPrisma().registrationAttendee.findFirst({
+      where: { id: access.subject.attendeeId, registrationId: access.attendeeRegistrationId, eventId },
+      select: { id: true },
+    });
+    if (!belongs) throw new NoteError("NOT_FOUND", "That note was not found for this event.");
   }
   // The same visibility rule as reading: a note the editor cannot read is not theirs to revise.
   if (!canReadNote(existing, access.actorPermissions)) {
