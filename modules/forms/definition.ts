@@ -1774,7 +1774,6 @@ export function activePriceWindow(field: Pick<RegistrationFormField, "latePricin
   return activePriceWindows(field, pricingDate).at(-1);
 }
 
-/** The label of the pricing in force on `pricingDate`: the latest started window, else the starting-price label, else none. */
 /**
  * True when the label in force belongs to a rate before the field's last window: the starting-price label or a
  * middle window. Only the last window (and every one-window `latePricing`) is the late rate. Mirrors the club
@@ -1792,6 +1791,7 @@ export function isLateRateLine(line: { pricingLabel?: unknown; earlierRate?: unk
   return typeof line.pricingLabel === "string" && line.earlierRate !== true;
 }
 
+/** The label of the pricing in force on `pricingDate`: the latest started window, else the starting-price label, else none. */
 export function fieldPricingLabel(field: Pick<RegistrationFormField, "latePricing" | "pricingWindows" | "basePricingLabel">, pricingDate = localCalendarDate()): string | undefined {
   const window = activePriceWindow(field, pricingDate);
   if (window) return window.label;
