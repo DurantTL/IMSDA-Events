@@ -74,24 +74,3 @@
   box-shadow: none;
 }
 
-/* A viewed club's subtitle ("Church · Area Coordinator · view only") stays on one line from tablet width up, so the search
-   button beside the year never makes the banner taller: a long church name is cut with an ellipsis (its full name is in
-   the title) and the role stays whole. On a phone the line wraps as it always has. */
-@media (min-width: 769px) {
-  .viewedSubtitle {
-    display: flex;
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .viewedChurch {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .viewedRole {
-    flex: none;
-  }
-}

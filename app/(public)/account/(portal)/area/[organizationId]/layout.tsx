@@ -54,9 +54,9 @@ export default async function AreaClubLayout({
           <div className={`club-banner-inner ${searchStyles.bannerInner}`}>
             <div className="club-banner-identity">
               <h1 title={club.name} translate="no">{club.name}</h1>
-              <p className={searchStyles.viewedSubtitle}>
-                {club.parentOrganization && <span className={searchStyles.viewedChurch} title={club.parentOrganization.name}><span translate="no">{club.parentOrganization.name}</span>&nbsp;·&nbsp;</span>}
-                <span className={searchStyles.viewedRole}>Area Coordinator · view only</span>
+              <p>
+                {club.parentOrganization && <span translate="no">{club.parentOrganization.name} · </span>}
+                Area Coordinator · view only
               </p>
             </div>
             <ClubBannerTools>

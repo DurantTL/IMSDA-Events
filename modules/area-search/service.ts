@@ -10,10 +10,9 @@ import {
 } from "@/modules/area-search/domain";
 import { filterClubsByNameChurchCityOrDirector } from "@/modules/club-reports/area-summary-domain";
 import { coordinatorClubHref } from "@/modules/club-rosters/area-club-switch";
-import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { currentAreaCoordinatorViewer } from "@/modules/organizations/area-coordinators";
 import { directorGrantIsActive } from "@/modules/organizations/director-grants-domain";
 import { currentOwnDirectedClubIds } from "@/modules/organizations/own-directed-club-ids";
-import { currentStaffActingContext } from "@/modules/organizations/staff-act-as";
 
 /**
  * Area Coordinator search (#1854): the clubs the coordinator's Clubs page already lists, matched the way that page matches
@@ -34,12 +33,9 @@ export type AreaSearchViewer =
   | { kind: "ATTENDEE"; accountId: string }
   | { kind: "ACTING"; actAsId: string };
 
-/** The coordinator identity behind this request, or null (the route answers 401). The same order and checks as `currentAreaCoordinatorViewerActive`. */
+/** The coordinator identity behind this request, or null (the route answers 401): the area-clubs pages' own rule. */
 export async function getAreaSearchViewer(): Promise<AreaSearchViewer | null> {
-  const coordinator = await currentAreaCoordinator();
-  if (coordinator) return { kind: "ATTENDEE", accountId: coordinator.id };
-  const acting = await currentStaffActingContext();
-  return acting?.role === "AREA_COORDINATOR" ? { kind: "ACTING", actAsId: acting.actAsId } : null;
+  return currentAreaCoordinatorViewer();
 }
 
 /** The key the rate limit counts requests under. */
