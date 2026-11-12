@@ -92,12 +92,15 @@ describe("the responses view and pages (#1572)", () => {
     const admin = read("app/(workspace)/admin/information-forms/[formId]/responses/page.tsx");
     expect(admin).toContain('informationFormPageViews(generalInformationConfig(), formId, "responses")');
     expect(admin).toContain("AdminSectionHeaderFor");
-    expect(admin).not.toContain("back={");
+    // The section header keeps its own back link; only a valid All forms return replaces it (#1571).
+    expect(admin).toContain("<AdminSectionHeaderFor back={hubBack ?? undefined}");
+    expect(admin.match(/back=\{/g)?.length).toBe(1);
   });
 
   it("draws the list title on both list pages, and on every state of the event page", () => {
     const list = read("app/(workspace)/information-forms/page.tsx");
-    expect((list.match(/<PageHeader title="Information forms" \/>/g) ?? []).length).toBe(2);
+    // The builder state may add "Back to All forms" when opened from the All forms list (#1571).
+    expect((list.match(/<PageHeader title="Information forms"[^>]*\/>/g) ?? []).length).toBe(2);
     expect(list).toContain("<ListPage");
     const admin = read("app/(workspace)/admin/information-forms/page.tsx");
     expect(admin).toContain("<ListPage");

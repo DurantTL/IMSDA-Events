@@ -142,6 +142,7 @@ const factsSelect = {
       createdAt: true,
       profileSnapshot: true,
       person: { select: { firstName: true, lastName: true } },
+      attendeeTypeDefinition: { select: { code: true } },
       checkIns: { where: { undoneAt: null }, select: { id: true } },
       attendanceCorrections: {
         where: { supersededAt: null },
@@ -153,7 +154,7 @@ const factsSelect = {
   publicFormSubmission: { select: { responses: true, pricingSnapshot: true, createdAt: true, formVersion: { select: { definition: true } } } },
   operations: { where: { type: "AMENDMENT" }, orderBy: { createdAt: "desc" }, take: 1, select: { afterSnapshot: true, createdAt: true } },
   promoCodeRedemption: {
-    select: { codeSnapshot: true, discountTypeSnapshot: true, discountValueSnapshot: true, maximumDiscountCentsSnapshot: true, discountAmountCents: true },
+    select: { codeSnapshot: true, discountTypeSnapshot: true, discountValueSnapshot: true, maximumDiscountCentsSnapshot: true, discountAmountCents: true, attendeeTypeCodesSnapshot: true },
   },
 } satisfies Prisma.RegistrationSelect;
 
@@ -300,6 +301,7 @@ function sourceFor(row: FactsRow, context: SourceContext, placesFor: (registrati
       // Only the last price window is the late rate; earlier labelled rates carry `earlierRate` (see isEarlierRateLabel/isLateRateLine, and club-event-reports for the same rule). Old stored lines have no flag.
       lateRate: own.some(isLateRateLine),
       transferredFrom,
+      attendeeTypeCode: attendee.attendeeTypeDefinition?.code ?? null,
       adjustmentCents: row.adjustments
         .filter((adjustment) => adjustment.registrationAttendeeId === attendee.id)
         .reduce((total, adjustment) => total + adjustment.amountCents, 0),
@@ -352,6 +354,7 @@ function sourceFor(row: FactsRow, context: SourceContext, placesFor: (registrati
         value: redemption.discountValueSnapshot,
         maximumDiscountCents: redemption.maximumDiscountCentsSnapshot,
         recordedCents: recordedDiscount,
+        attendeeTypeCodes: redemption.attendeeTypeCodesSnapshot,
       }
     : null;
 

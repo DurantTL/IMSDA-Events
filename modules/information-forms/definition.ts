@@ -63,6 +63,7 @@ function fieldRefusals(field: RegistrationFormField): string[] {
   if (field.latePricing || field.pricingWindows || field.basePricingLabel) reasons.push("information forms cannot carry late pricing");
   if (field.creditCentsPerUnit !== undefined || field.capUnitsAtAttendeeCount) reasons.push("information forms cannot carry credits");
   if (field.type === "SIGNATURE") reasons.push("information forms cannot carry typed signatures");
+  if (field.type === "INFORMATION") reasons.push("information forms cannot carry information blocks");
   if (field.type === "CALCULATED") reasons.push("information forms cannot carry calculated (priced) fields");
   if (field.scope === "ATTENDEE") reasons.push("information forms have no attendee roster, so every field applies to the whole response");
   if (field.optionSource === "ATTENDEE_TYPES") reasons.push("information forms cannot ask for an attendee type");

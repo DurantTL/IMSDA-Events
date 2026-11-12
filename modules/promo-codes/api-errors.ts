@@ -24,7 +24,7 @@ export function promoCodeApiError(error: unknown, operation: string) {
     const status = error.code === "EVENT_NOT_FOUND"
       || error.code === "PROMO_CODE_NOT_FOUND"
       ? 404
-      : error.code === "PROMO_CODE_SPONSOR_INVALID"
+      : error.code === "PROMO_CODE_SPONSOR_INVALID" || error.code === "PROMO_CODE_ATTENDEE_TYPE_INVALID"
         ? 422
         : error.code === "PROMO_CODE_BUSY"
           ? 503

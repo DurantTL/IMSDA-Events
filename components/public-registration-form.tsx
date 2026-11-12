@@ -76,6 +76,7 @@ import { acknowledgmentFields, type AcknowledgmentDisplay } from "@/modules/ackn
 import { signatureFields } from "@/modules/signatures/fields";
 import { TranslateHint } from "@/components/translate-hint";
 import { planAttendeeRemoval, withoutAttendee } from "@/modules/forms/attendee-removal";
+import { RegistrationPasskeyOffer } from "@/components/registration-passkey-offer";
 import { confirmationEmailHeadline } from "@/modules/forms/confirmation-email-status";
 import { confirmationDetailRows, isTeamConfirmation } from "@/modules/forms/confirmation-details";
 import { hasAddressValue, isPlainAddressObject, type AddressValue } from "@/modules/forms/address";
@@ -144,6 +145,7 @@ import { accountPromptVisible } from "@/modules/forms/account-prompt";
 import { FieldError } from "@/components/field-error";
 import { labelledFieldMessage } from "@/lib/field-validation";
 import { FormErrorSummary, type ErrorSummaryItem } from "@/components/form-error-summary";
+import { InformationBlock } from "@/components/information-block";
 import { summarizeRosterAttendees } from "@/modules/forms/roster-summary";
 import {
   draftsAllowed,
@@ -304,6 +306,8 @@ export type PublicRegistrationFormProps = {
   topContent?: React.ReactNode;
   /** True for a signed-in visitor: no browser draft is read or written (#574). */
   disableDrafts?: boolean;
+  /** Server decision: offer a passkey on the confirmation (#219). */
+  passkeyOffer?: boolean;
   /**
    * The Turnstile "Security check" for the public submit (#1399), from `securityCheckConfigForPage()`; null or absent while
    * it is off. Shown only on the review step, and never on a club registration (a signed-in director's own endpoint).
@@ -515,6 +519,7 @@ export function PublicRegistrationForm({
   embedded = false,
   topContent,
   disableDrafts = false,
+  passkeyOffer = false,
   club,
   group,
   securityCheck = null,
@@ -1992,6 +1997,9 @@ export function PublicRegistrationForm({
       }
     }
 
+    // An Information block (#284) is shown where it is placed and has no input, answer, price or issue.
+    if (field.type === "INFORMATION") return <InformationBlock field={field} key={field.id} />;
+
     if (field.type === "CALCULATED") {
       const lineItemKey = context.attendeeIndex === null
         ? field.key
@@ -2807,6 +2815,7 @@ export function PublicRegistrationForm({
         || field.type === "CHECKBOX"
         || field.type === "ACKNOWLEDGMENT"
         || field.type === "SIGNATURE"
+        || field.type === "INFORMATION"
         || !isFieldVisible(field, { ...shared, ...values })
       ) {
         return [];
@@ -3506,6 +3515,7 @@ export function PublicRegistrationForm({
                 brief={teamConfirmation}
               />
             )}
+            <RegistrationPasskeyOffer eligible={passkeyOffer} embedded={embedded} />
             <div className="public-registration-confirmation-actions">
               <a {...eventsSiteNavigation} className="public-registration-secondary-button" href={`/events/${event.slug}`}><ArrowLeft size={16} aria-hidden="true" /> Back to event</a>
               <button className="public-registration-secondary-button" type="button" onClick={startAnotherRegistration}>{waitlisted ? "Add another waitlist request" : "Start another registration"}</button>

@@ -3,10 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { withCurrentEvent } from "@/components/staff-navigation";
 import { GuideScreenshotFigure } from "@/components/guide-screenshot";
+import { WalkthroughSteps } from "@/components/walkthrough-steps";
 import { BackLink } from "@/components/back-link";
 import { docLabel, docUrl } from "@/modules/help/guides";
+import { walkthroughCapturedFor } from "@/modules/help/walkthrough-check";
+import { walkthroughManifest } from "@/modules/help/walkthrough-manifest-data";
 import { loadHelpViewer } from "@/modules/help/viewer";
-import { guideForViewer, guideLinksForViewer, unavailableText } from "@/modules/help/visibility";
+import { guideForViewer, guideLinksForViewer, unavailableText, workspaceFilterLabels } from "@/modules/help/visibility";
 import styles from "../help.module.css";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +37,11 @@ export default async function GuidePage({ params, searchParams }: { params: Prom
   const guide = guideForViewer(guideId, viewer);
   if (!guide) notFound();
   const { links, unavailable } = guideLinksForViewer(guide, viewer);
+  // "See it step by step" (#1882): only walkthroughs this viewer may see.
+  const walkthroughLinks = (guide.walkthroughIds ?? []).flatMap((id) => {
+    const walkthrough = guideForViewer(id, viewer);
+    return walkthrough ? [{ id, label: walkthrough.title.replace(/^Step by step: /, "") }] : [];
+  });
 
   return (
     <section className="page-stack">
@@ -41,7 +49,7 @@ export default async function GuidePage({ params, searchParams }: { params: Prom
       <article className={styles.page}>
         <h2 className={styles.guideTitle}>{guide.title}</h2>
         <div className={styles.badges}>
-          <span className={styles.badge}>{guide.workspace === "System" ? "System administration" : "Event workspace"}</span>
+          <span className={styles.badge}>{guide.workspace === "Event" ? "Event workspace" : workspaceFilterLabels[guide.workspace]}</span>
         </div>
         <p className={styles.intro}>{guide.summary}</p>
         <section className={styles.section} aria-labelledby="guide-needs">
@@ -54,7 +62,16 @@ export default async function GuidePage({ params, searchParams }: { params: Prom
         </section>
         <section className={styles.section} aria-labelledby="guide-steps">
           <h3 className={styles.sectionTitle} id="guide-steps">Steps</h3>
-          <ol className={styles.steps}>{guide.steps.map((item) => <li key={item}>{item}</li>)}</ol>
+          {walkthroughLinks.length > 0 && (
+            <ul className={styles.stepLinks}>
+              {walkthroughLinks.map((link) => (
+                <li key={link.id}><Link className="secondary-button" href={withCurrentEvent(`/help/${link.id}`, viewer.selectedEventId)}>See it step by step: {link.label}</Link></li>
+              ))}
+            </ul>
+          )}
+          {guide.walkthrough
+            ? <WalkthroughSteps capturedFor={walkthroughCapturedFor(walkthroughManifest, guide.id)} guideId={guide.id} lastReviewed={guide.lastReviewed} steps={guide.walkthrough.steps} />
+            : <ol className={styles.steps}>{guide.steps.map((item) => <li key={item}>{item}</li>)}</ol>}
           <GuideScreenshotFigure guide={guide} />
         </section>
         <section className={styles.section} aria-labelledby="guide-verify">

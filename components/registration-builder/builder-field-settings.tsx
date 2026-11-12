@@ -4,7 +4,8 @@
 // right-hand settings panel.
 import { AcknowledgmentFieldSettings, acknowledgmentTypePatch } from "@/components/acknowledgment-field-settings";
 import { SignatureFieldSettings, signatureTypePatch } from "@/components/signature-field-settings";
-import { formFieldScopes, formFieldTypes, informationFormFieldTypes, directorySourceNoun, isChoiceFieldType, isDirectoryOptionSource, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { BuilderInformationSettings, informationTypePatch } from "./builder-information-block";
+import { formFieldScopes, formFieldTypes, informationFormFieldTypes, INFORMATION_PLACEHOLDER_TEXT, directorySourceNoun, isChoiceFieldType, isDirectoryOptionSource, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { hasOfferedChoices, resolveFieldFlags, resolveFieldOffer, sectionTitleLookup } from "@/modules/forms/field-flags";
 import { defaultTypeForNewChoiceField, singleChoiceTypeHint } from "@/modules/forms/choice-defaults";
 import { creditPatchForKindChange, hasCredit } from "@/modules/forms/credit-fields";
@@ -16,6 +17,7 @@ import { BuilderFieldAdvanced } from "./builder-field-advanced";
 import { informationFieldTypeAllowed } from "./information-mode";
 import { useLoadedBuilder } from "./builder-context";
 import { visibilityControllerKeys } from "@/modules/forms/visibility-rule";
+import { BuilderShowWhen } from "./builder-show-when";
 
 type FieldTarget = { field: RegistrationFormField; sectionIndex: number; fieldIndex: number };
 
@@ -33,14 +35,14 @@ export function scopeChangePatch(field: RegistrationFormField, scope: Registrati
   };
 }
 
-export function BuilderLabelInput({ field, sectionIndex, fieldIndex, inputId }: FieldTarget & { inputId?: string }) {
+export function BuilderLabelInput({ field, sectionIndex, fieldIndex, inputId, labelText = "Label" }: FieldTarget & { inputId?: string; labelText?: string }) {
   const { canEdit, updateField, allFields, autoKeyFieldIds, setAutoKeyFieldIds } = useLoadedBuilder();
   // A new question's key (still the `new_field_N` placeholder) follows its label as it is typed, until the key is
   // edited by hand or the draft is saved: kept unique, and never a key other code treats specially. Clearing the
   // label keeps it following.
   const following = field.key.startsWith("new_field_") || autoKeyFieldIds.has(field.id);
   const nextKey = (label: string) => following ? autoFieldKey(label, allFields.filter((other) => other.id !== field.id).map((other) => other.key), field.type) : field.key;
-  return <label>Label<input id={inputId} autoComplete="off" name="builder-rb-field-8" disabled={!canEdit} value={field.label} maxLength={120} onChange={(event) => { if (following) setAutoKeyFieldIds((current) => current.has(field.id) ? current : new Set(current).add(field.id)); updateField(sectionIndex, fieldIndex, { label: event.target.value, key: nextKey(event.target.value) }); }} /></label>;
+  return <label>{labelText}<input id={inputId} autoComplete="off" name="builder-rb-field-8" disabled={!canEdit} value={field.label} maxLength={120} onChange={(event) => { if (following) setAutoKeyFieldIds((current) => current.has(field.id) ? current : new Set(current).add(field.id)); updateField(sectionIndex, fieldIndex, { label: event.target.value, key: nextKey(event.target.value) }); }} /></label>;
 }
 
 export function BuilderRequiredToggle({ field, sectionIndex, fieldIndex, className = "required-toggle" }: FieldTarget & { className?: string }) {
@@ -54,11 +56,23 @@ export function BuilderRequiredToggle({ field, sectionIndex, fieldIndex, classNa
  */
 export function BuilderFieldSettings({ section, field, sectionIndex, fieldIndex, variant = "inline" }: { section: RegistrationFormDefinition["sections"][number]; field: RegistrationFormField; sectionIndex: number; fieldIndex: number; variant?: "inline" | "panel" }) {
   const { definition, autoRadioFieldIds, setAutoRadioFieldIds, dismissedChoiceHintIds, setDismissedChoiceHintIds, allFields, policyVersions, canEdit, updateField, eventId, information } = useLoadedBuilder();
+  // An Information block (#284) has no answer, price, scope or requirement: just its heading, text and note, and its show-when rule.
+  if (field.type === "INFORMATION") {
+    return (
+      <div className="field-editor-body">
+        <div className="field-settings field-basic-settings">
+          {variant === "inline" && <BuilderLabelInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} labelText="Heading" />}
+        </div>
+        <BuilderInformationSettings field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />
+        {variant === "inline" && <div className="field-full"><BuilderShowWhen field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} /></div>}
+      </div>
+    );
+  }
   return (
     <div className="field-editor-body">
               <div className="field-settings field-basic-settings">
                 {variant === "inline" && <BuilderLabelInput field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
-                <label>Field type<select disabled={!canEdit} value={field.type} onChange={(event) => { const requestedType = event.target.value as RegistrationFormField["type"]; const type = defaultTypeForNewChoiceField(field.type, requestedType, field.options.length < 2 ? 2 : field.options.length); if (type !== requestedType) setAutoRadioFieldIds((current) => new Set(current).add(field.id)); const choiceType = isChoiceFieldType(type); const nextOptions = choiceType ? (field.options.length < 2 ? ["Option one", "Option two"] : field.options) : []; updateField(sectionIndex, fieldIndex, { type, required: type === "CALCULATED" ? false : field.required, options: nextOptions, optionDescriptions: choiceType && field.options.length >= 2 ? field.optionDescriptions : undefined, minSelections: type === "RANKED_CHOICE" ? field.minSelections ?? 2 : type === "MULTISELECT" ? field.minSelections ?? 1 : undefined, maxSelections: type === "MULTISELECT" || type === "RANKED_CHOICE" ? field.maxSelections ?? 2 : undefined, availabilityMode: choiceType ? field.availabilityMode : undefined, choiceLimits: choiceType ? field.choiceLimits : undefined, choicePricesCents: choiceType ? field.choicePricesCents : undefined, ...pricingPatchForTypeChange(field, type), ...creditPatchForKindChange(field, { type }), ...acknowledgmentTypePatch(field, type), ...signatureTypePatch(field, type) }); }}>{(information ? informationFormFieldTypes : formFieldTypes).filter((type) => !information || informationFieldTypeAllowed(type)).map((type) => <option key={type} value={type}>{fieldTypeLabels[type]}</option>)}</select></label>
+                <label>Field type<select disabled={!canEdit} value={field.type} onChange={(event) => { const requestedType = event.target.value as RegistrationFormField["type"]; const type = defaultTypeForNewChoiceField(field.type, requestedType, field.options.length < 2 ? 2 : field.options.length); if (type !== requestedType) setAutoRadioFieldIds((current) => new Set(current).add(field.id)); const choiceType = isChoiceFieldType(type); const nextOptions = choiceType ? (field.options.length < 2 ? ["Option one", "Option two"] : field.options) : []; updateField(sectionIndex, fieldIndex, { type, required: type === "CALCULATED" || type === "INFORMATION" ? false : field.required, options: nextOptions, optionDescriptions: choiceType && field.options.length >= 2 ? field.optionDescriptions : undefined, minSelections: type === "RANKED_CHOICE" ? field.minSelections ?? 2 : type === "MULTISELECT" ? field.minSelections ?? 1 : undefined, maxSelections: type === "MULTISELECT" || type === "RANKED_CHOICE" ? field.maxSelections ?? 2 : undefined, availabilityMode: choiceType ? field.availabilityMode : undefined, choiceLimits: choiceType ? field.choiceLimits : undefined, choicePricesCents: choiceType ? field.choicePricesCents : undefined, ...pricingPatchForTypeChange(field, type), ...creditPatchForKindChange(field, { type }), ...acknowledgmentTypePatch(field, type), ...signatureTypePatch(field, type), ...informationTypePatch(field, type, INFORMATION_PLACEHOLDER_TEXT) }); }}>{(information ? informationFormFieldTypes : [...formFieldTypes, "INFORMATION" as const]).filter((type) => !information || informationFieldTypeAllowed(type)).map((type) => <option key={type} value={type}>{fieldTypeLabels[type]}</option>)}</select></label>
                 {variant === "inline" && <label>Applies to<select disabled={!canEdit} value={field.scope} onChange={(event) => updateField(sectionIndex, fieldIndex, scopeChangePatch(field, event.target.value as RegistrationFormField["scope"], allFields))}>{formFieldScopes.filter((scope) => !information || scope === "REGISTRATION").map((scope) => <option key={scope} value={scope}>{scope === "ATTENDEE" ? "Each attendee" : "Registration"}</option>)}</select></label>}
                 {variant === "inline" && <BuilderRequiredToggle field={field} sectionIndex={sectionIndex} fieldIndex={fieldIndex} />}
                 {!information && <div className="field-full field-visibility-flags" data-testid={`field-flags-${field.key}`}>

@@ -51,6 +51,7 @@ A role's tab row lists only the pages that role may open; every route keeps its 
 | `/admin/notifications` | System management | Admin | Catalogs and settings | - | More, Areas | Admin menu | - | `app/(workspace)/admin/notifications/page.tsx` |
 | `/admin/organizations` | System management | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/page.tsx` |
 | `/admin/organizations/[organizationId]/billing` | System management | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/[organizationId]/billing/page.tsx` |
+| `/admin/organizations/[organizationId]/church-clubs` | System management | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/[organizationId]/church-clubs/page.tsx` |
 | `/admin/organizations/[organizationId]/club` | System management | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/[organizationId]/club/page.tsx` |
 | `/admin/organizations/[organizationId]/club/honors` | System management | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/[organizationId]/club/honors/page.tsx` |
 | `/admin/organizations/[organizationId]/directors` | System management | Clubs | Clubs and churches | - | bar: Clubs | Clubs menu | - | `app/(workspace)/admin/organizations/[organizationId]/directors/page.tsx` |

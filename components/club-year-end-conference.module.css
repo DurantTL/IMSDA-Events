@@ -18,3 +18,8 @@
 .action { min-height: 44px; min-width: 44px; }
 .status { order: -2; }
 .directors { overflow-wrap: anywhere; }
+
+/* The search box is a 44px tap target at every width (#1588). */
+input.search {
+  min-height: 44px;
+}

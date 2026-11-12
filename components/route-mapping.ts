@@ -125,9 +125,11 @@ const menuRoutes: readonly Menu[] = [
   ["/more/club-assignments", "Event", "More directory", "People & clubs", "Club assignments"],
   ["/more/club-teachers", "Event", "More directory", "People & clubs", "Club teachers"],
   ["/more/event-scoring", "Event", "More directory", "People & clubs", "Camporee scoring"],
+  ["/more/inspections", "Event", "More directory", "People & clubs", "Inspections"],
   ["/more/attendance-points", "Event", "More directory", "People & clubs", "Attendance points"],
   ["/more/debrief", "Event", "More directory", "People & clubs", "Event debrief"],
   ["/more/budget", "Event", "More directory", "Reports", "Budget sheet"],
+  ["/more/event-staffing", "Event", "More directory", "People & clubs", "Event staffing"],
   ["/more/event-patches", "Event", "More directory", "Event tools", "Event patches"],
   ["/more/emergency-plan", "Event", "More directory", "Event tools", "Emergency plan"],
   ["/more/club-forms", "Event", "More directory", "People & clubs", "Club forms"],
@@ -227,7 +229,7 @@ export function buildRouteMapping(): RouteMappingRow[] {
   rows.push({ route: "/admin/clubs", kind: "shell", oldPlace: "Page link", scope: "System", destinationPath: "/admin/clubs", label: "Clubs Administrator dashboard", group: "Club administration", note: "The Clubs Administrator's home, opened from the role switcher and the Clubs sidebar. Clubs Administrators and system administrators only." });
   rows.push({
     route: "/people/matches", kind: "reached", oldPlace: "Page link", scope: "System", destinationPath: "/people", label: "Possible duplicate people", group: "/people",
-    reachedFrom: { parent: "/people", linkedIn: "components/people-workspace.tsx" },
+    reachedFrom: { parent: "/people", linkedIn: "app/(workspace)/people/page.tsx" },
     note: "System administrators only, from the People page's Actions menu; not in the sidebar. Identity merging stays a human decision.",
   });
   return rows;
@@ -243,6 +245,7 @@ export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/admin/information-forms/[formId]": "One information form, opened from Information forms.",
   "/admin/information-forms/[formId]/responses": "Its responses, opened from the form.",
   "/admin/organizations/[organizationId]/billing": "A club's billing contact, opened from Clubs and churches.",
+  "/admin/organizations/[organizationId]/church-clubs": "A church's clubs for a club year, from Clubs and churches or a club page.",
   "/admin/organizations/[organizationId]/club": "Open one club, from Clubs and churches.",
   "/admin/organizations/[organizationId]/club/honors": "A club's honors, from the club page.",
   "/admin/organizations/[organizationId]/directors": "A club's directors, from the club page.",

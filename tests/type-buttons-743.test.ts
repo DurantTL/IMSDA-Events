@@ -369,9 +369,10 @@ describe("one filled primary per screen (#743)", () => {
     expect(read("app/(public)/account/(portal)/clubs/[organizationId]/page.tsx")).not.toContain('"primary-button club-event-action"');
   });
 
-  it("registrations: Start registration is the filled action and Email selected sits in the outlined Actions menu", () => {
+  it("registrations: Start registration is the filled action and Email selected sits in the selection bar", () => {
+    // The page's header (#1574) holds the filled action and the one outlined Actions menu; Email selected is in the list's selection bar.
+    expect(read("app/(workspace)/people/page.tsx")).toMatch(/<PageHeader[\s\S]*?primary=\{canEdit \? <a className="primary-button"[\s\S]*?actions=\{</);
     const source = read("components/people-workspace.tsx");
-    expect(source).toContain("<ActionsMenu>");
     expect(source).toContain("onClick={() => setEmailingSelection(true)}");
     expect(source.match(/lifecycleActionButtonClass\(Boolean\(selected\.publicSubmission\?\.rosterEnabled\)\)/g)).toHaveLength(2);
     // Roster form: Edit is the one filled button. No roster (rosterEnabled false): Promote and Reactivate are.
