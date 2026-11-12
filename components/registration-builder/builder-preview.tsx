@@ -7,7 +7,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, ClipboardCheck, Plus, 
 import { AddressFieldGroup } from "@/components/address-field-group";
 import { SearchableSelect } from "@/components/searchable-select";
 import type { AddressValue } from "@/modules/forms/address";
-import { getAvailabilityMode, isFieldVisible, isLatePricingActive, type RegistrationFormField } from "@/modules/forms/definition";
+import { getAvailabilityMode, isFieldVisible, resolveFieldPrices, fieldPriceWindows, type RegistrationFormField } from "@/modules/forms/definition";
 import { type PreviewValue, localId } from "./builder-types";
 import { useLoadedBuilder } from "./builder-context";
 import { fieldlessIssues, lastFailedTestReasons, nextContinueBlock, previewStepIssues } from "./preview-continue";
@@ -86,7 +86,7 @@ export function BuilderPreview() {
     const choiceCount = (option: string, ranked = false) => {
       const { stats, limit, full } = choiceStatus(option);
       const tracksAvailability = getAvailabilityMode(field) !== "NONE";
-      const price = isLatePricingActive(field, pricingPreviewDate) ? field.latePricing?.choicePricesCents?.[option] ?? field.choicePricesCents?.[option] : field.choicePricesCents?.[option];
+      const price = resolveFieldPrices(field, pricingPreviewDate).choicePricesCents?.[option];
       if (price === undefined && !tracksAvailability) return null;
       return <small className={full ? "choice-availability full" : "choice-availability"}>{price !== undefined && <><Money cents={price} />{tracksAvailability ? " · " : ""}</>}{tracksAvailability && <>{ranked && <>{stats.first} first · {stats.second} second · </>}{stats.total} interested{limit ? ` · limit ${limit}` : " · unlimited"}</>}</small>;
     };
@@ -111,7 +111,7 @@ export function BuilderPreview() {
       return <fieldset className={className} key={field.id}><legend>{fieldHeading}</legend><div className="preview-acknowledgment-text"><p>{field.signature?.text || "Enter the statement people sign."}</p></div><label className="preview-field">Type your full name to sign<input id={inputId} type="text" autoComplete="name" value={nameValue} onChange={(event) => setValue(event.target.value)} /></label><small>Preview only: nothing is recorded.</small>{supportingText}</fieldset>;
     }
     if (field.type === "CHECKBOX") return <fieldset className={className} key={field.id}><legend>{fieldHeading}</legend><label className="preview-check"><input id={inputId} type="checkbox" checked={valueResponses[field.key] === true} onChange={(event) => setValue(event.target.checked)} /> <span>{field.placeholder || "Yes, I agree"}</span></label>{supportingText}</fieldset>;
-    if (field.type === "CALCULATED") return <div className="preview-field preview-calculated-field" key={field.id}><span>{field.label}</span><small>Automatically included in the order total.{field.latePricing ? ` ${field.latePricing.label} begins ${new Date(`${field.latePricing.startsOn}T12:00:00`).toLocaleDateString()}.` : ""}</small></div>;
+    if (field.type === "CALCULATED") return <div className="preview-field preview-calculated-field" key={field.id}><span>{field.label}</span><small>Automatically included in the order total.{fieldPriceWindows(field).map((window) => ` ${window.label} begins ${new Date(`${window.startsOn}T12:00:00`).toLocaleDateString()}.`).join("")}</small></div>;
     if (field.type === "ADDRESS") return <AddressFieldGroup key={field.id} className={className} legend={fieldHeading} idPrefix={inputId} required={field.required} invalid={Boolean(issue)} value={(valueResponses[field.key] as AddressValue | undefined) ?? {}} onChange={(next) => setValue(next)} helpText={field.helpText} supporting={issue && <small className="field-error">{issue.message}</small>} />;
     if (field.type === "SELECT") return <div className={className} key={field.id}><label htmlFor={inputId}>{fieldHeading}</label><SearchableSelect id={inputId} sheet label={field.label} value={typeof valueResponses[field.key] === "string" ? valueResponses[field.key] as string : ""} required={field.required} invalid={Boolean(issue)} placeholder={`Search ${field.label.toLocaleLowerCase()}…`} options={field.options.map((option) => ({ value: option, label: optionLabel(option), disabled: choiceStatus(option).full && valueResponses[field.key] !== option }))} onChange={(value) => setValue(value)} />{supportingText}</div>;
 

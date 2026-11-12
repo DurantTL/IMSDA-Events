@@ -1,0 +1,114 @@
+.editor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  background: var(--surface, #fff);
+  padding: 10px;
+}
+
+.help {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 500;
+  line-height: 1.4;
+  text-transform: none;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.field input {
+  min-height: 44px;
+}
+
+.window {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-element);
+  padding: 8px 10px 10px;
+}
+
+.window legend {
+  padding: 0 4px;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 800;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.warning {
+  color: var(--muted);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.choiceRow {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.choiceName {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+  font-weight: 700;
+}
+
+.choicePrices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 8px;
+}
+
+.choicePrices label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.choiceLimit {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: max(var(--type-staff-floor, 0px), 0.875rem);
+}
+
+.choicePrices input,
+.choiceLimit input {
+  min-height: 44px;
+}

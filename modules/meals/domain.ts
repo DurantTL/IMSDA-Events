@@ -332,6 +332,8 @@ type FormFieldLike = {
   label: string;
   priceCents?: number;
   latePricing?: { startsOn: string; priceCents?: number } | undefined;
+  pricingWindows?: unknown[] | undefined;
+  basePricingLabel?: string | undefined;
 };
 type FormDefinitionLike<F extends FormFieldLike> = { sections: Array<{ fields: F[] }> };
 
@@ -344,7 +346,7 @@ export function mealTicketFields<F extends FormFieldLike>(definition: FormDefini
 
 /**
  * The form with each bound ticket field's price taken from the meal plan, so the plan is the one place a ticket price
- * is set. A field whose plan has no price keeps what it had. The label's "— $7 each" follows the price. A late price is dropped
+ * is set. A field whose plan has no price keeps what it had. The label's "— $7 each" follows the price. A late price (or price windows) is dropped
  * from a bound field: the plan has one price per meal, so a form cannot carry a second, different one.
  */
 export function applyMealPricesToDefinition<F extends FormFieldLike, D extends FormDefinitionLike<F>>(definition: D, prices: ReadonlyMap<string, number>): D {
@@ -357,7 +359,7 @@ export function applyMealPricesToDefinition<F extends FormFieldLike, D extends F
         const cents = binding ? prices.get(`${binding.mealType}:${binding.ageGroup}`) : undefined;
         if (!binding || cents === undefined) return field;
         const label = LABEL_PRICE.test(field.label) ? field.label.replace(LABEL_PRICE, ` — ${formatCents(cents).replace(/\.00$/, "")} each`) : field.label;
-        return { ...field, priceCents: cents, label, latePricing: undefined };
+        return { ...field, priceCents: cents, label, latePricing: undefined, pricingWindows: undefined, basePricingLabel: undefined };
       }),
     })),
   } as D;
@@ -368,7 +370,7 @@ export function mealPriceDrift<F extends FormFieldLike>(definition: FormDefiniti
   return mealTicketFields(definition).filter((field) => {
     const binding = mealTicketBinding(field.key)!;
     const cents = prices.get(`${binding.mealType}:${binding.ageGroup}`);
-    return cents !== undefined && (field.priceCents !== cents || field.latePricing !== undefined);
+    return cents !== undefined && (field.priceCents !== cents || field.latePricing !== undefined || field.pricingWindows !== undefined || field.basePricingLabel !== undefined);
   }).map((field) => field.key);
 }
 

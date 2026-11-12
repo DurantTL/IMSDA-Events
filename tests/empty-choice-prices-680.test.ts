@@ -67,10 +67,10 @@ describe("empty choice-price maps (#680)", () => {
   });
 
   it("resolveFieldPrices reports no choice map for empty maps and keeps explicit $0 entries", () => {
-    expect(resolveFieldPrices(fieldOf({ priceCents: 900, choicePricesCents: {} }), false).choicePricesCents).toBeUndefined();
-    expect(resolveFieldPrices(fieldOf({ priceCents: 900, latePricing: { startsOn: "2026-11-01", label: "Late", priceCents: 1400, choicePricesCents: {} } }), true))
+    expect(resolveFieldPrices(fieldOf({ priceCents: 900, choicePricesCents: {} }), "2026-10-01").choicePricesCents).toBeUndefined();
+    expect(resolveFieldPrices(fieldOf({ priceCents: 900, latePricing: { startsOn: "2026-11-01", label: "Late", priceCents: 1400, choicePricesCents: {} } }), "2026-11-01"))
       .toEqual({ priceCents: 1400, choicePricesCents: undefined });
-    expect(resolveFieldPrices(fieldOf({ choicePricesCents: { Small: 0 } }), false).choicePricesCents).toEqual({ Small: 0 });
+    expect(resolveFieldPrices(fieldOf({ choicePricesCents: { Small: 0 } }), "2026-10-01").choicePricesCents).toEqual({ Small: 0 });
   });
 
   it("clears the hidden field price when a field becomes a choice type, and keeps it otherwise", () => {
@@ -98,7 +98,7 @@ describe("empty choice-price maps (#680)", () => {
     const late = { startsOn: "2026-11-01", label: "Late", priceCents: 1400 };
     // Non-choice to ADDRESS: price and late pricing both cleared, even though latePricing is carried by default.
     const toAddress = pricingPatchForTypeChange({ type: "CHECKBOX", latePricing: late }, "ADDRESS");
-    expect(toAddress).toStrictEqual({ latePricing: undefined, priceCents: undefined });
+    expect(toAddress).toStrictEqual({ latePricing: undefined, priceCents: undefined, pricingWindows: undefined, basePricingLabel: undefined });
     expect({ priceCents: 900, latePricing: late, ...toAddress }).toEqual({ priceCents: undefined, latePricing: undefined });
     // A leftover $9 on a SELECT changed to ADDRESS is cleared too, so it cannot be charged on a filled address.
     const patched = { priceCents: 900, ...pricingPatchForTypeChange({ type: "SELECT", latePricing: undefined }, "ADDRESS") };

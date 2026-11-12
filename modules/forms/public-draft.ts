@@ -1,5 +1,5 @@
 import { sensitiveFieldPattern } from "@/modules/forms/sensitive-fields";
-import { getAttendeeRosterConfig, isBirthDateField, isFieldVisible, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
+import { fieldPriceWindows, getAttendeeRosterConfig, isBirthDateField, isFieldVisible, type RegistrationFormDefinition, type RegistrationFormField } from "@/modules/forms/definition";
 import { hasVisibilityRule, visibilityControllerKeys } from "@/modules/forms/visibility-rule";
 
 /**
@@ -99,7 +99,7 @@ export function shouldPersistDraft(state: { enabled: boolean; ready: boolean; di
 }
 
 type DraftFieldShape = Pick<RegistrationFormField, "key" | "label" | "type">
-  & Partial<Pick<RegistrationFormField, "scope" | "required" | "optionSource" | "priceCents" | "choicePricesCents" | "choiceLimits" | "availabilityMode" | "latePricing">>;
+  & Partial<Pick<RegistrationFormField, "scope" | "required" | "optionSource" | "priceCents" | "choicePricesCents" | "choiceLimits" | "availabilityMode" | "latePricing" | "pricingWindows">>;
 
 const hasPositive = (prices: Record<string, number> | undefined) =>
   prices !== undefined && Object.values(prices).some((cents) => cents > 0);
@@ -112,8 +112,7 @@ function isSessionOrProductChoice(field: DraftFieldShape) {
     || hasPositive(field.choicePricesCents)
     || (field.choiceLimits !== undefined && Object.keys(field.choiceLimits).length > 0)
     || (field.availabilityMode !== undefined && field.availabilityMode !== "NONE")
-    || (field.latePricing !== undefined
-      && ((field.latePricing.priceCents ?? 0) > 0 || hasPositive(field.latePricing.choicePricesCents)));
+    || fieldPriceWindows(field).some((window) => (window.priceCents ?? 0) > 0 || hasPositive(window.choicePricesCents));
 }
 
 export function isDraftExcludedField(

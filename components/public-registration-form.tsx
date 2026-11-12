@@ -92,7 +92,7 @@ import {
   isFieldOptionalByCondition,
   isFieldVisible,
   resolveResponsibleOrganization,
-  isLatePricingActive,
+  resolveFieldPrices,
   numberFieldBounds,
   SIGNATURE_NAME_MAX,
   typedFieldNote,
@@ -1719,10 +1719,7 @@ export function PublicRegistrationForm({
   }
 
   function choicePrice(field: RegistrationFormField, option: string) {
-    if (isLatePricingActive(field, pricingDate)) {
-      return field.latePricing?.choicePricesCents?.[option] ?? field.choicePricesCents?.[option];
-    }
-    return field.choicePricesCents?.[option];
+    return resolveFieldPrices(field, pricingDate).choicePricesCents?.[option];
   }
 
   function choiceDetails(field: RegistrationFormField, option: string) {

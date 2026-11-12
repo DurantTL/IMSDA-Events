@@ -218,6 +218,13 @@ export function memberListProblems(field: Pick<RegistrationFormField, "label" | 
   return problems;
 }
 
+export const priceWindowSchema = z.object({
+  startsOn: calendarDateSchema,
+  label: z.string().trim().min(2).max(80).default("Late registration pricing"),
+  priceCents: priceCentsSchema.optional(),
+  choicePricesCents: z.record(z.string(), priceCentsSchema).optional(),
+});
+
 export const formFieldSchema = z.object({
   id: z.string().trim().min(3).max(80),
   key: z.string().trim().min(2).max(60).regex(/^[a-z][a-z0-9_]*$/, "Field keys use lowercase letters, numbers, and underscores."),
@@ -242,12 +249,16 @@ export const formFieldSchema = z.object({
   choicePricesCents: z.record(z.string(), priceCentsSchema).optional(),
   creditCentsPerUnit: creditCentsPerUnitSchema.optional(),
   capUnitsAtAttendeeCount: z.boolean().optional(),
-  latePricing: z.object({
-    startsOn: calendarDateSchema,
-    label: z.string().trim().min(2).max(80).default("Late registration pricing"),
-    priceCents: priceCentsSchema.optional(),
-    choicePricesCents: z.record(z.string(), priceCentsSchema).optional(),
-  }).optional(),
+  latePricing: priceWindowSchema.optional(),
+  /**
+   * Two or three dated price windows (early / regular / late, #1509). One
+   * window is always stored as `latePricing`, so every form saved before this
+   * existed reads and saves unchanged. Never set together with `latePricing`.
+   * Read both through `fieldPriceWindows` (see below), never directly.
+   */
+  pricingWindows: z.array(priceWindowSchema).min(2).max(3).optional(),
+  /** The label shown before the first window starts (e.g. "Early registration pricing"). Only with `latePricing` or `pricingWindows`. */
+  basePricingLabel: z.string().trim().min(2).max(80).optional(),
   conditional: z.object({ fieldKey: z.string().trim().min(2).max(60), operator: z.enum(conditionOperators), value: z.string().max(120).default("") }).optional(),
   /**
    * "Show this question when" with several conditions joined by All or Any
@@ -325,7 +336,7 @@ export const formFieldSchema = z.object({
     if (!field.signature) {
       context.addIssue({ code: "custom", path: ["signature"], message: "A signature needs the statement to be signed." });
     }
-    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
+    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
       context.addIssue({ code: "custom", path: ["type"], message: "A signature carries no choices, price, credit, age range or automatic date." });
     }
   } else if (field.signature) {
@@ -335,7 +346,7 @@ export const formFieldSchema = z.object({
     if (!field.acknowledgment) {
       context.addIssue({ code: "custom", path: ["acknowledgment"], message: "An acknowledgment needs its wording or a policy version." });
     }
-    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
+    if (field.options.length > 0 || field.optionSource || field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel || field.creditCentsPerUnit !== undefined || field.ageBounds || field.autoDate) {
       context.addIssue({ code: "custom", path: ["type"], message: "An acknowledgment carries no choices, price, credit, age range or automatic date." });
     }
   } else if (field.acknowledgment) {
@@ -405,19 +416,33 @@ export const formFieldSchema = z.object({
   for (const choice of Object.keys(field.choicePricesCents ?? {})) {
     if (!field.options.includes(choice)) context.addIssue({ code: "custom", path: ["choicePricesCents", choice], message: "Choice prices must reference a configured choice." });
   }
-  for (const choice of Object.keys(field.latePricing?.choicePricesCents ?? {})) {
-    if (!field.options.includes(choice)) context.addIssue({ code: "custom", path: ["latePricing", "choicePricesCents", choice], message: "Late choice prices must reference a configured choice." });
+  if (field.latePricing && field.pricingWindows) {
+    context.addIssue({ code: "custom", path: ["pricingWindows"], message: "Use either one late-pricing window or a list of price windows, not both." });
   }
+  const priceWindows = field.pricingWindows ?? (field.latePricing ? [field.latePricing] : []);
+  const windowsPath = field.pricingWindows ? "pricingWindows" : "latePricing";
+  priceWindows.forEach((window, windowIndex) => {
+    const path: Array<string | number> = field.pricingWindows ? ["pricingWindows", windowIndex] : ["latePricing"];
+    for (const choice of Object.keys(window.choicePricesCents ?? {})) {
+      if (!field.options.includes(choice)) context.addIssue({ code: "custom", path: [...path, "choicePricesCents", choice], message: "Late choice prices must reference a configured choice." });
+    }
+    if (windowIndex > 0 && window.startsOn <= priceWindows[windowIndex - 1]!.startsOn) {
+      context.addIssue({ code: "custom", path: [...path, "startsOn"], message: "Each price window must start after the one before it." });
+    }
+  });
   // A stored `{}` base map still satisfies this rule so forms saved by the old builder keep parsing (#680);
-  // the late map counts too, since the engine charges its entries from the late date.
-  if (field.latePricing && field.priceCents === undefined && !field.choicePricesCents && Object.keys(field.latePricing.choicePricesCents ?? {}).length === 0) {
-    context.addIssue({ code: "custom", path: ["latePricing"], message: "Late pricing requires a regular field or choice price." });
+  // a window's map counts too, since the engine charges its entries from that window's date.
+  if (priceWindows.length > 0 && field.priceCents === undefined && !field.choicePricesCents && !priceWindows.some((window) => Object.keys(window.choicePricesCents ?? {}).length > 0)) {
+    context.addIssue({ code: "custom", path: [windowsPath], message: "Late pricing requires a regular field or choice price." });
+  }
+  if (field.basePricingLabel && priceWindows.length === 0) {
+    context.addIssue({ code: "custom", path: ["basePricingLabel"], message: "A starting price label needs a late-pricing window or price windows." });
   }
   if (field.creditCentsPerUnit !== undefined) {
     if (field.type !== "NUMBER" || field.scope !== "REGISTRATION") {
       context.addIssue({ code: "custom", path: ["creditCentsPerUnit"], message: "A per-unit credit can only be set on a registration-level number field." });
     }
-    if (field.priceCents !== undefined || field.choicePricesCents || field.latePricing) {
+    if (field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel) {
       context.addIssue({ code: "custom", path: ["creditCentsPerUnit"], message: "A field can charge a price or apply a credit, not both." });
     }
   }
@@ -1726,8 +1751,34 @@ export function localCalendarDate(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-export function isLatePricingActive(field: RegistrationFormField, pricingDate = localCalendarDate()) {
-  return Boolean(field.latePricing && pricingDate >= field.latePricing.startsOn);
+export type FieldPriceWindow = z.infer<typeof priceWindowSchema>;
+
+/**
+ * A field's price windows in date order, from either storage shape: one window
+ * is `latePricing` (the shape every form saved before #1509 uses), two or
+ * three are `pricingWindows`. Every reader of a field's dated prices goes
+ * through here so none can disagree with what is charged.
+ */
+export function fieldPriceWindows(field: Pick<RegistrationFormField, "latePricing" | "pricingWindows">): FieldPriceWindow[] {
+  if (field.pricingWindows && field.pricingWindows.length > 0) return field.pricingWindows;
+  return field.latePricing ? [field.latePricing] : [];
+}
+
+/** The windows that have started on `pricingDate`, oldest first. */
+export function activePriceWindows(field: Pick<RegistrationFormField, "latePricing" | "pricingWindows">, pricingDate = localCalendarDate()): FieldPriceWindow[] {
+  return fieldPriceWindows(field).filter((window) => pricingDate >= window.startsOn);
+}
+
+/** The latest window that has started on `pricingDate`, if any. */
+export function activePriceWindow(field: Pick<RegistrationFormField, "latePricing" | "pricingWindows">, pricingDate = localCalendarDate()): FieldPriceWindow | undefined {
+  return activePriceWindows(field, pricingDate).at(-1);
+}
+
+/** The label of the pricing in force on `pricingDate`: the latest started window, else the starting-price label, else none. */
+export function fieldPricingLabel(field: Pick<RegistrationFormField, "latePricing" | "pricingWindows" | "basePricingLabel">, pricingDate = localCalendarDate()): string | undefined {
+  const window = activePriceWindow(field, pricingDate);
+  if (window) return window.label;
+  return fieldPriceWindows(field).length > 0 ? field.basePricingLabel : undefined;
 }
 
 function attendeeDisplayName(responses: Record<string, unknown>, index: number, attendeeLabel: string) {
@@ -1743,17 +1794,24 @@ function attendeeDisplayName(responses: Record<string, unknown>, index: number, 
 }
 
 /**
- * The prices a field charges in one pricing state, exactly as `pricedLineItem`
- * resolves them. The base map and, while late pricing is active, the late map
- * are merged (late wins per choice). A field is choice-priced only when that
- * merged map has at least one entry; an empty map (the builder used to write
- * `{}` for the Quick choices preset and the late-pricing toggle) falls back to
- * `priceCents`. An entry of 0 is an explicit free choice and still counts.
- * Shared so a display of prices can never disagree with what is charged.
+ * The prices a field charges on `pricingDate`, exactly as `pricedLineItem`
+ * resolves them. Starting from the base prices, each window that has started
+ * is applied in date order: its `priceCents` replaces the price and its choice
+ * map overrides per choice; a choice a window omits keeps the latest earlier
+ * price. With one window this is the old late-pricing merge. A field is
+ * choice-priced only when the merged map has at least one entry; an empty map
+ * (the builder used to write `{}` for the Quick choices preset and the
+ * late-pricing toggle) falls back to `priceCents`. An entry of 0 is an
+ * explicit free choice and still counts. Shared so a display of prices can
+ * never disagree with what is charged.
  */
-export function resolveFieldPrices(field: RegistrationFormField, latePricingActive: boolean) {
-  const priceCents = latePricingActive ? field.latePricing?.priceCents ?? field.priceCents : field.priceCents;
-  const merged = { ...(field.choicePricesCents ?? {}), ...(latePricingActive ? field.latePricing?.choicePricesCents ?? {} : {}) };
+export function resolveFieldPrices(field: Pick<RegistrationFormField, "priceCents" | "choicePricesCents" | "latePricing" | "pricingWindows">, pricingDate = localCalendarDate()) {
+  let priceCents = field.priceCents;
+  const merged: Record<string, number> = { ...(field.choicePricesCents ?? {}) };
+  for (const window of activePriceWindows(field, pricingDate)) {
+    priceCents = window.priceCents ?? priceCents;
+    Object.assign(merged, window.choicePricesCents ?? {});
+  }
   const choicePricesCents = Object.keys(merged).length > 0 ? merged : undefined;
   return { priceCents, choicePricesCents };
 }
@@ -1780,8 +1838,8 @@ function pricedLineItem(
     if (creditCents === 0) return null;
     return { key: field.key, label: field.label, amountCents: Math.round(creditCents) };
   }
-  const latePricingActive = isLatePricingActive(field, pricingDate);
-  const { priceCents, choicePricesCents } = resolveFieldPrices(field, latePricingActive);
+  const { priceCents, choicePricesCents } = resolveFieldPrices(field, pricingDate);
+  const pricingLabel = fieldPricingLabel(field, pricingDate);
   let amountCents = 0;
   if (choicePricesCents) {
     const selections = Array.isArray(value) ? value.map(String) : hasValue(value) ? [String(value)] : [];
@@ -1794,7 +1852,7 @@ function pricedLineItem(
     key: attendee ? `attendees.${attendee.index}.${field.key}` : field.key,
     label: attendee ? `${field.label} — ${attendee.label}` : field.label,
     amountCents: Math.round(amountCents),
-    ...(latePricingActive ? { pricingLabel: field.latePricing?.label } : {}),
+    ...(pricingLabel !== undefined ? { pricingLabel } : {}),
     ...(attendee ? { attendeeIndex: attendee.index, attendeeLabel: attendee.label } : {}),
   };
 }

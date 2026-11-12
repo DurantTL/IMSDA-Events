@@ -141,7 +141,7 @@ function formPriceFeatures(formTemplateKey: string) {
   const json = form ? JSON.stringify(form.definition) : "";
   return {
     prices: /"(priceCents|choicePricesCents|creditCentsPerUnit)"/.test(json),
-    latePricing: /"latePricing"/.test(json),
+    latePricing: /"(latePricing|pricingWindows)"/.test(json),
     choiceLimits: /"choiceLimits"/.test(json),
   };
 }
