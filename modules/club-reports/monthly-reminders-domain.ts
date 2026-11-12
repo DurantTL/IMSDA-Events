@@ -1,6 +1,6 @@
 import { isEmail } from "@/lib/field-validation";
 import { clubYearFor } from "@/modules/club-rosters/domain";
-import { reportMonthLabel, monthNotDueForClub } from "@/modules/club-reports/domain";
+import { REPORT_DUE_DAY, formatDueDate, monthNotDueForClub, reportDueDate, reportMonthLabel } from "@/modules/club-reports/domain";
 
 /**
  * The automatic Monthly Record reminder (#1895): the pure rules. When it is due, which clubs and people it goes to, and
@@ -12,8 +12,8 @@ import { reportMonthLabel, monthNotDueForClub } from "@/modules/club-reports/dom
  * the club and the month and links to the club's Monthly Record page. It never carries a child's or a Pathfinder's name.
  */
 
-/** The reminder is due from this day of the month, in conference time. The record itself is due on the 10th. */
-export const MONTHLY_RECORD_REMINDER_DAY = 11;
+/** The reminder is due from this day of the month, in conference time: the day after the record is due (`REPORT_DUE_DAY`). */
+export const MONTHLY_RECORD_REMINDER_DAY = REPORT_DUE_DAY + 1;
 
 export type ReminderWindow = {
   /** The conference calendar date, "YYYY-MM-DD". */
@@ -54,6 +54,8 @@ export type ReminderClub = {
   joinedOn: string | null;
   /** The status of its record for the month: null when there is none. */
   status: "DRAFT" | "SUBMITTED" | null;
+  /** The record was submitted at least once (`firstSubmittedAt`), even if the club reopened it since to fix something. */
+  everSubmitted?: boolean;
 };
 
 /** Only a SUBMITTED record counts as filed. A missing record and a draft (which includes a record the club reopened) do not. */
@@ -61,9 +63,12 @@ export function recordIsSubmitted(status: ReminderClub["status"]) {
   return status === "SUBMITTED";
 }
 
-/** A club owes the month when it is active (the caller passes active clubs), had joined, and has not submitted it. */
+/**
+ * A club owes the month when it is active (the caller passes active clubs), had joined, and never submitted it. A record
+ * that was submitted once and then reopened to fix something is not reminded: only never-submitted records are.
+ */
 export function clubOwesRecord(club: ReminderClub, reportMonth: string) {
-  if (recordIsSubmitted(club.status)) return false;
+  if (recordIsSubmitted(club.status) || club.everSubmitted) return false;
   return !monthNotDueForClub(reportMonth, club.joinedOn, club.status !== null);
 }
 
@@ -109,7 +114,7 @@ export function reminderEmail(input: { directorName: string; clubName: string; r
     bodyText: [
       greeting,
       "",
-      `The ${month} Monthly Record for ${input.clubName} has not been submitted yet. It was due on the 10th.`,
+      `The ${month} Monthly Record for ${input.clubName} has not been submitted yet. It was due on ${formatDueDate(reportDueDate(input.reportMonth))}.`,
       "",
       `Open the Monthly Record page: ${input.recordsUrl}`,
       "",
@@ -133,7 +138,7 @@ export function summaryEmail(input: { reportMonth: string; counts: ReminderSumma
   return {
     subject: `${month} Monthly Records: ${reminded} ${reminded === 1 ? "club" : "clubs"} reminded`,
     bodyText: [
-      `Monthly Record reminders for ${month} went out today.`,
+      `Monthly Record reminders for ${month} went out this month.`,
       "",
       `Clubs reminded: ${reminded}`,
       `Clubs submitted: ${submitted}`,
@@ -165,3 +170,12 @@ export function planReminders(input: {
     .filter((entry) => entry.recipients.length > 0)
     .sort((a, b) => a.clubName.localeCompare(b.clubName, "en-US") || a.clubId.localeCompare(b.clubId));
 }
+
+// --- The Clubs Administrator log table ---------------------------------------------------------------------------
+
+export const REMINDER_LOG_SORT_COLUMNS = ["month", "club", "recipients", "sent"] as const;
+export type ReminderLogColumn = typeof REMINDER_LOG_SORT_COLUMNS[number];
+/** Newest first. */
+export const REMINDER_LOG_DEFAULT_SORT = { key: "sent", dir: "desc" } as const;
+export const REMINDER_LOG_PAGE_SIZE = 25;
+export const REMINDER_LOG_PREFIX = "reminders";

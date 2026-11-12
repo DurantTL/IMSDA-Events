@@ -20,6 +20,8 @@ const state = vi.hoisted(() => ({
   nextId: 1,
 }));
 
+const activeAccount = (account: unknown) => { const row = account as { disabledAt?: Date | null; status?: string }; return !row.disabledAt && (row.status ?? "ACTIVE") === "ACTIVE"; };
+
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env", () => ({ getServerEnv: () => ({ APP_BASE_URL: "https://events.example.test" }) }));
 vi.mock("@/lib/logger", () => ({ logError: () => undefined }));
@@ -61,8 +63,15 @@ vi.mock("@/lib/prisma", () => {
         if (existing) Object.assign(existing, update); else state.settings.push(create);
       },
     },
-    clubDirectorGrant: { findMany: async ({ where }: { where: { organizationId: { in: string[] } } }) => state.grants.filter((grant) => where.organizationId.in.includes(grant.organizationId as string)) },
-    areaCoordinatorGrant: { findMany: async () => state.coordinators },
+    clubDirectorGrant: { findMany: async ({ where }: { where: { organizationId: { in: string[] }; attendeeAccount?: unknown } }) => {
+      // The query must ask for active accounts only; the stand-in then applies exactly that filter.
+      expect(where.attendeeAccount).toEqual({ disabledAt: null, status: "ACTIVE" });
+      return state.grants.filter((grant) => where.organizationId.in.includes(grant.organizationId as string) && activeAccount(grant.attendeeAccount));
+    } },
+    areaCoordinatorGrant: { findMany: async ({ where }: { where: { attendeeAccount?: unknown } }) => {
+      expect(where.attendeeAccount).toEqual({ disabledAt: null, status: "ACTIVE" });
+      return state.coordinators.filter((row) => activeAccount(row.attendeeAccount));
+    } },
     messageOutbox: {
       findUnique: async ({ where }: { where: { idempotencyKey: string } }) => state.outbox.find((row) => row.idempotencyKey === where.idempotencyKey) ?? null,
       create: async ({ data }: { data: Row }) => {
@@ -188,6 +197,25 @@ describe("when it runs", () => {
     expect((await sendDueMonthlyRecordReminders()).reminded).toBe(1);
   });
 
+  it("does not remind a club whose record was submitted once and then reopened", async () => {
+    state.reports.push({ organizationId: "club-a", reportMonth: "2026-10", status: "DRAFT", firstSubmittedAt: new Date("2026-11-05T12:00:00Z") });
+    at("2026-11-11T15:00:00Z");
+    await sendDueMonthlyRecordReminders();
+    expect(state.logs.map((row) => row.organizationId)).toEqual(["club-c"]);
+  });
+
+  it("does not email a disabled or unverified director or deputy", async () => {
+    state.grants = [
+      { ...director("club-a", "disabled@example.test"), attendeeAccount: { displayName: "Dis", email: "disabled@example.test", disabledAt: new Date("2026-06-01T00:00:00Z"), status: "ACTIVE" } },
+      { ...director("club-a", "unverified@example.test", "DEPUTY"), attendeeAccount: { displayName: "Unv", email: "unverified@example.test", disabledAt: null, status: "PENDING" } },
+      director("club-c", "cedar.director@example.test"),
+    ];
+    at("2026-11-11T15:00:00Z");
+    await sendDueMonthlyRecordReminders();
+    expect(outboxFor("MONTHLY_RECORD_REMINDER").map((row) => row.recipientEmail)).toEqual(["cedar.director@example.test"]);
+    expect(state.logs.map((row) => row.organizationId)).toEqual(["club-c"]);
+  });
+
   it("skips a revoked or ended grant", async () => {
     state.grants = [
       { ...director("club-a", "revoked@example.test"), revokedAt: new Date("2026-06-01T00:00:00Z") },
@@ -251,6 +279,16 @@ describe("the switch", () => {
 });
 
 describe("the Area Coordinator summary", () => {
+  it("does not email a disabled or unverified coordinator", async () => {
+    state.coordinators.push(
+      { attendeeAccountId: "acct-off", attendeeAccount: { displayName: "Off", email: "off@example.test", disabledAt: new Date("2026-06-01T00:00:00Z"), status: "ACTIVE" } },
+      { attendeeAccountId: "acct-new", attendeeAccount: { displayName: "New", email: "new@example.test", disabledAt: null, status: "PENDING" } },
+    );
+    at("2026-11-11T15:00:00Z");
+    await sendDueMonthlyRecordReminders();
+    expect(outboxFor("MONTHLY_RECORD_REMINDER_SUMMARY").map((row) => row.recipientEmail)).toEqual(["ac@example.test"]);
+  });
+
   it("is one email per coordinator, numbers only, and not repeated", async () => {
     at("2026-11-11T15:00:00Z");
     expect((await sendDueMonthlyRecordReminders()).summaries).toBe(1);

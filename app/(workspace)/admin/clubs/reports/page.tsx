@@ -19,15 +19,28 @@ import { AdminPageHeader } from "@/components/admin-page-header";
 import { MonthlyRecordReminders } from "@/components/monthly-record-reminders";
 import { formatInConferenceTime } from "@/modules/calendar/conference-format";
 import { getMonthlyRecordReminderOverview } from "@/modules/club-reports/monthly-reminders";
+import {
+  REMINDER_LOG_DEFAULT_SORT,
+  REMINDER_LOG_PAGE_SIZE,
+  REMINDER_LOG_PREFIX,
+  REMINDER_LOG_SORT_COLUMNS,
+} from "@/modules/club-reports/monthly-reminders-domain";
+import { isAccountEmailConfigured } from "@/modules/communications/account-email";
+import { serverSort, sortParamNames, sortRows } from "@/lib/list-sort";
+import { paginate } from "@/lib/pagination";
 
 export const metadata: Metadata = { title: "Review monthly records" };
 export const dynamic = "force-dynamic";
 
-export default async function ClubReportsAdminPage({ searchParams }: { searchParams: Promise<{ year?: string; month?: string; review?: string }> }) {
+export default async function ClubReportsAdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { user } = await getCurrentSession();
   if (!user) redirect(await staffLoginRedirectPath());
   if (!(await hasClubsAdministration(user))) redirect("/no-access");
-  const { year, month: monthParam, review } = await searchParams;
+  const search = await searchParams;
+  const one = (value: string | string[] | undefined) => (typeof value === "string" ? value : undefined);
+  const year = one(search.year);
+  const monthParam = one(search.month);
+  const review = one(search.review);
   const now = new Date();
   const current = clubYearFor(now);
   const clubYear = year && /^\d{4}-\d{2}$/.test(year) ? year : current;
@@ -39,6 +52,24 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
     ? recordsToReview(await getAreaClubsSummary(clubYear, now, { backgroundChecks: false }), reviewMonth)
     : null;
   const reminders = await getMonthlyRecordReminderOverview(now);
+  const reminderSorting = serverSort("/admin/clubs/reports", search, REMINDER_LOG_SORT_COLUMNS, REMINDER_LOG_DEFAULT_SORT, {
+    prefix: REMINDER_LOG_PREFIX,
+    hash: "#monthly-record-reminders",
+    firstDirection: (column) => (column === "sent" || column === "month" ? "desc" : "asc"),
+  });
+  const orderedLog = sortRows(reminders.log, reminderSorting.order.key, reminderSorting.order.dir, {
+    month: (row) => row.reportMonth,
+    club: (row) => row.clubName,
+    recipients: (row) => row.recipients,
+    sent: (row) => row.sentAt,
+  });
+  const reminderSlice = paginate(orderedLog, Number(one(search[sortParamNames(REMINDER_LOG_PREFIX).page]) ?? 1) || 1, REMINDER_LOG_PAGE_SIZE);
+  const reminderPageHref = (page: number) => {
+    const params = new URLSearchParams();
+    for (const [name, value] of Object.entries(search)) if (typeof value === "string") params.set(name, value);
+    params.set(sortParamNames(REMINDER_LOG_PREFIX).page, String(page));
+    return `/admin/clubs/reports?${params.toString()}#monthly-record-reminders`;
+  };
   // Moving to another year keeps the filter the person is on (#1588); the month follows the chosen year.
   const yearLinkTail = toReviewRows ? `&review=${REVIEW_FILTER}` : "";
   return (
@@ -60,9 +91,12 @@ export default async function ClubReportsAdminPage({ searchParams }: { searchPar
       )}
       <MonthlyRecordReminders
         clubYear={reminders.clubYear}
+        emailConfigured={isAccountEmailConfigured()}
         enabled={reminders.enabled}
-        log={reminders.log}
-        sentAtLabels={reminders.log.map((row) => formatInConferenceTime(row.sentAt, { dateStyle: "medium", timeStyle: "short" }))}
+        pageHref={reminderPageHref}
+        sentAtLabels={Object.fromEntries(reminders.log.map((row) => [row.id, formatInConferenceTime(row.sentAt, { dateStyle: "medium", timeStyle: "short" })]))}
+        slice={reminderSlice}
+        sorting={reminderSorting}
       />
     </>
   );

@@ -1,21 +1,8 @@
-.card { container: reminders / inline-size; display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); }
+.card { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-info); background: var(--card); }
 .heading { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1rem); line-height: 1.35; }
 .note { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); line-height: 1.5; }
+.switchBlock { display: grid; gap: 8px; }
 .switchRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .switchRow button { min-height: 44px; min-width: 44px; }
 .state { font-weight: 700; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.problem { color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.table { width: 100%; border-collapse: collapse; }
-.table th, .table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
-.table thead th { color: var(--muted); font-weight: 700; }
-.club { overflow-wrap: anywhere; }
-.number { font-variant-numeric: tabular-nums; }
-
-/* Four columns need about 560px; narrower boxes show each row as a short labelled block. */
-@container reminders (max-width: 559px) {
-  .table thead { display: none; }
-  .table, .table tbody { display: block; }
-  .table tr { display: grid; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-  .table td { display: block; padding: 0; border: 0; }
-  .table td::before { content: attr(data-label) ": "; color: var(--muted); }
-}
+.problem { margin: 0; color: var(--coral); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }

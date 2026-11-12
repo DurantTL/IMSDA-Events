@@ -89,14 +89,17 @@ export async function sendDueMonthlyRecordReminders(options: { now?: Date } = {}
   });
   const clubIds = orgs.map((club) => club.id);
   const [reports, logged] = await Promise.all([
-    prisma.clubMonthlyReport.findMany({ where: { reportMonth: window.reportMonth, organizationId: { in: clubIds } }, select: { organizationId: true, status: true } }),
+    prisma.clubMonthlyReport.findMany({ where: { reportMonth: window.reportMonth, organizationId: { in: clubIds } }, select: { organizationId: true, status: true, firstSubmittedAt: true } }),
     prisma.monthlyRecordReminderLog.findMany({ where: { reportMonth: window.reportMonth }, select: { organizationId: true } }),
   ]);
-  const statusByClub = new Map(reports.map((report) => [report.organizationId, report.status as "DRAFT" | "SUBMITTED"]));
-  const clubs: ReminderClub[] = orgs.map((club) => ({ id: club.id, name: club.name, joinedOn: clubJoinedOn(club), status: statusByClub.get(club.id) ?? null }));
+  const reportByClub = new Map(reports.map((report) => [report.organizationId, report]));
+  const clubs: ReminderClub[] = orgs.map((club) => {
+    const report = reportByClub.get(club.id);
+    return { id: club.id, name: club.name, joinedOn: clubJoinedOn(club), status: (report?.status as "DRAFT" | "SUBMITTED" | undefined) ?? null, everSubmitted: Boolean(report?.firstSubmittedAt) };
+  });
   const alreadyReminded = new Set(logged.map((row) => row.organizationId));
 
-  const candidateIds = clubs.filter((club) => !alreadyReminded.has(club.id) && !recordIsSubmitted(club.status)).map((club) => club.id);
+  const candidateIds = clubs.filter((club) => !alreadyReminded.has(club.id) && !recordIsSubmitted(club.status) && !club.everSubmitted).map((club) => club.id);
   const grantsByClub = new Map<string, ReminderGrant[]>();
   if (candidateIds.length > 0) {
     const grants = await prisma.clubDirectorGrant.findMany({
@@ -106,6 +109,8 @@ export async function sendDueMonthlyRecordReminders(options: { now?: Date } = {}
         revokedAt: null,
         effectiveFrom: { lte: now },
         OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+        // A disabled or unverified account is never emailed.
+        attendeeAccount: { disabledAt: null, status: "ACTIVE" },
       },
       select: { organizationId: true, role: true, effectiveFrom: true, effectiveTo: true, revokedAt: true, attendeeAccount: { select: { displayName: true, email: true } } },
     });
@@ -128,9 +133,9 @@ export async function sendDueMonthlyRecordReminders(options: { now?: Date } = {}
         if (!(await switchIsOn(tx, window.switchClubYear))) return [];
         const current = await tx.clubMonthlyReport.findUnique({
           where: { organizationId_reportMonth: { organizationId: entry.clubId, reportMonth: window.reportMonth } },
-          select: { status: true },
+          select: { status: true, firstSubmittedAt: true },
         });
-        if (current?.status === "SUBMITTED") return [];
+        if (current?.status === "SUBMITTED" || current?.firstSubmittedAt) return [];
         // The claim. A second run (or a concurrent one that lost the unique write) writes nothing and queues nothing.
         const claimed = await tx.monthlyRecordReminderLog.createMany({
           data: [{ organizationId: entry.clubId, reportMonth: window.reportMonth, clubYear: window.reportClubYear, recipients: entry.recipients.length, sentAt: now }],
@@ -224,7 +229,7 @@ async function queueCoordinatorSummary(input: {
   const reminded = await prisma.monthlyRecordReminderLog.count({ where: { reportMonth: input.window.reportMonth } });
   if (reminded === 0) return [];
   const coordinators = await prisma.areaCoordinatorGrant.findMany({
-    where: { revokedAt: null, expiresAt: null },
+    where: { revokedAt: null, expiresAt: null, attendeeAccount: { disabledAt: null, status: "ACTIVE" } },
     select: { attendeeAccountId: true, attendeeAccount: { select: { displayName: true, email: true } } },
   });
   if (coordinators.length === 0) return [];

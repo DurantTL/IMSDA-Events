@@ -6,12 +6,12 @@ Caleb decided on November 11, 2026 that this one reminder is sent automatically.
 
 - **When:** from the 11th of each month, in conference (Central) time, for the month before. The record itself is due on the 10th.
   A sweep that first runs on the 12th or later still sends it. It only ever covers the month before, so an older month is never caught up late.
-- **Who:** the director and deputy (active grant, usable address, once per address) of each active club whose record for that month is
-  not submitted. A missing record and a draft (including one the club reopened) count as not submitted. A club created through a
+- **Who:** the director and deputy (active grant on an active, verified account, usable address, once per address) of each active club whose record for that month is
+  never submitted. A missing record and a never-submitted draft are reminded; a record that was submitted once and then reopened to fix something (it has a first-submitted time) is not. A club created through a
   new-club application is not reminded about a month before it joined unless it already has a record for it.
 - **What:** the club name, the month and a link to the club's Monthly Record page. Nothing about a child or a Pathfinder.
 - **Area Coordinators:** one email per coordinator per month with three numbers (clubs reminded, clubs submitted, total clubs).
-  Coordinator grants have no area, so the counts cover the whole conference. Temporary acting grants (with an expiry) are not emailed.
+  Coordinator grants have no area, so the counts cover the whole conference. Temporary acting grants (with an expiry) and disabled or unverified accounts are not emailed.
   The summary is sent once clubs were reminded for the month and the run finished with no failure.
 
 ## How it stays once-only
@@ -22,10 +22,16 @@ A repeat or concurrent run finds the row and queues nothing; a failure rolls bot
 nobody to email is not logged, so a director added later is still reminded. Delivery uses the account email adapter, which
 skips addresses that bounced or complained.
 
+## Unsubscribe decision (Caleb, via the #915 deadline-reminder precedent)
+
+These are essential role emails to club leaders, so announcement opt-outs do not apply. Provider bounce and complaint suppression
+still does. The off control is the Clubs Administrator's switch for the club year. The email's "why you got this" line says the
+person gets it as the club's director or deputy and that the conference Clubs Administrator can turn the reminders off.
+
 ## Clubs Administrator controls
 
 On **Review monthly records** (`/admin/clubs/reports`), the Monthly Record reminders section shows the log (month, club, people
-emailed, time sent; no address or name) and a switch for the current club year. Turning it off stops the whole run until it is
+emailed, time sent; no address or name) and a switch for the current club year (the button reads "Saving…", then "Saved."). The table has sortable headers (newest first) and a pager, and turns into cards on a phone. When account email isn't set up, the section says so and the System report row needs attention. Turning it off stops the whole run until it is
 turned back on. Each change is audited (`MONTHLY_RECORD_REMINDER_TURNED_OFF` / `_ON`), and each club's send is audited
 (`MONTHLY_RECORD_REMINDER_SENT`). The switch route is `PUT /api/admin/club-reports/monthly-reminders`; only a system
 administrator or an active Clubs Administrator can use it.

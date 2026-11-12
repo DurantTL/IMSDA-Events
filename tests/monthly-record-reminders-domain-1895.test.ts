@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { REPORT_DUE_DAY } from "@/modules/club-reports/domain";
 import {
+  MONTHLY_RECORD_REMINDER_DAY,
   clubOwesRecord,
   planReminders,
   reminderEmail,
@@ -12,6 +14,10 @@ import {
 /** #1895: when the Monthly Record reminder is due, who it goes to, and what it says. Synthetic clubs and addresses only. */
 
 describe("reminderWindow", () => {
+  it("is due the day after the record is due", () => {
+    expect(MONTHLY_RECORD_REMINDER_DAY).toBe(REPORT_DUE_DAY + 1);
+  });
+
   it("is not due on the 1st to the 10th", () => {
     expect(reminderWindow("2026-11-01")).toBeNull();
     expect(reminderWindow("2026-11-10")).toBeNull();
@@ -47,6 +53,11 @@ describe("which clubs owe the record", () => {
     expect(clubOwesRecord(club(null), "2026-10")).toBe(true);
     expect(clubOwesRecord(club("DRAFT"), "2026-10")).toBe(true);
     expect(clubOwesRecord(club("SUBMITTED"), "2026-10")).toBe(false);
+  });
+
+  it("a record submitted once and then reopened is not reminded; a never-submitted draft is", () => {
+    expect(clubOwesRecord({ ...club("DRAFT"), everSubmitted: true }, "2026-10")).toBe(false);
+    expect(clubOwesRecord({ ...club("DRAFT"), everSubmitted: false }, "2026-10")).toBe(true);
   });
 
   it("a club that joined after the month with no record owes nothing; with a draft it still does", () => {
@@ -102,6 +113,7 @@ describe("what the emails say", () => {
     expect(email.bodyText).toContain("October 2026");
     expect(email.bodyText).toContain("https://events.example.test/account/clubs/club-1/records");
     expect(email.bodyText.startsWith("Hello Pat Person,")).toBe(true);
+    expect(email.bodyText).toContain("It was due on November 10.");
   });
 
   it("gives the coordinator three numbers and no names", () => {
@@ -110,5 +122,7 @@ describe("what the emails say", () => {
     expect(email.bodyText).toContain("Clubs submitted: 20");
     expect(email.bodyText).toContain("Total clubs: 26");
     expect(email.subject).toBe("October 2026 Monthly Records: 4 clubs reminded");
+    expect(email.bodyText).toContain("went out this month");
+    expect(email.bodyText).not.toContain("today");
   });
 });
