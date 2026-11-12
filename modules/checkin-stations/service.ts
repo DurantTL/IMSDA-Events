@@ -11,9 +11,10 @@ import {
   serializeAttendee,
 } from "@/modules/checkin/attendee-pass-repository";
 import { clubPassTokenPrefix } from "@/modules/checkin/club-pass-token";
-import { CheckInOperationError, checkInAttendee } from "@/modules/checkin/repository";
+import { CheckInOperationError, checkInAttendee, undoCheckIn } from "@/modules/checkin/repository";
 import {
   STATION_HISTORY_LIMIT,
+  stationBadgeLine,
   stationBalanceReasonLabel,
   stationPaymentMethodLabel,
   stationPaymentSummary,
@@ -47,7 +48,10 @@ export class StationServiceError extends Error {
       | "BILLED_TO_GROUP"
       | "NOTHING_DUE"
       | "BALANCE_REASON_REQUIRED"
-      | "PAYMENT_NOT_LISTED",
+      | "PAYMENT_NOT_LISTED"
+      | "PERMISSION_DENIED"
+      | "NOT_THIS_STATION"
+      | "NOTHING_TO_UNDO",
   ) {
     super(
       code === "NOT_FOUND"
@@ -62,7 +66,13 @@ export class StationServiceError extends Error {
                 ? "This registration still has a balance due. Pick a reason before checking anyone in."
                 : code === "PAYMENT_NOT_LISTED"
                   ? "That payment is not listed for this registration. Note it for finance to match later."
-                  : "Nothing is due on this registration.",
+                  : code === "PERMISSION_DENIED"
+                    ? "This station cannot check people in or undo a check-in. Use the check-in desk."
+                    : code === "NOT_THIS_STATION"
+                      ? "Only check-ins made at this station can be undone here. Use the check-in desk."
+                      : code === "NOTHING_TO_UNDO"
+                        ? "Already undone, or not checked in."
+                        : "Nothing is due on this registration.",
     );
     this.name = "StationServiceError";
   }
@@ -390,6 +400,102 @@ export async function checkInStationFamily(
     }
   }
   return results;
+}
+
+function unitDisplayName(unit: { name: string; building: { name: string } }) {
+  return `${unit.name}${unit.building.name && unit.building.name !== unit.name ? `, ${unit.building.name}` : ""}`;
+}
+
+/**
+ * What to put in the family's hands after a check-in: one name badge each, and a room key line for every
+ * room-linked item type of the event, per room the newly checked-in people are housed in. Event-scoped and only about
+ * the people given (the ones newly checked in by this request); it returns no names and no other data.
+ */
+export type StationHandOut = {
+  /** The finished lines: "Name badge × 2", "Cabin key K-204". */
+  lines: string[];
+  /** The room-linked item type names, and each person's room label, so the screen can adjust after an undo. */
+  keyTypes: string[];
+  rooms: Array<{ attendeeId: string; label: string }>;
+};
+
+export async function stationHandOutList(station: ResolvedStation, newlyCheckedInIds: string[]): Promise<StationHandOut> {
+  const ids = [...new Set(newlyCheckedInIds)];
+  if (ids.length === 0) return { lines: [], keyTypes: [], rooms: [] };
+  const eventId = station.station.eventId;
+  const prisma = getPrisma();
+  const badge = [stationBadgeLine(ids.length)];
+  const types = await prisma.issuedAssetType.findMany({
+    where: { eventId, active: true, roomLinked: true },
+    orderBy: { name: "asc" },
+    select: { name: true },
+  });
+  if (types.length === 0) return { lines: badge, keyTypes: [], rooms: [] };
+  const assignments = await prisma.eventLodgingAssignment.findMany({
+    where: { eventId, attendeeId: { in: ids }, cancelledAt: null, eventLodgingUnitId: { not: null } },
+    select: { attendeeId: true, eventLodgingUnitId: true },
+  });
+  const keyTypes = types.map((type) => type.name);
+  const unitIds = [...new Set(assignments.map((row) => row.eventLodgingUnitId).filter((id): id is string => Boolean(id)))];
+  if (unitIds.length === 0) return { lines: badge, keyTypes, rooms: [] };
+  const units = await prisma.eventLodgingUnit.findMany({
+    where: { eventId, id: { in: unitIds } },
+    select: { id: true, unit: { select: { name: true, building: { select: { name: true } } } } },
+  });
+  const labelByUnit = new Map(units.map((row) => [row.id, unitDisplayName(row.unit)]));
+  const rooms = assignments.flatMap((row) => {
+    const label = row.eventLodgingUnitId ? labelByUnit.get(row.eventLodgingUnitId) : undefined;
+    return row.attendeeId && label ? [{ attendeeId: row.attendeeId, label }] : [];
+  });
+  const labels = [...new Set(rooms.map((room) => room.label))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const lines = [...badge];
+  for (const type of keyTypes) {
+    for (const label of labels) lines.push(`${type} ${label}`);
+  }
+  return { lines, keyTypes, rooms };
+}
+
+/**
+ * Undo at the station: only a check-in made by this same station, so the desk's and other stations' work is never
+ * undone from a tablet. The check-in's own audit entry says which station made it.
+ */
+export async function undoStationCheckIn(station: ResolvedStation, attendeeId: string) {
+  if (!station.capabilities.canCheckIn) throw new StationServiceError("PERMISSION_DENIED");
+  const eventId = station.station.eventId;
+  const prisma = getPrisma();
+  const attendee = await prisma.registrationAttendee.findFirst({
+    where: { id: attendeeId, eventId },
+    select: { id: true },
+  });
+  if (!attendee) throw new StationServiceError("NOT_FOUND");
+  const active = await prisma.checkIn.findFirst({
+    where: { eventId, registrationAttendeeId: attendeeId, undoneAt: null },
+    orderBy: { checkedInAt: "desc" },
+    select: { id: true, checkedInAt: true },
+  });
+  if (!active) throw new StationServiceError("NOTHING_TO_UNDO");
+  const entry = await prisma.auditLog.findFirst({
+    where: {
+      eventId,
+      action: "ATTENDEE_CHECKED_IN",
+      entityType: "RegistrationAttendee",
+      entityId: attendeeId,
+      createdAt: { gte: active.checkedInAt },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { metadata: true },
+  });
+  const metadata = entry?.metadata && typeof entry.metadata === "object" && !Array.isArray(entry.metadata)
+    ? entry.metadata as { station?: { id?: unknown } }
+    : {};
+  if (metadata.station?.id !== station.station.id) throw new StationServiceError("NOT_THIS_STATION");
+  const undone = await undoCheckIn(eventId, attendeeId, station.starter.id, {
+    auditContext: { station: { id: station.station.id, label: station.station.label } },
+    expectedCheckInId: active.id,
+  });
+  if (!undone) throw new StationServiceError("NOTHING_TO_UNDO");
+  return { undone: true as const, attendeeId };
 }
 
 async function requirePayableRegistration(station: ResolvedStation, registrationId: string) {

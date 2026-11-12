@@ -3,7 +3,8 @@
 import { Money } from "@/components/exact-value";
 import { CheckCircle2, CreditCard, ShieldAlert, Square } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { formatPersonName } from "@/lib/person-name";
 import { CheckInPaymentDue } from "@/components/check-in-payment-due";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
@@ -13,6 +14,7 @@ import {
   classifyStationEntry,
   parseDollarsToCents,
   stationAttendeeTypeLabel,
+  stationBadgeLine,
   stationResultLabel,
   type StationBalanceReasonCode,
   type StationCheckInResult,
@@ -25,6 +27,37 @@ import { formatCents } from "@/modules/payments/format-cents";
 import styles from "@/components/check-in-station.module.css";
 
 type MoneyUpdate = { payment: StationPaymentSummary; paymentHistory?: StationPaymentHistoryEntry[] };
+
+type JustCheckedIn = { attendeeId: string; name: string; confirmationCode: string };
+
+const JUST_IN_KEY = "imsda-check-in-station-just-in";
+const JUST_IN_MAX = 10;
+
+/** Saved with the station's id, so a list left by another station on this device is never shown. */
+function readJustIn(stationId: string): JustCheckedIn[] {
+  try {
+    const saved: unknown = JSON.parse(window.sessionStorage.getItem(JUST_IN_KEY) ?? "null");
+    if (!saved || typeof saved !== "object" || (saved as { stationId?: unknown }).stationId !== stationId) return [];
+    const parsed = (saved as { rows?: unknown }).rows;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((row): row is JustCheckedIn => Boolean(row) && typeof row.attendeeId === "string" && typeof row.name === "string" && typeof row.confirmationCode === "string")
+      .slice(0, JUST_IN_MAX);
+  } catch {
+    return [];
+  }
+}
+
+function writeJustIn(stationId: string, rows: JustCheckedIn[]) {
+  try {
+    if (rows.length === 0) window.sessionStorage.removeItem(JUST_IN_KEY);
+    else window.sessionStorage.setItem(JUST_IN_KEY, JSON.stringify({ stationId, rows }));
+  } catch {
+    // Private windows and blocked storage: the list still works for this page load.
+  }
+}
+
+type HandOut = { keyTypes: string[]; rooms: Array<{ attendeeId: string; label: string }>; attendeeIds: string[] };
 
 type ApiFailure = { error?: string; message?: string };
 
@@ -56,10 +89,12 @@ async function post<T>(path: string, body: unknown): Promise<{ ok: true; data: T
  * entry, no badge printing and no self check-in.
  */
 export function CheckInStationScreen({
+  stationId,
   eventName,
   stationLabel,
   canRecordPayments,
 }: {
+  stationId: string;
   eventName: string;
   stationLabel: string;
   canRecordPayments: boolean;
@@ -76,6 +111,15 @@ export function CheckInStationScreen({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState("");
   const [stopped, setStopped] = useState(false);
+  const noHandOut: HandOut = { keyTypes: [], rooms: [], attendeeIds: [] };
+  const [handOut, setHandOut] = useState<HandOut>(noHandOut);
+  const [justIn, setJustIn] = useState<JustCheckedIn[]>([]);
+  const [undoMessage, setUndoMessage] = useState<{ text: string; name?: string } | null>(null);
+  const [focusTarget, setFocusTarget] = useState<{ kind: "undo" | "checkin" | "status"; id?: string; n: number } | null>(null);
+  const undoButtons = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const checkInButton = useRef<HTMLButtonElement>(null);
+  const undoStatus = useRef<HTMLDivElement>(null);
+  const [undoing, setUndoing] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   // One key per person for as long as this family is on screen, so a double tap or a retry replays safely.
   const keys = useRef<Map<string, string>>(new Map());
@@ -89,7 +133,41 @@ export function CheckInStationScreen({
     return key;
   }
 
+  // Read after mount so the server and the first client render agree.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const saved = readJustIn(stationId);
+      if (saved.length > 0) setJustIn((current) => (current.length > 0 ? current : saved));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [stationId]);
+
+  useEffect(() => {
+    if (!focusTarget) return;
+    const element = focusTarget.kind === "undo" && focusTarget.id
+      ? undoButtons.current.get(focusTarget.id)
+      : focusTarget.kind === "checkin"
+        ? checkInButton.current
+        : undoStatus.current;
+    (element ?? undoStatus.current)?.focus();
+  }, [focusTarget]);
+
+  function updateJustIn(update: (rows: JustCheckedIn[]) => JustCheckedIn[]) {
+    setJustIn((current) => {
+      const next = update(current).slice(0, JUST_IN_MAX);
+      writeJustIn(stationId, next);
+      return next;
+    });
+  }
+
+  function markStopped() {
+    setJustIn([]);
+    writeJustIn(stationId, []);
+    setStopped(true);
+  }
+
   function reset() {
+    setHandOut(noHandOut);
     setFamily(null);
     setSelected(new Set());
     setResults({});
@@ -112,7 +190,7 @@ export function CheckInStationScreen({
     const response = await post<{ family: StationFamily }>("/api/check-in-station/lookup", lookupInput);
     setBusy("");
     if (!response.ok) {
-      if (response.status === 401) setStopped(true);
+      if (response.status === 401) markStopped();
       setFamily(null);
       if (response.status === 409) setDeskNotice(response.message);
       else setMessage(response.message);
@@ -142,10 +220,15 @@ export function CheckInStationScreen({
     if (!family || busy || selected.size === 0) return;
     setBusy("confirm");
     setMessage("");
+    setUndoMessage(null);
     const items = family.attendees
       .filter((person) => selected.has(person.id))
       .map((person) => ({ attendeeId: person.id, idempotencyKey: keyFor(person.id) }));
-    const response = await post<{ results: StationCheckInResult[]; paymentHistory?: StationPaymentHistoryEntry[] }>("/api/check-in-station/check-in", {
+    const response = await post<{
+      results: StationCheckInResult[];
+      paymentHistory?: StationPaymentHistoryEntry[];
+      handOutParts?: { keyTypes: string[]; rooms: Array<{ attendeeId: string; label: string }> };
+    }>("/api/check-in-station/check-in", {
       registrationId: family.registrationId,
       items,
       ...(family.payment.state === "DUE" && reasonCode
@@ -154,13 +237,25 @@ export function CheckInStationScreen({
     });
     setBusy("");
     if (!response.ok) {
-      if (response.status === 401) setStopped(true);
+      if (response.status === 401) markStopped();
       setMessage(response.message);
       return;
     }
     const byId: Record<string, StationCheckInResult["status"]> = {};
     for (const result of response.data.results) byId[result.attendeeId] = result.status;
     setResults(byId);
+    const newlyIn = family.attendees.filter((person) => byId[person.id] === "CHECKED_IN");
+    if (newlyIn.length > 0) {
+      setHandOut({
+        keyTypes: response.data.handOutParts?.keyTypes ?? [],
+        rooms: response.data.handOutParts?.rooms ?? [],
+        attendeeIds: newlyIn.map((person) => person.id),
+      });
+      updateJustIn((rows) => [
+        ...newlyIn.map((person) => ({ attendeeId: person.id, name: formatPersonName(person), confirmationCode: family.confirmationCode })).reverse(),
+        ...rows.filter((row) => !newlyIn.some((person) => person.id === row.attendeeId)),
+      ]);
+    }
     setFamily({
       ...family,
       paymentHistory: response.data.paymentHistory ?? family.paymentHistory,
@@ -174,6 +269,56 @@ export function CheckInStationScreen({
       }),
     });
     setSelected(new Set());
+  }
+
+  async function undoCheckIn(row: JustCheckedIn) {
+    if (undoing) return;
+    setUndoing(row.attendeeId);
+    setUndoMessage(null);
+    const response = await post<{ undone: boolean }>("/api/check-in-station/undo", { attendeeId: row.attendeeId });
+    setUndoing("");
+    const index = justIn.findIndex((item) => item.attendeeId === row.attendeeId);
+    const neighbour = justIn[index + 1] ?? justIn[index - 1];
+    const onScreen = family?.attendees.some((person) => person.id === row.attendeeId) ?? false;
+    // Focus goes to the next Undo, or (list now empty) the Check in button when this person can be checked in
+    // again, or the status message.
+    const afterRemoval = () => setFocusTarget((current) => ({
+      ...(neighbour
+        ? { kind: "undo" as const, id: neighbour.attendeeId }
+        : { kind: onScreen ? ("checkin" as const) : ("status" as const) }),
+      n: (current?.n ?? 0) + 1,
+    }));
+    if (!response.ok) {
+      if (response.status === 401) return markStopped();
+      setUndoMessage({ text: response.message });
+      // Retrying cannot help once the server has answered: the person was already undone, or can only be undone at the desk.
+      if (response.status >= 400 && response.status < 500) {
+        updateJustIn((rows) => rows.filter((item) => item.attendeeId !== row.attendeeId));
+        if (neighbour) afterRemoval();
+        else setFocusTarget((current) => ({ kind: "status", n: (current?.n ?? 0) + 1 }));
+      } else {
+        setFocusTarget((current) => ({ kind: "undo", id: row.attendeeId, n: (current?.n ?? 0) + 1 }));
+      }
+      return;
+    }
+    updateJustIn((rows) => rows.filter((item) => item.attendeeId !== row.attendeeId));
+    setUndoMessage({ text: "", name: row.name });
+    setHandOut((current) => ({ ...current, attendeeIds: current.attendeeIds.filter((id) => id !== row.attendeeId) }));
+    if (onScreen && family) {
+      // A new key, so checking them in again is a new check-in and not a replay of the undone one.
+      keys.current.delete(row.attendeeId);
+      setFamily({
+        ...family,
+        attendees: family.attendees.map((person) => (person.id === row.attendeeId ? { ...person, checkedIn: false } : person)),
+      });
+      setResults((current) => {
+        const next = { ...current };
+        delete next[row.attendeeId];
+        return next;
+      });
+      setSelected((current) => new Set(current).add(row.attendeeId));
+    }
+    afterRemoval();
   }
 
   // After a network error on a payment: ask the server for the registration's current balance.
@@ -197,7 +342,7 @@ export function CheckInStationScreen({
       return;
     }
     setStopping(false);
-    setStopped(true);
+    markStopped();
   }
 
   if (stopped) {
@@ -217,6 +362,13 @@ export function CheckInStationScreen({
   const selectable = family?.attendees.filter((person) => !person.checkedIn && !person.needsDeskReview) ?? [];
   const balanceDue = family?.payment.state === "DUE";
   const reasonMissing = balanceDue && (reasonCode === "" || (reasonCode === "OTHER" && reasonNote.trim() === ""));
+  const remainingIds = new Set(handOut.attendeeIds);
+  const handOutRooms = [...new Set(handOut.rooms.filter((room) => remainingIds.has(room.attendeeId)).map((room) => room.label))]
+    .sort((x, y) => x.localeCompare(y, undefined, { numeric: true }));
+  const handOutLines: Array<{ prefix: string; room: string | null }> = remainingIds.size === 0 ? [] : [
+    { prefix: stationBadgeLine(remainingIds.size), room: null },
+    ...handOut.keyTypes.flatMap((type) => handOutRooms.map((label) => ({ prefix: type, room: label }))),
+  ];
   const allDone = family !== null && family.attendees.length > 0 && family.attendees.every((person) => person.checkedIn);
 
   return (
@@ -263,6 +415,20 @@ export function CheckInStationScreen({
         <section className={styles.cisCard} aria-labelledby="cis-family-title">
           <h2 id="cis-family-title">Registration <span translate="no">{family.confirmationCode}</span></h2>
           {allDone && <p className={styles.cisOk}><CheckCircle2 aria-hidden="true" size={18} /> Everyone on this registration is checked in.</p>}
+          <div role="status" aria-live="polite">
+            {handOutLines.length > 0 && (
+              <section className={styles.cisHandOut} aria-labelledby="cis-handout-title">
+                <h3 id="cis-handout-title">Hand out</h3>
+                <ul>
+                  {handOutLines.map((line) => (
+                    <li key={`${line.prefix}|${line.room ?? ""}`}>
+                      {line.prefix}{line.room !== null && <> <span translate="no">{line.room}</span></>}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
           <PaymentPanel
             key={family.registrationId}
             family={family}
@@ -283,7 +449,7 @@ export function CheckInStationScreen({
                   <li key={person.id} className={styles.cisPerson}>
                     {person.checkedIn || person.needsDeskReview ? (
                       <span className={styles.cisPersonBody}>
-                        <strong>{person.firstName} {person.lastName}</strong>
+                        <strong translate="no">{person.firstName} {person.lastName}</strong>
                         <span className={styles.cisType}>{stationAttendeeTypeLabel(person.attendeeType)}</span>
                         {person.checkedIn
                           ? <span className={`${styles.cisStatus} ${styles.cisStatusOk}`}>{result ? stationResultLabel(result) : "Checked in"}</span>
@@ -293,7 +459,7 @@ export function CheckInStationScreen({
                       <label className={`${styles.cisPersonBody} ${styles.cisPersonPick}`}>
                         <input type="checkbox" checked={selected.has(person.id)} onChange={() => toggle(person.id)} />
                         <span>
-                          <strong>{person.firstName} {person.lastName}</strong>
+                          <strong translate="no">{person.firstName} {person.lastName}</strong>
                           <span className={styles.cisType}>{stationAttendeeTypeLabel(person.attendeeType)}</span>
                           {result && <span className={`${styles.cisStatus} ${styles.cisStatusHold}`}>{stationResultLabel(result)}</span>}
                         </span>
@@ -336,6 +502,7 @@ export function CheckInStationScreen({
             )}
             <div className={styles.cisActions}>
               <button
+                ref={checkInButton}
                 type="button"
                 className={`primary-button ${styles.large}`}
                 disabled={busy !== "" || selected.size === 0 || (reasonMissing && selectable.length > 0)}
@@ -347,6 +514,42 @@ export function CheckInStationScreen({
             </div>
 
           </section>
+        </section>
+      )}
+
+      <div role="status" aria-live="polite" className={styles.cisUndoStatus} ref={undoStatus} tabIndex={-1}>
+        {undoMessage && (
+          <p className={styles.cisHelp}>
+            {undoMessage.name ? <>Check-in undone for <span translate="no">{undoMessage.name}</span>.</> : undoMessage.text}
+          </p>
+        )}
+      </div>
+      {justIn.length > 0 && (
+        <section className={styles.cisCard} aria-labelledby="cis-just-in-title">
+          <h2 id="cis-just-in-title">Just checked in</h2>
+          <ul className={styles.cisPeople}>
+            {justIn.map((row) => (
+              <li key={row.attendeeId} className={`${styles.cisPerson} ${styles.cisJustIn}`}>
+                <span className={styles.cisPersonBody}>
+                  <strong translate="no">{row.name}</strong>
+                  <span className={styles.cisType}>Registration <span translate="no">{row.confirmationCode}</span></span>
+                </span>
+                <button
+                  ref={(element) => {
+                    if (element) undoButtons.current.set(row.attendeeId, element);
+                    else undoButtons.current.delete(row.attendeeId);
+                  }}
+                  type="button"
+                  className={`secondary-button ${styles.large}`}
+                  aria-label={`Undo check-in for ${row.name}`}
+                  disabled={undoing !== ""}
+                  onClick={() => undoCheckIn(row)}
+                >
+                  {undoing === row.attendeeId ? "Undoing..." : "Undo"}
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
