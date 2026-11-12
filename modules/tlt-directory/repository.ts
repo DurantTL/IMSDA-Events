@@ -19,8 +19,11 @@ import {
   type TltListAction,
   type OpportunityAnswerRow,
   type TltAnswerSummary,
+  type TltMoveUpRequest,
   type TltProfileUpdate,
   type TltSuggestionAccept,
+  TLT_MOVE_UP_EXCLUDED_STATUSES,
+  planTltMoveUp,
 } from "@/modules/tlt-directory/domain";
 import type { TltDirectorActor } from "@/modules/tlt-directory/access";
 import { toCsv } from "@/modules/reporting/csv";
@@ -98,6 +101,7 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
     select: {
       personId: true,
       tltYear: true,
+      tltYearClubYear: true,
       positionTypeId: true,
       status: true,
       positionType: { select: { name: true } },
@@ -142,6 +146,7 @@ export async function listTltDirectoryRows(now = new Date()): Promise<TltDirecto
       reportedAge: member.sealedBirthDate ? null : member.reportedAge,
       grade: member.schoolGrade ? clubSchoolGradeLabels[member.schoolGrade] : null,
       tltYear: profile?.tltYear ?? null,
+      tltYearClubYear: profile?.tltYearClubYear ?? null,
       positionTypeId: profile?.positionTypeId ?? null,
       positionName: profile?.positionType?.name ?? null,
       status: profile?.status ?? null,
@@ -215,16 +220,26 @@ export async function updateTltProfile(input: TltProfileUpdate, actor: TltDirect
       if (found.length !== newTagIds.length) throw new TltDirectoryError("TAG_NOT_AVAILABLE", "Choose tags from the current list.");
     }
 
+    // The year applies to this club year whenever it is set or changed; clearing it clears the club year too.
+    const yearChanged = (existing?.tltYear ?? null) !== input.tltYear;
+    const clubYearNow = clubYearFor(now);
     const profile = await tx.tltProfile.upsert({
       where: { personId: input.personId },
       create: {
         personId: input.personId,
         tltYear: input.tltYear,
+        tltYearClubYear: input.tltYear === null ? null : clubYearNow,
         positionTypeId: input.positionTypeId,
         status: input.status,
         updatedByAccountId: actor.accountId,
       },
-      update: { tltYear: input.tltYear, positionTypeId: input.positionTypeId, status: input.status, updatedByAccountId: actor.accountId },
+      update: {
+        tltYear: input.tltYear,
+        ...(yearChanged ? { tltYearClubYear: input.tltYear === null ? null : clubYearNow } : {}),
+        positionTypeId: input.positionTypeId,
+        status: input.status,
+        updatedByAccountId: actor.accountId,
+      },
       select: { id: true },
     });
     await tx.tltProfileTag.deleteMany({ where: { profileId: profile.id, tagId: { notIn: input.tagIds } } });
@@ -409,5 +424,65 @@ export async function recordTltDirectoryView(
       filters: activeFilterKeys(view.filters),
       sort: view.filters.sort,
     },
+  });
+}
+
+/** The move-up review for this club year: the directory's TLTs, grouped (see `planTltMoveUp`). */
+export async function readTltMoveUp(now = new Date()) {
+  const rows = await listTltDirectoryRows(now);
+  return planTltMoveUp(rows, clubYearFor(now));
+}
+
+/**
+ * The confirmed move-up (#1686). The club year must be the current one (else STALE_CLUB_YEAR). In one transaction each
+ * chosen person who is still a current TLT is moved up one year by a single conditional update: the year must still be
+ * 1 to 3, the status not finished or left, and the year not already set for this club year. The update is atomic, so a
+ * double submit or a concurrent edit moves nobody twice. Everyone else counts as skipped. One audit row: ids and
+ * counts, never a name.
+ */
+export async function confirmTltMoveUp(input: TltMoveUpRequest, actor: TltDirectorActor, now = new Date()) {
+  const clubYear = clubYearFor(now);
+  if (input.clubYear !== clubYear) {
+    throw new TltDirectoryError("STALE_CLUB_YEAR", "The club year has changed since this page was opened. Reload the page and check the list again.");
+  }
+  const prisma = getPrisma();
+  return prisma.$transaction(async (tx) => {
+    const roster = await tx.clubRosterMember.findMany({
+      where: {
+        personId: { in: input.personIds },
+        clubYear,
+        attendeeType: "YOUTH",
+        isTlt: true,
+        status: "ACTIVE",
+        organization: { type: "CLUB", isActive: true },
+      },
+      select: { personId: true },
+    });
+    const current = new Set(roster.flatMap((member) => (member.personId ? [member.personId] : [])));
+    const movedPersonIds: string[] = [];
+    for (const personId of input.personIds) {
+      if (!current.has(personId)) continue;
+      const result = await tx.tltProfile.updateMany({
+        where: {
+          personId,
+          tltYear: { in: [1, 2, 3] },
+          AND: [
+            { OR: [{ status: null }, { status: { notIn: [...TLT_MOVE_UP_EXCLUDED_STATUSES] } }] },
+            { OR: [{ tltYearClubYear: null }, { tltYearClubYear: { lt: clubYear } }] },
+          ],
+        },
+        data: { tltYear: { increment: 1 }, tltYearClubYear: clubYear, updatedByAccountId: actor.accountId },
+      });
+      if (result.count > 0) movedPersonIds.push(personId);
+    }
+    const moved = movedPersonIds.length;
+    const skipped = input.personIds.length - moved;
+    await writeAuditLog({
+      action: "TLT_YEAR_MOVE_UP_CONFIRMED",
+      entityType: "TltProfile",
+      summary: "Confirmed the TLT year move-up.",
+      metadata: { actorAttendeeAccountId: actor.accountId, clubYear, movedCount: moved, skippedCount: skipped, movedPersonIds },
+    }, tx);
+    return { moved, skipped };
   });
 }

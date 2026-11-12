@@ -263,7 +263,7 @@ visibility condition is exactly what gated that destination before.
 ## TLT directory (#1686)
 
 An extra tab, **TLT directory**, in the coordinator's Club coordination menu (`/account/area-clubs/tlt`, with Manage lists
-at `/account/area-clubs/tlt/lists`). It is shown only to the TLT director: an Area Coordinator whose **TLT director
+at `/account/area-clubs/tlt/lists` and the club-year Year move-up review at `/account/area-clubs/tlt/move-up`). It is shown only to the TLT director: an Area Coordinator whose **TLT director
 setting** is on. Only a system administrator switches it (People & access, the coordinator's row; audited both ways).
 Removing the Area Coordinator role switches it off, and granting the role again does not bring it back.
 

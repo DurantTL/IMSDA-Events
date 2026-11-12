@@ -6,7 +6,7 @@ import { z } from "zod";
  * form answers. Ages are whole years; a birth date never appears here.
  */
 
-export type TltDirectoryErrorCode = "NOT_A_TLT" | "NO_ACTIVE_GRANT" | "POSITION_NOT_AVAILABLE" | "TAG_NOT_AVAILABLE" | "NAME_TAKEN" | "ENTRY_NOT_FOUND" | "NOT_SUGGESTED";
+export type TltDirectoryErrorCode = "NOT_A_TLT" | "NO_ACTIVE_GRANT" | "POSITION_NOT_AVAILABLE" | "TAG_NOT_AVAILABLE" | "NAME_TAKEN" | "ENTRY_NOT_FOUND" | "NOT_SUGGESTED" | "STALE_CLUB_YEAR";
 
 export class TltDirectoryError extends Error {
   constructor(public readonly code: TltDirectoryErrorCode, message: string) {
@@ -190,6 +190,8 @@ export type TltDirectoryRow = {
   reportedAge: number | null;
   grade: string | null;
   tltYear: number | null;
+  /** The club year `tltYear` applies to; null when never recorded (#1686 move-up). */
+  tltYearClubYear: string | null;
   positionTypeId: string | null;
   positionName: string | null;
   status: TltStatusValue | null;
@@ -305,4 +307,74 @@ export function activeFilterKeys(filters: TltFilters): string[] {
   if (filters.status) keys.push("status");
   if (filters.tag) keys.push("tag");
   return keys;
+}
+
+/** The status values that take a TLT out of the yearly move-up: they are done with the program. */
+const MOVE_UP_EXCLUDED_STATUSES: ReadonlyArray<TltStatusValue> = ["FINISHED", "LEFT"];
+export const TLT_MOVE_UP_EXCLUDED_STATUSES = MOVE_UP_EXCLUDED_STATUSES;
+
+export type TltMoveUpFacts = { tltYear: number | null; tltYearClubYear: string | null; status: TltStatusValue | null };
+
+/**
+ * Whether a TLT is offered a move up one year at this club year's rollover (#1686): Year 1 to 3, not finished or left,
+ * and the year was not already set for this club year (a missing club year counts as an earlier one). Year 4 is the
+ * last level and never moves. Club years are "2026-27" strings, which sort in time order.
+ */
+export function isMoveUpEligible(facts: TltMoveUpFacts, clubYear: string) {
+  if (facts.tltYear === null || facts.tltYear < 1 || facts.tltYear > 3) return false;
+  if (facts.status && MOVE_UP_EXCLUDED_STATUSES.includes(facts.status)) return false;
+  return facts.tltYearClubYear === null || facts.tltYearClubYear < clubYear;
+}
+
+export type TltMoveUpRow = {
+  personId: string;
+  name: string;
+  clubName: string;
+  tltYear: number | null;
+  tltYearClubYear: string | null;
+  status: TltStatusValue | null;
+};
+
+export type TltMoveUpPlan = {
+  clubYear: string;
+  /** Offered a move: Year N to Year N+1, in name order. */
+  proposed: Array<{ personId: string; name: string; clubName: string; fromYear: number; toYear: number }>;
+  /** Year 4: the last level, shown but never moved. */
+  lastLevel: Array<{ personId: string; name: string; clubName: string }>;
+  /** No year saved yet: shown, never moved. */
+  notSet: Array<{ personId: string; name: string; clubName: string }>;
+  /** Year 1 to 3 already set for this club year. */
+  alreadyThisYear: number;
+};
+
+/** The move-up review for the directory's TLTs: finished or left TLTs are left out of every group. */
+export function planTltMoveUp(rows: readonly TltMoveUpRow[], clubYear: string): TltMoveUpPlan {
+  const byName = (a: { name: string; personId: string }, b: { name: string; personId: string }) => a.name.localeCompare(b.name, "en-US") || a.personId.localeCompare(b.personId);
+  const plan: TltMoveUpPlan = { clubYear, proposed: [], lastLevel: [], notSet: [], alreadyThisYear: 0 };
+  for (const row of rows) {
+    if (row.status && MOVE_UP_EXCLUDED_STATUSES.includes(row.status)) continue;
+    const who = { personId: row.personId, name: row.name, clubName: row.clubName };
+    if (row.tltYear === null) plan.notSet.push(who);
+    else if (row.tltYear >= 4) plan.lastLevel.push(who);
+    else if (isMoveUpEligible(row, clubYear)) plan.proposed.push({ ...who, fromYear: row.tltYear, toYear: row.tltYear + 1 });
+    else if (row.tltYearClubYear === clubYear) plan.alreadyThisYear += 1;
+  }
+  plan.proposed.sort(byName);
+  plan.lastLevel.sort(byName);
+  plan.notSet.sort(byName);
+  return plan;
+}
+
+/** The move-up request: the club year the page showed and the people she left ticked. Nothing else is accepted. */
+export const moveUpSchema = z.object({
+  clubYear: z.string().trim().regex(/^\d{4}-\d{2}$/, "Reload the page and try again."),
+  personIds: z.array(idSchema).min(1, "Choose at least one TLT.").max(500).transform((ids) => [...new Set(ids)]),
+}).strict();
+export type TltMoveUpRequest = z.infer<typeof moveUpSchema>;
+
+/** The sentence announced after a move-up: "Moved 5 TLTs up a year. 1 was skipped because it had already changed." */
+export function moveUpResultMessage(moved: number, skipped: number) {
+  const movedText = `Moved ${moved} ${moved === 1 ? "TLT" : "TLTs"} up a year.`;
+  if (skipped === 0) return movedText;
+  return `${movedText} ${skipped} ${skipped === 1 ? "was" : "were"} skipped because ${skipped === 1 ? "it" : "they"} had already changed.`;
 }

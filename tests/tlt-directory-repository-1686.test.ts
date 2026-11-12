@@ -168,12 +168,39 @@ describe("saving a TLT record (#1686)", () => {
     state.rosterFindFirst.mockResolvedValue({ id: "m1" });
     await updateTltProfile(input, actor);
     expect(state.profileUpsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: { personId: "p1", tltYear: 2, positionTypeId: "pos-1", status: "ACTIVE", updatedByAccountId: "account-1" },
+      create: { personId: "p1", tltYear: 2, tltYearClubYear: "2026-27", positionTypeId: "pos-1", status: "ACTIVE", updatedByAccountId: "account-1" },
     }));
     const entry = state.audit.mock.calls[0]![0];
     expect(entry).toMatchObject({ action: "TLT_DIRECTORY_PROFILE_UPDATED", entityType: "TltProfile", entityId: "profile-1" });
     expect(entry.metadata).toMatchObject({ actorAttendeeAccountId: "account-1", personId: "p1", changed: ["tltYear", "positionType", "status", "tags"] });
     expect(JSON.stringify(entry)).not.toMatch(/Casey|Sample/);
+  });
+});
+
+describe("the club year a TLT year applies to (#1686 move-up)", () => {
+  const actor = { accountId: "account-1" };
+  const existing = { id: "profile-1", tltYear: 2, positionTypeId: null, status: "ACTIVE", tags: [] };
+  const base = { personId: "p1", positionTypeId: null, status: "ACTIVE" as const, tagIds: [] };
+
+  it("records the current club year when the year changes", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce(existing as never);
+    await updateTltProfile({ ...base, tltYear: 3 }, actor);
+    expect(state.profileUpsert.mock.calls[0]![0].update).toMatchObject({ tltYear: 3, tltYearClubYear: "2026-27" });
+  });
+
+  it("clears it when the year is cleared", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce(existing as never);
+    await updateTltProfile({ ...base, tltYear: null }, actor);
+    expect(state.profileUpsert.mock.calls[0]![0].update).toMatchObject({ tltYear: null, tltYearClubYear: null });
+  });
+
+  it("leaves it alone when only the status changes", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce(existing as never);
+    await updateTltProfile({ ...base, tltYear: 2, status: "APPROVED" }, actor);
+    expect(state.profileUpsert.mock.calls[0]![0].update).not.toHaveProperty("tltYearClubYear");
   });
 });
 
