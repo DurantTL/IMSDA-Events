@@ -311,7 +311,7 @@ export type ClubNewYearStatus = {
  * last year's roster haven't started the new year, a club counting as started
  * once its director confirmed a carry-forward or any person is on its new
  * roster. Counts only, never a person. The caller has already authorized the
- * viewer for the all-clubs view. `kinds` limits it to an Area Coordinator's ministries (#843); staff leave it out.
+ * viewer for the all-clubs view. `kinds` limits it to an Area Coordinator's ministries (#843); staff pass every kind.
  */
 export async function listClubsNewYearStatus(now = new Date(), options: { kinds: readonly ClubKindValue[] }) {
   const { fromClubYear, toClubYear } = carryForwardYears(now);

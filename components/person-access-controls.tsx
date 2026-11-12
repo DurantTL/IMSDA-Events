@@ -1,6 +1,7 @@
 "use client";
 
 import { SubmitButton } from "@/components/submit-button";
+import { savedMessage } from "@/components/form-message";
 import { PhoneInput } from "@/components/phone-input";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
@@ -201,7 +202,7 @@ export function AreaCoordinatorMinistries({ accountId, ministries, name }: { acc
     if (next.length === 0 || !changed) return;
     await run(async () => {
       const result = await callJson(`/api/admin/accounts/${encodeURIComponent(accountId)}`, { method: "POST", json: { action: "area-coordinator-ministries", ministries: next } }, "The ministries could not be changed.");
-      return result.message ?? "Ministries saved.";
+      return result.message ?? savedMessage();
     }, "The ministries could not be changed.");
   }
 
