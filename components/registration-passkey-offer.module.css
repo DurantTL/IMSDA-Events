@@ -1,0 +1,32 @@
+.offer {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  text-align: left;
+}
+
+.offer h3 {
+  margin: 0;
+  font-size: var(--text-helper-min);
+}
+
+.offer p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions a,
+.actions button {
+  margin: 0;
+  min-height: 44px;
+  min-width: 44px;
+}
