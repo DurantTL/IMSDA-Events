@@ -258,6 +258,8 @@ jobs:
       - run: npm run test:event-budget
       # Real-database check of the optional Event staffing sheet (#1678): off by default, who may switch it, who reads and who changes activities, only people registered for the event or on its staff can be assigned, one lead per activity, gaps worked out on the rows, each change audited with ids and counts only, the CSV with names and roles only, and each assigned person seeing only their own assignments.
       - run: npm run test:event-staffing
+      # Real-database check of the TLT year move-up (#1686): ticked TLTs move up one year and Year 4, no year, finished, left and already-set TLTs do not, unticked TLTs are held for the club year, a double submit moves nobody twice, a stale club year is refused, the directory save refuses an out-of-date year, and the audit has ids and counts only.
+      - run: npm run test:tlt-move-up
       - run: npm run test:honor-class-requirements
       # Real-database check of the Honors Weekend class waitlist (#831): join order, offers to the
       # next in line (one director emailed per offer), accept once, an unaccepted offer passing on

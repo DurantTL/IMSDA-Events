@@ -19,10 +19,10 @@ import {
   type TltListAction,
   type OpportunityAnswerRow,
   type TltAnswerSummary,
+  type TltMoveUpPlan,
   type TltMoveUpRequest,
   type TltProfileUpdate,
   type TltSuggestionAccept,
-  TLT_MOVE_UP_EXCLUDED_STATUSES,
   planTltMoveUp,
 } from "@/modules/tlt-directory/domain";
 import type { TltDirectorActor } from "@/modules/tlt-directory/access";
@@ -208,6 +208,9 @@ export async function updateTltProfile(input: TltProfileUpdate, actor: TltDirect
       where: { personId: input.personId },
       select: { id: true, tltYear: true, positionTypeId: true, status: true, tags: { select: { tagId: true } } },
     });
+    if ((existing?.tltYear ?? null) !== input.expectedTltYear) {
+      throw new TltDirectoryError("YEAR_CHANGED", "This TLT's year changed since you opened the page. Reload and try again.");
+    }
     const currentTagIds = new Set(existing?.tags.map((link) => link.tagId) ?? []);
 
     if (input.positionTypeId && input.positionTypeId !== existing?.positionTypeId) {
@@ -433,12 +436,26 @@ export async function readTltMoveUp(now = new Date()) {
   return planTltMoveUp(rows, clubYearFor(now));
 }
 
+/** The people the conditional update below may touch: still Year 1 to 3, not finished or left, not already set for this club year. */
+function moveUpUpdate(kind: "move" | "keep", personIds: string[], clubYear: string, accountId: string) {
+  const year = kind === "move" ? Prisma.sql`"tltYear" = "tltYear" + 1,` : Prisma.empty;
+  return Prisma.sql`
+    UPDATE "TltProfile"
+    SET ${year} "tltYearClubYear" = ${clubYear}, "updatedByAccountId" = ${accountId}, "updatedAt" = now()
+    WHERE "personId" = ANY(${personIds}::text[])
+      AND "tltYear" BETWEEN 1 AND 3
+      AND ("status" IS NULL OR "status"::text NOT IN ('FINISHED', 'LEFT'))
+      AND ("tltYearClubYear" IS NULL OR "tltYearClubYear" < ${clubYear} COLLATE "C")
+    RETURNING "personId"`;
+}
+
 /**
- * The confirmed move-up (#1686). The club year must be the current one (else STALE_CLUB_YEAR). In one transaction each
- * chosen person who is still a current TLT is moved up one year by a single conditional update: the year must still be
- * 1 to 3, the status not finished or left, and the year not already set for this club year. The update is atomic, so a
- * double submit or a concurrent edit moves nobody twice. Everyone else counts as skipped. One audit row: ids and
- * counts, never a name.
+ * The confirmed move-up (#1686). The club year must be the current one (else STALE_CLUB_YEAR). In one transaction, for
+ * the people who are still current TLTs: the ticked ones are moved up one year and the unticked ones are held at their
+ * current year for this club year (so they are not offered again). Each is one set-based conditional UPDATE: the year
+ * must still be 1 to 3, the status not finished or left, and the year not already set for this club year, so a double
+ * submit or a concurrent edit changes nobody twice. Everyone else counts as skipped. One audit row: ids and counts,
+ * never a name.
  */
 export async function confirmTltMoveUp(input: TltMoveUpRequest, actor: TltDirectorActor, now = new Date()) {
   const clubYear = clubYearFor(now);
@@ -447,9 +464,10 @@ export async function confirmTltMoveUp(input: TltMoveUpRequest, actor: TltDirect
   }
   const prisma = getPrisma();
   return prisma.$transaction(async (tx) => {
+    const requested = [...input.moveIds, ...input.keepIds];
     const roster = await tx.clubRosterMember.findMany({
       where: {
-        personId: { in: input.personIds },
+        personId: { in: requested },
         clubYear,
         attendeeType: "YOUTH",
         isTlt: true,
@@ -459,30 +477,40 @@ export async function confirmTltMoveUp(input: TltMoveUpRequest, actor: TltDirect
       select: { personId: true },
     });
     const current = new Set(roster.flatMap((member) => (member.personId ? [member.personId] : [])));
-    const movedPersonIds: string[] = [];
-    for (const personId of input.personIds) {
-      if (!current.has(personId)) continue;
-      const result = await tx.tltProfile.updateMany({
-        where: {
-          personId,
-          tltYear: { in: [1, 2, 3] },
-          AND: [
-            { OR: [{ status: null }, { status: { notIn: [...TLT_MOVE_UP_EXCLUDED_STATUSES] } }] },
-            { OR: [{ tltYearClubYear: null }, { tltYearClubYear: { lt: clubYear } }] },
-          ],
-        },
-        data: { tltYear: { increment: 1 }, tltYearClubYear: clubYear, updatedByAccountId: actor.accountId },
-      });
-      if (result.count > 0) movedPersonIds.push(personId);
-    }
+    const run = async (kind: "move" | "keep", ids: string[]) => {
+      const wanted = ids.filter((id) => current.has(id));
+      if (wanted.length === 0) return [] as string[];
+      const rows = await tx.$queryRaw<Array<{ personId: string }>>(moveUpUpdate(kind, wanted, clubYear, actor.accountId));
+      return rows.map((row) => row.personId);
+    };
+    const movedPersonIds = await run("move", input.moveIds);
+    const keptPersonIds = await run("keep", input.keepIds);
     const moved = movedPersonIds.length;
-    const skipped = input.personIds.length - moved;
+    const kept = keptPersonIds.length;
+    const skipped = requested.length - moved - kept;
     await writeAuditLog({
       action: "TLT_YEAR_MOVE_UP_CONFIRMED",
       entityType: "TltProfile",
       summary: "Confirmed the TLT year move-up.",
-      metadata: { actorAttendeeAccountId: actor.accountId, clubYear, movedCount: moved, skippedCount: skipped, movedPersonIds },
+      metadata: { actorAttendeeAccountId: actor.accountId, clubYear, movedCount: moved, keptCount: kept, skippedCount: skipped, movedPersonIds, keptPersonIds },
     }, tx);
-    return { moved, skipped };
+    return { moved, kept, skipped };
+  }, { timeout: 20_000 });
+}
+
+/** One audit row when the TLT director opens the move-up page: counts only. */
+export async function recordTltMoveUpView(plan: TltMoveUpPlan, actor: TltDirectorActor) {
+  await writeAuditLog({
+    action: "TLT_YEAR_MOVE_UP_VIEWED",
+    entityType: "TltProfile",
+    summary: "Opened the TLT year move-up.",
+    metadata: {
+      actorAttendeeAccountId: actor.accountId,
+      clubYear: plan.clubYear,
+      proposedCount: plan.proposed.length,
+      lastLevelCount: plan.lastLevel.length,
+      notSetCount: plan.notSet.length,
+      alreadyThisYearCount: plan.alreadyThisYear,
+    },
   });
 }

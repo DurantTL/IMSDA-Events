@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { yearLabel } from "@/modules/club-rosters/home-view";
 import { moveUpResultMessage, type TltMoveUpPlan } from "@/modules/tlt-directory/domain";
 import styles from "./tlt-directory.module.css";
 
@@ -21,6 +22,7 @@ export function TltMoveUp({ plan }: { plan: TltMoveUpPlan }) {
   useEffect(() => { if (result) resultRef.current?.focus(); }, [result]);
 
   const chosen = plan.proposed.filter((row) => !unchecked.has(row.personId));
+  const kept = plan.proposed.filter((row) => unchecked.has(row.personId));
   const toggle = (personId: string) => setUnchecked((current) => {
     const next = new Set(current);
     if (next.has(personId)) next.delete(personId); else next.add(personId);
@@ -34,11 +36,11 @@ export function TltMoveUp({ plan }: { plan: TltMoveUpPlan }) {
       const response = await fetch("/api/attendee/area-clubs/tlt-directory/move-up", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clubYear: plan.clubYear, personIds: chosen.map((row) => row.personId) }),
+        body: JSON.stringify({ clubYear: plan.clubYear, moveIds: chosen.map((row) => row.personId), keepIds: kept.map((row) => row.personId) }),
       });
-      const body = await response.json().catch(() => ({})) as { moved?: number; skipped?: number; message?: string };
+      const body = await response.json().catch(() => ({})) as { moved?: number; kept?: number; skipped?: number; message?: string };
       if (!response.ok) throw new Error(body.message ?? "That could not be done. Try again.");
-      setResult(moveUpResultMessage(body.moved ?? 0, body.skipped ?? 0));
+      setResult(moveUpResultMessage(body.moved ?? 0, body.skipped ?? 0, body.kept ?? 0));
       setConfirming(false);
       router.refresh();
     } catch (caught) {
@@ -73,8 +75,8 @@ export function TltMoveUp({ plan }: { plan: TltMoveUpPlan }) {
             })}
           </ul>
           <p>
-            <button className="primary-button" disabled={chosen.length === 0} onClick={() => { setError(""); setConfirming(true); }} type="button">
-              Move {chosen.length} {chosen.length === 1 ? "TLT" : "TLTs"} up a year
+            <button className="primary-button" onClick={() => { setError(""); setConfirming(true); }} type="button">
+              Confirm choices
             </button>
           </p>
         </>
@@ -104,14 +106,17 @@ export function TltMoveUp({ plan }: { plan: TltMoveUpPlan }) {
       <ConfirmDialog
         busy={busy}
         busyLabel="Moving…"
-        confirmLabel={`Move ${chosen.length} up`}
+        confirmLabel="Confirm"
         error={error}
         onCancel={() => setConfirming(false)}
         onConfirm={() => void confirm()}
         open={confirming}
         title="Move TLTs up a year?"
       >
-        <p>{chosen.length} {chosen.length === 1 ? "TLT" : "TLTs"} will move up one year for club year {plan.clubYear}. Anyone who has changed since this page opened is skipped. This is recorded in the log.</p>
+        <p>
+          {chosen.length > 0 ? `Move ${chosen.length} up a year` : "Move no one up"}
+          {kept.length > 0 ? ` and keep ${kept.length} at their current year` : ""} for {yearLabel(plan.clubYear)}. Anyone who has changed since this page opened is skipped. This is recorded in the log.
+        </p>
       </ConfirmDialog>
     </>
   );

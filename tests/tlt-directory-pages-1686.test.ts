@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   readTltDirectory: vi.fn(),
   listTltLists: vi.fn(),
   recordTltDirectoryView: vi.fn(),
+  recordTltMoveUpView: vi.fn(),
   readTltMoveUp: vi.fn(),
 }));
 
@@ -24,7 +25,7 @@ vi.mock("@/components/tlt-lists-editor", () => ({ TltListsEditor: () => null }))
 vi.mock("@/components/coordinator-section-heading", () => ({ CoordinatorSectionHeading: () => null }));
 vi.mock("@/components/navigation-link", () => ({ NavigationLink: () => null }));
 vi.mock("@/modules/tlt-directory/forms", () => ({ countTltFormsByPerson: vi.fn(async () => new Map()) }));
-vi.mock("@/modules/tlt-directory/repository", () => ({ readTltDirectory: mocks.readTltDirectory, listTltLists: mocks.listTltLists, recordTltDirectoryView: mocks.recordTltDirectoryView, readTltMoveUp: mocks.readTltMoveUp }));
+vi.mock("@/modules/tlt-directory/repository", () => ({ readTltDirectory: mocks.readTltDirectory, listTltLists: mocks.listTltLists, recordTltDirectoryView: mocks.recordTltDirectoryView, readTltMoveUp: mocks.readTltMoveUp, recordTltMoveUpView: mocks.recordTltMoveUpView }));
 
 import ListsPage from "@/app/(public)/account/(portal)/area-clubs/tlt/lists/page";
 import MoveUpPage from "@/app/(public)/account/(portal)/area-clubs/tlt/move-up/page";
@@ -56,6 +57,7 @@ describe("the TLT directory pages (#1686)", () => {
     await expect(ListsPage()).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(MoveUpPage()).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mocks.readTltMoveUp).not.toHaveBeenCalled();
+    expect(mocks.recordTltMoveUpView).not.toHaveBeenCalled();
     expect(mocks.readTltDirectory).not.toHaveBeenCalled();
     expect(mocks.recordTltDirectoryView).not.toHaveBeenCalled();
     expect(mocks.listTltLists).not.toHaveBeenCalled();
@@ -68,6 +70,7 @@ describe("the TLT directory pages (#1686)", () => {
     await expect(ListsPage()).resolves.toBeTruthy();
     await expect(MoveUpPage()).resolves.toBeTruthy();
     expect(mocks.readTltMoveUp).toHaveBeenCalledTimes(1);
+    expect(mocks.recordTltMoveUpView).toHaveBeenCalledTimes(1);
     expect(mocks.readTltDirectory).toHaveBeenCalledTimes(1);
     // One audit row per view, with the search text only as a filter key.
     expect(mocks.recordTltDirectoryView).toHaveBeenCalledTimes(1);
@@ -120,7 +123,9 @@ describe("the move-up page (#1686, site rules B9 and B10)", () => {
     expect(source).not.toMatch(/window\.(confirm|prompt)/);
     expect(source.match(/fetch\(/g)).toHaveLength(1);
     expect(source).toMatch(/onConfirm=\{\(\) => void confirm\(\)\}/);
-    expect(source).toMatch(/\{chosen\.length\} \{chosen\.length === 1 \? "TLT" : "TLTs"\} will move up/);
+    expect(source).toContain("and keep ${kept.length} at their current year");
+    expect(source).toContain("yearLabel(plan.clubYear)");
+    expect(source).toContain("keepIds: kept.map");
   });
 
   it("announces the result in a polite live region and moves focus to it", () => {

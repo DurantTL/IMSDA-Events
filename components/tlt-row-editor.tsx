@@ -48,7 +48,7 @@ export function TltRowEditor({ personId, tltYear, positionTypeId, status, tagIds
       const response = await fetch("/api/attendee/area-clubs/tlt-directory/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personId, tltYear: year ? Number(year) : null, positionTypeId: position || null, status: state || null, tagIds: [...picked] }),
+        body: JSON.stringify({ personId, tltYear: year ? Number(year) : null, expectedTltYear: tltYear, positionTypeId: position || null, status: state || null, tagIds: [...picked] }),
       });
       const result = await response.json().catch(() => ({})) as { message?: string };
       if (!response.ok) throw new Error(result.message ?? "That could not be saved.");

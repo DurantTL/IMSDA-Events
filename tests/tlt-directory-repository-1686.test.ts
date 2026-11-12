@@ -139,7 +139,7 @@ describe("who appears in the TLT directory (#1686)", () => {
 
 describe("saving a TLT record (#1686)", () => {
   const actor = { accountId: "account-1" };
-  const input = { personId: "p1", tltYear: 2 as const, positionTypeId: "pos-1", status: "ACTIVE" as const, tagIds: ["tag-1"] };
+  const input = { personId: "p1", tltYear: 2 as const, expectedTltYear: null, positionTypeId: "pos-1", status: "ACTIVE" as const, tagIds: ["tag-1"] };
 
   it("refuses someone who is not a current TLT", async () => {
     state.rosterFindFirst.mockResolvedValue(null);
@@ -180,13 +180,21 @@ describe("saving a TLT record (#1686)", () => {
 describe("the club year a TLT year applies to (#1686 move-up)", () => {
   const actor = { accountId: "account-1" };
   const existing = { id: "profile-1", tltYear: 2, positionTypeId: null, status: "ACTIVE", tags: [] };
-  const base = { personId: "p1", positionTypeId: null, status: "ACTIVE" as const, tagIds: [] };
+  const base = { personId: "p1", expectedTltYear: 2 as const, positionTypeId: null, status: "ACTIVE" as const, tagIds: [] };
 
   it("records the current club year when the year changes", async () => {
     state.rosterFindFirst.mockResolvedValue({ id: "m1" });
     vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce(existing as never);
     await updateTltProfile({ ...base, tltYear: 3 }, actor);
     expect(state.profileUpsert.mock.calls[0]![0].update).toMatchObject({ tltYear: 3, tltYearClubYear: "2026-27" });
+  });
+
+  it("refuses with YEAR_CHANGED when the stored year is not the one the editor loaded, saving nothing", async () => {
+    state.rosterFindFirst.mockResolvedValue({ id: "m1" });
+    vi.mocked(client.tltProfile.findUnique).mockResolvedValueOnce({ ...existing, tltYear: 3 } as never);
+    await expect(updateTltProfile({ ...base, tltYear: 4 }, actor)).rejects.toMatchObject({ code: "YEAR_CHANGED" });
+    expect(state.profileUpsert).not.toHaveBeenCalled();
+    expect(state.audit).not.toHaveBeenCalled();
   });
 
   it("clears it when the year is cleared", async () => {

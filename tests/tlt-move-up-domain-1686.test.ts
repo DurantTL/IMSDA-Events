@@ -68,16 +68,20 @@ describe("the move-up plan (#1686)", () => {
 });
 
 describe("the move-up request and message (#1686)", () => {
-  it("accepts a club year and ids only, and removes duplicates", () => {
-    expect(moveUpSchema.parse({ clubYear: "2026-27", personIds: ["p1", "p1", "p2"] })).toEqual({ clubYear: "2026-27", personIds: ["p1", "p2"] });
-    expect(() => moveUpSchema.parse({ clubYear: "2026-27", personIds: [] })).toThrow();
-    expect(() => moveUpSchema.parse({ clubYear: "next", personIds: ["p1"] })).toThrow();
-    expect(() => moveUpSchema.parse({ clubYear: "2026-27", personIds: ["p1"], tltYear: 4 })).toThrow();
+  it("accepts a club year and two id lists only, and removes duplicates", () => {
+    expect(moveUpSchema.parse({ clubYear: "2026-27", moveIds: ["p1", "p1", "p2"], keepIds: ["p3"] })).toEqual({ clubYear: "2026-27", moveIds: ["p1", "p2"], keepIds: ["p3"] });
+    expect(moveUpSchema.parse({ clubYear: "2026-27", keepIds: ["p3"] })).toMatchObject({ moveIds: [], keepIds: ["p3"] });
+    expect(() => moveUpSchema.parse({ clubYear: "2026-27", moveIds: [], keepIds: [] })).toThrow();
+    expect(() => moveUpSchema.parse({ clubYear: "next", moveIds: ["p1"] })).toThrow();
+    expect(() => moveUpSchema.parse({ clubYear: "2026-27", moveIds: ["p1"], keepIds: ["p1"] })).toThrow();
+    expect(() => moveUpSchema.parse({ clubYear: "2026-27", moveIds: ["p1"], tltYear: 4 })).toThrow();
   });
 
   it("words the result", () => {
     expect(moveUpResultMessage(5, 1)).toBe("Moved 5 TLTs up a year. 1 was skipped because it had already changed.");
     expect(moveUpResultMessage(1, 0)).toBe("Moved 1 TLT up a year.");
     expect(moveUpResultMessage(0, 2)).toBe("Moved 0 TLTs up a year. 2 were skipped because they had already changed.");
+    expect(moveUpResultMessage(5, 1, 2)).toBe("Moved 5 TLTs up a year. Kept 2 TLTs at their current year. 1 was skipped because it had already changed.");
+    expect(moveUpResultMessage(0, 0, 1)).toBe("Kept 1 TLT at their current year.");
   });
 });

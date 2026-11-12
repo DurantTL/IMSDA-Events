@@ -60,7 +60,7 @@ describe("TLT directory seeds (#1686)", () => {
 });
 
 describe("TLT directory validation (#1686)", () => {
-  const ok = { personId: "p1", tltYear: 3, positionTypeId: "pos1", status: "APPROVED", tagIds: ["a", "a", "b"] } as const;
+  const ok = { personId: "p1", tltYear: 3, expectedTltYear: 3, positionTypeId: "pos1", status: "APPROVED", tagIds: ["a", "a", "b"] } as const;
 
   it("accepts the four fields and removes duplicate tags", () => {
     expect(profileUpdateSchema.parse(ok).tagIds).toEqual(["a", "b"]);

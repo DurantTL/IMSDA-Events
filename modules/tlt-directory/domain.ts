@@ -6,7 +6,7 @@ import { z } from "zod";
  * form answers. Ages are whole years; a birth date never appears here.
  */
 
-export type TltDirectoryErrorCode = "NOT_A_TLT" | "NO_ACTIVE_GRANT" | "POSITION_NOT_AVAILABLE" | "TAG_NOT_AVAILABLE" | "NAME_TAKEN" | "ENTRY_NOT_FOUND" | "NOT_SUGGESTED" | "STALE_CLUB_YEAR";
+export type TltDirectoryErrorCode = "NOT_A_TLT" | "NO_ACTIVE_GRANT" | "POSITION_NOT_AVAILABLE" | "TAG_NOT_AVAILABLE" | "NAME_TAKEN" | "ENTRY_NOT_FOUND" | "NOT_SUGGESTED" | "STALE_CLUB_YEAR" | "YEAR_CHANGED";
 
 export class TltDirectoryError extends Error {
   constructor(public readonly code: TltDirectoryErrorCode, message: string) {
@@ -159,6 +159,8 @@ const idSchema = z.string().trim().min(1).max(64);
 export const profileUpdateSchema = z.object({
   personId: idSchema,
   tltYear: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.null()]),
+  /** The year the editor loaded; a different stored year means someone changed it since (409, nothing saved). */
+  expectedTltYear: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.null()]),
   positionTypeId: idSchema.nullable(),
   status: z.enum(TLT_STATUSES).nullable(),
   tagIds: z.array(idSchema).max(60).transform((ids) => [...new Set(ids)]),
@@ -365,16 +367,24 @@ export function planTltMoveUp(rows: readonly TltMoveUpRow[], clubYear: string): 
   return plan;
 }
 
-/** The move-up request: the club year the page showed and the people she left ticked. Nothing else is accepted. */
+/**
+ * The move-up request: the club year the page showed, the people she left ticked (`moveIds`) and the proposed people she
+ * unticked (`keepIds`, held at their current year for this club year). Nothing else is accepted.
+ */
+const idList = z.array(idSchema).max(500).default([]).transform((ids) => [...new Set(ids)]);
 export const moveUpSchema = z.object({
   clubYear: z.string().trim().regex(/^\d{4}-\d{2}$/, "Reload the page and try again."),
-  personIds: z.array(idSchema).min(1, "Choose at least one TLT.").max(500).transform((ids) => [...new Set(ids)]),
-}).strict();
+  moveIds: idList,
+  keepIds: idList,
+}).strict().refine((body) => body.moveIds.length + body.keepIds.length > 0, { message: "Choose at least one TLT." })
+  .refine((body) => !body.keepIds.some((id) => body.moveIds.includes(id)), { message: "Reload the page and try again." });
 export type TltMoveUpRequest = z.infer<typeof moveUpSchema>;
 
-/** The sentence announced after a move-up: "Moved 5 TLTs up a year. 1 was skipped because it had already changed." */
-export function moveUpResultMessage(moved: number, skipped: number) {
-  const movedText = `Moved ${moved} ${moved === 1 ? "TLT" : "TLTs"} up a year.`;
-  if (skipped === 0) return movedText;
-  return `${movedText} ${skipped} ${skipped === 1 ? "was" : "were"} skipped because ${skipped === 1 ? "it" : "they"} had already changed.`;
+/** The sentence announced after a move-up: "Moved 5 TLTs up a year. Kept 1 at their current year. 1 was skipped because it had already changed." */
+export function moveUpResultMessage(moved: number, skipped: number, kept = 0) {
+  const parts: string[] = [];
+  if (moved > 0 || kept === 0) parts.push(`Moved ${moved} ${moved === 1 ? "TLT" : "TLTs"} up a year.`);
+  if (kept > 0) parts.push(`Kept ${kept} ${kept === 1 ? "TLT" : "TLTs"} at their current year.`);
+  if (skipped > 0) parts.push(`${skipped} ${skipped === 1 ? "was" : "were"} skipped because ${skipped === 1 ? "it" : "they"} had already changed.`);
+  return parts.join(" ");
 }
