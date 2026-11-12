@@ -65,7 +65,7 @@ export function StaffSignInEndedNotice({ marker }: { marker: string }) {
         {STAFF_SIGN_IN_ENDED_TEXT}{" "}
         <Link className={styles.link} href={STAFF_SIGN_IN_HREF}>Staff sign-in</Link>
       </p>
-      <button className={styles.dismiss} type="button" aria-label="Dismiss the staff sign-in notice" onClick={() => setDismissed(true)}>
+      <button className={`secondary-button ${styles.dismiss}`} type="button" aria-label="Dismiss the staff sign-in notice" onClick={() => setDismissed(true)}>
         Dismiss
       </button>
     </div>
