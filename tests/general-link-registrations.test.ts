@@ -190,6 +190,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+// The guest club rule (#835) reads the club's `guestEventId`; these routes are about the conference club's own event.
+vi.mock("@/modules/club-registrations/event-gate", async (importOriginal) => ({ ...(await importOriginal<object>()), rejectGuestClubOtherEvent: async () => null, clubMayUseEvent: async () => true }));
 vi.mock("@/modules/access/authorization", () => ({ AccessDeniedError: mocks.AccessDeniedError, requirePermission: mocks.requirePermission }));
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));

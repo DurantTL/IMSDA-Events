@@ -409,7 +409,7 @@ export async function listEventOptions(): Promise<EventOption[]> {
 /** Active clubs a director role can be given for. CLUB-type only; the route still decides. */
 export async function listClubOptions(): Promise<ClubOption[]> {
   return getPrisma().organization.findMany({
-    where: { type: "CLUB", isActive: true },
+    where: { type: "CLUB", isActive: true, guestEventId: null },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });

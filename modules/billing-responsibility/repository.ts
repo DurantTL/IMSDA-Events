@@ -74,7 +74,7 @@ const registrationSelect = {
     select: {
       teamName: true,
       organization: {
-        select: { id: true, name: true, parentOrganizationId: true, parentOrganization: { select: { id: true, name: true } } },
+        select: { id: true, name: true, parentOrganizationId: true, guestEventId: true, parentOrganization: { select: { id: true, name: true } } },
       },
     },
   },
@@ -102,7 +102,11 @@ type RegistrationRow = Prisma.RegistrationGetPayload<{ select: typeof registrati
 function ruleFor(row: RegistrationRow): Resolution {
   return resolveByRule({
     club: row.clubRegistration
-      ? { organizationId: row.clubRegistration.organization.id, parentOrganizationId: row.clubRegistration.organization.parentOrganizationId }
+      ? {
+        organizationId: row.clubRegistration.organization.id,
+        parentOrganizationId: row.clubRegistration.organization.parentOrganizationId,
+        guestEventId: row.clubRegistration.organization.guestEventId,
+      }
       : null,
     groupBillingPersonId: row.groupRegistration?.billingPerson.id ?? null,
   });
@@ -131,6 +135,10 @@ function loadRegistrations(client: Client, eventId: string, locationId?: string 
 
 function ruleParty(row: RegistrationRow, rule: Resolution): ResponsibleParty {
   const club = row.clubRegistration?.organization ?? null;
+  // A visiting guest club (#835) is billed to itself.
+  if (rule.kind === "ORGANIZATION" && rule.source === "VISITING_CLUB" && club) {
+    return { kind: "ORGANIZATION", id: club.id, name: club.name };
+  }
   if (rule.kind === "ORGANIZATION" && club?.parentOrganization) {
     return { kind: "ORGANIZATION", id: club.parentOrganization.id, name: club.parentOrganization.name };
   }

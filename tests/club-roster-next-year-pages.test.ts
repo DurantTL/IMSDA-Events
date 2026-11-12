@@ -25,7 +25,7 @@ vi.mock("@/modules/club-rosters/carry-forward", () => ({ getCarryForwardOffer: m
 vi.mock("@/modules/background-checks/repository", () => ({ clubPortalComplianceStatuses: mocks.clubPortalComplianceStatuses }));
 vi.mock("@/modules/club-rosters/repository", () => ({ listRoster: mocks.listRoster }));
 vi.mock("@/modules/honors/member-honor-repository", () => ({ listClubHonorsPage: mocks.listClubHonorsPage }));
-vi.mock("@/modules/club-transfers/repository", () => ({ listTransferClubOptions: mocks.listTransferClubOptions }));
+vi.mock("@/modules/club-transfers/repository", () => ({ isGuestClub: async () => false, listTransferClubOptions: mocks.listTransferClubOptions }));
 
 import ClubRosterNextYearPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/roster/next-year/page";
 import ClubRosterPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/roster/page";

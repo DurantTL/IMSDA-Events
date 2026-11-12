@@ -1,3 +1,4 @@
+import { rejectGuestClubOtherEvent } from "@/modules/club-registrations/event-gate";
 import { z } from "zod";
 import { rejectCrossOriginRequest } from "@/modules/access/request-security";
 import { actorAttribution, requireRosterAccess } from "@/modules/club-rosters/access";
@@ -22,6 +23,8 @@ async function putHandler(request: Request, context: { params: Promise<{ organiz
   try {
     const { organizationId, eventId } = await context.params;
     const access = await requireRosterAccess(organizationId, new Date(), "registerForEvents");
+    const guestBlock = await rejectGuestClubOtherEvent(organizationId, eventId);
+    if (guestBlock) return guestBlock;
     const { selections, confirmations, overrides } = selectionsSchema.parse(await request.json());
     const workspace = await setClassSelections(organizationId, eventId, actorAttribution(access.actor), selections, new Date(), { confirmations, overrides });
     return Response.json({ workspace }, { headers: { "Cache-Control": "no-store" } });

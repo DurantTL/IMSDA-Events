@@ -5,6 +5,7 @@
  * Who is financially responsible is decided by an explicit rule or by staff, never inferred:
  *  - a club registration -> the club's sponsoring church (`parentOrganizationId`); a club with no
  *    church is UNRESOLVED, never guessed;
+ *  - a visiting guest club (#835; `guestEventId` set) -> the club itself, never a sponsoring church;
  *  - a group registration (#650) -> its billing person;
  *  - anything else -> UNRESOLVED until staff link it to an organization. A free-text answer (a
  *    church name typed on a form) is shown as a hint only and is never linked automatically.
@@ -23,7 +24,8 @@ export type BillingResponsibilitySource =
   | "UNRESOLVED_CLUB_HAS_NO_CHURCH"
   | "UNRESOLVED_NO_ORGANIZATION_LINKED"
   | "STAFF_LINKED"
-  | "STAFF_OVERRIDE";
+  | "STAFF_OVERRIDE"
+  | "VISITING_CLUB";
 
 export type InvoiceGroupingMode = "PER_CHURCH" | "PER_CLUB";
 
@@ -62,7 +64,7 @@ export function isStaffDecision(source: BillingResponsibilitySource) {
 
 export type ResolutionFacts = {
   /** Present when the registration is a club registration. */
-  club: { organizationId: string; parentOrganizationId: string | null } | null;
+  club: { organizationId: string; parentOrganizationId: string | null; guestEventId?: string | null } | null;
   /** Present when the registration is a group registration (#650). */
   groupBillingPersonId: string | null;
 };
@@ -70,6 +72,10 @@ export type ResolutionFacts = {
 /** The rule-derived responsible party. Never looks at free text, email, or the submitter. */
 export function resolveByRule(facts: ResolutionFacts): Resolution {
   if (facts.club) {
+    // A visiting guest club (#835) pays for itself, whatever its (absent) sponsoring church.
+    if (facts.club.guestEventId) {
+      return { kind: "ORGANIZATION", organizationId: facts.club.organizationId, personId: null, source: "VISITING_CLUB" };
+    }
     return facts.club.parentOrganizationId
       ? { kind: "ORGANIZATION", organizationId: facts.club.parentOrganizationId, personId: null, source: "CLUB_SPONSORING_CHURCH" }
       : { kind: "UNRESOLVED", organizationId: null, personId: null, source: "UNRESOLVED_CLUB_HAS_NO_CHURCH" };
@@ -121,6 +127,7 @@ export function sourceLabel(source: BillingResponsibilitySource) {
   switch (source) {
     case "CLUB_SPONSORING_CHURCH": return "Club's sponsoring church";
     case "GROUP_BILLING_PERSON": return "Group's billing contact";
+    case "VISITING_CLUB": return "Visiting club (billed to itself)";
     case "STAFF_LINKED": return "Linked by staff";
     case "STAFF_OVERRIDE": return "Overridden by staff";
     default: return unresolvedReasonLabel(source);

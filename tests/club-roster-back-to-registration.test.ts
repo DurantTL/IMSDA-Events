@@ -11,7 +11,7 @@ vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: m
 vi.mock("@/modules/background-checks/repository", () => ({ clubPortalComplianceStatuses: vi.fn().mockResolvedValue(null) }));
 vi.mock("@/modules/club-rosters/repository", () => ({ listRoster: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/modules/honors/member-honor-repository", () => ({ listClubHonorsPage: vi.fn().mockResolvedValue([]) }));
-vi.mock("@/modules/club-transfers/repository", () => ({ listTransferClubOptions: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/modules/club-transfers/repository", () => ({ isGuestClub: async () => false, listTransferClubOptions: vi.fn().mockResolvedValue([]) }));
 
 import ClubRosterPage from "@/app/(public)/account/(portal)/clubs/[organizationId]/roster/page";
 import { BackLink } from "@/components/back-link";

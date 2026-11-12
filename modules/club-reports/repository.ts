@@ -302,7 +302,7 @@ export async function listClubReportsForYear(clubYear: string) {
   const prisma = getPrisma();
   const [clubs, reports, standings, eventPoints] = await Promise.all([
     prisma.organization.findMany({
-      where: { type: "CLUB", isActive: true },
+      where: { type: "CLUB", isActive: true, guestEventId: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, parentOrganization: { select: { name: true } }, ...clubJoinSelect },
     }),

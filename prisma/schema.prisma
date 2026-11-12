@@ -296,6 +296,8 @@ enum BillingResponsibilitySource {
   UNRESOLVED_NO_ORGANIZATION_LINKED
   STAFF_LINKED
   STAFF_OVERRIDE
+  /// A visiting guest club (#835) is billed to itself, not to a sponsoring church.
+  VISITING_CLUB
 }
 
 enum BillingResponsibilityChangeType {
@@ -661,6 +663,12 @@ enum MessageTemplateKey {
   NEW_CLUB_APPLICATION_DECLINED
   /// A system administrator invited someone to apply for a new club (#817). The body carries a sentinel; the link is minted at delivery.
   NEW_CLUB_APPLICATION_INVITE
+  /// Staff invited a visiting club's director for one event (#835). The body carries a sentinel; the link is minted at delivery.
+  VISITING_CLUB_INVITE
+  /// A visiting club request was approved (#835): sent to the visiting director.
+  VISITING_CLUB_APPROVED
+  /// A visiting club request was declined (#835): sent to the visiting director, with the reason when one was given.
+  VISITING_CLUB_DECLINED
   /// A seat in a full Honors Weekend class was offered to a youth on its waitlist (#831): one email to that club's director. Not an event template.
   HONOR_CLASS_WAITLIST_OFFER
   /// A reinstated or promoted registration came back without some Honors Weekend class picks because the class was full or the club's limit was reached (#880): one email to that club's director. Not an event template.
@@ -953,6 +961,8 @@ model User {
   createdAreaCoordinatorInvites  AreaCoordinatorInvite[]          @relation("AreaCoordinatorInviteCreatedBy")
   decidedNewClubApplications     NewClubApplication[]             @relation("NewClubApplicationDecider")
   createdNewClubApplicationInvites NewClubApplicationInvite[]     @relation("NewClubApplicationInviteCreator")
+  createdVisitingClubInvites     VisitingClubInvite[]             @relation("VisitingClubInviteCreator")
+  decidedVisitingClubRequests    VisitingClubRequest[]            @relation("VisitingClubRequestDecider")
   passkeys                       UserPasskey[]
   driverVerificationsReviewed    DriverVerification[]              @relation("DriverVerificationReviewedByUser")
   /// The person this staff account is explicitly linked to, if any. Grants
@@ -1230,6 +1240,7 @@ model AttendeeAccount {
   updatedAt          DateTime              @updatedAt
 
   honorInstructorRoles         HonorInstructor[]
+  visitingClubRequests         VisitingClubRequest[]
   credential                   AttendeeCredential?
   identities                   AttendeeIdentity[]
   sessions                     AttendeeSession[]
@@ -1986,6 +1997,9 @@ model Event {
   honorRooms                          HonorRoom[]
   honorOfferings                      HonorOffering[]
   honorInstructors                    HonorInstructor[]
+  guestClubs                          Organization[]        @relation("OrganizationGuestEvent")
+  visitingClubInvites                 VisitingClubInvite[]
+  visitingClubRequests                VisitingClubRequest[]
   clubRegistrations                   ClubEventRegistration[]
   teamSettings                        EventTeamSettings?
   teamLevelCheckIns                   ClubTeamLevelCheckIn[]
@@ -2922,10 +2936,13 @@ model Organization {
   /// The export's SubOrgOf, resolved by name. Kept apart from
   /// `parentOrganizationId`, which means "sponsoring church" for a club.
   affiliatedOrganizationId String?
+  /// Set only on a visiting guest club (#835): the one event it may see and register for. Null for every conference club.
+  guestEventId         String?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
   parentOrganization Organization?      @relation("OrganizationHierarchy", fields: [parentOrganizationId], references: [id], onDelete: Restrict)
+  guestEvent         Event?             @relation("OrganizationGuestEvent", fields: [guestEventId], references: [id], onDelete: Restrict)
   childOrganizations Organization[]     @relation("OrganizationHierarchy")
   affiliatedOrganization Organization?  @relation("OrganizationAffiliation", fields: [affiliatedOrganizationId], references: [id], onDelete: SetNull)
   affiliatedChildren Organization[]     @relation("OrganizationAffiliation")
@@ -2945,6 +2962,7 @@ model Organization {
   clubInvites        ClubInvite[]
   newClubApplicationsAsChurch NewClubApplication[] @relation("NewClubApplicationChurch")
   newClubApplicationCreated   NewClubApplication?  @relation("NewClubApplicationCreatedClub")
+  visitingClubRequestCreated  VisitingClubRequest? @relation("VisitingClubRequestCreatedClub")
   monthlyReports     ClubMonthlyReport[]
   yearEndReports     ClubYearEndReport[]
   meetingNotes       ClubMeetingNote[]
@@ -2976,6 +2994,7 @@ model Organization {
   @@index([parentOrganizationId, isActive])
   @@index([affiliatedOrganizationId])
   @@index([normalizedName])
+  @@index([guestEventId])
 }
 
 /**
@@ -11858,4 +11877,79 @@ model TltProfileTag {
 
   @@id([profileId, tagId])
   @@index([tagId])
+}
+
+enum VisitingClubRequestStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+enum VisitingClubType {
+  PATHFINDER
+  ADVENTURER
+}
+
+/// A private link staff send a visiting club's director for one event (#835). Single use. Like the new club
+/// application link (#817), the email body holds a sentinel and the token is minted when the message is delivered;
+/// only its SHA-256 is stored. The link by itself grants nothing: the director signs in, asks, and staff approve.
+model VisitingClubInvite {
+  id              String    @id @default(cuid())
+  eventId         String
+  /// Lower-cased. The signed-in account's verified email must be this address.
+  email           String
+  name            String    @default("")
+  tokenHash       String?   @unique
+  /// The outbox message that carries the link, for delivery-time minting.
+  messageId       String?   @unique
+  expiresAt       DateTime
+  usedAt          DateTime?
+  cancelledAt     DateTime?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+
+  event     Event                 @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  createdBy User?                 @relation("VisitingClubInviteCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  request   VisitingClubRequest?
+
+  @@index([eventId, createdAt])
+  @@index([email])
+}
+
+/// A visiting director's request to register a guest club for one event (#835). Approving creates a guest
+/// `Organization` (`guestEventId` set) and the director's grant, once, in one transaction.
+model VisitingClubRequest {
+  id                    String                    @id @default(cuid())
+  eventId               String
+  inviteId              String                    @unique
+  submittedByAccountId  String
+  status                VisitingClubRequestStatus @default(PENDING)
+  clubName              String
+  clubType              VisitingClubType
+  homeConference        String
+  homeChurch            String
+  directorName          String
+  /// The account's verified email.
+  directorEmail         String
+  directorPhone         String
+  /// When the director confirmed their own conference's adult screening for this club's staff.
+  screeningConfirmedAt  DateTime
+  decidedByUserId       String?
+  decidedAt             DateTime?
+  /// Goes to the director in the email only, never into audit metadata.
+  declineReason         String?
+  /// Set once, in the same transaction that approves: the claim that makes a second approval impossible.
+  createdOrganizationId String?                   @unique
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  event               Event               @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  invite              VisitingClubInvite  @relation(fields: [inviteId], references: [id], onDelete: Restrict)
+  submittedBy         AttendeeAccount     @relation(fields: [submittedByAccountId], references: [id], onDelete: Restrict)
+  decidedBy           User?               @relation("VisitingClubRequestDecider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+  createdOrganization Organization?       @relation("VisitingClubRequestCreatedClub", fields: [createdOrganizationId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([eventId, status])
+  @@index([submittedByAccountId])
 }

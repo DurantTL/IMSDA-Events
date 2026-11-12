@@ -24,7 +24,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/modules/club-rosters/access", () => ({ getRosterAccessStateForPage: mocks.access }));
 vi.mock("@/modules/background-checks/repository", () => ({ clubPortalComplianceStatuses: mocks.compliance }));
 vi.mock("@/modules/club-rosters/repository", () => ({ listRoster: mocks.listRoster }));
-vi.mock("@/modules/club-transfers/repository", () => ({ listTransferClubOptions: mocks.transferOptions }));
+vi.mock("@/modules/club-transfers/repository", () => ({ isGuestClub: async () => false, listTransferClubOptions: mocks.transferOptions }));
 vi.mock("@/modules/health-records/flag", () => ({ healthRecordsEnabled: () => true }));
 vi.mock("@/modules/health-records/access", () => ({ requireHealthViewerForClub: mocks.viewer }));
 vi.mock("@/modules/health-records/repository", () => ({

@@ -202,7 +202,7 @@ describe("body validation (#1761)", () => {
     asCoordinator();
     const response = await post({ columns: ["club"], clubs: ["club-a", "not-a-club"] });
     expect(response.status).toBe(400);
-    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true } }));
+    expect(mocks.orgFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { type: "CLUB", isActive: true, guestEventId: null } }));
     expect(mocks.writeAuditLog).not.toHaveBeenCalled();
   });
 
