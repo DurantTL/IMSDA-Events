@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSearchDestinations, type DestinationSearchContext } from "@/components/destination-search-model";
-import { clubsAdminGroups } from "@/components/staff-navigation";
+import { areaTabs, type StaffArea, type StaffAreaViewer } from "@/components/staff-areas";
 import { eventPermissions } from "@/modules/access/permissions";
 import { clubsAdminGuides } from "@/modules/help/clubs-admin-guides";
 import { helpDestinations, helpGuides } from "@/modules/help/guides";
@@ -28,11 +28,18 @@ describe("Clubs guides", () => {
     }
   });
 
-  it("name the Clubs pages with the Clubs sidebar's own labels", () => {
-    const sidebar = new Set(clubsAdminGroups.flatMap((group) => group.items.map((item) => item.label)));
-    for (const id of ["club-summary", "club-transfers", "club-sterling", "club-monthly-records", "club-year-end", "club-invites", "club-import", "club-people-access"]) {
-      expect(sidebar.has(helpDestinations[id]!.label), id).toBe(true);
+  it("name the Clubs pages with the tabs and views a Clubs Administrator really sees, and send readers there by those names", () => {
+    const viewer: StaffAreaViewer = { isSystemAdmin: false, held: ["CLUBS_ADMIN"], activeRole: "CLUBS_ADMIN", hasEvents: false, siteContentEditor: false, healthImport: true, clubYear: null, counts: {} };
+    const drawn = new Set(["clubs", "people"].flatMap((area) => areaTabs(area as StaffArea, viewer).flatMap((tab) => [tab.label, ...(tab.views ?? []).map((view) => view.label)])));
+    for (const id of ["club-summary", "club-transfers", "club-sterling", "club-monthly-records", "club-year-end", "club-invites", "club-import", "club-people-access", "club-applications"]) {
+      expect(drawn.has(helpDestinations[id]!.label), id).toBe(true);
     }
+    const text = clubsGuides.flatMap((guide) => [...guide.needs, ...guide.steps]).join("\n");
+    expect(text).not.toMatch(/Records and points|under People|sideways|Clubs bar/);
+  });
+
+  it("keep each written guide to ten one-action steps, or a few more only for the longest", () => {
+    for (const guide of clubsGuides.filter((candidate) => !candidate.walkthrough)) expect(guide.steps.length, guide.id).toBeLessThanOrEqual(11);
   });
 
   it("do not mention the automatic late reminder switch", () => {

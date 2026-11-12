@@ -54,10 +54,10 @@ a permission grant. The hub and every guide say so. Do not add anything that rec
 ## Clubs guides (#1882)
 
 The Clubs guides (workspace Clubs, owner "Communication office") are in `modules/help/clubs-admin-guides.ts`: Find a club, Check club
-leaders and invites, Give someone a club role, Review a new club application (id `review-new-club-application`, moved here), Handle club
+leaders and invites, Send draft club invites, Give someone a club role, Review a new club application (id `review-new-club-application`, moved here), Handle club
 member transfers, Import clubs from a file, Follow Monthly Records, Review Year-End Reports, Follow up Sterling Volunteers checks and
 Download club reports. Each says what saves or sends email and what does not, with one action per step and the page's own labels.
-Their destinations have scope `Clubs` and use the Clubs sidebar's own labels (`clubsAdminGroups`): Club summary, Monthly Records,
+Their destinations have scope `Clubs` and use the labels of the tabs and views a Clubs Administrator really sees (`areaTabs("clubs", viewer)` in `components/staff-areas.ts`): Club summary, Monthly Records,
 Review monthly records, Club Year-End Reports, Club member transfers, Sterling Volunteers, Club leaders, Import clubs, New club
 applications and People & access. A destination path may carry a `?view=` or `#section`; `help:check` only needs the page.
 
@@ -202,7 +202,7 @@ in, so no code is typed: the harness adds a placeholder `UserMfaEnrollment` (as 
 enrolment, grant and sessions cascade). Like the coordinator walkthroughs, a run hides the other active clubs, so the pictures show
 only the sample clubs. Two sample club leader invites (one Sent, one Draft) feed the leaders pictures. The local site sends no email, so
 Resend and Send all unsent are greyed out in the pictures and the page says account email is not set up; the alt text says so. The two
-written guides they cover, Find a club and Check club leaders and invites, have example pictures (`guide-example-pictures.ts`).
+written guides they cover, Find a club and Check club leaders and invites (Send draft club invites links to the same walkthrough), have example pictures (`guide-example-pictures.ts`).
 
 **The family walkthroughs (#1883)** start as a sample family account (`walkthrough_account_family`, "Taylor Sample",
 `walkthrough.family@example.test`) with one registration for "Sample Family Retreat" (a general event with a synthetic

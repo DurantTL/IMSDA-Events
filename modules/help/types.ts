@@ -25,7 +25,7 @@ export type GuideAudience =
 export type HelpDestination = {
   id: string;
   label: string;
-  /** The page's route path, no query string. The event is added for the viewer. */
+  /** The page's route path. System and Event paths carry no query string (the event is added for the viewer); a Clubs path may name a view (`?view=`) or a section (`#section`). */
   path: string;
   /** `Clubs` pages open for a system administrator or an active Clubs Administrator, with no event needed. */
   scope: "System" | "Clubs" | "Event";

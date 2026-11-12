@@ -172,7 +172,7 @@ const upperLabelFloorPx = staffTextFloorPx;
 const cardsMaxWidth = 600;
 
 /** "visitor" is a signed-out public page: no session cookie at all. */
-type Role = "event-admin" | "system-admin" | "kitchen" | "director" | "registrar" | "reporter" | "area" | "attendee" | "attendee-history" | "station" | "visitor";
+type Role = "event-admin" | "system-admin" | "clubs-admin" | "kitchen" | "director" | "registrar" | "reporter" | "area" | "attendee" | "attendee-history" | "station" | "visitor";
 type SignedInRole = Exclude<Role, "visitor">;
 
 type PageSpec = {
@@ -396,6 +396,11 @@ const pages: PageSpec[] = [
   staff("help-guide-admin", "/help/create-or-copy-event", "system-admin"),
   staff("help-glossary", "/help/glossary"),
   staff("help-hub-event-staff", "/help", "kitchen"),
+  // Help for a Clubs Administrator (#1882), a staff user with no event: the hub with its Clubs group, a written Clubs guide with its
+  // example picture, and a Clubs walkthrough with its step pictures. No event in the address: this account has none.
+  { name: "staff-help-hub-clubs-admin", path: "/help", role: "clubs-admin", expectText: /Clubs administration/ },
+  { name: "staff-help-guide-clubs-admin", path: "/help/clubs-find-a-club", role: "clubs-admin", expectText: /Find a club/ },
+  { name: "staff-help-walkthrough-clubs-admin", path: "/help/walkthrough-clubs-find-club", role: "clubs-admin", expectText: /Step by step: Find a club/ },
   staff("reports", "/more/reports"),
   staff("reports-clubs", "/more/reports/clubs"),
   staff("clubs-oversight", "/more/clubs"),
@@ -1933,6 +1938,14 @@ async function seedClubsAdministrator(prisma: PrismaClient) {
   const user = await prisma.user.findUnique({ where: { email: "system@imsda-events.test" }, select: { id: true } });
   if (!user) return;
   await prisma.clubsAdministratorGrant.upsert({ where: { userId: user.id }, update: { revokedAt: null, revokedByUserId: null }, create: { userId: user.id, grantedByUserId: user.id } });
+  // A Clubs Administrator who is not a system administrator and has no event (#1882), for the Help pages only that role sees.
+  const clubsAdmin = await prisma.user.upsert({
+    where: { email: `${P}.clubsadmin@example.test` }, update: {},
+    create: { id: `${P}_user_clubsadmin`, email: `${P}.clubsadmin@example.test`, displayName: "Jules Mobilecheck-Clubs", accountStatus: "ACTIVE" },
+  });
+  await prisma.clubsAdministratorGrant.upsert({ where: { userId: clubsAdmin.id }, update: { revokedAt: null, revokedByUserId: null }, create: { userId: clubsAdmin.id, grantedByUserId: user.id } });
+  // A session is only valid for an account with a credential row; this one can never sign in with a password.
+  await prisma.authCredential.upsert({ where: { userId: clubsAdmin.id }, update: {}, create: { userId: clubsAdmin.id, passwordHash: "mobilecheck-never-a-real-hash" } });
 }
 
 /** Kitchen counts (#1029): two services with entries, one corrected, and a long note, so the entry cards and the table have content. */
@@ -2183,7 +2196,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
       tokens.attendee.push(session.token);
       return { name: attendeeSessionCookie.legacyName, value: session.token, expires: Math.floor(session.expiresAt.getTime() / 1000) };
     }
-    const email = role === "system-admin" ? "system@imsda-events.test" : role === "kitchen" ? `${P}.kitchen@example.test` : "admin@imsda-events.test";
+    const email = role === "system-admin" ? "system@imsda-events.test" : role === "clubs-admin" ? `${P}.clubsadmin@example.test` : role === "kitchen" ? `${P}.kitchen@example.test` : "admin@imsda-events.test";
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) throw new Error(`The seeded account ${email} is missing. Run \`npm run db:seed\` first.`);
     const session = await staffSession.createDatabaseSession(user.id, null);
@@ -2193,6 +2206,7 @@ async function mintSessions(prisma: PrismaClient, tokens: { staff: string[]; att
   const cookies: Record<SignedInRole, { name: string; value: string; expires: number }> = {
     "event-admin": await cookie("event-admin"),
     "system-admin": await cookie("system-admin"),
+    "clubs-admin": await cookie("clubs-admin"),
     kitchen: await cookie("kitchen"),
     director: await cookie("director"),
     registrar: await cookie("registrar"),
@@ -4849,7 +4863,7 @@ async function main() {
     });
     for (const width of widths) {
       const height = heightFor(width);
-      for (const role of ["visitor", "director", "registrar", "reporter", "area", "attendee", "attendee-history", "event-admin", "system-admin", "kitchen", "station"] as Role[]) {
+      for (const role of ["visitor", "director", "registrar", "reporter", "area", "attendee", "attendee-history", "event-admin", "system-admin", "clubs-admin", "kitchen", "station"] as Role[]) {
         const specs = pages.filter((spec) => spec.role === role && (!only || only.split(",").some((part) => spec.name.includes(part.trim()))));
         if (specs.length === 0) continue;
         const context: Context = await browser.newContext({

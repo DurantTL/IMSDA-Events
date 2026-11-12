@@ -535,7 +535,7 @@ export const clubsAdminWalkthroughs: readonly WalkthroughDefinition[] = [
       "components/people-directory.module.css", "components/get-filter-form.tsx", "modules/system-admin/club-leaders-model.ts", ...CLUBS_SHELL,
     ],
     steps: [
-      { id: "status-choice", text: "Open Club leaders, under People. The Status box says Current, which lists everyone who leads a club now.", alt: "The Club leaders page with the Status box marked. It says Current, and the current leaders are listed under it." },
+      { id: "status-choice", text: "Choose Clubs, then Club leaders (on a phone, open Clubs menu first). Under Status, Current lists everyone who leads a club now.", alt: "The Club leaders page with the Status box marked. It says Current, and the current leaders are listed under it." },
       { id: "invited", text: "Pick Invited under Status, then choose Show. Each row is an invite that was sent.", alt: "The Invited list with one invite's row marked. It shows the club, the role and the Sent chip with a date." },
       { id: "resend", text: "To email an invite again, choose Resend on its row.", alt: "The Invited list with the Resend button on the invite's row marked. It is greyed out here because the sample site sends no email." },
       { id: "draft", text: "To send invites that were made but not sent, pick Draft under Status, then choose Show. Send all unsent emails every draft.", alt: "The Draft list with the Send all unsent button marked. It is greyed out here because the sample site sends no email." },
@@ -622,6 +622,7 @@ export const walkthroughsForGuide: Record<string, readonly string[]> = {
   // The Clubs Administrator guides (#1882) are staff guides: `guides.ts` reads these entries for them.
   "clubs-find-a-club": ["walkthrough-clubs-find-club"],
   "clubs-leaders-and-invites": ["walkthrough-clubs-leaders"],
+  "clubs-send-draft-invites": ["walkthrough-clubs-leaders"],
   "family-pay-balance": ["walkthrough-family-pay"],
   "family-change-registration": ["walkthrough-family-change"],
   "family-cancel-registration": ["walkthrough-family-cancel"],

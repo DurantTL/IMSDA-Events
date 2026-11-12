@@ -75,6 +75,7 @@ describe("guide registry", () => {
       // Clubs Administrator guides (#1882): the written ones (review-new-club-application moved here), then the walkthroughs.
       "clubs-find-a-club",
       "clubs-leaders-and-invites",
+      "clubs-send-draft-invites",
       "clubs-give-a-club-role",
       "review-new-club-application",
       "clubs-member-transfers",
