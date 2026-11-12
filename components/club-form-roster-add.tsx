@@ -267,7 +267,7 @@ export function ClubFormRosterAdd({ review, formHref, clubKind }: { review: Rost
           </label>
           <label>
             Role (optional)
-            <input defaultValue={displayRosterRole(prefill.role, clubKind)} maxLength={60} name="role" placeholder={defaultRosterRole(formType, clubKind)} />
+            <input defaultValue={displayRosterRole(prefill.role, clubKind, formType)} maxLength={60} name="role" placeholder={defaultRosterRole(formType, clubKind)} />
           </label>
           <label>
             Gender

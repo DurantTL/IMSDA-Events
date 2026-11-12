@@ -42,14 +42,14 @@ export function ClubKindControl({ organizationId, clubKind }: { organizationId: 
     <div className={styles.control}>
       <label className={styles.label}>
         Club kind
-        <select disabled={busy} onChange={(event) => setChoice(event.target.value as ClubKindValue)} value={choice}>
+        <select disabled={busy} onChange={(event) => { setChoice(event.target.value as ClubKindValue); setMessage(null); }} value={choice}>
           {CLUB_KINDS.map((kind) => <option key={kind} value={kind}>{clubKindLabels[kind]}</option>)}
         </select>
       </label>
       <button className="secondary-button" disabled={busy || choice === clubKind} onClick={save} type="button">
         {busy ? "Saving…" : "Save kind"}
       </button>
-      <FormMessage message={message?.text ?? ""} tone={message?.tone ?? "success"} />
+      <FormMessage alwaysMounted message={message?.text ?? ""} tone={message?.tone ?? "success"} />
     </div>
   );
 }

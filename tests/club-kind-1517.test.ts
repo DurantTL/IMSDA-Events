@@ -51,6 +51,8 @@ describe("role wording by club kind (#1517)", () => {
     expect(displayRosterRole("Pathfinder")).toBe("Pathfinder");
     expect(displayRosterRole("TLT", "ADVENTURER")).toBe("TLT");
     expect(displayRosterRole(null, "ADVENTURER")).toBe("");
+    expect(displayRosterRole("Pathfinder", "ADVENTURER", "STAFF")).toBe("Pathfinder");
+    expect(displayRosterRole("Pathfinder", "ADVENTURER", "YOUTH")).toBe("Adventurer");
   });
 
   it("carries a blank youth role as the club's default and re-defaults it when a youth becomes staff", () => {

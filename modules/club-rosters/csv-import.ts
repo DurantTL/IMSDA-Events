@@ -172,8 +172,8 @@ export function missingRosterCsvFields(row: RosterCsvRow): string[] {
 
 /**
  * What a new person from this row will be saved with (#424): a blank type is
- * Youth, and a blank role defaults by type (youth → "Pathfinder", others stay
- * blank). The import route saves exactly this.
+ * Youth, and a blank role defaults by type (youth → the club's member noun, "Pathfinder"
+ * or "Adventurer"; others stay blank). The import route saves exactly this.
  */
 export function rosterCsvAddDefaults(row: RosterCsvRow, clubKind?: string | null) {
   const attendeeType: AttendeeType = row.attendeeType ?? "YOUTH";
