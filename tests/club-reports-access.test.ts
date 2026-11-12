@@ -48,7 +48,8 @@ describe("requireClubReportsAccess", () => {
   it("allows an event administrator (VIEW_REPORTS is part of that role's full grant) without checking the event's billing mode", async () => {
     await requireClubReportsAccess(session, "event-1", lookup("EVENT_ADMIN"));
     // Only the audience is read (to decide whether club exports are limited to registered clubs), never the billing mode.
-    for (const [query] of mocks.findUnique.mock.calls) expect(query).toEqual({ where: { id: "event-1" }, select: { audience: true } });
+    expect(mocks.findUnique).toHaveBeenCalledTimes(1);
+    expect(mocks.findUnique).toHaveBeenCalledWith({ where: { id: "event-1" }, select: { audience: true } });
   });
 
   it("falls back to the event's audience only for a member who lacks VIEW_REPORTS but is an event administrator by role", async () => {
