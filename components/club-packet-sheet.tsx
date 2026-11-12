@@ -3,6 +3,7 @@ import { CheckSquare, QrCode } from "lucide-react";
 import { PerPersonPriceNotice } from "@/components/per-person-price-notice";
 import { CHURCH_BILLED_NOTICE } from "@/modules/club-registrations/per-person-price";
 import type { ClubPacket } from "@/modules/reporting/club-packet";
+import { clubMemberNounPlural } from "@/modules/organizations/club-kind";
 
 function dateRange(startsOn: string, endsOn: string, timeZone: string) {
   return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone }).formatRange(
@@ -48,7 +49,7 @@ function PacketHeader({ packet, side }: { packet: ClubPacket; side: 1 | 2 }) {
  * is camping requirements, assignments, preferences, and the amount billed
  * to the church. No birth dates, no protected free text — flags only.
  */
-export function ClubPacketSheet({ packet, qrSrc }: { packet: ClubPacket; qrSrc: string }) {
+export function ClubPacketSheet({ packet, qrSrc, clubKind }: { packet: ClubPacket; qrSrc: string; /** Pathfinder or Adventurer: the headcount wording (#1517). */ clubKind?: string | null }) {
   const { headcounts } = packet;
   return (
     <article className="club-packet">
@@ -69,7 +70,7 @@ export function ClubPacketSheet({ packet, qrSrc }: { packet: ClubPacket; qrSrc: 
                 : "—"}</dd></div>
           </dl>
           <div className="club-packet-headcounts">
-            <article><strong>{headcounts.pathfinder}</strong><span>Pathfinders</span></article>
+            <article><strong>{headcounts.pathfinder}</strong><span>{clubMemberNounPlural(clubKind)}</span></article>
             <article><strong>{headcounts.tlt}</strong><span>TLTs</span></article>
             <article><strong>{headcounts.staff}</strong><span>Staff</span></article>
             <article><strong>{headcounts.child}</strong><span>Children</span></article>

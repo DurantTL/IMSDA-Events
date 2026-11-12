@@ -10,6 +10,7 @@ import { OrganizationSearchControls } from "@/components/organization-search-con
 import { cardCell } from "@/components/table-card-labels";
 import { OrganizationStatusButton } from "@/components/organization-status-button";
 import { getCurrentSession } from "@/modules/access/current-session";
+import { clubKindLabel } from "@/modules/organizations/club-kind";
 import { listDirectoryContacts } from "@/modules/organizations/contacts-repository";
 import { disbandedNotice, organizationKindLabels, safeWebsiteHref } from "@/modules/organizations/eadventist-import";
 import { listDirectoryOrganizations, type DirectoryStatusFilter } from "@/modules/organizations/eadventist-import-repository";
@@ -108,7 +109,10 @@ export default async function OrganizationDirectoryPage({ searchParams }: { sear
                   const rowContacts = contacts.get(organization.id);
                   const place = [organization.city, organization.state].filter(Boolean).join(", ");
                   const kindLabel = organizationKindLabels[organization.type];
-                  const subType = organization.sourceOrgType && organization.sourceOrgType !== kindLabel ? organization.sourceOrgType : null;
+                  // A club's subtype is its kind (#1517); every other organization shows the eAdventist type text when it adds something.
+                  const subType = organization.type === "CLUB"
+                    ? clubKindLabel(organization.clubKind)
+                    : organization.sourceOrgType && organization.sourceOrgType !== kindLabel ? organization.sourceOrgType : null;
                   return (
                     <tr key={organization.id} role="row">
                       <th className="org-cell-name" role="rowheader" scope="row" translate="no">{organization.name}</th>

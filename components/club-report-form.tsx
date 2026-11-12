@@ -19,6 +19,7 @@ import type { ClubReportRecord } from "@/modules/club-reports/repository";
 import { clubClassLevelLabels, type ClubClassLevel } from "@/modules/club-rosters/domain";
 import { savedMessage } from "@/components/form-message";
 import { useUnsavedChangesGuard } from "@/components/use-unsaved-changes-guard";
+import { clubMemberNounPlural } from "@/modules/organizations/club-kind";
 
 type Prefill = {
   meetingPlace: string;
@@ -80,7 +81,10 @@ export function ClubReportForm({
   allowDraft = false,
   variant = "account",
   asDialog = false,
+  clubKind,
 }: {
+  /** Pathfinder or Adventurer: the member wording (#1517). Pathfinder when omitted. */
+  clubKind?: string | null;
   endpoint: string;
   /** Only for the account variant: reopens a SUBMITTED report back to DRAFT (#426). */
   reopenEndpoint?: string;
@@ -282,7 +286,7 @@ export function ClubReportForm({
           <div><dt>Meeting place</dt><dd>{report?.meetingPlace || "Not given"}</dd></div>
           <div><dt>Meeting day and time</dt><dd>{report?.meetingSchedule || "Not given"}</dd></div>
           <div><dt>Average attendance</dt><dd>{report?.averageAttendance ?? "Not given"}</dd></div>
-          <div><dt>Number of Pathfinders</dt><dd>{report?.pathfinderCount ?? "Not given"}</dd></div>
+          <div><dt>Number of {clubMemberNounPlural(clubKind)}</dt><dd>{report?.pathfinderCount ?? "Not given"}</dd></div>
           <div><dt>Number of TLTs</dt><dd>{report?.tltCount ?? "Not given"}</dd></div>
           <div><dt>Number of staff</dt><dd>{report?.staffCount ?? "Not given"}</dd></div>
           {report?.investitureDate && <div><dt>Investiture date</dt><dd>{report.investitureDate}</dd></div>}
@@ -338,7 +342,7 @@ export function ClubReportForm({
           <label>Meeting place<input defaultValue={report?.meetingPlace ?? prefill.meetingPlace} maxLength={200} name="meetingPlace" /></label>
           <label>Meeting day and time<input defaultValue={report?.meetingSchedule ?? prefill.meetingSchedule} maxLength={120} name="meetingSchedule" /></label>
           <label>Average attendance<input key={`${countsKey}-averageAttendance`} defaultValue={countValue("averageAttendance", report?.averageAttendance, prefill.averageAttendance)} inputMode="numeric" max={999} min={0} name="averageAttendance" type="number" /></label>
-          <label>Number of Pathfinders<input key={`${countsKey}-pathfinderCount`} defaultValue={countValue("pathfinderCount", report?.pathfinderCount, prefill.pathfinderCount)} inputMode="numeric" max={999} min={0} name="pathfinderCount" type="number" /></label>
+          <label>Number of {clubMemberNounPlural(clubKind)}<input key={`${countsKey}-pathfinderCount`} defaultValue={countValue("pathfinderCount", report?.pathfinderCount, prefill.pathfinderCount)} inputMode="numeric" max={999} min={0} name="pathfinderCount" type="number" /></label>
           <label>Number of TLTs<input key={`${countsKey}-tltCount`} defaultValue={countValue("tltCount", report?.tltCount, prefill.tltCount)} inputMode="numeric" max={999} min={0} name="tltCount" type="number" /></label>
           <label>Number of staff<input key={`${countsKey}-staffCount`} defaultValue={countValue("staffCount", report?.staffCount, prefill.staffCount)} inputMode="numeric" max={999} min={0} name="staffCount" type="number" /></label>
           <label>Investiture date (if set)<input defaultValue={report?.investitureDate ?? ""} name="investitureDate" type="date" /></label>

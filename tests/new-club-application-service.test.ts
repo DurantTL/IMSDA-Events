@@ -439,7 +439,7 @@ describe("approving", () => {
     expect(result.status).toBe("APPROVED");
     const clubs = [...db.organizations.values()].filter((org) => org.type === "CLUB");
     expect(clubs).toHaveLength(1);
-    expect(clubs[0]).toMatchObject({ name: "Synthetic Trailblazers", parentOrganizationId: "church-1", isActive: true, sourceOrgType: "Pathfinder Club", normalizedName: "synthetic trailblazers" });
+    expect(clubs[0]).toMatchObject({ name: "Synthetic Trailblazers", parentOrganizationId: "church-1", isActive: true, sourceOrgType: "Pathfinder Club", clubKind: "PATHFINDER", normalizedName: "synthetic trailblazers" });
     expect(result.organizationId).toBe(clubs[0].id);
     expect(db.applications[0]).toMatchObject({ status: "APPROVED", decidedByUserId: "user-admin", createdOrganizationId: clubs[0].id });
     expect(db.clubInvites).toHaveLength(1);
@@ -469,7 +469,7 @@ describe("approving", () => {
     await submitNewClubApplication(input({ clubName: "Little Lambs" }), { now: NOW });
     db.applications[1].clubType = "ADVENTURER";
     await decideNewClubApplication(systemAdmin, db.applications[1].id, { decision: "approve" }, NOW);
-    expect([...db.organizations.values()].find((org) => org.name === "Little Lambs")).toMatchObject({ sourceOrgType: "Adventurer Club" });
+    expect([...db.organizations.values()].find((org) => org.name === "Little Lambs")).toMatchObject({ sourceOrgType: "Adventurer Club", clubKind: "ADVENTURER" });
   });
 
   it("refuses a second approval, a decline after it, and creates nothing twice", async () => {

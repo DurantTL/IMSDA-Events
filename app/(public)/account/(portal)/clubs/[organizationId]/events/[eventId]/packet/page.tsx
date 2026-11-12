@@ -7,6 +7,7 @@ import { PrintReportButton } from "@/components/print-report-button";
 import { clubAccessClosed } from "@/components/club-access-closed";
 import { getRosterAccessStateForPage } from "@/modules/club-rosters/access";
 import { singleSearchParam } from "@/modules/club-teams/domain";
+import { getClubKind } from "@/modules/organizations/club-profile-repository";
 import { loadDirectorClubPacket } from "@/modules/reporting/director-club-packet";
 
 export const metadata: Metadata = { title: "Club packet" };
@@ -46,7 +47,7 @@ export default async function DirectorClubPacketPage({
         </div>
         <PrintReportButton label="Print packet" />
       </div>
-      <ClubPacketSheet packet={packet} qrSrc={`/api/attendee/clubs/${encodeURIComponent(organizationId)}/events/${encodeURIComponent(eventId)}/club-pass/qr${teamKey ? `?team=${encodeURIComponent(teamKey)}` : ""}`} />
+      <ClubPacketSheet clubKind={await getClubKind(organizationId)} packet={packet} qrSrc={`/api/attendee/clubs/${encodeURIComponent(organizationId)}/events/${encodeURIComponent(eventId)}/club-pass/qr${teamKey ? `?team=${encodeURIComponent(teamKey)}` : ""}`} />
     </section>
   );
 }

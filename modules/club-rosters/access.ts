@@ -66,12 +66,12 @@ export async function getRosterAccessState(organizationId: string, now = new Dat
   if (acting && acting.role === "CLUB_DIRECTOR" && acting.organizationId === organizationId) {
     const club = await getPrisma().organization.findUnique({
       where: { id: organizationId },
-      select: { type: true, isActive: true, name: true, parentOrganization: { select: { name: true } } },
+      select: { type: true, isActive: true, name: true, clubKind: true, parentOrganization: { select: { name: true } } },
     });
     if (club && club.type === "CLUB" && club.isActive) {
       return {
         state: "OPEN",
-        club: { organizationId, name: club.name, role: "DIRECTOR", sponsoringChurch: club.parentOrganization?.name ?? null },
+        club: { organizationId, name: club.name, role: "DIRECTOR", sponsoringChurch: club.parentOrganization?.name ?? null, clubKind: club.clubKind },
         capabilities: clubCapabilities("DIRECTOR"),
         actor: { kind: "STAFF_ACTING", userId: acting.userId, staffSessionId: acting.staffSessionId, actAsId: acting.actAsId, organizationId, ...(acting.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) },
       };
@@ -189,12 +189,12 @@ export async function getClubRoleAccess(organizationId: string, now = new Date()
   if (acting && acting.role === "CLUB_DIRECTOR" && acting.organizationId === organizationId) {
     const club = await getPrisma().organization.findUnique({
       where: { id: organizationId },
-      select: { type: true, isActive: true, name: true, parentOrganization: { select: { name: true } } },
+      select: { type: true, isActive: true, name: true, clubKind: true, parentOrganization: { select: { name: true } } },
     });
     if (club && club.type === "CLUB" && club.isActive) {
       return {
         state: "OK",
-        club: { organizationId, name: club.name, role: "DIRECTOR", sponsoringChurch: club.parentOrganization?.name ?? null },
+        club: { organizationId, name: club.name, role: "DIRECTOR", sponsoringChurch: club.parentOrganization?.name ?? null, clubKind: club.clubKind },
         capabilities: clubCapabilities("DIRECTOR"),
         actor: { kind: "STAFF_ACTING", userId: acting.userId, staffSessionId: acting.staffSessionId, actAsId: acting.actAsId, organizationId, ...(acting.viaClubsAdministrator ? { viaClubsAdministrator: true as const } : {}) },
       };

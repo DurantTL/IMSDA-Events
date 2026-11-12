@@ -108,6 +108,7 @@ function fakeDatabase() {
         return { count: before - db.guardians.length };
       },
     },
+    organization: { findUnique: async () => ({ clubKind: "PATHFINDER" }) },
     healthRecord: { deleteMany: async () => ({ count: 0 }) },
     healthRecordLink: { updateMany: async () => ({ count: 0 }) },
     clubMeetingAttendance: {

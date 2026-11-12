@@ -63,6 +63,13 @@ enum MembershipStatus {
   INACTIVE
 }
 
+/// Which kind of club a CLUB organization is (#1517). Only the portal wording and
+/// the staff orders filter read it; Adventurer events and reports wait for #842.
+enum ClubKind {
+  PATHFINDER
+  ADVENTURER
+}
+
 /// CHURCH and CLUB predate the eAdventist organizations import (#649) and keep
 /// their meaning everywhere. The rest are the kinds that import brings in:
 /// COMPANY and GROUP are congregations that are not yet organized churches.
@@ -2927,6 +2934,8 @@ model Organization {
   /// The export's OrgType text ("PK-08 School", "Camp/Conf center", ...), kept
   /// because several of them collapse into one `type`.
   sourceOrgType        String?
+  /// Meaningful only for CLUB organizations (#1517). Every other type keeps the default and ignores it.
+  clubKind             ClubKind         @default(PATHFINDER)
   streetAddress        String?
   city                 String?
   state                String?

@@ -172,20 +172,20 @@ export function missingRosterCsvFields(row: RosterCsvRow): string[] {
 
 /**
  * What a new person from this row will be saved with (#424): a blank type is
- * Youth, and a blank role defaults by type (youth → "Pathfinder", others stay
- * blank). The import route saves exactly this.
+ * Youth, and a blank role defaults by type (youth → the club's member noun, "Pathfinder"
+ * or "Adventurer"; others stay blank). The import route saves exactly this.
  */
-export function rosterCsvAddDefaults(row: RosterCsvRow) {
+export function rosterCsvAddDefaults(row: RosterCsvRow, clubKind?: string | null) {
   const attendeeType: AttendeeType = row.attendeeType ?? "YOUTH";
-  return { attendeeType, role: rosterRoleOrDefault(row.role, attendeeType) };
+  return { attendeeType, role: rosterRoleOrDefault(row.role, attendeeType, clubKind) };
 }
 
 /**
  * The preview line for a new person (#424): which blanks get a default, then
  * what will still be missing on the roster afterwards.
  */
-function addMessage(row: RosterCsvRow) {
-  const { attendeeType, role } = rosterCsvAddDefaults(row);
+function addMessage(row: RosterCsvRow, clubKind?: string | null) {
+  const { attendeeType, role } = rosterCsvAddDefaults(row, clubKind);
   const defaults: string[] = [];
   if (row.attendeeType === undefined) defaults.push(`${rosterFieldLabels.attendeeType} → ${clubRosterAttendeeTypeLabels[attendeeType]}`);
   if (!(row.role ?? "").trim() && role) defaults.push(`${rosterFieldLabels.role} → ${role}`);
@@ -214,7 +214,7 @@ export type RosterImportStep = {
 };
 
 /** What the upload will do with each row, against this year's roster (names only). */
-export function planRosterImport(rows: readonly RosterCsvRow[], existing: ReadonlyArray<{ id: string; firstName: string; lastName: string }>) {
+export function planRosterImport(rows: readonly RosterCsvRow[], existing: ReadonlyArray<{ id: string; firstName: string; lastName: string }>, clubKind?: string | null) {
   const byName = new Map<string, string[]>();
   for (const member of existing) {
     const key = nameKey(member.firstName, member.lastName);
@@ -242,6 +242,6 @@ export function planRosterImport(rows: readonly RosterCsvRow[], existing: Readon
       return { line: row.line, name, action: "UPDATE", memberId: matches[0], message, row };
     }
     if (!row.birthDate) return skip("New people need a birth date.");
-    return { line: row.line, name, action: "ADD", memberId: null, message: addMessage(row), row };
+    return { line: row.line, name, action: "ADD", memberId: null, message: addMessage(row, clubKind), row };
   });
 }

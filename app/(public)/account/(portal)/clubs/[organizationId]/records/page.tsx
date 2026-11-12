@@ -30,6 +30,7 @@ import {
 import { listYearEndReportsForClub } from "@/modules/club-reports/year-end-repository";
 import { getClubRoleAccessForPage, getRosterAccessState } from "@/modules/club-rosters/access";
 import { clubYearChoices, clubYearFor } from "@/modules/club-rosters/domain";
+import { clubMemberNoun } from "@/modules/organizations/club-kind";
 import { clubAccessClosed } from "@/components/club-access-closed";
 
 export const metadata: Metadata = { title: "Monthly Records" };
@@ -161,6 +162,7 @@ export default async function ClubRecordsPage({
       </nav>
 
       <ClubMeetingNotes
+        clubKind={access.club.clubKind}
         attendanceAvailable={attendanceAvailable}
         exportHref={exportable ? `${apiBase}/exports/attendance?year=${encodeURIComponent(clubYear)}` : null}
         exportMonthHref={exportable ? attendanceMonthExportHref(apiBase, clubYear, month) : null}
@@ -177,6 +179,7 @@ export default async function ClubRecordsPage({
       <ClubReportForm
         allowDraft
         asDialog
+        clubKind={access.club.clubKind}
         dueLabel={formatDueDate(due)}
         endpoint={`${apiBase}/reports/${month}`}
         expectedOnTime={report?.firstSubmittedAt ? onTimePoints(month, new Date(report.firstSubmittedAt)) : locked ? 0 : ON_TIME_POINTS}
@@ -204,7 +207,7 @@ export default async function ClubRecordsPage({
               <li key={year}>
                 {submitted ? <CheckCircle2 size={17} aria-hidden="true" /> : <CircleAlert size={17} aria-hidden="true" />}
                 <span>
-                  <strong>Pathfinder year {year}</strong>
+                  <strong>{clubMemberNoun(access.club.clubKind)} year {year}</strong>
                   <small>
                     {reportYearSpanLabel(year)} ·{" "}
                     {submitted

@@ -34,6 +34,7 @@ function fakeDatabase() {
     person: {
       create: async ({ data }: { data: Row }) => { const row = { ...data, id: `person-${++sequence}` }; db.people.push(row); return row; },
     },
+    organization: { findUnique: async () => ({ clubKind: "PATHFINDER" }) },
     clubRosterMember: {
       findMany: async ({ where }: { where: { organizationId: string; clubYear: string; status: { not: string }; id?: { not: string } | undefined } }) =>
         db.members

@@ -40,6 +40,7 @@ export default async function ClubYearEndReportPage({ params }: { params: Promis
     <>
       <BackLink href={backHref}>Back to Monthly Records</BackLink>
       <ClubYearEndReportForm
+        clubKind={access.club.clubKind}
         dueLabel={formatReportYearDueDate(year)}
         endpoint={`/api/attendee/clubs/${encodeURIComponent(organizationId)}/year-end-reports/${year}`}
         initialContact={{
