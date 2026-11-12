@@ -99,8 +99,12 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
+    min-width: 0;
+    overflow-wrap: anywhere;
     text-align: right;
   }
+  /* The no-match and empty states are one cell across the whole card, not a cell in the narrow first column. */
+  .list.list:global(.table-cards-max) > tbody > tr > td[colspan] { grid-column: 1 / -1; }
   .list.list:global(.table-cards-max) > tbody > tr > td[data-label]:not(:empty, [data-col="confirmationCode"], [data-col="status"])::before {
     flex: 0 0 min(42%, 9rem);
     text-align: left;

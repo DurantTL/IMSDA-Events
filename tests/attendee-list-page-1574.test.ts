@@ -117,4 +117,9 @@ describe("attendee list styles (#1574)", () => {
     expect(css).toContain('td[data-col="status"]');
     expect(css).toMatch(/td:empty \{ display: none; \}/);
   });
+
+  it("spans the empty and no-match cell across the phone card and lets values wrap", () => {
+    expect(css).toMatch(/td\[colspan\] \{ grid-column: 1 \/ -1; \}/);
+    expect(css).toMatch(/min-width: 0;\s*overflow-wrap: anywhere;/);
+  });
 });
