@@ -1,5 +1,5 @@
 import type { RegistrationFormDefinition, RegistrationFormField } from "@/modules/forms/definition";
-import { resolveResponsibleOrganization } from "@/modules/forms/definition";
+import { fieldPriceWindows, resolveResponsibleOrganization } from "@/modules/forms/definition";
 import { formatPerPersonAmount, type PerPersonPrice } from "@/modules/club-registrations/per-person-price";
 import { hasVisibilityRule } from "@/modules/forms/visibility-rule";
 
@@ -53,8 +53,7 @@ function dayBefore(iso: string) {
 function isPriced(field: RegistrationFormField) {
   return (field.priceCents !== undefined && field.priceCents > 0)
     || Object.keys(field.choicePricesCents ?? {}).length > 0
-    || Object.keys(field.latePricing?.choicePricesCents ?? {}).length > 0
-    || (field.latePricing?.priceCents !== undefined && field.latePricing.priceCents > 0);
+    || fieldPriceWindows(field).some((window) => Object.keys(window.choicePricesCents ?? {}).length > 0 || (window.priceCents !== undefined && window.priceCents > 0));
 }
 
 /**
@@ -67,7 +66,7 @@ function soleFeeField(definition: RegistrationFormDefinition): RegistrationFormF
   const priced = definition.sections.flatMap((section) => section.fields).filter(isPriced);
   if (priced.length !== 1) return null;
   const fee = priced[0];
-  if (fee.type !== "CALCULATED" || !fee.priceCents || Object.keys(fee.choicePricesCents ?? {}).length > 0 || Object.keys(fee.latePricing?.choicePricesCents ?? {}).length > 0) return null;
+  if (fee.type !== "CALCULATED" || !fee.priceCents || Object.keys(fee.choicePricesCents ?? {}).length > 0 || fieldPriceWindows(fee).some((window) => Object.keys(window.choicePricesCents ?? {}).length > 0)) return null;
   if (hasVisibilityRule(fee) || fee.optionalWhen) return null;
   if (definition.attendeeRoster?.enabled && fee.scope !== "ATTENDEE") return null;
   return fee;
@@ -80,26 +79,27 @@ export function churchInvoiceTerms(
   const fee = soleFeeField(definition);
   if (!fee) return null;
   const regular = fee.priceCents as number;
-  const late = fee.latePricing && fee.latePricing.priceCents !== undefined && fee.latePricing.priceCents !== regular
-    ? { amountCents: fee.latePricing.priceCents, startsOn: fee.latePricing.startsOn }
-    : null;
   const label = (options.attendeeLabel ?? definition.attendeeRoster?.attendeeLabel ?? "attendee").trim().toLocaleLowerCase();
   const referenceYear = Number(options.pricingDate.slice(0, 4)) || undefined;
-  let tiers: ChurchInvoiceRateTier[];
-  if (!late) {
-    tiers = [{ amountCents: regular, throughDate: null }];
-  } else if (options.pricingDate >= late.startsOn) {
-    // The deadline has passed: only the rate in force is described.
-    tiers = [{ amountCents: late.amountCents, throughDate: null }];
-  } else {
-    tiers = [
-      { amountCents: regular, throughDate: dayBefore(late.startsOn) },
-      { amountCents: late.amountCents, throughDate: null },
-    ];
+  // The rate before each window and from each window on, oldest first; a window that does not change the rate adds no tier.
+  const steps: Array<{ amountCents: number; startsOn: string | null }> = [{ amountCents: regular, startsOn: null }];
+  for (const window of fieldPriceWindows(fee)) {
+    const previous = steps[steps.length - 1]!.amountCents;
+    if (window.priceCents !== undefined && window.priceCents !== previous) steps.push({ amountCents: window.priceCents, startsOn: window.startsOn });
   }
+  // A rate whose next change has already started is over: only the rates still in force are described.
+  const remaining = steps.filter((step, index) => {
+    const next = steps[index + 1];
+    return !next || options.pricingDate < (next.startsOn as string);
+  });
+  const tiers: ChurchInvoiceRateTier[] = remaining.map((step) => {
+    const next = steps[steps.indexOf(step) + 1];
+    return { amountCents: step.amountCents, throughDate: next ? dayBefore(next.startsOn as string) : null };
+  });
+  const amount = (cents: number) => formatPerPersonAmount(cents);
   const rateSentence = tiers.length === 1
-    ? `${formatPerPersonAmount(tiers[0].amountCents)} per ${label}.`
-    : `${formatPerPersonAmount(tiers[0].amountCents)} per ${label} through ${formatInvoiceDate(tiers[0].throughDate as string, referenceYear)}; ${formatPerPersonAmount(tiers[1].amountCents)} afterward.`;
+    ? `${amount(tiers[0].amountCents)} per ${label}.`
+    : `${tiers.slice(0, -1).map((tier) => `${amount(tier.amountCents)} per ${label} through ${formatInvoiceDate(tier.throughDate as string, referenceYear)}`).join("; ")}; ${amount(tiers[tiers.length - 1].amountCents)} afterward.`;
   return {
     tiers,
     feeLabel: fee.label,

@@ -152,7 +152,7 @@ function clubFormRestrictionIssues(definition: RegistrationFormDefinition): Buil
       if (field.type === "SIGNATURE") issues.push({ key, message: `${name}: typed signatures are not available on club forms.` });
       if (field.scope !== "REGISTRATION") issues.push({ key, message: `${name}: club forms ask each question once, not per attendee.` });
       if (
-        field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.creditCentsPerUnit !== undefined
+        field.priceCents !== undefined || field.choicePricesCents || field.latePricing || field.pricingWindows || field.basePricingLabel || field.creditCentsPerUnit !== undefined
         || field.capUnitsAtAttendeeCount || field.choiceLimits || (field.availabilityMode && field.availabilityMode !== "NONE")
       ) {
         issues.push({ key, message: `${name}: pricing and capacity limits are not available on club forms.` });

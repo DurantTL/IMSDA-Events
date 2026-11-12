@@ -24,6 +24,8 @@ export function signatureTypePatch(field: RegistrationFormField, nextType: Regis
       creditCentsPerUnit: undefined,
       capUnitsAtAttendeeCount: undefined,
       latePricing: undefined,
+      pricingWindows: undefined,
+      basePricingLabel: undefined,
       ageBounds: undefined,
       autoDate: undefined,
       placeholder: undefined,

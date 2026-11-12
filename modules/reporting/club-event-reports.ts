@@ -164,7 +164,7 @@ function numberFromResponse(value: unknown): number | null {
   return null;
 }
 
-/** Whether any attendee fee line item in the pricing snapshot used the given late-pricing label. */
+/** Whether any attendee fee line item in the pricing snapshot used the given late-pricing label (the last window's; the same rule as `earlierRate` in attendance reconciliation). */
 function lateRateFromPricingSnapshot(pricingSnapshot: Record<string, unknown>, lateLabel: string | null): boolean {
   if (!lateLabel) return false;
   const lineItems = pricingSnapshot.lineItems;
