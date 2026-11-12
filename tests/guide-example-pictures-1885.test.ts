@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { guideExamplePictures } from "@/modules/help/guide-example-pictures";
+import { helpGuides } from "@/modules/help/guides";
 import { portalGuides } from "@/modules/help/portal-guides";
 import { findWalkthrough } from "@/modules/help/walkthroughs";
 import { walkthroughImageFileSize, walkthroughImageBudgets } from "@/modules/help/walkthrough-images";
@@ -9,7 +10,8 @@ import { walkthroughImageFileSize, walkthroughImageBudgets } from "@/modules/hel
 /** Guide example pictures (#1885): retaken in the walkthrough style by `npm run help:screenshots`. */
 describe("guide example pictures", () => {
   it.each(guideExamplePictures)("$guideId matches its guide, its walkthrough step and the phone picture size", (example) => {
-    const guide = portalGuides.find((item) => item.id === example.guideId)!;
+    // A guide is a portal guide or, for the Clubs Administrator ones (#1882), a staff guide.
+    const guide = [...portalGuides, ...helpGuides].find((item) => item.id === example.guideId)!;
     const file = walkthroughImageFileSize("phone");
     expect(guide.screenshot).toMatchObject({ src: example.src, width: file.width, height: file.height });
     expect(guide.steps[example.guideStepNumber - 1]).toBeTruthy();
