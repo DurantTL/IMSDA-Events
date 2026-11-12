@@ -327,6 +327,9 @@ const pages: PageSpec[] = [
   { ...club("letters", "/letters"), expectText: /Letters and certificates/ },
   club("letter-print", `/letters/${clubLetterId}/print?people=${P}_person_a_07,${P}_person_a_14`),
   club("certificate-print", `/letters/${clubCertificateId}/print?people=${P}_person_a_07`),
+  // Optional class and honor certificates (#1696): switched on for the club by this script's seed.
+  { ...club("certificates", "/certificates"), expectText: /Class and honor certificates/ },
+  club("certificates-print", "/certificates/print"),
   // Area Coordinator.
   { ...area("overview", "/account/area-clubs/overview"), flow: "portal-navigation" },
   area("clubs", "/account/area-clubs/clubs"),
@@ -1855,6 +1858,12 @@ async function seedSynthetic(prisma: PrismaClient) {
     where: { organizationId_featureKey: { organizationId: clubA, featureKey: "fill-in-letters" } },
     update: {},
     create: { organizationId: clubA, featureKey: "fill-in-letters" },
+  });
+  // #1696: class and honor certificates are switched on for the audit club so their pages can be audited (undone in cleanupSynthetic).
+  await prisma.clubOptionalFeature.upsert({
+    where: { organizationId_featureKey: { organizationId: clubA, featureKey: "completion-certificates" } },
+    update: {},
+    create: { organizationId: clubA, featureKey: "completion-certificates" },
   });
   for (const [id, kind, title, body] of [
     [clubLetterId, "LETTER", "Welcome letter", "Dear {first_name},\n\nWelcome to {club_name} for {club_year}. We are glad to have {full_name} with us.\n\n{date}"],

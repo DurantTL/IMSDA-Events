@@ -1,0 +1,36 @@
+/* Class and honor certificates (#1696): the picker list at 390px, and one landscape certificate per printed page. */
+.filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin: 0 0 14px; }
+.field { display: grid; gap: 4px; min-width: 0; font-size: max(var(--type-staff-floor, 0px), 0.875rem); font-weight: 600; color: var(--imsda-navy); }
+.field input, .field select { box-sizing: border-box; min-height: 44px; padding: 0 10px; border: 1px solid var(--field-border); border-radius: var(--radius-element); background: var(--card); font: inherit; font-weight: 400; color: inherit; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.actions > :is(button, a) { min-height: 44px; }
+.meta { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.fieldset { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.items { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); }
+.item { display: flex; align-items: center; min-height: 44px; font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
+.item label { display: flex; align-items: center; gap: 8px; min-height: 44px; flex: 1; cursor: pointer; overflow-wrap: anywhere; }
+.item input { width: 20px; height: 20px; flex: none; }
+
+/* The print view: one certificate per page; the site chrome is left out of the printout. */
+.printTools { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.sheets { display: grid; gap: 16px; }
+.certificate { box-sizing: border-box; display: grid; align-content: center; justify-items: center; gap: 14px; min-height: 24rem; padding: 40px 32px; border: 3px double var(--imsda-navy); border-radius: var(--radius-card); background: var(--card); text-align: center; }
+.symbol { width: 72px; height: 72px; object-fit: contain; }
+.heading { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 2rem); line-height: 1.2; }
+.lead { margin: 0; color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 1rem); }
+.name { margin: 0; color: var(--ink); font-size: max(var(--type-staff-floor, 0px), 2.25rem); font-weight: 700; overflow-wrap: anywhere; }
+.what { margin: 0; color: var(--imsda-navy); font-size: max(var(--type-staff-floor, 0px), 1.5rem); font-weight: 600; overflow-wrap: anywhere; }
+.when, .club { margin: 0; font-size: max(var(--type-staff-floor, 0px), 1.125rem); overflow-wrap: anywhere; }
+.signatures { display: grid; grid-template-columns: 2fr 1fr; gap: 32px; width: min(100%, 36rem); margin-top: 28px; }
+.signature { display: grid; gap: 4px; padding-top: 6px; border-top: 1px solid var(--ink); font-size: max(var(--type-staff-floor, 0px), 0.875rem); text-align: left; }
+
+@page { size: landscape; margin: 0.5in; }
+
+@media print {
+  :global(.club-shell):has(.sheets) > :not(:global(.club-roster-layout)) { display: none !important; }
+  :global(.club-roster-layout):has(.sheets) { margin: 0; padding: 0; }
+  .printTools { display: none !important; }
+  .sheets { display: block; }
+  .certificate { break-after: page; break-inside: avoid; min-height: 6.5in; border: 3px double var(--ink); border-radius: 0; padding: 32px; }
+  .certificate:last-child { break-after: auto; }
+}
