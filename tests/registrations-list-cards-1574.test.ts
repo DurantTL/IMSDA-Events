@@ -63,6 +63,9 @@ describe("Registrations header (#1574)", () => {
     expect(html).not.toContain("<h1");
     expect(html).not.toContain("duplicate-page-title");
     expect(pageOwnsHeader("/people")).toBe(true);
+    // The "/people" entry matches that page only: a sub-page without its own header still gets the shell's title.
+    expect(pageOwnsHeader("/people/review-queues")).toBe(false);
+    // The Attendee list draws its own header too (#1574, second PR).
     expect(pageOwnsHeader("/people/attendees")).toBe(true);
   });
 
