@@ -620,7 +620,7 @@ function PaymentPanel({
                         {candidates.map((candidate) => (
                           <li key={candidate.providerPaymentId} className={styles.cisMatchRow}>
                             <span>
-                              <strong>{formatCents(candidate.amountCents)}</strong>
+                              <strong><Money cents={candidate.amountCents} /></strong>
                               {candidate.whenLabel && <span className={styles.cisType}> {candidate.whenLabel}</span>}
                               {candidate.overBalance && (
                                 <span className={styles.cisHelp} id={`cis-over-${candidate.providerPaymentId}`}>
@@ -705,7 +705,7 @@ function PaymentPanel({
         title="Match a payment that is more than the balance?"
       >
         <p>
-          This Square payment is {confirmCandidate ? formatCents(confirmCandidate.amountCents) : ""}, more than the balance due of {formatCents(balanceCents)}.
+          This Square payment is {confirmCandidate ? <Money cents={confirmCandidate.amountCents} /> : null}, more than the balance due of <Money cents={balanceCents} />.
           That is usually the card fee. The whole amount is recorded, and finance reviews the difference.
         </p>
       </ConfirmDialog>
