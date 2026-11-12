@@ -55,7 +55,7 @@ const imageParams = { params: Promise.resolve({ eventId, imageId }) };
 
 const routeCases: Array<{ name: string; call: () => Promise<Response> }> = [
   { name: "GET list", call: () => listRoute(request(base, "GET"), listParams) },
-  { name: "POST upload", call: () => uploadRoute(request(base, "POST", new FormData()), listParams) },
+  { name: "POST upload", call: () => uploadRoute(request(base, "POST", new FormData(), { "content-length": "100" }), listParams) },
   { name: "PATCH image", call: () => patchRoute(request(`${base}/${imageId}`, "PATCH", JSON.stringify({ retired: true }), { "content-type": "application/json" }), imageParams) },
   { name: "POST use", call: () => chooseRoute(request(`${base}/${imageId}/use`, "POST"), imageParams) },
   { name: "GET file", call: () => fileRoute(request(`${base}/${imageId}/file`, "GET"), imageParams) },
@@ -143,11 +143,27 @@ describe("image library routes for an event editor", () => {
     dependencies.addUploadToLibrary.mockRejectedValue(new ImageLibraryError("IMAGE_TOO_LARGE", "Too big."));
     const form = new FormData();
     form.append("file", new File([new Uint8Array([1])], "a.png", { type: "image/png" }));
-    const response = await uploadRoute(request(base, "POST", form), listParams);
+    const response = await uploadRoute(request(base, "POST", form, { "content-length": "200" }), listParams);
     expect(response.status).toBe(413);
     expect(await response.json()).toMatchObject({ error: "IMAGE_TOO_LARGE" });
-    const empty = await uploadRoute(request(base, "POST", new FormData()), listParams);
+    const empty = await uploadRoute(request(base, "POST", new FormData(), { "content-length": "100" }), listParams);
     expect(empty.status).toBe(400);
+  });
+
+  it("refuses an upload declared over the size limit, or with no declared size, before reading the body", async () => {
+    const form = new FormData();
+    form.append("file", new File([new Uint8Array([1])], "a.png", { type: "image/png" }));
+    const tooLarge = request(base, "POST", form, { "content-length": String(26 * 1024 * 1024) });
+    const readBody = vi.spyOn(tooLarge, "formData");
+    const response = await uploadRoute(tooLarge, listParams);
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ error: "IMAGE_TOO_LARGE" });
+    expect(readBody).not.toHaveBeenCalled();
+    const unstated = await uploadRoute(request(base, "POST", form), listParams);
+    expect(unstated.status).toBe(411);
+    const notANumber = await uploadRoute(request(base, "POST", form, { "content-length": "lots" }), listParams);
+    expect(notANumber.status).toBe(411);
+    expect(dependencies.addUploadToLibrary).not.toHaveBeenCalled();
   });
 
   it("uses an image and returns the event's refreshed file list", async () => {

@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   approveForArea: vi.fn(),
   loadMasterGuide: vi.fn(),
   listAreaApprovalQueue: vi.fn(),
+  coordinatorMinistriesForAccount: vi.fn(),
   rateLimit: vi.fn(),
   rejectCrossOriginRequest: vi.fn(),
   redirect: vi.fn((to: string) => { throw new Error(`REDIRECT ${to}`); }),
@@ -42,7 +43,7 @@ vi.mock("@/modules/attendee-accounts/sign-in-gate", () => ({ accountNeedsSecondS
 vi.mock("@/modules/attendee-accounts/passkeys", () => ({ passkeysConfigured: mocks.passkeysConfigured }));
 vi.mock("@/modules/attendee-accounts/return-redirect", () => ({ twoStepRedirectPath: vi.fn(async () => "/account/two-step") }));
 vi.mock("@/modules/access/request-security", () => ({ rejectCrossOriginRequest: mocks.rejectCrossOriginRequest }));
-vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: mocks.currentAreaCoordinator }));
+vi.mock("@/modules/organizations/area-coordinators", () => ({ currentAreaCoordinator: mocks.currentAreaCoordinator, coordinatorMinistriesForAccount: mocks.coordinatorMinistriesForAccount }));
 vi.mock("@/modules/rate-limit/service", () => ({ checkMasterGuideWriteRateLimit: mocks.rateLimit }));
 vi.mock("@/modules/master-guide/repository", () => ({
   addCandidate: mocks.addCandidate,
@@ -298,10 +299,12 @@ describe("the club's Master Guide page", () => {
 });
 
 describe("the Area Coordinator's approvals page", () => {
-  it("shows the queue to an Area Coordinator", async () => {
+  it("shows the queue to an Area Coordinator, for their own ministries", async () => {
     mocks.currentAreaCoordinator.mockResolvedValue({ id: "account-area" });
+    mocks.coordinatorMinistriesForAccount.mockResolvedValue(["ADVENTURER"]);
     expect(await MasterGuideApprovalsPage()).not.toBeNull();
-    expect(mocks.listAreaApprovalQueue).toHaveBeenCalledTimes(1);
+    expect(mocks.coordinatorMinistriesForAccount).toHaveBeenCalledWith("account-area");
+    expect(mocks.listAreaApprovalQueue).toHaveBeenCalledWith(["ADVENTURER"]);
   });
 
   it.each([

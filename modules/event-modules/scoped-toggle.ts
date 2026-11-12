@@ -29,7 +29,7 @@ export class ScopedToggleError extends Error {
   }
 }
 
-/** Staff access: a system administrator or an Event Admin (the Clubs Administrator is one on club events). Returns the actor. */
+/** Staff access: a system administrator or an Event Admin on this event (the Clubs Administrator role alone does not qualify). Returns the actor. */
 export async function requireStaffToggleAccess(session: Session, eventId: string, lookup: MembershipLookup): Promise<ScopedToggleActor & { kind: "staff" }> {
   const access = await requireEventMembership(session, eventId, lookup);
   if (access.user.globalRole !== "SYSTEM_ADMIN" && access.membership?.role !== "EVENT_ADMIN") {

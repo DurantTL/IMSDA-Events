@@ -11,7 +11,7 @@ import { withRequestContext } from "@/lib/request-context";
 /**
  * An Area Coordinator approves a Master Guide candidate the club has approved (#1698): the one write a coordinator has
  * here. An active grant and the second sign-in step on their own account; staff acting as a coordinator are refused. The club
- * must have the feature on, and the candidate must be waiting for this step. Everyone else gets "not found".
+ * must be of one of the coordinator's ministries (#843) with the feature on, and the candidate must be waiting for this step. Everyone else gets "not found".
  */
 async function postHandler(request: Request) {
   const originError = rejectCrossOriginRequest(request);

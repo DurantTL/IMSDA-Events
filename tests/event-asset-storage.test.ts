@@ -60,6 +60,14 @@ describe("verifying bytes against the declared type", () => {
     expect(bytesMatchType(pdf, "image/png")).toBe(false);
   });
 
+  it("accepts a WebP only when WEBP follows the RIFF header at byte 8", () => {
+    const riff = (formType: string) => new Uint8Array([...new TextEncoder().encode("RIFF"), 1, 2, 3, 4, ...new TextEncoder().encode(formType)]);
+    expect(bytesMatchType(riff("WEBP"), "image/webp")).toBe(true);
+    expect(bytesMatchType(riff("WAVE"), "image/webp")).toBe(false);
+    expect(bytesMatchType(riff("AVI "), "image/webp")).toBe(false);
+    expect(bytesMatchType(new TextEncoder().encode("RIFF"), "image/webp")).toBe(false);
+  });
+
   it("refuses a file too short to carry a signature", () => {
     expect(bytesMatchType(new Uint8Array([0x25]), "application/pdf")).toBe(false);
     expect(bytesMatchType(new Uint8Array(), "image/png")).toBe(false);

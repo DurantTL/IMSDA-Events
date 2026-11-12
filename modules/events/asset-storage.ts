@@ -41,12 +41,18 @@ export function isAllowedAssetType(value: string): value is AllowedAssetType {
   return Object.hasOwn(ALLOWED_ASSET_TYPES, value);
 }
 
+/** "WEBP", at byte 8 of a WebP file: RIFF alone (bytes 0 to 3) is shared with WAV, AVI and other containers. */
+const WEBP_FORM_TYPE_HEX = "57454250";
+
 /** Whether the bytes actually begin the way the claimed type requires. */
 export function bytesMatchType(bytes: Uint8Array, type: AllowedAssetType) {
   const prefix = Buffer.from(bytes.subarray(0, 12)).toString("hex");
-  return ALLOWED_ASSET_TYPES[type].signatures.some(
+  const signed = ALLOWED_ASSET_TYPES[type].signatures.some(
     (signature) => prefix.startsWith(signature),
   );
+  if (!signed) return false;
+  if (type === "image/webp") return prefix.slice(16, 24) === WEBP_FORM_TYPE_HEX;
+  return true;
 }
 
 /**
