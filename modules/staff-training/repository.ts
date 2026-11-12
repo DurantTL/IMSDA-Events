@@ -6,6 +6,7 @@ import { isClubFeatureEnabled } from "@/modules/club-features/repository";
 import { clubRosterAttendeeTypeLabels, clubYearFor } from "@/modules/club-rosters/domain";
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
 import {
+  STAFF_TRAINING_ATTENDEE_TYPES,
   STAFF_TRAINING_FEATURE_KEY,
   canManageStaffTraining,
   recordAuditName,
@@ -52,8 +53,6 @@ export async function staffTrainingAvailable(organizationId: string, capabilitie
   return isClubFeatureEnabled(organizationId, STAFF_TRAINING_FEATURE_KEY);
 }
 
-const ADULT_TYPES = ["ADULT", "STAFF"] as const;
-
 function toView(row: {
   id: string; kind: string; certificationKey: string | null; workshopCode: string | null; workshopTitle: string | null;
   completedOn: Date; signedOffBy: string | null; createdAt: Date;
@@ -87,7 +86,7 @@ export async function loadStaffTraining(
   const prisma = getPrisma();
   const clubYear = clubYearFor(now);
   const members = await prisma.clubRosterMember.findMany({
-    where: { organizationId, clubYear, status: "ACTIVE", attendeeType: { in: [...ADULT_TYPES] }, personId: { not: null } },
+    where: { organizationId, clubYear, status: "ACTIVE", attendeeType: { in: [...STAFF_TRAINING_ATTENDEE_TYPES] }, personId: { not: null } },
     select: { personId: true, attendeeType: true, person: { select: { firstName: true, lastName: true } } },
   });
   const byPerson = new Map<string, (typeof members)[number]>();
@@ -137,7 +136,7 @@ export async function addStaffTrainingRecord(organizationId: string, input: Staf
       throw new StaffTrainingError("FEATURE_OFF", "That page could not be found.");
     }
     const member = await tx.clubRosterMember.findFirst({
-      where: { organizationId, personId: input.personId, clubYear: clubYearFor(now), status: "ACTIVE", attendeeType: { in: [...ADULT_TYPES] } },
+      where: { organizationId, personId: input.personId, clubYear: clubYearFor(now), status: "ACTIVE", attendeeType: { in: [...STAFF_TRAINING_ATTENDEE_TYPES] } },
       select: { id: true },
     });
     if (!member) throw new StaffTrainingError("PERSON_NOT_ON_ROSTER", "That person is not an adult on this club's roster.");

@@ -92,8 +92,8 @@ describe("ordering and labels", () => {
   it("names a certification by its level and a workshop by its code and title", () => {
     expect(recordLabel({ kind: "CERTIFICATION", certificationKey: "INSTRUCTOR", workshopCode: null, workshopTitle: null })).toBe("Instructor");
     expect(recordLabel({ kind: "WORKSHOP", certificationKey: null, workshopCode: "W-101", workshopTitle: "Campfire safety" })).toBe("W-101 Campfire safety");
-    expect(recordAuditName({ kind: "WORKSHOP", certificationKey: null, workshopCode: "W-101" })).toBe("workshop W-101");
-    expect(recordAuditName({ kind: "CERTIFICATION", certificationKey: "DIRECTOR", workshopCode: null })).toBe("certification Director");
+    expect(recordAuditName({ kind: "WORKSHOP", certificationKey: null })).toBe("workshop");
+    expect(recordAuditName({ kind: "CERTIFICATION", certificationKey: "DIRECTOR" })).toBe("certification Director");
   });
 });
 

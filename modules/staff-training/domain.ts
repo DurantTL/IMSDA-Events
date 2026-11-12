@@ -9,7 +9,6 @@
  */
 
 import type { ClubCapabilities } from "@/modules/organizations/director-grants-domain";
-import { sterlingApplies } from "@/modules/club-features/domain";
 
 export const STAFF_TRAINING_FEATURE_KEY = "staff-training-records";
 export const STAFF_TRAINING_PATH = "staff-training";
@@ -51,9 +50,11 @@ export function canManageStaffTraining(capabilities: Pick<ClubCapabilities, "edi
   return capabilities.editProfile;
 }
 
-/** The roster types that can hold a record: adults, by the same rule as the Sterling Volunteers check. */
+/** The roster types that can hold a record: adults and staff, the same people the Sterling Volunteers check covers. */
+export const STAFF_TRAINING_ATTENDEE_TYPES = ["ADULT", "STAFF"] as const;
+
 export function staffTrainingApplies(attendeeType: string): boolean {
-  return sterlingApplies(attendeeType);
+  return (STAFF_TRAINING_ATTENDEE_TYPES as readonly string[]).includes(attendeeType);
 }
 
 export const WORKSHOP_CODE_MAX = 20;
@@ -108,7 +109,7 @@ export function recordLabel(record: { kind: string; certificationKey: string | n
   return [record.workshopCode, record.workshopTitle].filter(Boolean).join(" ") || "Workshop";
 }
 
-/** The audit's one-line description of a record: the kind and the certification or workshop code. */
-export function recordAuditName(record: { kind: string; certificationKey: string | null; workshopCode: string | null }): string {
-  return record.kind === "CERTIFICATION" ? `certification ${certificationLabel(record.certificationKey)}` : `workshop ${record.workshopCode ?? ""}`.trim();
+/** The audit summary's description of a record: the kind and the certification. Text the club typed (a workshop code) stays in the metadata only. */
+export function recordAuditName(record: { kind: string; certificationKey: string | null }): string {
+  return record.kind === "CERTIFICATION" ? `certification ${certificationLabel(record.certificationKey)}` : "workshop";
 }
