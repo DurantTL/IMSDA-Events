@@ -243,6 +243,7 @@ export const unmappedDynamicPages: Readonly<Record<string, string>> = {
   "/admin/information-forms/[formId]": "One information form, opened from Information forms.",
   "/admin/information-forms/[formId]/responses": "Its responses, opened from the form.",
   "/admin/organizations/[organizationId]/billing": "A club's billing contact, opened from Clubs and churches.",
+  "/admin/organizations/[organizationId]/church-clubs": "A church's clubs for a club year, from Clubs and churches or a club page.",
   "/admin/organizations/[organizationId]/club": "Open one club, from Clubs and churches.",
   "/admin/organizations/[organizationId]/club/honors": "A club's honors, from the club page.",
   "/admin/organizations/[organizationId]/directors": "A club's directors, from the club page.",

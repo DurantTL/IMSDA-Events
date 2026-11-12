@@ -48,7 +48,7 @@ export default async function StaffOpenClubPage({
   const view = staffClubYearView(query?.year);
   const club = await getPrisma().organization.findUnique({
     where: { id: organizationId },
-    select: { type: true, name: true, isActive: true, parentOrganization: { select: { name: true } } },
+    select: { type: true, name: true, isActive: true, parentOrganizationId: true, parentOrganization: { select: { name: true, type: true } } },
   });
   if (!club || club.type !== "CLUB") notFound();
   const imports = await listClubImports(organizationId);
@@ -85,7 +85,13 @@ export default async function StaffOpenClubPage({
           <p className="eyebrow">Open club · view only</p>
           <h2 className="club-name-heading" title={club.name} translate="no">{club.name}</h2>
           <dl className={styles.facts}>
-            <div><dt>Sponsoring church</dt><dd translate={club.parentOrganization ? "no" : undefined}>{club.parentOrganization?.name ?? "No church listed"}</dd></div>
+            <div><dt>Sponsoring church</dt><dd translate={club.parentOrganization ? "no" : undefined}>
+              {club.parentOrganization?.name ?? "No church listed"}
+              {/* Only this page's viewers (system administrators and Clubs Administrators) hold the gate the church summary uses. */}
+              {club.parentOrganizationId && club.parentOrganization?.type === "CHURCH" && (
+                <>{" "}<Link href={`/admin/organizations/${club.parentOrganizationId}/church-clubs`}>Church club summary</Link></>
+              )}
+            </dd></div>
             <div><dt>Status</dt><dd>{club.isActive ? "Active" : "Inactive"}</dd></div>
             <div><dt>Club year</dt><dd>{view.clubYear}</dd></div>
           </dl>
