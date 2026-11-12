@@ -15,6 +15,14 @@
   gap: 8px;
 }
 
+/* On a phone the year is a one-line chip under the name (#1894) whose width changes when the web font arrives; the button
+   goes first there, at the line's start, so the font swap never moves it (keep-place load shift, #1557). */
+@media (max-width: 640px) {
+  .tools > :global(.on-dark) {
+    order: -1;
+  }
+}
+
 .toggle {
   flex: none;
   width: var(--touch-target);

@@ -23,6 +23,8 @@ import {
   viewerCanSeeClub,
   viewerCanWriteForClub,
   viewerSeesDrafts,
+  isTltFormTemplateKey,
+  TLT_FORM_TEMPLATE_KEYS,
   parseClubFormTemplate,
   fillDefinition,
   allFields,
@@ -278,6 +280,10 @@ export type ClubFormListFilter = {
   /** Narrow in the query, so a long list can't hide a match behind the row cap (#1166). */
   status?: "DRAFT" | "SUBMITTED";
   clubYear?: string;
+  /** The TLT forms inbox (#1686): a name search on the member or subject. Matches only the label, never an answer. */
+  subjectSearch?: string;
+  /** The TLT forms inbox (#1686): submissions tied by id to this person, through the roster member the form was filled for or added to. */
+  personId?: string;
 };
 
 function visibleWhere(viewer: ClubFormsViewer, filter: ClubFormListFilter): Prisma.ClubFormSubmissionWhereInput {
@@ -285,14 +291,21 @@ function visibleWhere(viewer: ClubFormsViewer, filter: ClubFormListFilter): Pris
     throw new ClubFormError("CLUB_NOT_FOUND", "That club could not be found.");
   }
   const organizationId = viewer.kind === "CLUB_LEADER" ? viewer.organizationId : filter.organizationId;
+  const tltDirector = viewer.kind === "TLT_DIRECTOR";
   return {
     ...(organizationId
       ? { organizationId }
       // A submission with no club (#1229) is conference staff's alone: an Area Coordinator's unfiltered list leaves it out.
-      : viewer.kind === "STAFF" ? {} : { organizationId: { not: null } }),
+      // The TLT director (#1686) also reads a "Not listed" TLT Application, which is one of her three forms.
+      : viewer.kind === "STAFF" || tltDirector ? {} : { organizationId: { not: null } }),
     ...(filter.rosterMemberId ? { rosterMemberId: filter.rosterMemberId } : {}),
     // A form that has been switched off blocks new fills and links only: past submissions stay readable.
-    ...(filter.templateKey ? { template: { key: filter.templateKey } } : {}),
+    // The TLT director never gets past her three forms, whatever the address asks for (#1686).
+    ...(tltDirector
+      ? { template: { key: !filter.templateKey ? { in: [...TLT_FORM_TEMPLATE_KEYS] } : isTltFormTemplateKey(filter.templateKey) ? filter.templateKey : { in: [] as string[] } } }
+      : filter.templateKey ? { template: { key: filter.templateKey } } : {}),
+    ...(filter.subjectSearch ? { subjectName: { contains: filter.subjectSearch.slice(0, 80), mode: "insensitive" as const } } : {}),
+    ...(filter.personId ? { OR: [{ rosterMember: { personId: filter.personId } }, { rosterActionMember: { personId: filter.personId } }] } : {}),
     ...(filter.clubYear ? { clubYear: filter.clubYear } : {}),
     // A viewer who can't see drafts only ever gets submitted forms, and asking them for drafts matches nothing.
     ...(viewerSeesDrafts(viewer)
@@ -456,13 +469,17 @@ export async function getSubmissionForViewer(
     },
   });
   if (!row) throw new ClubFormError("SUBMISSION_NOT_FOUND", "That form could not be found.");
+  // The TLT director reads and prints; she never edits a draft or adds a form to a roster (#1686).
+  if (viewer.kind === "TLT_DIRECTOR" && purpose !== "VIEW" && purpose !== "PRINT") {
+    throw new ClubFormError("FORBIDDEN", "The TLT director can read TLT forms but not change them.");
+  }
   const current = parseClubFormTemplate(row.template);
   // A submission is shown against the version it was filled in against (#712). A draft being edited moves to
   // the latest published version, which is what its next save is validated against.
   const editingDraft = purpose === "EDIT" && row.status === "DRAFT";
   const template = editingDraft ? current : await getClubFormTemplateAtVersion(current, row.templateVersion, prisma);
   const restricted = new Set(restrictedFieldKeys(viewer, row.organizationId, template));
-  const reveal = viewerCanRevealSensitive(viewer, row.organizationId);
+  const reveal = viewerCanRevealSensitive(viewer, row.organizationId, template.key);
   const revealBirthDates = viewerCanRevealBirthDates(viewer, row.organizationId);
   // Between a deploy and the human-run `npm run club-forms:unseal-emergency`, an older submission still holds the
   // emergency answers inside its sealed value. A viewer who cannot open it sees Restricted, not a blank (ADR 0005 Addendum G).
@@ -487,7 +504,22 @@ export async function getSubmissionForViewer(
   const sensitiveKeys = new Set(template.sensitiveFieldKeys);
   const holdsSensitive = row.hasSensitiveAnswers
     || Object.keys(row.answers as Record<string, unknown>).some((key) => sensitiveKeys.has(key));
-  if (holdsSensitive) {
+  if (viewer.kind === "TLT_DIRECTOR") {
+    // Every view by the TLT director is recorded, with or without sensitive answers (#1686): ids and the form key only,
+    // no name and no answer. Written first; if it fails nothing is returned.
+    await writeAuditLog({
+      action: "TLT_FORM_SUBMISSION_VIEWED",
+      entityType: "ClubFormSubmission",
+      entityId: row.id,
+      summary: "The TLT director opened a TLT form.",
+      metadata: {
+        ...viewerAuditFields(viewer).metadata,
+        submissionId: row.id,
+        templateKey: template.key,
+        organizationId: row.organizationId,
+      },
+    });
+  } else if (holdsSensitive) {
     const who = viewerAuditFields(viewer);
     await writeAuditLog({
       actorUserId: who.actorUserId,

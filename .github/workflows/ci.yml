@@ -187,6 +187,10 @@ jobs:
       # owed line per redemption, cancellation dropping it, parallel redemptions,
       # and no double billing on church-billed events (#545).
       - run: npm run test:church-promo-codes
+      # Real-database check of promo codes restricted to attendee types: the real
+      # submission and staff routines, the eligible subtotal, per-person and staff
+      # use, unrestricted codes unchanged, and the last use going to one submission (#102).
+      - run: npm run test:promo-attendee-types
       # Real-database check of locations inside one event: the required pick on a
       # real club submit, per-location capacity under the location row lock (two
       # clubs racing for the last seats, exactly one wins), per-location closing
@@ -258,6 +262,8 @@ jobs:
       - run: npm run test:event-budget
       # Real-database check of the optional baptism follow-up notice (#1680): off by default, nothing with no event lead, one email per recipient (each lead and the church pastor) for a new name, nothing for the same names again, only the new name when one is added, a removed name does nothing, two saves racing on one new name leave one ledger row and no duplicate email, the lead only when no pastor is on file, and an audit entry with counts and roles only.
       - run: npm run test:baptism-follow-up
+      # Real-database check of the optional Event staffing sheet (#1678): off by default, who may switch it, who reads and who changes activities, only people registered for the event or on its staff can be assigned, one lead per activity, gaps worked out on the rows, each change audited with ids and counts only, the CSV with names and roles only, and each assigned person seeing only their own assignments.
+      - run: npm run test:event-staffing
       - run: npm run test:honor-class-requirements
       # Real-database check of the Honors Weekend class waitlist (#831): join order, offers to the
       # next in line (one director emailed per offer), accept once, an unaccepted offer passing on

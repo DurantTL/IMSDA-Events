@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   sweepClassWaitlists: vi.fn(),
   sendDueClassChangeEmails: vi.fn(),
   sendDueHonorWatchSummaries: vi.fn(),
+  sendDueMonthlyRecordReminders: vi.fn(),
   healthRecordsEnabled: vi.fn(),
 }));
 
@@ -47,6 +48,7 @@ vi.mock("@/modules/calendar/deadline-reminders", () => ({ reconcileDeadlineRemin
 vi.mock("@/modules/honors/waitlist-repository", () => ({ sweepClassWaitlists: mocks.sweepClassWaitlists }));
 vi.mock("@/modules/honors/class-change-emails", () => ({ sendDueClassChangeEmails: mocks.sendDueClassChangeEmails }));
 vi.mock("@/modules/honors/watch-emails", () => ({ sendDueHonorWatchSummaries: mocks.sendDueHonorWatchSummaries }));
+vi.mock("@/modules/club-reports/monthly-reminders", () => ({ sendDueMonthlyRecordReminders: mocks.sendDueMonthlyRecordReminders }));
 
 vi.mock("@/modules/communications/message-file-sweep", () => ({ sweepMessageFiles: mocks.sweepMessageFiles }));
 vi.mock("@/modules/communications/message-file-config", () => ({ messageFileSweepDeletes: mocks.messageFileSweepDeletes }));
@@ -72,6 +74,7 @@ beforeEach(() => {
   mocks.sweepClassWaitlists.mockResolvedValue({ classes: 0, offered: 0, lapsed: 0, failed: 0, budgetExhausted: false });
   mocks.sendDueClassChangeEmails.mockResolvedValue({ status: "RAN", immediate: { changes: 0, queued: 0, skippedStale: 0, failed: 0 }, summaries: { due: false, instructors: 0, queued: 0, noChanges: 0, failed: 0 }, delivered: 0, pruned: 0 });
   mocks.sendDueHonorWatchSummaries.mockResolvedValue({ status: "RAN", due: false, watches: 0, queued: 0, noChanges: 0, failed: 0, messages: 0, delivered: 0 });
+  mocks.sendDueMonthlyRecordReminders.mockResolvedValue({ status: "NOT_DUE", reportMonth: null, reminded: 0, noRecipient: 0, failed: 0, summaries: 0, delivered: 0 });
   mocks.healthRecordsEnabled.mockReturnValue(false);
   mocks.refreshDueCalendarFeeds.mockResolvedValue({ due: 0, refreshed: 0, failed: 0 });
   mocks.sweepHostedCheckouts.mockResolvedValue({ withdrawn: 0, deleted: 0, failed: 0 });
@@ -288,6 +291,7 @@ describe("the sweep records every remaining step for the System report (#1377)",
       status: "RAN", immediate: { changes: 3, queued: 2, skippedStale: 0, failed: 1 }, summaries: { due: true, instructors: 2, queued: 2, noChanges: 0, failed: 0 }, delivered: 3, pruned: 7,
     });
     mocks.sendDueHonorWatchSummaries.mockResolvedValueOnce({ status: "RAN", due: true, watches: 4, queued: 3, noChanges: 1, failed: 0, messages: 3, delivered: 3 });
+    mocks.sendDueMonthlyRecordReminders.mockResolvedValueOnce({ status: "RAN", reportMonth: "2026-10", reminded: 3, noRecipient: 1, failed: 0, summaries: 2, delivered: 8 });
     mocks.healthRecordsEnabled.mockReturnValue(true);
     mocks.runHealthSnapshotSweep.mockResolvedValueOnce({
       started: { events: 2, taken: 6, skipped: 1, failed: 1 }, retention: { ran: true, deleted: 4, heldSkipped: 2, batches: 1, backlogRemaining: false },
@@ -305,6 +309,7 @@ describe("the sweep records every remaining step for the System report (#1377)",
     expect(recorded()).toContainEqual(["class-waitlist-sweep", "SUCCEEDED", { classes: 5, offered: 2, lapsed: 1, failed: 0, budgetExhausted: true }]);
     expect(recorded()).toContainEqual(["instructor-class-emails", "SUCCEEDED", { status: "RAN", queued: 4, failed: 1, delivered: 3 }]);
     expect(recorded()).toContainEqual(["honor-watch-summaries", "SUCCEEDED", { status: "RAN", watches: 4, queued: 3, failed: 0, delivered: 3 }]);
+    expect(recorded()).toContainEqual(["monthly-record-reminders", "SUCCEEDED", { status: "RAN", reminded: 3, noRecipient: 1, failed: 0, summaries: 2, delivered: 8 }]);
     expect(recorded()).toContainEqual(["health-snapshot-sweep", "SUCCEEDED", { enabled: true, taken: 6, sealFailed: 1, deleted: 4, heldSkipped: 2 }]);
     expect(recorded()).toContainEqual(["retention-cleanup", "SUCCEEDED", { community: 5, alertFeed: 6, analytics: 7 }]);
     expect(JSON.stringify(recorded())).not.toContain("secret-key-name");
@@ -317,6 +322,7 @@ describe("the sweep records every remaining step for the System report (#1377)",
     mocks.sweepClassWaitlists.mockRejectedValueOnce(new Error("synthetic"));
     mocks.sendDueClassChangeEmails.mockRejectedValueOnce(new Error("synthetic"));
     mocks.sendDueHonorWatchSummaries.mockRejectedValueOnce(new Error("synthetic"));
+    mocks.sendDueMonthlyRecordReminders.mockRejectedValueOnce(new Error("synthetic"));
     mocks.runHealthSnapshotSweep.mockRejectedValueOnce(new Error("synthetic"));
     mocks.pruneAlertFeed.mockRejectedValueOnce(new Error("synthetic"));
     mocks.pruneExpiredCommunityContent.mockResolvedValueOnce({ removedPosts: 5 });
@@ -324,7 +330,7 @@ describe("the sweep records every remaining step for the System report (#1377)",
 
     const response = await POST(request());
     expect(response.status).toBe(200);
-    for (const job of ["alert-scan", "deadline-reminder-preparation", "location-waitlist-digest", "class-waitlist-sweep", "instructor-class-emails", "honor-watch-summaries"]) {
+    for (const job of ["alert-scan", "deadline-reminder-preparation", "location-waitlist-digest", "class-waitlist-sweep", "instructor-class-emails", "honor-watch-summaries", "monthly-record-reminders"]) {
       expect(recorded()).toContainEqual([job, "FAILED", undefined]);
     }
     expect(recorded()).toContainEqual(["health-snapshot-sweep", "FAILED", undefined]);

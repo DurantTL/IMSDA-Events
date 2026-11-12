@@ -7,13 +7,13 @@
 // the module to builderFieldModules), never editing the sidebar.
 // See docs/FORM-BUILDER-PALETTE.md.
 import {
-  Calculator, Calendar, CircleDot, ChevronDown, Church, FileCheck2, Hash, Layers3, ListChecks, ListOrdered,
+  Calculator, Calendar, CircleDot, ChevronDown, Church, FileCheck2, Hash, Info, Layers3, ListChecks, ListOrdered,
   Mail, MapPin, AlignLeft, PenLine, Phone, School, SquareCheck, Tag, Type, DollarSign, Users, type LucideIcon,
 } from "lucide-react";
 import { builderFieldModules, planModuleInsert, type BuilderModuleDefinition } from "@/modules/forms/builder-modules";
 import { acknowledgmentTypePatch } from "@/components/acknowledgment-field-settings";
 import { signatureTypePatch } from "@/components/signature-field-settings";
-import type { RegistrationFormField } from "@/modules/forms/definition";
+import { INFORMATION_PLACEHOLDER_TEXT, type RegistrationFormField } from "@/modules/forms/definition";
 
 /** What an entry's `add()` is given: the fields already on the form (for unique keys) and an id maker. */
 export type PaletteInsertContext = {
@@ -217,6 +217,8 @@ type TypeEntrySpec = {
   keywords: string[];
   extra?: (field: RegistrationFormField) => Partial<RegistrationFormField>;
   informationOnly?: boolean;
+  /** See `PaletteEntry.informationForm`. */
+  informationForm?: boolean;
 };
 
 const choiceOptions = ["Option one", "Option two"];
@@ -245,6 +247,7 @@ const typeEntrySpecs: TypeEntrySpec[] = [
       { key: "working_on", label: "Working on this year", type: "TEXT", required: false },
     ],
   }) },
+  { type: "INFORMATION", label: "Information", description: "A heading, text and an optional highlighted note. Shown, never answered", group: PALETTE_GROUP_IDS.general, icon: Info, keywords: ["information", "info", "note", "notice", "text", "heading", "instructions", "explain"], informationForm: false, extra: () => ({ information: { text: INFORMATION_PLACEHOLDER_TEXT } }) },
   { type: "CALCULATED", label: "Automatic fee", description: "A fixed fee added to the total", group: PALETTE_GROUP_IDS.money, icon: Calculator, keywords: ["price", "registration fee", "cost", "charge", "payment"] },
 ];
 
@@ -257,6 +260,7 @@ function typeEntry(spec: TypeEntrySpec): PaletteEntry {
     icon: spec.icon,
     keywords: spec.keywords,
     ...(spec.informationOnly ? { informationOnly: true } : {}),
+    ...(spec.informationForm !== undefined ? { informationForm: spec.informationForm } : {}),
     add(context) {
       const field = baseField(context, spec.label, spec.type);
       return { fields: [{ ...field, ...spec.extra?.(field) }] };

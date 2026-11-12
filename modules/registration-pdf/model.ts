@@ -148,6 +148,8 @@ export function excludedFieldKeys(definition: RegistrationFormDefinition): Set<s
       || field.type === "CALCULATED"
       // A typed signature (#1265) is evidence: staff see its record, and the answer never prints or mails.
       || field.type === "SIGNATURE"
+      // An Information block (#284) is text for the form, never an answer.
+      || field.type === "INFORMATION"
     ) excluded.add(field.key);
   }
   for (let changed = true; changed;) {

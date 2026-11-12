@@ -47,6 +47,26 @@ export const walkthroughCoordinator = {
 } as const;
 
 /**
+ * The Clubs Administrator walkthroughs' fixtures (#1882): a staff user (never a system administrator, no event membership) holding an
+ * active Clubs Administrator grant. Staff two-step sign-in is checked when someone signs in, and no walkthrough signs in as them: the
+ * session is minted directly (`createDatabaseSession`), as the other browser checks do, after a placeholder enrolment is added the way
+ * the director's is. `searchWord` is a word only the sample club "Sample Harbor Adventurers" has.
+ */
+export const walkthroughClubsAdmin = {
+  id: `${W}_user_clubsadmin`,
+  email: `${W}.clubsadmin@example.test`,
+  password: "Sample-ClubsAdmin-Pass-2026!",
+  displayName: "Jules Sample",
+  searchWord: "Harbor",
+} as const;
+
+/** Club leader invites for the Clubs Administrator walkthroughs: one sent (Invited) and one not sent yet (Draft). Sample people, example.test addresses. */
+export const walkthroughClubInvites = [
+  { id: `${W}_invite_sent`, clubId: `${W}_club_harbor`, name: "Reese Placeholder", email: `${W}.invite.sent@example.test`, role: "DIRECTOR", status: "SENT" },
+  { id: `${W}_invite_draft`, clubId: `${W}_club_ridge`, name: "Quinn Mockup", email: `${W}.invite.draft@example.test`, role: "DEPUTY", status: "PENDING" },
+] as const;
+
+/**
  * The family walkthroughs' fixtures (#1883): an attendee account with one registration for a sample family event. The registration
  * has a balance (part paid, part owing), two sample attendees with a choice they can change, a contact the account can update,
  * and the event has a synthetic cancellation policy, so My registrations shows every action a family can use. Square is not set
@@ -216,6 +236,9 @@ export async function deleteWalkthroughFixtures(prisma: PrismaClient) {
   await prisma.registrationForm.deleteMany({ where: { id: mine } });
   await prisma.event.deleteMany({ where: { id: walkthroughIds.event } });
   await prisma.attendeeAccount.deleteMany({ where: { id: { in: fixtureAccountIds } } });
+  // The sample Clubs Administrator (#1882): the sessions, credential, enrolment and grant go with the user (they cascade).
+  await prisma.userSession.deleteMany({ where: { userId: walkthroughClubsAdmin.id } });
+  await prisma.user.deleteMany({ where: { id: walkthroughClubsAdmin.id } });
   await prisma.clubProfile.deleteMany({ where: orgs });
   await prisma.organization.deleteMany({ where: { id: { in: allClubIds } } });
   await prisma.organization.deleteMany({ where: { id: { in: allChurchIds } } });
@@ -392,8 +415,30 @@ export async function createWalkthroughFixtures(prisma: PrismaClient) {
     data: { accountId: walkthroughCoordinator.id, method: "TOTP", status: "ACTIVE", sealedSecret: sealSecret(authenticatorSecret, "attendee-mfa-totp-secret"), confirmedAt: now },
   });
 
+  await createClubsAdminFixtures(prisma, now);
   await createFamilyFixtures(prisma, now);
   return { authenticatorSecret };
+}
+
+/** The sample Clubs Administrator and the club invites their walkthroughs show (#1882). The invites need the area clubs, so this runs after them. */
+async function createClubsAdminFixtures(prisma: PrismaClient, now: Date) {
+  const { hashPassword } = await import("../../modules/access/passwords");
+  const day = 86_400_000;
+  await prisma.user.create({
+    data: {
+      id: walkthroughClubsAdmin.id, email: walkthroughClubsAdmin.email, displayName: walkthroughClubsAdmin.displayName, accountStatus: "ACTIVE", activatedAt: now,
+      credential: { create: { passwordHash: await hashPassword(walkthroughClubsAdmin.password) } },
+    },
+  });
+  await prisma.clubsAdministratorGrant.create({ data: { userId: walkthroughClubsAdmin.id } });
+  for (const invite of walkthroughClubInvites) {
+    await prisma.clubInvite.create({
+      data: {
+        id: invite.id, organizationId: invite.clubId, email: invite.email, name: invite.name, role: invite.role, status: invite.status, source: "IMPORT",
+        ...(invite.status === "SENT" ? { sentAt: new Date(now.getTime() - 5 * day), sentCount: 1, expiresAt: new Date(now.getTime() + 9 * day) } : {}),
+      },
+    });
+  }
 }
 
 /** The family account, its sample event (with a cancellation policy) and its one registration, part paid. */
@@ -537,6 +582,19 @@ export async function enrolPlaceholderTwoStep(prisma: PrismaClient, accountId: s
     where: { accountId },
     update: { status: "ACTIVE" },
     create: { accountId, method: "TOTP", status: "ACTIVE", sealedSecret: `${W}-placeholder-not-a-secret`, confirmedAt: new Date() },
+  });
+}
+
+/**
+ * Gives the sample Clubs Administrator a placeholder authenticator enrolment (#1882), the way the director gets one. Staff two-step
+ * sign-in is checked when a person signs in; no code is ever checked here, and the walkthrough session is minted directly. It is
+ * removed with the user.
+ */
+export async function enrolPlaceholderStaffTwoStep(prisma: PrismaClient, userId: string = walkthroughClubsAdmin.id) {
+  await prisma.userMfaEnrollment.upsert({
+    where: { userId },
+    update: { status: "ACTIVE" },
+    create: { userId, method: "TOTP", status: "ACTIVE", sealedSecret: `${W}-placeholder-not-a-secret`, confirmedAt: new Date() },
   });
 }
 

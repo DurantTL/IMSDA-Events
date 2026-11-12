@@ -11,6 +11,11 @@ const mocks = vi.hoisted(() => {
       super(code);
     }
   }
+  class MockSquareError extends Error {
+    constructor(public readonly code: string) {
+      super(code);
+    }
+  }
   class MockStationError extends Error {
     constructor(public readonly code: string) {
       super(code);
@@ -25,6 +30,7 @@ const mocks = vi.hoisted(() => {
     MockServiceError,
     MockPaymentError,
     MockStationError,
+    MockSquareError,
     MockAccessDeniedError,
     rejectCrossOriginRequest: vi.fn(),
     resolveStation: vi.fn(),
@@ -36,6 +42,9 @@ const mocks = vi.hoisted(() => {
     checkInStationFamily: vi.fn(),
     recordStationPayment: vi.fn(),
     noteStationSquareAppPayment: vi.fn(),
+    listStationSquareCandidates: vi.fn(),
+    matchStationSquarePayment: vi.fn(),
+    stationPaymentHistoryAfterWrite: vi.fn(),
     checkLookupRateLimit: vi.fn(),
     requirePermission: vi.fn(),
     getCurrentSession: vi.fn(),
@@ -56,6 +65,7 @@ vi.mock("@/modules/access/authorization", () => ({
 vi.mock("@/modules/access/current-session", () => ({ getCurrentSession: mocks.getCurrentSession }));
 vi.mock("@/modules/events/repository", () => ({ findActiveMembership: vi.fn() }));
 vi.mock("@/modules/payments/repository", () => ({ PaymentOperationError: mocks.MockPaymentError }));
+vi.mock("@/modules/payments/square-match-repository", () => ({ SquareMatchOperationError: mocks.MockSquareError }));
 vi.mock("@/modules/checkin-stations/repository", () => ({
   CheckInStationError: mocks.MockStationError,
   resolveStation: mocks.resolveStation,
@@ -70,6 +80,9 @@ vi.mock("@/modules/checkin-stations/service", () => ({
   checkInStationFamily: mocks.checkInStationFamily,
   recordStationPayment: mocks.recordStationPayment,
   noteStationSquareAppPayment: mocks.noteStationSquareAppPayment,
+  listStationSquareCandidates: mocks.listStationSquareCandidates,
+  matchStationSquarePayment: mocks.matchStationSquarePayment,
+  stationPaymentHistoryAfterWrite: mocks.stationPaymentHistoryAfterWrite,
 }));
 vi.mock("@/modules/rate-limit/service", () => ({ checkCheckInStationLookupRateLimit: mocks.checkLookupRateLimit }));
 
@@ -77,6 +90,8 @@ import { POST as lookupPost } from "@/app/api/check-in-station/lookup/route";
 import { POST as checkInPost } from "@/app/api/check-in-station/check-in/route";
 import { POST as paymentPost } from "@/app/api/check-in-station/payment/route";
 import { POST as squareNotePost } from "@/app/api/check-in-station/square-app-note/route";
+import { POST as squareUnmatchedPost } from "@/app/api/check-in-station/square-unmatched/route";
+import { POST as squareMatchPost } from "@/app/api/check-in-station/square-match/route";
 import { POST as stopPost } from "@/app/api/check-in-station/stop/route";
 import { POST as startPost } from "@/app/api/events/[eventId]/check-in-stations/route";
 import { DELETE as revokeDelete } from "@/app/api/events/[eventId]/check-in-stations/[stationId]/route";
@@ -108,6 +123,9 @@ beforeEach(() => {
   mocks.checkInStationFamily.mockResolvedValue([{ attendeeId: "attendee_1", status: "CHECKED_IN" }]);
   mocks.recordStationPayment.mockResolvedValue({ state: "PAID" });
   mocks.noteStationSquareAppPayment.mockResolvedValue({ state: "DUE", balanceCents: 1000, squareAppNote: null });
+  mocks.stationPaymentHistoryAfterWrite.mockResolvedValue({});
+  mocks.listStationSquareCandidates.mockResolvedValue({ candidates: [], unavailable: false });
+  mocks.matchStationSquarePayment.mockResolvedValue({ state: "PAID" });
   mocks.getCurrentSession.mockResolvedValue({ user: { id: "user_1" } });
   mocks.requirePermission.mockResolvedValue({ user: { id: "user_1", email: "a@example.test", displayName: "Casey" } });
   mocks.startStation.mockResolvedValue({
@@ -123,6 +141,8 @@ describe("check-in station API: access (#892)", () => {
     ["check-in", checkInPost, { registrationId: "r1", items: [{ attendeeId: "a1", idempotencyKey: key }] }],
     ["payment", paymentPost, { registrationId: "r1", method: "CASH", amountCents: 100, idempotencyKey: key }],
     ["square-app-note", squareNotePost, { registrationId: "r1", amountCents: 100 }],
+    ["square-unmatched", squareUnmatchedPost, { registrationId: "r1" }],
+    ["square-match", squareMatchPost, { registrationId: "r1", providerPaymentId: "sq_1" }],
     ["stop", stopPost, {}],
   ] as const)("rejects a revoked, expired or missing station on %s and clears its cookie", async (_name, handler, body) => {
     mocks.resolveStation.mockResolvedValue(null);
@@ -259,6 +279,74 @@ describe("check-in station API: payments (#892)", () => {
     expect(response.status).toBe(200);
     expect(mocks.stopStation).toHaveBeenCalledWith(station);
     expect(response.headers.get("set-cookie")).toContain("imsda_check_in_station=;");
+  });
+});
+
+describe("check-in station API: balance reason and Square match (#1577)", () => {
+  const body = { registrationId: "registration_1", items: [{ attendeeId: "attendee_1", idempotencyKey: key }] };
+
+  it("passes a balance reason through and returns the refreshed history", async () => {
+    mocks.stationPaymentHistoryAfterWrite.mockResolvedValue({ paymentHistory: [{ id: "reason:1" }] });
+    const withReason = { ...body, balanceReason: { code: "PAYING_LATER", note: " Pays Friday " } };
+    const response = await checkInPost(post("/api/check-in-station/check-in", withReason));
+    expect(response.status).toBe(200);
+    expect(mocks.checkInStationFamily).toHaveBeenCalledWith(station, { ...body, balanceReason: { code: "PAYING_LATER", note: "Pays Friday" } });
+    expect(await response.json()).toMatchObject({ paymentHistory: [{ id: "reason:1" }] });
+  });
+
+  it("answers 422 in plain words when a balance reason is missing", async () => {
+    mocks.checkInStationFamily.mockRejectedValue(new mocks.MockServiceError("BALANCE_REASON_REQUIRED"));
+    const response = await checkInPost(post("/api/check-in-station/check-in", body));
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ error: "BALANCE_REASON_REQUIRED" });
+  });
+
+  it("rejects Other without a note, an unknown reason, and a note over 300 characters", async () => {
+    for (const balanceReason of [{ code: "OTHER", note: "" }, { code: "BECAUSE", note: "x" }, { code: "PAYING_LATER", note: "x".repeat(301) }]) {
+      expect((await checkInPost(post("/api/check-in-station/check-in", { ...body, balanceReason }))).status).toBe(400);
+    }
+    expect(mocks.checkInStationFamily).not.toHaveBeenCalled();
+  });
+
+  it("answers 403 on both Square routes without the payments capability", async () => {
+    expect((await squareUnmatchedPost(post("/api/check-in-station/square-unmatched", { registrationId: "r1" }))).status).toBe(403);
+    expect((await squareMatchPost(post("/api/check-in-station/square-match", { registrationId: "r1", providerPaymentId: "sq_1" }))).status).toBe(403);
+    expect(mocks.listStationSquareCandidates).not.toHaveBeenCalled();
+    expect(mocks.matchStationSquarePayment).not.toHaveBeenCalled();
+  });
+
+  it("lists candidates for this registration on the lookup rate limit", async () => {
+    mocks.resolveStation.mockResolvedValue(financeStation);
+    mocks.listStationSquareCandidates.mockResolvedValue({ candidates: [{ providerPaymentId: "sq_1", amountCents: 6000, whenLabel: "", overBalance: false }], unavailable: false, alreadyHasPayment: false });
+    const response = await squareUnmatchedPost(post("/api/check-in-station/square-unmatched", { registrationId: "registration_1" }));
+    expect(response.status).toBe(200);
+    expect(mocks.checkLookupRateLimit).toHaveBeenCalledWith("station_1", 60);
+    expect(mocks.listStationSquareCandidates).toHaveBeenCalledWith(financeStation, "registration_1");
+    expect(await response.json()).toEqual({ candidates: [{ providerPaymentId: "sq_1", amountCents: 6000, whenLabel: "", overBalance: false }], unavailable: false, alreadyHasPayment: false });
+  });
+
+  it("matches only the named payment and never accepts a duplicate acknowledgement", async () => {
+    mocks.resolveStation.mockResolvedValue(financeStation);
+    const ok = await squareMatchPost(post("/api/check-in-station/square-match", { registrationId: "registration_1", providerPaymentId: "sq_1" }));
+    expect(ok.status).toBe(200);
+    expect(mocks.matchStationSquarePayment).toHaveBeenCalledWith(financeStation, { registrationId: "registration_1", providerPaymentId: "sq_1" });
+    const tampered = await squareMatchPost(post("/api/check-in-station/square-match", { registrationId: "registration_1", providerPaymentId: "sq_1", acknowledgeDuplicate: true }));
+    expect(tampered.status).toBe(400);
+    expect(mocks.matchStationSquarePayment).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["PAYMENT_LIKELY_DUPLICATE", 409, /already shows a payment/],
+    ["PAYMENT_ALREADY_RECORDED", 409, /already recorded/],
+    ["SQUARE_UNREACHABLE", 503, /Square could not be reached/],
+    ["SQUARE_NOT_CONFIGURED", 503, /Square could not be reached/],
+    ["REGISTRATION_NOT_FOUND", 404, /could not find/],
+  ])("maps %s to a plain station message", async (code, status, message) => {
+    mocks.resolveStation.mockResolvedValue(financeStation);
+    mocks.matchStationSquarePayment.mockRejectedValue(new mocks.MockSquareError(code));
+    const response = await squareMatchPost(post("/api/check-in-station/square-match", { registrationId: "registration_1", providerPaymentId: "sq_1" }));
+    expect(response.status).toBe(status);
+    expect((await response.json()).message).toMatch(message);
   });
 });
 

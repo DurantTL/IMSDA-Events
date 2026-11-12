@@ -2,7 +2,7 @@ import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/modules/audit/audit-service";
-import { clubFormClubLabel, formatClubFormAnswer, schoolDetailFieldKeysFor, viewerCanSeeSchoolDetails, type ClubFormsViewer } from "@/modules/club-forms/domain";
+import { clubFormClubLabel, formatClubFormAnswer, isTltFormTemplateKey, schoolDetailFieldKeysFor, viewerAuditFields, viewerCanSeeSchoolDetails, type ClubFormsViewer } from "@/modules/club-forms/domain";
 import { ClubFormError } from "@/modules/club-forms/errors";
 import { getClubFormTemplateForStaff } from "@/modules/club-forms/templates";
 import { exportColumnsAcrossVersions, listClubFormTemplateVersions } from "@/modules/club-forms/versions";
@@ -19,7 +19,10 @@ export async function buildClubFormsCsv(
   viewer: ClubFormsViewer,
   input: { templateKey: string; organizationId?: string },
 ) {
-  if (viewer.kind !== "STAFF") throw new ClubFormError("FORBIDDEN", "Only conference staff can export forms.");
+  // Conference staff, or the TLT director for her three TLT forms only (#1686); the same file either way.
+  if (viewer.kind !== "STAFF" && !(viewer.kind === "TLT_DIRECTOR" && isTltFormTemplateKey(input.templateKey))) {
+    throw new ClubFormError("FORBIDDEN", "Only conference staff can export forms.");
+  }
   const prisma = getPrisma();
   const template = await getClubFormTemplateForStaff(input.templateKey, prisma);
   // Columns cover every version (#712): a field a later version dropped or hid still has answers in older submissions.
@@ -66,12 +69,12 @@ export async function buildClubFormsCsv(
   });
 
   await writeAuditLog({
-    actorUserId: viewer.userId,
+    ...(viewer.kind === "STAFF" ? { actorUserId: viewer.userId } : {}),
     action: "CLUB_FORMS_EXPORTED",
     entityType: "ClubFormTemplate",
     entityId: template.id,
     summary: "Exported submitted club forms (non-sensitive columns).",
-    metadata: { templateKey: template.key, rowCount: rows.length, organizationId: input.organizationId ?? null },
+    metadata: { ...(viewer.kind === "STAFF" ? {} : viewerAuditFields(viewer).metadata), templateKey: template.key, rowCount: rows.length, organizationId: input.organizationId ?? null },
   });
   return { filename: `${template.key}.csv`, csv: toCsv([header, ...body]), rowCount: rows.length };
 }

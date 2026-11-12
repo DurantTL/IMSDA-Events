@@ -19,7 +19,7 @@ export const MAX_RULE_CONDITIONS = 10;
 
 /** The questions a rule on `field` can look at: not itself, and a registration-level question never looks at an attendee answer. */
 export function ruleControllerChoices(field: RegistrationFormField, allFields: readonly RegistrationFormField[]): RegistrationFormField[] {
-  return allFields.filter((candidate) => candidate.id !== field.id && (field.scope === "ATTENDEE" || candidate.scope === "REGISTRATION"));
+  return allFields.filter((candidate) => candidate.id !== field.id && candidate.type !== "INFORMATION" && (field.scope === "ATTENDEE" || candidate.scope === "REGISTRATION"));
 }
 
 /** A condition on a question, set up with its first answer so the row is never a blank. */
