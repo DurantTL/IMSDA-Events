@@ -507,7 +507,9 @@ async function blankTransferText(tx: Prisma.TransactionClient, personId: string,
  *     membership being erased, so it never keeps a Person. This club's honor
  *     entries are deleted only when the Person itself is deleted (the
  *     foreign key stays `onDelete: Restrict`, so no other path drops honor
- *     history silently; a kept Person keeps their honor history).
+ *     history silently; a kept Person keeps their honor history);
+ *   - deletes the club's Master Guide candidate row (#1698), unless the
+ *     person still has another non-removed roster row in this club.
  *
  * The Person is kept when something outside this membership still needs it: a
  * registration, an account link, another roster or club's records, or an item
@@ -553,10 +555,15 @@ export async function removeRosterMember(organizationId: string, memberId: strin
       classCompletionsErased = (await tx.memberClassCompletion.deleteMany({
         where: { organizationId, personId: member.personId },
       })).count;
-      // The club's Master Guide candidate row (#1698) belongs to the membership too, so it goes with it.
-      masterGuideCandidatesErased = (await tx.masterGuideCandidate.deleteMany({
-        where: { organizationId, personId: member.personId },
-      })).count;
+      // The club's Master Guide candidate row (#1698) belongs to the membership too: erased with the last non-removed row of this person in this club.
+      const otherClubRows = await tx.clubRosterMember.count({
+        where: { organizationId, personId: member.personId, id: { not: memberId }, status: { not: "REMOVED" } },
+      });
+      if (otherClubRows === 0) {
+        masterGuideCandidatesErased = (await tx.masterGuideCandidate.deleteMany({
+          where: { organizationId, personId: member.personId },
+        })).count;
+      }
     }
     let personDeleted = false;
     let nameKept = false;

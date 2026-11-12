@@ -52,7 +52,7 @@ function PastWindow({ window }: { window: MasterGuideWindow | null }) {
   return <p className={styles.flag}>Past the 3-year window</p>;
 }
 
-function CandidateCard({ organizationId, row }: { organizationId: string; row: MasterGuideRow }) {
+function CandidateCard({ organizationId, row, onRemoved }: { organizationId: string; row: MasterGuideRow; onRemoved: (name: string) => void }) {
   const router = useRouter();
   const base = `/api/attendee/clubs/${encodeURIComponent(organizationId)}/master-guide/${encodeURIComponent(row.id)}`;
   const [startedOn, setStartedOn] = useState(row.startedOn);
@@ -72,7 +72,9 @@ function CandidateCard({ organizationId, row }: { organizationId: string; row: M
     setNotice("");
     try {
       await action();
-      setNotice(done);
+      // The card unmounts on refresh after a removal, so the parent list says it.
+      if (kind === "remove") onRemoved(row.name);
+      else setNotice(done);
       setConfirmRemove(false);
       router.refresh();
     } catch (caught) {
@@ -217,7 +219,7 @@ export function MasterGuideCandidates({ organizationId, list }: { organizationId
         <p className={styles.empty}>No Master Guide candidates yet.</p>
       ) : (
         <ul className={styles.list}>
-          {list.rows.map((row) => <CandidateCard key={row.id} organizationId={organizationId} row={row} />)}
+          {list.rows.map((row) => <CandidateCard key={row.id} onRemoved={(name) => { setError(""); setNotice(`${name} was removed from the list.`); }} organizationId={organizationId} row={row} />)}
         </ul>
       )}
     </>

@@ -662,6 +662,18 @@ describe("club roster storage", () => {
     expect(removal.metadata).toMatchObject({ masterGuideCandidatesErased: 1 });
   });
 
+  it("keeps the Master Guide candidate while the person has another non-removed row in the same club (#1698)", async () => {
+    const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
+    const personId = db.members[0].personId as string;
+    db.members.push({ id: "old-year-row", organizationId: "club-1", clubYear: "2025-26", personId, attendeeType: "YOUTH", isTlt: false, status: "ACTIVE" });
+
+    await removeRosterMember("club-1", id, actor, now);
+
+    expect(db.masterGuideErased).toEqual([]);
+    const removal = mocks.writeAuditLog.mock.calls.map(([entry]) => entry).find((entry) => entry.action === "CLUB_ROSTER_MEMBER_REMOVED");
+    expect(removal.metadata).toMatchObject({ masterGuideCandidatesErased: 0 });
+  });
+
   it("keeps the TLT director's record while the kept person has another active TLT roster row (#1686)", async () => {
     const { memberId: id } = await addRosterMember("club-1", "2026-27", youth, actor, { now });
     const personId = db.members[0].personId as string;
