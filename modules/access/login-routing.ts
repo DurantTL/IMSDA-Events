@@ -24,12 +24,16 @@ export type LoginRoutingInput = {
   returnTo?: string | null;
   /** An active Clubs Administrator with no events lands on Club administration, not "no access". */
   isClubsAdmin?: boolean;
+  /** An active Youth Admin (#1685) with no events and no Clubs Administrator role lands on the Youth directory. */
+  isYouthAdmin?: boolean;
 };
 
 export const SYSTEM_ADMIN_PATH = "/admin";
 export const NO_EVENTS_PATH = "/no-access";
 /** A Clubs Administrator's home (#1226): where they land with no event assignment. */
 export const CLUBS_ADMIN_HOME_PATH = "/admin/clubs";
+/** A Youth Admin's home (#1685): the Youth directory. */
+export const YOUTH_DIRECTORY_PATH = "/admin/youth";
 export const EVENT_PICKER_PATH = "/select-event";
 /** Where a signed-in attendee or club leader (no staff session) is sent from a staff page, so they are told it is not theirs. */
 export const NO_STAFF_ACCESS_PATH = "/no-access?from=attendee";
@@ -53,7 +57,7 @@ export const DEFAULT_POST_LOGIN_DESTINATION = "/overview";
  * 1. A validated `returnTo` target always wins — it is what brought the
  *    person to `/login` in the first place, and applies regardless of role.
  * 2. A system administrator always goes to the System Command Center.
- * 3. No active event membership: Club administration for a Clubs Administrator, else the safe no-access page, never an error.
+ * 3. No active event membership: Club administration for a Clubs Administrator, the Youth directory for a Youth Admin, else the safe no-access page, never an error.
  * 4. Exactly one active event: straight to that event's workspace, the same
  *    `?event=` URL the event switcher uses.
  * 5. Several: the remembered event, if it is still one of the account's
@@ -66,7 +70,10 @@ export function resolveLoginDestination(input: LoginRoutingInput): string {
   if (input.isSystemAdmin) return SYSTEM_ADMIN_PATH;
 
   const { events, lastEventId } = input;
-  if (events.length === 0) return input.isClubsAdmin ? CLUBS_ADMIN_HOME_PATH : NO_EVENTS_PATH;
+  if (events.length === 0) {
+    if (input.isClubsAdmin) return CLUBS_ADMIN_HOME_PATH;
+    return input.isYouthAdmin ? YOUTH_DIRECTORY_PATH : NO_EVENTS_PATH;
+  }
   if (events.length === 1) return eventWorkspacePath(events[0].id);
 
   const lastEvent = lastEventId
