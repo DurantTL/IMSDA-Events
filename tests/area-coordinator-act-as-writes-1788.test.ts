@@ -22,6 +22,7 @@ vi.mock("@/modules/audit/audit-service", () => ({ writeAuditLog: vi.fn() }));
 import { resolveAreaCoordinatorViewer } from "@/modules/club-forms/access";
 import { requireAreaCoordinatorToggleActor } from "@/modules/event-modules/scoped-toggle";
 import { currentAreaCoordinator } from "@/modules/organizations/area-coordinators";
+import { requireTltDirectorStaffingActor } from "@/modules/event-staffing/access";
 import { currentTltDirector } from "@/modules/tlt-directory/access";
 import { resolveCoordinatorReportActor } from "@/modules/reporting/club-report-api";
 
@@ -49,6 +50,8 @@ const WRITE_ROUTES: Record<string, { gate: string; actingStaff: "allowed" | "ref
   "tlt-directory/lists/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/export/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
   "tlt-directory/suggestion/route.ts": { gate: "tltDirectorRequest", actingStaff: "refused" },
+  // TLT staffing (#1678): the TLT director's own account only.
+  "tlt-staffing/[eventId]/assignments/route.ts": { gate: "requireTltDirectorStaffingActor", actingStaff: "refused" },
 };
 
 function routeFiles(dir: string): string[] {
@@ -106,8 +109,9 @@ describe("what staff acting as an Area Coordinator may change", () => {
     expect(await currentAreaCoordinator()).toBeNull();
   });
 
-  it("gives acting staff no access to the TLT directory", async () => {
+  it("gives acting staff no access to the TLT directory or its event staffing routes", async () => {
     expect(await currentTltDirector()).toBeNull();
+    await expect(requireTltDirectorStaffingActor()).rejects.toMatchObject({ code: "NOT_AVAILABLE" });
   });
 
   it("allows nothing when the act-as is for a club director or has ended", async () => {

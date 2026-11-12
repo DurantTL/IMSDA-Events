@@ -23,6 +23,7 @@ import {
   type TltSuggestionAccept,
 } from "@/modules/tlt-directory/domain";
 import type { TltDirectorActor } from "@/modules/tlt-directory/access";
+import { personIsCurrentTlt } from "@/modules/tlt-directory/current-tlt";
 import { toCsv } from "@/modules/reporting/csv";
 
 /**
@@ -186,17 +187,7 @@ export async function readTltDirectory(filters: TltFilters, now = new Date()) {
 export async function updateTltProfile(input: TltProfileUpdate, actor: TltDirectorActor, now = new Date()) {
   const prisma = getPrisma();
   await prisma.$transaction(async (tx) => {
-    const isTlt = await tx.clubRosterMember.findFirst({
-      where: {
-        personId: input.personId,
-        clubYear: clubYearFor(now),
-        attendeeType: "YOUTH",
-        isTlt: true,
-        status: "ACTIVE",
-        organization: { type: "CLUB", isActive: true },
-      },
-      select: { id: true },
-    });
+    const isTlt = await personIsCurrentTlt(tx, input.personId, now);
     if (!isTlt) throw new TltDirectoryError("NOT_A_TLT", "That person isn't a TLT on a current club roster.");
 
     const existing = await tx.tltProfile.findUnique({
@@ -275,17 +266,7 @@ export async function acceptTltTagSuggestion(input: TltSuggestionAccept, actor: 
 async function acceptSuggestionOnce(input: TltSuggestionAccept, actor: TltDirectorActor, now: Date) {
   const prisma = getPrisma();
   await prisma.$transaction(async (tx) => {
-    const isTlt = await tx.clubRosterMember.findFirst({
-      where: {
-        personId: input.personId,
-        clubYear: clubYearFor(now),
-        attendeeType: "YOUTH",
-        isTlt: true,
-        status: "ACTIVE",
-        organization: { type: "CLUB", isActive: true },
-      },
-      select: { id: true },
-    });
+    const isTlt = await personIsCurrentTlt(tx, input.personId, now);
     if (!isTlt) throw new TltDirectoryError("NOT_A_TLT", "That person isn't a TLT on a current club roster.");
     const tag = await tx.tltHelpTag.findUnique({ where: { id: input.tagId }, select: { id: true, seedKey: true, retiredAt: true } });
     const answers = await readOpportunityAnswers(tx, [input.personId]);

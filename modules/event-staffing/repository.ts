@@ -20,7 +20,9 @@ import {
   type ActivityView,
   type AssignmentInput,
   type AssignmentView,
+  type TltAssignmentInput,
 } from "@/modules/event-staffing/domain";
+import { currentTltPersonIds, personIsCurrentTlt } from "@/modules/tlt-directory/current-tlt";
 import { formatPersonName } from "@/lib/person-name";
 
 /**
@@ -64,12 +66,13 @@ type ActivityRow = Prisma.EventStaffingActivityGetPayload<{ select: typeof activ
 type Client = Prisma.TransactionClient | ReturnType<typeof getPrisma>;
 
 /** Which of these people are still registered (or still staff) for the event. A cancelled registration or a removed staff member is not. */
-async function activeAssignees(client: Client, eventId: string, rows: ReadonlyArray<{ personId: string | null; userId: string | null; attendeeAccountId?: string | null }>) {
+async function activeAssignees(client: Client, eventId: string, rows: ReadonlyArray<{ role?: string; personId: string | null; userId: string | null; attendeeAccountId?: string | null }>) {
+  const tltIds = [...new Set(rows.flatMap((row) => (row.role === "TLT" && row.personId ? [row.personId] : [])))];
   const personIds = [...new Set(rows.flatMap((row) => (row.personId ? [row.personId] : [])))];
   const userIds = [...new Set(rows.flatMap((row) => (row.userId ? [row.userId] : [])))];
   const accountIds = [...new Set(rows.flatMap((row) => (row.attendeeAccountId ? [row.attendeeAccountId] : [])))];
   const now = new Date();
-  const [people, staff, coordinators] = await Promise.all([
+  const [people, staff, coordinators, tlts] = await Promise.all([
     personIds.length === 0 ? [] : client.registrationAttendee.findMany({
       where: { eventId, personId: { in: personIds }, registration: { eventId, status: { in: [...ACTIVE_REGISTRATION_STATUSES] } } },
       select: { personId: true },
@@ -79,14 +82,16 @@ async function activeAssignees(client: Client, eventId: string, rows: ReadonlyAr
       where: { attendeeAccountId: { in: accountIds }, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }], attendeeAccount: { status: "ACTIVE" } },
       select: { attendeeAccountId: true },
     }),
+    // A TLT counts only while they are still a current TLT as well as registered (#1678).
+    currentTltPersonIds(client, tltIds, now),
   ]);
-  return { people: new Set(people.map((row) => row.personId)), users: new Set(staff.map((row) => row.userId)), accounts: new Set(coordinators.map((row) => row.attendeeAccountId)) };
+  return { people: new Set(people.map((row) => row.personId)), users: new Set(staff.map((row) => row.userId)), accounts: new Set(coordinators.map((row) => row.attendeeAccountId)), tlts };
 }
 
-function toView(row: ActivityRow, active: { people: Set<string>; users: Set<string>; accounts: Set<string> }): ActivityView {
+function toView(row: ActivityRow, active: { people: Set<string>; users: Set<string>; accounts: Set<string>; tlts: Set<string> }): ActivityView {
   const assignments: AssignmentView[] = row.assignments.map((assignment) => {
     if (assignment.personId && assignment.person) {
-      return { id: assignment.id, role: assignment.role, kind: "person", assigneeId: assignment.personId, ...assignmentName(assignment.person), active: active.people.has(assignment.personId) };
+      return { id: assignment.id, role: assignment.role, kind: "person", assigneeId: assignment.personId, ...assignmentName(assignment.person), active: active.people.has(assignment.personId) && (assignment.role !== "TLT" || active.tlts.has(assignment.personId)) };
     }
     if (assignment.attendeeAccountId) {
       const accountName = assignment.attendeeAccount?.displayName ?? "";
@@ -175,8 +180,9 @@ export async function listPickerPeople(eventId: string): Promise<{ people: Picke
 }
 
 function auditWho(actor: StaffingActor) {
-  return actor.kind === "staff"
-    ? { actorUserId: actor.userId, metadata: {} }
+  if (actor.kind === "staff") return { actorUserId: actor.userId, metadata: {} };
+  return actor.kind === "tlt-director"
+    ? { metadata: { actorAttendeeAccountId: actor.accountId, viaTltDirector: true } }
     : { metadata: { actorAttendeeAccountId: actor.accountId, viaAreaCoordinator: true } };
 }
 
@@ -262,6 +268,8 @@ async function assertOnEvent(tx: Prisma.TransactionClient, eventId: string, assi
 /** Puts a person on an activity. A new lead replaces the current lead. Returns the whole activity as it now stands. */
 export async function addAssignment(actor: StaffingActor, eventId: string, input: AssignmentInput): Promise<ActivityView> {
   await assertStaffingAccess(actor, eventId, "write");
+  // The request schema already leaves TLT out; this keeps the service safe when called from anywhere else.
+  if ((input.role as string) === "TLT") throw new StaffingError("NOT_PERMITTED", "Only the TLT director assigns TLTs.");
   try {
     return await getPrisma().$transaction(async (tx) => {
       const activity = await loadActivity(tx, eventId, input.activityId);
@@ -295,11 +303,48 @@ export async function addAssignment(actor: StaffingActor, eventId: string, input
   }
 }
 
+/**
+ * The TLT director puts a TLT on an activity (#1678). The person must be registered (submitted or confirmed) for THIS event and be
+ * a current TLT (a youth, ACTIVE roster member flagged TLT on an active club's roster this club year), both read from the database
+ * here: the request only names an id. Audit: ids and the role only, never a name.
+ */
+export async function addTltAssignment(actor: StaffingActor, eventId: string, input: TltAssignmentInput, now = new Date()): Promise<ActivityView> {
+  if (actor.kind !== "tlt-director") throw new StaffingError("NOT_PERMITTED", "Only the TLT director assigns TLTs.");
+  await assertStaffingAccess(actor, eventId, "assign-tlt");
+  try {
+    return await getPrisma().$transaction(async (tx) => {
+      const activity = await loadActivity(tx, eventId, input.activityId);
+      const conflict = assignmentConflict(activity, { role: "TLT", assignee: input.assignee });
+      if (conflict) throw new StaffingError(conflict.code, conflict.message);
+      await assertOnEvent(tx, eventId, input.assignee);
+      if (!(await personIsCurrentTlt(tx, input.assignee.id, now))) {
+        throw new StaffingError("NOT_ON_EVENT", "Only a TLT on a current club roster can be assigned here.");
+      }
+      const created = await tx.eventStaffingAssignment.create({ data: { eventId, activityId: input.activityId, role: "TLT", personId: input.assignee.id }, select: { id: true } });
+      await audit(tx, actor, eventId, {
+        action: "EVENT_STAFFING_ASSIGNED",
+        summary: "Put a TLT on a staffing sheet activity.",
+        entityType: "EventStaffingAssignment",
+        entityId: created.id,
+        metadata: { activityId: input.activityId, assignmentId: created.id, role: "TLT", assigneeKind: "person", assigneeId: input.assignee.id, replacedLead: false },
+      });
+      return loadActivity(tx, eventId, input.activityId);
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new StaffingError("CONFLICT", "That person was just added to this activity. Reload to see the current list.");
+    }
+    throw error;
+  }
+}
+
 export async function removeAssignment(actor: StaffingActor, eventId: string, assignmentId: string): Promise<ActivityView> {
-  await assertStaffingAccess(actor, eventId, "write");
+  // The TLT director may take a TLT off and nothing else; anyone who may change the sheet may take anyone off.
+  await assertStaffingAccess(actor, eventId, actor.kind === "tlt-director" ? "assign-tlt" : "write");
   return getPrisma().$transaction(async (tx) => {
     const found = await tx.eventStaffingAssignment.findFirst({ where: { id: assignmentId, eventId }, select: { id: true, activityId: true, role: true, personId: true, userId: true, attendeeAccountId: true } });
     if (!found) throw new StaffingError("ASSIGNMENT_NOT_FOUND", "That assignment could not be found. It may already be removed.");
+    if (actor.kind === "tlt-director" && found.role !== "TLT") throw new StaffingError("NOT_PERMITTED", "The TLT director can take TLTs off an activity, not other people.");
     await tx.eventStaffingAssignment.delete({ where: { id: assignmentId } });
     await audit(tx, actor, eventId, {
       action: "EVENT_STAFFING_UNASSIGNED",

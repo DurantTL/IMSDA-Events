@@ -64,6 +64,13 @@ describe("an assigned person sees their own assignment (#1678)", () => {
     expect(JSON.stringify(select.activity)).not.toContain("assignments");
   });
 
+  it("shows a TLT their own TLT assignment, matched by their person, while they are still registered", async () => {
+    mocks.assignmentFindMany.mockResolvedValue([row({ id: "asg-tlt", role: "TLT" })]);
+    expect(await listOwnAssignments(sam)).toEqual([expect.objectContaining({ id: "asg-tlt", role: "TLT", roleLabel: "TLT", activityName: "Canoe" })]);
+    mocks.attendeeFindMany.mockResolvedValue([]);
+    expect(await listOwnAssignments(sam)).toEqual([]);
+  });
+
   it("shows nothing for an account with no assignment, such as an unassigned attendee or a club director", async () => {
     mocks.assignmentFindMany.mockResolvedValue([]);
     expect(await listOwnAssignments({ id: "acct-other", verifiedEmail: "someone.else@example.test" })).toEqual([]);
