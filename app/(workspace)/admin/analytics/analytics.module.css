@@ -7,3 +7,4 @@
 .table thead th { color: var(--muted); font-size: max(var(--type-staff-floor, 0px), 0.875rem); }
 .table tbody th { font-weight: 600; }
 .help { margin: 4px 0 0; }
+.charts { display: grid; gap: 24px; margin-top: 16px; }

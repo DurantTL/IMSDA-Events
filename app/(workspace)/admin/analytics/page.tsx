@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AdminSectionHeaderFor } from "@/components/admin-section-header";
@@ -11,7 +12,8 @@ import { getCurrentSession } from "@/modules/access/current-session";
 import { staffLoginRedirectPath } from "@/modules/access/login-redirect";
 import { formatDateRange } from "@/modules/calendar/domain";
 import { conferenceToday } from "@/modules/calendar/repository";
-import { analyticsPeriods, funnelRate, parseAnalyticsPeriod, type AnalyticsPeriod } from "@/modules/public-metrics/domain";
+import { FunnelBars, HorizontalBars, InlineFunnelBar, InlineFunnelKey, StatTiles, TrendChart, type StatTile } from "@/components/analytics-charts";
+import { analyticsPeriods, bucketSeries, changeVersusPrevious, describeChange, funnelRate, parseAnalyticsPeriod, rateChangeVersusPrevious, topEventsByCompleted, type AnalyticsPeriod, type Change, type RateChange } from "@/modules/public-metrics/domain";
 import { getAnalyticsSummary, type MetricRow } from "@/modules/public-metrics/repository";
 import styles from "./analytics.module.css";
 
@@ -32,11 +34,23 @@ function periodHref(search: Record<string, string | string[] | undefined>, perio
   return query ? `/admin/analytics?${query}` : "/admin/analytics";
 }
 
+const number = (value: number) => value.toLocaleString("en-US");
+const longDate = (day: string) => new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const shortDate = (day: string) => new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const percentText = (rate: number | null) => (rate === null ? "No data" : `${Math.round(rate * 100)}%`);
+
+/** A tile's change line: an arrow word plus the sentence. `change` null means there is nothing to compare with. */
+function changeLine(change: Change | RateChange | null, available: boolean, previousLabel: string, previousCount?: number): StatTile["change"] {
+  if (!available) return { direction: "none", text: describeChange(null, previousLabel) };
+  if (change === null) return { direction: "none", text: `No comparison: nothing was started in the previous ${previousLabel}.` };
+  return { direction: change.direction, text: describeChange(change, previousLabel, previousCount) };
+}
+
 const periodLabels: Record<AnalyticsPeriod, string> = { 30: "Last 30 days", 90: "Last 90 days", 365: "Last 12 months" };
 const periodText: Record<AnalyticsPeriod, string> = { 30: "30 days", 90: "90 days", 365: "12 months" };
 
 /** A table row: what shows, and the plain value each column sorts by (the same numbers the page already shows). */
-type TableRow = { cells: string[]; values?: SortValue[] };
+type TableRow = { cells: string[]; values?: SortValue[]; /** Decorative extra under the first cell (the inline funnel bar). */ extra?: ReactNode };
 
 /** Sort keys are the column's position, named in code: a table never reads a column name from the address. */
 const COLUMN_KEYS = ["c0", "c1", "c2", "c3", "c4", "c5"] as const;
@@ -59,7 +73,7 @@ function Table({ caption, head, rows, empty = "Nothing counted yet.", sortBy, se
         <tbody role="rowgroup">
           {shown.length === 0 ? <tr role="row"><td role="cell" colSpan={head.length}>{empty}</td></tr> : shown.map((row, index) => (
             <tr role="row" key={index}>{row.cells.map((cell, cellIndex) => (cellIndex === 0
-              ? <th key={cellIndex} role="rowheader" scope="row">{cell}</th>
+              ? <th key={cellIndex} role="rowheader" scope="row">{cell}{row.extra}</th>
               : <td key={cellIndex} {...cardCell(head[cellIndex] ?? null)}>{cell}</td>))}</tr>
           ))}
         </tbody>
@@ -79,6 +93,39 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
   const days = parseAnalyticsPeriod(search.days);
   const summary = await getAnalyticsSummary(conferenceToday(), days);
   const { totals } = summary;
+  const current = { views: totals.EVENT_PAGE_VIEW, started: totals.REGISTRATION_START, completed: totals.REGISTRATION_COMPLETE };
+  const previous = summary.previous.totals;
+  const previousLabel = periodText[days];
+  const rate = funnelRate(current.completed, current.started);
+  const previousRate = previous ? funnelRate(previous.completed, previous.started) : null;
+  const tiles: StatTile[] = [
+    { label: "Event page views", value: number(current.views), change: changeLine(previous ? changeVersusPrevious(current.views, previous.views) : null, previous !== null, previousLabel, previous?.views) },
+    { label: "Registrations started", value: number(current.started), change: changeLine(previous ? changeVersusPrevious(current.started, previous.started) : null, previous !== null, previousLabel, previous?.started) },
+    { label: "Registrations completed", value: number(current.completed), change: changeLine(previous ? changeVersusPrevious(current.completed, previous.completed) : null, previous !== null, previousLabel, previous?.completed) },
+    { label: "Completed of started", value: percentText(rate), change: changeLine(rateChangeVersusPrevious(rate, previousRate), previous !== null, previousLabel) },
+  ];
+  const buckets = bucketSeries(summary.daily, days);
+  const weekly = days === 365;
+  const trendPoints = buckets.map((bucket) => ({
+    label: bucket.days === 1 ? longDate(bucket.start) : `${shortDate(bucket.start)} to ${longDate(bucket.end)} (${bucket.days} days)`,
+    values: [bucket.views, bucket.started, bucket.completed],
+  }));
+  const peak = buckets.reduce((best, bucket) => (bucket.views > best.views ? bucket : best), buckets[0]!);
+  const trendSummary = `Line chart of event page views, registrations started and registrations completed, ${weekly ? "added up for each week" : "for each day"}, from ${longDate(summary.from)} to ${longDate(summary.to)}. `
+    + `Over the period: ${number(current.views)} page views, ${number(current.started)} started, ${number(current.completed)} completed. `
+    + (peak.views > 0 ? `The highest ${weekly ? "week" : "day"} for page views was ${peak.days === 1 ? longDate(peak.start) : `${shortDate(peak.start)} to ${longDate(peak.end)}`} with ${number(peak.views)}. ` : "No page views were counted in this period. ")
+    + "The same numbers are in the table.";
+  const startedOfViews = funnelRate(current.started, current.views);
+  const completedOfStarted = funnelRate(current.completed, current.started);
+  const funnelSteps = [
+    { label: "Event page views", value: current.views },
+    { label: "Registrations started", value: current.started, note: startedOfViews === null ? undefined : `${percentText(startedOfViews)} of page views` },
+    { label: "Registrations completed", value: current.completed, note: completedOfStarted === null ? undefined : `${percentText(completedOfStarted)} of started` },
+  ];
+  const topEvents = topEventsByCompleted(summary.funnel, 10);
+  const topSummary = topEvents.length === 0
+    ? `No registrations were completed in the last ${periodText[days]}.`
+    : `Bar chart of completed registrations for the ${topEvents.length === 1 ? "one event" : `top ${topEvents.length} events`}, most first: ${topEvents.map((row) => `${row.title}, ${number(row.completed)}`).join("; ")}. The same numbers are in the table.`;
   const attempts = totals.LOGIN_SUCCESS + totals.LOGIN_FAILURE;
 
   return (
@@ -96,6 +143,22 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
             Daily counts only. Nothing here identifies a person, a device, a search or a private event.
             Visitors who send a Global Privacy Control or Do Not Track signal are not counted, and the staff workspace is never measured. Rows older than 400 days are deleted.
           </p>
+        </section>
+
+        <section aria-labelledby="analytics-glance" className="panel">
+          <div className="section-heading"><div><h2 id="analytics-glance">At a glance</h2></div></div>
+          <StatTiles label={`Headline numbers for the last ${previousLabel}, with the change from the previous ${previousLabel}`} tiles={tiles} />
+          <p className={`field-help ${styles.help}`}>
+            Each change compares with the {previousLabel} just before this period.
+            Counts are kept for 400 days, so the previous 12 months can&apos;t be compared: part of that period has already been deleted, and a part-kept period would give a misleading change.
+            Completed of started is a rate, so its change is in percentage points.
+          </p>
+          <div className={styles.charts}>
+            <TrendChart endLabel={longDate(summary.to)} points={trendPoints} series={[{ key: "views", label: "Event page views" }, { key: "started", label: "Registrations started" }, { key: "completed", label: "Registrations completed" }]} startLabel={longDate(summary.from)} summary={trendSummary} title={weekly ? "Views, starts and completions by week" : "Views, starts and completions by day"} />
+            <FunnelBars steps={funnelSteps} summary={`Funnel for the whole site over the last ${periodText[days]}: ${funnelSteps.map((step) => `${step.label}, ${number(step.value)}${step.note ? ` (${step.note})` : ""}`).join("; ")}.`} title="From page views to completed registrations" />
+            <HorizontalBars empty="No registrations were completed in this period." rows={topEvents.map((row) => ({ key: row.slug, label: row.title, value: row.completed }))} summary={topSummary} title="Top events by completed registrations" valueLabel="Completed" />
+          </div>
+          <p className={`field-help ${styles.help}`}>Rates can pass 100%: the counts come from separate days, and people can arrive by a direct link.</p>
         </section>
 
         <section aria-labelledby="analytics-totals" className="panel">
@@ -125,11 +188,14 @@ export default async function PublicAnalyticsPage({ searchParams }: { searchPara
             rows={summary.funnel.map((row) => ({
               cells: [row.title, String(row.views), String(row.started), String(row.completed), pct(row.completed, row.views), pct(row.completed, row.started)],
               values: [row.title, row.views, row.started, row.completed, funnelRate(row.completed, row.views), funnelRate(row.completed, row.started)],
+              extra: <InlineFunnelBar completed={row.completed} started={row.started} views={row.views} />,
             }))}
             search={search}
             sortBy="funnel"
           />
+          <InlineFunnelKey />
           <p className={`field-help ${styles.help}`}>
+            The bars under each event show its page views, started and completed on that event&apos;s own largest count; the numbers are in the row.
             Counts come from separate days&apos; totals, and people can arrive by a direct link, so a rate can pass 100%.
             Events are counted only while they are public.
           </p>

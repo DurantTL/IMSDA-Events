@@ -5,6 +5,7 @@
  */
 
 import { z } from "zod";
+import { addDays } from "@/modules/calendar/domain";
 
 export const publicMetrics = [
   "EVENT_PAGE_VIEW", "DIRECTORY_SEARCH", "DIRECTORY_FILTER", "REGISTRATION_START", "REGISTRATION_COMPLETE",
@@ -137,3 +138,113 @@ export function buildEventFunnel(views: ReadonlyMap<string, number>, started: Re
 
 /** part / whole, or null when there is nothing to divide by. Not capped: separate days and direct links can pass 1. */
 export const funnelRate = (part: number, whole: number): number | null => (whole > 0 ? part / whole : null);
+
+/* ------------------------------------------------------------------ Headline tiles and charts (#1961) */
+
+export type FunnelCounts = { views: number; started: number; completed: number };
+export type DateRange = { from: string; to: string };
+
+/** The `days` days immediately before the period that starts on `from`: the same length, ending the day before. */
+export function previousPeriodRange(from: string, days: number): DateRange {
+  const to = addDays(from, -1);
+  return { from: addDays(to, -(days - 1)), to };
+}
+
+/**
+ * Whether the whole previous period is still stored. Rows older than the retention window (400 days, counted back from
+ * `today`) are deleted, so a half-kept period would make a change look bigger than it is. Rule: the previous period is
+ * compared only when every one of its days is inside the window; otherwise there is no comparison at all. In practice
+ * 30 and 90 days compare, and 12 months (730 days back) never does.
+ */
+export function previousPeriodAvailable(today: string, days: number): boolean {
+  const from = addDays(today, -(days - 1));
+  return previousPeriodRange(from, days).from >= addDays(today, -retentionDays);
+}
+
+export type ChangeDirection = "up" | "down" | "same";
+export type Change = {
+  direction: ChangeDirection;
+  /** Whole percent of the previous count, always 0 or more (the direction carries the sign); null when the previous count was 0. */
+  percent: number | null;
+};
+
+/** Current against previous. A previous count of 0 has no percent (never a made-up +100%); it is still "up" when something was counted. */
+export function changeVersusPrevious(current: number, previous: number): Change {
+  if (current === previous) return { direction: "same", percent: previous === 0 ? null : 0 };
+  const direction: ChangeDirection = current > previous ? "up" : "down";
+  if (previous === 0) return { direction, percent: null };
+  const percent = Math.round((Math.abs(current - previous) / previous) * 100);
+  // A change that rounds to 0% reads as "same", so the arrow and the words agree.
+  return percent === 0 ? { direction: "same", percent: 0 } : { direction, percent };
+}
+
+export type RateChange = { direction: ChangeDirection; /** Percentage points, one decimal, 0 or more. */ points: number };
+
+/** Change in a rate (a 0 to 1 share) in percentage points; null when either rate is unknown. */
+export function rateChangeVersusPrevious(current: number | null, previous: number | null): RateChange | null {
+  if (current === null || previous === null) return null;
+  const points = Math.round((current - previous) * 1000) / 10;
+  if (points === 0) return { direction: "same", points: 0 };
+  return { direction: points > 0 ? "up" : "down", points: Math.abs(points) };
+}
+
+const plain = (count: number) => count.toLocaleString("en-US");
+
+/** The words next to a tile's arrow: "Up 12% from the previous 30 days". `previousLabel` is like "30 days" or "12 months". */
+export function describeChange(change: Change | RateChange | null, previousLabel: string, previousCount?: number): string {
+  if (change === null) return `No comparison: the previous ${previousLabel} are older than the ${retentionDays} days of counts kept.`;
+  const word = change.direction === "up" ? "Up" : change.direction === "down" ? "Down" : "No change";
+  if ("points" in change) return change.direction === "same" ? `No change from the previous ${previousLabel}` : `${word} ${change.points} percentage points from the previous ${previousLabel}`;
+  if (change.direction === "same") return `No change from the previous ${previousLabel}`;
+  if (change.percent === null) return `${word} from none counted in the previous ${previousLabel}`;
+  return `${word} ${change.percent}% from the previous ${previousLabel}${previousCount === undefined ? "" : ` (${plain(previousCount)})`}`;
+}
+
+export type DailyFunnelPoint = { day: string } & FunnelCounts;
+export type DailyMetricRow = { day: string; metric: string; count: number };
+
+/** Every day from `from` to `to` (inclusive) with its views, starts and completions; a day with no row is 0, never skipped. */
+export function fillDailySeries(from: string, to: string, rows: readonly DailyMetricRow[]): DailyFunnelPoint[] {
+  const byDay = new Map<string, FunnelCounts>();
+  for (const row of rows) {
+    const counts = byDay.get(row.day) ?? { views: 0, started: 0, completed: 0 };
+    if (row.metric === "EVENT_PAGE_VIEW") counts.views += row.count;
+    else if (row.metric === "REGISTRATION_START") counts.started += row.count;
+    else if (row.metric === "REGISTRATION_COMPLETE") counts.completed += row.count;
+    byDay.set(row.day, counts);
+  }
+  const points: DailyFunnelPoint[] = [];
+  for (let day = from; day <= to; day = addDays(day, 1)) points.push({ day, ...(byDay.get(day) ?? { views: 0, started: 0, completed: 0 }) });
+  return points;
+}
+
+export type TrendBucket = { start: string; end: string; days: number } & FunnelCounts;
+
+/**
+ * Daily points for 30 and 90 days, weekly sums for 365. Weeks are seven days and end on the last day, so the newest week is
+ * always whole; the oldest bucket holds the leftover (365 days is 52 weeks and 1 day, so it is 1 day long).
+ */
+export function bucketSeries(points: readonly DailyFunnelPoint[], days: number): TrendBucket[] {
+  const size = days >= 365 ? 7 : 1;
+  const buckets: TrendBucket[] = [];
+  for (let end = points.length; end > 0; end -= size) {
+    const slice = points.slice(Math.max(0, end - size), end);
+    buckets.unshift({
+      start: slice[0]!.day,
+      end: slice[slice.length - 1]!.day,
+      days: slice.length,
+      views: slice.reduce((sum, point) => sum + point.views, 0),
+      started: slice.reduce((sum, point) => sum + point.started, 0),
+      completed: slice.reduce((sum, point) => sum + point.completed, 0),
+    });
+  }
+  return buckets;
+}
+
+/** The events with the most completed registrations, most first (ties: views, then slug). Events with none completed are left out. */
+export function topEventsByCompleted<T extends { slug: string; views: number; completed: number }>(rows: readonly T[], limit = 10): T[] {
+  return rows
+    .filter((row) => row.completed > 0)
+    .sort((a, b) => b.completed - a.completed || b.views - a.views || a.slug.localeCompare(b.slug))
+    .slice(0, limit);
+}

@@ -200,9 +200,14 @@ describe("the beacon route", () => {
   });
 });
 
+/** The summary asks for three groupings: by metric and dimension, by day and metric (#1961), and the previous period's totals by metric. */
+function mockSummaryRows(rows: unknown[], extra: { daily?: unknown[]; previous?: unknown[] } = {}) {
+  mocks.groupBy.mockImplementation(async (args: { by: string[] }) => (args.by.includes("dimension") ? rows : args.by.includes("day") ? extra.daily ?? [] : extra.previous ?? []));
+}
+
 describe("the summary and who can see it", () => {
   it("adds up the last 30 days into totals, a funnel, sign-in rates and speed ratings", async () => {
-    mocks.groupBy.mockResolvedValue([
+    mockSummaryRows([
       { metric: "EVENT_PAGE_VIEW", dimension: "public-camp", _sum: { count: 9 } },
       { metric: "REGISTRATION_START", dimension: "public-camp", _sum: { count: 4 } },
       { metric: "REGISTRATION_COMPLETE", dimension: "public-camp", _sum: { count: 3 } },
@@ -223,15 +228,37 @@ describe("the summary and who can see it", () => {
   });
 
   it("reads 90 days and 12 months back, and falls back to the slug for an unknown event", async () => {
-    mocks.groupBy.mockResolvedValue([{ metric: "EVENT_PAGE_VIEW", dimension: "gone-event", _sum: { count: 2 } }]);
+    mockSummaryRows([{ metric: "EVENT_PAGE_VIEW", dimension: "gone-event", _sum: { count: 2 } }]);
     const summary = await getAnalyticsSummary("2026-10-28", 90);
     expect(summary.from).toBe("2026-07-31");
     expect(summary.funnel).toEqual([{ slug: "gone-event", title: "gone-event", views: 2, started: 0, completed: 0 }]);
     expect((await getAnalyticsSummary("2026-10-28", 365)).from).toBe("2025-10-29");
   });
 
+  it("adds the previous period's totals and a day-by-day series (#1961)", async () => {
+    mockSummaryRows([], {
+      daily: [{ day: new Date("2026-10-27T00:00:00Z"), metric: "EVENT_PAGE_VIEW", _sum: { count: 7 } }, { day: new Date("2026-10-28T00:00:00Z"), metric: "REGISTRATION_COMPLETE", _sum: { count: 1 } }],
+      previous: [{ metric: "EVENT_PAGE_VIEW", _sum: { count: 5 } }, { metric: "REGISTRATION_START", _sum: { count: 2 } }],
+    });
+    const summary = await getAnalyticsSummary("2026-10-28");
+    expect(summary.previous).toEqual({ from: "2026-08-30", to: "2026-09-28", totals: { views: 5, started: 2, completed: 0 } });
+    expect(summary.daily).toHaveLength(30);
+    expect(summary.daily.at(-2)).toEqual({ day: "2026-10-27", views: 7, started: 0, completed: 0 });
+    expect(summary.daily.at(-1)).toEqual({ day: "2026-10-28", views: 0, started: 0, completed: 1 });
+    expect(summary.daily[0]).toEqual({ day: "2026-09-29", views: 0, started: 0, completed: 0 });
+  });
+
+  it("does not look up a previous period that is past the 400-day retention", async () => {
+    mockSummaryRows([]);
+    mocks.groupBy.mockClear();
+    const summary = await getAnalyticsSummary("2026-10-28", 365);
+    expect(summary.previous.totals).toBeNull();
+    expect(summary.daily).toHaveLength(365);
+    expect(mocks.groupBy.mock.calls.filter(([args]) => args.by.length === 1)).toHaveLength(0);
+  });
+
   it("shows the period links and the one funnel table", async () => {
-    mocks.groupBy.mockResolvedValue([{ metric: "EVENT_PAGE_VIEW", dimension: "public-camp", _sum: { count: 2 } }]);
+    mockSummaryRows([{ metric: "EVENT_PAGE_VIEW", dimension: "public-camp", _sum: { count: 2 } }]);
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: "SYSTEM_ADMIN" } });
     const html = renderToStaticMarkup(createElement("div", null, await PublicAnalyticsPage({ searchParams: Promise.resolve({ days: "90", funnelSort: "c1", funnelDir: "desc" }) })));
     expect(html).toContain("last 90 days");
@@ -255,14 +282,14 @@ describe("the summary and who can see it", () => {
   });
 
   it("skips the event name lookup when asked", async () => {
-    mocks.groupBy.mockResolvedValue([{ metric: "EVENT_PAGE_VIEW", dimension: "public-camp", _sum: { count: 2 } }]);
+    mockSummaryRows([{ metric: "EVENT_PAGE_VIEW", dimension: "public-camp", _sum: { count: 2 } }]);
     const summary = await getAnalyticsSummary("2026-10-28", 30, { eventNames: false });
     expect(mocks.eventFindMany).not.toHaveBeenCalled();
     expect(summary.funnel[0].title).toBe("public-camp");
   });
 
   it("is for system administrators only", async () => {
-    mocks.groupBy.mockResolvedValue([]);
+    mockSummaryRows([]);
     mocks.getCurrentSession.mockResolvedValue({ user: null });
     await expect(PublicAnalyticsPage({ searchParams: Promise.resolve({}) })).rejects.toThrow("redirect:/login");
     mocks.getCurrentSession.mockResolvedValue({ user: { id: "u", globalRole: null } });
